@@ -12,8 +12,8 @@ type NavItem = 'accueil' | 'discover' | 'messages' | 'creer' | 'profil'
 const NAV_ITEMS: { id: NavItem; label: string; icon: IconDefinition; href?: string }[] = [
   { id: 'accueil', label: 'Accueil', icon: faHouse, href: '/' },
   { id: 'discover', label: 'Discover', icon: faCompass, href: '/discover' },
-  { id: 'messages', label: 'Messages', icon: faMessage, href: '/messages' },
   { id: 'creer', label: 'Créer', icon: faWandMagicSparkles },
+  { id: 'messages', label: 'Messages', icon: faMessage, href: '/messages' },
   { id: 'profil', label: 'Profil', icon: faUser, href: '/profil' },
 ]
 
@@ -64,7 +64,6 @@ export default function NavBar() {
                   className={`bottom-nav-item w-full ${creerOpen || isCreerActive ? 'active' : ''}`}
                 >
                   <span className="bottom-nav-icon"><FontAwesomeIcon icon={item.icon} /></span>
-                  <span className="bottom-nav-label">{item.label}</span>
                 </button>
                 {creerOpen && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 min-w-[120px] bg-[#1a1a1a] border border-[#2A2A2A] rounded-xl overflow-hidden shadow-xl z-[600]">
@@ -90,7 +89,6 @@ export default function NavBar() {
               className={`bottom-nav-item ${isActive(item.href!) ? 'active' : ''}`}
             >
               <span className="bottom-nav-icon"><FontAwesomeIcon icon={item.icon} /></span>
-              <span className="bottom-nav-label">{item.label}</span>
             </Link>
           )
         })}
