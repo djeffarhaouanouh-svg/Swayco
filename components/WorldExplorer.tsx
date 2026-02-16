@@ -28,11 +28,14 @@ function createMarkerElement(item: WorldItem, onClick: () => void): HTMLDivEleme
       </div>
     `
   } else if (item.type === 'scene') {
-    el.className = 'map-bubble place scene'
+    el.className = 'map-scene'
     el.innerHTML = `
-      <span class="map-bubble-name">${item.name}</span>
-      <div class="map-bubble-avatar">
-        <img src="${item.image}" alt="${item.name}" />
+      <div class="map-scene-card">
+        <div class="map-scene-frame">
+          <img src="${item.image}" alt="${item.name}" />
+          <span class="map-scene-icon">🎬</span>
+        </div>
+        <span class="map-scene-label">${item.name}</span>
       </div>
     `
   } else {
@@ -293,10 +296,8 @@ export default function WorldExplorer() {
     // Characters (hide when filtering by place or scene)
     if (filter !== 'place' && filter !== 'scene') {
       if (shouldCluster) {
-        const sceneCharacterIds = new Set(scenes.map(s => s.characterId))
-        const standaloneCharacters = characters.filter(c => !sceneCharacterIds.has(c.id))
         const grouped: Record<string, WorldItem[]> = {}
-        standaloneCharacters.forEach(item => {
+        characters.forEach(item => {
           const country = getCountry(item)
           if (!grouped[country]) grouped[country] = []
           grouped[country].push(item)

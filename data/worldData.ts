@@ -282,17 +282,6 @@ export const characters: Character[] = [
     description: 'Hollandais décontracté, passionné de vélo, canaux et art flamand. Parle de culture libérale et qualité de vie néerlandaise.',
     stats: { messages: '176.9k' },
     badge: 'FX'
-  },
-  {
-    id: 16,
-    type: 'character',
-    name: 'La boulangère',
-    location: 'Paris, France',
-    coordinates: [2.3456, 48.8600],
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop',
-    description: 'Boulangère parisienne au sourire enchanteur. Elle travaille dans sa boulangerie du Marais et adore les croissants tout chauds. Un certain jeu de regard...',
-    stats: { messages: '89.3k' },
-    badge: 'FX'
   }
 ];
 
@@ -302,10 +291,10 @@ export const scenes: Scene[] = [
     type: 'scene',
     name: 'La boulangerie',
     location: 'Paris, France',
-    coordinates: [2.3456, 48.8600],
+    coordinates: [2.35, 48.92],
     image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=500&fit=crop',
     description: 'Tu es dans la boulangerie et tu as un jeu de regard avec la boulangère.',
-    characterId: 16
+    characterId: 1
   }
 ];
 
