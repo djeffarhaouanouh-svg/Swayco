@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 function formatMemberSince(date: Date | null): string {
   if (!date) return "";
   return date.toLocaleDateString("fr-FR", {

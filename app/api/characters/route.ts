@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 // Map coordinates by country name (fallback when no precise coords)
 const COUNTRY_COORDS: Record<string, [number, number]> = {
   France: [2.3522, 48.8566],
