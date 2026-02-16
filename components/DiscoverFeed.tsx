@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Bookmark } from 'lucide-react'
 import { getCountry } from '@/data/worldData'
 import type { Character } from '@/data/worldData'
+import { getSavedCharacterIds, toggleSavedCharacter } from '@/lib/savedCharacters'
 
 const COUNTRY_ISO: Record<string, string> = {
   France: 'fr',
@@ -26,7 +27,17 @@ const COUNTRY_ISO: Record<string, string> = {
   Pérou: 'pe',
 }
 
-function DiscoverSlide({ character, onChat }: { character: Character; onChat: () => void }) {
+function DiscoverSlide({
+  character,
+  isSaved,
+  onToggleSave,
+  onChat,
+}: {
+  character: Character
+  isSaved: boolean
+  onToggleSave: () => void
+  onChat: () => void
+}) {
   const country = getCountry(character)
   const iso = COUNTRY_ISO[country]
   return (
@@ -36,6 +47,21 @@ function DiscoverSlide({ character, onChat }: { character: Character; onChat: ()
         alt={character.name}
         className="discover-slide-image"
       />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSave()
+        }}
+        className={`discover-slide-signer ${isSaved ? 'discover-slide-signer--saved' : ''}`}
+        aria-label={isSaved ? 'Retirer des enregistrements' : 'Enregistrer ce personnage'}
+      >
+        <Bookmark
+          size={24}
+          strokeWidth={2}
+          fill={isSaved ? 'currentColor' : 'none'}
+        />
+      </button>
       <div className="discover-slide-overlay">
         <div className="discover-slide-info">
           <h2 className="discover-slide-name">{character.name}</h2>
@@ -71,6 +97,13 @@ function DiscoverSlide({ character, onChat }: { character: Character; onChat: ()
 export default function DiscoverFeed() {
   const router = useRouter()
   const [characters, setCharacters] = useState<Character[]>([])
+  const [savedIds, setSavedIds] = useState<number[]>([])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSavedIds(getSavedCharacterIds())
+    }
+  }, [])
 
   useEffect(() => {
     fetch('/api/characters')
@@ -80,6 +113,15 @@ export default function DiscoverFeed() {
       })
       .catch(err => console.error('Erreur chargement personnages:', err))
   }, [])
+
+  const handleToggleSave = (character: Character) => {
+    const nowSaved = toggleSavedCharacter(character)
+    setSavedIds((prev) =>
+      nowSaved
+        ? [...prev, character.id]
+        : prev.filter((id) => id !== character.id)
+    )
+  }
 
   return (
     <div className="discover-feed">
@@ -97,6 +139,8 @@ export default function DiscoverFeed() {
         <DiscoverSlide
           key={character.id}
           character={character}
+          isSaved={savedIds.includes(character.id)}
+          onToggleSave={() => handleToggleSave(character)}
           onChat={() => router.push(`/chat?characterId=${character.id}`)}
         />
       ))}

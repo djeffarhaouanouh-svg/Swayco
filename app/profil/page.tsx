@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   User,
   Mail,
@@ -11,8 +12,11 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  ChevronDown,
   X,
+  Bookmark,
 } from "lucide-react";
+import { getSavedCharactersData } from "@/lib/savedCharacters";
 
 type ProfileData = {
   id: string;
@@ -25,7 +29,15 @@ type ProfileData = {
   plan: string;
 };
 
+type SavedCharacter = {
+  id: number;
+  name: string;
+  image: string;
+  location: string;
+};
+
 export default function ProfilPage() {
+  const router = useRouter();
   const [userName, setUserName] = useState<string>("Utilisateur");
   const [userEmail, setUserEmail] = useState<string>("");
   const [memberSince, setMemberSince] = useState<string>("");
@@ -35,6 +47,8 @@ export default function ProfilPage() {
   const [charactersCount, setCharactersCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [savedChars, setSavedChars] = useState<SavedCharacter[]>([]);
+  const [savedOpen, setSavedOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -74,6 +88,30 @@ export default function ProfilPage() {
       if (storedEmail) setUserEmail(storedEmail);
     };
     fetchProfile().finally(() => setLoading(false));
+  }, []);
+
+  const refreshSavedChars = () => {
+    if (typeof window !== "undefined") {
+      const data = getSavedCharactersData();
+      setSavedChars(
+        data.map((c) => ({
+          id: c.id,
+          name: c.name,
+          image: c.image,
+          location: c.location,
+        }))
+      );
+    }
+  };
+
+  useEffect(() => {
+    refreshSavedChars();
+  }, []);
+
+  useEffect(() => {
+    const onStorage = () => refreshSavedChars();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const handleLogout = () => {
@@ -263,6 +301,71 @@ export default function ProfilPage() {
             </div>
           </div>
         )}
+
+        {/* Personnages enregistrés - menu déroulant */}
+        <div className="w-full bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl overflow-hidden mb-3">
+          <button
+            type="button"
+            onClick={() => setSavedOpen((o) => !o)}
+            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
+                <Bookmark className="w-5 h-5 text-[#FFD700]" fill="#FFD700" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-white">Personnages enregistrés</p>
+                <p className="text-sm text-[#A3A3A3]">
+                  {savedChars.length} personnage{savedChars.length !== 1 ? "s" : ""} sauvegardé{savedChars.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+            <span
+              className={`w-9 h-9 flex items-center justify-center text-[#6B7280] transition-transform duration-200 ${savedOpen ? "rotate-0" : "-rotate-90"}`}
+            >
+              <ChevronDown className="w-5 h-5" />
+            </span>
+          </button>
+          {savedOpen && (
+            <div className="px-5 pb-5 md:px-6 pt-0 border-t border-[#2A2A2A]">
+              {savedChars.length === 0 ? (
+                <div className="flex flex-col gap-3 pt-4">
+                  <p className="text-[#A3A3A3] text-sm">
+                    Aucun personnage enregistré. Découvre des personnages et clique sur le signet pour les enregistrer.
+                  </p>
+                  <Link
+                    href="/discover"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#3BB9FF]/20 text-[#3BB9FF] text-sm font-medium hover:bg-[#3BB9FF]/30 transition-colors w-fit"
+                  >
+                    Aller au Discover
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4">
+                  {savedChars.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => router.push(`/chat?characterId=${c.id}`)}
+                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#3BB9FF]/50 hover:bg-[#1A1A1A] transition-colors text-left"
+                    >
+                      <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-[#2A2A2A]">
+                        <img
+                          src={c.image}
+                          alt={c.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      <p className="font-medium text-white text-sm truncate w-full">{c.name}</p>
+                      <p className="text-xs text-[#A3A3A3] truncate w-full">{c.location}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Personnages */}
         <Link
