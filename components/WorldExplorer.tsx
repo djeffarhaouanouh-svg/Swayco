@@ -690,7 +690,7 @@ export default function WorldExplorer() {
                 <p className="card-description">{selectedItem.description}</p>
                 <div className="card-actions">
                   <button className="btn-primary" onClick={() => router.push(`/chat?characterId=${selectedItem.characterId}`)}>
-                    Discutez
+                    Commencer
                   </button>
                 </div>
               </div>

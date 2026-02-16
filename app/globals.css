@@ -255,28 +255,28 @@
 
 /* ===== Map Cluster Bubbles ===== */
 .map-cluster {
-  width: 44px;
-  height: 44px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #1a1a1a;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .map-cluster:hover {
   transform: scale(1.15);
-  box-shadow: 0 4px 18px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.5);
   border-color: rgba(102, 126, 234, 0.6);
 }
 
 .map-cluster span {
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -881,7 +881,7 @@
 .btn-primary {
   flex: 1;
   padding: 0.875rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #3BB9FF;
   border: none;
   border-radius: 12px;
   color: #fff;
@@ -889,12 +889,13 @@
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(59, 185, 255, 0.4);
 }
 
 .btn-primary:hover {
+  background: #2AA3E6;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 6px 20px rgba(59, 185, 255, 0.5);
 }
 
 .btn-secondary {
@@ -1206,6 +1207,12 @@
   background-position: center;
   background-repeat: no-repeat;
   z-index: -1;
+}
+
+/* Parallaxe : fond qui bouge avec le gyroscope du téléphone */
+.chat-bg-parallax {
+  transition: background-position 0.15s ease-out;
+  will-change: background-position;
 }
 
 .chat-container-with-bg .chat-header {

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Send, CheckCheck, MoreVertical, Trash2 } from 'lucide-react';
-import { characters } from '@/data/worldData';
+import { characters as worldCharacters } from '@/data/worldData';
 import type { Character } from '@/data/worldData';
 
 interface Message {
@@ -50,14 +50,60 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Charger le personnage depuis l'URL
+  // Parallaxe du fond via gyroscope (mouvement du téléphone)
+  const [bgOffset, setBgOffset] = useState({ x: 50, y: 50 });
+  const PARALLAX_FACTOR = 8; // intensité du déplacement (en % par degré)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return;
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      const gamma = e.gamma ?? 0; // gauche-droite (-90 à 90)
+      const beta = e.beta ?? 0;   // avant-arrière (-180 à 180)
+      const x = 50 + gamma * (PARALLAX_FACTOR / 90);
+      const y = 50 + beta * (PARALLAX_FACTOR / 90);
+      const clampedX = Math.max(20, Math.min(80, x));
+      const clampedY = Math.max(20, Math.min(80, y));
+      setBgOffset({ x: clampedX, y: clampedY });
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation);
+    };
+  }, []);
+
+  // Charger le personnage depuis l'URL (worldData + personnages créés via API)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('characterId');
-    if (id) {
-      const found = characters.find(c => c.id === parseInt(id));
-      if (found) setCharacter(found);
-    }
+    const idParam = params.get('characterId');
+    if (!idParam) return;
+    const id = parseInt(idParam, 10);
+
+    const fromWorld = worldCharacters.find((c) => c.id === id);
+    if (fromWorld) setCharacter(fromWorld);
+
+    const merged: Character[] = [...worldCharacters];
+    fetch('/api/characters')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          data.forEach((ac: Character) => {
+            const idx = merged.findIndex((m) => m.id === ac.id);
+            if (idx >= 0) merged[idx] = ac;
+            else merged.push(ac);
+          });
+        }
+        const found = merged.find((c) => c.id === id);
+        if (found) setCharacter(found);
+      })
+      .catch(() => {
+        if (!fromWorld) {
+          const found = worldCharacters.find((c) => c.id === id);
+          if (found) setCharacter(found);
+        }
+      });
   }, []);
 
   // Scroll en bas a chaque nouveau message
@@ -133,9 +179,10 @@ export default function ChatPage() {
       {/* Couche de fond fixe (reste en place lors du scroll des messages) */}
       {character?.cityImage && (
         <div
-          className="chat-bg-fixed"
+          className="chat-bg-fixed chat-bg-parallax"
           style={{
             backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.4)), url(${character.cityImage})`,
+            backgroundPosition: `${bgOffset.x}% ${bgOffset.y}%`,
           }}
           aria-hidden
         />
