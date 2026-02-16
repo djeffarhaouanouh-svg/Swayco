@@ -1195,6 +1195,17 @@
 
 .chat-container-with-bg {
   background-color: transparent;
+  position: relative;
+}
+
+/* Photo de fond fixe (reste en place lors du scroll) */
+.chat-bg-fixed {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -1;
 }
 
 .chat-container-with-bg .chat-header {

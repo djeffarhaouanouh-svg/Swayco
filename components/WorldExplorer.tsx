@@ -516,7 +516,7 @@ export default function WorldExplorer() {
     })
 
     m.addControl(
-      new maptilersdk.NavigationControl({ showCompass: false }),
+      new maptilersdk.NavigationControl({ showCompass: false, showZoom: false }),
       'top-right'
     )
 
