@@ -206,7 +206,7 @@ function SingleTrackPlayer({
       {(track.artist || track.title) && (
         <div className="country-music-info">
           <span className="country-music-artist">{track.artist}</span>
-          {track.title && <span className="country-music-title">"{track.title}"</span>}
+          {track.title && <span className="country-music-title">&ldquo;{track.title}&rdquo;</span>}
         </div>
       )}
       <div className="country-music-player">
