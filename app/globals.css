@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import 'maplibre-gl/dist/maplibre-gl.css';
 
 @layer base {
   * {
@@ -460,16 +459,43 @@
   transform: translateY(0);
 }
 
+.sheet-header {
+  position: relative;
+  padding: 12px 1.5rem 0;
+}
+
 .sheet-handle {
   width: 40px;
   height: 4px;
   background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
-  margin: 12px auto;
+  margin: 0 auto;
+}
+
+.sheet-close-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.sheet-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .sheet-content {
-  padding: 0 1.5rem 2rem;
+  padding: 1rem 1.5rem 2rem;
 }
 
 /* Character Card */
@@ -659,10 +685,66 @@
 }
 
 .country-music {
+  margin-bottom: 1.5rem;
+}
+
+.country-music-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.country-music-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.country-music-arrow {
+  transition: transform 0.2s;
+}
+
+.country-music-arrow.open {
+  transform: rotate(180deg);
+}
+
+.country-music-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.country-music-track {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.country-music-info {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-bottom: 0.2rem;
+}
+
+.country-music-artist {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.country-music-title {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .country-music-player {
@@ -696,9 +778,20 @@
 
 .country-music-time {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.8);
+}
+
+.country-music-speed-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-weight: 600;
 }
 
 .country-music-progress {
@@ -718,9 +811,23 @@
   transition: width 0.1s linear;
 }
 
-.country-music-volume,
-.country-music-more {
+.country-music-volume {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 4px;
+}
+
+.country-music-more-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.country-music-more {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -731,9 +838,39 @@
   padding: 4px;
 }
 
-.country-music-volume:hover,
 .country-music-more:hover {
   color: white;
+}
+
+.country-music-more-dropdown {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 6px;
+  min-width: 160px;
+  padding: 0.25rem;
+  background: #222222;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+}
+
+.country-music-more-dropdown button {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.country-music-more-dropdown button:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .card-actions {
@@ -892,17 +1029,42 @@
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.discover-slide-flag {
+  width: 20px;
+  height: 15px;
+  object-fit: cover;
+  border-radius: 2px;
+  vertical-align: middle;
 }
 
 .discover-slide-stats {
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.discover-slide-teaser {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.35;
   margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.discover-slide-teaser span {
+  display: block;
 }
 
 .discover-slide-btn {
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #3498db;
   border: none;
   border-radius: 12px;
   color: #fff;
@@ -914,7 +1076,7 @@
 
 .discover-slide-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.5);
 }
 
 .discover-back-btn {
@@ -1026,8 +1188,21 @@
 .chat-container {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   height: 100vh;
   background: #1a1a1a;
+}
+
+.chat-container-with-bg {
+  background-color: transparent;
+}
+
+.chat-container-with-bg .chat-header {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.chat-container-with-bg .chat-input-bar {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .chat-header {

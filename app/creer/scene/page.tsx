@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Camera, X } from "lucide-react";
+import { ArrowLeft, Camera, X, Loader2 } from "lucide-react";
 
 function SceneContent() {
   const router = useRouter();
@@ -67,16 +67,44 @@ function SceneContent() {
     router.push(`/creer/scene?step=3&name=${encodeURIComponent(displayName.trim())}`);
   };
 
-  const handleSubmitStep3 = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [adresseScene, setAdresseScene] = useState("");
+
+  const handleSubmitStep3 = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("[Placeholder] Scène:", {
-      prenom: displayName?.trim(),
-      photo: importedImageFile?.name ?? null,
-      typeScene,
-      ambiance,
-      descriptionScene: descriptionScene || null,
-    });
-    router.push("/");
+    if (!displayName?.trim()) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch("/api/scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: displayName.trim(),
+          location: adresseScene.trim() || null,
+          description: descriptionScene || null,
+          typeScene: typeScene || null,
+          ambiance: ambiance || null,
+          characterId: 1,
+          imageUrl: importedImageUrl || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSubmitError(data.error || "Erreur lors de la création");
+        return;
+      }
+
+      router.push("/");
+    } catch (err) {
+      setSubmitError("Erreur réseau, réessaye.");
+      console.error("Erreur création scène:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -205,6 +233,16 @@ function SceneContent() {
 
           <form onSubmit={handleSubmitStep3} className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">Adresse / Lieu</label>
+              <input
+                type="text"
+                value={adresseScene}
+                onChange={(e) => setAdresseScene(e.target.value)}
+                placeholder="Ex : Paris, Shibuya, Rome..."
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">Type de scène</label>
               <input
                 type="text"
@@ -235,9 +273,30 @@ function SceneContent() {
               />
             </div>
 
+            {submitError && (
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm">
+                {submitError}
+              </div>
+            )}
+
             <footer className="fixed bottom-0 left-0 right-0 pl-4 pr-4 md:pl-6 md:pr-6 py-4 bg-[#0F0F0F] border-t border-[#2A2A2A] flex justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button type="submit" className="py-2.5 px-6 font-medium rounded-xl bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]">
-                Terminer
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 ${
+                  isSubmitting
+                    ? "bg-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
+                    : "bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  "Terminer"
+                )}
               </button>
             </footer>
           </form>

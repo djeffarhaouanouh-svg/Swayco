@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model users {
+  id              Int       @id @default(autoincrement())
+  email           String    @unique @db.VarChar(255)
+  name            String?   @db.VarChar(255)
+  password        String?   @db.VarChar(255)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  updated_at      DateTime? @default(now()) @db.Timestamp(6)
+  plan            String?   @default("free") @db.VarChar(50)
+  avatar_url      String?
+  birth_month     Int?
+  birth_day       Int?
+  credits         Int?      @default(21)
+  credits_per_month Int?    @default(5)
+  characters_count Int?    @default(0)
+  characters       characters[]
+}
+
+model characters {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  location        String    @db.VarChar(255)
+  country         String    @db.VarChar(100)
+  lng             Float
+  lat             Float
+  image_url       String?
+  description     String?
+  teaser          String?
+  city_image      String?
+  badge           String?   @default("FX") @db.VarChar(20)
+  voice_id        String?   @db.VarChar(255)
+  stats_messages  String?   @default("0") @db.VarChar(50)
+  creator_id      Int?
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  creator         users?    @relation(fields: [creator_id], references: [id])
+  scenes          scenes[]
+}
+
+model scenes {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  location        String    @db.VarChar(255)
+  lng             Float
+  lat             Float
+  image_url       String?
+  description     String?
+  type_scene      String?   @db.VarChar(100)
+  ambiance        String?   @db.VarChar(100)
+  character_id    Int
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  character       characters @relation(fields: [character_id], references: [id])
+}
+
+model places {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  location        String    @db.VarChar(255)
+  lng             Float
+  lat             Float
+  image_url       String?
+  description     String?
+  stats_visitors  String?   @default("0") @db.VarChar(50)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+}

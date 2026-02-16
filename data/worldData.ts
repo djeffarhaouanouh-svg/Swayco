@@ -6,6 +6,8 @@ export interface Character {
   coordinates: [number, number]; // [lng, lat]
   image: string;
   description: string;
+  teaser?: string; // court texte affiché au-dessus du bouton Parler (2 lignes séparées par \n)
+  cityImage?: string; // image de la ville (fond du chat)
   stats: {
     messages: string;
   };
@@ -47,6 +49,8 @@ export interface MusicTrack {
   start?: number; // sec, défaut 0
   end?: number;   // sec, défaut selon piste
   label?: string;
+  artist?: string;
+  title?: string;
 }
 
 export interface CountryCluster {
@@ -70,8 +74,8 @@ export const countries: CountryCluster[] = [
       'https://images.unsplash.com/photo-1531366934919-4bcd7c65e216?w=400&h=500&fit=crop',
     ],
     music: [
-      { url: '/music/france.m4a', start: 0, end: 30, label: 'France 1' },
-      { url: '/music/france-2.m4a', start: 15, end: 60, label: 'France 2' },
+      { url: '/music/france.m4a', start: 0, end: 30, label: 'France 1', artist: 'Aya Nakamura', title: 'Djadja' },
+      { url: '/music/france-2.m4a', start: 15, end: 60, label: 'France 2', artist: 'Indila', title: 'Dernière danse' },
     ],
   },
   { country: 'Japon', center: [138.2529, 36.2048], zoom: 6 },
@@ -126,6 +130,8 @@ export const characters: Character[] = [
     coordinates: [2.3522, 48.8566],
     image: '/jade.png',
     description: 'Parisienne passionnée d\'art et d\'histoire. Adore discuter de culture française, cuisine raffinée et architecture haussmannienne.',
+    teaser: 'Étudiante en droit le jour, confidente la nuit 😉\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=800&h=1200&fit=crop',
     stats: { messages: '111.2k' },
     badge: 'FX'
   },
@@ -137,6 +143,8 @@ export const characters: Character[] = [
     coordinates: [139.6917, 35.6895],
     image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop',
     description: 'Tokyoïte moderne et traditionnelle. Passionnée de manga, technologie et cérémonie du thé. Parle de la vie urbaine japonaise.',
+    teaser: 'Manga le matin, matcha l\'après-midi ✨\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=1200&fit=crop',
     stats: { messages: '312.5k' },
     badge: 'FX'
   },
@@ -148,6 +156,8 @@ export const characters: Character[] = [
     coordinates: [12.4964, 41.9028],
     image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop',
     description: 'Romain chaleureux, guide touristique passionné. Expert en histoire antique, gastronomie italienne et dolce vita.',
+    teaser: 'Guide le jour, épicurien la nuit 🍝\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&h=1200&fit=crop',
     stats: { messages: '189.3k' },
     badge: 'FX'
   },
@@ -159,6 +169,8 @@ export const characters: Character[] = [
     coordinates: [-0.1278, 51.5074],
     image: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=500&fit=crop',
     description: 'Londonienne élégante, passionnée de littérature britannique, thé et culture royale. Aime les conversations profondes.',
+    teaser: 'Earl Grey le matin, poésie le soir ☕\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&h=1200&fit=crop',
     stats: { messages: '267.1k' },
     badge: 'FX'
   },
@@ -170,6 +182,8 @@ export const characters: Character[] = [
     coordinates: [-43.1729, -22.9068],
     image: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=500&fit=crop',
     description: 'Brésilienne joyeuse et énergique. Parle de samba, carnaval, plages paradisiaques et joie de vivre carioca.',
+    teaser: 'Samba au cœur, soleil dans l\'âme 🌴\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=800&h=1200&fit=crop',
     stats: { messages: '198.7k' },
     badge: 'FX'
   },
@@ -181,6 +195,8 @@ export const characters: Character[] = [
     coordinates: [-7.9811, 31.6295],
     image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop',
     description: 'Guide marocain expert des souks. Connaît les secrets de Marrakech, épices, artisanat et traditions berbères.',
+    teaser: 'Souks le jour, conteur la nuit 🧿\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1489749798305-4fea3d13302f?w=800&h=1200&fit=crop',
     stats: { messages: '156.2k' },
     badge: 'FX'
   },
@@ -192,6 +208,8 @@ export const characters: Character[] = [
     coordinates: [37.6173, 55.7558],
     image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=500&fit=crop',
     description: 'Moscovite cultivée, passionnée de ballet, littérature russe et architecture soviétique. Élégante et intellectuelle.',
+    teaser: 'Ballet au matin, Dostoïevski au soir 📚\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1513326738677-b964603b136d?w=800&h=1200&fit=crop',
     stats: { messages: '143.9k' },
     badge: 'FX'
   },
@@ -203,6 +221,8 @@ export const characters: Character[] = [
     coordinates: [2.1734, 41.3851],
     image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=500&fit=crop',
     description: 'Catalan passionné d\'architecture Gaudí, football et tapas. Adore partager la culture méditerranéenne vibrante.',
+    teaser: 'Gaudí par jour, tapas par nuit 🏛️\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=800&h=1200&fit=crop',
     stats: { messages: '221.4k' },
     badge: 'FX'
   },
@@ -214,6 +234,8 @@ export const characters: Character[] = [
     coordinates: [-74.0060, 40.7128],
     image: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=500&fit=crop',
     description: 'New-Yorkaise dynamique, passionnée de mode, art contemporain et vie urbaine intense. Toujours à l\'affût des tendances.',
+    teaser: 'Manhattan le jour, Brooklyn la nuit 🗽\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1566404791232-af9fe0ae8f8b?w=800&h=1200&fit=crop',
     stats: { messages: '378.6k' },
     badge: 'FX'
   },
@@ -225,6 +247,8 @@ export const characters: Character[] = [
     coordinates: [-6.2603, 53.3498],
     image: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&h=500&fit=crop',
     description: 'Irlandais chaleureux, conteur né. Parle de légendes celtiques, pubs traditionnels et paysages verdoyants d\'Irlande.',
+    teaser: 'Pubs le jour, légendes la nuit 🍀\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1600096194734-9c8a2a150109?w=800&h=1200&fit=crop',
     stats: { messages: '134.5k' },
     badge: 'FX'
   },
@@ -236,6 +260,8 @@ export const characters: Character[] = [
     coordinates: [121.4737, 31.2304],
     image: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=400&h=500&fit=crop',
     description: 'Shanghaïenne moderne, experte en business et tradition chinoise. Passionnée de calligraphie et innovation technologique.',
+    teaser: 'Business le jour, calligraphie la nuit 🎋\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=800&h=1200&fit=crop',
     stats: { messages: '289.1k' },
     badge: 'FX'
   },
@@ -247,6 +273,8 @@ export const characters: Character[] = [
     coordinates: [151.2093, -33.8688],
     image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=500&fit=crop',
     description: 'Australienne aventurière, amoureuse de la nature. Parle de surf, vie marine et culture décontractée aussie.',
+    teaser: 'Surf le matin, étoiles la nuit 🏄\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=800&h=1200&fit=crop',
     stats: { messages: '167.8k' },
     badge: 'FX'
   },
@@ -258,6 +286,8 @@ export const characters: Character[] = [
     coordinates: [23.7275, 37.9838],
     image: 'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=400&h=500&fit=crop',
     description: 'Athénien passionné d\'histoire antique et philosophie. Guide expert des ruines grecques et mythologie.',
+    teaser: 'Philosophe le jour, mythologue la nuit 🏛️\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1555993524-3d26e037e07f?w=800&h=1200&fit=crop',
     stats: { messages: '142.3k' },
     badge: 'FX'
   },
@@ -269,6 +299,8 @@ export const characters: Character[] = [
     coordinates: [31.2357, 30.0444],
     image: 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=400&h=500&fit=crop',
     description: 'Égyptienne fascinante, experte en égyptologie. Partage les secrets des pharaons, pyramides et civilisation millénaire.',
+    teaser: 'Égyptologue le jour, mystérieuse la nuit ☀️\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1539650116574-8efeb43e2750?w=800&h=1200&fit=crop',
     stats: { messages: '201.5k' },
     badge: 'FX'
   },
@@ -280,6 +312,8 @@ export const characters: Character[] = [
     coordinates: [4.9041, 52.3676],
     image: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=400&h=500&fit=crop',
     description: 'Hollandais décontracté, passionné de vélo, canaux et art flamand. Parle de culture libérale et qualité de vie néerlandaise.',
+    teaser: 'Vélo le jour, van Gogh la nuit 🎨\nParle-moi de tout… ou presque.',
+    cityImage: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=800&h=1200&fit=crop',
     stats: { messages: '176.9k' },
     badge: 'FX'
   }

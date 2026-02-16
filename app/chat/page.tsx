@@ -129,7 +129,20 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="chat-container">
+    <div
+      className={`chat-container ${character?.cityImage ? 'chat-container-with-bg' : ''}`}
+      style={
+        character?.cityImage
+          ? {
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.4)), url(${character.cityImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundAttachment: 'fixed',
+              backgroundRepeat: 'no-repeat',
+            }
+          : undefined
+      }
+    >
       {/* Header */}
       <header className="chat-header">
         <button

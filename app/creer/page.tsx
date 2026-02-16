@@ -112,18 +112,42 @@ function CreerContent() {
     router.push(`/creer?step=4&name=${encodeURIComponent(displayName.trim())}`);
   };
 
-  const handleSubmitStep4 = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmitStep4 = async () => {
     if (!displayName || !displayName.trim()) return;
-    console.log("[Placeholder] Données onboarding:", {
-      prenom: displayName.trim(),
-      photo: importedImageFile?.name ?? null,
-      pays,
-      adresse: adresse || null,
-      age: age || null,
-      descriptionPersonnage: descriptionPersonnage || null,
-      voiceId: selectedVoiceId,
-    });
-    router.push("/");
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch("/api/characters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: displayName.trim(),
+          country: pays || "France",
+          address: adresse || null,
+          age: age || null,
+          description: descriptionPersonnage || null,
+          voiceId: selectedVoiceId,
+          imageUrl: importedImageUrl || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSubmitError(data.error || "Erreur lors de la création");
+        return;
+      }
+
+      router.push("/personnages");
+    } catch (err) {
+      setSubmitError("Erreur réseau, réessaye.");
+      console.error("Erreur création personnage:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const playVoicePreview = (voiceId: string, e: React.MouseEvent) => {
@@ -544,13 +568,31 @@ function CreerContent() {
             </div>
           )}
 
+          {submitError && (
+            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm mb-4">
+              {submitError}
+            </div>
+          )}
+
           <footer className="fixed bottom-0 left-0 right-0 pl-4 pr-4 md:pl-6 md:pr-6 py-4 bg-[#0F0F0F] border-t border-[#2A2A2A] flex items-center justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={handleSubmitStep4}
-              className="py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+              disabled={isSubmitting}
+              className={`py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 ${
+                isSubmitting
+                  ? "bg-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
+                  : "bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+              }`}
             >
-              Terminer
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                "Terminer"
+              )}
             </button>
           </footer>
         </main>

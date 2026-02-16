@@ -13,25 +13,73 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  X,
 } from "lucide-react";
 
+type ProfileData = {
+  id: string;
+  name: string;
+  email: string;
+  memberSince: string;
+  credits: number;
+  creditsPerMonth: number;
+  charactersCount: number;
+  plan: string;
+};
+
 export default function ProfilPage() {
-  const [userName, setUserName] = useState<string>("Lenny");
-  const [userEmail, setUserEmail] = useState<string>("lennyhdr1@gmail.com");
-  const [memberSince, setMemberSince] = useState<string>("13 janvier 2026");
+  const [userName, setUserName] = useState<string>("Utilisateur");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [memberSince, setMemberSince] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [credits, setCredits] = useState<number>(21);
   const [creditsPerMonth, setCreditsPerMonth] = useState<number>(5);
-  const [charactersCount, setCharactersCount] = useState<number>(7);
+  const [charactersCount, setCharactersCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [profileId, setProfileId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const name = localStorage.getItem("userName") ?? "Utilisateur";
-    const email = localStorage.getItem("userEmail") ?? "";
-    const since = localStorage.getItem("memberSince") ?? "";
-    setUserName(name);
-    if (email) setUserEmail(email);
-    if (since) setMemberSince(since);
-    // TODO: fetch credits et charactersCount depuis l'API
+    const fetchProfile = async () => {
+      if (typeof window === "undefined") return;
+      const storedEmail = localStorage.getItem("userEmail");
+      const storedId = localStorage.getItem("userId");
+      const storedName = localStorage.getItem("userName");
+
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (storedId) params.set("userId", storedId);
+        else if (storedEmail) params.set("email", storedEmail);
+
+        if (params.toString()) {
+          const res = await fetch(`/api/profile?${params}`);
+          if (res.ok) {
+            const data: ProfileData = await res.json();
+            setUserName(data.name);
+            setUserEmail(data.email);
+            setMemberSince(data.memberSince);
+            setCredits(data.credits);
+            setCreditsPerMonth(data.creditsPerMonth);
+            setCharactersCount(data.charactersCount);
+            setProfileId(data.id);
+            localStorage.setItem("userId", data.id);
+            localStorage.setItem("userName", data.name);
+            localStorage.setItem("userEmail", data.email);
+            if (data.memberSince)
+              localStorage.setItem("memberSince", data.memberSince);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Erreur chargement profil:", err);
+      }
+      setLoading(false);
+      if (storedName) setUserName(storedName);
+      if (storedEmail) setUserEmail(storedEmail);
+    };
+    fetchProfile().finally(() => setLoading(false));
   }, []);
 
   const handleLogout = () => {
@@ -43,6 +91,53 @@ export default function ProfilPage() {
     }
   };
 
+  const handleOpenEdit = () => {
+    setEditName(userName);
+    setEditEmail(userEmail);
+    setIsEditing(true);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newName = editName.trim() || userName;
+    const newEmail = editEmail.trim() || userEmail;
+    if (!newEmail) return;
+
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(profileId && { id: profileId }),
+          email: newEmail,
+          name: newName,
+        }),
+      });
+      if (res.ok) {
+        const data: ProfileData = await res.json();
+        setUserName(data.name);
+        setUserEmail(data.email);
+        setMemberSince(data.memberSince);
+        setCredits(data.credits);
+        setCreditsPerMonth(data.creditsPerMonth);
+        setCharactersCount(data.charactersCount);
+        setProfileId(data.id);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("userId", data.id);
+          localStorage.setItem("userName", data.name);
+          localStorage.setItem("userEmail", data.email);
+        }
+      }
+    } catch (err) {
+      console.error("Erreur sauvegarde profil:", err);
+    }
+    setIsEditing(false);
+  };
+
   const initial = userName.charAt(0).toUpperCase();
 
   return (
@@ -52,42 +147,52 @@ export default function ProfilPage() {
           Mon <span className="text-[#3BB9FF]">Profil</span>
         </h1>
 
+        {loading && (
+          <div className="flex items-center justify-center py-12 text-[#A3A3A3]">
+            <div className="w-8 h-8 border-2 border-[#3BB9FF] border-t-transparent rounded-full animate-spin" />
+            <span className="ml-2">Chargement du profil...</span>
+          </div>
+        )}
+
+        {!loading && (
+        <>
         {/* Section Identité */}
         <div className="w-full bg-[#1E1E1E] rounded-2xl p-5 md:p-6 border border-[#2A2A2A] mb-4">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-full bg-[#3BB9FF] flex items-center justify-center flex-shrink-0">
-              <span className="text-xl font-bold text-white">{initial}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={handleOpenEdit}
+              className="absolute top-0 right-0 w-9 h-9 rounded-lg bg-[#3BB9FF]/20 flex items-center justify-center text-[#3BB9FF] hover:bg-[#3BB9FF]/30 transition-colors"
+              aria-label="Modifier le profil"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <div className="flex flex-col items-start text-left">
+              <div className="flex items-center gap-4 mb-5">
+                <div className="w-14 h-14 rounded-full bg-[#3BB9FF] flex items-center justify-center flex-shrink-0">
+                  <span className="text-xl font-bold text-white">{initial}</span>
+                </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">{userName}</h2>
                   <p className="text-sm text-white/80 truncate">{userEmail}</p>
                 </div>
-                <button
-                  type="button"
-                  className="w-9 h-9 rounded-lg bg-[#3BB9FF]/20 flex items-center justify-center text-[#3BB9FF] hover:bg-[#3BB9FF]/30 transition-colors flex-shrink-0"
-                  aria-label="Modifier le profil"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
               </div>
-              <div className="mt-5 space-y-4">
-                <div>
+              <div className="space-y-4 w-full">
+                <div className="flex flex-col items-start">
                   <div className="flex items-center gap-2 text-[#A3A3A3] text-sm mb-1">
                     <User className="w-4 h-4" />
                     <span>Nom de profil</span>
                   </div>
                   <p className="font-semibold text-white">{userName}</p>
                 </div>
-                <div>
+                <div className="flex flex-col items-start">
                   <div className="flex items-center gap-2 text-[#A3A3A3] text-sm mb-1">
                     <Mail className="w-4 h-4" />
                     <span>Email</span>
                   </div>
                   <p className="font-semibold text-white truncate">{userEmail}</p>
                 </div>
-                <div>
+                <div className="flex flex-col items-start">
                   <div className="flex items-center gap-2 text-[#A3A3A3] text-sm mb-1">
                     <Calendar className="w-4 h-4" />
                     <span>Membre depuis</span>
@@ -98,6 +203,74 @@ export default function ProfilPage() {
             </div>
           </div>
         </div>
+
+        {/* Modal Modifier le profil */}
+        {isEditing && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            onClick={handleCloseEdit}
+          >
+            <div
+              className="bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">
+                  Modifier le profil
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleCloseEdit}
+                  className="w-9 h-9 rounded-lg bg-[#2A2A2A] flex items-center justify-center text-[#A3A3A3] hover:text-white transition-colors"
+                  aria-label="Fermer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleSaveEdit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
+                    Nom de profil
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Ton prénom"
+                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="ton@email.com"
+                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseEdit}
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#2A2A2A] text-[#A3A3A3] font-medium hover:bg-[#333] transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#3BB9FF] text-white font-medium hover:bg-[#2AA3E6] transition-colors"
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Section Mes Crédits */}
         <div className="w-full bg-[#1E1E1E] rounded-2xl p-5 md:p-6 border border-[#2A2A2A] mb-4">
@@ -166,6 +339,8 @@ export default function ProfilPage() {
             <p className="font-semibold text-red-400">Déconnexion</p>
           </div>
         </button>
+        </>
+        )}
 
       </div>
 

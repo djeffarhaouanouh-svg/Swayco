@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Camera, X } from "lucide-react";
+import { ArrowLeft, Camera, X, Loader2 } from "lucide-react";
 
 function LieuxContent() {
   const router = useRouter();
@@ -58,13 +58,40 @@ function LieuxContent() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSubmitStep2 = () => {
-    console.log("[Placeholder] Lieu:", {
-      nom: nomFromUrl || nom,
-      adresse: adresseFromUrl || adresse || null,
-      photo: importedImageFile?.name ?? null,
-    });
-    router.push("/");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmitStep2 = async () => {
+    const finalNom = nomFromUrl || nom;
+    const finalAdresse = adresseFromUrl || adresse;
+    if (!finalNom?.trim()) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch("/api/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: finalNom.trim(),
+          address: finalAdresse?.trim() || null,
+          imageUrl: importedImageUrl || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSubmitError(data.error || "Erreur lors de la création");
+        return;
+      }
+
+      router.push("/");
+    } catch (err) {
+      setSubmitError("Erreur réseau, réessaye.");
+      console.error("Erreur création lieu:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -191,9 +218,31 @@ function LieuxContent() {
             </div>
           )}
 
+          {submitError && (
+            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm mb-4">
+              {submitError}
+            </div>
+          )}
+
           <footer className="fixed bottom-0 left-0 right-0 pl-4 pr-4 md:pl-6 md:pr-6 py-4 bg-[#0F0F0F] border-t border-[#2A2A2A] flex justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <button type="button" onClick={handleSubmitStep2} className="py-2.5 px-6 font-medium rounded-xl bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]">
-              Terminer
+            <button
+              type="button"
+              onClick={handleSubmitStep2}
+              disabled={isSubmitting}
+              className={`py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 ${
+                isSubmitting
+                  ? "bg-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
+                  : "bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                "Terminer"
+              )}
             </button>
           </footer>
         </main>
