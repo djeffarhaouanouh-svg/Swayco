@@ -495,7 +495,7 @@ export default function WorldExplorer() {
       center: [2.3522, 48.8566],
       zoom: 3,
       minZoom: 2,
-      maxZoom: 12,
+      maxZoom: 16,
       terrain: true,
       pitch: 60,
       attributionControl: false
