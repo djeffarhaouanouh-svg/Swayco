@@ -6,9 +6,7 @@ import {
   User,
   Mail,
   Calendar,
-  Link2,
   Pencil,
-  TrendingUp,
   Users,
   Settings,
   LogOut,
@@ -34,8 +32,6 @@ export default function ProfilPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  const [credits, setCredits] = useState<number>(21);
-  const [creditsPerMonth, setCreditsPerMonth] = useState<number>(5);
   const [charactersCount, setCharactersCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -60,8 +56,6 @@ export default function ProfilPage() {
             setUserName(data.name);
             setUserEmail(data.email);
             setMemberSince(data.memberSince);
-            setCredits(data.credits);
-            setCreditsPerMonth(data.creditsPerMonth);
             setCharactersCount(data.charactersCount);
             setProfileId(data.id);
             localStorage.setItem("userId", data.id);
@@ -122,8 +116,6 @@ export default function ProfilPage() {
         setUserName(data.name);
         setUserEmail(data.email);
         setMemberSince(data.memberSince);
-        setCredits(data.credits);
-        setCreditsPerMonth(data.creditsPerMonth);
         setCharactersCount(data.charactersCount);
         setProfileId(data.id);
         if (typeof window !== "undefined") {
@@ -271,30 +263,6 @@ export default function ProfilPage() {
             </div>
           </div>
         )}
-
-        {/* Section Mes Crédits */}
-        <div className="w-full bg-[#1E1E1E] rounded-2xl p-5 md:p-6 border border-[#2A2A2A] mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-white" />
-              <span className="font-medium text-white">Mes Crédits</span>
-            </div>
-            <span className="px-3 py-1 rounded-full bg-[#2A2A2A] text-white text-xs font-medium">
-              Gratuit
-            </span>
-          </div>
-          <p className="mb-4">
-            <span className="text-3xl font-bold text-[#3BB9FF]">{credits}</span>
-            <span className="text-white/80 ml-1">/ {creditsPerMonth} par mois</span>
-          </p>
-          <button
-            type="button"
-            className="w-full py-3 px-4 bg-[#3BB9FF] rounded-xl text-white font-semibold flex items-center justify-center gap-2 hover:bg-[#2AA3E6] transition-colors"
-          >
-            <TrendingUp className="w-5 h-5" />
-            Passer Premium
-          </button>
-        </div>
 
         {/* Personnages */}
         <Link

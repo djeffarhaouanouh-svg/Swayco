@@ -73,14 +73,16 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 260px;
-  max-width: 85vw;
+  width: 220px;
+  max-width: 80vw;
   background: #1a1a1a;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   transform: translateX(-100%);
   transition: transform 0.3s ease;
   z-index: 999;
   padding: calc(3.5rem + env(safe-area-inset-top, 0)) 0 1rem;
+  display: flex;
+  flex-direction: column;
 }
 .burger-drawer.active {
   transform: translateX(0);
@@ -89,17 +91,92 @@
 .burger-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0;
 }
 .burger-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.85rem 1.25rem;
   color: rgba(255, 255, 255, 0.9);
   text-decoration: none;
   font-size: 1rem;
   transition: background 0.2s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.burger-nav a:last-child {
+  border-bottom: none;
 }
 .burger-nav a:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+.burger-nav-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.burger-nav-premium {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.burger-nav-premium .burger-nav-icon {
+  color: #f5a623 !important;
+}
+
+.burger-nav-bottom {
+  margin-top: auto;
+  padding-top: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.burger-nav-footer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+}
+.burger-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1rem;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.burger-footer-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.burger-nav-legal-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1.25rem 0;
+}
+.burger-nav-legal-inline a {
+  font-size: 0.65rem;
+  color: rgba(163, 163, 163, 0.7);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.burger-nav-legal-inline a:hover {
+  color: #3BB9FF;
+}
+.burger-legal-sep {
+  font-size: 0.6rem;
+  color: rgba(163, 163, 163, 0.4);
+}
+.burger-nav-copyright {
+  padding: 0.35rem 1.25rem 0.75rem;
+  font-size: 0.6rem;
+  color: rgba(163, 163, 163, 0.5);
+  text-align: center;
 }
 
 .logo {
@@ -878,6 +955,30 @@
   gap: 1rem;
 }
 
+.card-actions-scene {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btn-scene-action {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.btn-scene-action:hover {
+  background: #3BB9FF;
+  border-color: #3BB9FF;
+}
+
 .btn-primary {
   flex: 1;
   padding: 0.875rem 1.5rem;
@@ -1277,6 +1378,15 @@
   object-fit: cover;
 }
 
+.chat-header-scene-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.1rem;
+}
+
 .chat-header-text {
   display: flex;
   flex-direction: column;
@@ -1411,6 +1521,15 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.chat-bubble-scene-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.9rem;
 }
 
 .chat-bubble {
@@ -1688,4 +1807,210 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ===== Chat Video Features ===== */
+
+/* Neon border spinner (play button + action button) */
+.neon-border-spinner-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.neon-border-spinner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  border-top-color: #667eea;
+  border-right-color: #764ba2;
+  animation: neonSpin 1.2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes neonSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Play button on assistant messages */
+.chat-play-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.chat-play-btn:hover {
+  transform: scale(1.1);
+}
+
+.chat-play-btn:active {
+  transform: scale(0.95);
+}
+
+.chat-play-btn .neon-border-spinner-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.chat-play-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-play-spinner-inner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: neonSpin 0.8s linear infinite;
+}
+
+/* Progress bar for generating/processing */
+.chat-progress-container {
+  padding: 0.75rem 1rem;
+  min-width: 180px;
+}
+
+.chat-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.chat-progress-label span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-progress-label .chat-progress-time {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.chat-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chat-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+  background-size: 200% 100%;
+  animation: chatProgress 40s ease-out forwards, chatProgressShimmer 2s linear infinite;
+}
+
+@keyframes chatProgress {
+  0% { width: 5%; }
+  100% { width: 95%; }
+}
+
+@keyframes chatProgressShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Video bubble */
+.chat-video-bubble {
+  margin-top: 0.4rem;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+}
+
+.chat-video-bubble video {
+  width: 100%;
+  max-width: 240px;
+  min-height: 120px;
+  display: block;
+  border-radius: 12px;
+}
+
+/* Image bubble */
+.chat-image-bubble {
+  margin-top: 0.4rem;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chat-image-bubble img {
+  width: 100%;
+  max-width: 240px;
+  min-height: 120px;
+  display: block;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* Fullscreen video overlay */
+.chat-video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chat-video-overlay-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  z-index: 10000;
+}
+
+.chat-video-overlay-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-video-overlay video {
+  max-width: 95vw;
+  max-height: 90vh;
+  border-radius: 12px;
+}
+
+/* Bubble wrapper relative for play button positioning */
+.chat-bubble-wrapper {
+  position: relative;
 }

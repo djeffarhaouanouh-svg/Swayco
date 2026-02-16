@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Play, Pause, Volume2, MoreVertical, ChevronDown, Menu, X } from 'lucide-react'
+import { Play, Pause, Volume2, MoreVertical, ChevronDown, Menu, X, User, Home, Compass, MessageCircle, Wand2, Crown, MessageSquare, Mail, Share2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as maptilersdk from '@maptiler/sdk'
@@ -586,12 +586,32 @@ export default function WorldExplorer() {
       <div className={`burger-overlay ${burgerOpen ? 'active' : ''}`} onClick={() => setBurgerOpen(false)} aria-hidden={!burgerOpen} />
       <div className={`burger-drawer ${burgerOpen ? 'active' : ''}`}>
         <nav className="burger-nav">
-          <Link href="/profil" onClick={() => setBurgerOpen(false)}>Mon profil</Link>
-          <Link href="/" onClick={() => setBurgerOpen(false)}>Accueil</Link>
-          <Link href="/discover" onClick={() => setBurgerOpen(false)}>Discover</Link>
-          <Link href="/messages" onClick={() => setBurgerOpen(false)}>Messages</Link>
-          <Link href="/creer" onClick={() => setBurgerOpen(false)}>Créer</Link>
+          <Link href="/profil" onClick={() => setBurgerOpen(false)} className="burger-nav-item"><User size={18} className="burger-nav-icon" />Mon profil</Link>
+          <Link href="/" onClick={() => setBurgerOpen(false)} className="burger-nav-item"><Home size={18} className="burger-nav-icon" />Accueil</Link>
+          <Link href="/discover" onClick={() => setBurgerOpen(false)} className="burger-nav-item"><Compass size={18} className="burger-nav-icon" />Découvrir</Link>
+          <Link href="/messages" onClick={() => setBurgerOpen(false)} className="burger-nav-item"><MessageCircle size={18} className="burger-nav-icon" />Discuter</Link>
+          <Link href="/creer" onClick={() => setBurgerOpen(false)} className="burger-nav-item"><Wand2 size={18} className="burger-nav-icon" />Créer</Link>
+          <Link href="/profil" onClick={() => setBurgerOpen(false)} className="burger-nav-item burger-nav-premium"><Crown size={18} className="burger-nav-icon" />Devenir Premium</Link>
         </nav>
+        <div className="burger-nav-bottom">
+        <div className="burger-nav-footer-buttons">
+          <Link href="/discord" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Discord</Link>
+          <Link href="/contact" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Contact</Link>
+          <Link href="/affiliation" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Affiliation</Link>
+        </div>
+        <div className="burger-nav-legal-inline">
+          <Link href="/mentions-legales" onClick={() => setBurgerOpen(false)}>Mentions légales</Link>
+          <span className="burger-legal-sep">·</span>
+          <Link href="/confidentialite" onClick={() => setBurgerOpen(false)}>Confidentialité</Link>
+          <span className="burger-legal-sep">·</span>
+          <Link href="/cookies" onClick={() => setBurgerOpen(false)}>Cookies</Link>
+          <span className="burger-legal-sep">·</span>
+          <Link href="/faq" onClick={() => setBurgerOpen(false)}>FAQ</Link>
+        </div>
+        <div className="burger-nav-copyright">
+          &copy; {new Date().getFullYear()} MyDouble
+        </div>
+        </div>
       </div>
 
       {/* Map */}
@@ -688,9 +708,27 @@ export default function WorldExplorer() {
                 <h2 className="card-name">{selectedItem.name}</h2>
                 <p className="card-subtitle">{selectedItem.location}</p>
                 <p className="card-description">{selectedItem.description}</p>
-                <div className="card-actions">
-                  <button className="btn-primary" onClick={() => router.push(`/chat?characterId=${selectedItem.characterId}`)}>
-                    Commencer
+                <div className="card-actions card-actions-scene">
+                  <button
+                    type="button"
+                    className="btn-scene-action"
+                    onClick={() => router.push(`/chat?sceneImage=${encodeURIComponent(selectedItem.image || '')}&sceneName=${encodeURIComponent(selectedItem.name)}&sceneLocation=${encodeURIComponent(selectedItem.location)}`)}
+                  >
+                    👋 Entrer et commander comme un Français
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-scene-action"
+                    onClick={() => router.push(`/chat?sceneImage=${encodeURIComponent(selectedItem.image || '')}&sceneName=${encodeURIComponent(selectedItem.name)}&sceneLocation=${encodeURIComponent(selectedItem.location)}`)}
+                  >
+                    🥖 Découvrir les spécialités
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-scene-action"
+                    onClick={() => router.push(`/chat?sceneImage=${encodeURIComponent(selectedItem.image || '')}&sceneName=${encodeURIComponent(selectedItem.name)}&sceneLocation=${encodeURIComponent(selectedItem.location)}`)}
+                  >
+                    💬 Discuter avec la boulangère
                   </button>
                 </div>
               </div>

@@ -3,7 +3,6 @@
 import { useState, Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Camera, X, Loader2 } from "lucide-react";
-import { characters as worldCharacters } from "@/data/worldData";
 
 function SceneContent() {
   const router = useRouter();
@@ -16,10 +15,6 @@ function SceneContent() {
   const [typeScene, setTypeScene] = useState("");
   const [ambiance, setAmbiance] = useState("");
   const [descriptionScene, setDescriptionScene] = useState("");
-  const [selectedCharacterId, setSelectedCharacterId] = useState<number>(1);
-  const [charactersList, setCharactersList] = useState<{ id: number; name: string; location: string }[]>(
-    () => worldCharacters.map((c) => ({ id: c.id, name: c.name, location: c.location }))
-  );
   const [importedImageUrl, setImportedImageUrl] = useState<string | null>(null);
   const [importedImageFile, setImportedImageFile] = useState<File | null>(null);
   const [showImageOverlay, setShowImageOverlay] = useState(false);
@@ -92,7 +87,7 @@ function SceneContent() {
           description: descriptionScene || null,
           typeScene: typeScene || null,
           ambiance: ambiance || null,
-          characterId: selectedCharacterId,
+          characterId: 1,
           imageUrl: importedImageUrl || null,
         }),
       });
@@ -117,23 +112,6 @@ function SceneContent() {
       if (importedImageUrl) URL.revokeObjectURL(importedImageUrl);
     };
   }, [importedImageUrl]);
-
-  // Charger les personnages pour le sélecteur (worldData + personnages créés)
-  useEffect(() => {
-    const base = worldCharacters.map((c) => ({ id: c.id, name: c.name, location: c.location }));
-    fetch("/api/characters")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const merged = [...base];
-          data.forEach((ac: { id: number; name: string; location: string }) => {
-            if (!merged.some((m) => m.id === ac.id)) merged.push({ id: ac.id, name: ac.name, location: ac.location });
-          });
-          setCharactersList(merged);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const progressWidth = step === 1 ? "33%" : step === 2 ? "66%" : "100%";
 
@@ -254,20 +232,6 @@ function SceneContent() {
           <p className="text-[#A3A3A3] mb-6">Complète les informations de ta scène, {displayName}</p>
 
           <form onSubmit={handleSubmitStep3} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">Avec qui discuter dans cette scène ?</label>
-              <select
-                value={selectedCharacterId}
-                onChange={(e) => setSelectedCharacterId(parseInt(e.target.value, 10))}
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
-              >
-                {charactersList.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-[#1E1E1E] text-white">
-                    {c.name} ({c.location})
-                  </option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="block text-sm font-medium text-[#A3A3A3] mb-1.5">Adresse / Lieu</label>
               <input

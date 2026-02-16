@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHouse, faCompass, faMessage, faWandMagicSparkles, faUser } from '@fortawesome/free-solid-svg-icons'
+import { faHouse, faCompass, faMessage, faWandMagicSparkles, faUser, faUsers, faVideo } from '@fortawesome/free-solid-svg-icons'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 
 type NavItem = 'accueil' | 'discover' | 'messages' | 'creer' | 'profil'
@@ -17,10 +17,9 @@ const NAV_ITEMS: { id: NavItem; label: string; icon: IconDefinition; href?: stri
   { id: 'profil', label: 'Profil', icon: faUser, href: '/profil' },
 ]
 
-const CREER_OPTIONS = [
-  { label: 'Personnages', href: '/creer' },
-  { label: 'Scène', href: '/creer/scene' },
-  { label: 'Lieux', href: '/creer/lieux' },
+const CREER_OPTIONS: { label: string; href: string; icon: IconDefinition }[] = [
+  { label: 'Personnages', href: '/creer', icon: faUsers },
+  { label: 'Scène', href: '/creer/scene', icon: faVideo },
 ]
 
 export default function NavBar() {
@@ -66,14 +65,15 @@ export default function NavBar() {
                   <span className="bottom-nav-icon"><FontAwesomeIcon icon={item.icon} /></span>
                 </button>
                 {creerOpen && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 min-w-[120px] bg-[#1a1a1a] border border-[#2A2A2A] rounded-xl overflow-hidden shadow-xl z-[600]">
-                    {CREER_OPTIONS.map((opt) => (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 min-w-[140px] bg-[#1a1a1a] border border-[#2A2A2A] rounded-xl overflow-hidden shadow-xl z-[600]">
+                    {CREER_OPTIONS.map((opt, index) => (
                       <Link
                         key={opt.href}
                         href={opt.href}
-                        className="block px-4 py-3 text-sm text-white hover:bg-[#252525] transition-colors text-center"
+                        className={`flex items-center gap-2 px-4 py-3 text-sm text-white hover:bg-[#252525] transition-colors ${index < CREER_OPTIONS.length - 1 ? 'border-b border-[#2A2A2A]' : ''}`}
                         onClick={() => setCreerOpen(false)}
                       >
+                        <FontAwesomeIcon icon={opt.icon} className="w-4 h-4 text-[#A3A3A3]" />
                         {opt.label}
                       </Link>
                     ))}
