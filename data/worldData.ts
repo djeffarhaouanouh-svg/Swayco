@@ -26,7 +26,18 @@ export interface Place {
   };
 }
 
-export type WorldItem = Character | Place;
+export interface Scene {
+  id: number;
+  type: 'scene';
+  name: string;
+  location: string;
+  coordinates: [number, number]; // [lng, lat]
+  image: string;
+  description: string;
+  characterId: number; // id du personnage avec qui discuter (ex: la boulangère)
+}
+
+export type WorldItem = Character | Place | Scene;
 
 // Placeholder image for countries without a photo yet
 const COUNTRY_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250"%3E%3Crect fill="%231a1a1a" width="400" height="250"/%3E%3Ctext fill="%23555" font-size="18" font-family="sans-serif" x="50%" y="50%" text-anchor="middle" dy=".35em"%3EImage à venir%3C/text%3E%3C/svg%3E';
@@ -271,6 +282,30 @@ export const characters: Character[] = [
     description: 'Hollandais décontracté, passionné de vélo, canaux et art flamand. Parle de culture libérale et qualité de vie néerlandaise.',
     stats: { messages: '176.9k' },
     badge: 'FX'
+  },
+  {
+    id: 16,
+    type: 'character',
+    name: 'La boulangère',
+    location: 'Paris, France',
+    coordinates: [2.3456, 48.8600],
+    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop',
+    description: 'Boulangère parisienne au sourire enchanteur. Elle travaille dans sa boulangerie du Marais et adore les croissants tout chauds. Un certain jeu de regard...',
+    stats: { messages: '89.3k' },
+    badge: 'FX'
+  }
+];
+
+export const scenes: Scene[] = [
+  {
+    id: 201,
+    type: 'scene',
+    name: 'La boulangerie',
+    location: 'Paris, France',
+    coordinates: [2.3456, 48.8600],
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=500&fit=crop',
+    description: 'Tu es dans la boulangerie et tu as un jeu de regard avec la boulangère.',
+    characterId: 16
   }
 ];
 

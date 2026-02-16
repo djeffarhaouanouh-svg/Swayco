@@ -5,7 +5,7 @@ import { Play, Pause, Volume2, MoreVertical, ChevronDown, Menu } from 'lucide-re
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import maplibregl from 'maplibre-gl'
-import { characters, places, WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, type MusicTrack } from '@/data/worldData'
+import { characters, places, scenes, WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, type MusicTrack } from '@/data/worldData'
 import ImageCarousel from '@/components/ImageCarousel'
 
 type FilterType = 'all' | 'character' | 'place' | 'scene'
@@ -25,6 +25,14 @@ function createMarkerElement(item: WorldItem, onClick: () => void): HTMLDivEleme
       <div class="map-bubble-avatar">
         <img src="${item.image}" alt="${item.name}" />
         <span class="map-bubble-name-overlay">${item.name}</span>
+      </div>
+    `
+  } else if (item.type === 'scene') {
+    el.className = 'map-bubble place scene'
+    el.innerHTML = `
+      <span class="map-bubble-name">${item.name}</span>
+      <div class="map-bubble-avatar">
+        <img src="${item.image}" alt="${item.name}" />
       </div>
     `
   } else {
@@ -238,6 +246,28 @@ export default function WorldExplorer() {
     clearMarkers()
     clusterModeRef.current = shouldCluster
 
+    // Scènes: show when all or scene (hide when character or place)
+    if (filter !== 'character' && filter !== 'place') {
+      scenes.forEach(item => {
+        const el = createMarkerElement(item, () => {
+          setSelectedItem(item)
+          setSelectedCountry(null)
+          setIsSheetOpen(true)
+          m.flyTo({
+            center: item.coordinates,
+            zoom: Math.min(m.getZoom() + 2, 12),
+            duration: 1000
+          })
+        })
+
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(item.coordinates)
+          .addTo(m)
+
+        markersRef.current.push(marker)
+      })
+    }
+
     // Monuments: always show individually (hide when filtering by character or scene)
     if (filter !== 'character' && filter !== 'scene') {
         places.forEach(item => {
@@ -263,8 +293,10 @@ export default function WorldExplorer() {
     // Characters (hide when filtering by place or scene)
     if (filter !== 'place' && filter !== 'scene') {
       if (shouldCluster) {
+        const sceneCharacterIds = new Set(scenes.map(s => s.characterId))
+        const standaloneCharacters = characters.filter(c => !sceneCharacterIds.has(c.id))
         const grouped: Record<string, WorldItem[]> = {}
-        characters.forEach(item => {
+        standaloneCharacters.forEach(item => {
           const country = getCountry(item)
           if (!grouped[country]) grouped[country] = []
           grouped[country].push(item)
@@ -504,6 +536,26 @@ export default function WorldExplorer() {
                 <div className="card-actions">
                   <button className="btn-primary" onClick={() => alert(`Explorer ${selectedItem.name}...`)}>
                     🔍 En savoir plus
+                  </button>
+                  <button className="btn-secondary" onClick={closeSheet}>Fermer</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedItem && selectedItem.type === 'scene' && (
+            <div className="character-card">
+              <div className="card-image-container">
+                <img src={selectedItem.image} alt={selectedItem.name} className="card-image" />
+                <span className="card-badge">🎬</span>
+              </div>
+              <div className="card-info">
+                <h2 className="card-name">{selectedItem.name}</h2>
+                <p className="card-subtitle">{selectedItem.location}</p>
+                <p className="card-description">{selectedItem.description}</p>
+                <div className="card-actions">
+                  <button className="btn-primary" onClick={() => router.push(`/chat?characterId=${selectedItem.characterId}`)}>
+                    💬 Parler
                   </button>
                   <button className="btn-secondary" onClick={closeSheet}>Fermer</button>
                 </div>
