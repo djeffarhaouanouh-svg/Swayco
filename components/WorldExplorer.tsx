@@ -196,7 +196,7 @@ export default function WorldExplorer() {
   const router = useRouter()
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all')
   const [selectedItem, setSelectedItem] = useState<WorldItem | null>(null)
-  const [selectedCountry, setSelectedCountry] = useState<{ country: string; center: [number, number]; zoom: number; description?: string; images?: string[]; music?: string[] } | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<{ country: string; center: [number, number]; zoom: number; description?: string; images?: string[]; music?: (string | MusicTrack)[] } | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
   filterRef.current = currentFilter
