@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Play, Pause, Volume2, MoreVertical } from 'lucide-react'
+import { Play, Pause, Volume2, MoreVertical, ChevronDown, Menu } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import maplibregl from 'maplibre-gl'
 import { characters, places, WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, type MusicTrack } from '@/data/worldData'
 import ImageCarousel from '@/components/ImageCarousel'
@@ -195,11 +196,31 @@ export default function WorldExplorer() {
 
   const router = useRouter()
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [burgerOpen, setBurgerOpen] = useState(false)
+  const filterDropdownRef = useRef<HTMLDivElement>(null)
   const [selectedItem, setSelectedItem] = useState<WorldItem | null>(null)
   const [selectedCountry, setSelectedCountry] = useState<{ country: string; center: [number, number]; zoom: number; description?: string; images?: string[]; music?: (string | MusicTrack)[] } | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
   filterRef.current = currentFilter
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) setFilterOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  useEffect(() => {
+    if (burgerOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [burgerOpen])
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => m.remove())
@@ -358,33 +379,52 @@ export default function WorldExplorer() {
     <div className="app-container">
       {/* Header */}
       <div className="header">
+        <button
+          type="button"
+          className="header-burger"
+          onClick={() => setBurgerOpen(!burgerOpen)}
+          aria-label="Menu"
+          aria-expanded={burgerOpen}
+        >
+          <Menu size={24} />
+        </button>
         <div className="logo">Explorer</div>
-        <div className="filters">
+        <div className={`explorer-filter-dropdown ${filterOpen ? 'open' : ''}`} ref={filterDropdownRef}>
           <button
-            className={`filter-btn ${currentFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setCurrentFilter('all')}
+            type="button"
+            className="explorer-filter-trigger"
+            onClick={() => setFilterOpen(!filterOpen)}
+            aria-expanded={filterOpen}
           >
-            Tout
+            <span>
+              {currentFilter === 'all' && 'Tout'}
+              {currentFilter === 'character' && '👤 Personnages'}
+              {currentFilter === 'place' && '🏛️ Lieux'}
+              {currentFilter === 'scene' && '🎬 Scènes'}
+            </span>
+            <ChevronDown className={filterOpen ? 'open' : ''} size={18} />
           </button>
-          <button
-            className={`filter-btn ${currentFilter === 'character' ? 'active' : ''}`}
-            onClick={() => setCurrentFilter('character')}
-          >
-            👤 Personnages
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === 'place' ? 'active' : ''}`}
-            onClick={() => setCurrentFilter('place')}
-          >
-            🏛️ Lieux
-          </button>
-          <button
-            className={`filter-btn ${currentFilter === 'scene' ? 'active' : ''}`}
-            onClick={() => setCurrentFilter('scene')}
-          >
-            🎬 Scènes
-          </button>
+          {filterOpen && (
+            <ul className="explorer-filter-menu">
+              <li><button type="button" className={currentFilter === 'all' ? 'active' : ''} onClick={() => { setCurrentFilter('all'); setFilterOpen(false); }}>Tout</button></li>
+              <li><button type="button" className={currentFilter === 'character' ? 'active' : ''} onClick={() => { setCurrentFilter('character'); setFilterOpen(false); }}>👤 Personnages</button></li>
+              <li><button type="button" className={currentFilter === 'place' ? 'active' : ''} onClick={() => { setCurrentFilter('place'); setFilterOpen(false); }}>🏛️ Lieux</button></li>
+              <li><button type="button" className={currentFilter === 'scene' ? 'active' : ''} onClick={() => { setCurrentFilter('scene'); setFilterOpen(false); }}>🎬 Scènes</button></li>
+            </ul>
+          )}
         </div>
+      </div>
+
+      {/* Burger menu overlay + drawer */}
+      <div className={`burger-overlay ${burgerOpen ? 'active' : ''}`} onClick={() => setBurgerOpen(false)} aria-hidden={!burgerOpen} />
+      <div className={`burger-drawer ${burgerOpen ? 'active' : ''}`}>
+        <nav className="burger-nav">
+          <Link href="/profil" onClick={() => setBurgerOpen(false)}>Mon profil</Link>
+          <Link href="/" onClick={() => setBurgerOpen(false)}>Accueil</Link>
+          <Link href="/discover" onClick={() => setBurgerOpen(false)}>Discover</Link>
+          <Link href="/messages" onClick={() => setBurgerOpen(false)}>Messages</Link>
+          <Link href="/creer" onClick={() => setBurgerOpen(false)}>Créer</Link>
+        </nav>
       </div>
 
       {/* Map */}
