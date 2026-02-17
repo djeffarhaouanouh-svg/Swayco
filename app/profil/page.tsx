@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +15,9 @@ import {
   ChevronDown,
   X,
   Bookmark,
+  MapPin,
+  MessageCircle,
+  Plus,
 } from "lucide-react";
 import { getSavedCharactersData } from "@/lib/savedCharacters";
 
@@ -36,6 +39,16 @@ type SavedCharacter = {
   location: string;
 };
 
+type CreatedCharacter = {
+  id: number;
+  name: string;
+  location: string;
+  image: string;
+  description: string;
+  stats: { messages: string };
+  badge: string;
+};
+
 export default function ProfilPage() {
   const router = useRouter();
   const [userName, setUserName] = useState<string>("Utilisateur");
@@ -49,6 +62,9 @@ export default function ProfilPage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [savedChars, setSavedChars] = useState<SavedCharacter[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [createdChars, setCreatedChars] = useState<CreatedCharacter[]>([]);
+  const [createdOpen, setCreatedOpen] = useState(false);
+  const [createdLoading, setCreatedLoading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -113,6 +129,24 @@ export default function ProfilPage() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  const fetchCreatedChars = useCallback(() => {
+    const id = profileId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
+    if (!id) return;
+    setCreatedLoading(true);
+    fetch(`/api/characters?creatorId=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCreatedChars(data);
+        else if (data?.error) console.error("API characters:", data.error);
+      })
+      .catch((err) => console.error("Erreur chargement personnages créés:", err))
+      .finally(() => setCreatedLoading(false));
+  }, [profileId]);
+
+  useEffect(() => {
+    fetchCreatedChars();
+  }, [fetchCreatedChars]);
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
@@ -367,22 +401,85 @@ export default function ProfilPage() {
           )}
         </div>
 
-        {/* Personnages */}
-        <Link
-          href="/personnages"
-          className="flex items-center justify-between w-full px-5 py-4 md:px-6 bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors mb-3"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
-              <Users className="w-5 h-5 text-[#3BB9FF]" />
+        {/* Personnages créés */}
+        <div className="w-full bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl overflow-hidden mb-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCreatedOpen((o) => !o);
+              if (!createdOpen) fetchCreatedChars();
+            }}
+            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
+                <Users className="w-5 h-5 text-[#3BB9FF]" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-white">Personnages</p>
+                <p className="text-sm text-[#A3A3A3]">
+                  {createdChars.length} créés
+                </p>
+              </div>
             </div>
-            <div className="text-left">
-              <p className="font-semibold text-white">Personnages</p>
-              <p className="text-sm text-[#A3A3A3]">{charactersCount} créés</p>
+            <span
+              className={`w-9 h-9 flex items-center justify-center text-[#6B7280] transition-transform duration-200 ${createdOpen ? "rotate-0" : "-rotate-90"}`}
+            >
+              <ChevronDown className="w-5 h-5" />
+            </span>
+          </button>
+          {createdOpen && (
+            <div className="px-5 pb-5 md:px-6 pt-0 border-t border-[#2A2A2A]">
+              {createdLoading ? (
+                <div className="flex items-center justify-center py-8 text-[#A3A3A3]">
+                  <div className="w-6 h-6 border-2 border-[#3BB9FF] border-t-transparent rounded-full animate-spin mr-2" />
+                  Chargement...
+                </div>
+              ) : createdChars.length === 0 ? (
+                <div className="flex flex-col gap-3 pt-4">
+                  <p className="text-[#A3A3A3] text-sm">
+                    Aucun personnage créé. Crée ton premier personnage.
+                  </p>
+                  <Link
+                    href="/creer"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#3BB9FF]/20 text-[#3BB9FF] text-sm font-medium hover:bg-[#3BB9FF]/30 transition-colors w-fit"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Créer un personnage
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4">
+                  {createdChars.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => router.push(`/chat?characterId=${c.id}`)}
+                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#3BB9FF]/50 hover:bg-[#1A1A1A] transition-colors text-left"
+                    >
+                      <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-[#2A2A2A]">
+                        <img
+                          src={c.image || "/jade.png"}
+                          alt={c.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      <p className="font-medium text-white text-sm truncate w-full">{c.name}</p>
+                      <p className="text-xs text-[#A3A3A3] truncate w-full flex items-center gap-1">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                        {c.location}
+                      </p>
+                      <p className="text-xs text-[#6B7280] mt-0.5 flex items-center gap-1">
+                        <MessageCircle className="w-3 h-3 flex-shrink-0" />
+                        {c.stats?.messages ?? "0"} messages
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <ChevronRight className="w-5 h-5 text-[#6B7280]" />
-        </Link>
+          )}
+        </div>
 
         {/* Paramètres */}
         <button

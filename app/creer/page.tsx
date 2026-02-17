@@ -121,6 +121,29 @@ function CreerContent() {
     setSubmitError(null);
 
     try {
+      let creatorPayload: { creatorId?: string; creatorEmail?: string } = {};
+      if (typeof window !== "undefined") {
+        const id = localStorage.getItem("userId");
+        const email = localStorage.getItem("userEmail");
+        if (id) creatorPayload.creatorId = id;
+        else if (email) creatorPayload.creatorEmail = email;
+      }
+
+      // Upload image file to Vercel Blob storage
+      let uploadedImageUrl: string | null = null;
+      if (importedImageFile) {
+        const formData = new FormData();
+        formData.append("file", importedImageFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          uploadedImageUrl = uploadData.url;
+        }
+      }
+
       const res = await fetch("/api/characters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,7 +154,8 @@ function CreerContent() {
           age: age || null,
           description: descriptionPersonnage || null,
           voiceId: selectedVoiceId,
-          imageUrl: importedImageUrl || null,
+          imageUrl: uploadedImageUrl,
+          ...creatorPayload,
         }),
       });
 
@@ -141,7 +165,7 @@ function CreerContent() {
         return;
       }
 
-      router.push("/personnages");
+      router.push(`/felicitation?name=${encodeURIComponent(displayName.trim())}`);
     } catch (err) {
       setSubmitError("Erreur réseau, réessaye.");
       console.error("Erreur création personnage:", err);
@@ -214,7 +238,7 @@ function CreerContent() {
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <header className="sticky top-0 z-50 flex items-center justify-between pl-3 pr-12 md:pl-4 md:pr-20 py-3 border-b border-[#2A2A2A] bg-[#0F0F0F]">
+      <header className="sticky top-0 z-50 relative flex items-center justify-between pl-3 pr-12 md:pl-4 md:pr-20 py-3 border-b border-[#2A2A2A] bg-[#0F0F0F]">
         <button
           type="button"
           onClick={handleBack}
@@ -223,9 +247,11 @@ function CreerContent() {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-base font-semibold absolute left-1/2 -translate-x-1/2">
-          Onboarding IA
-        </h1>
+        <img
+          src="/logo%20swayco.png"
+          alt="Swayco"
+          className="absolute left-1/2 top-[60%] -translate-x-1/2 -translate-y-1/2 h-[110px] w-auto object-contain"
+        />
         <div className="w-9" />
       </header>
 
@@ -242,7 +268,7 @@ function CreerContent() {
             </div>
           </div>
           <p className="text-white mb-3">
-            Pour commencer, quel est ton prénom ?
+            Pour commencer, nous allons nommer ton personnage ?
           </p>
           <form onSubmit={handleSubmitStep1} className="space-y-3">
             <div>
@@ -250,7 +276,7 @@ function CreerContent() {
                 type="text"
                 value={prenom}
                 onChange={(e) => setPrenom(e.target.value)}
-                placeholder="Ton prénom"
+                placeholder="Nom du personnage"
                 className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
                 autoFocus
               />
@@ -291,7 +317,7 @@ function CreerContent() {
 
           <h2 className="text-xl font-semibold text-white mb-2">Ta photo</h2>
           <p className="text-[#A3A3A3] mb-6">
-            Upload ta photo pour personnaliser ton avatar, {displayName}
+            Upload la photo de <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
           </p>
 
           {!importedImageUrl ? (
@@ -386,7 +412,7 @@ function CreerContent() {
             Caractéristiques
           </h2>
           <p className="text-[#A3A3A3] mb-6">
-            Complète les informations du personnage, {displayName}
+            Complète les informations du personnage, <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
           </p>
 
           <form onSubmit={handleSubmitStep3} className="space-y-4">
@@ -469,7 +495,7 @@ function CreerContent() {
             Choisis ta voix
           </h2>
           <p className="text-[#A3A3A3] mb-4">
-            Clique sur une voix pour l&apos;écouter. Sélectionne celle qui te plaît, {displayName}
+            Clique sur une voix pour l&apos;écouter. Sélectionne celle qui te plaît, <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
           </p>
 
           {/* Filtre Homme / Femme */}

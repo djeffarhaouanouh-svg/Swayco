@@ -332,7 +332,7 @@ export default function WorldExplorer() {
 
   // Fetch characters, places and scenes from DB
   useEffect(() => {
-    fetch('/api/characters')
+    fetch('/api/characters', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setCharacters(data) })
       .catch(err => console.error('Erreur chargement personnages:', err))
@@ -427,10 +427,16 @@ export default function WorldExplorer() {
     if (filter !== 'place' && filter !== 'scene') {
       if (shouldCluster) {
         const grouped: Record<string, WorldItem[]> = {}
+        const ungroupedChars: WorldItem[] = []
         charactersRef.current.forEach(item => {
           const country = getCountry(item)
-          if (!grouped[country]) grouped[country] = []
-          grouped[country].push(item)
+          const countryData = countries.find(c => c.country === country)
+          if (countryData) {
+            if (!grouped[country]) grouped[country] = []
+            grouped[country].push(item)
+          } else {
+            ungroupedChars.push(item)
+          }
         })
 
         Object.entries(grouped).forEach(([countryName, items]) => {
@@ -453,6 +459,23 @@ export default function WorldExplorer() {
             .setLngLat(countryData.center)
             .addTo(m)
 
+          markersRef.current.push(marker)
+        })
+
+        ungroupedChars.forEach(item => {
+          const el = createMarkerElement(item, () => {
+            setSelectedItem(item)
+            setSelectedCountry(null)
+            setIsSheetOpen(true)
+            m.flyTo({
+              center: item.coordinates,
+              zoom: Math.min(m.getZoom() + 2, 12),
+              duration: 1000
+            })
+          })
+          const marker = new maptilersdk.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(item.coordinates)
+            .addTo(m)
           markersRef.current.push(marker)
         })
       } else {
@@ -555,7 +578,7 @@ export default function WorldExplorer() {
         >
           <Menu size={24} />
         </button>
-        <div className="logo">Explorer</div>
+        <img src="/logo%20swayco.png" alt="Swayco" className="logo logo-img" />
         <div className={`explorer-filter-dropdown ${filterOpen ? 'open' : ''}`} ref={filterDropdownRef}>
           <button
             type="button"
@@ -659,7 +682,7 @@ export default function WorldExplorer() {
               </div>
               <div className="card-info">
                 <h2 className="card-name">{selectedItem.name}</h2>
-                <p className="card-subtitle">Par swayco.ai</p>
+                <p className="card-subtitle">{selectedItem.creatorName ? `Par ${selectedItem.creatorName}` : 'Par swayco.ai'}</p>
                 <div className="card-stats">
                   <div className="stat-item">💬 {selectedItem.stats.messages}</div>
                   <div className="stat-item">📍 {selectedItem.location}</div>

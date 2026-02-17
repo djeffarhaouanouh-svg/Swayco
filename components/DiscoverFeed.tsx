@@ -1,11 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, forwardRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Bookmark } from 'lucide-react'
 import { getCountry } from '@/data/worldData'
 import type { Character } from '@/data/worldData'
 import { getSavedCharacterIds, toggleSavedCharacter } from '@/lib/savedCharacters'
+
+const DISCOVER_SCROLL_KEY = 'discover-slide'
+
+/* Module-level index – survives component remounts during SPA navigation */
+let persistedSlideIndex = 0
+try {
+  const s = typeof window !== 'undefined' ? sessionStorage.getItem(DISCOVER_SCROLL_KEY) : null
+  if (s !== null) persistedSlideIndex = Math.max(0, parseInt(s, 10))
+} catch (_) {}
 
 const COUNTRY_ISO: Record<string, string> = {
   France: 'fr',
@@ -27,21 +36,19 @@ const COUNTRY_ISO: Record<string, string> = {
   Pérou: 'pe',
 }
 
-function DiscoverSlide({
-  character,
-  isSaved,
-  onToggleSave,
-  onChat,
-}: {
-  character: Character
-  isSaved: boolean
-  onToggleSave: () => void
-  onChat: () => void
-}) {
+const DiscoverSlide = forwardRef<
+  HTMLDivElement,
+  {
+    character: Character
+    isSaved: boolean
+    onToggleSave: () => void
+    onChat: () => void
+  }
+>(function DiscoverSlide({ character, isSaved, onToggleSave, onChat }, ref) {
   const country = getCountry(character)
   const iso = COUNTRY_ISO[country]
   return (
-    <div className="discover-slide">
+    <div className="discover-slide" ref={ref}>
       <img
         src={character.image}
         alt={character.name}
@@ -92,12 +99,15 @@ function DiscoverSlide({
       </div>
     </div>
   )
-}
+})
 
 export default function DiscoverFeed() {
   const router = useRouter()
+  const feedRef = useRef<HTMLDivElement>(null)
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
   const [savedIds, setSavedIds] = useState<number[]>([])
+  const isNavigatingRef = useRef(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -106,13 +116,79 @@ export default function DiscoverFeed() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/characters')
+    fetch('/api/characters', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setCharacters(data)
       })
       .catch(err => console.error('Erreur chargement personnages:', err))
   }, [])
+
+  /* ---- Track visible slide with IntersectionObserver ---- */
+  useEffect(() => {
+    const el = feedRef.current
+    if (!el || characters.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isNavigatingRef.current) return
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            const idx = slideRefs.current.indexOf(entry.target as HTMLDivElement)
+            if (idx !== -1) {
+              persistedSlideIndex = idx
+              try { sessionStorage.setItem(DISCOVER_SCROLL_KEY, String(idx)) } catch (_) {}
+            }
+          }
+        }
+      },
+      { root: el, threshold: 0.5 }
+    )
+
+    slideRefs.current.forEach((slide) => {
+      if (slide) observer.observe(slide)
+    })
+
+    return () => observer.disconnect()
+  }, [characters.length])
+
+  /* ---- Restore scroll position when characters load ---- */
+  useEffect(() => {
+    if (characters.length === 0) return
+    const idx = persistedSlideIndex
+    if (idx <= 0) return
+
+    // Immediate attempt
+    const slide = slideRefs.current[idx]
+    if (slide) {
+      slide.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+    }
+
+    // Safety retry after layout settles
+    const id = setTimeout(() => {
+      const s = slideRefs.current[idx]
+      if (s) s.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+    }, 100)
+
+    return () => clearTimeout(id)
+  }, [characters.length])
+
+  /* ---- navigation helpers ---- */
+  const navigateAway = useCallback((go: () => void) => {
+    isNavigatingRef.current = true
+    go()
+  }, [])
+
+  const handleBack = () => {
+    navigateAway(() => {
+      if (window.history.length > 1) router.back()
+      else router.push('/')
+    })
+  }
+
+  const handleChat = (characterId: number) => {
+    navigateAway(() => router.push(`/chat?characterId=${characterId}`))
+  }
 
   const handleToggleSave = (character: Character) => {
     const nowSaved = toggleSavedCharacter(character)
@@ -124,24 +200,25 @@ export default function DiscoverFeed() {
   }
 
   return (
-    <div className="discover-feed">
+    <div
+      ref={feedRef}
+      className="discover-feed"
+    >
       <button
-        onClick={() => {
-          if (window.history.length > 1) router.back()
-          else router.push('/')
-        }}
+        onClick={handleBack}
         className="discover-back-btn"
         aria-label="Retour"
       >
         <ArrowLeft size={22} />
       </button>
-      {characters.map((character) => (
+      {characters.map((character, i) => (
         <DiscoverSlide
           key={character.id}
+          ref={(el) => { slideRefs.current[i] = el }}
           character={character}
           isSaved={savedIds.includes(character.id)}
           onToggleSave={() => handleToggleSave(character)}
-          onChat={() => router.push(`/chat?characterId=${character.id}`)}
+          onChat={() => handleChat(character.id)}
         />
       ))}
     </div>

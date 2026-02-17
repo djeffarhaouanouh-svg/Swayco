@@ -8,10 +8,12 @@ export interface Character {
   description: string;
   teaser?: string; // court texte affiché au-dessus du bouton Parler (2 lignes séparées par \n)
   cityImage?: string; // image de la ville (fond du chat)
+  voiceId?: string; // ElevenLabs voice ID for TTS
   stats: {
     messages: string;
   };
   badge: string;
+  creatorName?: string; // nom du créateur du personnage
 }
 
 export interface Place {
@@ -94,12 +96,22 @@ export const countries: CountryCluster[] = [
   { country: 'Pays-Bas', center: [5.2913, 52.1326], zoom: 7 },
   { country: 'Inde', center: [78.9629, 20.5937], zoom: 6 },
   { country: 'Pérou', center: [-75.0152, -9.1900], zoom: 6 },
+  { country: 'Portugal', center: [-8.2245, 39.3999], zoom: 6 },
 ];
 
 export { COUNTRY_PLACEHOLDER };
 
 // Map each item to its country
 export function getCountry(item: WorldItem): string {
+  // Use the country field directly if available (DB characters have it)
+  const countryField = 'country' in item && typeof (item as Record<string, unknown>).country === 'string'
+    ? (item as Record<string, unknown>).country as string
+    : null;
+  if (countryField) {
+    const match = countries.find(c => c.country === countryField);
+    if (match) return match.country;
+  }
+
   const loc = item.location;
   if (loc.includes('France') || loc.includes('Paris')) return 'France';
   if (loc.includes('Japon') || loc.includes('Tokyo')) return 'Japon';
@@ -118,6 +130,7 @@ export function getCountry(item: WorldItem): string {
   if (loc.includes('Pays-Bas') || loc.includes('Amsterdam')) return 'Pays-Bas';
   if (loc.includes('Inde') || loc.includes('Agra')) return 'Inde';
   if (loc.includes('Pérou')) return 'Pérou';
+  if (loc.includes('Portugal') || loc.includes('Lisbonne') || loc.includes('Nisa')) return 'Portugal';
   return loc;
 }
 

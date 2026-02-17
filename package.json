@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -14,6 +18,7 @@
     "@fortawesome/react-fontawesome": "^3.2.0",
     "@maptiler/sdk": "^3.11.1",
     "@prisma/client": "^5.22.0",
+    "@vercel/blob": "^0.27.1",
     "lucide-react": "^0.564.0",
     "maplibre-gl": "^3.6.2",
     "next": "14.1.0",
@@ -31,6 +36,7 @@
     "eslint-config-next": "14.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

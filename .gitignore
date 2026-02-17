@@ -26,6 +26,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# uploaded files
+/public/uploads/
+
 # vercel
 .vercel
 

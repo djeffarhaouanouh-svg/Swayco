@@ -22,6 +22,7 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   "Pays-Bas": [4.9041, 52.3676],
   Inde: [78.0421, 27.1751],
   Pérou: [-75.0152, -9.19],
+  Portugal: [-8.2245, 39.3999],
 };
 
 function mapCharacter(c: {
@@ -38,32 +39,62 @@ function mapCharacter(c: {
   badge: string | null;
   voice_id: string | null;
   stats_messages: string | null;
+  creator?: { name: string | null } | null;
 }) {
   return {
     id: c.id,
     type: "character" as const,
     name: c.name,
     location: c.location,
+    country: c.country,
     coordinates: [c.lng, c.lat] as [number, number],
-    image: c.image_url || "/jade.png",
+    image: (c.image_url && !c.image_url.startsWith("blob:")) ? c.image_url : "/jade.png",
     description: c.description || "",
     teaser: c.teaser || undefined,
     cityImage: c.city_image || undefined,
     stats: { messages: c.stats_messages || "0" },
     badge: c.badge || "FX",
+    voiceId: c.voice_id || undefined,
+    creatorName: c.creator?.name || undefined,
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const url = request.url ?? `${request.nextUrl?.origin || ""}/api/characters${request.nextUrl?.search || ""}`;
+    const { searchParams } = new URL(url);
+    const creatorIdParam = searchParams.get("creatorId");
+    const creatorId = creatorIdParam ? parseInt(creatorIdParam, 10) : undefined;
+
+    const where = creatorId != null && !isNaN(creatorId)
+      ? { creator_id: creatorId }
+      : undefined;
+
     const chars = await prisma.characters.findMany({
-      orderBy: { created_at: "desc" },
+      where,
+      orderBy: { id: "desc" },
     });
-    return NextResponse.json(chars.map(mapCharacter));
+
+    const creatorIds = [...new Set(chars.map((c) => c.creator_id).filter((id): id is number => id != null))];
+    const creators = creatorIds.length > 0
+      ? await prisma.users.findMany({
+          where: { id: { in: creatorIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const creatorMap = Object.fromEntries(creators.map((u) => [u.id, u.name]));
+
+    const withCreator = chars.map((c) => ({
+      ...c,
+      creator: c.creator_id ? { name: creatorMap[c.creator_id] ?? null } : null,
+    }));
+
+    return NextResponse.json(withCreator.map(mapCharacter));
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error("[API Characters GET]", error);
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des personnages" },
+      { error: "Erreur lors de la récupération des personnages", details: message },
       { status: 500 }
     );
   }
@@ -72,7 +103,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, country, address, age, description, voiceId, imageUrl } = body;
+    const { name, country, address, age, description, voiceId, imageUrl, creatorId, creatorEmail } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Nom requis" }, { status: 400 });
@@ -117,6 +148,18 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join(" ");
 
+    let creatorIdNum: number | undefined;
+    if (creatorId != null) {
+      const parsed = parseInt(String(creatorId), 10);
+      if (!isNaN(parsed)) creatorIdNum = parsed;
+    }
+    if (creatorIdNum == null && creatorEmail?.trim()) {
+      const user = await prisma.users.findUnique({
+        where: { email: creatorEmail.trim() },
+        select: { id: true },
+      });
+      if (user) creatorIdNum = user.id;
+    }
     const character = await prisma.characters.create({
       data: {
         name: name.trim(),
@@ -131,9 +174,9 @@ export async function POST(request: NextRequest) {
         badge: "FX",
         voice_id: voiceId || null,
         stats_messages: "0",
+        ...(creatorIdNum != null && { creator_id: creatorIdNum }),
       },
     });
-
     return NextResponse.json(mapCharacter(character), { status: 201 });
   } catch (error) {
     console.error("[API Characters POST]", error);

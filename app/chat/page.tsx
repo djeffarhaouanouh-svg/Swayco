@@ -23,6 +23,10 @@ interface Message {
 const getTime = () =>
   new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+/** Longueur min/max du message (en caractères) pour afficher le bouton play de génération vidéo */
+const MIN_CONTENT_LENGTH_FOR_VIDEO = 50;
+const MAX_CONTENT_LENGTH_FOR_VIDEO = 130;
+
 export default function ChatPage() {
   const router = useRouter();
   const [character, setCharacter] = useState<Character | null>(null);
@@ -130,9 +134,14 @@ export default function ChatPage() {
       .catch(() => {});
   }, []);
 
-  // Scroll en bas a chaque nouveau message
+  // Scroll en bas pour afficher le dernier message de l'assistant
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToEnd = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    };
+    scrollToEnd();
+    const t = setTimeout(scrollToEnd, 100);
+    return () => clearTimeout(t);
   }, [messages]);
 
   // Cleanup polling on unmount
@@ -246,6 +255,9 @@ export default function ChatPage() {
   const handleGenerateVideo = useCallback(async (messageId: string, content: string) => {
     if (!content.trim()) return;
 
+    const params = new URLSearchParams(window.location.search);
+    const charId = params.get('characterId');
+
     setGeneratingMessageId(messageId);
 
     try {
@@ -254,7 +266,7 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: content.trim(),
-          characterImage: character?.image || null,
+          characterId: charId ? parseInt(charId, 10) : null,
         }),
       });
       const data = await response.json();
@@ -278,7 +290,7 @@ export default function ChatPage() {
       console.error('Erreur generate-video:', error);
       setGeneratingMessageId(null);
     }
-  }, [character, pollJobStatus]);
+  }, [pollJobStatus]);
 
   const handleClearMessages = () => {
     setMessages([]);
@@ -470,6 +482,29 @@ export default function ChatPage() {
                 <>
                   <div className="chat-bubble-wrapper">
                     <div className="chat-bubble chat-bubble-assistant">
+                      {message.content && message.content.length >= MIN_CONTENT_LENGTH_FOR_VIDEO && message.content.length <= MAX_CONTENT_LENGTH_FOR_VIDEO && !message.videoUrl && message.status === 'completed' && (
+                        <>
+                          {generatingMessageId === message.id ? (
+                            <div className="chat-play-btn">
+                              <div className="chat-play-spinner">
+                                <div className="chat-play-spinner-inner" />
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="chat-play-btn"
+                              onClick={() => handleGenerateVideo(message.id, message.content)}
+                              aria-label="Générer la vidéo"
+                            >
+                              <div className="neon-border-spinner-wrapper" style={{ width: '100%', height: '100%' }}>
+                                <div className="neon-border-spinner" aria-hidden />
+                                <Play size={14} fill="currentColor" style={{ marginLeft: 2 }} />
+                              </div>
+                            </button>
+                          )}
+                        </>
+                      )}
                       {message.status === 'sending' && (
                         <div className="chat-typing">
                           <span /><span /><span />
@@ -490,9 +525,8 @@ export default function ChatPage() {
 
                       {message.status === 'processing' && (
                         <div className="chat-progress-container">
-                          {message.content && <p style={{ marginBottom: '0.5rem' }}>{message.content}</p>}
                           <div className="chat-progress-label">
-                            <span>Génération vidéo...</span>
+                            <span>{character?.name || 'Elle'} allume sa caméra...</span>
                             <span className="chat-progress-time">~40s</span>
                           </div>
                           <div className="chat-progress-bar">
@@ -501,7 +535,7 @@ export default function ChatPage() {
                         </div>
                       )}
 
-                      {message.status !== 'sending' && message.status !== 'generating' && message.status !== 'processing' && message.content && (
+                      {message.status !== 'sending' && message.status !== 'generating' && message.status !== 'processing' && message.content && !(message.videoUrl && message.showVideo) && (
                         <p>{message.content}</p>
                       )}
 
@@ -534,30 +568,6 @@ export default function ChatPage() {
                         </div>
                       )}
                     </div>
-
-                    {message.content && !message.videoUrl && message.status === 'completed' && (
-                      <>
-                        {generatingMessageId === message.id ? (
-                          <div className="chat-play-btn">
-                            <div className="chat-play-spinner">
-                              <div className="chat-play-spinner-inner" />
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            className="chat-play-btn"
-                            onClick={() => handleGenerateVideo(message.id, message.content)}
-                            aria-label="Générer la vidéo"
-                          >
-                            <div className="neon-border-spinner-wrapper" style={{ width: '100%', height: '100%' }}>
-                              <div className="neon-border-spinner" aria-hidden />
-                              <Play size={14} fill="currentColor" style={{ marginLeft: 2 }} />
-                            </div>
-                          </button>
-                        )}
-                      </>
-                    )}
                   </div>
                   <div className="chat-bubble-meta chat-meta-left">
                     <span>{message.time}</span>
