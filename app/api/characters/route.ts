@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       orderBy: { id: "desc" },
     });
 
-    const creatorIds = [...new Set(chars.map((c) => c.creator_id).filter((id): id is number => id != null))];
+    const creatorIds = Array.from(new Set(chars.map((c) => c.creator_id).filter((id): id is number => id != null)));
     const creators = creatorIds.length > 0
       ? await prisma.users.findMany({
           where: { id: { in: creatorIds } },
