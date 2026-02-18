@@ -39,7 +39,7 @@ export default function NavBar() {
   }, [])
 
   // Masquer la navbar sur certaines pages (onboarding, chat, discover, scene, lieux)
-  if (pathname.startsWith('/chat') || pathname.startsWith('/discover') || pathname.startsWith('/creer')) {
+  if (pathname.startsWith('/chat') || pathname.startsWith('/discover') || pathname.startsWith('/creer') || pathname.startsWith('/guide-eiffel')) {
     return null
   }
 

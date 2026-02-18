@@ -713,9 +713,15 @@ export default function WorldExplorer() {
                 </div>
                 <p className="card-description">{selectedItem.description}</p>
                 <div className="card-actions">
-                  <button className="btn-primary" onClick={() => alert(`Explorer ${selectedItem.name}...`)}>
-                    🔍 En savoir plus
-                  </button>
+                  {selectedItem.name === 'Tour Eiffel' && (
+                    <button
+                      className="btn-primary"
+                      style={{ background: '#f59e0b', borderColor: '#f59e0b', boxShadow: '0 4px 15px rgba(245,158,11,0.4)', color: '#000' }}
+                      onClick={() => router.push('/guide-eiffel')}
+                    >
+                      🗼 Visite guidée interactive
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
