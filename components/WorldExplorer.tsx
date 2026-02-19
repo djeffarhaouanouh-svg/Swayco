@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as maptilersdk from '@maptiler/sdk'
 import '@maptiler/sdk/dist/maptiler-sdk.css'
-import { WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, type MusicTrack, type Character, type Place, type Scene } from '@/data/worldData'
+import { WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, characters as fallbackCharacters, places as fallbackPlaces, scenes as fallbackScenes, type MusicTrack, type Character, type Place, type Scene } from '@/data/worldData'
 import ImageCarousel from '@/components/ImageCarousel'
 import CharacterOverlay from '@/components/CharacterOverlay'
 import PlaceOverlay from '@/components/PlaceOverlay'
@@ -336,20 +336,20 @@ export default function WorldExplorer() {
   const scenesRef = useRef<Scene[]>([])
   scenesRef.current = scenes
 
-  // Fetch characters, places and scenes from DB
+  // Fetch characters, places and scenes from DB (fallback to worldData if empty or error)
   useEffect(() => {
     fetch('/api/characters', { cache: 'no-store' })
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setCharacters(data) })
-      .catch(err => console.error('Erreur chargement personnages:', err))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setCharacters(Array.isArray(data) && data.length > 0 ? data : fallbackCharacters))
+      .catch(err => { console.error('Erreur chargement personnages:', err); setCharacters(fallbackCharacters) })
     fetch('/api/places')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setPlaces(data) })
-      .catch(err => console.error('Erreur chargement lieux:', err))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setPlaces(Array.isArray(data) && data.length > 0 ? data : fallbackPlaces))
+      .catch(err => { console.error('Erreur chargement lieux:', err); setPlaces(fallbackPlaces) })
     fetch('/api/scenes')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setScenes(data) })
-      .catch(err => console.error('Erreur chargement scènes:', err))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setScenes(Array.isArray(data) && data.length > 0 ? data : fallbackScenes))
+      .catch(err => { console.error('Erreur chargement scènes:', err); setScenes(fallbackScenes) })
   }, [])
 
   useEffect(() => {
