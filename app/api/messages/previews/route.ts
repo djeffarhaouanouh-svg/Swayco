@@ -58,7 +58,7 @@ export async function GET() {
       ...charMessages.map(m => m.character_id!),
       ...resolvedSceneChars.filter((id): id is number => id != null),
     ];
-    const uniqueCharIds = [...new Set(charIds)];
+    const uniqueCharIds = Array.from(new Set(charIds));
     const dbCharacters = uniqueCharIds.length > 0
       ? await prisma.characters.findMany({
           where: { id: { in: uniqueCharIds } },
