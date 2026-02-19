@@ -1,10 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, conversationHistory, characterName, characterDescription, characterLocation } = await request.json();
+    const {
+      message,
+      conversationHistory,
+      characterName,
+      characterDescription,
+      characterLocation,
+      sceneId,
+    } = await request.json();
 
-    const systemPrompt = `Tu es ${characterName || 'un personnage IA'}, ${characterDescription || 'un personnage chaleureux et amical'}. Tu vis à ${characterLocation || 'quelque part dans le monde'}. Réponds de manière naturelle, chaleureuse et en restant dans ton personnage. Réponds toujours en français. Sois concis (2-4 phrases max).`;
+    let systemPrompt: string;
+
+    if (sceneId) {
+      const scene = await prisma.scenes.findUnique({
+        where: { id: Number(sceneId) },
+      });
+
+      // Contexte de lieu : priorité à la description de la scène, sinon on la compose
+      const lieuContext = scene?.description
+        || (scene ? `Tu te trouves dans ${scene.name}${scene.location ? `, ${scene.location}` : ''}.` : '');
+
+      // Le personnage garde sa propre personnalité, on ajoute juste le lieu
+      systemPrompt = `Tu es ${characterName || 'un personnage'}, ${characterDescription || 'quelqu\'un de chaleureux et authentique'}. ${lieuContext} Réponds en restant totalement toi-même. Réponds toujours en français. Sois concis (2-4 phrases max).`;
+    } else {
+      // Mode personnage classique (sans scène)
+      systemPrompt = `Tu es ${characterName || 'un personnage IA'}, ${characterDescription || 'un personnage chaleureux et amical'}. Tu vis à ${characterLocation || 'quelque part dans le monde'}. Réponds de manière naturelle, chaleureuse et en restant dans ton personnage. Réponds toujours en français. Sois concis (2-4 phrases max).`;
+    }
 
     const messages = [
       { role: 'system', content: systemPrompt },

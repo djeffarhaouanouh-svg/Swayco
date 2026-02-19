@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Send, ChevronRight, MessageCircle, MoreVertical, Trash2 } from 'lucide-react'
+import { ArrowLeft, Send, ChevronRight, MessageCircle, MoreVertical, Trash2, RotateCcw } from 'lucide-react'
 
 const IMAGE_MAP: Record<string, string> = {
   intro:          '/intro.jpg',
@@ -18,12 +18,10 @@ const IMAGE_MAP: Record<string, string> = {
 }
 
 const N8N_URL = 'https://ouistitiii.app.n8n.cloud/webhook/guide-eiffel'
-const SESSION_ID = `guide_${Math.random().toString(36).slice(2)}`
+const SESSION_ID = `place_${Math.random().toString(36).slice(2)}`
 
 function parseN8nReply(reply: string): Record<string, string> {
-  // Supprime le préfixe [object Object] si présent
   const cleaned = reply.replace(/^\[object Object\]\s*/i, '')
-  // Split sur les sauts de ligne (littéraux \n ou vrais retours)
   const lines = cleaned.split(/\\n|\n/).map(l => l.trim()).filter(Boolean)
   const result: Record<string, string> = {}
   for (const line of lines) {
@@ -46,22 +44,29 @@ async function callGuide(payload: Record<string, string>) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const raw = await res.json()
 
-  // Log pour debug — visible dans DevTools > Console
   console.log('[Guide n8n raw]', JSON.stringify(raw))
 
   const item = Array.isArray(raw) ? raw[0] : raw
 
-  // n8n renvoie { reply: { reply: "string..." } } — on descend jusqu'à la string
   let current = item
   while (current?.reply !== undefined) {
     current = current.reply
   }
 
-  // current est soit une string à parser, soit déjà l'objet final
   if (typeof current === 'string') {
     return parseN8nReply(current)
   }
   return current
+}
+
+async function saveToDb(sessionId: string, role: 'user' | 'assistant', content: string) {
+  try {
+    await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sceneSessionId: sessionId, role, content }),
+    })
+  } catch { /* ignore */ }
 }
 
 interface ChatMessage {
@@ -88,6 +93,7 @@ export default function EiffelGuidePage() {
   const [showInput, setShowInput] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [bgOffset, setBgOffset] = useState({ x: 50, y: 50 })
+  const [isResume, setIsResume] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -102,12 +108,39 @@ export default function EiffelGuidePage() {
     return () => document.removeEventListener('mousedown', handle)
   }, [showMenu])
 
+  // Charger l'historique depuis /messages (placeSessionId dans l'URL)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const resumeId = params.get('placeSessionId')
+    if (!resumeId) return
+    setIsResume(true)
+    setHasNextStep(false)
+    fetch(`/api/messages?sceneSessionId=${resumeId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(data.messages.map((m: { id: number; role: 'user' | 'assistant'; content: string; created_at: string }) => ({
+            id: m.id.toString(),
+            role: m.role,
+            content: m.content,
+            time: new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const handleClear = () => {
     setMessages([])
     setCurrentStep('intro')
     setHasNextStep(true)
     setShowInput(false)
     setShowMenu(false)
+    setIsResume(false)
+    // Retirer placeSessionId de l'URL sans rechargement
+    const url = new URL(window.location.href)
+    url.searchParams.delete('placeSessionId')
+    window.history.replaceState({}, '', url.toString())
   }
 
   // Parallaxe gyroscope
@@ -155,6 +188,10 @@ export default function EiffelGuidePage() {
         ))
         setCurrentStep(data.next_step ?? '')
         setHasNextStep(!!data.next_step)
+
+        // Sauvegarder l'étape en DB
+        const stepContent = [data.title, data.text].filter(Boolean).join('\n')
+        saveToDb(SESSION_ID, 'assistant', stepContent)
       }
     } catch {
       setMessages(prev => prev.map(m =>
@@ -190,14 +227,19 @@ export default function EiffelGuidePage() {
     setShowInput(false)
     setIsLoading(true)
 
+    // Sauvegarder la question
+    saveToDb(SESSION_ID, 'user', q)
+
     try {
       const data = await callGuide({ sessionId: SESSION_ID, mode: 'question', step: currentStep, question: q })
+      const answer = data.type === 'answer' ? data.text : 'Réponse non disponible.'
 
       setMessages(prev => prev.map(m =>
-        m.id === loadingId
-          ? { ...m, content: data.type === 'answer' ? data.text : 'Réponse non disponible.' }
-          : m
+        m.id === loadingId ? { ...m, content: answer } : m
       ))
+
+      // Sauvegarder la réponse
+      saveToDb(SESSION_ID, 'assistant', answer)
     } catch {
       setMessages(prev => prev.map(m =>
         m.id === loadingId
@@ -269,7 +311,23 @@ export default function EiffelGuidePage() {
       <div className="chat-messages">
         {messages.length === 0 && !isLoading && (
           <div className="chat-empty">
-            <p>Appuyez sur <strong>Étape suivante</strong> pour commencer la visite guidée</p>
+            <p>Appuyez sur <strong>Commencer la visite</strong> pour démarrer la visite guidée</p>
+          </div>
+        )}
+
+        {/* Bannière historique */}
+        {isResume && messages.length > 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '10px 16px',
+            margin: '0 16px 12px',
+            background: 'rgba(245,158,11,0.12)',
+            border: '1px solid rgba(245,158,11,0.25)',
+            borderRadius: 12,
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: 13,
+          }}>
+            📜 Historique de votre visite précédente
           </div>
         )}
 
@@ -358,91 +416,141 @@ export default function EiffelGuidePage() {
 
       {/* Input bar */}
       <div className="chat-input-bar" style={{ flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-        {/* Boutons d'action */}
-        {!showInput && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            {hasNextStep && (
-              <button
-                type="button"
-                onClick={fetchNextStep}
-                disabled={isLoading}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  padding: '10px 14px',
-                  background: isLoading ? 'rgba(245,158,11,0.4)' : '#f59e0b',
-                  color: '#000',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  borderRadius: 22,
-                  border: 'none',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  transition: 'background 0.2s',
-                }}
-              >
-                <ChevronRight size={16} />
-                {messages.length === 0 ? 'Commencer la visite' : 'Étape suivante'}
-              </button>
+
+        {/* Mode historique : bouton recommencer en évidence */}
+        {isResume ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '12px 16px',
+              background: '#f59e0b',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: 14,
+              borderRadius: 22,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <RotateCcw size={16} />
+            Recommencer la visite
+          </button>
+        ) : (
+          <>
+            {/* Boutons d'action */}
+            {!showInput && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {hasNextStep && (
+                  <button
+                    type="button"
+                    onClick={fetchNextStep}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '10px 14px',
+                      background: isLoading ? 'rgba(245,158,11,0.4)' : '#f59e0b',
+                      color: '#000',
+                      fontWeight: 700,
+                      fontSize: 14,
+                      borderRadius: 22,
+                      border: 'none',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    <ChevronRight size={16} />
+                    {messages.length === 0 ? 'Commencer la visite' : 'Étape suivante'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setShowInput(true); setTimeout(() => inputRef.current?.focus(), 50) }}
+                  disabled={isLoading}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '10px 14px',
+                    background: 'rgba(255,255,255,0.1)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    borderRadius: 22,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <MessageCircle size={16} />
+                  Poser une question
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => { setShowInput(true); setTimeout(() => inputRef.current?.focus(), 50) }}
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                padding: '10px 14px',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 22,
-                border: '1px solid rgba(255,255,255,0.15)',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
-              }}
-            >
-              <MessageCircle size={16} />
-              Poser une question
-            </button>
-          </div>
-        )}
 
-        {/* Champ question */}
-        {showInput && (
-          <div className="chat-input-wrapper" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Posez votre question…"
-              disabled={isLoading}
-              style={{ flex: 1 }}
-            />
-            <button
-              type="button"
-              onClick={sendQuestion}
-              disabled={isLoading || !input.trim()}
-              className="chat-send-btn"
-            >
-              <Send size={20} />
-            </button>
-          </div>
-        )}
+            {/* Champ question */}
+            {showInput && (
+              <div className="chat-input-wrapper" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Posez votre question…"
+                  disabled={isLoading}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={sendQuestion}
+                  disabled={isLoading || !input.trim()}
+                  className="chat-send-btn"
+                >
+                  <Send size={20} />
+                </button>
+              </div>
+            )}
 
-        {/* Fin de visite */}
-        {!hasNextStep && (
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>
-            🏁 Visite terminée — vous pouvez encore poser des questions
-          </p>
+            {/* Fin de visite */}
+            {!hasNextStep && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>
+                  🏁 Visite terminée — vous pouvez encore poser des questions
+                </p>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 20px',
+                    background: 'rgba(245,158,11,0.15)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                    color: '#f59e0b',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    borderRadius: 20,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <RotateCcw size={14} />
+                  Recommencer la visite
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

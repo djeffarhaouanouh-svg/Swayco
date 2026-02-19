@@ -6,10 +6,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const characterId = request.nextUrl.searchParams.get('characterId');
   const sceneId = request.nextUrl.searchParams.get('sceneId');
+  const sceneSessionId = request.nextUrl.searchParams.get('sceneSessionId');
 
   const where: Record<string, unknown> = {};
   if (characterId) where.character_id = parseInt(characterId);
-  if (sceneId) where.scene_id = parseInt(sceneId);
+  if (sceneSessionId) where.scene_session_id = sceneSessionId;
+  else if (sceneId) where.scene_id = parseInt(sceneId);
 
   try {
     const messages = await prisma.messages.findMany({
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
         user_id: body.userId ? parseInt(body.userId) : null,
         character_id: body.characterId ? parseInt(body.characterId) : null,
         scene_id: body.sceneId ? parseInt(body.sceneId) : null,
+        scene_session_id: body.sceneSessionId || null,
         role: body.role,
         content: body.content,
         video_url: body.videoUrl || null,
@@ -65,10 +68,12 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const characterId = request.nextUrl.searchParams.get('characterId');
   const sceneId = request.nextUrl.searchParams.get('sceneId');
+  const sceneSessionId = request.nextUrl.searchParams.get('sceneSessionId');
 
   const where: Record<string, unknown> = {};
   if (characterId) where.character_id = parseInt(characterId);
-  if (sceneId) where.scene_id = parseInt(sceneId);
+  if (sceneSessionId) where.scene_session_id = sceneSessionId;
+  else if (sceneId) where.scene_id = parseInt(sceneId);
 
   try {
     await prisma.messages.deleteMany({ where });

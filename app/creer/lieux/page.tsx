@@ -124,7 +124,7 @@ function LieuxContent() {
           <div className="mb-6">
             <span className="text-sm text-[#A3A3A3]">Étape 1 / 2</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-[#3BB9FF] transition-all duration-300" style={{ width: progressWidth }} />
+              <div className="h-full bg-[#f59e0b] transition-all duration-300" style={{ width: progressWidth }} />
             </div>
           </div>
           <p className="text-white mb-3">Nom et adresse du lieu</p>
@@ -136,7 +136,7 @@ function LieuxContent() {
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
                 placeholder="Ex : Café de Flore"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
                 autoFocus
               />
             </div>
@@ -149,14 +149,14 @@ function LieuxContent() {
                 value={adresse}
                 onChange={(e) => setAdresse(e.target.value)}
                 placeholder="Ex : 172 Bd Saint-Germain, 75006 Paris"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
               />
             </div>
             <button
               type="submit"
               disabled={!nom.trim()}
               className={`w-full py-3 px-4 rounded-xl text-white font-medium transition-colors ${
-                nom.trim() ? "bg-[#3BB9FF] hover:bg-[#2AA3E6]" : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
+                nom.trim() ? "bg-[#f59e0b] hover:bg-[#d97706]" : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
               }`}
             >
               Suivant
@@ -169,7 +169,7 @@ function LieuxContent() {
           <div className="mb-6">
             <span className="text-sm text-[#A3A3A3]">Étape 2 / 2</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-[#3BB9FF] transition-all duration-300" style={{ width: progressWidth }} />
+              <div className="h-full bg-[#f59e0b] transition-all duration-300" style={{ width: progressWidth }} />
             </div>
           </div>
           <h2 className="text-xl font-semibold text-white mb-2">Photo du lieu</h2>
@@ -181,9 +181,9 @@ function LieuxContent() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full aspect-square max-w-[300px] mx-auto flex flex-col items-center justify-center gap-3 bg-[#1E1E1E] border-2 border-dashed border-[#2A2A2A] rounded-xl hover:border-[#3BB9FF] hover:bg-[#252525] transition-colors text-[#A3A3A3] hover:text-white"
+              className="w-full aspect-square max-w-[300px] mx-auto flex flex-col items-center justify-center gap-3 bg-[#1E1E1E] border-2 border-dashed border-[#2A2A2A] rounded-xl hover:border-[#f59e0b] hover:bg-[#252525] transition-colors text-[#A3A3A3] hover:text-white"
             >
-              <Camera className="w-16 h-16 text-[#3BB9FF]" />
+              <Camera className="w-16 h-16 text-[#f59e0b]" />
               <span className="text-base font-medium">Ajouter une photo</span>
               <span className="text-sm">PNG, JPG ou WEBP</span>
             </button>
@@ -203,7 +203,7 @@ function LieuxContent() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[#3BB9FF] hover:underline text-sm">
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[#f59e0b] hover:underline text-sm">
                 Changer la photo
               </button>
             </div>
@@ -232,7 +232,7 @@ function LieuxContent() {
               className={`py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 ${
                 isSubmitting
                   ? "bg-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
-                  : "bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+                  : "bg-[#f59e0b] text-white hover:bg-[#d97706]"
               }`}
             >
               {isSubmitting ? (

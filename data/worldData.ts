@@ -134,6 +134,21 @@ export function getCountry(item: WorldItem): string {
   return loc;
 }
 
+/** Extract city of residence from location when possible */
+export function getCity(item: WorldItem): string | null {
+  const loc = item.location;
+  const parts = loc.split(/\s*,\s*/);
+  if (parts.length < 2) return null;
+  const countryPart = parts[parts.length - 1]?.trim() ?? '';
+  const beforeCountry = parts.slice(0, -1).join(', ').trim();
+  if (!beforeCountry) return null;
+  // "City, Country" : court, pas de chiffres → ville probable
+  if (beforeCountry.length <= 30 && !/\d/.test(beforeCountry)) return beforeCountry;
+  // "Adresse avec code postal, Country" : mot avant XXXX ou XXXX-XXX
+  const beforePostal = beforeCountry.match(/([A-Za-zÀ-ÿ]+)\s+\d{4}(-\d{3})?\s*$/);
+  return beforePostal ? beforePostal[1].trim() : null;
+}
+
 export const characters: Character[] = [
   {
     id: 1,

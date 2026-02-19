@@ -8,6 +8,9 @@ import * as maptilersdk from '@maptiler/sdk'
 import '@maptiler/sdk/dist/maptiler-sdk.css'
 import { WorldItem, countries, getCountry, COUNTRY_PLACEHOLDER, type MusicTrack, type Character, type Place, type Scene } from '@/data/worldData'
 import ImageCarousel from '@/components/ImageCarousel'
+import CharacterOverlay from '@/components/CharacterOverlay'
+import PlaceOverlay from '@/components/PlaceOverlay'
+import SceneOverlay from '@/components/SceneOverlay'
 
 type FilterType = 'all' | 'character' | 'place' | 'scene'
 
@@ -321,6 +324,9 @@ export default function WorldExplorer() {
   const [selectedItem, setSelectedItem] = useState<WorldItem | null>(null)
   const [selectedCountry, setSelectedCountry] = useState<{ country: string; center: [number, number]; zoom: number; description?: string; images?: string[]; music?: (string | MusicTrack)[] } | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [characterOverlay, setCharacterOverlay] = useState<Character | null>(null)
+  const [placeOverlay, setPlaceOverlay] = useState<Place | null>(null)
+  const [sceneOverlay, setSceneOverlay] = useState<Scene | null>(null)
 
   filterRef.current = currentFilter
   const charactersRef = useRef<Character[]>([])
@@ -372,6 +378,7 @@ export default function WorldExplorer() {
     const filter = filterRef.current
     const zoom = m.getZoom()
     const shouldCluster = zoom < CLUSTER_ZOOM_THRESHOLD
+    const zoomedOut = zoom < CLUSTER_ZOOM_THRESHOLD
 
     // Skip if mode hasn't changed
     if (shouldCluster === clusterModeRef.current) return
@@ -379,13 +386,83 @@ export default function WorldExplorer() {
     clearMarkers()
     clusterModeRef.current = shouldCluster
 
-    // Scènes: show when all or scene (hide when character or place)
-    if (filter !== 'character' && filter !== 'place') {
+    // Zoomé loin : monuments + clusters (pas de personnages/scènes individuels)
+    if (zoomedOut) {
+      // Monuments
+      placesRef.current.forEach(item => {
+        const el = createMarkerElement(item, () => {
+          setPlaceOverlay(item)
+          m.flyTo({
+            center: item.coordinates,
+            zoom: Math.min(m.getZoom() + 2, 12),
+            duration: 1000
+          })
+        })
+        const marker = new maptilersdk.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(item.coordinates)
+          .addTo(m)
+        markersRef.current.push(marker)
+      })
+      // Clusters par pays (si filtre le permet)
+      if (filter !== 'place' && filter !== 'scene') {
+        const grouped: Record<string, WorldItem[]> = {}
+        const ungroupedChars: WorldItem[] = []
+        charactersRef.current.forEach(item => {
+          const country = getCountry(item)
+          const countryData = countries.find(c => c.country === country)
+          if (countryData) {
+            if (!grouped[country]) grouped[country] = []
+            grouped[country].push(item)
+          } else {
+            ungroupedChars.push(item)
+          }
+        })
+        Object.entries(grouped).forEach(([countryName, items]) => {
+          const countryData = countries.find(c => c.country === countryName)
+          if (!countryData) return
+          const el = createClusterElement(items.length, () => {
+            clusterModeRef.current = null
+            setSelectedCountry(null)
+            setSelectedItem(null)
+            setIsSheetOpen(false)
+            m.flyTo({
+              center: countryData.center,
+              zoom: countryData.zoom,
+              duration: 1000
+            })
+          })
+          const marker = new maptilersdk.Marker({ element: el, anchor: 'center' })
+            .setLngLat(countryData.center)
+            .addTo(m)
+          markersRef.current.push(marker)
+        })
+        ungroupedChars.forEach(item => {
+          const el = createMarkerElement(item, () => {
+            setSelectedItem(item)
+            setSelectedCountry(null)
+            setCharacterOverlay(item)
+            m.flyTo({
+              center: item.coordinates,
+              zoom: Math.min(m.getZoom() + 2, 12),
+              duration: 1000
+            })
+          })
+          const marker = new maptilersdk.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(item.coordinates)
+            .addTo(m)
+          markersRef.current.push(marker)
+        })
+      }
+      return
+    }
+
+    // Zoomé près : personnages, scènes et monuments selon le filtre
+
+    // Scènes : visibles en même temps que les personnages (cache si filtre "lieux")
+    if (filter !== 'place') {
       scenesRef.current.forEach(item => {
         const el = createMarkerElement(item, () => {
-          setSelectedItem(item)
-          setSelectedCountry(null)
-          setIsSheetOpen(true)
+          setSceneOverlay(item)
           m.flyTo({
             center: item.coordinates,
             zoom: Math.min(m.getZoom() + 2, 12),
@@ -401,13 +478,11 @@ export default function WorldExplorer() {
       })
     }
 
-    // Monuments: always show individually (hide when filtering by character or scene)
+    // Monuments: overlay au clic (hide when filtering by character or scene)
     if (filter !== 'character' && filter !== 'scene') {
         placesRef.current.forEach(item => {
         const el = createMarkerElement(item, () => {
-          setSelectedItem(item)
-          setSelectedCountry(null)
-          setIsSheetOpen(true)
+          setPlaceOverlay(item)
           m.flyTo({
             center: item.coordinates,
             zoom: Math.min(m.getZoom() + 2, 12),
@@ -445,9 +520,9 @@ export default function WorldExplorer() {
 
           const el = createClusterElement(items.length, () => {
             clusterModeRef.current = null // force refresh after flyTo
-            setSelectedCountry(countryData)
+            setSelectedCountry(null)
             setSelectedItem(null)
-            setIsSheetOpen(true)
+            setIsSheetOpen(false)
             m.flyTo({
               center: countryData.center,
               zoom: countryData.zoom,
@@ -466,7 +541,7 @@ export default function WorldExplorer() {
           const el = createMarkerElement(item, () => {
             setSelectedItem(item)
             setSelectedCountry(null)
-            setIsSheetOpen(true)
+            setCharacterOverlay(item)
             m.flyTo({
               center: item.coordinates,
               zoom: Math.min(m.getZoom() + 2, 12),
@@ -483,7 +558,7 @@ export default function WorldExplorer() {
           const el = createMarkerElement(item, () => {
             setSelectedItem(item)
             setSelectedCountry(null)
-            setIsSheetOpen(true)
+            setCharacterOverlay(item)
             m.flyTo({
               center: item.coordinates,
               zoom: Math.min(m.getZoom() + 2, 12),
@@ -521,7 +596,8 @@ export default function WorldExplorer() {
       maxZoom: 16,
       terrain: true,
       pitch: 60,
-      attributionControl: false
+      attributionControl: false,
+      geolocateControl: false
     })
 
     m.on('error', (e: unknown) => {
@@ -563,6 +639,18 @@ export default function WorldExplorer() {
     setIsSheetOpen(false)
     setSelectedItem(null)
     setSelectedCountry(null)
+  }
+
+  const closeCharacterOverlay = () => {
+    setCharacterOverlay(null)
+  }
+
+  const closePlaceOverlay = () => {
+    setPlaceOverlay(null)
+  }
+
+  const closeSceneOverlay = () => {
+    setSceneOverlay(null)
   }
 
   return (
@@ -618,7 +706,6 @@ export default function WorldExplorer() {
         </nav>
         <div className="burger-nav-bottom">
         <div className="burger-nav-footer-buttons">
-          <Link href="/discord" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Discord</Link>
           <Link href="/contact" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Contact</Link>
           <Link href="/affiliation" onClick={() => setBurgerOpen(false)} className="burger-footer-btn">Affiliation</Link>
         </div>
@@ -667,7 +754,6 @@ export default function WorldExplorer() {
               </div>
               <div className="card-info">
                 <h2 className="card-name">📍 {selectedCountry.country}</h2>
-                <p className="card-description">{selectedCountry.description || 'Explorez ce pays sur la carte.'}</p>
                 {selectedCountry.music?.length ? (
                   <CountryMusicPlayer tracks={selectedCountry.music} />
                 ) : null}
@@ -765,6 +851,50 @@ export default function WorldExplorer() {
           )}
         </div>
       </div>
+
+      {characterOverlay && (
+        <CharacterOverlay
+          character={{
+            id: characterOverlay.id,
+            name: characterOverlay.name,
+            image: characterOverlay.image,
+            description: characterOverlay.description,
+            teaser: characterOverlay.teaser,
+            location: characterOverlay.location,
+            badge: characterOverlay.badge,
+          }}
+          isOpen={!!characterOverlay}
+          onClose={closeCharacterOverlay}
+        />
+      )}
+
+      {placeOverlay && (
+        <PlaceOverlay
+          place={{
+            id: placeOverlay.id,
+            name: placeOverlay.name,
+            image: placeOverlay.image,
+            images: placeOverlay.images,
+            visitLabel: placeOverlay.name === 'Tour Eiffel' ? '🗼 Visite guidée interactive' : 'Visiter',
+            visitHref: placeOverlay.name === 'Tour Eiffel' ? '/guide-eiffel' : undefined,
+          }}
+          isOpen={!!placeOverlay}
+          onClose={closePlaceOverlay}
+        />
+      )}
+
+      {sceneOverlay && (
+        <SceneOverlay
+          scene={{
+            id: sceneOverlay.id,
+            name: sceneOverlay.name,
+            image: sceneOverlay.image,
+            location: sceneOverlay.location,
+          }}
+          isOpen={!!sceneOverlay}
+          onClose={closeSceneOverlay}
+        />
+      )}
     </div>
   )
 }

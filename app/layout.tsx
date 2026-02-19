@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import NavBar from '@/components/NavBar'
 
@@ -14,6 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
+      <head>
+        <Script
+          src="https://t.contentsquare.net/uxa/5682f410a201f.js"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body>
         {children}
         <NavBar />

@@ -20,6 +20,7 @@ import {
   Plus,
 } from "lucide-react";
 import { getSavedCharactersData } from "@/lib/savedCharacters";
+import CharacterOverlay from "@/components/CharacterOverlay";
 
 type ProfileData = {
   id: string;
@@ -65,6 +66,14 @@ export default function ProfilPage() {
   const [createdChars, setCreatedChars] = useState<CreatedCharacter[]>([]);
   const [createdOpen, setCreatedOpen] = useState(false);
   const [createdLoading, setCreatedLoading] = useState(false);
+  const [overlayCharacter, setOverlayCharacter] = useState<{
+    id: number;
+    name: string;
+    image: string;
+    description: string;
+    teaser?: string;
+    location?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -208,12 +217,12 @@ export default function ProfilPage() {
     <div className="min-h-screen bg-[#0F0F0F] text-white pt-6 pb-10">
       <div className="max-w-2xl mx-auto px-4 md:px-6">
         <h1 className="text-2xl font-bold mb-6">
-          Mon <span className="text-[#3BB9FF]">Profil</span>
+          Mon <span className="text-[#f59e0b]">Profil</span>
         </h1>
 
         {loading && (
           <div className="flex items-center justify-center py-12 text-[#A3A3A3]">
-            <div className="w-8 h-8 border-2 border-[#3BB9FF] border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#f59e0b] border-t-transparent rounded-full animate-spin" />
             <span className="ml-2">Chargement du profil...</span>
           </div>
         )}
@@ -226,14 +235,14 @@ export default function ProfilPage() {
             <button
               type="button"
               onClick={handleOpenEdit}
-              className="absolute top-0 right-0 w-9 h-9 rounded-lg bg-[#3BB9FF]/20 flex items-center justify-center text-[#3BB9FF] hover:bg-[#3BB9FF]/30 transition-colors"
+              className="absolute top-0 right-0 w-9 h-9 rounded-lg bg-[#f59e0b]/20 flex items-center justify-center text-[#f59e0b] hover:bg-[#f59e0b]/30 transition-colors"
               aria-label="Modifier le profil"
             >
               <Pencil className="w-4 h-4" />
             </button>
             <div className="flex flex-col items-start text-left">
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-14 h-14 rounded-full bg-[#3BB9FF] flex items-center justify-center flex-shrink-0">
+                <div className="w-14 h-14 rounded-full bg-[#f59e0b] flex items-center justify-center flex-shrink-0">
                   <span className="text-xl font-bold text-white">{initial}</span>
                 </div>
                 <div>
@@ -301,7 +310,7 @@ export default function ProfilPage() {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Ton prénom"
-                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -313,7 +322,7 @@ export default function ProfilPage() {
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="ton@email.com"
-                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                    className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
                   />
                 </div>
                 <div className="flex gap-3 pt-2">
@@ -326,7 +335,7 @@ export default function ProfilPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 px-4 rounded-xl bg-[#3BB9FF] text-white font-medium hover:bg-[#2AA3E6] transition-colors"
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#f59e0b] text-white font-medium hover:bg-[#d97706] transition-colors"
                   >
                     Enregistrer
                   </button>
@@ -341,7 +350,7 @@ export default function ProfilPage() {
           <button
             type="button"
             onClick={() => setSavedOpen((o) => !o)}
-            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors text-left"
+            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#f59e0b]/30 transition-colors text-left"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
@@ -369,7 +378,7 @@ export default function ProfilPage() {
                   </p>
                   <Link
                     href="/discover"
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#3BB9FF]/20 text-[#3BB9FF] text-sm font-medium hover:bg-[#3BB9FF]/30 transition-colors w-fit"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#f59e0b]/20 text-[#f59e0b] text-sm font-medium hover:bg-[#f59e0b]/30 transition-colors w-fit"
                   >
                     Aller au Discover
                     <ChevronRight className="w-4 h-4" />
@@ -377,12 +386,27 @@ export default function ProfilPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4">
-                  {savedChars.map((c) => (
+                  {savedChars.map((c) => {
+                    const fullChar = getSavedCharactersData().find((fc) => fc.id === c.id);
+                    return (
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => router.push(`/chat?characterId=${c.id}`)}
-                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#3BB9FF]/50 hover:bg-[#1A1A1A] transition-colors text-left"
+                      onClick={() =>
+                        setOverlayCharacter(
+                          fullChar
+                            ? {
+                                id: fullChar.id,
+                                name: fullChar.name,
+                                image: fullChar.image,
+                                description: fullChar.description,
+                                teaser: fullChar.teaser,
+                                location: fullChar.location,
+                              }
+                            : { id: c.id, name: c.name, image: c.image, description: "", location: c.location }
+                        )
+                      }
+                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#f59e0b]/50 hover:bg-[#1A1A1A] transition-colors text-left"
                     >
                       <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-[#2A2A2A]">
                         <img
@@ -394,7 +418,8 @@ export default function ProfilPage() {
                       <p className="font-medium text-white text-sm truncate w-full">{c.name}</p>
                       <p className="text-xs text-[#A3A3A3] truncate w-full">{c.location}</p>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -409,11 +434,11 @@ export default function ProfilPage() {
               setCreatedOpen((o) => !o);
               if (!createdOpen) fetchCreatedChars();
             }}
-            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors text-left"
+            className="flex items-center justify-between w-full px-5 py-4 md:px-6 hover:bg-[#252525] hover:border-[#f59e0b]/30 transition-colors text-left"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
-                <Users className="w-5 h-5 text-[#3BB9FF]" />
+                <Users className="w-5 h-5 text-[#f59e0b]" />
               </div>
               <div className="text-left">
                 <p className="font-semibold text-white">Personnages</p>
@@ -432,7 +457,7 @@ export default function ProfilPage() {
             <div className="px-5 pb-5 md:px-6 pt-0 border-t border-[#2A2A2A]">
               {createdLoading ? (
                 <div className="flex items-center justify-center py-8 text-[#A3A3A3]">
-                  <div className="w-6 h-6 border-2 border-[#3BB9FF] border-t-transparent rounded-full animate-spin mr-2" />
+                  <div className="w-6 h-6 border-2 border-[#f59e0b] border-t-transparent rounded-full animate-spin mr-2" />
                   Chargement...
                 </div>
               ) : createdChars.length === 0 ? (
@@ -442,7 +467,7 @@ export default function ProfilPage() {
                   </p>
                   <Link
                     href="/creer"
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#3BB9FF]/20 text-[#3BB9FF] text-sm font-medium hover:bg-[#3BB9FF]/30 transition-colors w-fit"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#f59e0b]/20 text-[#f59e0b] text-sm font-medium hover:bg-[#f59e0b]/30 transition-colors w-fit"
                   >
                     <Plus className="w-4 h-4" />
                     Créer un personnage
@@ -454,8 +479,16 @@ export default function ProfilPage() {
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => router.push(`/chat?characterId=${c.id}`)}
-                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#3BB9FF]/50 hover:bg-[#1A1A1A] transition-colors text-left"
+                      onClick={() =>
+                        setOverlayCharacter({
+                          id: c.id,
+                          name: c.name,
+                          image: c.image || "/jade.png",
+                          description: c.description || "",
+                          location: c.location,
+                        })
+                      }
+                      className="group flex flex-col items-center p-3 rounded-xl bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#f59e0b]/50 hover:bg-[#1A1A1A] transition-colors text-left"
                     >
                       <div className="w-full aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-[#2A2A2A]">
                         <img
@@ -484,7 +517,7 @@ export default function ProfilPage() {
         {/* Paramètres */}
         <button
           type="button"
-          className="flex items-center w-full px-5 py-4 md:px-6 bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl hover:bg-[#252525] hover:border-[#3BB9FF]/30 transition-colors text-left mb-3"
+          className="flex items-center w-full px-5 py-4 md:px-6 bg-[#1E1E1E] border border-[#2A2A2A] rounded-2xl hover:bg-[#252525] hover:border-[#f59e0b]/30 transition-colors text-left mb-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[#2A2A2A] flex items-center justify-center">
@@ -510,6 +543,14 @@ export default function ProfilPage() {
         </>
         )}
 
+        {overlayCharacter && (
+          <CharacterOverlay
+            character={overlayCharacter}
+            isOpen={!!overlayCharacter}
+            onClose={() => setOverlayCharacter(null)}
+          />
+        )}
+
       </div>
 
       {/* Footer */}
@@ -518,7 +559,7 @@ export default function ProfilPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <h3 className="text-xl font-bold mb-4">
-                <span className="text-white">swayco</span><span className="text-[#3BB9FF]">.ai</span>
+                <span className="text-white">swayco</span><span className="text-[#f59e0b]">.ai</span>
               </h3>
               <p className="text-[#A3A3A3] text-sm">
                 Conversations personnalisées avec vos créatrices préférées, alimentées par l&apos;IA.
@@ -528,22 +569,22 @@ export default function ProfilPage() {
               <h4 className="font-semibold mb-4 text-white">Légal</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="/mentions-legales" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/mentions-legales" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     Mentions légales
                   </Link>
                 </li>
                 <li>
-                  <Link href="/cgv" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/cgv" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     CGV
                   </Link>
                 </li>
                 <li>
-                  <Link href="/confidentialite" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/confidentialite" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     Confidentialité
                   </Link>
                 </li>
                 <li>
-                  <Link href="/cookies" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/cookies" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     Cookies
                   </Link>
                 </li>
@@ -553,12 +594,12 @@ export default function ProfilPage() {
               <h4 className="font-semibold mb-4 text-white">Support</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="/faq" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/faq" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     FAQ
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="text-[#A3A3A3] hover:text-[#3BB9FF] transition-colors">
+                  <Link href="/contact" className="text-[#A3A3A3] hover:text-[#f59e0b] transition-colors">
                     Contact
                   </Link>
                 </li>

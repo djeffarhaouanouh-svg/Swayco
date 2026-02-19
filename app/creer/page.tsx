@@ -262,7 +262,7 @@ function CreerContent() {
             <span className="text-sm text-[#A3A3A3]">Étape 1 / 4</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
               <div
-                className="h-full bg-[#3BB9FF] transition-all duration-300"
+                className="h-full bg-[#f59e0b] transition-all duration-300"
                 style={{ width: progressWidth }}
               />
             </div>
@@ -277,7 +277,7 @@ function CreerContent() {
                 value={prenom}
                 onChange={(e) => setPrenom(e.target.value)}
                 placeholder="Nom du personnage"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
                 autoFocus
               />
             </div>
@@ -286,7 +286,7 @@ function CreerContent() {
               disabled={!prenom.trim()}
               className={`w-full py-3 px-4 rounded-xl text-white font-medium transition-colors ${
                 prenom.trim()
-                  ? "bg-[#3BB9FF] hover:bg-[#2AA3E6]"
+                  ? "bg-[#f59e0b] hover:bg-[#d97706]"
                   : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
               }`}
             >
@@ -309,7 +309,7 @@ function CreerContent() {
             <span className="text-sm text-[#A3A3A3]">Étape 2 / 4</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
               <div
-                className="h-full bg-[#3BB9FF] transition-all duration-300"
+                className="h-full bg-[#f59e0b] transition-all duration-300"
                 style={{ width: progressWidth }}
               />
             </div>
@@ -317,16 +317,16 @@ function CreerContent() {
 
           <h2 className="text-xl font-semibold text-white mb-2">Ta photo</h2>
           <p className="text-[#A3A3A3] mb-6">
-            Upload la photo de <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
+            Upload la photo de <span className="text-xl font-semibold text-[#f59e0b]">{displayName}</span>
           </p>
 
           {!importedImageUrl ? (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full aspect-square max-w-[300px] mx-auto flex flex-col items-center justify-center gap-3 bg-[#1E1E1E] border-2 border-dashed border-[#2A2A2A] rounded-xl hover:border-[#3BB9FF] hover:bg-[#252525] transition-colors text-[#A3A3A3] hover:text-white"
+              className="w-full aspect-square max-w-[300px] mx-auto flex flex-col items-center justify-center gap-3 bg-[#1E1E1E] border-2 border-dashed border-[#2A2A2A] rounded-xl hover:border-[#f59e0b] hover:bg-[#252525] transition-colors text-[#A3A3A3] hover:text-white"
             >
-              <Camera className="w-16 h-16 text-[#3BB9FF]" />
+              <Camera className="w-16 h-16 text-[#f59e0b]" />
               <span className="text-base font-medium">Ajouter une photo</span>
               <span className="text-sm">PNG, JPG ou WEBP</span>
             </button>
@@ -356,7 +356,7 @@ function CreerContent() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[#3BB9FF] hover:underline text-sm"
+                className="text-[#f59e0b] hover:underline text-sm"
               >
                 Changer la photo
               </button>
@@ -389,7 +389,7 @@ function CreerContent() {
             <button
               type="button"
               onClick={handleSubmitStep2}
-              className="py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+              className="py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 bg-[#f59e0b] text-white hover:bg-[#d97706]"
             >
               Continuer
             </button>
@@ -402,7 +402,7 @@ function CreerContent() {
             <span className="text-sm text-[#A3A3A3]">Étape 3 / 4</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
               <div
-                className="h-full bg-[#3BB9FF] transition-all duration-300"
+                className="h-full bg-[#f59e0b] transition-all duration-300"
                 style={{ width: progressWidth }}
               />
             </div>
@@ -412,7 +412,7 @@ function CreerContent() {
             Caractéristiques
           </h2>
           <p className="text-[#A3A3A3] mb-6">
-            Complète les informations du personnage, <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
+            Complète les informations du personnage, <span className="text-xl font-semibold text-[#f59e0b]">{displayName}</span>
           </p>
 
           <form onSubmit={handleSubmitStep3} className="space-y-4">
@@ -425,7 +425,7 @@ function CreerContent() {
                 value={pays}
                 onChange={(e) => setPays(e.target.value)}
                 placeholder="Ex : France"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
               />
             </div>
 
@@ -438,7 +438,7 @@ function CreerContent() {
                 value={adresse}
                 onChange={(e) => setAdresse(e.target.value)}
                 placeholder="Ex : Paris, 75001"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
               />
             </div>
 
@@ -451,7 +451,7 @@ function CreerContent() {
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
                 placeholder="Ex : 28 ans"
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent"
               />
             </div>
 
@@ -464,14 +464,14 @@ function CreerContent() {
                 onChange={(e) => setDescriptionPersonnage(e.target.value)}
                 placeholder="Personnalité, passions, style de vie..."
                 rows={4}
-                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#3BB9FF] focus:border-transparent resize-none"
+                className="w-full px-4 py-3 bg-[#1E1E1E] border border-[#2A2A2A] rounded-xl text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent resize-none"
               />
             </div>
 
             <footer className="fixed bottom-0 left-0 right-0 pl-4 pr-4 md:pl-6 md:pr-6 py-4 bg-[#0F0F0F] border-t border-[#2A2A2A] flex justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="submit"
-                className="py-2.5 px-6 font-medium rounded-xl bg-[#3BB9FF] text-white hover:bg-[#2AA3E6] transition-colors"
+                className="py-2.5 px-6 font-medium rounded-xl bg-[#f59e0b] text-white hover:bg-[#d97706] transition-colors"
               >
                 Continuer
               </button>
@@ -485,7 +485,7 @@ function CreerContent() {
             <span className="text-sm text-[#A3A3A3]">Étape 4 / 4</span>
             <div className="w-full h-2 bg-[#2A2A2A] rounded-full overflow-hidden mt-1">
               <div
-                className="h-full bg-[#3BB9FF] transition-all duration-300"
+                className="h-full bg-[#f59e0b] transition-all duration-300"
                 style={{ width: progressWidth }}
               />
             </div>
@@ -495,7 +495,7 @@ function CreerContent() {
             Choisis ta voix
           </h2>
           <p className="text-[#A3A3A3] mb-4">
-            Clique sur une voix pour l&apos;écouter. Sélectionne celle qui te plaît, <span className="text-xl font-semibold text-[#3BB9FF]">{displayName}</span>
+            Clique sur une voix pour l&apos;écouter. Sélectionne celle qui te plaît, <span className="text-xl font-semibold text-[#f59e0b]">{displayName}</span>
           </p>
 
           {/* Filtre Homme / Femme */}
@@ -505,8 +505,8 @@ function CreerContent() {
               onClick={() => setGenderFilter("tous")}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 genderFilter === "tous"
-                  ? "bg-[#3BB9FF] text-white"
-                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#3BB9FF]"
+                  ? "bg-[#f59e0b] text-white"
+                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#f59e0b]"
               }`}
             >
               Tous
@@ -516,8 +516,8 @@ function CreerContent() {
               onClick={() => setGenderFilter("femme")}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 genderFilter === "femme"
-                  ? "bg-[#3BB9FF] text-white"
-                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#3BB9FF]"
+                  ? "bg-[#f59e0b] text-white"
+                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#f59e0b]"
               }`}
             >
               Femme
@@ -527,8 +527,8 @@ function CreerContent() {
               onClick={() => setGenderFilter("homme")}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 genderFilter === "homme"
-                  ? "bg-[#3BB9FF] text-white"
-                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#3BB9FF]"
+                  ? "bg-[#f59e0b] text-white"
+                  : "bg-[#1E1E1E] border border-[#2A2A2A] text-[#A3A3A3] hover:border-[#f59e0b]"
               }`}
             >
               Homme
@@ -538,7 +538,7 @@ function CreerContent() {
           {voicesLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3 text-[#A3A3A3]">
-                <div className="w-8 h-8 border-2 border-[#3BB9FF] border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-[#f59e0b] border-t-transparent rounded-full animate-spin" />
                 <span>Chargement des voix...</span>
               </div>
             </div>
@@ -559,8 +559,8 @@ function CreerContent() {
                       onClick={(e) => handleVoiceCardClick(voice, e)}
                       className={`flex items-center gap-3 py-4 px-4 rounded-xl text-left transition-all ${
                         isSelected
-                          ? "bg-[#3BB9FF] text-white border-2 border-[#3BB9FF]"
-                          : "bg-[#1E1E1E] text-white border border-[#2A2A2A] hover:border-[#3BB9FF]"
+                          ? "bg-[#f59e0b] text-white border-2 border-[#f59e0b]"
+                          : "bg-[#1E1E1E] text-white border border-[#2A2A2A] hover:border-[#f59e0b]"
                       }`}
                     >
                       <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -608,7 +608,7 @@ function CreerContent() {
               className={`py-2.5 px-6 font-medium rounded-xl transition-colors flex items-center gap-2 ${
                 isSubmitting
                   ? "bg-[#2A2A2A] text-[#6B7280] cursor-not-allowed"
-                  : "bg-[#3BB9FF] text-white hover:bg-[#2AA3E6]"
+                  : "bg-[#f59e0b] text-white hover:bg-[#d97706]"
               }`}
             >
               {isSubmitting ? (

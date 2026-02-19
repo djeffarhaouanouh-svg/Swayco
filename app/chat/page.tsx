@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Send, CheckCheck, MoreVertical, Trash2, Play, X } from 'lucide-react';
+import { ArrowLeft, Send, CheckCheck, MoreVertical, Trash2, Play, X, ChevronDown } from 'lucide-react';
 import { characters as worldCharacters } from '@/data/worldData';
 import type { Character } from '@/data/worldData';
 
@@ -62,7 +62,18 @@ export default function ChatPage() {
   const [sceneImage, setSceneImage] = useState<string | null>(null);
   const [sceneName, setSceneName] = useState<string | null>(null);
   const [sceneLocation, setSceneLocation] = useState<string | null>(null);
+  const [sceneId, setSceneId] = useState<string | null>(null);
+  const [sceneSessionId, setSceneSessionId] = useState<string | null>(null);
+  // sceneResume=true quand on arrive depuis /messages (afficher messages + picker en bas, pas en plein écran)
+  const [sceneResume, setSceneResume] = useState(false);
   const isSceneMode = !!(sceneImage && sceneName);
+
+  // Personnage choisi pour la scène
+  const [sceneCharacter, setSceneCharacter] = useState<Character | null>(null);
+  const [availableCharacters, setAvailableCharacters] = useState<Character[]>([]);
+  const [loadingCharacters, setLoadingCharacters] = useState(false);
+  const [showPickerSheet, setShowPickerSheet] = useState(false);
+  const [scenePickerPage, setScenePickerPage] = useState(0);
 
   // Charger depuis l'URL
   useEffect(() => {
@@ -70,13 +81,42 @@ export default function ChatPage() {
     const sceneImgParam = params.get('sceneImage');
     const sceneNameParam = params.get('sceneName');
     const sceneLocParam = params.get('sceneLocation');
+    const sceneIdParam = params.get('sceneId');
+    const sceneSessionIdParam = params.get('sceneSessionId');
+    const sceneCharIdParam = params.get('sceneCharacterId'); // reprise depuis /messages
     const idParam = params.get('characterId');
 
     if (sceneImgParam) setSceneImage(decodeURIComponent(sceneImgParam));
     if (sceneNameParam) setSceneName(decodeURIComponent(sceneNameParam));
     if (sceneLocParam) setSceneLocation(decodeURIComponent(sceneLocParam));
+    if (sceneIdParam) setSceneId(sceneIdParam);
+    if (sceneSessionIdParam) setSceneSessionId(sceneSessionIdParam);
+    if (params.get('sceneResume') === '1') setSceneResume(true);
 
-    if (idParam && !sceneImgParam) {
+    // Reprise d'une scène depuis /messages : charger le personnage directement, sans picker
+    if (sceneCharIdParam) {
+      const id = parseInt(sceneCharIdParam, 10);
+      const fromWorld = worldCharacters.find((c) => c.id === id);
+      if (fromWorld) setSceneCharacter(fromWorld);
+      const merged: Character[] = [...worldCharacters];
+      fetch('/api/characters')
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            data.forEach((ac: Character) => {
+              const idx = merged.findIndex((m) => m.id === ac.id);
+              if (idx >= 0) merged[idx] = ac;
+              else merged.push(ac);
+            });
+          }
+          const found = merged.find((c) => c.id === id);
+          if (found) setSceneCharacter(found);
+        })
+        .catch(() => {});
+    }
+
+    // Mode personnage direct (pas de scène)
+    if (idParam && !sceneIdParam) {
       const id = parseInt(idParam, 10);
       const fromWorld = worldCharacters.find((c) => c.id === id);
       if (fromWorld) setCharacter(fromWorld);
@@ -103,35 +143,68 @@ export default function ChatPage() {
     }
   }, []);
 
+  // Charger les personnages disponibles pour le picker
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sceneCharIdParam = params.get('sceneCharacterId');
+    if (!isSceneMode || sceneCharIdParam) return; // skip si personnage déjà connu
+    setLoadingCharacters(true);
+    const merged: Character[] = [...worldCharacters];
+    fetch('/api/characters')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          data.forEach((ac: Character) => {
+            const idx = merged.findIndex((m) => m.id === ac.id);
+            if (idx >= 0) merged[idx] = ac;
+            else merged.push(ac);
+          });
+        }
+        setAvailableCharacters(merged);
+      })
+      .catch(() => { setAvailableCharacters(merged); })
+      .finally(() => setLoadingCharacters(false));
+  }, [isSceneMode]);
+
   // Charger les messages depuis la DB
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const charId = params.get('characterId');
     const scnId = params.get('sceneId');
-    if (!charId && !scnId) return;
+    const sceneCharId = params.get('sceneCharacterId');
+    const resume = params.get('sceneResume') === '1';
 
-    const query = new URLSearchParams();
-    if (charId) query.set('characterId', charId);
-    if (scnId) query.set('sceneId', scnId);
+    const mapMessages = (data: any) =>
+      data.messages.map((m: any) => ({
+        id: m.id.toString(),
+        dbId: m.id,
+        role: m.role,
+        content: m.content,
+        status: 'completed' as const,
+        time: new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        videoUrl: m.video_url || undefined,
+        audioUrl: m.audio_url || undefined,
+        showVideo: !!m.video_url,
+      }));
 
-    fetch(`/api/messages?${query.toString()}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.messages) && data.messages.length > 0) {
-          setMessages(data.messages.map((m: any) => ({
-            id: m.id.toString(),
-            dbId: m.id,
-            role: m.role,
-            content: m.content,
-            status: 'completed' as const,
-            time: new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-            videoUrl: m.video_url || undefined,
-            audioUrl: m.audio_url || undefined,
-            showVideo: !!m.video_url,
-          })));
-        }
-      })
-      .catch(() => {});
+    if (charId && !scnId) {
+      // Mode personnage direct
+      fetch(`/api/messages?characterId=${charId}`)
+        .then(res => res.json())
+        .then(data => { if (data.success && data.messages?.length > 0) setMessages(mapMessages(data)); })
+        .catch(() => {});
+    } else if (scnId && resume) {
+      // Reprise depuis /messages → charger les messages par session ou par scène (rétrocompat)
+      const sessionId = params.get('sceneSessionId');
+      const url = sessionId
+        ? `/api/messages?sceneSessionId=${sessionId}`
+        : `/api/messages?sceneId=${scnId}`;
+      fetch(url)
+        .then(res => res.json())
+        .then(data => { if (data.success && data.messages?.length > 0) setMessages(mapMessages(data)); })
+        .catch(() => {});
+    }
+    // Scène fraîche (scnId sans resume) → session vide, picker plein écran
   }, []);
 
   // Scroll en bas pour afficher le dernier message de l'assistant
@@ -164,17 +237,20 @@ export default function ChatPage() {
   }, [showMenu]);
 
   // Sauvegarder un message en DB
-  const saveMessageToDB = useCallback(async (data: { role: string; content: string; videoUrl?: string }) => {
+  // En mode scène : on stocke scene_id + character_id (du personnage choisi) pour retrouver la conversation
+  const saveMessageToDB = useCallback(async (data: { role: string; content: string; videoUrl?: string; sceneCharacterId?: number }) => {
     const params = new URLSearchParams(window.location.search);
     const charId = params.get('characterId');
     const scnId = params.get('sceneId');
+    const sessionId = params.get('sceneSessionId');
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          characterId: charId || null,
-          sceneId: scnId || null,
+          characterId: data.sceneCharacterId ?? (charId ? parseInt(charId) : null),
+          sceneId: scnId ? parseInt(scnId) : null,
+          sceneSessionId: sessionId || null,
           role: data.role,
           content: data.content,
           videoUrl: data.videoUrl || null,
@@ -298,15 +374,18 @@ export default function ChatPage() {
     const params = new URLSearchParams(window.location.search);
     const charId = params.get('characterId');
     const scnId = params.get('sceneId');
+    const sessionId = params.get('sceneSessionId');
     const query = new URLSearchParams();
     if (charId) query.set('characterId', charId);
-    if (scnId) query.set('sceneId', scnId);
+    if (sessionId) query.set('sceneSessionId', sessionId);
+    else if (scnId) query.set('sceneId', scnId);
     fetch(`/api/messages?${query.toString()}`, { method: 'DELETE' }).catch(() => {});
   };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
     if (!character && !isSceneMode) return;
+    if (isSceneMode && !sceneCharacter && !sceneResume) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -330,7 +409,7 @@ export default function ChatPage() {
     setInput('');
     setIsLoading(true);
 
-    saveMessageToDB({ role: 'user', content: userInput });
+    saveMessageToDB({ role: 'user', content: userInput, sceneCharacterId: sceneCharacter?.id });
 
     const history = messages
       .filter(m => m.status === 'completed' && m.content)
@@ -344,16 +423,17 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: userInput,
           conversationHistory: history,
-          characterName: isSceneMode ? sceneName : character?.name,
-          characterDescription: isSceneMode ? `Un personnage dans la scène ${sceneName}` : character?.description,
-          characterLocation: isSceneMode ? sceneLocation : character?.location,
+          characterName: isSceneMode ? sceneCharacter!.name : character?.name,
+          characterDescription: isSceneMode ? sceneCharacter!.description : character?.description,
+          characterLocation: isSceneMode ? undefined : character?.location,
+          sceneId: isSceneMode ? sceneId : undefined,
         }),
       });
 
       const data = await res.json();
       const aiText = data.aiResponse || 'Désolé, une erreur est survenue.';
 
-      const dbId = await saveMessageToDB({ role: 'assistant', content: aiText });
+      const dbId = await saveMessageToDB({ role: 'assistant', content: aiText, sceneCharacterId: sceneCharacter?.id });
 
       setMessages(prev =>
         prev.map(m =>
@@ -385,6 +465,120 @@ export default function ChatPage() {
 
   const bgImage = sceneImage || character?.cityImage;
 
+  // Avatar à afficher dans les bulles du chat
+  const bubbleAvatar = isSceneMode
+    ? (sceneCharacter?.image || null)
+    : (character?.image || '/avatar-1.png');
+
+  // Écran de sélection de personnage pour le mode scène (plein écran = session fraîche depuis SceneOverlay)
+  if (isSceneMode && !sceneCharacter && !sceneResume) {
+    return (
+      <div className={`chat-container ${bgImage ? 'chat-container-with-bg' : ''}`}>
+        {bgImage && (
+          <div
+            className="chat-bg-fixed chat-bg-parallax"
+            style={{
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url(${bgImage})`,
+              backgroundPosition: `${bgOffset.x}% ${bgOffset.y}%`,
+            }}
+            aria-hidden
+          />
+        )}
+
+        <header className="chat-header">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push('/');
+            }}
+            className="chat-back-btn"
+            aria-label="Retour"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <div className="chat-header-info">
+            <div className="chat-header-avatar">
+              {sceneImage ? (
+                <img src={sceneImage} alt={sceneName || 'Scène'} />
+              ) : (
+                <span className="chat-header-scene-icon">🎬</span>
+              )}
+            </div>
+            <div className="chat-header-text">
+              <span className="chat-header-name">{sceneName}</span>
+              <span className="chat-header-location">{sceneLocation || ''}</span>
+            </div>
+          </div>
+          <div style={{ width: 40 }} />
+        </header>
+
+        <div className="scene-character-picker">
+          <div className="scene-character-picker-inner">
+            <p className="scene-character-picker-title">Choisissez un personnage</p>
+            <p className="scene-character-picker-subtitle">
+              Qui souhaitez-vous incarner dans cette scène ?
+            </p>
+
+            {loadingCharacters ? (
+              <div className="scene-character-picker-loading">
+                <div className="chat-typing"><span /><span /><span /></div>
+              </div>
+            ) : (
+              <>
+                <div className="scene-character-picker-list">
+                  {availableCharacters
+                    .slice(scenePickerPage * 5, scenePickerPage * 5 + 5)
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="scene-character-picker-item"
+                        onClick={() => setSceneCharacter(c)}
+                      >
+                        <img
+                          src={c.image || '/avatar-1.png'}
+                          alt={c.name}
+                          className="scene-character-picker-avatar"
+                        />
+                        <div className="scene-character-picker-info">
+                          <span className="scene-character-picker-name">{c.name}</span>
+                          <span className="scene-character-picker-location">{c.location}</span>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+                {availableCharacters.length > 5 && (
+                  <div className="scene-character-picker-nav">
+                    {scenePickerPage > 0 && (
+                      <button
+                        type="button"
+                        className="scene-character-picker-nav-btn"
+                        onClick={() => setScenePickerPage((p) => p - 1)}
+                      >
+                        ← Précédents
+                      </button>
+                    )}
+                    {(scenePickerPage + 1) * 5 < availableCharacters.length && (
+                      <button
+                        type="button"
+                        className="scene-character-picker-nav-btn scene-character-picker-nav-btn-primary"
+                        onClick={() => setScenePickerPage((p) => p + 1)}
+                      >
+                        Voir plus
+                        <ChevronDown size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`chat-container ${bgImage ? 'chat-container-with-bg' : ''}`}>
       {/* Fond fixe */}
@@ -399,7 +593,7 @@ export default function ChatPage() {
         />
       )}
 
-      {/* Header */}
+      {/* Header — affiche toujours la scène en mode scène */}
       <header className="chat-header">
         <button
           type="button"
@@ -416,7 +610,11 @@ export default function ChatPage() {
         <div className="chat-header-info">
           <div className="chat-header-avatar">
             {isSceneMode ? (
-              <span className="chat-header-scene-icon">🎬</span>
+              sceneImage ? (
+                <img src={sceneImage} alt={sceneName || 'Scène'} />
+              ) : (
+                <span className="chat-header-scene-icon">🎬</span>
+              )
             ) : (
               <img
                 src={character?.image || '/avatar-1.png'}
@@ -449,7 +647,7 @@ export default function ChatPage() {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="chat-empty">
-            <p>{isSceneMode ? `Commencez une conversation à ${sceneName}` : `Commencez une conversation avec ${character?.name || 'votre avatar IA'}`}</p>
+            <p>{isSceneMode ? `Commencez la scène à ${sceneName}` : `Commencez une conversation avec ${character?.name || 'votre avatar IA'}`}</p>
           </div>
         )}
 
@@ -460,10 +658,10 @@ export default function ChatPage() {
           >
             {message.role === 'assistant' && (
               <div className="chat-bubble-avatar-small">
-                {isSceneMode ? (
-                  <span className="chat-bubble-scene-icon">🎬</span>
+                {bubbleAvatar ? (
+                  <img src={bubbleAvatar} alt="" />
                 ) : (
-                  <img src={character?.image || '/avatar-1.png'} alt="" />
+                  <span className="chat-bubble-scene-icon">🎬</span>
                 )}
               </div>
             )}
@@ -526,7 +724,7 @@ export default function ChatPage() {
                       {message.status === 'processing' && (
                         <div className="chat-progress-container">
                           <div className="chat-progress-label">
-                            <span>{character?.name || 'Elle'} allume sa caméra...</span>
+                            <span>{isSceneMode ? (sceneCharacter?.name || 'Le personnage') : (character?.name || 'Elle')} allume sa caméra...</span>
                             <span className="chat-progress-time">~40s</span>
                           </div>
                           <div className="chat-progress-bar">
@@ -595,7 +793,7 @@ export default function ChatPage() {
         </div>
         <button
           onClick={sendMessage}
-          disabled={isLoading || !input.trim() || (!character && !isSceneMode)}
+          disabled={isLoading || !input.trim() || (!character && !isSceneMode) || (isSceneMode && !sceneCharacter && !sceneResume)}
           className="chat-send-btn"
         >
           <Send size={20} />

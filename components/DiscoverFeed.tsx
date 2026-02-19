@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Bookmark } from 'lucide-react'
-import { getCountry } from '@/data/worldData'
+import { getCountry, getCity } from '@/data/worldData'
 import type { Character } from '@/data/worldData'
 import { getSavedCharacterIds, toggleSavedCharacter } from '@/lib/savedCharacters'
 
@@ -34,6 +34,7 @@ const COUNTRY_ISO: Record<string, string> = {
   'Pays-Bas': 'nl',
   Inde: 'in',
   Pérou: 'pe',
+  Portugal: 'pt',
 }
 
 const DiscoverSlide = forwardRef<
@@ -46,7 +47,9 @@ const DiscoverSlide = forwardRef<
   }
 >(function DiscoverSlide({ character, isSaved, onToggleSave, onChat }, ref) {
   const country = getCountry(character)
+  const city = getCity(character)
   const iso = COUNTRY_ISO[country]
+  const locationLabel = city ? `${city}, ${country}` : country
   return (
     <div className="discover-slide" ref={ref}>
       <img
@@ -74,7 +77,7 @@ const DiscoverSlide = forwardRef<
           <h2 className="discover-slide-name">{character.name}</h2>
           <p className="discover-slide-location">
             <span>📍</span>
-            <span>{character.location}</span>
+            <span>{locationLabel}</span>
             {iso && (
               <img
                 src={`https://flagcdn.com/24x18/${iso}.png`}
@@ -92,7 +95,7 @@ const DiscoverSlide = forwardRef<
               ))}
             </p>
           )}
-          <button className="discover-slide-btn" onClick={onChat}>
+          <button className="discover-slide-btn" onClick={(e) => { e.stopPropagation(); onChat(); }}>
             Discutez
           </button>
         </div>
