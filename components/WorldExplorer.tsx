@@ -440,7 +440,7 @@ export default function WorldExplorer() {
           const el = createMarkerElement(item, () => {
             setSelectedItem(item)
             setSelectedCountry(null)
-            setCharacterOverlay(item)
+            setCharacterOverlay(item as Character)
             m.flyTo({
               center: item.coordinates,
               zoom: Math.min(m.getZoom() + 2, 12),
@@ -541,7 +541,7 @@ export default function WorldExplorer() {
           const el = createMarkerElement(item, () => {
             setSelectedItem(item)
             setSelectedCountry(null)
-            setCharacterOverlay(item)
+            setCharacterOverlay(item as Character)
             m.flyTo({
               center: item.coordinates,
               zoom: Math.min(m.getZoom() + 2, 12),
@@ -558,7 +558,7 @@ export default function WorldExplorer() {
           const el = createMarkerElement(item, () => {
             setSelectedItem(item)
             setSelectedCountry(null)
-            setCharacterOverlay(item)
+            setCharacterOverlay(item as Character)
             m.flyTo({
               center: item.coordinates,
               zoom: Math.min(m.getZoom() + 2, 12),
