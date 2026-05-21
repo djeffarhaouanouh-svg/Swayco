@@ -624,6 +624,19 @@ class _FriendChatRow extends StatelessWidget {
                         ),
                       ),
                     ],
+                    // Call button — sits just before the overflow menu.
+                    // A tap dials the friend directly (LiveKit call +
+                    // ring) via the shared CallLauncher.
+                    IconButton(
+                      onPressed: onCall,
+                      tooltip: AppStrings.t('tooltip_call'),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                          width: 34, height: 34),
+                      icon: const Icon(Icons.phone,
+                          color: Colors.white, size: 20),
+                    ),
                     PopupMenuButton<String>(
                       tooltip: AppStrings.t('tooltip_more'),
                       padding: EdgeInsets.zero,
@@ -677,19 +690,6 @@ class _FriendChatRow extends StatelessWidget {
                           ),
                         ),
                       ],
-                    ),
-                    // Call button — placed rightmost, clear of the
-                    // overflow menu. A tap dials the friend directly
-                    // (LiveKit call + ring) via the shared CallLauncher.
-                    IconButton(
-                      onPressed: onCall,
-                      tooltip: AppStrings.t('tooltip_call'),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints.tightFor(
-                          width: 34, height: 34),
-                      icon: const Icon(Icons.phone,
-                          color: Colors.white, size: 20),
                     ),
                   ],
                 ),
