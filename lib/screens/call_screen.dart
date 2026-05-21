@@ -295,6 +295,16 @@ class _CallScreenState extends State<CallScreen> {
           unawaited(_refreshTranslationBinding(room));
           if (mounted) setState(() {});
         });
+      // A participant may have joined in the window between connect() and
+      // this listener being attached — very likely in live calls where
+      // both peers join at once, and the slow translation setup above
+      // widens the window. That ParticipantConnectedEvent would be missed,
+      // leaving _hadRemote false and defeating the auto-hangup when the
+      // peer later leaves. Re-seed from the current snapshot so both sides
+      // are sent back to the live screen when either one ends the call.
+      if (room.remoteParticipants.isNotEmpty) {
+        _hadRemote = true;
+      }
       await _audio.bind(room);
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       if (mounted) {
