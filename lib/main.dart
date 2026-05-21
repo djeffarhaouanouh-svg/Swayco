@@ -214,7 +214,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       valueListenable: AppStrings.currentBcp47,
       builder: (context, _, _) {
         return MaterialApp(
-          title: 'Calls',
+          title: 'Swayco',
           debugShowCheckedModeBanner: false,
           theme: WhatsAppCallTheme.material(),
           home: _buildHome(),

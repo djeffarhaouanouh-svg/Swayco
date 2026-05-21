@@ -1,11 +1,11 @@
 {
-    "name": "livekit_translate",
-    "short_name": "livekit_translate",
+    "name": "Swayco",
+    "short_name": "Swayco",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#00A884",
-    "description": "A new Flutter project.",
+    "description": "Appels vidéo traduits en direct.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
