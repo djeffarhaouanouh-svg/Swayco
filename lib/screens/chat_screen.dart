@@ -346,44 +346,34 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: WhatsAppCallTheme.scaffold,
       body: SafeArea(
         bottom: false,
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      AppStrings.t('messages_title'),
-                      style: const TextStyle(
-                        color: WhatsAppCallTheme.strongText,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  AppStrings.t('messages_title'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                Expanded(child: _buildBody()),
-              ],
-            ),
-            // "Invite to a call" pinned just above the floating nav bar.
-            // The conversation list (see _buildBody) reserves matching
-            // bottom padding so its last row is never hidden behind it.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 78 + safeBottom,
-              child: _InviteToCallBar(
-                onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-                creatingInvite: _creatingInvite,
               ),
+            ),
+            Expanded(child: _buildBody()),
+            // Fixed footer anchored to the bottom of the page. Its green
+            // extends all the way down behind the floating nav bar, so the
+            // bar floats over green — never on a black footer.
+            _InviteToCallBar(
+              onInviteToCall: _creatingInvite ? null : _shareCallInvite,
+              creatingInvite: _creatingInvite,
             ),
           ],
         ),
@@ -415,12 +405,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       onRefresh: _reload,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Reserve room for the pinned "Invite to a call" button + the
-        // floating nav bar so the last conversation can always be
-        // scrolled fully into view (never hidden behind them).
-        padding: EdgeInsets.only(
-          bottom: 140 + MediaQuery.paddingOf(context).bottom,
-        ),
+        // Small gap above the fixed "Invite to a call" footer.
+        padding: const EdgeInsets.only(bottom: 8),
         itemCount: _friends.length,
         // Brighter separator so rows read distinctly against the dark
         // scaffold (the previous near-black 0xFF1F2C34 was invisible).
@@ -700,9 +686,11 @@ class _FriendChatRow extends StatelessWidget {
   }
 }
 
-/// Pinned footer on the Messages page: a single button that mints a guest
-/// invite link (join a call with no account) and opens the native OS share
-/// sheet. Bottom padding sits it just above the floating glass nav pill.
+/// Fixed footer on the Messages page: a full-width green bar that mints a
+/// guest invite link (join a call with no account) and opens the native OS
+/// share sheet. The green extends down behind the floating glass nav pill
+/// so the bar floats over green, not over a black footer. The label stays
+/// in the upper portion, clear of the nav bar.
 class _InviteToCallBar extends StatelessWidget {
   const _InviteToCallBar({
     required this.onInviteToCall,
@@ -715,44 +703,42 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Material(
-        color: WhatsAppCallTheme.accent,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onInviteToCall,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (creatingInvite)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                else
-                  const Icon(Icons.videocam_rounded,
-                      color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  creatingInvite
-                      ? AppStrings.t('invite_call_creating')
-                      : AppStrings.t('invite_to_call'),
-                  style: const TextStyle(
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    return Material(
+      color: WhatsAppCallTheme.accent,
+      child: InkWell(
+        onTap: onInviteToCall,
+        child: Padding(
+          // Bottom padding spans the nav bar's float zone (12 + 54 height)
+          // so it sits on green; the label rides comfortably above it.
+          padding: EdgeInsets.fromLTRB(12, 16, 12, 78 + safeBottom),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (creatingInvite)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
                     color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
                   ),
+                )
+              else
+                const Icon(Icons.videocam_rounded,
+                    color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                creatingInvite
+                    ? AppStrings.t('invite_call_creating')
+                    : AppStrings.t('invite_to_call'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
