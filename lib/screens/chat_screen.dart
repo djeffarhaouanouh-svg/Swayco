@@ -483,6 +483,15 @@ class _FriendChatRow extends StatelessWidget {
   /// Dials this friend — same call path as the chat thread header.
   final VoidCallback onCall;
 
+  /// True when the peer was active in the last 2 minutes and has not
+  /// hidden their online status.
+  bool get _peerOnline {
+    final ls = profile.lastSeen;
+    return !profile.hideOnlineStatus &&
+        ls != null &&
+        DateTime.now().difference(ls) < const Duration(minutes: 2);
+  }
+
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
     final isSameDay = dt.year == now.year && dt.month == now.month && dt.day == now.day;
@@ -539,14 +548,37 @@ class _FriendChatRow extends StatelessWidget {
         child: Row(
           children: [
             // Avatar = direct shortcut to the peer's profile (Insta-style).
+            // A green dot rides the bottom-right corner when the peer is
+            // currently online.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
-              child: ProfileAvatar(
-                displayName: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                avatarColorHex: profile.avatarColor,
-                size: 60,
+              child: Stack(
+                children: [
+                  ProfileAvatar(
+                    displayName: profile.displayName,
+                    avatarUrl: profile.avatarUrl,
+                    avatarColorHex: profile.avatarColor,
+                    size: 60,
+                  ),
+                  if (_peerOnline)
+                    Positioned(
+                      right: 1,
+                      bottom: 1,
+                      child: Container(
+                        width: 15,
+                        height: 15,
+                        decoration: BoxDecoration(
+                          color: WhatsAppCallTheme.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: WhatsAppCallTheme.scaffold,
+                            width: 2.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 14),
