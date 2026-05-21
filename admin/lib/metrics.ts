@@ -349,6 +349,10 @@ export type SocialStats = {
   messages: number;
   recurringUsers: number;
   recurringRate: number;
+  /** Conversations with messages on ≥ 2 distinct days. */
+  repeatConversations: number;
+  /** repeatConversations / conversationsActive. */
+  repeatConversationRate: number;
 };
 
 export async function getSocial(days = 30): Promise<SocialStats> {
@@ -359,7 +363,7 @@ export async function getSocial(days = 30): Promise<SocialStats> {
         q.eq("status", "accepted").gte("responded_at", sinceISO(days)),
       ),
       safeCount("friendships", (q) => q.eq("status", "pending")),
-      safeRows("messages", "conversation_id", (q) =>
+      safeRows("messages", "conversation_id, created_at", (q) =>
         q.gte("created_at", sinceISO(days)).limit(50000),
       ),
       safeRows("analytics_events", "user_id, created_at", (q) =>
@@ -374,6 +378,25 @@ export async function getSocial(days = 30): Promise<SocialStats> {
   const conversations = new Set(
     msgs.map((m) => m.conversation_id).filter(Boolean),
   );
+
+  // "Revient parler à la même personne": a conversation carrying messages
+  // on ≥ 2 distinct days means at least one side came back to that person
+  // — a relationship that stuck, not a one-off. The GOLD engagement signal.
+  const convDays = new Map<string, Set<string>>();
+  for (const m of msgs) {
+    if (
+      typeof m.conversation_id !== "string" ||
+      typeof m.created_at !== "string"
+    ) {
+      continue;
+    }
+    if (!convDays.has(m.conversation_id)) {
+      convDays.set(m.conversation_id, new Set());
+    }
+    convDays.get(m.conversation_id)!.add(dayKey(new Date(m.created_at)));
+  }
+  let repeatConversations = 0;
+  for (const [, dset] of convDays) if (dset.size >= 2) repeatConversations++;
 
   // Recurring = a real user who opened the app on ≥ 2 distinct days.
   const userDays = new Map<string, Set<string>>();
@@ -395,6 +418,9 @@ export async function getSocial(days = 30): Promise<SocialStats> {
     messages: msgs.length,
     recurringUsers: recurring,
     recurringRate: userDays.size > 0 ? recurring / userDays.size : 0,
+    repeatConversations,
+    repeatConversationRate:
+      conversations.size > 0 ? repeatConversations / conversations.size : 0,
   };
 }
 
@@ -509,6 +535,8 @@ export async function getRetention(days = 30): Promise<Retention> {
 
 export type CostBreakdown = {
   callMinutes: number;
+  /** Minutes the OpenAI translation pipeline was actually live. */
+  translationMinutes: number;
   textTokens: number;
   costRealtimeUsd: number;
   costLivekitUsd: number;
@@ -553,11 +581,20 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
   ]);
 
   let totalMs = 0;
+  let translationMs = 0;
   for (const c of calls) {
-    const d = (c.props as Record<string, unknown> | null)?.duration_ms;
+    const props = c.props as Record<string, unknown> | null;
+    const d = props?.duration_ms;
     if (typeof d === "number" && d > 0) totalMs += d;
+    const t = props?.translation_ms;
+    if (typeof t === "number" && t > 0) translationMs += t;
   }
   const callMinutes = totalMs / 60000;
+  // OpenAI Realtime only runs while translation is actually live — not for
+  // the whole call. call_ended carries translation_ms for exactly this;
+  // calls from before that instrumentation contribute 0 (slight
+  // under-count until they roll out of the window).
+  const translationMinutes = translationMs / 60000;
 
   let textTokens = 0;
   for (const t of texts) {
@@ -565,7 +602,9 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
     textTokens += num(p.prompt_tokens, 0) + num(p.completion_tokens, 0);
   }
 
-  const costRealtimeUsd = callMinutes * rateRealtime;
+  // Realtime = translation time only; LiveKit = whole call (it carries
+  // every call's audio/video transport regardless of translation).
+  const costRealtimeUsd = translationMinutes * rateRealtime;
   const costLivekitUsd = callMinutes * rateLivekit;
   const costTextUsd = (textTokens / 1000) * rateText;
   const costTotalEur =
@@ -574,6 +613,7 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
 
   return {
     callMinutes,
+    translationMinutes,
     textTokens,
     costRealtimeUsd,
     costLivekitUsd,

@@ -114,6 +114,10 @@ export default async function MonetisationPage() {
                   value: fmtMinutes(c.callMinutes),
                 },
                 {
+                  label: "Minutes de traduction (OpenAI Realtime)",
+                  value: fmtMinutes(c.translationMinutes),
+                },
+                {
                   label: "Tokens de traduction texte",
                   value: fmtInt(c.textTokens),
                 },

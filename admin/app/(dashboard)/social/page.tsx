@@ -45,6 +45,16 @@ export default async function SocialPage() {
           value={fmtPct(social.recurringRate, 0)}
           tone={social.recurringRate >= 0.3 ? "good" : "default"}
         />
+        <KpiCard
+          label="Reparle à la même personne"
+          value={fmtInt(social.repeatConversations)}
+          sub="conversations actives ≥ 2 jours"
+        />
+        <KpiCard
+          label="Taux de re-contact"
+          value={fmtPct(social.repeatConversationRate, 0)}
+          tone={social.repeatConversationRate >= 0.3 ? "good" : "default"}
+        />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -75,6 +85,11 @@ export default async function SocialPage() {
                 {
                   label: "Utilisateurs récurrents",
                   value: fmtInt(social.recurringUsers),
+                  tone: "good",
+                },
+                {
+                  label: "Reparle à la même personne",
+                  value: fmtInt(social.repeatConversations),
                   tone: "good",
                 },
               ]}

@@ -82,6 +82,11 @@ class _CallScreenState extends State<CallScreen> {
 
   late final AudioController _audio = AudioController(translation: widget.translation);
   bool _lastTranslationSpeaking = false;
+  /// Accumulates real translation-live time (runs only while the OpenAI
+  /// pipeline is live). Reported as `translation_ms` on the call_ended
+  /// analytics event so the admin can cost OpenAI Realtime against actual
+  /// translation time rather than whole-call time.
+  final Stopwatch _translationLive = Stopwatch();
   /// Set to true the first time any RemoteParticipant joins the room.
   /// Used by the ParticipantDisconnectedEvent handler to distinguish
   /// "caller waiting alone before pickup" (empty + !_hadRemote → keep
@@ -119,9 +124,16 @@ class _CallScreenState extends State<CallScreen> {
   /// waiting for the peer / connecting / idle, resume it once OpenAI is
   /// connected and translating.
   void _syncUsageMeter() {
-    if (UsageTracker.isDisabled) return;
     final live = widget.translation.translationFeedbackPhase ==
         TranslationFeedbackPhase.live;
+    // The stopwatch tracks real translation time for the cost analytics —
+    // kept running even when UsageTracker is disabled (test mode).
+    if (live) {
+      _translationLive.start();
+    } else {
+      _translationLive.stop();
+    }
+    if (UsageTracker.isDisabled) return;
     if (live) {
       UsageTracker.resume();
     } else {
@@ -561,6 +573,9 @@ class _CallScreenState extends State<CallScreen> {
         props: {
           'kind': _callKind,
           'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          // Real translation-live time — drives the OpenAI Realtime cost
+          // estimate in the admin dashboard.
+          'translation_ms': _translationLive.elapsed.inMilliseconds,
         },
       );
     }
