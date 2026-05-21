@@ -586,9 +586,8 @@ class _DiscoverHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Search pill: compact button when collapsed, wider TextField when
-          // expanded — but never full-width. Fixed expanded width keeps the
-          // Filtres pill visible to its right.
+          // Search pill: compact button when collapsed, wider TextField
+          // when expanded — but never full-width.
           AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOut,
@@ -652,30 +651,6 @@ class _DiscoverHeader extends StatelessWidget {
                           size: 16, color: WhatsAppCallTheme.subtleText),
                     ),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: WhatsAppCallTheme.bar,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.tune, size: 16, color: WhatsAppCallTheme.subtleText),
-                const SizedBox(width: 6),
-                Text(
-                  AppStrings.t('filters'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.subtleText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
               ],
             ),
           ),
