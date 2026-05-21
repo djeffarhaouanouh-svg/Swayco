@@ -346,31 +346,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: WhatsAppCallTheme.scaffold,
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppStrings.t('messages_title'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      AppStrings.t('messages_title'),
+                      style: const TextStyle(
+                        color: WhatsAppCallTheme.strongText,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                Expanded(child: _buildBody()),
+              ],
             ),
-            Expanded(child: _buildBody()),
-            _InviteToCallBar(
-              onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-              creatingInvite: _creatingInvite,
+            // "Invite to a call" pinned just above the floating nav bar.
+            // The conversation list (see _buildBody) reserves matching
+            // bottom padding so its last row is never hidden behind it.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 78 + safeBottom,
+              child: _InviteToCallBar(
+                onInviteToCall: _creatingInvite ? null : _shareCallInvite,
+                creatingInvite: _creatingInvite,
+              ),
             ),
           ],
         ),
@@ -402,6 +415,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       onRefresh: _reload,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
+        // Reserve room for the pinned "Invite to a call" button + the
+        // floating nav bar so the last conversation can always be
+        // scrolled fully into view (never hidden behind them).
+        padding: EdgeInsets.only(
+          bottom: 140 + MediaQuery.paddingOf(context).bottom,
+        ),
         itemCount: _friends.length,
         // Brighter separator so rows read distinctly against the dark
         // scaffold (the previous near-black 0xFF1F2C34 was invisible).
@@ -696,9 +715,8 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 78 + safeBottom),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Material(
         color: WhatsAppCallTheme.accent,
         borderRadius: BorderRadius.circular(14),
