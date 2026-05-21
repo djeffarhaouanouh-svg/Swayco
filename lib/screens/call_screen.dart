@@ -12,6 +12,7 @@ import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_alert.dart';
+import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/usage_tracker.dart';
 import '../theme/whatsapp_call_theme.dart';
@@ -62,6 +63,15 @@ class _CallScreenState extends State<CallScreen> {
   /// The remote BCP-47 we have attached the translation pipeline with, so we
   /// only re-attach when it actually changes.
   String _attachedRemoteLang = '';
+  /// The local output language the pipeline is currently attached with —
+  /// tracked alongside [_attachedRemoteLang] so a mid-call language change
+  /// also triggers a re-attach.
+  String _attachedMyLang = '';
+  /// The language the local user currently *hears* the remote translated
+  /// into. Starts at the user's own language; changeable mid-call via the
+  /// language button. Local-only — it is never written to LiveKit
+  /// metadata, so the remote participant is completely unaffected.
+  late String _myOutputLang = widget.mySourceLang;
   bool _refreshingTranslation = false;
   /// Set when an event arrives while a refresh is in flight; we re-run once
   /// the in-flight call completes so the latest state is reflected.
@@ -144,10 +154,16 @@ class _CallScreenState extends State<CallScreen> {
       do {
         _refreshPending = false;
         final remoteLang = _discoverRemoteLang(room);
-        if (remoteLang == _attachedRemoteLang) continue;
+        // Re-attach when the remote's language OR my chosen output
+        // language changed since the last bind.
+        if (remoteLang == _attachedRemoteLang &&
+            _myOutputLang == _attachedMyLang) {
+          continue;
+        }
         _attachedRemoteLang = remoteLang;
+        _attachedMyLang = _myOutputLang;
         final route = TranslationRoute(
-          sourceBcp47: widget.mySourceLang,
+          sourceBcp47: _myOutputLang,
           targetBcp47: remoteLang,
         );
         await widget.translation.attachToRoom(room, route: route);
@@ -400,6 +416,38 @@ class _CallScreenState extends State<CallScreen> {
       ),
       builder: (ctx) => _AudioSettingsSheet(controller: _audio),
     );
+  }
+
+  void _openLanguageSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: WhatsAppCallTheme.bar,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _OutputLanguageSheet(
+        currentCode: _myOutputLang,
+        onSelected: (code) {
+          Navigator.of(ctx).pop();
+          _changeOutputLanguage(code);
+        },
+      ),
+    );
+  }
+
+  /// Change the language the local user hears the remote translated into.
+  /// Local-only: it rebuilds our incoming translation pipeline with a new
+  /// output language. The remote participant is not affected — we never
+  /// touch our LiveKit metadata, so they keep translating our speech from
+  /// our real spoken language.
+  Future<void> _changeOutputLanguage(String code) async {
+    if (code.isEmpty || code == _myOutputLang) return;
+    setState(() => _myOutputLang = code);
+    final room = _room;
+    if (room != null) {
+      await _refreshTranslationBinding(room);
+    }
   }
 
   Future<void> _hangUp() async {
@@ -803,6 +851,12 @@ class _CallScreenState extends State<CallScreen> {
                           onTap: _openAudioSheet,
                         ),
                         _RoundCallButton(
+                          icon: Icons.translate,
+                          label: 'Langue',
+                          background: WhatsAppCallTheme.bar,
+                          onTap: _openLanguageSheet,
+                        ),
+                        _RoundCallButton(
                           icon: Icons.call_end_rounded,
                           label: 'End',
                           background: WhatsAppCallTheme.danger,
@@ -951,6 +1005,125 @@ class _AudioSettingsSheet extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet to change the language the local user hears the remote
+/// translated into. Picking a language only re-routes our own incoming
+/// translation pipeline — the remote side is untouched.
+class _OutputLanguageSheet extends StatelessWidget {
+  const _OutputLanguageSheet({
+    required this.currentCode,
+    required this.onSelected,
+  });
+
+  final String currentCode;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = findLanguageByCode(currentCode)?.code ?? '';
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text(
+              'Langue que j’entends',
+              style: TextStyle(
+                color: WhatsAppCallTheme.strongText,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Change la langue dans laquelle tu entends l’autre '
+              'personne. Ça ne change rien pour elle.',
+              style: TextStyle(
+                color: WhatsAppCallTheme.subtleText,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final lang in supportedLanguages)
+                    _LanguageRow(
+                      lang: lang,
+                      selected: lang.code == current,
+                      onTap: () => onSelected(lang.code),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageRow extends StatelessWidget {
+  const _LanguageRow({
+    required this.lang,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppLanguage lang;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Row(
+            children: [
+              Text(lang.flag, style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  lang.label,
+                  style: TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 15,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (selected)
+                const Icon(Icons.check_rounded,
+                    color: WhatsAppCallTheme.accent, size: 20),
+            ],
+          ),
         ),
       ),
     );
