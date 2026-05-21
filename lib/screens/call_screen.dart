@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -256,6 +257,14 @@ class _CallScreenState extends State<CallScreen> {
         _connectError = AppStrings.t('call_perm_required');
       });
       return;
+    }
+
+    // Android 12+ requires BLUETOOTH_CONNECT at runtime before in-call
+    // audio can be routed to a Bluetooth headset. Ask once here, but
+    // never block the call on it — a refused grant just keeps audio on
+    // the speaker/earpiece. No-op on iOS / web (the OS auto-routes).
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await Permission.bluetoothConnect.request();
     }
 
     final room = Room();
