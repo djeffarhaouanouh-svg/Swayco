@@ -171,13 +171,13 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // Mute the original remote audio entirely (0.0) instead of dampening to 18 %.
-  // On iOS Safari two simultaneous WebRTC PeerConnections (LiveKit + OpenAI)
-  // can cause the OS to silently "duck" one of them — typically the
-  // OpenAI translation, so the listener hears only the original speech and
-  // never the translation. Cutting the original to absolute zero while the
-  // remote is hot leaves a single active flow and avoids the OS arbitration.
-  static const double _duckedLevel = 0.2;
+  // While the translated audio is playing, drop the original remote voice
+  // to 10 % rather than silencing it: the listener still senses the speaker
+  // talking underneath, but the translation sits clearly on top. The
+  // original is restored to the user's full level [_duckReleaseDelay] after
+  // the translation stops, so the short gaps between translated sentences
+  // don't make the volume flap.
+  static const double _duckedLevel = 0.1;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
