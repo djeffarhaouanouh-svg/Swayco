@@ -251,15 +251,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       // — best-effort, ignored on failure.
       unawaited(Greetings.sendIntroMessage(myId: _myId, peerId: peer.id));
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(f == null
-            ? 'Erreur — Supabase non configuré'
-            : 'Demande envoyée à ${peer.displayName}'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: WhatsAppCallTheme.bar,
-      ),
-    );
+    // No confirmation snackbar — adding is silent so swiping through the
+    // Discover stack isn't interrupted by a toast on every card.
   }
 
   FriendshipStatus _statusFor(RemoteProfile peer) {
