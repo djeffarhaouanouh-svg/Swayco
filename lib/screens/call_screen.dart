@@ -219,7 +219,7 @@ class _CallScreenState extends State<CallScreen> {
     if (!cam.isGranted || !mic.isGranted) {
       setState(() {
         _connecting = false;
-        _connectError = 'Camera and microphone permission are required to join the call.';
+        _connectError = AppStrings.t('call_perm_required');
       });
       return;
     }
@@ -493,20 +493,21 @@ class _CallScreenState extends State<CallScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: WhatsAppCallTheme.bar,
-        title: const Text('Leave call?', style: TextStyle(color: WhatsAppCallTheme.strongText)),
-        content: const Text(
-          'You will disconnect from this room.',
-          style: TextStyle(color: WhatsAppCallTheme.subtleText),
+        title: Text(AppStrings.t('call_leave_q'),
+            style: const TextStyle(color: WhatsAppCallTheme.strongText)),
+        content: Text(
+          AppStrings.t('call_leave_body'),
+          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Stay'),
+            child: Text(AppStrings.t('call_stay')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: WhatsAppCallTheme.danger),
-            child: const Text('Leave'),
+            child: Text(AppStrings.t('call_leave')),
           ),
         ],
       ),
@@ -562,7 +563,7 @@ class _CallScreenState extends State<CallScreen> {
         appBar: AppBar(
           backgroundColor: WhatsAppCallTheme.scaffold,
           foregroundColor: WhatsAppCallTheme.strongText,
-          title: const Text('Could not join'),
+          title: Text(AppStrings.t('call_could_not_join')),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
@@ -584,7 +585,7 @@ class _CallScreenState extends State<CallScreen> {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Go back'),
+                  child: Text(AppStrings.t('call_go_back')),
                 ),
               ],
             ),
@@ -610,7 +611,8 @@ class _CallScreenState extends State<CallScreen> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Connecting to ${widget.roomName}…',
+                AppStrings.t('call_connecting',
+                    args: {'room': widget.roomName}),
                 style: const TextStyle(
                   color: WhatsAppCallTheme.subtleText,
                   fontSize: 15,
@@ -698,7 +700,7 @@ class _CallScreenState extends State<CallScreen> {
                         Icon(Icons.person, size: 80, color: Colors.white.withValues(alpha: 0.28)),
                         const SizedBox(height: 14),
                         Text(
-                          'Waiting for the other person…',
+                          AppStrings.t('call_waiting_title'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),
                             fontSize: 16,
@@ -707,7 +709,7 @@ class _CallScreenState extends State<CallScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Share the same room name on another device.',
+                          AppStrings.t('call_waiting_body'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.5),
@@ -830,7 +832,9 @@ class _CallScreenState extends State<CallScreen> {
                       children: [
                         _RoundCallButton(
                           icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-                          label: _micOn ? 'Mute' : 'Unmute',
+                          label: _micOn
+                              ? AppStrings.t('call_mute')
+                              : AppStrings.t('call_unmute'),
                           background: WhatsAppCallTheme.bar,
                           onTap: _toggleMic,
                         ),
@@ -840,13 +844,15 @@ class _CallScreenState extends State<CallScreen> {
                             icon: _camOn
                                 ? Icons.videocam_rounded
                                 : Icons.videocam_off_rounded,
-                            label: _camOn ? 'Video' : 'Off',
+                            label: _camOn
+                                ? AppStrings.t('call_video')
+                                : AppStrings.t('call_video_off'),
                             background: WhatsAppCallTheme.bar,
                             onTap: _toggleCam,
                           ),
                         _RoundCallButton(
                           icon: Icons.tune_rounded,
-                          label: 'Audio',
+                          label: AppStrings.t('call_audio'),
                           background: WhatsAppCallTheme.bar,
                           onTap: _openAudioSheet,
                         ),
@@ -858,7 +864,7 @@ class _CallScreenState extends State<CallScreen> {
                         ),
                         _RoundCallButton(
                           icon: Icons.call_end_rounded,
-                          label: 'End',
+                          label: AppStrings.t('call_end'),
                           background: WhatsAppCallTheme.danger,
                           onTap: _hangUp,
                         ),
@@ -952,9 +958,9 @@ class _AudioSettingsSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Text(
-                  'Audio',
-                  style: TextStyle(
+                Text(
+                  AppStrings.t('call_audio'),
+                  style: const TextStyle(
                     color: WhatsAppCallTheme.strongText,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -963,9 +969,9 @@ class _AudioSettingsSheet extends StatelessWidget {
                 const SizedBox(height: 14),
                 _MicLevelStrip(level: controller.micLevel),
                 const SizedBox(height: 18),
-                const _SheetLabel(
+                _SheetLabel(
                   icon: Icons.record_voice_over_rounded,
-                  text: 'Volume de la traduction',
+                  text: AppStrings.t('call_translation_volume'),
                 ),
                 Slider(
                   value: controller.translatedVolume,
@@ -974,9 +980,9 @@ class _AudioSettingsSheet extends StatelessWidget {
                   inactiveColor: Colors.white24,
                 ),
                 const SizedBox(height: 6),
-                const _SheetLabel(
+                _SheetLabel(
                   icon: Icons.person_outline_rounded,
-                  text: 'Volume voix originale',
+                  text: AppStrings.t('call_original_volume'),
                 ),
                 Slider(
                   value: controller.originalVolume,
@@ -989,14 +995,15 @@ class _AudioSettingsSheet extends StatelessWidget {
                   value: controller.duckingEnabled,
                   onChanged: controller.setDuckingEnabled,
                   activeTrackColor: WhatsAppCallTheme.accent,
-                  title: const Text(
-                    'Baisser la voix d’origine',
-                    style: TextStyle(color: WhatsAppCallTheme.strongText, fontSize: 15),
+                  title: Text(
+                    AppStrings.t('call_ducking_title'),
+                    style: const TextStyle(
+                        color: WhatsAppCallTheme.strongText, fontSize: 15),
                   ),
                   subtitle: Text(
                     controller.isDucking
-                        ? 'Active maintenant — traduction en cours'
-                        : 'Baisse l’original quand la traduction parle',
+                        ? AppStrings.t('call_ducking_on')
+                        : AppStrings.t('call_ducking_off'),
                     style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 12),
                   ),
                 ),
@@ -1191,9 +1198,9 @@ class _RouteRow extends StatelessWidget {
     final external = route == AudioRoute.wiredHeadset || route == AudioRoute.bluetooth;
     final routeLabel = switch (route) {
       AudioRoute.bluetooth => 'Bluetooth',
-      AudioRoute.wiredHeadset => 'Casque',
-      AudioRoute.speaker => 'Haut-parleur',
-      AudioRoute.earpiece => 'Écouteur',
+      AudioRoute.wiredHeadset => AppStrings.t('call_route_headset'),
+      AudioRoute.speaker => AppStrings.t('call_route_speaker'),
+      AudioRoute.earpiece => AppStrings.t('call_route_earpiece'),
     };
     final routeIcon = switch (route) {
       AudioRoute.bluetooth => Icons.bluetooth_audio_rounded,
@@ -1204,7 +1211,9 @@ class _RouteRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SheetLabel(icon: Icons.speaker_phone_rounded, text: 'Sortie audio'),
+        _SheetLabel(
+            icon: Icons.speaker_phone_rounded,
+            text: AppStrings.t('call_audio_output')),
         Row(
           children: [
             Icon(routeIcon, color: WhatsAppCallTheme.strongText),
@@ -1226,8 +1235,8 @@ class _RouteRow extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             external
-                ? 'Sortie gérée par votre appareil tant qu’un casque ou Bluetooth est connecté.'
-                : 'Active le haut-parleur ou repasse à l’écouteur.',
+                ? AppStrings.t('call_route_external_hint')
+                : AppStrings.t('call_route_internal_hint'),
             style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 12),
           ),
         ),
