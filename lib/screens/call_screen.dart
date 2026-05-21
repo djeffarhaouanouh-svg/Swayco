@@ -852,7 +852,7 @@ class _CallScreenState extends State<CallScreen> {
                         ),
                         _RoundCallButton(
                           icon: Icons.translate,
-                          label: 'Langue',
+                          label: AppStrings.t('call_language'),
                           background: WhatsAppCallTheme.bar,
                           onTap: _openLanguageSheet,
                         ),
@@ -1045,19 +1045,18 @@ class _OutputLanguageSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const Text(
-              'Langue que j’entends',
-              style: TextStyle(
+            Text(
+              AppStrings.t('call_output_language_title'),
+              style: const TextStyle(
                 color: WhatsAppCallTheme.strongText,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Change la langue dans laquelle tu entends l’autre '
-              'personne. Ça ne change rien pour elle.',
-              style: TextStyle(
+            Text(
+              AppStrings.t('call_output_language_hint'),
+              style: const TextStyle(
                 color: WhatsAppCallTheme.subtleText,
                 fontSize: 12,
                 height: 1.4,
