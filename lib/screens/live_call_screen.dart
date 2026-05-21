@@ -7,6 +7,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/app_strings.dart';
 import '../services/device_id.dart';
 import '../services/live_lobby_api.dart';
 import '../services/profile_api.dart';
@@ -282,7 +283,7 @@ class _LiveCallScreenState extends State<LiveCallScreen>
       unawaited(PushDispatcher.broadcastLiveCall());
     } catch (e) {
       if (!mounted) return;
-      _showError('Impossible de lancer la recherche : $e');
+      _showError(AppStrings.t('live_search_failed', args: {'error': '$e'}));
       _backToIdle();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -401,7 +402,9 @@ class _LiveCallScreenState extends State<LiveCallScreen>
         ),
       );
     } catch (e) {
-      if (mounted) _showError('Connexion impossible : $e');
+      if (mounted) {
+        _showError(AppStrings.t('live_connect_failed', args: {'error': '$e'}));
+      }
     }
     // Returned from the call (or it failed) — tidy our lobby row and
     // reset the screen.
@@ -429,29 +432,28 @@ class _LiveCallScreenState extends State<LiveCallScreen>
   }
 
   Widget _buildUnavailable() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 36),
+        padding: const EdgeInsets.symmetric(horizontal: 36),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.public_off, color: WhatsAppCallTheme.subtleText,
+            const Icon(Icons.public_off, color: WhatsAppCallTheme.subtleText,
                 size: 56),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
-              'Appel live indisponible',
-              style: TextStyle(
+              AppStrings.t('live_unavailable_title'),
+              style: const TextStyle(
                 color: WhatsAppCallTheme.strongText,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              'La mise en relation aléatoire a besoin de Supabase. '
-              'Configure-le pour activer cet onglet.',
+              AppStrings.t('live_unavailable_body'),
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: WhatsAppCallTheme.subtleText,
                 fontSize: 13,
                 height: 1.4,
@@ -544,13 +546,13 @@ class _LiveCallScreenState extends State<LiveCallScreen>
           child: const Icon(Icons.public, color: Colors.white, size: 26),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Appel aléatoire',
-                style: TextStyle(
+                AppStrings.t('live_title'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -558,8 +560,8 @@ class _LiveCallScreenState extends State<LiveCallScreen>
                 ),
               ),
               Text(
-                'Rencontre quelqu\'un au hasard, traduit en direct.',
-                style: TextStyle(color: Color(0xFFB8E0D8), fontSize: 13),
+                AppStrings.t('live_subtitle'),
+                style: const TextStyle(color: Color(0xFFB8E0D8), fontSize: 13),
               ),
             ],
           ),
@@ -572,9 +574,8 @@ class _LiveCallScreenState extends State<LiveCallScreen>
     final count = _waitingCount;
     final hasPeople = count > 0;
     final text = hasPeople
-        ? '$count ${count == 1 ? "personne cherche" : "personnes cherchent"} '
-            'un live'
-        : 'Sois le premier à lancer un live';
+        ? AppStrings.t('live_searching_count', args: {'count': '$count'})
+        : AppStrings.t('live_be_first');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
@@ -624,9 +625,9 @@ class _LiveCallScreenState extends State<LiveCallScreen>
                 ),
               )
             : const Icon(Icons.public, size: 22),
-        label: const Text(
-          'Déclencher un appel aléatoire',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        label: Text(
+          AppStrings.t('live_trigger'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         style: FilledButton.styleFrom(
           backgroundColor: WhatsAppCallTheme.accent,
@@ -665,18 +666,18 @@ class _LiveCallScreenState extends State<LiveCallScreen>
           ),
           const SizedBox(height: 14),
           if (_cameraDenied) ...[
-            const Text(
-              'Caméra non autorisée',
-              style: TextStyle(
+            Text(
+              AppStrings.t('live_camera_denied'),
+              style: const TextStyle(
                 color: WhatsAppCallTheme.strongText,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Tu peux quand même lancer un appel live.',
-              style: TextStyle(
+            Text(
+              AppStrings.t('live_camera_denied_body'),
+              style: const TextStyle(
                 color: WhatsAppCallTheme.subtleText,
                 fontSize: 13,
               ),
@@ -709,22 +710,21 @@ class _LiveCallScreenState extends State<LiveCallScreen>
               const Spacer(flex: 3),
               const _WobblingMagnifier(),
               const SizedBox(height: 38),
-              const Text(
-                'Recherche d\'une personne…',
-                style: TextStyle(
+              Text(
+                AppStrings.t('live_searching_title'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 44),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 44),
                 child: Text(
-                  'On te met en relation avec quelqu\'un, quelque part '
-                  'dans le monde 🌍 — traduit en direct.',
+                  AppStrings.t('live_searching_body'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: WhatsAppCallTheme.subtleText,
                     fontSize: 14,
                     height: 1.5,
@@ -744,9 +744,9 @@ class _LiveCallScreenState extends State<LiveCallScreen>
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                child: const Text(
-                  'Annuler',
-                  style: TextStyle(
+                child: Text(
+                  AppStrings.t('live_cancel'),
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
