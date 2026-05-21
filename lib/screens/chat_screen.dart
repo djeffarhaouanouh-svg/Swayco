@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
+import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
@@ -436,6 +437,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             onViewProfile: () => _viewProfile(p),
             onBlock: () => _blockPeer(p),
             onReport: () => _reportPeer(p),
+            onCall: () => CallLauncher.startCall(
+              context,
+              peerDeviceId: p.id,
+              translation: widget.translation,
+            ),
           );
         },
       ),
@@ -453,6 +459,7 @@ class _FriendChatRow extends StatelessWidget {
     required this.onViewProfile,
     required this.onBlock,
     required this.onReport,
+    required this.onCall,
   });
   final RemoteProfile profile;
   final ChatMessage? lastMessage;
@@ -464,6 +471,8 @@ class _FriendChatRow extends StatelessWidget {
   final VoidCallback onViewProfile;
   final VoidCallback onBlock;
   final VoidCallback onReport;
+  /// Dials this friend — same call path as the chat thread header.
+  final VoidCallback onCall;
 
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
@@ -615,12 +624,6 @@ class _FriendChatRow extends StatelessWidget {
                         ),
                       ),
                     ],
-                    // Decorative phone glyph next to the 3-dot menu —
-                    // mirrors the call icon on the chat thread page. Not
-                    // interactive on purpose.
-                    const Icon(Icons.phone,
-                        color: WhatsAppCallTheme.subtleText, size: 20),
-                    const SizedBox(width: 8),
                     PopupMenuButton<String>(
                       tooltip: AppStrings.t('tooltip_more'),
                       padding: EdgeInsets.zero,
@@ -674,6 +677,19 @@ class _FriendChatRow extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    // Call button — placed rightmost, clear of the
+                    // overflow menu. A tap dials the friend directly
+                    // (LiveKit call + ring) via the shared CallLauncher.
+                    IconButton(
+                      onPressed: onCall,
+                      tooltip: AppStrings.t('tooltip_call'),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                          width: 34, height: 34),
+                      icon: const Icon(Icons.phone,
+                          color: WhatsAppCallTheme.accent, size: 20),
                     ),
                   ],
                 ),
