@@ -220,6 +220,10 @@ abstract final class AppStrings {
     'profile_message': 'Message',
     'follow_back': "S'abonner en retour",
     'follow_following': 'Abonné(e)',
+    'follow_unfollow': 'Se désabonner',
+    'unfollow_q': 'Se désabonner de {name} ?',
+    'unfollow_body':
+        'Vous ne serez plus abonné(e) à cette personne. Elle sera retirée de vos amis.',
     'profile_loading': 'Chargement...',
     'profile_anonymous': 'Sans nom',
     'profile_email_private': 'Privé · visible uniquement par toi',
@@ -471,6 +475,10 @@ abstract final class AppStrings {
     'profile_message': 'Message',
     'follow_back': 'Follow back',
     'follow_following': 'Following',
+    'follow_unfollow': 'Unfollow',
+    'unfollow_q': 'Unfollow {name}?',
+    'unfollow_body':
+        "You'll no longer follow this person. They will be removed from your friends.",
     'profile_loading': 'Loading...',
     'profile_anonymous': 'No name',
     'profile_email_private': 'Private · only visible to you',

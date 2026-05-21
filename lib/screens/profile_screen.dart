@@ -8,16 +8,19 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
+import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
+import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/whatsapp_call_theme.dart';
+import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import 'chat_thread_screen.dart';
@@ -248,6 +251,55 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     } catch (e) {
       if (!mounted) return;
       setState(() => _iFollowPeer = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
+  /// Unfollow the displayed peer — removes them from my friends. Reachable
+  /// only when I already follow them (see the button gating in
+  /// [_IdentitySection]). Confirms first, then optimistic with rollback.
+  Future<void> _unfollowPeer() async {
+    if (_targetId.isEmpty || _deviceId.isEmpty) return;
+    final name = _displayName.isEmpty
+        ? AppStrings.t('incoming_someone').toLowerCase()
+        : _displayName;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WhatsAppCallTheme.bar,
+        title: Text(
+          AppStrings.t('unfollow_q', args: {'name': name}),
+          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+        ),
+        content: Text(
+          AppStrings.t('unfollow_body'),
+          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(AppStrings.t('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(AppStrings.t('follow_unfollow')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _iFollowPeer = false);
+    try {
+      await FriendshipApi.unfollow(meId: _deviceId, peerId: _targetId);
+      if (!mounted) return;
+      // Re-pull so the followers/following counts reflect the dropped edge.
+      await _reload(silent: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _iFollowPeer = true);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
@@ -678,9 +730,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               ],
             )
           : null,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
         color: WhatsAppCallTheme.accent,
         backgroundColor: WhatsAppCallTheme.bar,
         onRefresh: _reload,
@@ -740,6 +794,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     onEdit: _openEditor,
                     onSettings: _openSettings,
                     onFollowBack: _followBack,
+                    onUnfollow: _unfollowPeer,
                     onTogglePeerLike: _togglePeerLike,
                     onMessagePeer: _openChatWithPeer,
                   ),
@@ -764,6 +819,38 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 ],
               ),
         ),
+          ),
+          // When viewing someone else's profile this screen is a route
+          // pushed on top of [RootShell], so the shell's floating nav bar
+          // is hidden. Re-render it here and route taps back to the shell.
+          if (_isViewingOther)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 12 + MediaQuery.paddingOf(context).bottom,
+              child: Center(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: NavTab.index,
+                  builder: (context, navIndex, _) =>
+                      ValueListenableBuilder<int>(
+                    valueListenable: ChatUnread.count,
+                    builder: (context, unread, _) => GlassNavBar(
+                      selected: navIndex,
+                      unreadChat: unread,
+                      onSelect: (i) {
+                        NavTab.select(i);
+                        if (i == NavTab.chat) ChatUnread.markAllSeen();
+                        // Pop every pushed route so the shell — now on
+                        // tab [i] — is visible underneath.
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1453,6 +1540,7 @@ class _IdentitySection extends StatelessWidget {
     this.peerFollowsMe = false,
     this.iFollowPeer = false,
     this.onFollowBack,
+    this.onUnfollow,
     this.iLikePeer = false,
     this.onTogglePeerLike,
     this.onMessagePeer,
@@ -1487,6 +1575,8 @@ class _IdentitySection extends StatelessWidget {
   final bool iFollowPeer;
   /// Viewer-mode only: follow the peer back.
   final VoidCallback? onFollowBack;
+  /// Viewer-mode only: unfollow the peer (removes them from my friends).
+  final VoidCallback? onUnfollow;
   /// Viewer-mode only: have I liked this peer? Drives the heart overlay
   /// on their photo cell.
   final bool iLikePeer;
@@ -1718,7 +1808,8 @@ class _IdentitySection extends StatelessWidget {
                     ),
                     // Second action depends on the follow relation:
                     //  • peer follows me, I don't follow back → "Follow back"
-                    //  • I already follow them → a subdued "Following" state
+                    //  • I already follow them → "Unfollow" (removes them
+                    //    from my friends)
                     //  • strangers → nothing (Message button on its own)
                     if (peerFollowsMe && !iFollowPeer) ...[
                       const SizedBox(height: 10),
@@ -1730,9 +1821,9 @@ class _IdentitySection extends StatelessWidget {
                     ] else if (iFollowPeer) ...[
                       const SizedBox(height: 10),
                       _GradientActionButton(
-                        label: AppStrings.t('follow_following'),
-                        icon: Icons.check,
-                        onTap: () {},
+                        label: AppStrings.t('follow_unfollow'),
+                        icon: Icons.person_remove_alt_1,
+                        onTap: onUnfollow ?? () {},
                         subdued: true,
                       ),
                     ],

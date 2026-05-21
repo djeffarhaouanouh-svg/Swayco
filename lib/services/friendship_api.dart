@@ -311,6 +311,23 @@ abstract final class FriendshipApi {
     await _c.from('friendships').delete().eq('id', friendshipId);
   }
 
+  /// Unfollow [peerId]: delete the friendship edge I created when I
+  /// followed them (requester = me, addressee = peer). The reverse edge,
+  /// if any (they still follow me), is left intact — unfollowing is a
+  /// one-directional action, like Instagram. Idempotent: deleting a row
+  /// that doesn't exist is a no-op.
+  static Future<void> unfollow({
+    required String meId,
+    required String peerId,
+  }) async {
+    if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty) return;
+    await _c
+        .from('friendships')
+        .delete()
+        .eq('requester', meId)
+        .eq('addressee', peerId);
+  }
+
   /// Viewer-mode helper for the profile screen: resolves the two
   /// independent directions of the relation between me ([meId]) and a
   /// [peerId]. `peerFollowsMe` is true when the peer sent me a request

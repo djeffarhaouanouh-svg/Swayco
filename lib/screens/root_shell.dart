@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +8,7 @@ import '../services/call_alert.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
+import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
@@ -16,6 +16,7 @@ import '../services/token_api.dart';
 import '../services/web_poll.dart';
 import '../theme/whatsapp_call_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
@@ -35,14 +36,12 @@ class RootShell extends StatefulWidget {
 }
 
 class _RootShellState extends State<RootShell> {
-  /// Default tab — Discover (now at index 1, swapped with Chat).
-  static const _mainIndex = 1;
-  int _index = _mainIndex;
-
   // Tab order: Chat (0), Discover (1), Live (2), Profile (3). Discover is
-  // the default landing tab. The pages list is rebuilt every frame in
-  // build() so the Live tab can be told whether it is currently visible
-  // (it holds the camera only while on screen).
+  // the default landing tab. The selected index lives in the shared
+  // [NavTab] notifier so screens pushed on top of the shell can drive it.
+  // The pages list is rebuilt every frame in build() so the Live tab can
+  // be told whether it is currently visible (it holds the camera only
+  // while on screen).
 
   RealtimeChannel? _callsChannel;
   bool _ringingDialogOpen = false;
@@ -72,9 +71,9 @@ class _RootShellState extends State<RootShell> {
     if (intent == null || !mounted) return;
     switch (intent.type) {
       case 'live_call':
-        if (_index != 2) setState(() => _index = 2);
+        NavTab.select(NavTab.live);
       case 'message':
-        if (_index != 0) setState(() => _index = 0);
+        NavTab.select(NavTab.chat);
         ChatUnread.markAllSeen();
       // 'incoming_call' needs no routing — the ring modal is shown by
       // the realtime subscription / poll whatever tab is open.
@@ -192,220 +191,42 @@ class _RootShellState extends State<RootShell> {
       backgroundColor: WhatsAppCallTheme.scaffold,
       extendBody: true,
       body: ValueListenableBuilder<int>(
-        valueListenable: ChatUnread.count,
-        builder: (context, unread, _) {
-          final pages = <Widget>[
-            ChatScreen(translation: widget.translation),
-            const DiscoverScreen(),
-            LiveCallScreen(
-              active: _index == 2,
-              translation: widget.translation,
-            ),
-            const ProfileScreen(),
-          ];
-          return Stack(
-            children: [
-              IndexedStack(index: _index, children: pages),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 12 + MediaQuery.paddingOf(context).bottom,
-                child: Center(
-                  child: _GlassNavBar(
-                    selected: _index,
-                    unreadChat: unread,
-                    onSelect: (i) {
-                      setState(() => _index = i);
-                      // Chat is at index 0 now (swapped with Discover).
-                      if (i == 0) ChatUnread.markAllSeen();
-                    },
-                  ),
-                ),
+        valueListenable: NavTab.index,
+        builder: (context, index, _) => ValueListenableBuilder<int>(
+          valueListenable: ChatUnread.count,
+          builder: (context, unread, _) {
+            final pages = <Widget>[
+              ChatScreen(translation: widget.translation),
+              const DiscoverScreen(),
+              LiveCallScreen(
+                active: index == NavTab.live,
+                translation: widget.translation,
               ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _GlassNavBar extends StatelessWidget {
-  const _GlassNavBar({
-    required this.selected,
-    required this.unreadChat,
-    required this.onSelect,
-  });
-
-  final int selected;
-  final int unreadChat;
-  final ValueChanged<int> onSelect;
-
-  static const double _height = 54;
-  static const double _itemWidth = 72;
-  static const double _hPad = 10;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = <_NavItemData>[
-      _NavItemData(
-        icon: Icons.chat_bubble_outline,
-        selectedIcon: Icons.chat_bubble,
-        label: AppStrings.t('nav_chat'),
-        badge: unreadChat,
-      ),
-      _NavItemData(
-        icon: Icons.search,
-        selectedIcon: Icons.manage_search,
-        label: AppStrings.t('nav_search'),
-      ),
-      const _NavItemData(
-        icon: Icons.public,
-        selectedIcon: Icons.travel_explore,
-        label: 'Live',
-      ),
-      _NavItemData(
-        icon: Icons.person_outline,
-        selectedIcon: Icons.person,
-        label: AppStrings.t('nav_tab3'),
-      ),
-    ];
-
-    final totalWidth = _hPad * 2 + _itemWidth * items.length;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          width: totalWidth,
-          height: _height,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.20),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.30),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 6),
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              // Sliding highlight pill — animates between item slots.
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                left: _itemWidth * selected,
-                top: 0,
-                bottom: 0,
-                width: _itemWidth,
-                child: Center(
-                  child: Container(
-                    width: _itemWidth - 4,
-                    height: _height - 16,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
-                      ),
+              const ProfileScreen(),
+            ];
+            return Stack(
+              children: [
+                IndexedStack(index: index, children: pages),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 12 + MediaQuery.paddingOf(context).bottom,
+                  child: Center(
+                    child: GlassNavBar(
+                      selected: index,
+                      unreadChat: unread,
+                      onSelect: (i) {
+                        NavTab.select(i);
+                        if (i == NavTab.chat) ChatUnread.markAllSeen();
+                      },
                     ),
                   ),
                 ),
-              ),
-              // Items.
-              Row(
-                children: [
-                  for (var i = 0; i < items.length; i++)
-                    SizedBox(
-                      width: _itemWidth,
-                      height: _height,
-                      child: _NavItem(
-                        data: items[i],
-                        selected: selected == i,
-                        onTap: () => onSelect(i),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
-    );
-  }
-}
-
-class _NavItemData {
-  const _NavItemData({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    this.badge = 0,
-  });
-
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final int badge;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.data,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _NavItemData data;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        onTap: onTap,
-        child: Center(
-          child: _badged(
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: Icon(
-                selected ? data.selectedIcon : data.icon,
-                key: ValueKey(selected),
-                size: 22,
-                color: selected
-                    ? WhatsAppCallTheme.accent
-                    : Colors.white.withValues(alpha: 0.78),
-              ),
-            ),
-            data.badge,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _badged(Widget child, int count) {
-    if (count <= 0) return child;
-    return Badge.count(
-      count: count,
-      backgroundColor: WhatsAppCallTheme.danger,
-      textColor: Colors.white,
-      child: child,
     );
   }
 }
