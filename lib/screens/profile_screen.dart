@@ -2010,6 +2010,12 @@ class _PhotosGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPhoto = discoverPhotoUrl.isNotEmpty;
     if (viewerMode && !hasPhoto) return const SizedBox.shrink();
+    // Own profile with no photo yet → a full-width call-to-action that
+    // explains why a Discover photo matters, instead of a lonely empty
+    // grid cell.
+    if (!viewerMode && !hasPhoto) {
+      return _AddDiscoverPhotoCta(onTap: onPick);
+    }
     return Align(
       alignment: Alignment.centerLeft,
       child: FractionallySizedBox(
@@ -2025,6 +2031,77 @@ class _PhotosGrid extends StatelessWidget {
             onTapLikes: onTapLikes,
             iLikePeer: iLikePeer,
             onTogglePeerLike: onTogglePeerLike,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown on the user's own profile when they have no Discover photo yet
+/// — an accent-tinted card nudging them to add one so they appear in the
+/// Discover stack.
+class _AddDiscoverPhotoCta extends StatelessWidget {
+  const _AddDiscoverPhotoCta({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: WhatsAppCallTheme.accent.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: WhatsAppCallTheme.accent.withValues(alpha: 0.45),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(14, 16, 16, 16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: WhatsAppCallTheme.accent.withValues(alpha: 0.20),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_a_photo_rounded,
+                    color: WhatsAppCallTheme.accent, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppStrings.t('discover_photo_cta_title'),
+                      style: const TextStyle(
+                        color: WhatsAppCallTheme.strongText,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      AppStrings.t('discover_photo_cta_body'),
+                      style: const TextStyle(
+                        color: WhatsAppCallTheme.subtleText,
+                        fontSize: 12.5,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
