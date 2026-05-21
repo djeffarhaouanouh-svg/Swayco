@@ -37,6 +37,7 @@ class RemoteProfile {
     this.creditsResetAt,
     this.lifetimeCallSeconds = 0,
     this.proExpiresAt,
+    this.lastSeen,
   });
 
   final String id;
@@ -79,6 +80,11 @@ class RemoteProfile {
   /// When the current Premium period ends. Null on free tier.
   final DateTime? proExpiresAt;
 
+  /// Last time this user's app was foregrounded (presence heartbeat).
+  /// Null when unknown. Whether it is surfaced as "online" is gated by
+  /// [hideOnlineStatus] on the client.
+  final DateTime? lastSeen;
+
   /// Backwards-compat shim — the rest of the UI still reads `firstName` /
   /// `sourceLang`. Same data, different schema names.
   String get firstName => displayName;
@@ -114,6 +120,7 @@ class RemoteProfile {
         creditsResetAt: _parseDate(m['credits_reset_at']),
         lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
         proExpiresAt: _parseDate(m['pro_expires_at']),
+        lastSeen: _parseDate(m['last_seen']),
       );
 }
 
@@ -442,6 +449,21 @@ abstract final class ProfileApi {
     } catch (e) {
       debugPrint('ProfileApi.updateHideOnlineStatus failed: $e');
       return false;
+    }
+  }
+
+  /// Presence heartbeat — bump the caller's `last_seen` to now. Other
+  /// clients read it to show an online indicator (gated by
+  /// `hide_online_status`). Best-effort: a missing `last_seen` column
+  /// (migration 0018 not applied yet) just no-ops via the catch.
+  static Future<void> touchLastSeen(String userId) async {
+    if (!isSupabaseReady || userId.isEmpty) return;
+    try {
+      await _c.from('profiles').update({
+        'last_seen': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+    } catch (e) {
+      debugPrint('ProfileApi.touchLastSeen failed: $e');
     }
   }
 

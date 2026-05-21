@@ -15,9 +15,6 @@ abstract final class AppSettings {
   /// Hide the online status (persisted to the profile row).
   static const kHideOnline = 'pref_hide_online';
 
-  /// Auto-translate default (reserved — see Settings report).
-  static const kAutoTranslate = 'pref_auto_translate_default';
-
   /// Default call audio output: `'speaker'` or `'earpiece'`.
   static const kAudioOutput = 'pref_audio_output';
 }

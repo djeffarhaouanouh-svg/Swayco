@@ -19,6 +19,7 @@ import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
 import 'services/guest_invite_api.dart';
 import 'services/notification_client.dart';
+import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
@@ -191,6 +192,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       );
     }
     unawaited(ChatUnread.start(uid));
+    // Presence heartbeat — keeps profiles.last_seen fresh for the online
+    // indicator (gated by each user's hide-online-status setting).
+    PresenceService.start(uid);
     // Apply the user's saved Settings preferences.
     final prefs = await SharedPreferences.getInstance();
     // In-app sounds: gate the CallAlert ring / dial tone.

@@ -402,6 +402,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     return '@${_deviceId.replaceAll('-', '').substring(0, 8)}';
   }
 
+  /// True when viewing a peer who is currently online — `last_seen`
+  /// within the last 2 minutes — and who has not hidden their status.
+  bool get _peerOnline {
+    if (!_isViewingOther) return false;
+    final r = _remote;
+    if (r == null || r.hideOnlineStatus) return false;
+    final ls = r.lastSeen;
+    if (ls == null) return false;
+    return DateTime.now().difference(ls) < const Duration(minutes: 2);
+  }
+
   Future<void> _upgradeToPremium() async {
     // For now this just opens a confirmation sheet describing the offer.
     // The actual IAP / receipt-validation hook will go here once App Store /
@@ -797,6 +808,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         ? AppStrings.t('profile_anonymous')
                         : _displayName,
                     handle: _handle,
+                    online: _peerOnline,
                     avatarColorHex: _remote?.avatarColor,
                     avatarUrl: _remote?.avatarUrl,
                     bio: _remote?.bio ?? '',
@@ -1608,6 +1620,7 @@ class _IdentitySection extends StatelessWidget {
   const _IdentitySection({
     required this.displayName,
     required this.handle,
+    this.online = false,
     required this.avatarColorHex,
     required this.avatarUrl,
     required this.bio,
@@ -1635,6 +1648,8 @@ class _IdentitySection extends StatelessWidget {
 
   final String displayName;
   final String handle;
+  /// Viewer-mode only: show a green "online" line under the handle.
+  final bool online;
   final String? avatarColorHex;
   final String? avatarUrl;
   final String bio;
@@ -1801,6 +1816,33 @@ class _IdentitySection extends StatelessWidget {
             color: WhatsAppCallTheme.subtleText, fontSize: 13,
           ),
         ),
+        // Online indicator — viewer mode, peer active in the last 2 min
+        // and not hiding their status.
+        if (online) ...[
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: WhatsAppCallTheme.accent,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                AppStrings.t('online_now'),
+                style: const TextStyle(
+                  color: WhatsAppCallTheme.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         // Stats row, TikTok-style. On my own profile we add a private
         // posts | followers | following. Likes count moved to a badge on

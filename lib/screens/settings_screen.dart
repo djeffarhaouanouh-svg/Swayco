@@ -37,7 +37,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _kSounds = AppSettings.kSounds;
   static const _kInAppSounds = AppSettings.kInAppSounds;
   static const _kHideOnline = AppSettings.kHideOnline;
-  static const _kAutoTranslate = AppSettings.kAutoTranslate;
   static const _kAudioOutput = AppSettings.kAudioOutput;
 
   bool _busy = false;
@@ -45,7 +44,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _sounds = true;
   bool _inAppSounds = true;
   bool _hideOnline = false;
-  bool _autoTranslate = false;
   String _audioOutput = 'speaker';
 
   String get _email => AuthService.currentEmail;
@@ -78,7 +76,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _inAppSounds = p.getBool(_kInAppSounds) ?? true;
       // Local cache used for instant render — DB value below overrides.
       _hideOnline = p.getBool(_kHideOnline) ?? false;
-      _autoTranslate = p.getBool(_kAutoTranslate) ?? false;
       _audioOutput = p.getString(_kAudioOutput) ?? 'speaker';
     });
     // Pull the canonical hide_online_status from Supabase so what's on
@@ -280,28 +277,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Web: open the Stripe customer portal (cancel / change card / swap
-  /// tier). Native: deep-link to the platform's subscription page — the
-  /// stores require IAP subscriptions to be managed there.
+  /// Opens the Stripe customer portal (cancel / change card / swap tier).
+  /// Web-only — the subscription section is hidden on native builds.
   Future<void> _manageSubscription() async {
-    if (kIsWeb) {
-      setState(() => _busy = true);
-      final url = await StripeApi.openPortal();
-      if (!mounted) return;
-      setState(() => _busy = false);
-      if (url != null && url.isNotEmpty) {
-        await _openExternal(url);
-      } else {
-        _toast(AppStrings.t('settings_subscription_appstore'));
-      }
-      return;
+    setState(() => _busy = true);
+    final url = await StripeApi.openPortal();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (url != null && url.isNotEmpty) {
+      await _openExternal(url);
+    } else {
+      _toast(AppStrings.t('settings_subscription_appstore'));
     }
-    final storeUrl = defaultTargetPlatform == TargetPlatform.iOS
-        ? 'https://apps.apple.com/account/subscriptions'
-        : 'https://play.google.com/store/account/subscriptions';
-    await _openExternal(storeUrl);
   }
-  void _restorePurchases() => _toast(AppStrings.t('settings_restore_soon'));
+
   void _openHelp() => _openExternal('https://swayco.fr/help');
   void _contactSupport() => _openExternal('mailto:support@swayco.fr');
   void _openTerms() => _openExternal('https://swayco.fr/terms');
@@ -466,15 +455,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: AppStrings.t('settings_lang_interface'),
                   onTap: _openLanguageEditor,
                 ),
-                _SettingsToggleRow(
-                  icon: Icons.translate,
-                  label: AppStrings.t('settings_auto_translate'),
-                  value: _autoTranslate,
-                  onChanged: (v) {
-                    setState(() => _autoTranslate = v);
-                    _saveBool(_kAutoTranslate, v);
-                  },
-                ),
                 _SettingsRow(
                   icon: Icons.speaker_outlined,
                   label: AppStrings.t('settings_audio_output'),
@@ -487,20 +467,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ]),
 
-              _SectionHeader(
-                  label: AppStrings.t('settings_section_subscription')),
-              _SettingsCard(children: [
-                _SettingsRow(
-                  icon: Icons.workspace_premium_outlined,
-                  label: AppStrings.t('settings_manage_sub'),
-                  onTap: _manageSubscription,
-                ),
-                _SettingsRow(
-                  icon: Icons.restart_alt,
-                  label: AppStrings.t('settings_restore_purchase'),
-                  onTap: _restorePurchases,
-                ),
-              ]),
+              // Subscriptions are handled by Stripe, which the app only
+              // drives on the web build — hide the section on native
+              // (store IAP isn't wired up).
+              if (kIsWeb) ...[
+                _SectionHeader(
+                    label: AppStrings.t('settings_section_subscription')),
+                _SettingsCard(children: [
+                  _SettingsRow(
+                    icon: Icons.workspace_premium_outlined,
+                    label: AppStrings.t('settings_manage_sub'),
+                    onTap: _manageSubscription,
+                  ),
+                ]),
+              ],
 
               _SectionHeader(label: AppStrings.t('settings_section_help')),
               _SettingsCard(children: [
