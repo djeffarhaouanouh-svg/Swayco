@@ -689,7 +689,7 @@ class _FriendChatRow extends StatelessWidget {
                       constraints: const BoxConstraints.tightFor(
                           width: 34, height: 34),
                       icon: const Icon(Icons.phone,
-                          color: WhatsAppCallTheme.accent, size: 20),
+                          color: Colors.white, size: 20),
                     ),
                   ],
                 ),
