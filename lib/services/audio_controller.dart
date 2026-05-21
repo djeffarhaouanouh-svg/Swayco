@@ -6,6 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
 
 import '../translation/realtime_translation_port.dart';
+import 'livekit_web_audio.dart';
 import 'user_prefs.dart';
 
 /// Possible audio output destinations as seen from the call screen.
@@ -192,6 +193,15 @@ class AudioController extends ChangeNotifier {
   }
 
   Future<void> _applyOriginalVolume(double v) async {
+    // On web, LiveKit plays remote audio through its own hidden <audio>
+    // elements, which rtc.Helper.setVolume cannot reach (it only sets a
+    // bogus track constraint). Drive those DOM elements directly instead —
+    // otherwise the original voice never ducks and bleeds through the
+    // translation.
+    if (kIsWeb) {
+      applyLiveKitRemoteVolumeWeb(v);
+      return;
+    }
     final room = _room;
     if (room == null) return;
     for (final p in room.remoteParticipants.values) {
