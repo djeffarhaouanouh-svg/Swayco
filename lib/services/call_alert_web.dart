@@ -21,6 +21,11 @@ import 'package:web/web.dart' as web;
 /// the visual / interactive piece — this class only adds the sensory
 /// cues around it.
 abstract final class CallAlert {
+  /// When false, the ring / dial-tone beeps are muted (Settings →
+  /// In-app sounds). Vibration and the flashing tab title still fire —
+  /// they are not "sounds".
+  static bool soundsEnabled = true;
+
   static Timer? _vibTimer;
   static Timer? _titleTimer;
   static Timer? _ringTimer;
@@ -75,6 +80,7 @@ abstract final class CallAlert {
   }
 
   static void _dialOnce() {
+    if (!soundsEnabled) return;
     try {
       final ctx = _audioCtx ??= web.AudioContext();
       if (ctx.state == 'suspended') {
@@ -106,6 +112,7 @@ abstract final class CallAlert {
   /// here: receiving a call means the user is already signed in and has
   /// interacted with the app, so the context resumes cleanly.
   static void _ringOnce() {
+    if (!soundsEnabled) return;
     try {
       final ctx = _audioCtx ??= web.AudioContext();
       // If the browser parked the context (tab was backgrounded), wake

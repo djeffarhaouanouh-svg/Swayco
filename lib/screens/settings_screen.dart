@@ -1,14 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/block_api.dart';
+import '../services/call_alert.dart';
 import '../services/device_id.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
+import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
 import '../theme/whatsapp_call_theme.dart';
 import '../widgets/profile_avatar.dart';
@@ -28,12 +33,12 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Toggle preferences are stored in SharedPreferences. Keys are namespaced
   // so they don't collide with the existing UserPrefs keys.
-  static const _kPush = 'pref_push_enabled';
-  static const _kSounds = 'pref_sounds_enabled';
-  static const _kInAppSounds = 'pref_in_app_sounds_enabled';
-  static const _kHideOnline = 'pref_hide_online';
-  static const _kAutoTranslate = 'pref_auto_translate_default';
-  static const _kAudioOutput = 'pref_audio_output'; // 'speaker' | 'earpiece'
+  static const _kPush = AppSettings.kPush;
+  static const _kSounds = AppSettings.kSounds;
+  static const _kInAppSounds = AppSettings.kInAppSounds;
+  static const _kHideOnline = AppSettings.kHideOnline;
+  static const _kAutoTranslate = AppSettings.kAutoTranslate;
+  static const _kAudioOutput = AppSettings.kAudioOutput;
 
   bool _busy = false;
   bool _push = true;
@@ -44,14 +49,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _audioOutput = 'speaker';
 
   String get _email => AuthService.currentEmail;
-  // Hardcoded for now — a follow-up can switch this to package_info_plus
-  // (would require adding the package + a sync in initState).
-  static const String _appVersion = '1.0.0';
+  // Real version + build, loaded from package_info_plus in initState.
+  String _appVersion = '—';
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = '${info.version} (${info.buildNumber})');
+    } catch (_) {
+      // Leave the placeholder if the platform channel is unavailable.
+    }
   }
 
   Future<void> _loadPrefs() async {
@@ -104,6 +119,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveString(String key, String value) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(key, value);
+  }
+
+  /// Register or drop the push transport target when the user flips the
+  /// Push toggle. No-op on platforms where the notification client is a
+  /// stub (web, or native before FCM is wired).
+  Future<void> _applyPushPref(bool enabled) async {
+    final uid = await DeviceId.getOrCreate();
+    if (enabled) {
+      await NotificationClient.register(uid);
+    } else {
+      await NotificationClient.unregister(uid);
+    }
   }
 
   // ───── Actions ─────────────────────────────────────────────────────────
@@ -253,8 +280,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _manageSubscription() =>
-      _toast(AppStrings.t('settings_subscription_appstore'));
+  /// Web: open the Stripe customer portal (cancel / change card / swap
+  /// tier). Native: deep-link to the platform's subscription page — the
+  /// stores require IAP subscriptions to be managed there.
+  Future<void> _manageSubscription() async {
+    if (kIsWeb) {
+      setState(() => _busy = true);
+      final url = await StripeApi.openPortal();
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (url != null && url.isNotEmpty) {
+        await _openExternal(url);
+      } else {
+        _toast(AppStrings.t('settings_subscription_appstore'));
+      }
+      return;
+    }
+    final storeUrl = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions';
+    await _openExternal(storeUrl);
+  }
   void _restorePurchases() => _toast(AppStrings.t('settings_restore_soon'));
   void _openHelp() => _openExternal('https://swayco.fr/help');
   void _contactSupport() => _openExternal('mailto:support@swayco.fr');
@@ -374,6 +420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) {
                     setState(() => _push = v);
                     _saveBool(_kPush, v);
+                    _applyPushPref(v);
                   },
                 ),
                 _SettingsToggleRow(
@@ -392,6 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) {
                     setState(() => _inAppSounds = v);
                     _saveBool(_kInAppSounds, v);
+                    CallAlert.soundsEnabled = v;
                   },
                 ),
               ]),
@@ -858,9 +906,9 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                             ),
                             TextButton(
                               onPressed: () => _unblock(p),
-                              child: const Text(
-                                'Débloquer',
-                                style: TextStyle(
+                              child: Text(
+                                AppStrings.t('unblock'),
+                                style: const TextStyle(
                                     color: WhatsAppCallTheme.accent),
                               ),
                             ),

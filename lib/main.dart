@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
@@ -11,8 +12,10 @@ import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/analytics.dart';
+import 'services/app_settings.dart';
 import 'services/app_strings.dart';
 import 'services/auth_service.dart';
+import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
 import 'services/guest_invite_api.dart';
 import 'services/notification_client.dart';
@@ -188,10 +191,17 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       );
     }
     unawaited(ChatUnread.start(uid));
-    // Best-effort: ask for notification permission + register the
-    // transport target. No-op on platforms where the stub is shipped
-    // (anything that isn't web until the native client is wired up).
-    unawaited(NotificationClient.register(uid));
+    // Apply the user's saved Settings preferences.
+    final prefs = await SharedPreferences.getInstance();
+    // In-app sounds: gate the CallAlert ring / dial tone.
+    CallAlert.soundsEnabled =
+        prefs.getBool(AppSettings.kInAppSounds) ?? true;
+    // Push: only register the transport target when the user hasn't
+    // turned push off in Settings. No-op on platforms where the
+    // notification client is a stub (web, or native before FCM is wired).
+    if (prefs.getBool(AppSettings.kPush) ?? true) {
+      unawaited(NotificationClient.register(uid));
+    }
   }
 
   @override

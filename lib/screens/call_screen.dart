@@ -7,7 +7,10 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/analytics.dart';
+import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
@@ -306,6 +309,15 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await _audio.bind(room);
+      // Apply the user's default call audio output (Settings → Audio
+      // output). AudioController already defaults to speaker, so only
+      // the earpiece choice needs to be applied here.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getString(AppSettings.kAudioOutput) == 'earpiece') {
+          await _audio.setSpeakerOn(false);
+        }
+      } catch (_) {}
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       if (mounted) {
         setState(() {
