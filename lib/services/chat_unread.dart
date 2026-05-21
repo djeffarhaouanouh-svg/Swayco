@@ -102,4 +102,35 @@ abstract final class ChatUnread {
     }
     return out;
   }
+
+  /// Prefix for per-conversation "cleared at" timestamps — set when the
+  /// user deletes a conversation from their chat list. Local-only (delete
+  /// for me): the peer's copy is untouched.
+  static const _convClearedPrefix = 'chat_conv_cleared_';
+
+  /// Mark conversation [convId] as cleared *now*. The chat list hides it
+  /// until a message newer than this timestamp arrives.
+  static Future<void> markConversationCleared(String convId) async {
+    if (convId.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+      '$_convClearedPrefix$convId',
+      DateTime.now().toUtc().toIso8601String(),
+    );
+  }
+
+  /// Snapshot of every "cleared at" timestamp, `{conversationId: DateTime}`.
+  static Future<Map<String, DateTime>> clearedConversations() async {
+    final p = await SharedPreferences.getInstance();
+    final out = <String, DateTime>{};
+    for (final k in p.getKeys()) {
+      if (!k.startsWith(_convClearedPrefix)) continue;
+      final iso = p.getString(k);
+      if (iso == null) continue;
+      final dt = DateTime.tryParse(iso);
+      if (dt == null) continue;
+      out[k.substring(_convClearedPrefix.length)] = dt;
+    }
+    return out;
+  }
 }

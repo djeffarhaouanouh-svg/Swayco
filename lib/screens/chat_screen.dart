@@ -125,6 +125,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // activity (WhatsApp style).
       final latest = await ChatApi.fetchLatestPerConversation(id);
       final seen = await ChatUnread.readPerConversationSeen();
+      // Conversations the user deleted from their list (local "delete for
+      // me"). A row stays hidden until a message newer than the clear
+      // timestamp arrives.
+      final cleared = await ChatUnread.clearedConversations();
       // Drop any conversation where either side has blocked the other —
       // I blocked them (BlockApi.fetchMyBlockedProfiles) or they blocked
       // me (my_blockers RPC). Both directions should make the row
@@ -141,7 +145,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return 'dm-${ids[0]}-${ids[1]}';
       }
 
-      final friends = byId.values.toList()
+      final friends = byId.values.where((p) {
+        final clearedAt = cleared[convIdFor(p.id)];
+        if (clearedAt == null) return true;
+        // Re-surface the conversation once a newer message lands.
+        final lm = latest[convIdFor(p.id)];
+        return lm != null && lm.createdAt.isAfter(clearedAt);
+      }).toList()
         ..sort((a, b) {
           final la = latest[convIdFor(a.id)]?.createdAt;
           final lb = latest[convIdFor(b.id)]?.createdAt;
@@ -200,6 +210,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         builder: (_) => ProfileScreen(userId: peer.id),
       ),
     );
+  }
+
+  /// Delete a conversation from the chat list — local "delete for me".
+  /// The peer's copy is untouched; the row reappears here if they send a
+  /// new message later.
+  Future<void> _deleteConversation(RemoteProfile peer) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WhatsAppCallTheme.bar,
+        title: Text(
+          AppStrings.t('delete_conversation'),
+          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+        ),
+        content: Text(
+          AppStrings.t('delete_conversation_body'),
+          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(AppStrings.t('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(AppStrings.t('delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ChatUnread.markConversationCleared(_conversationIdFor(peer.id));
+    await _reload();
   }
 
   Future<void> _reportPeer(RemoteProfile peer) async {
@@ -446,6 +491,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             onViewProfile: () => _viewProfile(p),
             onBlock: () => _blockPeer(p),
             onReport: () => _reportPeer(p),
+            onDeleteConversation: () => _deleteConversation(p),
             onCall: () => CallLauncher.startCall(
               context,
               peerDeviceId: p.id,
@@ -468,6 +514,7 @@ class _FriendChatRow extends StatelessWidget {
     required this.onViewProfile,
     required this.onBlock,
     required this.onReport,
+    required this.onDeleteConversation,
     required this.onCall,
   });
   final RemoteProfile profile;
@@ -480,6 +527,8 @@ class _FriendChatRow extends StatelessWidget {
   final VoidCallback onViewProfile;
   final VoidCallback onBlock;
   final VoidCallback onReport;
+  /// Removes this conversation from the chat list (local "delete for me").
+  final VoidCallback onDeleteConversation;
   /// Dials this friend — same call path as the chat thread header.
   final VoidCallback onCall;
 
@@ -696,6 +745,7 @@ class _FriendChatRow extends StatelessWidget {
                         if (v == 'profile') onViewProfile();
                         if (v == 'report') onReport();
                         if (v == 'block') onBlock();
+                        if (v == 'delete') onDeleteConversation();
                       },
                       itemBuilder: (ctx) => [
                         PopupMenuItem<String>(
@@ -733,6 +783,19 @@ class _FriendChatRow extends StatelessWidget {
                                   size: 18, color: Color(0xFFE53935)),
                               const SizedBox(width: 10),
                               Text(AppStrings.t('block'),
+                                  style: const TextStyle(
+                                      color: Color(0xFFE53935))),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.delete_outline,
+                                  size: 18, color: Color(0xFFE53935)),
+                              const SizedBox(width: 10),
+                              Text(AppStrings.t('delete_conversation'),
                                   style: const TextStyle(
                                       color: Color(0xFFE53935))),
                             ],
