@@ -76,6 +76,34 @@ const GUEST_ROOM_PREFIX = 'guest-';
 /** How long an invite link stays valid after creation. */
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Supabase service-role client — backs the guest-invite short-code store.
+ *  Same env pair already used by notify.js / analytics.js. */
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+let _supabase;
+function supabase() {
+  if (_supabase !== undefined) return _supabase;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    _supabase = null;
+    return null;
+  }
+  const { createClient } = require('@supabase/supabase-js');
+  _supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+  return _supabase;
+}
+
+/** Short, URL-safe invite code (9 base62 chars). */
+function newInviteCode() {
+  const alphabet =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(9);
+  let s = '';
+  for (let i = 0; i < 9; i += 1) s += alphabet[bytes[i] % 62];
+  return s;
+}
+
 const OPENAI_TRANSLATION_CLIENT_SECRETS =
   'https://api.openai.com/v1/realtime/translations/client_secrets';
 const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translations/calls';
@@ -343,7 +371,66 @@ app.post('/invite/create', async (req, res) => {
   const room = GUEST_ROOM_PREFIX + crypto.randomBytes(12).toString('hex');
   const exp = Date.now() + INVITE_TTL_MS;
   const sig = signInvite(room, String(exp));
-  return res.json({ roomName: room, exp, sig, ttlMs: INVITE_TTL_MS });
+
+  // Persist a short code → invite mapping so the shared link can be a
+  // tiny `…/i/<code>` rather than carrying the room + 43-char signature
+  // inline. Best-effort: if Supabase isn't configured the client falls
+  // back to the long inline link.
+  let code = null;
+  const sb = supabase();
+  if (sb) {
+    try {
+      code = newInviteCode();
+      const { error } = await sb
+        .from('guest_invites')
+        .insert({ code, room, exp, sig });
+      if (error) {
+        console.error('[invite] store failed:', error.message);
+        code = null;
+      }
+      // Opportunistic cleanup of expired rows — keeps the table tiny.
+      sb.from('guest_invites')
+        .delete()
+        .lt('exp', Date.now())
+        .then(() => {}, () => {});
+    } catch (e) {
+      console.error('[invite] store exception:', e);
+      code = null;
+    }
+  }
+  return res.json({ roomName: room, exp, sig, ttlMs: INVITE_TTL_MS, code });
+});
+
+/**
+ * GET /invite/resolve?code=<code>
+ * Public — resolves a short invite code back to { roomName, sig, exp } so
+ * a `…/i/<code>` link can be opened with no account. 404 unknown,
+ * 410 expired.
+ */
+app.get('/invite/resolve', async (req, res) => {
+  const code = String(req.query.code || '').trim();
+  if (!code) return res.status(400).json({ error: 'missing_code' });
+  const sb = supabase();
+  if (!sb) return res.status(500).json({ error: 'store_unconfigured' });
+  try {
+    const { data, error } = await sb
+      .from('guest_invites')
+      .select('room, exp, sig')
+      .eq('code', code)
+      .maybeSingle();
+    if (error || !data) return res.status(404).json({ error: 'not_found' });
+    if (Number(data.exp) < Date.now()) {
+      return res.status(410).json({ error: 'expired' });
+    }
+    return res.json({
+      roomName: data.room,
+      sig: data.sig,
+      exp: String(data.exp),
+    });
+  } catch (e) {
+    console.error('[invite] resolve exception:', e);
+    return res.status(500).json({ error: 'resolve_failed' });
+  }
 });
 
 /**

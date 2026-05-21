@@ -103,7 +103,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // A guest-invite deep link (`/c/<room>` on web) bypasses login entirely:
     // the visitor joins the call with no account. Detected before anything
     // else so an auth check never gates them.
-    final invite = GuestInviteApi.fromCurrentUrl();
+    final invite = await GuestInviteApi.resolveFromCurrentUrl();
     if (invite != null) {
       if (!mounted) return;
       setState(() {
