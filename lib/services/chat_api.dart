@@ -90,6 +90,16 @@ abstract final class ChatApi {
     );
   }
 
+  /// Delete a single message by id. Used by "long-press → delete" on a
+  /// message the user sent — it removes the row, so the message is gone
+  /// for both sides (an "unsend"). RLS decides what the caller may
+  /// actually delete: a row the user isn't allowed to touch is simply
+  /// left untouched.
+  static Future<void> deleteMessage(String messageId) async {
+    if (messageId.isEmpty) return;
+    await _client.from('messages').delete().eq('id', messageId);
+  }
+
   /// Latest message per conversation that involves [meId]. Used by the
   /// chat list to render WhatsApp-style "last message" previews and to
   /// order rows by recent activity.

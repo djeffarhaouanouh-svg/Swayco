@@ -359,6 +359,50 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     );
   }
 
+  /// Long-press one of my own messages → confirm, then delete it (an
+  /// "unsend" — the row is removed for both sides). Removed optimistically;
+  /// the realtime stream confirms it.
+  Future<void> _deleteMessage(ChatMessage m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WhatsAppCallTheme.bar,
+        title: Text(
+          AppStrings.t('delete_message'),
+          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+        ),
+        content: Text(
+          AppStrings.t('delete_message_body'),
+          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(AppStrings.t('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(AppStrings.t('delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ChatApi.deleteMessage(m.id);
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.where((x) => x.id != m.id).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   Widget _buildMessageList() {
     if (_messages.isEmpty) {
       return Center(
@@ -389,6 +433,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           mine: mine,
           displayBody: _displayBodyFor(m),
           translating: _translatingIds.contains(m.id),
+          // Long-press to delete — only my own messages.
+          onLongPressDelete: mine ? () => _deleteMessage(m) : null,
         );
       },
     );
@@ -509,9 +555,12 @@ class _MessageBubble extends StatelessWidget {
     required this.mine,
     required this.displayBody,
     required this.translating,
+    this.onLongPressDelete,
   });
   final ChatMessage message;
   final bool mine;
+  /// Long-press handler — non-null only for the user's own messages.
+  final VoidCallback? onLongPressDelete;
   /// Body text actually rendered — may be the translated version when the
   /// thread-level auto-translate toggle is on.
   final String displayBody;
@@ -541,7 +590,10 @@ class _MessageBubble extends StatelessWidget {
 
     return Align(
       alignment: align,
-      child: Container(
+      child: GestureDetector(
+        // Long-press one of my own bubbles → offer to delete it.
+        onLongPress: onLongPressDelete,
+        child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         constraints: BoxConstraints(
@@ -587,6 +639,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
