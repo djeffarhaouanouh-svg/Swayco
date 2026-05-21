@@ -347,46 +347,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: WhatsAppCallTheme.scaffold,
       body: SafeArea(
         bottom: false,
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      AppStrings.t('messages_title'),
-                      style: const TextStyle(
-                        color: WhatsAppCallTheme.strongText,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  AppStrings.t('messages_title'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                Expanded(child: _buildBody()),
-              ],
-            ),
-            // Full-width "Invite to a call" bar pinned just above the
-            // floating nav bar — a normal row-height strip, not a tall
-            // block. The conversation list runs full height behind both,
-            // so the nav bar floats over real content (no black footer).
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 70 + safeBottom,
-              child: _InviteToCallBar(
-                onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-                creatingInvite: _creatingInvite,
               ),
             ),
+            // The list fills the full height (scrolling behind the
+            // floating nav bar). The "Invite to a call" row is the last
+            // item of the list — see _buildBody.
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
@@ -417,12 +402,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       onRefresh: _reload,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Clear the pinned call bar + floating nav bar so the last
-        // conversation can always be scrolled fully into view.
+        // Clear the floating nav bar so the invite row (last item) can
+        // always be scrolled fully into view.
         padding: EdgeInsets.only(
-          bottom: 142 + MediaQuery.paddingOf(context).bottom,
+          bottom: 84 + MediaQuery.paddingOf(context).bottom,
         ),
-        itemCount: _friends.length,
+        // +1 for the "Invite to a call" row, placed right after the last
+        // conversation — same in-list position as the discussions.
+        itemCount: _friends.length + 1,
         // Brighter separator so rows read distinctly against the dark
         // scaffold (the previous near-black 0xFF1F2C34 was invisible).
         separatorBuilder: (_, _) => const Divider(
@@ -432,6 +419,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           indent: 68,
         ),
         itemBuilder: (ctx, i) {
+          // Last item: "Invite to a call", in the list flow just below
+          // the last discussion.
+          if (i == _friends.length) {
+            return _InviteToCallBar(
+              onInviteToCall: _creatingInvite ? null : _shareCallInvite,
+              creatingInvite: _creatingInvite,
+            );
+          }
           final p = _friends[i];
           final convId = _conversationIdFor(p.id);
           final last = _latestByConv[convId];
@@ -609,35 +604,43 @@ class _FriendChatRow extends StatelessWidget {
               children: [
                 if (lastMessage != null)
                   Padding(
-                    padding: const EdgeInsets.only(right: 4, bottom: 4),
-                    child: Text(
-                      _formatTime(lastMessage!.createdAt),
-                      style: TextStyle(
-                        // Time turns accent-green when unread, matching
-                        // the dot below — same affordance WhatsApp uses.
-                        color: unread
-                            ? WhatsAppCallTheme.accent
-                            : WhatsAppCallTheme.subtleText,
-                        fontSize: 12,
-                        fontWeight:
-                            unread ? FontWeight.w700 : FontWeight.normal,
-                      ),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // The unread dot lives next to the time — never in
+                        // the buttons row — so the call + overflow icons
+                        // stay pinned at a fixed right-hand position
+                        // whether the row is read or unread.
+                        if (unread) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 5),
+                            decoration: const BoxDecoration(
+                              color: WhatsAppCallTheme.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                        Text(
+                          _formatTime(lastMessage!.createdAt),
+                          style: TextStyle(
+                            color: unread
+                                ? WhatsAppCallTheme.accent
+                                : WhatsAppCallTheme.subtleText,
+                            fontSize: 12,
+                            fontWeight: unread
+                                ? FontWeight.w700
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (unread) ...[
-                      Container(
-                        width: 10,
-                        height: 10,
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: const BoxDecoration(
-                          color: WhatsAppCallTheme.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
                     // Call button — sits just before the overflow menu.
                     // A tap dials the friend directly (LiveKit call +
                     // ring) via the shared CallLauncher.
@@ -716,10 +719,10 @@ class _FriendChatRow extends StatelessWidget {
   }
 }
 
-/// Pinned "Invite to a call" bar on the Messages page: a full-width green
-/// strip, the height of a single conversation row, that mints a guest
-/// invite link (join a call with no account) and opens the native OS
-/// share sheet. Positioned just above the floating nav bar.
+/// "Invite to a call" row on the Messages page: a full-width green strip,
+/// the height of a conversation row, that mints a guest invite link (join
+/// a call with no account) and opens the native OS share sheet. Rendered
+/// as the last item of the conversation list, just below the discussions.
 class _InviteToCallBar extends StatelessWidget {
   const _InviteToCallBar({
     required this.onInviteToCall,
