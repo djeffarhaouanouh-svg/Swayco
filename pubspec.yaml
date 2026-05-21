@@ -69,10 +69,10 @@ dev_dependencies:
   # Generates the launcher icons (Android / iOS / web) from icon-swayco.png.
   flutter_launcher_icons: ^0.14.1
 
-# App launcher icon. Regenerate after changing icon-swayco.png with:
+# App launcher icon. Regenerate after changing assets/icon-app.png with:
 #   dart run flutter_launcher_icons
 flutter_launcher_icons:
-  image_path: "icon-swayco.png"
+  image_path: "assets/icon-app.png"
   android: true
   ios: true
   # iOS icons may not carry transparency — flatten the rounded-corner
@@ -81,20 +81,20 @@ flutter_launcher_icons:
   background_color_ios: "#000000"
   web:
     generate: true
-    image_path: "icon-swayco.png"
+    image_path: "assets/icon-app.png"
     background_color: "#000000"
     theme_color: "#00A884"
 
 flutter_native_splash:
   color: "#000000"
-  image: assets/icon-sway.png
+  image: assets/test-splashscreen.png
   color_dark: "#000000"
-  image_dark: assets/icon-sway.png
+  image_dark: assets/test-splashscreen.png
   android_12:
     color: "#000000"
-    image: assets/icon-sway.png
+    image: assets/test-splashscreen.png
     color_dark: "#000000"
-    image_dark: assets/icon-sway.png
+    image_dark: assets/test-splashscreen.png
   android: true
   ios: true
   web: true
@@ -111,7 +111,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon-sway.png
     - assets/demo_profile.png
 
   # To add assets to your application, add an assets section, like this:
