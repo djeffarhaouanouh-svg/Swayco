@@ -549,7 +549,7 @@ class _LiveCallScreenState extends State<LiveCallScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Appel live',
+                'Appel aléatoire',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -625,7 +625,7 @@ class _LiveCallScreenState extends State<LiveCallScreen>
               )
             : const Icon(Icons.public, size: 22),
         label: const Text(
-          'Déclencher un appel live',
+          'Déclencher un appel aléatoire',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         style: FilledButton.styleFrom(
