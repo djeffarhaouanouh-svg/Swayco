@@ -196,11 +196,18 @@ class _LiveCallScreenState extends State<LiveCallScreen>
         _cameraStarting = false;
         return;
       }
-      _renderer!.srcObject = stream;
       _camStream = stream;
       _cameraDenied = false;
       _cameraStarting = false;
       if (mounted) setState(() {});
+      // Safari won't autoplay a <video> whose srcObject was assigned
+      // before the element was attached to the DOM — the preview freezes
+      // on its first frame. Assign the stream only once RTCVideoView is
+      // mounted (next frame). Harmless on Chrome / native.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _camStream != stream) return;
+        _renderer?.srcObject = stream;
+      });
     } catch (e) {
       _cameraStarting = false;
       debugPrint('LiveCallScreen: camera acquire failed: $e');
