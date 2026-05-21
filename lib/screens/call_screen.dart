@@ -264,6 +264,14 @@ class _CallScreenState extends State<CallScreen> {
         ..on<LocalTrackPublishedEvent>((_) {
           if (mounted) setState(() {});
         })
+        // Turning a camera on/off mutes/unmutes its track. Rebuild so the
+        // camera-off tile replaces the frozen last frame (and vice versa).
+        ..on<TrackMutedEvent>((_) {
+          if (mounted) setState(() {});
+        })
+        ..on<TrackUnmutedEvent>((_) {
+          if (mounted) setState(() {});
+        })
         ..on<ParticipantConnectedEvent>((_) {
           // First remote joining = call answered → silence the caller's
           // dial tone (no-op on native via the stub).
@@ -352,6 +360,11 @@ class _CallScreenState extends State<CallScreen> {
   VideoTrack? _remoteVideo(Room room) {
     for (final p in room.remoteParticipants.values) {
       for (final pub in p.videoTrackPublications) {
+        // A muted publication means the participant turned their camera
+        // off — LiveKit mutes the track instead of unpublishing it. Treat
+        // it as "no video" so the camera-off tile shows instead of a
+        // frozen / black VideoTrackRenderer.
+        if (pub.muted) continue;
         final t = pub.track;
         if (t != null) return t;
       }
@@ -363,6 +376,7 @@ class _CallScreenState extends State<CallScreen> {
     final lp = room.localParticipant;
     if (lp == null) return null;
     for (final pub in lp.videoTrackPublications) {
+      if (pub.muted) continue;
       final t = pub.track;
       if (t != null) return t;
     }
@@ -717,34 +731,6 @@ class _CallScreenState extends State<CallScreen> {
                       },
                     ),
                   ),
-                if (peerName.isNotEmpty && remote != null)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 132,
-                    child: IgnorePointer(
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            child: Text(
-                              peerName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
                 // swap. Always rendered when the corresponding party
                 // exists, even if their camera is off — falls back to a
@@ -838,12 +824,16 @@ class _CallScreenState extends State<CallScreen> {
                           background: WhatsAppCallTheme.bar,
                           onTap: _toggleMic,
                         ),
-                        _RoundCallButton(
-                          icon: _camOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-                          label: _camOn ? 'Video' : 'Off',
-                          background: WhatsAppCallTheme.bar,
-                          onTap: _toggleCam,
-                        ),
+                        // Live broadcasts keep the camera on — no toggle.
+                        if (_callKind != 'live')
+                          _RoundCallButton(
+                            icon: _camOn
+                                ? Icons.videocam_rounded
+                                : Icons.videocam_off_rounded,
+                            label: _camOn ? 'Video' : 'Off',
+                            background: WhatsAppCallTheme.bar,
+                            onTap: _toggleCam,
+                          ),
                         _RoundCallButton(
                           icon: Icons.tune_rounded,
                           label: 'Audio',
@@ -1253,7 +1243,7 @@ class _CameraOffTile extends StatelessWidget {
     final iconSize = compact ? 28.0 : 56.0;
     final hasLabel = label != null && label!.isNotEmpty;
     return Container(
-      color: const Color(0xFF111111),
+      color: Colors.black,
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
