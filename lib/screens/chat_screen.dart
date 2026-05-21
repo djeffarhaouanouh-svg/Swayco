@@ -347,34 +347,45 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: WhatsAppCallTheme.scaffold,
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppStrings.t('messages_title'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      AppStrings.t('messages_title'),
+                      style: const TextStyle(
+                        color: WhatsAppCallTheme.strongText,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                Expanded(child: _buildBody()),
+              ],
             ),
-            Expanded(child: _buildBody()),
-            // Fixed footer anchored to the bottom of the page. Its green
-            // extends all the way down behind the floating nav bar, so the
-            // bar floats over green — never on a black footer.
-            _InviteToCallBar(
-              onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-              creatingInvite: _creatingInvite,
+            // Full-width "Invite to a call" bar pinned just above the
+            // floating nav bar — a normal row-height strip, not a tall
+            // block. The conversation list runs full height behind both,
+            // so the nav bar floats over real content (no black footer).
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 70 + safeBottom,
+              child: _InviteToCallBar(
+                onInviteToCall: _creatingInvite ? null : _shareCallInvite,
+                creatingInvite: _creatingInvite,
+              ),
             ),
           ],
         ),
@@ -406,8 +417,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       onRefresh: _reload,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Small gap above the fixed "Invite to a call" footer.
-        padding: const EdgeInsets.only(bottom: 8),
+        // Clear the pinned call bar + floating nav bar so the last
+        // conversation can always be scrolled fully into view.
+        padding: EdgeInsets.only(
+          bottom: 142 + MediaQuery.paddingOf(context).bottom,
+        ),
         itemCount: _friends.length,
         // Brighter separator so rows read distinctly against the dark
         // scaffold (the previous near-black 0xFF1F2C34 was invisible).
@@ -702,11 +716,10 @@ class _FriendChatRow extends StatelessWidget {
   }
 }
 
-/// Fixed footer on the Messages page: a full-width green bar that mints a
-/// guest invite link (join a call with no account) and opens the native OS
-/// share sheet. The green extends down behind the floating glass nav pill
-/// so the bar floats over green, not over a black footer. The label stays
-/// in the upper portion, clear of the nav bar.
+/// Pinned "Invite to a call" bar on the Messages page: a full-width green
+/// strip, the height of a single conversation row, that mints a guest
+/// invite link (join a call with no account) and opens the native OS
+/// share sheet. Positioned just above the floating nav bar.
 class _InviteToCallBar extends StatelessWidget {
   const _InviteToCallBar({
     required this.onInviteToCall,
@@ -719,15 +732,12 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Material(
       color: WhatsAppCallTheme.accent,
       child: InkWell(
         onTap: onInviteToCall,
         child: Padding(
-          // Bottom padding spans the nav bar's float zone (12 + 54 height)
-          // so it sits on green; the label rides comfortably above it.
-          padding: EdgeInsets.fromLTRB(12, 16, 12, 78 + safeBottom),
+          padding: const EdgeInsets.symmetric(vertical: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
