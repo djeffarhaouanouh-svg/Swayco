@@ -111,6 +111,22 @@ class _CallScreenState extends State<CallScreen> {
       _lastTranslationSpeaking = speaking;
       _audio.onTranslationSpeaking(speaking);
     }
+    _syncUsageMeter();
+  }
+
+  /// Translation credits should only burn while the OpenAI pipeline is
+  /// actually live — not for the whole call. Pause the meter while
+  /// waiting for the peer / connecting / idle, resume it once OpenAI is
+  /// connected and translating.
+  void _syncUsageMeter() {
+    if (UsageTracker.isDisabled) return;
+    final live = widget.translation.translationFeedbackPhase ==
+        TranslationFeedbackPhase.live;
+    if (live) {
+      UsageTracker.resume();
+    } else {
+      UsageTracker.pause();
+    }
   }
 
   void _onRoomChanged() {
@@ -194,6 +210,9 @@ class _CallScreenState extends State<CallScreen> {
     if (!mounted || p == null) return;
     UsageTracker.start(userId: uid, initialCredits: p.creditsSeconds);
     if (UsageTracker.isDisabled) return;
+    // Don't bill the whole call — only while translation is live. Set the
+    // meter to whatever the pipeline's state is right now.
+    _syncUsageMeter();
     if (p.creditsSeconds <= 0) {
       // Already empty before the call started — kill translation now.
       await widget.translation.detach();
