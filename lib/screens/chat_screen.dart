@@ -256,28 +256,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Opens the OS share sheet with the invite link. The native sheet lists
-  /// every app that can receive text — WhatsApp, Instagram, Snapchat, SMS,
-  /// Mail… — so there's no need for per-app buttons.
-  Future<void> _shareInvite() async {
-    // sharePositionOrigin is required on iPad (anchors the popover) and
-    // harmless elsewhere — pass this screen's bounds.
-    final box = context.findRenderObject() as RenderBox?;
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text'),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // User dismissed the sheet or sharing is unavailable — nothing to do.
-    }
-  }
-
   /// Random LiveKit identity for the host joining a guest-invite call.
   String _newCallIdentity() {
     final r = Random();
@@ -390,9 +368,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             ),
             Expanded(child: _buildBody()),
-            _InviteFriendBar(
+            _InviteToCallBar(
               onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-              onInviteFriend: _shareInvite,
               creatingInvite: _creatingInvite,
             ),
           ],
@@ -633,6 +610,12 @@ class _FriendChatRow extends StatelessWidget {
                         ),
                       ),
                     ],
+                    // Decorative phone glyph next to the 3-dot menu —
+                    // mirrors the call icon on the chat thread page. Not
+                    // interactive on purpose.
+                    const Icon(Icons.phone,
+                        color: WhatsAppCallTheme.subtleText, size: 20),
+                    const SizedBox(width: 8),
                     PopupMenuButton<String>(
                       tooltip: AppStrings.t('tooltip_more'),
                       padding: EdgeInsets.zero,
@@ -698,20 +681,17 @@ class _FriendChatRow extends StatelessWidget {
   }
 }
 
-/// Pinned footer on the Messages page. The primary button mints a guest
-/// invite link (join a call with no account); the secondary one opens the
-/// classic "invite a friend to Swayco" share sheet. Both use the native OS
-/// share sheet. Bottom padding clears the floating glass nav pill.
-class _InviteFriendBar extends StatelessWidget {
-  const _InviteFriendBar({
+/// Pinned footer on the Messages page: a single button that mints a guest
+/// invite link (join a call with no account) and opens the native OS share
+/// sheet. Bottom padding sits it just above the floating glass nav pill.
+class _InviteToCallBar extends StatelessWidget {
+  const _InviteToCallBar({
     required this.onInviteToCall,
-    required this.onInviteFriend,
     required this.creatingInvite,
   });
 
   /// Null while a link is being minted — disables the button.
   final VoidCallback? onInviteToCall;
-  final VoidCallback onInviteFriend;
   final bool creatingInvite;
 
   @override
@@ -719,63 +699,44 @@ class _InviteFriendBar extends StatelessWidget {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(12, 8, 12, 78 + safeBottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: WhatsAppCallTheme.accent,
-            borderRadius: BorderRadius.circular(14),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onInviteToCall,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (creatingInvite)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    else
-                      const Icon(Icons.videocam_rounded,
-                          color: Colors.white, size: 20),
-                    const SizedBox(width: 10),
-                    Text(
-                      creatingInvite
-                          ? AppStrings.t('invite_call_creating')
-                          : AppStrings.t('invite_to_call'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
+      child: Material(
+        color: WhatsAppCallTheme.accent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onInviteToCall,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (creatingInvite)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
                     ),
-                  ],
+                  )
+                else
+                  const Icon(Icons.videocam_rounded,
+                      color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  creatingInvite
+                      ? AppStrings.t('invite_call_creating')
+                      : AppStrings.t('invite_to_call'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: onInviteFriend,
-            icon: const Icon(Icons.person_add_alt_1,
-                color: WhatsAppCallTheme.subtleText, size: 18),
-            label: Text(
-              AppStrings.t('invite_friend'),
-              style: const TextStyle(
-                color: WhatsAppCallTheme.subtleText,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

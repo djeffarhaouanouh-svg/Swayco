@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_strings.dart';
@@ -640,6 +641,28 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     });
   }
 
+  /// Opens the OS share sheet to invite a friend to Swayco. The native
+  /// sheet lists every app that can receive text — WhatsApp, Instagram,
+  /// SMS, Mail… — so there's no need for per-app buttons.
+  Future<void> _shareInvite() async {
+    // sharePositionOrigin is required on iPad (anchors the popover) and
+    // harmless elsewhere — pass this screen's bounds.
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: AppStrings.t('invite_share_text'),
+          subject: AppStrings.t('invite_friend'),
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
+        ),
+      );
+    } catch (_) {
+      // User dismissed the sheet or sharing is unavailable — nothing to do.
+    }
+  }
+
   Future<void> _reportPeer() async {
     if (!_isViewingOther || _deviceId.isEmpty || _targetId.isEmpty) return;
     final peerName = _displayName.isEmpty
@@ -799,6 +822,12 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     onMessagePeer: _openChatWithPeer,
                   ),
                   const SizedBox(height: 20),
+                  // "Invite a friend to Swayco" — own profile only, sits
+                  // between the identity block and the language card.
+                  if (!_isViewingOther) ...[
+                    _InviteFriendCard(onTap: _shareInvite),
+                    const SizedBox(height: 16),
+                  ],
                   _LanguageCard(
                     language: lang,
                     showCallWarning: !_isViewingOther,
@@ -1507,6 +1536,64 @@ class _LanguageCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Accent-tinted call-to-action card that opens the OS share sheet to
+/// invite a friend to Swayco. Deliberately not a dark "bar" card so it
+/// reads as an action, not just another panel.
+class _InviteFriendCard extends StatelessWidget {
+  const _InviteFriendCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: WhatsAppCallTheme.accent.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: WhatsAppCallTheme.accent.withValues(alpha: 0.45),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: WhatsAppCallTheme.accent.withValues(alpha: 0.20),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person_add_alt_1,
+                    color: WhatsAppCallTheme.accent, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  AppStrings.t('invite_friend'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: WhatsAppCallTheme.subtleText, size: 22),
+            ],
+          ),
+        ),
       ),
     );
   }
