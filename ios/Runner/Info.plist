@@ -59,13 +59,10 @@
 		<string>Microphone is used for video calls.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
-		<key>NSPhotoLibraryAddUsageDescription</key>
-		<string>Used to save photos taken or edited within the app.</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>audio</string>
 			<string>remote-notification</string>
-			<string>voip</string>
 		</array>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
