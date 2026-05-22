@@ -482,7 +482,6 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
     RTCPeerConnection? pc;
     RTCVideoRenderer? renderer;
-    MediaStreamTrack? cloned;
     MediaStream? ms;
 
     try {
@@ -511,7 +510,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         _handleOaiEvent(t);
       };
 
-      cloned = await remote.mediaStreamTrack.clone();
+      final cloned = await remote.mediaStreamTrack.clone();
       ms = await createLocalMediaStream('openai_translation_src');
       await ms.addTrack(cloned);
       await pc.addTrack(cloned, ms);
@@ -567,7 +566,6 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       _boundPublicationSid = publicationSid;
       pc = null;
       renderer = null;
-      cloned = null;
       ms = null;
 
       notifyListeners();
@@ -582,11 +580,16 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
           await renderer.dispose();
         } catch (_) {}
       }
-      if (cloned != null) {
-        try {
-          await cloned.stop();
-        } catch (_) {}
-      }
+      // NEVER call `.stop()` on the cloned remote track here. The clone
+      // shares its source with the RemoteAudioTrack LiveKit is still
+      // playing; on several WebRTC implementations stopping a clone
+      // propagates up and ends the *source*, which kills the remote
+      // party's audio entirely — you stop hearing them at all, not just
+      // the translation. Especially likely on a flaky pipeline open
+      // (weak peer device / bad network) where this finally runs often.
+      // Disposing the MediaStream that holds the clone and closing the
+      // PC releases it without touching the source — same reasoning as
+      // documented in `_stopMedia`.
       if (ms != null) {
         try {
           await ms.dispose();
