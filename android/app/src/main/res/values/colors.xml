@@ -2,4 +2,5 @@
 <resources>
     <!-- Accent tint applied to push-notification small icons + app name. -->
     <color name="notification_color">#00A884</color>
+	<color name="ic_launcher_background">#000000</color>
 </resources>

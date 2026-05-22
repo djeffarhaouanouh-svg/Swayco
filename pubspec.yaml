@@ -74,6 +74,13 @@ dev_dependencies:
 flutter_launcher_icons:
   image_path: "assets/icon-app.png"
   android: true
+  # Android 8+ needs an adaptive icon. The whole tile goes in the
+  # BACKGROUND layer, which fills the icon edge to edge with no inset —
+  # so the tile fills whatever mask shape the launcher applies, instead
+  # of floating as a small square. The foreground layer is left
+  # transparent (the plugin still requires one).
+  adaptive_icon_background: "assets/icon-app.png"
+  adaptive_icon_foreground: "assets/icon-fg-transparent.png"
   ios: true
   # iOS icons may not carry transparency — flatten the rounded-corner
   # alpha onto the icon's own near-black background.
