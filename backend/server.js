@@ -703,6 +703,7 @@ if (hasLegalSite) {
     '/terms': 'terms.html',
     '/privacy': 'privacy.html',
     '/help': 'help.html',
+    '/child-safety': 'child-safety.html',
   };
   for (const [route, file] of Object.entries(legalRoutes)) {
     app.get(route, (_req, res) =>
@@ -727,7 +728,8 @@ if (hasWebUi) {
       p === '/legal' ||
       p === '/terms' ||
       p === '/privacy' ||
-      p === '/help'
+      p === '/help' ||
+      p === '/child-safety'
     ) {
       return next();
     }
