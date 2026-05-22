@@ -13,6 +13,7 @@ import '../services/notification_router.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
+import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/whatsapp_call_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -52,17 +53,24 @@ class _RootShellState extends State<RootShell> {
   /// same ring. Cleared lazily; bounded by call rate so it won't blow up.
   final Set<String> _handledCallIds = {};
 
+  /// Guards the one-shot coach-mark dialogs from overlapping each other.
+  bool _tipBusy = false;
+
   @override
   void initState() {
     super.initState();
     _subscribeIncomingCalls();
     // Route taps on push notifications (live-call invite, message, …).
     NotificationRouter.pending.addListener(_onNotificationIntent);
+    // Show the first-visit hint when the user opens their Profile tab.
+    NavTab.index.addListener(_onNavTabChanged);
     // A cold launch from a notification tap may have set an intent
     // before this shell mounted — handle it once after the first frame.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _onNotificationIntent(),
-    );
+    // The same frame is a safe point to fire the post-onboarding nudge.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onNotificationIntent();
+      _maybeShowOnboardingTips();
+    });
   }
 
   /// Sends the shell to the screen a tapped notification points at.
@@ -178,11 +186,75 @@ class _RootShellState extends State<RootShell> {
   void dispose() {
     _callPollTimer?.cancel();
     NotificationRouter.pending.removeListener(_onNotificationIntent);
+    NavTab.index.removeListener(_onNavTabChanged);
     final ch = _callsChannel;
     if (ch != null) {
       unawaited(Supabase.instance.client.removeChannel(ch));
     }
     super.dispose();
+  }
+
+  void _onNavTabChanged() {
+    if (NavTab.index.value == NavTab.profile) _maybeShowProfileTip();
+  }
+
+  /// First time the user lands in the app after onboarding: a two-step
+  /// nudge to add a Discover photo — why, then where. Shown once.
+  Future<void> _maybeShowOnboardingTips() async {
+    if (_tipBusy || !mounted) return;
+    if (await UserPrefs.isOnboardingTipsSeen() || !mounted) return;
+    _tipBusy = true;
+    await _showTip(
+      icon: Icons.add_a_photo_rounded,
+      title: AppStrings.t('tip_photo_title'),
+      body: AppStrings.t('tip_photo_body'),
+      buttonLabel: AppStrings.t('tip_next'),
+    );
+    if (mounted) {
+      await _showTip(
+        icon: Icons.person_rounded,
+        title: AppStrings.t('tip_photo_where_title'),
+        body: AppStrings.t('tip_photo_where_body'),
+        buttonLabel: AppStrings.t('tip_got_it'),
+      );
+    }
+    await UserPrefs.markOnboardingTipsSeen();
+    _tipBusy = false;
+  }
+
+  /// First time the user opens their own Profile tab: a hint pointing at
+  /// the add-photo card. Shown once.
+  Future<void> _maybeShowProfileTip() async {
+    if (_tipBusy || !mounted) return;
+    if (await UserPrefs.isProfileTipSeen() || !mounted) return;
+    if (NavTab.index.value != NavTab.profile) return;
+    _tipBusy = true;
+    await _showTip(
+      icon: Icons.add_a_photo_rounded,
+      title: AppStrings.t('tip_profile_here_title'),
+      body: AppStrings.t('tip_profile_here_body'),
+      buttonLabel: AppStrings.t('tip_got_it'),
+    );
+    await UserPrefs.markProfileTipSeen();
+    _tipBusy = false;
+  }
+
+  Future<void> _showTip({
+    required IconData icon,
+    required String title,
+    required String body,
+    required String buttonLabel,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TipDialog(
+        icon: icon,
+        title: title,
+        body: body,
+        buttonLabel: buttonLabel,
+      ),
+    );
   }
 
   @override
@@ -385,6 +457,79 @@ class _RoundActionButton extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Friendly one-shot coach-mark. Styled on the app's near-black scaffold
+/// colour with white copy; dismissed only by its button.
+class _TipDialog extends StatelessWidget {
+  const _TipDialog({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.buttonLabel,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String buttonLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: WhatsAppCallTheme.scaffold,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: WhatsAppCallTheme.accent.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: WhatsAppCallTheme.accent, size: 28),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14.5,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(buttonLabel),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

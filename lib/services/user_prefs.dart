@@ -10,6 +10,10 @@ abstract final class UserPrefs {
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
   static const String keySpeakerOn = 'audio_speaker_on';
+  // One-shot coach-marks: the post-onboarding "add a Discover photo"
+  // nudge, and the first-time hint shown on the Profile tab.
+  static const String keyOnboardingTipsSeen = 'onboarding_tips_seen';
+  static const String keyProfileTipSeen = 'profile_tip_seen';
 
   static Future<bool> isOnboardingDone() async {
     final p = await SharedPreferences.getInstance();
@@ -39,10 +43,37 @@ abstract final class UserPrefs {
     );
   }
 
-  /// Clears onboarding flag so the welcome flow shows again (e.g. from settings).
+  /// Clears onboarding flag so the welcome flow shows again (e.g. from
+  /// settings). Also clears the coach-mark flags so the photo nudges
+  /// replay alongside the fresh onboarding.
   static Future<void> resetOnboarding() async {
     final p = await SharedPreferences.getInstance();
     await p.remove(keyOnboardingDone);
+    await p.remove(keyOnboardingTipsSeen);
+    await p.remove(keyProfileTipSeen);
+  }
+
+  /// Whether the two post-onboarding "add a Discover photo" popups have
+  /// already been shown.
+  static Future<bool> isOnboardingTipsSeen() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(keyOnboardingTipsSeen) ?? false;
+  }
+
+  static Future<void> markOnboardingTipsSeen() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(keyOnboardingTipsSeen, true);
+  }
+
+  /// Whether the first-visit hint on the Profile tab has been shown.
+  static Future<bool> isProfileTipSeen() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(keyProfileTipSeen) ?? false;
+  }
+
+  static Future<void> markProfileTipSeen() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(keyProfileTipSeen, true);
   }
 
   static Future<AudioPrefs> loadAudio() async {
