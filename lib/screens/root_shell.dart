@@ -198,11 +198,29 @@ class _RootShellState extends State<RootShell> {
     if (NavTab.index.value == NavTab.profile) _maybeShowProfileTip();
   }
 
-  /// First time the user lands in the app after onboarding: a two-step
-  /// nudge to add a Discover photo — why, then where. Shown once.
+  /// Whether the signed-in user already uploaded a Discover photo — when
+  /// they have, the "add a photo" nudges are pointless and skipped.
+  Future<bool> _hasDiscoverPhoto() async {
+    if (!isSupabaseReady) return false;
+    try {
+      final uid = await DeviceId.getOrCreate();
+      final me = await ProfileApi.fetchById(uid);
+      return (me?.discoverPhotoUrl ?? '').isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Post-onboarding nudge to add a Discover photo (why, then where).
+  /// The "seen" flag is persisted UP FRONT, before any dialog is shown —
+  /// otherwise reloading the page mid-popup leaves the flag unset and the
+  /// nudge replays on every load. Skipped entirely if a photo is set.
   Future<void> _maybeShowOnboardingTips() async {
     if (_tipBusy || !mounted) return;
     if (await UserPrefs.isOnboardingTipsSeen() || !mounted) return;
+    await UserPrefs.markOnboardingTipsSeen();
+    if (!mounted) return;
+    if (await _hasDiscoverPhoto() || !mounted) return;
     _tipBusy = true;
     await _showTip(
       icon: Icons.add_a_photo_rounded,
@@ -218,16 +236,18 @@ class _RootShellState extends State<RootShell> {
         buttonLabel: AppStrings.t('tip_got_it'),
       );
     }
-    await UserPrefs.markOnboardingTipsSeen();
     _tipBusy = false;
   }
 
-  /// First time the user opens their own Profile tab: a hint pointing at
-  /// the add-photo card. Shown once.
+  /// First-visit hint on the Profile tab, pointing at the add-photo card.
+  /// Same one-shot guarantee: the flag is persisted before the dialog.
   Future<void> _maybeShowProfileTip() async {
     if (_tipBusy || !mounted) return;
     if (await UserPrefs.isProfileTipSeen() || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
+    await UserPrefs.markProfileTipSeen();
+    if (!mounted || NavTab.index.value != NavTab.profile) return;
+    if (await _hasDiscoverPhoto() || !mounted) return;
     _tipBusy = true;
     await _showTip(
       icon: Icons.add_a_photo_rounded,
@@ -235,7 +255,6 @@ class _RootShellState extends State<RootShell> {
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
     );
-    await UserPrefs.markProfileTipSeen();
     _tipBusy = false;
   }
 
