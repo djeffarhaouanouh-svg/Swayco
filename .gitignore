@@ -43,6 +43,12 @@ backend/node_modules/
 *-firebase-adminsdk-*.json
 **/firebase-adminsdk-*.json
 
+# Apple signing keys: APNs auth keys (AuthKey_*.p8) and App Store
+# Connect API keys (SubscriptionKey_*.p8). Server-side secrets — the
+# APNs key is uploaded to the Firebase console, never to the repo.
+*.p8
+**/*.p8
+
 # Android release signing — the keystore + its password file must
 # never be committed. Losing them means losing the ability to update
 # the app on Play Store, leaking them means anyone can ship malware
