@@ -1041,7 +1041,7 @@ class _CreditsCard extends StatelessWidget {
 ///     purchases for any subscription that unlocks app features, so
 ///     we deliberately don't surface pricing in the app shell — users
 ///     bounce to swayco.fr to subscribe.
-class _PlansSection extends StatelessWidget {
+class _PlansSection extends StatefulWidget {
   const _PlansSection({required this.isPro});
 
   final bool isPro;
@@ -1049,46 +1049,59 @@ class _PlansSection extends StatelessWidget {
   static const String _manageUrl = 'swayco.fr';
 
   @override
+  State<_PlansSection> createState() => _PlansSectionState();
+}
+
+class _PlansSectionState extends State<_PlansSection> {
+  // Which tier currently shows the accent (green) border. Pro is
+  // pre-selected so the section opens with the same visual as before;
+  // tapping Ultra hands the border over to it. Purely cosmetic — the
+  // Souscrire buttons remain the only thing that starts checkout.
+  String _selected = 'pro';
+
+  @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
-      if (isPro) {
+      if (widget.isPro) {
         // Already on the top tier — nothing more to upsell.
         return const SizedBox.shrink();
       }
       return Column(
-        children: const [
+        children: [
           _PlanCard(
             name: 'Pro',
             price: '29€/mois',
             audience: 'Pour voyageurs, dating, usage casual intensif.',
-            features: [
+            features: const [
               '~15h/mois',
               'priorité serveur',
               'meilleure qualité audio',
             ],
-            featured: true,
+            featured: _selected == 'pro',
             popularBadge: true,
+            onTap: () => setState(() => _selected = 'pro'),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _PlanCard(
             name: 'Ultra',
             price: '59€/mois',
             audience:
                 'Pour couples internationaux, gamers, créateurs, appels quotidiens.',
-            features: [
+            features: const [
               'Appels illimités',
               'meilleure latence',
               'voix premium',
               'future voice clone améliorée',
             ],
-            featured: false,
+            featured: _selected == 'ultra',
             popularBadge: false,
+            onTap: () => setState(() => _selected = 'ultra'),
           ),
         ],
       );
     }
     // Native — direct users to the web flow.
-    return _ManageOnWebCard(url: _manageUrl);
+    return _ManageOnWebCard(url: _PlansSection._manageUrl);
   }
 }
 
@@ -1100,6 +1113,7 @@ class _PlanCard extends StatelessWidget {
     required this.features,
     required this.featured,
     required this.popularBadge,
+    this.onTap,
   });
 
   final String name;
@@ -1113,15 +1127,34 @@ class _PlanCard extends StatelessWidget {
 
   /// Render a "Populaire" badge in the top-right corner. Independent
   /// of [featured] in the API so a tier can be visually featured
-  /// without claiming popularity (or vice versa), but in practice
-  /// they're flipped together.
+  /// without claiming popularity (or vice versa).
   final bool popularBadge;
+
+  /// Tap anywhere on the card body to claim the accent border. The
+  /// Souscrire button keeps its own onPressed, so taps that land on
+  /// the button still go straight to checkout instead of just
+  /// re-selecting the card.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final borderColor = featured
         ? WhatsAppCallTheme.accent
         : const Color(0xFF2A3942);
+    // GestureDetector around the whole body so users can claim the
+    // accent border by tapping anywhere on the card. The Souscrire
+    // FilledButton has its own gesture arena and still wins on its
+    // own bounds, so this doesn't steal checkout taps.
+    Widget wrap(Widget child) => MouseRegion(
+      cursor: onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: child,
+      ),
+    );
     final card = Container(
       decoration: BoxDecoration(
         color: WhatsAppCallTheme.bar,
@@ -1201,7 +1234,7 @@ class _PlanCard extends StatelessWidget {
       ),
     );
 
-    if (!popularBadge) return card;
+    if (!popularBadge) return wrap(card);
 
     // Overlay a "Populaire" badge in the top-right corner. The card
     // gets a little extra top padding so the title row never collides
@@ -1209,7 +1242,7 @@ class _PlanCard extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        card,
+        wrap(card),
         Positioned(
           top: -10,
           right: 14,
