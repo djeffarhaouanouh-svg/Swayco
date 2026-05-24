@@ -1094,14 +1094,21 @@ class _PlansSectionState extends State<_PlansSection> {
         // and on mobile.
         const wideBreakpoint = 720.0;
         if (constraints.maxWidth >= wideBreakpoint && cards.length >= 2) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(width: 16),
-                Expanded(child: cards[i]),
+          // IntrinsicHeight + crossAxisAlignment.stretch pads every
+          // card up to the tallest one so the cards align flush along
+          // both edges. Without this the shorter "Plus" card floats
+          // above the bottom of the taller "Ultra Plus" card and the
+          // row looks lopsided.
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < cards.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 16),
+                  Expanded(child: cards[i]),
+                ],
               ],
-            ],
+            ),
           );
         }
         return Column(
@@ -1269,6 +1276,11 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
             ),
+          // Push the Souscrire button to the bottom of the card so two
+          // cards laid side-by-side on desktop (IntrinsicHeight Row)
+          // align their CTAs along a single baseline regardless of how
+          // many feature bullets each tier has.
+          const Spacer(),
           const SizedBox(height: 8),
           _SubscribeButton(tier: tier, label: 'Souscrire $name'),
         ],
