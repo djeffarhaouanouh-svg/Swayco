@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const multer = require('multer');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
@@ -107,6 +108,31 @@ function newInviteCode() {
 const OPENAI_TRANSLATION_CLIENT_SECRETS =
   'https://api.openai.com/v1/realtime/translations/client_secrets';
 const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translations/calls';
+
+// ElevenLabs — voice messages (Scribe STT) + voice dubbing (TTS).
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim();
+const ELEVENLABS_STT_MODEL =
+  (process.env.ELEVENLABS_STT_MODEL?.trim() || 'scribe_v1');
+const ELEVENLABS_STT_URL = 'https://api.elevenlabs.io/v1/speech-to-text';
+const ELEVENLABS_TTS_MODEL =
+  (process.env.ELEVENLABS_TTS_MODEL?.trim() || 'eleven_flash_v2_5');
+/** Voice id used when the sender has not enrolled a cloned voice
+ *  (i.e. Plus / Pro tiers, and Ultra users who have not yet recorded
+ *  their sample). Defaults to a generic multilingual ElevenLabs voice. */
+const ELEVENLABS_DEFAULT_VOICE_ID =
+  (process.env.ELEVENLABS_DEFAULT_VOICE_ID?.trim() || '21m00Tcm4TlvDq8ikWAM');
+const { featuresFor, normalizeTier } = require('./tiers');
+/** Hard cap on the multipart audio body. 60s of AAC ≈ ~1MB; we leave
+ *  generous headroom for richer codecs / longer clips while still
+ *  refusing pathological uploads. */
+const VOICE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+/** Bucket name created by 0022_voice_messages.sql. */
+const VOICE_STORAGE_BUCKET = 'voice-messages';
+
+const voiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VOICE_UPLOAD_MAX_BYTES, files: 1 },
+});
 
 const webPath = path.join(__dirname, 'web');
 const webIndex = path.join(webPath, 'index.html');
@@ -536,11 +562,30 @@ app.post('/translation/realtime/session', async (req, res) => {
 
 /**
  * POST /translation/text
- * Body: { text: "...", from?: "fr", to: "en" } (BCP-47 primary subtag)
+ * Body: {
+ *   text: "...",                       // message to translate (required)
+ *   from?: "fr",                       // BCP-47 source primary subtag (optional)
+ *   to: "en",                          // BCP-47 target primary subtag (required)
+ *   history?: [                        // last N messages in the thread, oldest→newest
+ *     { author: "me"|"peer", text: "...", lang?: "fr" }
+ *   ],
+ *   context?: {
+ *     authorName?: string,             // sender display name
+ *     authorGender?: "m"|"f"|"x",
+ *     authorLang?: string,             // sender's native language
+ *     peerName?: string,               // reader display name
+ *     peerGender?: "m"|"f"|"x",
+ *     peerLang?: string,               // reader's native language
+ *     relationship?: string            // "couple"|"friends"|"dating"|"business"|...
+ *   }
+ * }
  * Returns: { translated: "..." }
- * Cheap one-shot text translation via gpt-4.1-mini Chat Completions. Used
- * by the in-app "auto-translate messages" toggle to render each foreign
- * message in the reader's language.
+ *
+ * Context-aware message translation. Uses gpt-4.1 (full model) with the last
+ * messages of the thread + speaker profiles so pronouns, in-jokes, gender
+ * agreement, register (tu/vous) and ongoing references resolve correctly.
+ * The system prompt is wrapped with `cache_control` so OpenAI caches it
+ * across requests in the same 5-min window (~-50% on input tokens).
  */
 app.post('/translation/text', async (req, res) => {
   try {
@@ -556,15 +601,91 @@ app.post('/translation/text', async (req, res) => {
     return res.status(400).json({ error: 'invalid_input' });
   }
   if (from && from === to) {
-    // Source and target match — no translation needed.
     return res.json({ translated: text });
   }
+
+  // Sanitise the supplied history. Cap at last 10 messages, 400 chars each,
+  // so a hostile or buggy client can't blow up the prompt size.
+  const historyIn = Array.isArray(req.body?.history) ? req.body.history : [];
+  const history = historyIn
+    .slice(-10)
+    .map((h) => {
+      const author = h?.author === 'peer' ? 'peer' : 'me';
+      const t = typeof h?.text === 'string' ? h.text.trim().slice(0, 400) : '';
+      return t ? { author, text: t } : null;
+    })
+    .filter(Boolean);
+
+  const ctx = (req.body?.context && typeof req.body.context === 'object')
+    ? req.body.context
+    : {};
+  const safeStr = (v, max = 60) =>
+    typeof v === 'string' ? v.trim().slice(0, max) : '';
+  const safeGender = (v) =>
+    v === 'm' || v === 'f' || v === 'x' ? v : '';
+  const authorName = safeStr(ctx.authorName);
+  const authorGender = safeGender(ctx.authorGender);
+  const authorLang = primaryLanguageTag(ctx.authorLang);
+  const peerName = safeStr(ctx.peerName);
+  const peerGender = safeGender(ctx.peerGender);
+  const peerLang = primaryLanguageTag(ctx.peerLang);
+  const relationship = safeStr(ctx.relationship, 30);
+
+  // Cacheable system prompt — kept generic and identity-free so OpenAI's
+  // prompt cache hits across all users of the app. The per-conversation
+  // context goes in the user turn so we don't bust the cache.
+  const sys =
+    `You are a professional chat-message translator. Translate the LAST ` +
+    `message of the supplied conversation into the target language only. ` +
+    `The conversation history is provided as context — do NOT retranslate it.\n\n` +
+    `Rules:\n` +
+    `- Resolve pronouns and elliptical references using the history.\n` +
+    `- Match the register (formal / casual / flirty / slang) that a native ` +
+    `speaker of the target language would naturally use given the relationship.\n` +
+    `- For gendered languages, use the correct grammatical gender for the ` +
+    `speaker and the addressee.\n` +
+    `- Preserve emojis, proper nouns, @mentions, #hashtags and URLs verbatim.\n` +
+    `- Keep punctuation, capitalisation and message length close to the original.\n` +
+    `- If a phrase was already translated earlier in the conversation, ` +
+    `reuse the same wording for consistency.\n` +
+    `- If the last message is already in the target language, return it unchanged.\n` +
+    `- Reply with the translated text ONLY — no quotes, no notes, no language tags, ` +
+    `no markdown fences.`;
+
+  const contextLines = [];
+  if (from) contextLines.push(`Source language: ${from}`);
+  contextLines.push(`Target language: ${to}`);
+  if (authorName || authorGender || authorLang) {
+    contextLines.push(
+      `Sender${authorName ? ` (${authorName})` : ''}: ` +
+        [authorGender && `gender=${authorGender}`, authorLang && `native=${authorLang}`]
+          .filter(Boolean)
+          .join(', '),
+    );
+  }
+  if (peerName || peerGender || peerLang) {
+    contextLines.push(
+      `Reader${peerName ? ` (${peerName})` : ''}: ` +
+        [peerGender && `gender=${peerGender}`, peerLang && `native=${peerLang}`]
+          .filter(Boolean)
+          .join(', '),
+    );
+  }
+  if (relationship) contextLines.push(`Relationship: ${relationship}`);
+
+  const historyBlock = history.length
+    ? '\n\n[Conversation history, oldest→newest]\n' +
+      history
+        .map((h) => `${h.author === 'me' ? 'Sender' : 'Reader'}: ${h.text}`)
+        .join('\n')
+    : '';
+
+  const userMsg =
+    `[Context]\n${contextLines.join('\n')}` +
+    historyBlock +
+    `\n\n[Last message to translate — translate THIS one only]\n${text}`;
+
   try {
-    const sys =
-      `You are a translator. Translate the user's message into ${to}. ` +
-      `Reply with the translated text ONLY, no quotes, no explanation, ` +
-      `no language tags. Preserve emojis and proper nouns. If the message ` +
-      `is already in ${to}, return it unchanged.`;
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -572,10 +693,19 @@ app.post('/translation/text', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1',
         messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: text },
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'text',
+                text: sys,
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
+          },
+          { role: 'user', content: userMsg },
         ],
         temperature: 0.2,
       }),
@@ -592,36 +722,471 @@ app.post('/translation/text', async (req, res) => {
     if (!r.ok) {
       return res.status(r.status).json({ error: 'openai_error', detail: parsed });
     }
-    const translated = parsed?.choices?.[0]?.message?.content ?? '';
-    // Token usage feeds the API-cost figure for in-app message
-    // translation (gpt-4.1-mini), priced separately from realtime calls.
+    let translated = parsed?.choices?.[0]?.message?.content ?? '';
+    if (typeof translated !== 'string') translated = '';
+    translated = translated.trim();
+    // Defensive: strip a leading/trailing pair of straight or smart quotes
+    // some models still add despite the explicit instruction.
+    translated = translated.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+
     track({
       event: 'text_translation',
       lang_from: from || undefined,
       lang_to: to,
       props: {
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1',
         chars: text.length,
+        history_msgs: history.length,
+        has_context: Boolean(authorGender || peerGender || relationship),
         prompt_tokens: parsed?.usage?.prompt_tokens ?? null,
+        cached_tokens:
+          parsed?.usage?.prompt_tokens_details?.cached_tokens ?? null,
         completion_tokens: parsed?.usage?.completion_tokens ?? null,
       },
     });
-    return res.json({ translated });
+    return res.json({ translated: translated || text });
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error('translation text', e);
     return res.status(502).json({ error: 'openai_unreachable' });
   }
 });
 
-// Stripe Checkout — body: { tier: 'pro' | 'ultra' }. Authorization
+/**
+ * POST /messages/voice  (multipart/form-data)
+ *
+ * Fields:
+ *   audio              — the recording (m4a / mp3 / webm / ogg / wav)
+ *   conversationId     — string
+ *   recipientId        — string (Supabase user_id of the peer)
+ *   senderName         — string (display name of the caller)
+ *   durationMs         — int    (recording length in ms, client-measured)
+ *   hintLanguage       — optional BCP-47 primary subtag; speeds up Scribe
+ *                        by not having to auto-detect
+ *
+ * Authorization: Bearer <Supabase JWT> — the sender is read from the
+ *                                        verified token, never the body.
+ *
+ * Flow:
+ *   1. Upload the raw audio bytes to `voice-messages/<senderId>/<uuid>.<ext>`
+ *      so the bubble can stream the original recording.
+ *   2. Send the bytes to ElevenLabs Scribe → transcription + detected
+ *      language. The transcription becomes the message `body` so the
+ *      existing /translation/text path picks it up unchanged.
+ *   3. Insert a row in `messages` with audio_url + audio_duration_ms +
+ *      detected language.
+ *   4. Fire-and-forget push to the recipient (best-effort).
+ *
+ * Returns the inserted row so the client can render it locally without
+ * waiting on the realtime subscription.
+ */
+app.post('/messages/voice', voiceUpload.single('audio'), async (req, res) => {
+  if (!ELEVENLABS_API_KEY) {
+    return res.status(500).json({ error: 'elevenlabs_not_configured' });
+  }
+  const sb = supabase();
+  if (!sb) {
+    return res.status(500).json({ error: 'supabase_not_configured' });
+  }
+  const uid = await stripeAuthUserId(req);
+  if (!uid) {
+    return res.status(401).json({ error: 'unauthenticated' });
+  }
+  const file = req.file;
+  if (!file || !file.buffer || file.buffer.length === 0) {
+    return res.status(400).json({ error: 'audio_missing' });
+  }
+
+  const conversationId =
+    typeof req.body?.conversationId === 'string'
+      ? req.body.conversationId.trim().slice(0, 200)
+      : '';
+  const recipientId =
+    typeof req.body?.recipientId === 'string'
+      ? req.body.recipientId.trim().slice(0, 200)
+      : '';
+  const senderName =
+    typeof req.body?.senderName === 'string'
+      ? req.body.senderName.trim().slice(0, 120)
+      : '';
+  const durationMs = (() => {
+    const n = Number(req.body?.durationMs);
+    if (!Number.isFinite(n)) return null;
+    const v = Math.round(n);
+    if (v <= 0 || v > 120000) return null;
+    return v;
+  })();
+  const hintLanguage = primaryLanguageTag(req.body?.hintLanguage);
+
+  if (!conversationId || !recipientId) {
+    return res.status(400).json({ error: 'invalid_input' });
+  }
+
+  // Pick an extension we'll trust on the storage URL. Default to `.m4a`
+  // when the client didn't send a recognisable mime, since that's what
+  // Flutter's `record` package emits on iOS/Android by default.
+  const mime = (file.mimetype || '').toLowerCase();
+  const ext = (() => {
+    if (mime.includes('webm')) return 'webm';
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('aac')) return 'm4a';
+    if (mime.includes('mp4') || mime.includes('m4a')) return 'm4a';
+    return 'm4a';
+  })();
+  const objectKey = `${uid}/${crypto.randomUUID()}.${ext}`;
+
+  // 1) Upload the original recording to Supabase Storage. Failure here
+  // is fatal — we can't insert a "voice message" row without the audio.
+  try {
+    const { error: upErr } = await sb.storage
+      .from(VOICE_STORAGE_BUCKET)
+      .upload(objectKey, file.buffer, {
+        contentType: file.mimetype || 'audio/m4a',
+        upsert: false,
+        cacheControl: '3600',
+      });
+    if (upErr) {
+      console.error('voice upload', upErr);
+      return res.status(502).json({ error: 'storage_failed', detail: upErr.message });
+    }
+  } catch (e) {
+    console.error('voice upload throw', e);
+    return res.status(502).json({ error: 'storage_failed' });
+  }
+  const audioUrl = sb.storage
+    .from(VOICE_STORAGE_BUCKET)
+    .getPublicUrl(objectKey).data.publicUrl;
+
+  // 2) STT via ElevenLabs Scribe. The recording is sent as multipart
+  // form-data — Node 18+'s built-in FormData / Blob can shape this.
+  let transcript = '';
+  let detectedLanguage = hintLanguage || '';
+  try {
+    const form = new FormData();
+    form.append('model_id', ELEVENLABS_STT_MODEL);
+    if (hintLanguage) form.append('language_code', hintLanguage);
+    form.append(
+      'file',
+      new Blob([file.buffer], { type: file.mimetype || 'audio/m4a' }),
+      `voice.${ext}`,
+    );
+    const r = await fetch(ELEVENLABS_STT_URL, {
+      method: 'POST',
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      body: form,
+    });
+    const body = await r.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (_) {
+      console.error('scribe parse', body.slice(0, 200));
+      return res.status(502).json({ error: 'stt_bad_response' });
+    }
+    if (!r.ok) {
+      console.error('scribe error', r.status, parsed);
+      return res.status(502).json({ error: 'stt_error', detail: parsed });
+    }
+    transcript = typeof parsed.text === 'string' ? parsed.text.trim() : '';
+    const lang = primaryLanguageTag(parsed.language_code);
+    if (lang) detectedLanguage = lang;
+  } catch (e) {
+    console.error('scribe throw', e);
+    return res.status(502).json({ error: 'stt_unreachable' });
+  }
+
+  // 3) Insert the message row. The transcript flows into the existing
+  // `body` column so chat_thread_screen's translator picks it up unchanged.
+  let inserted;
+  try {
+    const { data, error: insErr } = await sb
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        sender: uid,
+        recipient: recipientId,
+        sender_name: senderName,
+        body: transcript,
+        language: detectedLanguage || null,
+        audio_url: audioUrl,
+        audio_duration_ms: durationMs,
+      })
+      .select()
+      .single();
+    if (insErr) {
+      console.error('voice insert', insErr);
+      return res.status(502).json({ error: 'insert_failed', detail: insErr.message });
+    }
+    inserted = data;
+  } catch (e) {
+    console.error('voice insert throw', e);
+    return res.status(502).json({ error: 'insert_failed' });
+  }
+
+  // 4) Push the recipient — best-effort, never blocks the response.
+  (async () => {
+    try {
+      await notifyUser(recipientId, {
+        title: senderName || 'Nouveau message',
+        // Voice messages have no original-language hint on the
+        // notification body; surface a generic "🎙 message vocal".
+        body: transcript ? `🎙 ${transcript.slice(0, 120)}` : '🎙 Message vocal',
+        type: 'message',
+        data: { conversationId, senderId: uid, voice: '1' },
+      });
+    } catch (e) {
+      console.error('voice notify', e);
+    }
+  })();
+
+  track({
+    event: 'voice_message_sent',
+    lang_from: detectedLanguage || undefined,
+    props: {
+      stt_model: ELEVENLABS_STT_MODEL,
+      bytes: file.buffer.length,
+      duration_ms: durationMs,
+      transcript_chars: transcript.length,
+    },
+  });
+
+  return res.json({ message: inserted });
+});
+
+/**
+ * POST /voice/dub
+ *
+ * Body: { messageId, targetLang, text }
+ *   - messageId   — the voice message to dub (must be a row the caller
+ *                   participates in)
+ *   - targetLang  — BCP-47 primary subtag, e.g. "en"
+ *   - text        — the already-translated text (client passes the
+ *                   output of /translation/text so we don't re-bill
+ *                   gpt-4.1 server-side just to dub)
+ *
+ * Returns: { audioUrl, cached }
+ *
+ * Gating:
+ *   - tier === 'free'   → 402 upgrade_required
+ *   - tier === 'plus'   → quota 60 dubs / rolling 30 days
+ *   - tier === 'pro'    → unlimited, generic voice
+ *   - tier === 'ultra'  → unlimited, uses the sender's cloned voice
+ *                         when enrolled, generic voice otherwise
+ *
+ * Cache: results are keyed by (message_id, target_language) in the
+ * `voice_dubs` table so a second listener never re-bills ElevenLabs.
+ */
+app.post('/voice/dub', async (req, res) => {
+  if (!ELEVENLABS_API_KEY) {
+    return res.status(500).json({ error: 'elevenlabs_not_configured' });
+  }
+  const sb = supabase();
+  if (!sb) {
+    return res.status(500).json({ error: 'supabase_not_configured' });
+  }
+  const uid = await stripeAuthUserId(req);
+  if (!uid) {
+    return res.status(401).json({ error: 'unauthenticated' });
+  }
+
+  const messageId =
+    typeof req.body?.messageId === 'string' ? req.body.messageId.trim() : '';
+  const targetLang = primaryLanguageTag(req.body?.targetLang);
+  const text =
+    typeof req.body?.text === 'string'
+      ? req.body.text.trim().slice(0, 4000)
+      : '';
+  if (!messageId || !isReasonableLanguageTag(targetLang) || !text) {
+    return res.status(400).json({ error: 'invalid_input' });
+  }
+
+  // 1) Tier + quota — read profile + reset counter if its window is up.
+  const { data: profile, error: profErr } = await sb
+    .from('profiles')
+    .select(
+      'subscription_tier, voice_dubs_used_this_month, voice_dubs_reset_at, elevenlabs_voice_id',
+    )
+    .eq('id', uid)
+    .maybeSingle();
+  if (profErr || !profile) {
+    return res.status(404).json({ error: 'profile_not_found' });
+  }
+  const tier = normalizeTier(profile.subscription_tier);
+  const features = featuresFor(tier);
+  if (features.voiceDub === 'none') {
+    return res.status(402).json({ error: 'upgrade_required', minTier: 'plus' });
+  }
+
+  let used = Number(profile.voice_dubs_used_this_month) || 0;
+  let resetAt = new Date(profile.voice_dubs_reset_at || Date.now());
+  const now = new Date();
+  if (now >= resetAt) {
+    used = 0;
+    resetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await sb
+      .from('profiles')
+      .update({
+        voice_dubs_used_this_month: 0,
+        voice_dubs_reset_at: resetAt.toISOString(),
+      })
+      .eq('id', uid);
+  }
+  if (Number.isFinite(features.voiceDubsPerMonth) && used >= features.voiceDubsPerMonth) {
+    return res.status(402).json({
+      error: 'quota_exceeded',
+      resetAt: resetAt.toISOString(),
+      cap: features.voiceDubsPerMonth,
+    });
+  }
+
+  // 2) Auth on the message — caller must participate in the
+  //    conversation. Anyone with a valid messageId could otherwise
+  //    rack up bills on someone else's thread.
+  const { data: msg, error: msgErr } = await sb
+    .from('messages')
+    .select('id, sender, recipient')
+    .eq('id', messageId)
+    .maybeSingle();
+  if (msgErr || !msg) {
+    return res.status(404).json({ error: 'message_not_found' });
+  }
+  if (msg.sender !== uid && msg.recipient !== uid) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+
+  // 3) Cache lookup. Concurrent requests on the same (msg,lang) race;
+  //    whoever inserted first wins, the second one falls through to
+  //    a fresh generation but the upsert below will resolve it.
+  const { data: cached } = await sb
+    .from('voice_dubs')
+    .select('audio_url')
+    .eq('message_id', messageId)
+    .eq('target_language', targetLang)
+    .maybeSingle();
+  if (cached?.audio_url) {
+    return res.json({ audioUrl: cached.audio_url, cached: true });
+  }
+
+  // 4) Pick the voice. Ultra → use the sender's cloned voice when they
+  //    have one. Otherwise fall back to the default multilingual voice.
+  let voiceId = ELEVENLABS_DEFAULT_VOICE_ID;
+  let usedCloned = false;
+  if (features.voiceDub === 'cloned') {
+    // The clone we want is the SENDER's, not the listener's — the
+    // whole point is "hear them in their voice but in your language".
+    const { data: senderProfile } = await sb
+      .from('profiles')
+      .select('elevenlabs_voice_id')
+      .eq('id', msg.sender)
+      .maybeSingle();
+    const cloneId = senderProfile?.elevenlabs_voice_id;
+    if (cloneId) {
+      voiceId = cloneId;
+      usedCloned = true;
+    }
+  }
+
+  // 5) Generate TTS via ElevenLabs Flash. Flash is multilingual; we
+  //    pass `language_code` so the model doesn't auto-detect.
+  let audioBuffer;
+  try {
+    const ttsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+    const r = await fetch(ttsUrl, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS_TTS_MODEL,
+        language_code: targetLang,
+      }),
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('elevenlabs tts', r.status, errText.slice(0, 200));
+      return res
+        .status(502)
+        .json({ error: 'tts_failed', detail: errText.slice(0, 200) });
+    }
+    const ab = await r.arrayBuffer();
+    audioBuffer = Buffer.from(ab);
+  } catch (e) {
+    console.error('elevenlabs tts throw', e);
+    return res.status(502).json({ error: 'tts_unreachable' });
+  }
+
+  // 6) Upload the dub to storage. Path mirrors the original recording
+  //    layout but under `dubs/<msgId>/<lang>.mp3` so a single message
+  //    can carry one cached dub per target language.
+  const key = `dubs/${messageId}/${targetLang}.mp3`;
+  try {
+    const { error: upErr } = await sb.storage
+      .from(VOICE_STORAGE_BUCKET)
+      .upload(key, audioBuffer, {
+        contentType: 'audio/mpeg',
+        upsert: true,
+        cacheControl: '86400',
+      });
+    if (upErr) {
+      console.error('dub upload', upErr);
+      return res.status(502).json({ error: 'storage_failed', detail: upErr.message });
+    }
+  } catch (e) {
+    console.error('dub upload throw', e);
+    return res.status(502).json({ error: 'storage_failed' });
+  }
+  const audioUrl = sb.storage
+    .from(VOICE_STORAGE_BUCKET)
+    .getPublicUrl(key).data.publicUrl;
+
+  // 7) Cache + counter. Non-fatal: if these fail we still serve the
+  //    audio so the listener isn't penalised by an ops issue.
+  try {
+    await sb.from('voice_dubs').upsert({
+      message_id: messageId,
+      target_language: targetLang,
+      audio_url: audioUrl,
+      tts_model: ELEVENLABS_TTS_MODEL,
+      voice_id: voiceId,
+    });
+  } catch (e) {
+    console.error('voice_dubs upsert', e);
+  }
+  try {
+    await sb
+      .from('profiles')
+      .update({ voice_dubs_used_this_month: used + 1 })
+      .eq('id', uid);
+  } catch (e) {
+    console.error('dub counter inc', e);
+  }
+
+  track({
+    event: 'voice_dub',
+    lang_to: targetLang,
+    props: {
+      tier,
+      tts_model: ELEVENLABS_TTS_MODEL,
+      used_cloned_voice: usedCloned,
+      chars: text.length,
+    },
+  });
+
+  return res.json({ audioUrl, cached: false });
+});
+
+// Stripe Checkout — body: { tier: 'plus' | 'pro' | 'ultra' }. Authorization
 // must carry the caller's Supabase JWT; the user_id is read from
 // the verified token, never from the request body.
 app.post('/api/stripe/checkout', async (req, res) => {
   const uid = await stripeAuthUserId(req);
   if (!uid) return res.status(401).json({ error: 'unauthenticated' });
   const tier = req.body?.tier;
-  if (tier !== 'pro' && tier !== 'ultra') {
+  if (tier !== 'plus' && tier !== 'pro' && tier !== 'ultra') {
     return res.status(400).json({ error: 'invalid_tier' });
   }
   try {

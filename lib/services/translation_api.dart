@@ -165,25 +165,87 @@ Future<String> postTranslationCallsSdp({
   return res.body;
 }
 
-/// One-shot text translation via the backend (`/translation/text` →
-/// OpenAI Chat Completions). Returns the translated string; falls back to
-/// the original [text] on any error so the UI never goes blank.
+/// One thread message used as translation context. `author` is "me" when
+/// the local user wrote it (the reader of the translation), "peer" when
+/// the other party did. `text` is the original (untranslated) body.
+class TranslationHistoryItem {
+  const TranslationHistoryItem({
+    required this.author,
+    required this.text,
+  });
+  final String author; // "me" | "peer"
+  final String text;
+
+  Map<String, dynamic> toJson() => {
+        'author': author,
+        'text': text,
+      };
+}
+
+/// Conversation-level context that lets the translator pick the right
+/// gender agreement, pronouns and register. All fields are optional —
+/// the backend will fill in safe defaults for anything missing.
+class TranslationContext {
+  const TranslationContext({
+    this.authorName,
+    this.authorGender,
+    this.authorLang,
+    this.peerName,
+    this.peerGender,
+    this.peerLang,
+    this.relationship,
+  });
+  final String? authorName;
+  final String? authorGender; // "m" | "f" | "x"
+  final String? authorLang;
+  final String? peerName;
+  final String? peerGender;
+  final String? peerLang;
+  final String? relationship;
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{};
+    if (authorName != null && authorName!.isNotEmpty) m['authorName'] = authorName;
+    if (authorGender != null && authorGender!.isNotEmpty) m['authorGender'] = authorGender;
+    if (authorLang != null && authorLang!.isNotEmpty) m['authorLang'] = authorLang;
+    if (peerName != null && peerName!.isNotEmpty) m['peerName'] = peerName;
+    if (peerGender != null && peerGender!.isNotEmpty) m['peerGender'] = peerGender;
+    if (peerLang != null && peerLang!.isNotEmpty) m['peerLang'] = peerLang;
+    if (relationship != null && relationship!.isNotEmpty) m['relationship'] = relationship;
+    return m;
+  }
+}
+
+/// Context-aware chat-message translation via the backend
+/// (`/translation/text` → OpenAI gpt-4.1 with conversation history and
+/// speaker profiles). Returns the translated string; falls back to the
+/// original [text] on any error so the UI never goes blank.
 Future<String> fetchTextTranslation({
   required String text,
   required String to,
   String? from,
+  List<TranslationHistoryItem>? history,
+  TranslationContext? context,
 }) async {
   if (text.trim().isEmpty) return text;
   final uri = _translationTextUri();
   try {
+    final body = <String, dynamic>{
+      'text': text,
+      if (from != null && from.isNotEmpty) 'from': from,
+      'to': to,
+    };
+    if (history != null && history.isNotEmpty) {
+      body['history'] = history.map((h) => h.toJson()).toList();
+    }
+    if (context != null) {
+      final c = context.toJson();
+      if (c.isNotEmpty) body['context'] = c;
+    }
     final res = await http.post(
       uri,
       headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'text': text,
-        if (from != null && from.isNotEmpty) 'from': from,
-        'to': to,
-      }),
+      body: jsonEncode(body),
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
       return text;

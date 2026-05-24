@@ -33,7 +33,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _nameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   String? _selectedLang;
+  /// `m` / `f` / `x` or null. Asked once on the gender step right after
+  /// language. Skipped entirely on subsequent runs (see [_genderAlreadySet]).
+  String? _selectedGender;
+  /// True after [_prefill] has read SharedPreferences. While false, the
+  /// gender step is hidden from the page count so the dots / total stays
+  /// stable when the answer becomes known.
+  bool _prefillDone = false;
+  /// Set in [_prefill] from [UserPrefs.isGenderSet]. When true the gender
+  /// page is omitted from the flow ("Une fois choisi, plus s'afficher").
+  bool _genderAlreadySet = false;
   int _page = 0;
+
+  /// Total pages shown in this run. Welcome (0) + Language (1) + optionally
+  /// Gender (2), so 3 on first-ever onboarding and 2 once gender is known.
+  int get _pageCount => 2 + (_genderAlreadySet ? 0 : 1);
 
   @override
   void initState() {
@@ -46,6 +60,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// just what was last typed on this device.
   Future<void> _prefill() async {
     final snap = await UserPrefs.loadProfile();
+    final genderAlready = await UserPrefs.isGenderSet();
     if (!mounted) return;
     if (snap != null) {
       setState(() {
@@ -54,6 +69,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (stored.isNotEmpty && findLanguageByCode(stored) != null) {
           _selectedLang = findLanguageByCode(stored)!.code;
         }
+        if (snap.gender == 'm' || snap.gender == 'f' || snap.gender == 'x') {
+          _selectedGender = snap.gender;
+        }
+      });
+    }
+    if (mounted) {
+      setState(() {
+        _genderAlreadySet = genderAlready;
+        _prefillDone = true;
       });
     }
     if (!widget.editing || !isSupabaseReady) return;
@@ -106,11 +130,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       return;
     }
+    // Only enforce the gender pick on first run (when the step is actually
+    // shown). In editing mode + on later sessions, [_genderAlreadySet] is
+    // true and we accept whatever was saved before (or none).
+    if (!widget.editing && !_genderAlreadySet && _selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('onb_need_gender'))),
+      );
+      return;
+    }
+    final genderToSave = _selectedGender ?? '';
     await UserPrefs.completeOnboarding(
       firstName: name,
       sourceLang: _selectedLang!,
       // Other person's language is now discovered live from their metadata.
       targetLang: '',
+      gender: genderToSave,
     );
     // Make the rest of the app speak the user's chosen language right away.
     AppStrings.setFromCode(_selectedLang!);
@@ -124,6 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         deviceId: deviceId,
         displayName: name,
         language: _selectedLang!,
+        gender: genderToSave,
       );
       // Bio is only edited via this screen in editing mode (the first-run
       // welcome flow keeps the form to name + language). Persist it
@@ -211,13 +247,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
+    // While [_prefill] hasn't finished reading SharedPreferences, hold the
+    // wizard with a blank scaffold. Otherwise the gender step would briefly
+    // flash in before [_genderAlreadySet] resolves to true on returning
+    // users. Cheap — _prefill is a single SharedPreferences read.
+    if (!_prefillDone) {
+      return const Scaffold(
+        backgroundColor: WhatsAppCallTheme.scaffold,
+        body: SafeArea(child: SizedBox.shrink()),
+      );
+    }
+
+    final showGenderStep = !_genderAlreadySet;
+    final nextOrFinishFromLanguage =
+        showGenderStep ? _goToGenderStep : _finish;
+
     return Scaffold(
       backgroundColor: WhatsAppCallTheme.scaffold,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _OnboardingHeader(page: _page),
+            _OnboardingHeader(page: _page, pageCount: _pageCount),
             Expanded(
               child: PageView(
                 controller: _pageController,
@@ -246,8 +297,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       duration: const Duration(milliseconds: 280),
                       curve: Curves.easeOutCubic,
                     ),
-                    onFinish: _finish,
+                    onFinish: nextOrFinishFromLanguage,
+                    finishLabelKey:
+                        showGenderStep ? 'onb_next' : 'onb_finish',
                   ),
+                  if (showGenderStep)
+                    _StepGender(
+                      selected: _selectedGender,
+                      onSelect: (g) => setState(() => _selectedGender = g),
+                      onBack: () => _pageController.previousPage(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                      ),
+                      onFinish: _finish,
+                    ),
                 ],
               ),
             ),
@@ -256,12 +319,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+
+  void _goToGenderStep() {
+    if (_selectedLang == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('onb_need_language'))),
+      );
+      return;
+    }
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 }
 
 class _OnboardingHeader extends StatelessWidget {
-  const _OnboardingHeader({required this.page});
+  const _OnboardingHeader({required this.page, required this.pageCount});
 
   final int page;
+  final int pageCount;
+
+  String get _titleKey {
+    switch (page) {
+      case 0:
+        return 'onb_welcome_title';
+      case 1:
+        return 'onb_language_title';
+      default:
+        return 'onb_gender_title';
+    }
+  }
+
+  String get _subtitleKey {
+    switch (page) {
+      case 0:
+        return 'onb_welcome_subtitle';
+      case 1:
+        return 'onb_language_subtitle';
+      default:
+        return 'onb_gender_subtitle';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -273,9 +372,7 @@ class _OnboardingHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              page == 0
-                  ? AppStrings.t('onb_welcome_title')
-                  : AppStrings.t('onb_language_title'),
+              AppStrings.t(_titleKey),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -284,9 +381,7 @@ class _OnboardingHeader extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              page == 0
-                  ? AppStrings.t('onb_welcome_subtitle')
-                  : AppStrings.t('onb_language_subtitle'),
+              AppStrings.t(_subtitleKey),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 14,
@@ -296,9 +391,10 @@ class _OnboardingHeader extends StatelessWidget {
             const SizedBox(height: 14),
             Row(
               children: [
-                _Dot(active: page == 0),
-                const SizedBox(width: 8),
-                _Dot(active: page == 1),
+                for (var i = 0; i < pageCount; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  _Dot(active: i == page),
+                ],
               ],
             ),
           ],
@@ -370,12 +466,17 @@ class _StepLanguage extends StatelessWidget {
     required this.onSelect,
     required this.onBack,
     required this.onFinish,
+    this.finishLabelKey = 'onb_finish',
   });
 
   final String? selected;
   final ValueChanged<String> onSelect;
   final VoidCallback onBack;
   final VoidCallback onFinish;
+
+  /// AppStrings key for the right-hand CTA. Defaults to "Commencer"; when
+  /// the gender step follows, the parent passes `onb_next` instead.
+  final String finishLabelKey;
 
   @override
   Widget build(BuildContext context) {
@@ -398,12 +499,132 @@ class _StepLanguage extends StatelessWidget {
               Expanded(
                 child: FilledButton(
                   onPressed: onFinish,
+                  child: Text(AppStrings.t(finishLabelKey)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepGender extends StatelessWidget {
+  const _StepGender({
+    required this.selected,
+    required this.onSelect,
+    required this.onBack,
+    required this.onFinish,
+  });
+
+  /// `m` / `f` / `x` or null (nothing picked yet).
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onBack;
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _GenderOption(
+            value: 'f',
+            label: AppStrings.t('onb_gender_female'),
+            icon: Icons.female,
+            selected: selected == 'f',
+            onTap: () => onSelect('f'),
+          ),
+          const SizedBox(height: 10),
+          _GenderOption(
+            value: 'm',
+            label: AppStrings.t('onb_gender_male'),
+            icon: Icons.male,
+            selected: selected == 'm',
+            onTap: () => onSelect('m'),
+          ),
+          const SizedBox(height: 10),
+          _GenderOption(
+            value: 'x',
+            label: AppStrings.t('onb_gender_neutral'),
+            icon: Icons.transgender,
+            selected: selected == 'x',
+            onTap: () => onSelect('x'),
+          ),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              TextButton(onPressed: onBack, child: Text(AppStrings.t('onb_back'))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: selected == null ? null : onFinish,
                   child: Text(AppStrings.t('onb_finish')),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GenderOption extends StatelessWidget {
+  const _GenderOption({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? WhatsAppCallTheme.accent : WhatsAppCallTheme.bar;
+    final fg = selected ? Colors.white : WhatsAppCallTheme.strongText;
+    final border = selected
+        ? WhatsAppCallTheme.accent
+        : Colors.white.withValues(alpha: 0.08);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: fg, size: 22),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (selected)
+                const Icon(Icons.check_circle, color: Colors.white, size: 22),
+            ],
+          ),
+        ),
       ),
     );
   }

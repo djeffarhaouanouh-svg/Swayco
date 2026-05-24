@@ -31,8 +31,10 @@ class RemoteProfile {
     required this.avatarUrl,
     this.discoverPhotoUrl = '',
     this.bio = '',
+    this.gender = '',
     this.hideOnlineStatus = false,
     this.isPro = false,
+    this.subscriptionTier = 'free',
     this.creditsSeconds = freeWeeklyCreditsSeconds,
     this.creditsResetAt,
     this.lifetimeCallSeconds = 0,
@@ -56,6 +58,17 @@ class RemoteProfile {
   /// Discover card. Capped at [profileBioMaxLength] characters.
   final String bio;
 
+  /// Self-declared grammatical gender. One of:
+  ///   'm' — masculine
+  ///   'f' — feminine
+  ///   'x' — non-binary / unspecified
+  ///   ''  — not provided
+  /// Used by the contextual chat translator so gendered languages
+  /// (FR/ES/IT/AR/HE/…) produce the correct agreement. Not exposed in
+  /// the profile editor yet; column lives in the DB so the wiring is
+  /// ready when we surface it.
+  final String gender;
+
   /// When true, other clients should not show this user as online or render
   /// their "last seen" timestamp. Source of truth lives on the server so it
   /// can't be bypassed by a tampered client.
@@ -64,6 +77,21 @@ class RemoteProfile {
   /// Subscription state. `true` while the user has an active Premium
   /// entitlement (validated against the store IAP receipt server-side, later).
   final bool isPro;
+
+  /// Raw tier string: `'free' | 'plus' | 'pro' | 'ultra'`. Used by the
+  /// chat UI to decide whether to expose the `/voice/dub` CTA (Plus+)
+  /// or the live-call upgrade nudge. The backend re-validates the tier
+  /// on every paid endpoint — this field only drives client-side hints.
+  final String subscriptionTier;
+
+  bool get isPlus => subscriptionTier == 'plus'
+      || subscriptionTier == 'pro'
+      || subscriptionTier == 'ultra';
+  bool get isUltra => subscriptionTier == 'ultra';
+
+  /// True when this user's tier unlocks /voice/dub — i.e. anything
+  /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
+  bool get canDubAudio => isPlus;
 
   /// Translation credit remaining in seconds. Decremented during calls; the
   /// translation pipeline disables itself when this hits 0 but the underlying
@@ -113,8 +141,16 @@ class RemoteProfile {
         avatarUrl: m['avatar_url']?.toString() ?? '',
         discoverPhotoUrl: m['discover_photo_url']?.toString() ?? '',
         bio: m['bio']?.toString() ?? '',
+        gender: () {
+          final g = m['gender']?.toString().trim() ?? '';
+          return (g == 'm' || g == 'f' || g == 'x') ? g : '';
+        }(),
         hideOnlineStatus: m['hide_online_status'] == true,
         isPro: m['is_pro'] == true,
+        subscriptionTier: () {
+          final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
+          return (t == 'plus' || t == 'pro' || t == 'ultra') ? t : 'free';
+        }(),
         creditsSeconds:
             _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
         creditsResetAt: _parseDate(m['credits_reset_at']),
@@ -185,6 +221,7 @@ abstract final class ProfileApi {
     required String deviceId,
     required String displayName,
     required String language,
+    String gender = '',
   }) async {
     final now = DateTime.now();
     if (!isSupabaseReady) {
@@ -206,14 +243,22 @@ abstract final class ProfileApi {
       return;
     }
     try {
-      await _c.from('profiles').upsert({
+      final row = <String, dynamic>{
         'id': deviceId,
         'handle': _deriveHandle(displayName, deviceId),
         'display_name': displayName,
         'language': language,
         'avatar_color': _deriveAvatarColor(displayName + deviceId),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'id');
+      };
+      // Only write `gender` when explicitly provided so re-running the
+      // upsert (e.g. on a language change) can't clobber a value picked
+      // earlier in onboarding with an empty string.
+      final g = gender.trim();
+      if (g == 'm' || g == 'f' || g == 'x') {
+        row['gender'] = g;
+      }
+      await _c.from('profiles').upsert(row, onConflict: 'id');
       lastSync = ProfileSyncStatus(attemptedAt: now, ok: true);
     } catch (e) {
       lastSync = ProfileSyncStatus(

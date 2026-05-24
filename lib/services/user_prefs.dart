@@ -6,6 +6,10 @@ abstract final class UserPrefs {
   static const String keyFirstName = 'profile_first_name';
   static const String keySourceLang = 'profile_source_lang';
   static const String keyTargetLang = 'profile_target_lang';
+  /// Self-declared grammatical gender — `m` / `f` / `x` (neutral).
+  /// Asked once during onboarding right after the language step and never
+  /// shown again. Empty when not yet provided.
+  static const String keyGender = 'profile_gender';
   static const String keyTranslatedVolume = 'audio_translated_volume';
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
@@ -24,23 +28,38 @@ abstract final class UserPrefs {
     required String firstName,
     required String sourceLang,
     required String targetLang,
+    String gender = '',
   }) async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(keyOnboardingDone, true);
     await p.setString(keyFirstName, firstName.trim());
     await p.setString(keySourceLang, sourceLang.trim());
     await p.setString(keyTargetLang, targetLang.trim());
+    final g = gender.trim();
+    if (g == 'm' || g == 'f' || g == 'x') {
+      await p.setString(keyGender, g);
+    }
   }
 
   static Future<ProfileSnapshot?> loadProfile() async {
     final p = await SharedPreferences.getInstance();
     final name = p.getString(keyFirstName);
     if (name == null || name.isEmpty) return null;
+    final g = (p.getString(keyGender) ?? '').trim();
     return ProfileSnapshot(
       firstName: name,
       sourceLang: p.getString(keySourceLang) ?? '',
       targetLang: p.getString(keyTargetLang) ?? '',
+      gender: (g == 'm' || g == 'f' || g == 'x') ? g : '',
     );
+  }
+
+  /// True once the user picked their gender at least once. The onboarding
+  /// step is skipped on subsequent runs so it never re-prompts.
+  static Future<bool> isGenderSet() async {
+    final p = await SharedPreferences.getInstance();
+    final g = (p.getString(keyGender) ?? '').trim();
+    return g == 'm' || g == 'f' || g == 'x';
   }
 
   /// Clears onboarding flag so the welcome flow shows again (e.g. from
@@ -127,9 +146,13 @@ class ProfileSnapshot {
     required this.firstName,
     required this.sourceLang,
     required this.targetLang,
+    this.gender = '',
   });
 
   final String firstName;
   final String sourceLang;
   final String targetLang;
+
+  /// `m` / `f` / `x` / `''` — see [UserPrefs.keyGender].
+  final String gender;
 }

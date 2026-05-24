@@ -25,6 +25,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET?.trim();
 const STRIPE_PRICE_PRO = process.env.STRIPE_PRICE_PRO?.trim();
+const STRIPE_PRICE_PLUS = process.env.STRIPE_PRICE_PLUS?.trim();
 const STRIPE_PRICE_ULTRA = process.env.STRIPE_PRICE_ULTRA?.trim();
 const SUCCESS_URL =
   process.env.STRIPE_SUCCESS_URL?.trim() || 'https://swayco.fr/?subscribed=1';
@@ -34,10 +35,12 @@ const PORTAL_RETURN_URL =
   process.env.STRIPE_PORTAL_RETURN_URL?.trim() || 'https://swayco.fr/';
 
 const PRICE_BY_TIER = {
+  plus: STRIPE_PRICE_PLUS,
   pro: STRIPE_PRICE_PRO,
   ultra: STRIPE_PRICE_ULTRA,
 };
 const TIER_BY_PRICE = {
+  [STRIPE_PRICE_PLUS]: 'plus',
   [STRIPE_PRICE_PRO]: 'pro',
   [STRIPE_PRICE_ULTRA]: 'ultra',
 };
@@ -63,17 +66,13 @@ function supabase() {
 }
 
 // Per-tier weekly credit allotment (seconds) the webhook refills after
-// every successful payment. Pro and Ultra are deliberately generous —
-// the marketing card calls Ultra "Appels illimités", we still keep a
-// real cap to bound runaway OpenAI billing on a compromised account.
-const WEEKLY_SECONDS = {
-  free: 2 * 60 * 60,        // 2 h — matches what the UI advertises
-  pro: 4 * 60 * 60,         // 4 h / week ≈ 16 h / month → "~15h/mois"
-  ultra: 40 * 60 * 60,      // 40 h / week — effectively unlimited
-};
+// every successful payment. The numbers live in `./tiers.js` so backend
+// gating endpoints (e.g. /voice/dub) and the credit refill share one
+// source of truth — never duplicate them here.
+const { weeklySecondsFor } = require('./tiers');
 
 function creditsForTier(tier) {
-  return WEEKLY_SECONDS[tier] ?? WEEKLY_SECONDS.free;
+  return weeklySecondsFor(tier);
 }
 
 // 7-day rolling refill window, same cadence as the auto-refill in

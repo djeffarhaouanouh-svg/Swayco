@@ -1,6 +1,13 @@
 import 'dart:async';
+import 'dart:io' show File;
+import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
@@ -12,6 +19,7 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
+import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/whatsapp_call_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -55,6 +63,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   String _myId = '';
   String _myName = '';
   String _myLang = '';
+  String _myGender = '';
+  /// `'free' | 'plus' | 'pro' | 'ultra'` — read from my own
+  /// Supabase profile during [_bootstrap]. Gates the /voice/dub CTA
+  /// rendered on incoming voice messages.
+  String _myTier = 'free';
   RemoteProfile? _peer;
   bool _sending = false;
   String? _error;
@@ -162,6 +175,45 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
+  /// Build the conversation history that gets shipped alongside the
+  /// message being translated. Limited to the 10 messages immediately
+  /// *before* the one we're translating so the model can resolve
+  /// pronouns / references / in-conversation glossary without seeing
+  /// the answer it's about to produce.
+  List<TranslationHistoryItem> _historyBefore(String messageId) {
+    final idx = _messages.indexWhere((x) => x.id == messageId);
+    if (idx <= 0) return const [];
+    final start = idx - 10 < 0 ? 0 : idx - 10;
+    final slice = _messages.sublist(start, idx);
+    return [
+      for (final h in slice)
+        TranslationHistoryItem(
+          author: h.senderId == _myId ? 'peer' : 'me',
+          text: h.body,
+        ),
+    ];
+    // Note on the author labels: from the *backend's* point of view the
+    // "sender" is whoever wrote the message being translated (the peer,
+    // since we only translate foreign messages) and the "reader" is the
+    // local user. So a history message from `_myId` is from the reader's
+    // perspective — labelled "me" — and a peer message is "peer".
+  }
+
+  TranslationContext _buildContext() {
+    // From the translator's point of view the *sender* is the peer (we
+    // only translate foreign messages) and the *reader* is the local
+    // user. So author* fields = peer profile, peer* fields = me.
+    final peerGender = (_peer?.gender ?? '').isEmpty ? null : _peer!.gender;
+    return TranslationContext(
+      authorName: _peer?.displayName,
+      authorGender: peerGender,
+      authorLang: (_peer?.language ?? '').isEmpty ? null : _peer!.language,
+      peerName: _myName.isEmpty ? null : _myName,
+      peerGender: _myGender.isEmpty ? null : _myGender,
+      peerLang: _myLang.isEmpty ? null : _myLang,
+    );
+  }
+
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
     final id = m.id;
@@ -170,12 +222,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     if (lang == _myLang) return; // already in my language
     if (_translations.containsKey(id) || _translatingIds.contains(id)) return;
     _translatingIds.add(id);
+    final history = _historyBefore(id);
+    final ctx = _buildContext();
     () async {
       try {
         final out = await fetchTextTranslation(
           text: m.body,
           to: _myLang,
           from: lang.isEmpty ? null : lang,
+          history: history,
+          context: ctx,
         );
         if (!mounted) return;
         setState(() {
@@ -190,12 +246,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }();
   }
 
-  /// Best-effort message language: prefer the explicit column we send when
-  /// inserting; fall back to the sender's profile language ("their lang")
-  /// if needed. Empty if unknown.
+  /// Best-effort message language: prefer the explicit `language` column
+  /// (set by ChatApi.sendMessage and by the voice-message STT pipeline),
+  /// then fall back to the sender's profile language.
   String _messageLang(ChatMessage m) {
-    // ChatMessage doesn't expose the language column today; use the peer's
-    // language when the sender is the peer, else my language.
+    if (m.language.isNotEmpty) return m.language;
     if (m.senderId == _myId) return _myLang;
     return _peer?.language.trim() ?? '';
   }
@@ -213,6 +268,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final peer = isSupabaseReady
         ? await ProfileApi.fetchById(widget.peerDeviceId)
         : null;
+    // Load my own remote profile so we can read my subscription_tier
+    // — UserPrefs only carries the locally-typed name + language and
+    // intentionally doesn't track billing state. Failure is fine: we
+    // just leave the tier at 'free' and the bubble hides the CTA.
+    RemoteProfile? mine;
+    if (isSupabaseReady && id.isNotEmpty) {
+      try {
+        mine = await ProfileApi.fetchById(id);
+      } catch (_) {}
+    }
     final blocked = isSupabaseReady && id.isNotEmpty
         ? await BlockApi.isBlocked(
             blockerId: id, otherId: widget.peerDeviceId,
@@ -226,6 +291,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
       _myLang = profile?.sourceLang.trim() ?? '';
+      _myGender = profile?.gender.trim() ?? '';
+      _myTier = mine?.subscriptionTier ?? 'free';
       _peer = peer;
       _peerBlocked = blocked;
     });
@@ -322,6 +389,40 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
+  /// Upload a recorded voice message via the backend STT pipeline. The
+  /// backend persists the audio, transcribes it and inserts the row;
+  /// the realtime stream will surface the new message to both sides so
+  /// we don't have to optimistically inject it here.
+  Future<void> _sendVoice({
+    required Uint8List bytes,
+    required String mimeType,
+    required int durationMs,
+  }) async {
+    if (_myId.isEmpty || _sending) return;
+    if (!isSupabaseReady) {
+      setState(() => _error = 'Supabase non configuré.');
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await uploadVoiceMessage(
+        audioBytes: bytes,
+        mimeType: mimeType,
+        durationMs: durationMs,
+        conversationId: widget.conversationId,
+        recipientId: widget.peerDeviceId,
+        senderName: _myName.isEmpty ? 'Moi' : _myName,
+        hintLanguage: _myLang.isEmpty ? null : _myLang,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Envoi vocal échoué: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -351,6 +452,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             controller: _inputCtrl,
             sending: _sending,
             onSend: _send,
+            onSendVoice: _sendVoice,
             autoTranslate: _autoTranslate,
             onToggleTranslate: _toggleAutoTranslate,
           ),
@@ -421,6 +523,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
     // Top-anchored layout: first (oldest) message at the top, list grows
     // downward, empty space at the bottom when the conversation is short.
+    final canDub = _myTier == 'plus' || _myTier == 'pro' || _myTier == 'ultra';
     return ListView.builder(
       controller: _scrollCtrl,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -433,6 +536,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           mine: mine,
           displayBody: _displayBodyFor(m),
           translating: _translatingIds.contains(m.id),
+          canDubAudio: canDub,
+          myLang: _myLang,
           // Long-press to delete — only my own messages.
           onLongPressDelete: mine ? () => _deleteMessage(m) : null,
         );
@@ -555,6 +660,8 @@ class _MessageBubble extends StatelessWidget {
     required this.mine,
     required this.displayBody,
     required this.translating,
+    required this.canDubAudio,
+    required this.myLang,
     this.onLongPressDelete,
   });
   final ChatMessage message;
@@ -566,6 +673,13 @@ class _MessageBubble extends StatelessWidget {
   final String displayBody;
   /// Show a subtle indicator while the translation is being fetched.
   final bool translating;
+  /// True when the local user's tier unlocks /voice/dub. Plus / Pro /
+  /// Ultra → true; Free → false. Server-side gating is the final word,
+  /// so this only drives whether we render the CTA at all.
+  final bool canDubAudio;
+  /// BCP-47 primary subtag of the local user's language — the
+  /// translation target for any incoming foreign voice message.
+  final String myLang;
 
   @override
   Widget build(BuildContext context) {
@@ -616,17 +730,49 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            Text(
-              displayBody,
-              style: TextStyle(
-                color: translating
-                    ? WhatsAppCallTheme.strongText.withValues(alpha: 0.55)
-                    : WhatsAppCallTheme.strongText,
-                fontSize: 15,
-                height: 1.3,
-                fontStyle: translating ? FontStyle.italic : FontStyle.normal,
+            // Voice messages render an inline mini-player above the body.
+            // The body itself stays so the transcript / translation is
+            // always visible underneath the audio control.
+            if (message.isVoice)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _VoicePlayer(
+                  audioUrl: message.audioUrl,
+                  durationMs: message.audioDurationMs,
+                ),
               ),
-            ),
+            // For voice messages we still surface the transcription /
+            // translation as text. When [displayBody] is empty (raw
+            // STT returned nothing), drop the Text node entirely so
+            // the bubble doesn't show a phantom blank line.
+            if (displayBody.isNotEmpty)
+              Text(
+                displayBody,
+                style: TextStyle(
+                  color: translating
+                      ? WhatsAppCallTheme.strongText.withValues(alpha: 0.55)
+                      : WhatsAppCallTheme.strongText,
+                  fontSize: 15,
+                  height: 1.3,
+                  fontStyle: translating ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            // "🔊 Écouter la traduction" CTA. Only shown for incoming
+            // foreign voice messages when the local user is on a paid
+            // tier and we already have a translated body to dub.
+            if (message.isVoice &&
+                !mine &&
+                canDubAudio &&
+                !translating &&
+                displayBody.isNotEmpty &&
+                displayBody != message.body &&
+                myLang.isNotEmpty)
+              _DubButton(
+                key: ValueKey('dub-${message.id}-$myLang'),
+                messageId: message.id,
+                targetLang: myLang,
+                translatedText: displayBody,
+              ),
             const SizedBox(height: 2),
             Align(
               alignment: Alignment.bottomRight,
@@ -646,11 +792,264 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _Composer extends StatelessWidget {
+/// Inline audio player for a single voice message. Each bubble owns its
+/// own [AudioPlayer] so two messages can play concurrently if the user
+/// somehow taps two — but in practice we let any other instance keep
+/// running; there is no global "single player" coordinator yet.
+class _VoicePlayer extends StatefulWidget {
+  const _VoicePlayer({required this.audioUrl, required this.durationMs});
+  final String audioUrl;
+  final int durationMs;
+
+  @override
+  State<_VoicePlayer> createState() => _VoicePlayerState();
+}
+
+/// Companion "🔊 Écouter la traduction" CTA shown under the original
+/// voice bubble when:
+///   1. auto-translate is on,
+///   2. the message body is in a different language than mine, AND
+///   3. the local user is on a paid tier with [voiceDub != 'none']
+///      (the backend re-checks — this is a UX hint, not a security
+///      gate).
+/// On first tap we POST /voice/dub with the already-translated text;
+/// the backend renders + caches the mp3 and the player widget below
+/// fades in to play it.
+class _DubButton extends StatefulWidget {
+  const _DubButton({
+    super.key,
+    required this.messageId,
+    required this.targetLang,
+    required this.translatedText,
+  });
+  final String messageId;
+  final String targetLang;
+  final String translatedText;
+
+  @override
+  State<_DubButton> createState() => _DubButtonState();
+}
+
+class _DubButtonState extends State<_DubButton> {
+  bool _loading = false;
+  String? _dubUrl;
+  String? _error;
+
+  Future<void> _generate() async {
+    if (_loading || _dubUrl != null) return;
+    if (widget.translatedText.trim().isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final out = await fetchVoiceDub(
+        messageId: widget.messageId,
+        targetLang: widget.targetLang,
+        text: widget.translatedText,
+      );
+      if (!mounted) return;
+      setState(() => _dubUrl = out.audioUrl);
+    } on VoiceDubException catch (e) {
+      if (!mounted) return;
+      String msg;
+      switch (e.code) {
+        case VoiceDubError.upgradeRequired:
+          msg = AppStrings.t('voice_dub_upgrade');
+          break;
+        case VoiceDubError.quotaExceeded:
+          msg = AppStrings.t('voice_dub_quota');
+          break;
+        case VoiceDubError.other:
+          msg = AppStrings.t('voice_dub_failed');
+          break;
+      }
+      setState(() => _error = msg);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (_) {
+      if (!mounted) return;
+      final msg = AppStrings.t('voice_dub_failed');
+      setState(() => _error = msg);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dubUrl != null) {
+      // Once we have a URL, replace the CTA with a full mini-player so
+      // the user can scrub / replay the translated audio just like the
+      // original recording above.
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: _VoicePlayer(audioUrl: _dubUrl!, durationMs: 0),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: InkWell(
+        onTap: _loading ? null : _generate,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: WhatsAppCallTheme.accent,
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.volume_up_outlined,
+                  size: 16,
+                  color: WhatsAppCallTheme.accent,
+                ),
+              const SizedBox(width: 6),
+              Text(
+                _error ?? AppStrings.t('voice_dub_listen'),
+                style: const TextStyle(
+                  color: WhatsAppCallTheme.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoicePlayerState extends State<_VoicePlayer> {
+  late final AudioPlayer _player = AudioPlayer();
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<Duration>? _posSub;
+  Duration _position = Duration.zero;
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateSub = _player.onPlayerStateChanged.listen((s) {
+      if (!mounted) return;
+      setState(() => _playing = s == PlayerState.playing);
+      if (s == PlayerState.completed) {
+        setState(() => _position = Duration.zero);
+      }
+    });
+    _posSub = _player.onPositionChanged.listen((p) {
+      if (!mounted) return;
+      setState(() => _position = p);
+    });
+  }
+
+  @override
+  void dispose() {
+    _stateSub?.cancel();
+    _posSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    try {
+      if (_playing) {
+        await _player.pause();
+      } else {
+        await _player.play(UrlSource(widget.audioUrl));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lecture impossible: $e')),
+      );
+    }
+  }
+
+  String _fmt(Duration d) {
+    final secs = d.inSeconds;
+    final m = (secs ~/ 60).toString().padLeft(1, '0');
+    final s = (secs % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = Duration(milliseconds: widget.durationMs);
+    final progress = total.inMilliseconds <= 0
+        ? 0.0
+        : (_position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
+    final remaining = total - _position;
+    final label = _playing ? _fmt(_position) : _fmt(total > Duration.zero ? total : remaining);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: WhatsAppCallTheme.accent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: _toggle,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                _playing ? Icons.pause : Icons.play_arrow,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 140,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor:
+                  WhatsAppCallTheme.strongText.withValues(alpha: 0.18),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                WhatsAppCallTheme.accent,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: WhatsAppCallTheme.strongText.withValues(alpha: 0.75),
+            fontSize: 12,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Maximum recording length. Aligned with the DB CHECK constraint on
+/// `messages.audio_duration_ms` (120000 ms) but capped lower in the UI
+/// so users see a clear ceiling. Mirrors WhatsApp's UX.
+const Duration _kMaxVoiceMessage = Duration(seconds: 60);
+
+class _Composer extends StatefulWidget {
   const _Composer({
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.onSendVoice,
     required this.autoTranslate,
     required this.onToggleTranslate,
   });
@@ -658,11 +1057,180 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  /// Hand the parent the raw recording so it can run the backend upload.
+  final Future<void> Function({
+    required Uint8List bytes,
+    required String mimeType,
+    required int durationMs,
+  }) onSendVoice;
   final bool autoTranslate;
   final VoidCallback onToggleTranslate;
 
   @override
+  State<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<_Composer> {
+  final AudioRecorder _recorder = AudioRecorder();
+  /// True while the recorder is active. The composer collapses into a
+  /// "recording UI" with timer + cancel/send buttons during this state.
+  bool _recording = false;
+  /// True while the input field has any text — in that case we render
+  /// the send button (instead of the mic) so the gesture matches the
+  /// user's clear intent.
+  bool _hasText = false;
+  DateTime? _recordStart;
+  Timer? _tick;
+  Duration _elapsed = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+    _hasText = widget.controller.text.trim().isNotEmpty;
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    _tick?.cancel();
+    // Best-effort: drop any in-flight recording when the chat is closed.
+    unawaited(() async {
+      try {
+        if (await _recorder.isRecording()) await _recorder.cancel();
+      } catch (_) {}
+      await _recorder.dispose();
+    }());
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    final has = widget.controller.text.trim().isNotEmpty;
+    if (has != _hasText) setState(() => _hasText = has);
+  }
+
+  /// Resolved path passed to `record.start`. Native gets a real file in
+  /// the temp directory; on web the package ignores the path and writes
+  /// to a Blob URL we read back via `_recorder.stop()`.
+  Future<String> _recordingPath() async {
+    if (kIsWeb) return ''; // ignored by the web backend
+    final dir = await getTemporaryDirectory();
+    final name = 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    return '${dir.path}/$name';
+  }
+
+  Future<void> _startRecording() async {
+    if (_recording || widget.sending) return;
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('voice_mic_denied'))),
+        );
+        return;
+      }
+      final path = await _recordingPath();
+      // AAC-LC inside an MP4 container = .m4a — natively decodable by
+      // iOS / Android / Chrome / Safari. On web the package transparently
+      // falls back to the closest available codec (WebM/Opus on Chrome).
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 64000,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      _recordStart = DateTime.now();
+      _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        if (!mounted || _recordStart == null) return;
+        final el = DateTime.now().difference(_recordStart!);
+        // Hard stop at the cap so an idle user can't blow past the DB
+        // constraint or rack up STT bills accidentally.
+        if (el >= _kMaxVoiceMessage) {
+          unawaited(_stopAndSend());
+          return;
+        }
+        setState(() => _elapsed = el);
+      });
+      setState(() {
+        _recording = true;
+        _elapsed = Duration.zero;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur micro: $e')),
+      );
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    if (!_recording) return;
+    _tick?.cancel();
+    try {
+      await _recorder.cancel();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _recording = false;
+        _elapsed = Duration.zero;
+        _recordStart = null;
+      });
+    }
+  }
+
+  Future<void> _stopAndSend() async {
+    if (!_recording) return;
+    _tick?.cancel();
+    final ms = _elapsed.inMilliseconds;
+    String? out;
+    try {
+      out = await _recorder.stop();
+    } catch (_) {
+      out = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _recording = false;
+      _elapsed = Duration.zero;
+      _recordStart = null;
+    });
+    if (out == null || ms <= 500) {
+      // Sub-half-second recording is almost certainly a misfire — skip.
+      return;
+    }
+    Uint8List bytes;
+    try {
+      if (kIsWeb) {
+        // On web, `stop()` returns a blob: URL; fetch it to read bytes.
+        final res = await http.get(Uri.parse(out));
+        bytes = res.bodyBytes;
+      } else {
+        bytes = await File(out).readAsBytes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lecture audio échouée: $e')),
+        );
+      }
+      return;
+    }
+    if (bytes.isEmpty) return;
+    // Best-guess mime: native = m4a, web = webm.
+    final mime = kIsWeb ? 'audio/webm' : 'audio/m4a';
+    await widget.onSendVoice(bytes: bytes, mimeType: mime, durationMs: ms);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_recording) return _buildRecordingBar();
+    return _buildIdleBar();
+  }
+
+  Widget _buildIdleBar() {
     return SafeArea(
       top: false,
       child: Container(
@@ -675,8 +1243,8 @@ class _Composer extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 140),
                 child: TextField(
-                  controller: controller,
-                  enabled: !sending,
+                  controller: widget.controller,
+                  enabled: !widget.sending,
                   minLines: 1,
                   maxLines: 6,
                   textCapitalization: TextCapitalization.sentences,
@@ -687,12 +1255,9 @@ class _Composer extends StatelessWidget {
                     filled: true,
                     fillColor: WhatsAppCallTheme.surface,
                     contentPadding: const EdgeInsets.fromLTRB(2, 10, 14, 10),
-                    // Translate switch lives inline at the left of the field
-                    // — icon + sliding pill, tap-to-toggle. Pushes the
-                    // "Message" hint to the right.
                     prefixIcon: _ComposerTranslateToggle(
-                      active: autoTranslate,
-                      onTap: onToggleTranslate,
+                      active: widget.autoTranslate,
+                      onTap: widget.onToggleTranslate,
                     ),
                     prefixIconConstraints: const BoxConstraints(
                       minWidth: 96, minHeight: 40,
@@ -710,33 +1275,129 @@ class _Composer extends StatelessWidget {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  onSubmitted: (_) => onSend(),
+                  onSubmitted: (_) => widget.onSend(),
                 ),
               ),
             ),
             const SizedBox(width: 6),
+            _CircleActionButton(
+              icon: _hasText ? Icons.send : Icons.mic,
+              busy: widget.sending,
+              onTap: widget.sending
+                  ? null
+                  : (_hasText ? widget.onSend : _startRecording),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecordingBar() {
+    final secs = _elapsed.inSeconds;
+    final m = (secs ~/ 60).toString().padLeft(1, '0');
+    final s = (secs % 60).toString().padLeft(2, '0');
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+        color: WhatsAppCallTheme.bar,
+        child: Row(
+          children: [
+            // Cancel — drops the recording without sending.
             Material(
-              color: WhatsAppCallTheme.accent,
-              shape: const CircleBorder(),
+              color: Colors.transparent,
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: sending ? null : onSend,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: sending
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.send, color: Colors.white, size: 22),
+                onTap: _cancelRecording,
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFE57373),
+                    size: 26,
+                  ),
                 ),
               ),
             ),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE53935),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$m:$s',
+                    style: const TextStyle(
+                      color: WhatsAppCallTheme.strongText,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      AppStrings.t('voice_recording_hint'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: WhatsAppCallTheme.subtleText,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _CircleActionButton(
+              icon: Icons.send,
+              busy: false,
+              onTap: _stopAndSend,
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleActionButton extends StatelessWidget {
+  const _CircleActionButton({
+    required this.icon,
+    required this.busy,
+    required this.onTap,
+  });
+  final IconData icon;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: WhatsAppCallTheme.accent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: busy
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );

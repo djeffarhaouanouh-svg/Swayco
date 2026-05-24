@@ -352,6 +352,25 @@ abstract final class AppStrings {
     'onb_profile_title': 'Ton profil',
     'onb_translation_help':
         "En appel, on traduira automatiquement la voix de l'autre dans ta langue, et la tienne dans la sienne.",
+    'onb_gender_title': 'Toi, c\'est…',
+    'onb_gender_subtitle':
+        "Ça nous aide à traduire correctement les accords (féminin, masculin) dans tes conversations.",
+    'onb_gender_male': 'Masculin',
+    'onb_gender_female': 'Féminin',
+    'onb_gender_neutral': 'Neutre',
+    'onb_need_gender': 'Choisis une option pour continuer.',
+
+    // Voice messages — chat composer + bubble.
+    'voice_mic_denied':
+        "Accès au micro refusé. Active-le dans les réglages de l'app.",
+    'voice_recording_hint': 'Touche pour envoyer ou supprime pour annuler',
+    'voice_message': 'Message vocal',
+    'voice_dub_listen': 'Écouter la traduction',
+    'voice_dub_upgrade':
+        'Passe à Plus pour écouter la traduction des messages vocaux.',
+    'voice_dub_quota':
+        'Quota de doublages atteint pour ce mois. Repasse plus tard ou monte en Pro.',
+    'voice_dub_failed': 'Doublage indisponible, réessaie dans un instant.',
 
     'join_title': 'Rejoindre une room',
     'join_desc':
@@ -665,6 +684,24 @@ abstract final class AppStrings {
     'onb_profile_title': 'Your profile',
     'onb_translation_help':
         "In a call, we'll automatically translate the other person's voice into your language and yours into theirs.",
+    'onb_gender_title': 'You are…',
+    'onb_gender_subtitle':
+        'Helps us get gender agreement right (feminine, masculine) when translating your messages.',
+    'onb_gender_male': 'Male',
+    'onb_gender_female': 'Female',
+    'onb_gender_neutral': 'Neutral',
+    'onb_need_gender': 'Pick an option to continue.',
+
+    // Voice messages — chat composer + bubble.
+    'voice_mic_denied': "Microphone access denied. Enable it in the app settings.",
+    'voice_recording_hint': 'Tap to send, or delete to cancel',
+    'voice_message': 'Voice message',
+    'voice_dub_listen': 'Listen to translation',
+    'voice_dub_upgrade':
+        'Upgrade to Plus to hear voice messages translated aloud.',
+    'voice_dub_quota':
+        'Monthly translation cap reached. Come back later or upgrade to Pro.',
+    'voice_dub_failed': 'Translation playback unavailable, try again.',
 
     'join_title': 'Join a room',
     'join_desc':

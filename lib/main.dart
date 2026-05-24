@@ -189,6 +189,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         deviceId: uid,
         displayName: profile.firstName,
         language: profile.sourceLang,
+        gender: profile.gender,
       );
     }
     unawaited(ChatUnread.start(uid));

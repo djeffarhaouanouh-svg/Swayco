@@ -54,6 +54,12 @@ dependencies:
   share_plus: ^12.0.2
   # Reads the real app version/build number for the Settings screen.
   package_info_plus: ^8.0.0
+  # Voice messages: record on iOS/Android/web (AAC/m4a + WebM on web),
+  # play back the original recording on the receiving end. Both packages
+  # request mic / playback permissions through permission_handler above.
+  record: ^5.1.2
+  audioplayers: ^6.1.0
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

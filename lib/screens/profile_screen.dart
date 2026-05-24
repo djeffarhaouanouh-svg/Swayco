@@ -855,7 +855,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                           : null,
                     ),
                     const SizedBox(height: 16),
-                    _PlansSection(isPro: _remote?.isPro ?? false),
+                    _PlansSection(
+                      currentTier: _remote?.subscriptionTier ?? 'free',
+                    ),
                   ],
                 ],
               ),
@@ -1042,67 +1044,137 @@ class _CreditsCard extends StatelessWidget {
 ///     we deliberately don't surface pricing in the app shell — users
 ///     bounce to swayco.fr to subscribe.
 class _PlansSection extends StatefulWidget {
-  const _PlansSection({required this.isPro});
+  const _PlansSection({required this.currentTier});
 
-  final bool isPro;
+  /// Caller's current subscription tier. Drives which upgrade cards we
+  /// render — only tiers *strictly above* this one show up, so a Plus
+  /// subscriber sees Pro + Ultra, a Pro sees Ultra, and an Ultra sees
+  /// nothing (we hide the whole section).
+  final String currentTier;
 
   static const String _manageUrl = 'swayco.fr';
+
+  /// Ordered tier ladder. The index of [tier] in this list is used to
+  /// decide which cards are "above" the user's current tier — anything
+  /// at a strictly greater index is a valid upgrade target.
+  static const List<String> _ladder = ['free', 'plus', 'pro', 'ultra'];
+
+  static int _rank(String tier) {
+    final i = _ladder.indexOf(tier);
+    return i < 0 ? 0 : i;
+  }
 
   @override
   State<_PlansSection> createState() => _PlansSectionState();
 }
 
 class _PlansSectionState extends State<_PlansSection> {
-  // Which tier currently shows the accent (green) border. Pro is
-  // pre-selected so the section opens with the same visual as before;
-  // tapping Ultra hands the border over to it. Purely cosmetic — the
-  // Souscrire buttons remain the only thing that starts checkout.
-  String _selected = 'pro';
+  /// Which tier currently shows the accent (green) border. Initially
+  /// the first upgrade above the user's tier so the section opens with
+  /// a sensible default highlight.
+  String? _selected;
+
+  // Per-tier marketing copy, kept inline so the build below is just a
+  // filter over this map — adding a tier later means editing this one
+  // place and the ladder in _PlansSection.
+  static final Map<String, _PlanCopy> _copy = {
+    'plus': _PlanCopy(
+      price: '9.99€/mois',
+      audience:
+          'Pour découvrir, dater, swiper sans limite et écouter la traduction des messages vocaux.',
+      features: [
+        '1h de traduction live / semaine',
+        'doublage audio des messages vocaux (60/mois)',
+        'voir qui t\'a liké',
+        'swipes illimités',
+        '1 boost / semaine',
+      ],
+    ),
+    'pro': _PlanCopy(
+      price: '24.99€/mois',
+      audience: 'Pour voyageurs, dating sérieux, usage régulier.',
+      features: [
+        '3h de traduction live / semaine',
+        'doublage audio illimité',
+        'priorité serveur',
+        '5 boosts / semaine',
+        'filtres avancés',
+      ],
+    ),
+    'ultra': _PlanCopy(
+      price: '69.99€/mois',
+      audience:
+          'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
+      features: [
+        '7h de traduction live / semaine',
+        'doublage avec TA voix clonée',
+        'top placement Discover',
+        'voix premium ElevenLabs',
+        'tout le reste illimité',
+      ],
+    ),
+  };
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      if (widget.isPro) {
-        // Already on the top tier — nothing more to upsell.
-        return const SizedBox.shrink();
-      }
-      return Column(
-        children: [
+    if (!kIsWeb) {
+      // Native — direct users to the web flow.
+      return _ManageOnWebCard(url: _PlansSection._manageUrl);
+    }
+    // Tiers strictly above the user's current one. Ultra users see no
+    // upgrade cards at all → the whole section vanishes.
+    final myRank = _PlansSection._rank(widget.currentTier);
+    final upgrades = _PlansSection._ladder
+        .skip(myRank + 1)
+        .where(_copy.containsKey)
+        .toList(growable: false);
+    if (upgrades.isEmpty) return const SizedBox.shrink();
+
+    // Default the highlighted card to the cheapest available upgrade
+    // (= the closest step up). Idempotent: re-runs only update when
+    // the selection is missing or no longer in the visible set.
+    final defaultSelected = upgrades.first;
+    final effectiveSelected =
+        (_selected != null && upgrades.contains(_selected!))
+            ? _selected!
+            : defaultSelected;
+
+    return Column(
+      children: [
+        for (var i = 0; i < upgrades.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
           _PlanCard(
-            name: 'Pro',
-            price: '29€/mois',
-            audience: 'Pour voyageurs, dating, usage casual intensif.',
-            features: const [
-              '~15h/mois',
-              'priorité serveur',
-              'meilleure qualité audio',
-            ],
-            featured: _selected == 'pro',
-            popularBadge: true,
-            onTap: () => setState(() => _selected = 'pro'),
-          ),
-          const SizedBox(height: 12),
-          _PlanCard(
-            name: 'Ultra',
-            price: '59€/mois',
-            audience:
-                'Pour couples internationaux, gamers, créateurs, appels quotidiens.',
-            features: const [
-              'Appels illimités',
-              'meilleure latence',
-              'voix premium',
-              'future voice clone améliorée',
-            ],
-            featured: _selected == 'ultra',
-            popularBadge: false,
-            onTap: () => setState(() => _selected = 'ultra'),
+            name: _capitalise(upgrades[i]),
+            price: _copy[upgrades[i]]!.price,
+            audience: _copy[upgrades[i]]!.audience,
+            features: _copy[upgrades[i]]!.features,
+            featured: effectiveSelected == upgrades[i],
+            // "Populaire" sits on the closest upgrade (highest
+            // conversion target for the user's current tier).
+            popularBadge: i == 0,
+            onTap: () => setState(() => _selected = upgrades[i]),
           ),
         ],
-      );
-    }
-    // Native — direct users to the web flow.
-    return _ManageOnWebCard(url: _PlansSection._manageUrl);
+      ],
+    );
   }
+
+  static String _capitalise(String tier) =>
+      tier.isEmpty ? tier : '${tier[0].toUpperCase()}${tier.substring(1)}';
+}
+
+/// Marketing copy for a single tier — small POD so the [build] method
+/// can iterate over the visible-upgrades list without giant inline
+/// blocks per tier.
+class _PlanCopy {
+  const _PlanCopy({
+    required this.price,
+    required this.audience,
+    required this.features,
+  });
+  final String price;
+  final String audience;
+  final List<String> features;
 }
 
 class _PlanCard extends StatelessWidget {

@@ -12,17 +12,36 @@ class ChatMessage {
     required this.senderName,
     required this.body,
     required this.createdAt,
+    this.language = '',
+    this.audioUrl = '',
+    this.audioDurationMs = 0,
   });
 
   final String id;
   final String conversationId;
   final String senderId;
   final String senderName;
+  /// Text body. For voice messages this carries the STT transcription
+  /// produced by the backend so the existing chat translator path
+  /// works unchanged.
   final String body;
   final DateTime createdAt;
+  /// BCP-47 primary subtag describing what [body] is written in. Sent
+  /// at insertion time by [ChatApi.sendMessage] / `/messages/voice`.
+  /// Empty when unknown.
+  final String language;
+  /// Public URL of the original voice recording. Empty for plain text
+  /// messages.
+  final String audioUrl;
+  /// Recording length in milliseconds. 0 when [audioUrl] is empty.
+  final int audioDurationMs;
+
+  /// True when this message was recorded as audio (has a playable URL).
+  bool get isVoice => audioUrl.isNotEmpty;
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) {
     final created = m['created_at'];
+    final dur = m['audio_duration_ms'];
     return ChatMessage(
       id: m['id']?.toString() ?? '',
       conversationId: m['conversation_id']?.toString() ?? '',
@@ -35,6 +54,11 @@ class ChatMessage {
       createdAt: created is String
           ? DateTime.tryParse(created)?.toLocal() ?? DateTime.now()
           : DateTime.now(),
+      language: m['language']?.toString().trim() ?? '',
+      audioUrl: m['audio_url']?.toString() ?? '',
+      audioDurationMs: dur is int
+          ? dur
+          : (dur is num ? dur.toInt() : int.tryParse(dur?.toString() ?? '') ?? 0),
     );
   }
 }
