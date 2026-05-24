@@ -298,6 +298,10 @@ abstract final class AppStrings {
     'credits_remaining': 'Crédits restants',
     'credits_used_total': 'Temps total d\'appel',
     'credits_upgrade_cta': 'Passer Premium',
+    'credits_remaining_inline': '{count} crédits restants ce mois',
+    'credits_unlimited': 'Traduction illimitée',
+    'credits_low_hint':
+        'Bientôt à court de crédits. Renouvellement le mois prochain — passe à un palier supérieur pour ne pas attendre.',
     'premium_title': 'Premium',
     'premium_offer_label': 'Premium hebdomadaire',
     'premium_bullet_minutes':
@@ -650,6 +654,10 @@ abstract final class AppStrings {
     'credits_remaining': 'Credits left',
     'credits_used_total': 'Total call time',
     'credits_upgrade_cta': 'Go Premium',
+    'credits_remaining_inline': '{count} credits left this month',
+    'credits_unlimited': 'Unlimited translation',
+    'credits_low_hint':
+        'Running low. Refills next month — upgrade if you don\'t want to wait.',
     'premium_title': 'Premium',
     'premium_offer_label': 'Premium Weekly',
     'premium_bullet_minutes': '3 to 5 hours of translated calls per week',

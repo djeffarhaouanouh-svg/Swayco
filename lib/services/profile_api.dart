@@ -3,23 +3,28 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
 
-/// What we actually grant the free tier on each weekly refill, in
-/// seconds of translated call. Production value: 1 h, matching what
-/// the UI advertises. (Earlier this was 3 min for testing the
-/// cutoff-when-exhausted path — confirmed working, restored.)
-const int freeWeeklyCreditsSeconds = 1 * 60 * 60; // 1 h / week
+/// Translation credits, refilled every 30 days. UI-side we expose
+/// these as "crédits" where 1 crédit = 60 s of translated call, so the
+/// per-tier numbers read as 75 / 300 / 1000 / 2000 — abstract and
+/// generous instead of stopwatch-y. Source of truth for the matching
+/// per-tier values lives in `backend/tiers.js` (FEATURES); these
+/// constants exist so the local UI can pre-render a refill without
+/// waiting on the network.
+const int freeMonthlyCreditsSeconds = 75 * 60;     // 75 crédits / mois
+const int plusMonthlyCreditsSeconds = 300 * 60;    // 300 crédits / mois
+const int proMonthlyCreditsSeconds = 1000 * 60;    // 1000 crédits / mois
+const int ultraMonthlyCreditsSeconds = 2000 * 60;  // 2000 crédits / mois (fair use)
 
-/// The free-tier weekly quota we advertise in the UI. Kept as a
-/// separate name so we can shrink the real cap during future testing
-/// runs without leaking "3 min" into screenshots / store listings.
-const int freeWeeklyAdvertisedSeconds = 1 * 60 * 60; // 1 h / week
+/// Legacy alias kept so older call sites that still read this name
+/// keep compiling during the rename. New code should use the
+/// `*MonthlyCreditsSeconds` constants above directly.
+const int freeWeeklyCreditsSeconds = freeMonthlyCreditsSeconds;
+const int freeWeeklyAdvertisedSeconds = freeMonthlyCreditsSeconds;
+const int proWeeklyCreditsSeconds = proMonthlyCreditsSeconds;
 
-/// Default weekly allotment for the Premium tier.
-const int proWeeklyCreditsSeconds = 5 * 60 * 60; // 5 h / week
-
-/// Refill cadence: every Monday-ish (rolling 7 days from the last
-/// refill, in practice).
-const Duration creditsRefillPeriod = Duration(days: 7);
+/// Refill cadence: every 30 days from the last refill. Aligned with
+/// Stripe's monthly invoice so "refill" and "new bill" land together.
+const Duration creditsRefillPeriod = Duration(days: 30);
 
 class RemoteProfile {
   const RemoteProfile({

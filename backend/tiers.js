@@ -15,8 +15,13 @@ const TIERS = ['free', 'plus', 'pro', 'ultra'];
 
 /**
  * @typedef {Object} TierFeatures
- * @property {number}  weeklySeconds       — translation / live-call seconds
- *                                            refilled every 7 days.
+ * @property {number}  monthlySeconds      — translation / live-call seconds
+ *                                            refilled every 30 days. The
+ *                                            user-facing label is "crédits"
+ *                                            where 1 credit = 60s so the
+ *                                            numbers feel abstract /
+ *                                            generous instead of advertising
+ *                                            a stopwatch.
  * @property {'none'|'generic'|'cloned'} voiceDub
  *                                          — what the backend should
  *                                            produce when the bubble
@@ -32,29 +37,32 @@ const TIERS = ['free', 'plus', 'pro', 'ultra'];
 /** @type {Object<string, TierFeatures>} */
 const FEATURES = Object.freeze({
   free: Object.freeze({
-    weeklySeconds: 15 * 60,           // 15 min
+    monthlySeconds: 75 * 60,          // 75 crédits / mois (1.25 h)
     voiceDub: 'none',
     voiceDubsPerMonth: 0,
     voiceClone: false,
   }),
   plus: Object.freeze({
-    weeklySeconds: 60 * 60,           // 1 h
+    monthlySeconds: 300 * 60,         // 300 crédits / mois (5 h)
     voiceDub: 'generic',
     voiceDubsPerMonth: 60,            // cap matches the "60 vocaux/mois"
                                       // promise on the marketing card.
     voiceClone: false,
   }),
   pro: Object.freeze({
-    weeklySeconds: 3 * 60 * 60,       // 3 h
+    monthlySeconds: 1000 * 60,        // 1000 crédits / mois (~16.7 h)
     voiceDub: 'generic',
     voiceDubsPerMonth: Infinity,
     voiceClone: false,
   }),
   ultra: Object.freeze({
-    weeklySeconds: 7 * 60 * 60,       // 7 h — bounded so an "appels
-                                      // illimités" power user can't
-                                      // run the realtime bill past the
-                                      // subscription's gross margin.
+    monthlySeconds: 2000 * 60,        // 2000 crédits / mois fair-use cap.
+                                      // Marketing copy advertises Ultra
+                                      // as "Illimité"; the soft cap here
+                                      // exists only to bound runaway
+                                      // OpenAI billing on a compromised
+                                      // account, not to ration honest
+                                      // power users.
     voiceDub: 'cloned',
     voiceDubsPerMonth: Infinity,
     voiceClone: true,
@@ -72,9 +80,10 @@ function featuresFor(tier) {
   return FEATURES[normalizeTier(tier)];
 }
 
-/** Convenience: weekly translation credit allotment in seconds. */
-function weeklySecondsFor(tier) {
-  return featuresFor(tier).weeklySeconds;
+/** Convenience: monthly translation credit allotment in seconds.
+ *  1 credit (UI-side) = 60 seconds (storage-side). */
+function monthlySecondsFor(tier) {
+  return featuresFor(tier).monthlySeconds;
 }
 
 module.exports = {
@@ -82,5 +91,5 @@ module.exports = {
   FEATURES,
   normalizeTier,
   featuresFor,
-  weeklySecondsFor,
+  monthlySecondsFor,
 };

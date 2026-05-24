@@ -65,22 +65,23 @@ function supabase() {
   return _supabase;
 }
 
-// Per-tier weekly credit allotment (seconds) the webhook refills after
+// Per-tier monthly credit allotment (seconds) the webhook refills after
 // every successful payment. The numbers live in `./tiers.js` so backend
 // gating endpoints (e.g. /voice/dub) and the credit refill share one
 // source of truth — never duplicate them here.
-const { weeklySecondsFor } = require('./tiers');
+const { monthlySecondsFor } = require('./tiers');
 
 function creditsForTier(tier) {
-  return weeklySecondsFor(tier);
+  return monthlySecondsFor(tier);
 }
 
-// 7-day rolling refill window, same cadence as the auto-refill in
+// 30-day rolling refill window, same cadence as the auto-refill in
 // ProfileApi.dart. Pinned here so the webhook and the in-app refill
-// land on the same date.
+// land on the same date. Aligned with Stripe's monthly billing cycle
+// so users perceive "refill" + "new invoice" as the same event.
 function nextRefillDate() {
   const d = new Date();
-  d.setDate(d.getDate() + 7);
+  d.setDate(d.getDate() + 30);
   return d.toISOString();
 }
 

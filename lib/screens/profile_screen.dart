@@ -926,68 +926,116 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   }
 }
 
+/// Compact translation-credits indicator. Anxiety-by-stopwatch was the
+/// number one piece of OpenAI's UX feedback on this surface, so the
+/// card no longer renders the giant "X min remaining" + lifetime grid.
+/// Instead it shows:
+///   - one line of "X crédits restants" in the active tier's unit,
+///   - the tier badge,
+///   - an accent-coloured warning if the user has dropped under 20%
+///     of their monthly allotment,
+///   - the upgrade CTA when not on a paid tier,
+///   - the Stripe portal link on web for paid users.
+///
+/// Ultra subscribers never see a number — only "Illimité", because
+/// the fair-use cap (2000 crédits) exists to bound runaway billing,
+/// not to be displayed as a quota.
 class _CreditsCard extends StatelessWidget {
   const _CreditsCard({required this.profile, required this.onUpgrade});
 
   final RemoteProfile? profile;
 
-  /// Null when the user is already Pro (button is hidden).
+  /// Null when the user is already on a paid tier (button is hidden).
   final VoidCallback? onUpgrade;
 
-  String _formatMinutes(int totalSeconds) {
-    final minutes = totalSeconds ~/ 60;
-    if (minutes < 60) return '$minutes min';
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    if (m == 0) return '${h}h';
-    return '${h}h ${m.toString().padLeft(2, '0')}';
+  /// Per-tier monthly allotment used to compute the "low credits"
+  /// warning threshold (we flash a hint at <20%). Mirrors the
+  /// constants exported by profile_api.dart.
+  static int _monthlyAllotmentFor(String tier) {
+    switch (tier) {
+      case 'ultra':
+        return ultraMonthlyCreditsSeconds;
+      case 'pro':
+        return proMonthlyCreditsSeconds;
+      case 'plus':
+        return plusMonthlyCreditsSeconds;
+      default:
+        return freeMonthlyCreditsSeconds;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = profile;
-    final isPro = p?.isPro ?? false;
+    final tier = p?.subscriptionTier ?? 'free';
+    final isUltra = tier == 'ultra';
+    final isPaid = tier != 'free';
     final creditsSeconds = p?.creditsSeconds ?? 0;
-    final lifetimeSeconds = p?.lifetimeCallSeconds ?? 0;
+    final credits = creditsSeconds ~/ 60;
+    final allotment = _monthlyAllotmentFor(tier) ~/ 60;
+    // Threshold for the low-credits warning. Hidden entirely for
+    // Ultra — they're marketed as "Illimité" so flashing a low-credits
+    // hint would contradict the brand promise.
+    final lowThreshold = (allotment * 0.2).floor();
+    final lowCredits = !isUltra && allotment > 0 && credits <= lowThreshold;
+
+    final tierLabel = () {
+      switch (tier) {
+        case 'ultra':
+          return 'ULTRA';
+        case 'pro':
+          return 'PRO';
+        case 'plus':
+          return 'PLUS';
+        default:
+          return '';
+      }
+    }();
 
     return Container(
       decoration: BoxDecoration(
-        gradient: isPro
+        gradient: isPaid
             ? const LinearGradient(
                 colors: [Color(0xFF1F3A34), Color(0xFF0F2A26)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : null,
-        color: isPro ? null : WhatsAppCallTheme.bar,
+        color: isPaid ? null : WhatsAppCallTheme.bar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isPro
-              ? WhatsAppCallTheme.accent.withValues(alpha: 0.45)
-              : const Color(0xFF2A3942),
+          color: lowCredits
+              ? const Color(0xFFFFA726)
+              : (isPaid
+                  ? WhatsAppCallTheme.accent.withValues(alpha: 0.45)
+                  : const Color(0xFF2A3942)),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text('💎', style: TextStyle(fontSize: 26)),
-              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  isPro
-                      ? AppStrings.t('credits_pro_title')
-                      : AppStrings.t('credits_free_title'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                  isUltra
+                      ? AppStrings.t('credits_unlimited')
+                      : AppStrings.t(
+                          'credits_remaining_inline',
+                          args: {'count': credits.toString()},
+                        ),
+                  style: TextStyle(
+                    color: lowCredits
+                        ? const Color(0xFFFFA726)
+                        : WhatsAppCallTheme.strongText,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
-              if (isPro)
+              if (tierLabel.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 4),
@@ -995,9 +1043,9 @@ class _CreditsCard extends StatelessWidget {
                     color: WhatsAppCallTheme.accent,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
-                    'PRO',
-                    style: TextStyle(
+                  child: Text(
+                    tierLabel,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -1007,32 +1055,19 @@ class _CreditsCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCellInline(
-                  label: AppStrings.t('credits_remaining'),
-                  value: _formatMinutes(creditsSeconds),
-                  accent: true,
-                ),
+          if (lowCredits) ...[
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.t('credits_low_hint'),
+              style: const TextStyle(
+                color: Color(0xFFFFA726),
+                fontSize: 12,
+                height: 1.35,
               ),
-              Container(
-                width: 1,
-                height: 32,
-                color: const Color(0xFF2A3942),
-              ),
-              Expanded(
-                child: _StatCellInline(
-                  label: AppStrings.t('credits_used_total'),
-                  value: _formatMinutes(lifetimeSeconds),
-                  accent: false,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
           if (onUpgrade != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: onUpgrade,
               icon: const Text('💎', style: TextStyle(fontSize: 14)),
@@ -1040,16 +1075,16 @@ class _CreditsCard extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: WhatsAppCallTheme.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                minimumSize: const Size.fromHeight(42),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                minimumSize: const Size.fromHeight(40),
               ),
             ),
           ],
-          // Pro users on web get the Stripe Customer Portal link
+          // Paid users on web get the Stripe Customer Portal link
           // (cancel, change card, swap tier). Native users go through
           // App Store / Play Store subscription management instead.
-          if (isPro && kIsWeb) ...[
-            const SizedBox(height: 8),
+          if (isPaid && kIsWeb) ...[
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerLeft,
               child: const _ManageSubscriptionButton(),
@@ -1110,8 +1145,8 @@ class _PlansSectionState extends State<_PlansSection> {
       audience:
           'Pour découvrir, dater, swiper sans limite et écouter la traduction des messages vocaux.',
       features: [
-        '1h de traduction live / semaine',
-        'doublage audio des messages vocaux (60/mois)',
+        '300 crédits de traduction',
+        'doublage audio des messages vocaux',
         'voir qui t\'a liké',
         'swipes illimités',
         '1 boost / semaine',
@@ -1121,7 +1156,7 @@ class _PlansSectionState extends State<_PlansSection> {
       price: '24.99€/mois',
       audience: 'Pour voyageurs, dating sérieux, usage régulier.',
       features: [
-        '3h de traduction live / semaine',
+        '1 000 crédits de traduction',
         'doublage audio illimité',
         'priorité serveur',
         '5 boosts / semaine',
@@ -1133,7 +1168,7 @@ class _PlansSectionState extends State<_PlansSection> {
       audience:
           'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
       features: [
-        '7h de traduction live / semaine',
+        'Traduction illimitée',
         'doublage avec TA voix clonée',
         'top placement Discover',
         'voix premium ElevenLabs',
@@ -1570,44 +1605,6 @@ class _ManageOnWebCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StatCellInline extends StatelessWidget {
-  const _StatCellInline({
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
-  final String label;
-  final String value;
-  final bool accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: accent
-                ? WhatsAppCallTheme.accent
-                : WhatsAppCallTheme.strongText,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            color: WhatsAppCallTheme.subtleText,
-            fontSize: 12,
-          ),
-        ),
-      ],
     );
   }
 }
