@@ -1032,7 +1032,7 @@ class _PlansSectionState extends State<_PlansSection> {
       ],
     ),
     'ultra_plus': _PlanCopy(
-      price: '24.99€/mois',
+      price: '19.97€/mois',
       audience:
           'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
       features: [
