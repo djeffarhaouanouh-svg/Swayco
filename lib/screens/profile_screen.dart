@@ -1061,10 +1061,12 @@ class _PlansSectionState extends State<_PlansSection> {
         .toList(growable: false);
     if (upgrades.isEmpty) return const SizedBox.shrink();
 
-    // Default the highlighted card to the cheapest available upgrade
-    // (= the closest step up). Idempotent: re-runs only update when
-    // the selection is missing or no longer in the visible set.
-    final defaultSelected = upgrades.first;
+    // Default the highlighted card to the *top* upgrade in the visible
+    // set — i.e. Ultra Plus for a Free or Plus user. Anchoring the
+    // accent on the most premium option nudges conversion upward; the
+    // user can still tap Plus to claim the border. Falls back to the
+    // first upgrade if for some reason the top one isn't in the list.
+    final defaultSelected = upgrades.last;
     final effectiveSelected =
         (_selected != null && upgrades.contains(_selected!))
             ? _selected!
