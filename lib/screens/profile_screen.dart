@@ -420,126 +420,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     return DateTime.now().difference(ls) < const Duration(minutes: 2);
   }
 
-  Future<void> _upgradeToPremium() async {
-    // For now this just opens a confirmation sheet describing the offer.
-    // The actual IAP / receipt-validation hook will go here once App Store /
-    // Play Store products are wired up. No price is displayed on purpose —
-    // the storefront will be the source of truth.
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: WhatsAppCallTheme.bar,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          24 + MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text('💎', style: TextStyle(fontSize: 32)),
-                const SizedBox(width: 12),
-                Text(
-                  AppStrings.t('premium_title'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppStrings.t('premium_offer_label'),
-              style: const TextStyle(
-                color: WhatsAppCallTheme.accent,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _bullet(AppStrings.t('premium_bullet_minutes')),
-            const SizedBox(height: 8),
-            _bullet(AppStrings.t('premium_bullet_unlimited_calls')),
-            const SizedBox(height: 8),
-            _bullet(AppStrings.t('premium_bullet_priority')),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: WhatsAppCallTheme.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size.fromHeight(48),
-              ),
-              child: Text(
-                AppStrings.t('premium_continue'),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(AppStrings.t('cancel')),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (ok != true || _deviceId.isEmpty) return;
-    // TODO(billing): replace with real IAP receipt validation. For now we
-    // flip the flag directly so the rest of the UI can be developed end-to-end.
-    try {
-      await ProfileApi.activatePremiumWeek(_deviceId);
-      if (!mounted) return;
-      await _reload();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('premium_activated'))),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
-  Widget _bullet(String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 6),
-          child: Icon(Icons.check_circle,
-              color: WhatsAppCallTheme.accent, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: WhatsAppCallTheme.strongText,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _pickAndUploadDiscoverPhoto() async {
     if (_deviceId.isEmpty) return;
     if (!isSupabaseReady) {
@@ -853,14 +733,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   ),
                   if (!_isViewingOther) ...[
                     const SizedBox(height: 16),
-                    _CreditsCard(
-                      profile: _remote,
-                      onUpgrade: _remote != null &&
-                              !_remote!.isPro &&
-                              !kIsWeb
-                          ? _upgradeToPremium
-                          : null,
-                    ),
+                    _CreditsCard(profile: _remote),
                     const SizedBox(height: 16),
                     // Voice-clone card. Shown to ALL tiers when viewing
                     // your own profile — Ultra users get the recording
@@ -941,12 +814,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
 /// the fair-use cap (2000 crédits) exists to bound runaway billing,
 /// not to be displayed as a quota.
 class _CreditsCard extends StatelessWidget {
-  const _CreditsCard({required this.profile, required this.onUpgrade});
+  const _CreditsCard({required this.profile});
 
   final RemoteProfile? profile;
-
-  /// Null when the user is already on a paid tier (button is hidden).
-  final VoidCallback? onUpgrade;
 
   /// Per-tier monthly allotment used to compute the "low credits"
   /// warning threshold (we flash a hint at <20%). Mirrors the
@@ -1063,20 +933,6 @@ class _CreditsCard extends StatelessWidget {
                 color: Color(0xFFFFA726),
                 fontSize: 12,
                 height: 1.35,
-              ),
-            ),
-          ],
-          if (onUpgrade != null) ...[
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: onUpgrade,
-              icon: const Text('💎', style: TextStyle(fontSize: 14)),
-              label: Text(AppStrings.t('credits_upgrade_cta')),
-              style: FilledButton.styleFrom(
-                backgroundColor: WhatsAppCallTheme.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                minimumSize: const Size.fromHeight(40),
               ),
             ),
           ],

@@ -629,20 +629,4 @@ abstract final class ProfileApi {
     await _c.from('profiles').delete().eq('id', userId);
   }
 
-  /// Activate (or extend) Premium for [userId]. Stamps `pro_expires_at` 7
-  /// days out, flips `is_pro` true, refills credits to the Pro allotment.
-  ///
-  /// In production this should be called by the BACKEND after validating
-  /// an App Store / Play Store receipt — never trust the client. For now
-  /// it's wired so the UI can demo the upgrade flow.
-  static Future<void> activatePremiumWeek(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) return;
-    final until = DateTime.now().toUtc().add(creditsRefillPeriod);
-    await _c.from('profiles').update({
-      'is_pro': true,
-      'pro_expires_at': until.toIso8601String(),
-      'credits_seconds': proWeeklyCreditsSeconds,
-      'credits_reset_at': until.toIso8601String(),
-    }).eq('id', userId);
-  }
 }

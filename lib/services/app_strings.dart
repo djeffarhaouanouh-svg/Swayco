@@ -293,25 +293,10 @@ abstract final class AppStrings {
         'Tu pourras te reconnecter avec ton e-mail et ton mot de passe.',
     'cancel': 'Annuler',
 
-    'credits_free_title': 'Compte gratuit · 1h offerte / semaine',
-    'credits_pro_title': 'Compte Premium',
-    'credits_remaining': 'Crédits restants',
-    'credits_used_total': 'Temps total d\'appel',
-    'credits_upgrade_cta': 'Passer Premium',
     'credits_remaining_inline': '{count} crédits restants ce mois',
     'credits_unlimited': 'Traduction illimitée',
     'credits_low_hint':
         'Bientôt à court de crédits. Renouvellement le mois prochain — passe à un palier supérieur pour ne pas attendre.',
-    'premium_title': 'Premium',
-    'premium_offer_label': 'Premium hebdomadaire',
-    'premium_bullet_minutes':
-        '3 à 5 heures d\'appel traduit par semaine',
-    'premium_bullet_unlimited_calls':
-        'Appels illimités même sans traduction active',
-    'premium_bullet_priority':
-        'Qualité de traduction prioritaire et latence réduite',
-    'premium_continue': 'Continuer',
-    'premium_activated': '💎 Premium activé pour une semaine.',
     'credits_exhausted_banner':
         'Crédits épuisés — la traduction est désactivée, l\'appel continue.',
 
@@ -649,24 +634,10 @@ abstract final class AppStrings {
         'You can sign back in with your email and password.',
     'cancel': 'Cancel',
 
-    'credits_free_title': 'Free plan · 1h/week included',
-    'credits_pro_title': 'Premium account',
-    'credits_remaining': 'Credits left',
-    'credits_used_total': 'Total call time',
-    'credits_upgrade_cta': 'Go Premium',
     'credits_remaining_inline': '{count} credits left this month',
     'credits_unlimited': 'Unlimited translation',
     'credits_low_hint':
         'Running low. Refills next month — upgrade if you don\'t want to wait.',
-    'premium_title': 'Premium',
-    'premium_offer_label': 'Premium Weekly',
-    'premium_bullet_minutes': '3 to 5 hours of translated calls per week',
-    'premium_bullet_unlimited_calls':
-        'Unlimited calls even without active translation',
-    'premium_bullet_priority':
-        'Priority translation quality and lower latency',
-    'premium_continue': 'Continue',
-    'premium_activated': '💎 Premium activated for one week.',
     'credits_exhausted_banner':
         'Out of credits — translation is off, the call continues.',
 
