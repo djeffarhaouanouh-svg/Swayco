@@ -1070,24 +1070,49 @@ class _PlansSectionState extends State<_PlansSection> {
             ? _selected!
             : defaultSelected;
 
-    return Column(
-      children: [
-        for (var i = 0; i < upgrades.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
-          _PlanCard(
-            tier: upgrades[i],
-            name: _displayName(upgrades[i]),
-            price: _copy[upgrades[i]]!.price,
-            audience: _copy[upgrades[i]]!.audience,
-            features: _copy[upgrades[i]]!.features,
-            featured: effectiveSelected == upgrades[i],
-            // "Populaire" sits on the closest upgrade (highest
-            // conversion target for the user's current tier).
-            popularBadge: i == 0,
-            onTap: () => setState(() => _selected = upgrades[i]),
-          ),
-        ],
-      ],
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final cards = [
+          for (var i = 0; i < upgrades.length; i++)
+            _PlanCard(
+              tier: upgrades[i],
+              name: _displayName(upgrades[i]),
+              price: _copy[upgrades[i]]!.price,
+              audience: _copy[upgrades[i]]!.audience,
+              features: _copy[upgrades[i]]!.features,
+              featured: effectiveSelected == upgrades[i],
+              // "Populaire" sits on the closest upgrade (highest
+              // conversion target for the user's current tier).
+              popularBadge: i == 0,
+              onTap: () => setState(() => _selected = upgrades[i]),
+            ),
+        ];
+        // Wide layout: lay the upgrade tiers side-by-side so the user
+        // can compare them at a glance. Below ~720 px the cards would
+        // get crushed (the bullet list wraps awkwardly past 5+ items)
+        // so we fall back to the vertical stack at narrower widths
+        // and on mobile.
+        const wideBreakpoint = 720.0;
+        if (constraints.maxWidth >= wideBreakpoint && cards.length >= 2) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: 16),
+                Expanded(child: cards[i]),
+              ],
+            ],
+          );
+        }
+        return Column(
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              cards[i],
+            ],
+          ],
+        );
+      },
     );
   }
 
