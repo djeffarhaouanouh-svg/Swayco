@@ -48,6 +48,7 @@ COPY backend/server.js ./server.js
 COPY backend/notify.js ./notify.js
 COPY backend/stripe.js ./stripe.js
 COPY backend/analytics.js ./analytics.js
+COPY backend/tiers.js ./tiers.js
 COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.
