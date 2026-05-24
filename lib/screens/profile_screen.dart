@@ -1,11 +1,18 @@
 import 'dart:async';
+import 'dart:io' show File;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../services/voice_message_api.dart';
 
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
@@ -855,6 +862,22 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                           : null,
                     ),
                     const SizedBox(height: 16),
+                    // Ultra-only: enrol an ElevenLabs voice clone so
+                    // their outgoing voice messages get dubbed in their
+                    // own voice. Hidden for non-Ultra tiers (and when
+                    // viewing someone else's profile).
+                    if (!_isViewingOther && _remote?.isUltra == true) ...[
+                      _VoiceCloneCard(
+                        alreadyEnrolled: _remote!.hasClonedVoice,
+                        onEnrolled: () {
+                          // Refresh the remote profile so the badge
+                          // flips to "Voix clonée" without a manual
+                          // pull-to-refresh.
+                          unawaited(_reload(silent: true));
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _PlansSection(
                       currentTier: _remote?.subscriptionTier ?? 'free',
                     ),
@@ -2521,3 +2544,315 @@ class _GhostIconButton extends StatelessWidget {
   }
 }
 
+/// Ultra-only "Clone ma voix" card. Lets the user record ~30 s of
+/// audio, ships it to /voice/enroll and flips into a green
+/// "Voix clonée ✓" state once the backend confirms.
+///
+/// Tap to start recording → tap again to send → spinner while
+/// ElevenLabs processes → state updates. Re-enrolment is supported
+/// (record again to overwrite the stored voice_id; backend deletes the
+/// previous one to free the slot).
+class _VoiceCloneCard extends StatefulWidget {
+  const _VoiceCloneCard({
+    required this.alreadyEnrolled,
+    required this.onEnrolled,
+  });
+  final bool alreadyEnrolled;
+  final VoidCallback onEnrolled;
+
+  @override
+  State<_VoiceCloneCard> createState() => _VoiceCloneCardState();
+}
+
+class _VoiceCloneCardState extends State<_VoiceCloneCard> {
+  final AudioRecorder _recorder = AudioRecorder();
+  bool _recording = false;
+  bool _uploading = false;
+  DateTime? _recordStart;
+  Timer? _tick;
+  Duration _elapsed = Duration.zero;
+  /// Local override of [widget.alreadyEnrolled] for the moment between
+  /// a successful enrol and the parent's profile refetch landing.
+  bool _justEnrolled = false;
+
+  /// Recommended sample length for ElevenLabs IVC. Below 20 s the
+  /// clone quality drops sharply; above 60 s we hit the cap of the
+  /// per-recording quota and stop automatically.
+  static const Duration _maxSample = Duration(seconds: 60);
+  static const Duration _minSample = Duration(seconds: 20);
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    unawaited(() async {
+      try {
+        if (await _recorder.isRecording()) await _recorder.cancel();
+      } catch (_) {}
+      await _recorder.dispose();
+    }());
+    super.dispose();
+  }
+
+  Future<String> _recordingPath() async {
+    if (kIsWeb) return '';
+    final dir = await getTemporaryDirectory();
+    return '${dir.path}/voice_clone_${DateTime.now().millisecondsSinceEpoch}.m4a';
+  }
+
+  Future<void> _start() async {
+    if (_recording || _uploading) return;
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('voice_mic_denied'))),
+        );
+        return;
+      }
+      final path = await _recordingPath();
+      // Higher bitrate than chat messages: IVC quality is sensitive to
+      // compression artefacts. AAC 96 kbit/s mono 22 kHz is a good
+      // compromise that ElevenLabs handles cleanly.
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 96000,
+          sampleRate: 22050,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      _recordStart = DateTime.now();
+      _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        if (!mounted || _recordStart == null) return;
+        final el = DateTime.now().difference(_recordStart!);
+        if (el >= _maxSample) {
+          unawaited(_stopAndUpload());
+          return;
+        }
+        setState(() => _elapsed = el);
+      });
+      setState(() {
+        _recording = true;
+        _elapsed = Duration.zero;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur micro: $e')),
+      );
+    }
+  }
+
+  Future<void> _cancel() async {
+    if (!_recording) return;
+    _tick?.cancel();
+    try {
+      await _recorder.cancel();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _recording = false;
+        _elapsed = Duration.zero;
+        _recordStart = null;
+      });
+    }
+  }
+
+  Future<void> _stopAndUpload() async {
+    if (!_recording) return;
+    _tick?.cancel();
+    final ms = _elapsed.inMilliseconds;
+    String? out;
+    try {
+      out = await _recorder.stop();
+    } catch (_) {
+      out = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _recording = false;
+      _elapsed = Duration.zero;
+      _recordStart = null;
+    });
+    if (out == null) return;
+    if (ms < _minSample.inMilliseconds) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('voice_clone_too_short'))),
+      );
+      return;
+    }
+    Uint8List bytes;
+    try {
+      if (kIsWeb) {
+        final res = await http.get(Uri.parse(out));
+        bytes = res.bodyBytes;
+      } else {
+        bytes = await File(out).readAsBytes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lecture audio échouée: $e')),
+        );
+      }
+      return;
+    }
+    if (bytes.isEmpty) return;
+    setState(() => _uploading = true);
+    try {
+      await enrollClonedVoice(
+        audioBytes: bytes,
+        mimeType: kIsWeb ? 'audio/webm' : 'audio/m4a',
+      );
+      if (!mounted) return;
+      setState(() => _justEnrolled = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('voice_clone_success'))),
+      );
+      widget.onEnrolled();
+    } on VoiceEnrollException catch (e) {
+      if (!mounted) return;
+      final msg = e.code == VoiceEnrollError.upgradeRequired
+          ? AppStrings.t('voice_clone_ultra_only')
+          : AppStrings.t('voice_clone_failed');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('voice_clone_failed'))),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enrolled = widget.alreadyEnrolled || _justEnrolled;
+    final secs = _elapsed.inSeconds;
+    final m = (secs ~/ 60).toString().padLeft(1, '0');
+    final s = (secs % 60).toString().padLeft(2, '0');
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: WhatsAppCallTheme.bar,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: enrolled
+              ? WhatsAppCallTheme.accent
+              : const Color(0xFF2A3942),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                enrolled ? Icons.check_circle : Icons.mic_none,
+                color: enrolled
+                    ? WhatsAppCallTheme.accent
+                    : WhatsAppCallTheme.strongText,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  enrolled
+                      ? AppStrings.t('voice_clone_enrolled_title')
+                      : AppStrings.t('voice_clone_title'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            enrolled
+                ? AppStrings.t('voice_clone_enrolled_subtitle')
+                : AppStrings.t('voice_clone_subtitle'),
+            style: const TextStyle(
+              color: WhatsAppCallTheme.subtleText,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_recording)
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE53935),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$m:$s',
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _cancel,
+                  child: Text(AppStrings.t('cancel')),
+                ),
+                const SizedBox(width: 4),
+                FilledButton(
+                  onPressed: _stopAndUpload,
+                  child: Text(AppStrings.t('voice_clone_send')),
+                ),
+              ],
+            )
+          else if (_uploading)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: WhatsAppCallTheme.accent,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  AppStrings.t('voice_clone_processing'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.subtleText,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _start,
+                icon: const Icon(Icons.mic, size: 18),
+                label: Text(
+                  enrolled
+                      ? AppStrings.t('voice_clone_redo')
+                      : AppStrings.t('voice_clone_start'),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

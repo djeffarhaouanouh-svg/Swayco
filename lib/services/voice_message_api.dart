@@ -20,6 +20,7 @@ class VoiceMessageException implements Exception {
 
 Uri _voiceMessagesUri() => _backendUri('/messages/voice');
 Uri _voiceDubUri() => _backendUri('/voice/dub');
+Uri _voiceEnrollUri() => _backendUri('/voice/enroll');
 
 Uri _backendUri(String path) {
   const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
@@ -212,4 +213,74 @@ Future<VoiceDubResult> fetchVoiceDub({
     audioUrl: decoded['audioUrl'] as String,
     cached: decoded['cached'] == true,
   );
+}
+
+/// Specific error reasons surfaced by /voice/enroll. Maps 1-to-1 to the
+/// snackbar copy the profile card shows when the call fails.
+enum VoiceEnrollError { upgradeRequired, audioMissing, other }
+
+class VoiceEnrollException implements Exception {
+  VoiceEnrollException(this.code, this.message, {this.statusCode});
+  final VoiceEnrollError code;
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() => 'VoiceEnrollException($code/$statusCode): $message';
+}
+
+/// Send a ~30-60 s audio sample to the backend, which forwards it to
+/// ElevenLabs Instant Voice Cloning and stores the returned voice_id
+/// onto `profiles.elevenlabs_voice_id`. After this succeeds, the
+/// caller's outgoing voice messages will be dubbed in their own voice
+/// the next time an Ultra listener hits /voice/dub on them.
+///
+/// Returns the newly-stored voice_id so the profile UI can flip into
+/// its "voix clonée" state without a round-trip to refresh the row.
+Future<String> enrollClonedVoice({
+  required Uint8List audioBytes,
+  required String mimeType,
+}) async {
+  if (audioBytes.isEmpty) {
+    throw VoiceEnrollException(VoiceEnrollError.audioMissing, 'empty audio');
+  }
+  final session = Supabase.instance.client.auth.currentSession;
+  final accessToken = session?.accessToken;
+  if (accessToken == null || accessToken.isEmpty) {
+    throw VoiceEnrollException(VoiceEnrollError.other, 'not authenticated',
+        statusCode: 401);
+  }
+  final filename = (() {
+    if (mimeType.contains('webm')) return 'enroll.webm';
+    if (mimeType.contains('mpeg') || mimeType.contains('mp3')) return 'enroll.mp3';
+    if (mimeType.contains('wav')) return 'enroll.wav';
+    return 'enroll.m4a';
+  })();
+
+  final req = http.MultipartRequest('POST', _voiceEnrollUri());
+  req.headers['Authorization'] = 'Bearer $accessToken';
+  req.files.add(
+    http.MultipartFile.fromBytes('audio', audioBytes, filename: filename),
+  );
+  final streamed = await req.send();
+  final res = await http.Response.fromStream(streamed);
+  if (res.statusCode == 402) {
+    throw VoiceEnrollException(
+      VoiceEnrollError.upgradeRequired,
+      'ultra tier required',
+      statusCode: 402,
+    );
+  }
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw VoiceEnrollException(
+      VoiceEnrollError.other,
+      res.body.length > 400 ? '${res.body.substring(0, 400)}…' : res.body,
+      statusCode: res.statusCode,
+    );
+  }
+  final decoded = jsonDecode(res.body);
+  if (decoded is! Map || decoded['voiceId'] is! String) {
+    throw VoiceEnrollException(VoiceEnrollError.other, 'unexpected response shape');
+  }
+  return decoded['voiceId'] as String;
 }

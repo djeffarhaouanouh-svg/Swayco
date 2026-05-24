@@ -371,6 +371,22 @@ abstract final class AppStrings {
     'voice_dub_quota':
         'Quota de doublages atteint pour ce mois. Repasse plus tard ou monte en Pro.',
     'voice_dub_failed': 'Doublage indisponible, réessaie dans un instant.',
+    // Ultra voice-clone enrolment card.
+    'voice_clone_title': 'Cloner ma voix',
+    'voice_clone_subtitle':
+        'Enregistre 30 secondes de ta voix. Tes messages vocaux seront ensuite doublés dans TA voix pour les utilisateurs Ultra.',
+    'voice_clone_start': 'Enregistrer',
+    'voice_clone_redo': 'Refaire',
+    'voice_clone_send': 'Envoyer',
+    'voice_clone_processing': 'Clonage en cours…',
+    'voice_clone_success': 'Voix clonée ! 🎙',
+    'voice_clone_too_short': 'Il faut au moins 20 secondes pour cloner.',
+    'voice_clone_failed': 'Clonage échoué, réessaie dans un instant.',
+    'voice_clone_ultra_only':
+        'Le clonage est réservé aux abonnés Ultra.',
+    'voice_clone_enrolled_title': 'Voix clonée',
+    'voice_clone_enrolled_subtitle':
+        'Tes messages vocaux sont désormais doublés dans ta voix pour les Ultras. Recommence à tout moment pour mettre à jour la clone.',
 
     'join_title': 'Rejoindre une room',
     'join_desc':
@@ -702,6 +718,21 @@ abstract final class AppStrings {
     'voice_dub_quota':
         'Monthly translation cap reached. Come back later or upgrade to Pro.',
     'voice_dub_failed': 'Translation playback unavailable, try again.',
+    // Ultra voice-clone enrolment card.
+    'voice_clone_title': 'Clone my voice',
+    'voice_clone_subtitle':
+        'Record 30 seconds of yourself talking. Your voice messages will then be dubbed in YOUR voice for Ultra listeners.',
+    'voice_clone_start': 'Record',
+    'voice_clone_redo': 'Redo',
+    'voice_clone_send': 'Send',
+    'voice_clone_processing': 'Cloning…',
+    'voice_clone_success': 'Voice cloned! 🎙',
+    'voice_clone_too_short': 'You need at least 20 seconds to clone.',
+    'voice_clone_failed': 'Cloning failed, please try again.',
+    'voice_clone_ultra_only': 'Voice cloning is reserved for Ultra subscribers.',
+    'voice_clone_enrolled_title': 'Voice cloned',
+    'voice_clone_enrolled_subtitle':
+        'Your voice messages are now dubbed in your own voice for Ultra listeners. Re-record any time to refresh the clone.',
 
     'join_title': 'Join a room',
     'join_desc':

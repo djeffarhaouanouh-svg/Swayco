@@ -35,6 +35,7 @@ class RemoteProfile {
     this.hideOnlineStatus = false,
     this.isPro = false,
     this.subscriptionTier = 'free',
+    this.elevenlabsVoiceId = '',
     this.creditsSeconds = freeWeeklyCreditsSeconds,
     this.creditsResetAt,
     this.lifetimeCallSeconds = 0,
@@ -92,6 +93,16 @@ class RemoteProfile {
   /// True when this user's tier unlocks /voice/dub — i.e. anything
   /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
   bool get canDubAudio => isPlus;
+
+  /// ElevenLabs voice id from the user's own Instant Voice Clone.
+  /// Populated by /voice/enroll. Empty until enrolled. Only ever
+  /// non-empty for Ultra subscribers — the backend gates enrolment on
+  /// tier so this field stays empty for everyone else.
+  final String elevenlabsVoiceId;
+
+  /// True when this user has already enrolled their voice clone.
+  /// Drives the profile card's "Voix clonée" badge vs. the CTA.
+  bool get hasClonedVoice => elevenlabsVoiceId.isNotEmpty;
 
   /// Translation credit remaining in seconds. Decremented during calls; the
   /// translation pipeline disables itself when this hits 0 but the underlying
@@ -151,6 +162,7 @@ class RemoteProfile {
           final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
           return (t == 'plus' || t == 'pro' || t == 'ultra') ? t : 'free';
         }(),
+        elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
         creditsSeconds:
             _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
         creditsResetAt: _parseDate(m['credits_reset_at']),

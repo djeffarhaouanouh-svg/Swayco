@@ -1179,6 +1179,162 @@ app.post('/voice/dub', async (req, res) => {
   return res.json({ audioUrl, cached: false });
 });
 
+/**
+ * POST /voice/enroll   (multipart/form-data)
+ *
+ * Fields:
+ *   audio  — ~30-60 s of clean speech from the caller
+ *
+ * Auth:   Bearer <Supabase JWT>
+ * Gate:   featuresFor(tier).voiceClone === true  (Ultra only)
+ *
+ * Flow:
+ *   1. Build a multipart POST to ElevenLabs `/v1/voices/add` (Instant
+ *      Voice Cloning). IVC is included in the plan — no per-clone
+ *      charge — but the account has a finite number of voice slots,
+ *      so we gate strictly on Ultra so the slots scale with revenue.
+ *   2. If the caller already enrolled before, DELETE the previous
+ *      voice first so we don't leak slots on re-enrolment.
+ *   3. Write the returned voice_id onto profiles.elevenlabs_voice_id.
+ *      From then on the user's outgoing voice messages get dubbed with
+ *      this voice when an Ultra listener taps "Écouter la traduction".
+ *
+ * Returns: { voiceId }
+ */
+app.post('/voice/enroll', voiceUpload.single('audio'), async (req, res) => {
+  if (!ELEVENLABS_API_KEY) {
+    return res.status(500).json({ error: 'elevenlabs_not_configured' });
+  }
+  const sb = supabase();
+  if (!sb) {
+    return res.status(500).json({ error: 'supabase_not_configured' });
+  }
+  const uid = await stripeAuthUserId(req);
+  if (!uid) {
+    return res.status(401).json({ error: 'unauthenticated' });
+  }
+  const file = req.file;
+  if (!file || !file.buffer || file.buffer.length === 0) {
+    return res.status(400).json({ error: 'audio_missing' });
+  }
+
+  const { data: profile, error: profErr } = await sb
+    .from('profiles')
+    .select('subscription_tier, display_name, elevenlabs_voice_id')
+    .eq('id', uid)
+    .maybeSingle();
+  if (profErr || !profile) {
+    return res.status(404).json({ error: 'profile_not_found' });
+  }
+  const tier = normalizeTier(profile.subscription_tier);
+  if (!featuresFor(tier).voiceClone) {
+    return res.status(402).json({ error: 'upgrade_required', minTier: 'ultra' });
+  }
+
+  // 1) Best-effort delete of the previous clone — never blocks the
+  //    re-enrolment. If the old voice was already removed manually on
+  //    the ElevenLabs side, the DELETE 404s and we just move on.
+  const previousVoiceId =
+    typeof profile.elevenlabs_voice_id === 'string'
+      ? profile.elevenlabs_voice_id.trim()
+      : '';
+  if (previousVoiceId) {
+    try {
+      await fetch(`https://api.elevenlabs.io/v1/voices/${previousVoiceId}`, {
+        method: 'DELETE',
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      });
+    } catch (e) {
+      console.error('elevenlabs delete previous voice', e);
+    }
+  }
+
+  // 2) Add the new voice. ElevenLabs needs at least one audio file and
+  //    a voice name; the name is internal — we tag it with the user id
+  //    so support / dashboard queries can map back to a Supabase row.
+  const ext = (() => {
+    const m = (file.mimetype || '').toLowerCase();
+    if (m.includes('webm')) return 'webm';
+    if (m.includes('mpeg') || m.includes('mp3')) return 'mp3';
+    if (m.includes('wav')) return 'wav';
+    return 'm4a';
+  })();
+  const displayName =
+    (typeof profile.display_name === 'string' ? profile.display_name : '')
+      .trim()
+      .slice(0, 40);
+  const voiceName = `user_${uid.slice(0, 8)}${displayName ? `_${displayName}` : ''}`;
+
+  let voiceId;
+  try {
+    const form = new FormData();
+    form.append('name', voiceName);
+    form.append('description', 'Swayco user-cloned voice (Ultra tier)');
+    form.append(
+      'files',
+      new Blob([file.buffer], { type: file.mimetype || 'audio/m4a' }),
+      `enroll.${ext}`,
+    );
+    const r = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+      method: 'POST',
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      body: form,
+    });
+    const body = await r.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (_) {
+      console.error('elevenlabs add parse', body.slice(0, 200));
+      return res.status(502).json({ error: 'elevenlabs_bad_response' });
+    }
+    if (!r.ok) {
+      console.error('elevenlabs add', r.status, parsed);
+      return res
+        .status(502)
+        .json({ error: 'enroll_failed', detail: parsed });
+    }
+    voiceId =
+      typeof parsed.voice_id === 'string' ? parsed.voice_id.trim() : '';
+    if (!voiceId) {
+      return res.status(502).json({ error: 'no_voice_id' });
+    }
+  } catch (e) {
+    console.error('elevenlabs add throw', e);
+    return res.status(502).json({ error: 'elevenlabs_unreachable' });
+  }
+
+  // 3) Persist the voice_id. Failure here is fatal for the feature —
+  //    the voice slot is occupied on ElevenLabs but the app would not
+  //    know to use it — surface the error so the caller can retry.
+  try {
+    const { error: upErr } = await sb
+      .from('profiles')
+      .update({ elevenlabs_voice_id: voiceId })
+      .eq('id', uid);
+    if (upErr) {
+      console.error('voice id persist', upErr);
+      return res
+        .status(502)
+        .json({ error: 'profile_update_failed', detail: upErr.message });
+    }
+  } catch (e) {
+    console.error('voice id persist throw', e);
+    return res.status(502).json({ error: 'profile_update_failed' });
+  }
+
+  track({
+    event: 'voice_enroll',
+    props: {
+      tier,
+      bytes: file.buffer.length,
+      reenroll: Boolean(previousVoiceId),
+    },
+  });
+
+  return res.json({ voiceId });
+});
+
 // Stripe Checkout — body: { tier: 'plus' | 'pro' | 'ultra' }. Authorization
 // must carry the caller's Supabase JWT; the user_id is read from
 // the verified token, never from the request body.
