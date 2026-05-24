@@ -485,9 +485,23 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildStack() {
+    // Desktop / wide-web layout — without this the card stretches to
+    // the full viewport width (e.g. 1900 × 800) and BoxFit.cover crops
+    // the portrait photo down to a slice of the face. Cap at 460 wide
+    // and force a 3:4 portrait aspect ratio so the image always
+    // renders the way the photographer framed it.
+    //
+    // On phones the screen is narrower than the cap, so this is a
+    // no-op for mobile builds; the AspectRatio just centres the card
+    // vertically when the available height exceeds 4/3 of the width.
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: LayoutBuilder(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: AspectRatio(
+            aspectRatio: 3 / 4,
+            child: LayoutBuilder(
         builder: (ctx, constraints) {
           _cardSize = Size(constraints.maxWidth, constraints.maxHeight);
           final w = _cardSize.width;
@@ -542,6 +556,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             ],
           );
         },
+            ),
+          ),
+        ),
       ),
     );
   }
