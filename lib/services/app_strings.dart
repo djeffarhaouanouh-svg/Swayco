@@ -227,6 +227,9 @@ abstract final class AppStrings {
     'call_could_not_join': 'Connexion impossible',
     'call_go_back': 'Retour',
     'call_connecting': 'Connexion à {room}…',
+    'call_connecting_short': 'Connexion à l\'appel…',
+    'call_connecting_caller_pays':
+        'Seul l\'appelant utilise ses crédits de traduction pendant l\'appel.',
     'call_waiting_title': 'En attente de l’autre personne…',
     'call_waiting_body': 'Partage le même nom de salle sur un autre appareil.',
     'call_leave_q': 'Quitter l’appel ?',
@@ -572,6 +575,9 @@ abstract final class AppStrings {
     'call_could_not_join': 'Could not join',
     'call_go_back': 'Go back',
     'call_connecting': 'Connecting to {room}…',
+    'call_connecting_short': 'Connecting to call…',
+    'call_connecting_caller_pays':
+        'Only the caller uses translation credits during the call.',
     'call_waiting_title': 'Waiting for the other person…',
     'call_waiting_body': 'Share the same room name on another device.',
     'call_leave_q': 'Leave call?',

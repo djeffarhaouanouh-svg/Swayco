@@ -650,30 +650,59 @@ class _CallScreenState extends State<CallScreen> {
     }
 
     if (_connecting || _room == null) {
+      // Splash-style connecting state. Showing the room name + a bare
+      // spinner during LiveKit's handshake felt clinical and gave the
+      // caller no signal about the credit deduction — switch to the
+      // app's splash image with a single one-liner hint clarifying
+      // that only the caller's monthly credits are debited (the peer
+      // listens free). Keeps the spinner so the user still has motion
+      // feedback that something is happening.
       return Scaffold(
         backgroundColor: WhatsAppCallTheme.scaffold,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                height: 40,
-                width: 40,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: WhatsAppCallTheme.accent,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Image.asset(
+                      'assets/test-splashscreen.png',
+                      width: 220,
+                      height: 220,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                AppStrings.t('call_connecting',
-                    args: {'room': widget.roomName}),
-                style: const TextStyle(
-                  color: WhatsAppCallTheme.subtleText,
-                  fontSize: 15,
+                const SizedBox(
+                  height: 28,
+                  width: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: WhatsAppCallTheme.accent,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  AppStrings.t('call_connecting_short'),
+                  style: const TextStyle(
+                    color: WhatsAppCallTheme.strongText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppStrings.t('call_connecting_caller_pays'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: WhatsAppCallTheme.subtleText,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
