@@ -38,11 +38,6 @@ class GlassNavBar extends StatelessWidget {
         selectedIcon: Icons.manage_search,
         label: AppStrings.t('nav_search'),
       ),
-      const _NavItemData(
-        icon: Icons.public,
-        selectedIcon: Icons.travel_explore,
-        label: 'Live',
-      ),
       _NavItemData(
         icon: Icons.person_outline,
         selectedIcon: Icons.person,

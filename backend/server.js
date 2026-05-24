@@ -10,7 +10,7 @@ const multer = require('multer');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
-const { notifyUser, broadcastLiveCall } = require('./notify');
+const { notifyUser } = require('./notify');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
   authUserId: stripeAuthUserId,
@@ -1382,32 +1382,6 @@ app.post('/api/notify', async (req, res) => {
   } catch (e) {
     console.error('/api/notify error', e);
     return res.status(500).json({ error: 'notify_failed' });
-  }
-});
-
-// "Someone is live" re-engagement fan-out. Called by the app when a user
-// enters the live-call queue with nobody to pair with. Throttled two
-// ways so it can never spam:
-//   * global cooldown — at most one batch per LIVE_BROADCAST_COOLDOWN_MS,
-//   * per recipient — at most one push per 24h (see notify.js).
-// Requires the caller's Supabase JWT; their uid is excluded from the
-// fan-out (no point notifying the host of their own call).
-let lastLiveBroadcast = 0;
-const LIVE_BROADCAST_COOLDOWN_MS = 15 * 60 * 1000;
-app.post('/api/notify-live', async (req, res) => {
-  const uid = await stripeAuthUserId(req);
-  if (!uid) return res.status(401).json({ error: 'unauthenticated' });
-  const now = Date.now();
-  if (now - lastLiveBroadcast < LIVE_BROADCAST_COOLDOWN_MS) {
-    return res.json({ skipped: 'cooldown' });
-  }
-  lastLiveBroadcast = now;
-  try {
-    const out = await broadcastLiveCall(uid);
-    return res.json(out);
-  } catch (e) {
-    console.error('/api/notify-live error', e);
-    return res.status(500).json({ error: 'broadcast_failed' });
   }
 });
 

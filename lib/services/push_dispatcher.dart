@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 
@@ -65,31 +64,4 @@ abstract final class PushDispatcher {
     }
   }
 
-  /// Ask the backend to fan out a "someone is live" re-engagement push
-  /// to other users. Called when a user enters the live-call queue with
-  /// nobody to pair with.
-  ///
-  /// Spam-proof by construction: the backend applies a global cooldown
-  /// AND a per-recipient 24h throttle, so no user can ever receive more
-  /// than one of these per day. Fire-and-forget; needs a signed-in
-  /// session (the route is JWT-gated).
-  static Future<void> broadcastLiveCall() async {
-    try {
-      final token =
-          Supabase.instance.client.auth.currentSession?.accessToken;
-      if (token == null || token.isEmpty) return;
-      await http
-          .post(
-            _apiUri('/api/notify-live'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: '{}',
-          )
-          .timeout(const Duration(seconds: 6));
-    } catch (e) {
-      debugPrint('PushDispatcher.broadcastLiveCall failed: $e');
-    }
-  }
 }

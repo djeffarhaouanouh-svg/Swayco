@@ -22,7 +22,6 @@ import '../widgets/profile_avatar.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'discover_screen.dart';
-import 'live_call_screen.dart';
 import 'profile_screen.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
@@ -37,12 +36,9 @@ class RootShell extends StatefulWidget {
 }
 
 class _RootShellState extends State<RootShell> {
-  // Tab order: Chat (0), Discover (1), Live (2), Profile (3). Discover is
-  // the default landing tab. The selected index lives in the shared
+  // Tab order: Chat (0), Discover (1), Profile (2). Discover is the
+  // default landing tab. The selected index lives in the shared
   // [NavTab] notifier so screens pushed on top of the shell can drive it.
-  // The pages list is rebuilt every frame in build() so the Live tab can
-  // be told whether it is currently visible (it holds the camera only
-  // while on screen).
 
   RealtimeChannel? _callsChannel;
   bool _ringingDialogOpen = false;
@@ -78,13 +74,14 @@ class _RootShellState extends State<RootShell> {
     final intent = NotificationRouter.pending.value;
     if (intent == null || !mounted) return;
     switch (intent.type) {
-      case 'live_call':
-        NavTab.select(NavTab.live);
       case 'message':
         NavTab.select(NavTab.chat);
         ChatUnread.markAllSeen();
       // 'incoming_call' needs no routing — the ring modal is shown by
       // the realtime subscription / poll whatever tab is open.
+      // 'live_call' was the broadcast notification from the deleted
+      // Random-call lobby; ignored if it still lands from a stale
+      // push payload.
     }
     NotificationRouter.consume();
   }
@@ -289,10 +286,6 @@ class _RootShellState extends State<RootShell> {
             final pages = <Widget>[
               ChatScreen(translation: widget.translation),
               const DiscoverScreen(),
-              LiveCallScreen(
-                active: index == NavTab.live,
-                translation: widget.translation,
-              ),
               const ProfileScreen(),
             ];
             return Stack(
