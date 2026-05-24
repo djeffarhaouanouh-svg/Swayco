@@ -236,15 +236,18 @@ class _RootShellState extends State<RootShell> {
     _tipBusy = false;
   }
 
-  /// First-visit hint on the Profile tab, pointing at the add-photo card.
-  /// Same one-shot guarantee: the flag is persisted before the dialog.
+  /// Photo-nudge on the Profile tab. Shows on EVERY navigation into
+  /// the Profile tab — and stops showing entirely once the user has
+  /// actually uploaded a Discover photo. (The legacy one-shot
+  /// `isProfileTipSeen` flag is no longer read; the discover-photo
+  /// presence is the source of truth.) Re-fires only on tab-change
+  /// events (NavTab.index listener), so a user who stays on the
+  /// profile tab does not get the dialog re-shown.
   Future<void> _maybeShowProfileTip() async {
     if (_tipBusy || !mounted) return;
-    if (await UserPrefs.isProfileTipSeen() || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
-    await UserPrefs.markProfileTipSeen();
-    if (!mounted || NavTab.index.value != NavTab.profile) return;
     if (await _hasDiscoverPhoto() || !mounted) return;
+    if (NavTab.index.value != NavTab.profile) return;
     _tipBusy = true;
     await _showTip(
       icon: Icons.add_a_photo_rounded,
