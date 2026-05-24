@@ -11,8 +11,8 @@ import 'supabase_service.dart';
 /// constants exist so the local UI can pre-render a refill without
 /// waiting on the network.
 const int freeMonthlyCreditsSeconds = 75 * 60;          // 75 crédits / mois
-const int plusMonthlyCreditsSeconds = 300 * 60;         // 300 crédits / mois
-const int ultraPlusMonthlyCreditsSeconds = 2000 * 60;   // 2000 crédits / mois (fair use)
+const int plusMonthlyCreditsSeconds = 360 * 60;         // 360 crédits / mois (6 h)
+const int ultraPlusMonthlyCreditsSeconds = 1300 * 60;   // 1300 crédits / mois ≈ 5 h / semaine (cap fair-use)
 
 /// Legacy alias kept so older call sites that still read this name
 /// keep compiling during the rename. New code should use the

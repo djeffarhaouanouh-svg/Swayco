@@ -43,20 +43,20 @@ const FEATURES = Object.freeze({
     voiceClone: false,
   }),
   plus: Object.freeze({
-    monthlySeconds: 300 * 60,         // 300 crédits / mois (5 h)
+    monthlySeconds: 360 * 60,         // 360 crédits / mois (6 h)
     voiceDub: 'generic',
     voiceDubsPerMonth: 60,            // cap matches the "60 vocaux/mois"
                                       // promise on the marketing card.
     voiceClone: false,
   }),
   ultra_plus: Object.freeze({
-    monthlySeconds: 2000 * 60,        // 2000 crédits / mois fair-use cap.
-                                      // Marketing copy advertises Ultra
-                                      // Plus as "Illimité"; the soft cap
-                                      // exists only to bound runaway
-                                      // OpenAI billing on a compromised
-                                      // account, not to ration honest
-                                      // power users.
+    monthlySeconds: 1300 * 60,        // 1300 crédits / mois ≈ 5 h / week
+                                      // fair-use cap. Marketing copy
+                                      // advertises Ultra Plus as
+                                      // "Illimité"; the cap exists to
+                                      // bound runaway OpenAI billing on
+                                      // a compromised account, not to
+                                      // ration honest power users.
     voiceDub: 'cloned',
     voiceDubsPerMonth: Infinity,
     voiceClone: true,

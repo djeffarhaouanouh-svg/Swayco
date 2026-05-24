@@ -1030,13 +1030,10 @@ class _PlansSectionState extends State<_PlansSection> {
     'plus': _PlanCopy(
       price: '9.97€/mois',
       audience:
-          'Pour découvrir, dater, swiper sans limite et écouter la traduction des messages vocaux.',
+          'Pour écouter la traduction des messages vocaux et débloquer plus de traductions live.',
       features: [
-        '300 crédits de traduction',
+        '360 crédits de traduction (≈ 6 h / mois)',
         'doublage audio des messages vocaux',
-        'voir qui t\'a liké',
-        'swipes illimités',
-        '1 boost / semaine',
       ],
     ),
     'ultra_plus': _PlanCopy(
@@ -1046,10 +1043,6 @@ class _PlansSectionState extends State<_PlansSection> {
       features: [
         'Traduction illimitée',
         'doublage avec TA voix clonée',
-        'top placement Discover',
-        'voix premium ElevenLabs',
-        '5 boosts / semaine',
-        'filtres avancés',
       ],
     ),
   };
