@@ -862,13 +862,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                           : null,
                     ),
                     const SizedBox(height: 16),
-                    // Ultra-only: enrol an ElevenLabs voice clone so
-                    // their outgoing voice messages get dubbed in their
-                    // own voice. Hidden for non-Ultra tiers (and when
-                    // viewing someone else's profile).
-                    if (!_isViewingOther && _remote?.isUltra == true) ...[
+                    // Voice-clone card. Shown to ALL tiers when viewing
+                    // your own profile — Ultra users get the recording
+                    // flow, everyone else gets a locked state that
+                    // points at the Ultra checkout. The visible "🔒
+                    // Réservé Ultra" hint is a deliberate upsell hook;
+                    // hiding the feature for non-Ultra would forfeit
+                    // the conversion event.
+                    if (!_isViewingOther) ...[
                       _VoiceCloneCard(
-                        alreadyEnrolled: _remote!.hasClonedVoice,
+                        isUltra: _remote?.isUltra == true,
+                        alreadyEnrolled: _remote?.hasClonedVoice == true,
                         onEnrolled: () {
                           // Refresh the remote profile so the badge
                           // flips to "Voix clonée" without a manual
@@ -2554,9 +2558,14 @@ class _GhostIconButton extends StatelessWidget {
 /// previous one to free the slot).
 class _VoiceCloneCard extends StatefulWidget {
   const _VoiceCloneCard({
+    required this.isUltra,
     required this.alreadyEnrolled,
     required this.onEnrolled,
   });
+  /// When false, the card renders a locked state with a "Passer Ultra"
+  /// CTA instead of the recording controls — non-Ultra tiers still
+  /// see the feature exists so it acts as an upsell.
+  final bool isUltra;
   final bool alreadyEnrolled;
   final VoidCallback onEnrolled;
 
@@ -2727,8 +2736,32 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
     }
   }
 
+  Future<void> _openUltraCheckout() async {
+    if (_uploading) return;
+    setState(() => _uploading = true);
+    try {
+      final url = await StripeApi.startCheckout('ultra');
+      if (!mounted) return;
+      if (url == null || url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('voice_clone_failed'))),
+        );
+        return;
+      }
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('voice_clone_failed'))),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final locked = !widget.isUltra;
     final enrolled = widget.alreadyEnrolled || _justEnrolled;
     final secs = _elapsed.inSeconds;
     final m = (secs ~/ 60).toString().padLeft(1, '0');
@@ -2750,10 +2783,14 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
           Row(
             children: [
               Icon(
-                enrolled ? Icons.check_circle : Icons.mic_none,
-                color: enrolled
-                    ? WhatsAppCallTheme.accent
-                    : WhatsAppCallTheme.strongText,
+                locked
+                    ? Icons.lock_outline
+                    : (enrolled ? Icons.check_circle : Icons.mic_none),
+                color: locked
+                    ? WhatsAppCallTheme.subtleText
+                    : (enrolled
+                        ? WhatsAppCallTheme.accent
+                        : WhatsAppCallTheme.strongText),
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -2769,6 +2806,23 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
                   ),
                 ),
               ),
+              if (locked)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: WhatsAppCallTheme.accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    AppStrings.t('voice_clone_ultra_badge'),
+                    style: const TextStyle(
+                      color: WhatsAppCallTheme.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -2783,7 +2837,27 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_recording)
+          if (locked)
+            // Locked state: skip the recording flow entirely and offer
+            // a single CTA that drops the user into the Ultra checkout.
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _uploading ? null : _openUltraCheckout,
+                icon: _uploading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.bolt, size: 18),
+                label: Text(AppStrings.t('voice_clone_unlock')),
+              ),
+            )
+          else if (_recording)
             Row(
               children: [
                 Container(

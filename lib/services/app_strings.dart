@@ -387,6 +387,8 @@ abstract final class AppStrings {
     'voice_clone_enrolled_title': 'Voix clonée',
     'voice_clone_enrolled_subtitle':
         'Tes messages vocaux sont désormais doublés dans ta voix pour les Ultras. Recommence à tout moment pour mettre à jour la clone.',
+    'voice_clone_ultra_badge': 'ULTRA',
+    'voice_clone_unlock': 'Débloquer avec Ultra',
 
     'join_title': 'Rejoindre une room',
     'join_desc':
@@ -733,6 +735,8 @@ abstract final class AppStrings {
     'voice_clone_enrolled_title': 'Voice cloned',
     'voice_clone_enrolled_subtitle':
         'Your voice messages are now dubbed in your own voice for Ultra listeners. Re-record any time to refresh the clone.',
+    'voice_clone_ultra_badge': 'ULTRA',
+    'voice_clone_unlock': 'Unlock with Ultra',
 
     'join_title': 'Join a room',
     'join_desc':
