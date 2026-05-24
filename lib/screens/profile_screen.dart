@@ -332,9 +332,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   }
 
   Future<void> _openFriendsList(FriendDirection direction) async {
+    // On someone else's profile, tap their follower / following count
+    // → show THEIR list, not mine. _targetId resolves to the peer's
+    // id in viewer mode and falls back to the local device id on the
+    // user's own profile.
+    final targetId = _isViewingOther ? widget.userId : null;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => FriendsListScreen(direction: direction),
+        builder: (_) => FriendsListScreen(
+          direction: direction,
+          userId: targetId,
+        ),
       ),
     );
     // Counts may have changed (follow-back).

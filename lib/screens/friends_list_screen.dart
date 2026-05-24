@@ -17,9 +17,19 @@ import 'profile_screen.dart';
 /// followers, a "S'abonner" button appears for anyone the user does not
 /// already follow back, so the relation can be made mutual in one tap.
 class FriendsListScreen extends StatefulWidget {
-  const FriendsListScreen({super.key, required this.direction});
+  const FriendsListScreen({
+    super.key,
+    required this.direction,
+    this.userId,
+  });
 
   final FriendDirection direction;
+
+  /// When set, list the followers / following of THIS user instead of
+  /// the local user. Used when opening the screen from someone else's
+  /// profile so tapping their follower count actually shows their
+  /// followers, not yours. Null → defaults to the device's own id.
+  final String? userId;
 
   @override
   State<FriendsListScreen> createState() => _FriendsListScreenState();
@@ -59,16 +69,24 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       });
     }
     try {
-      final id = await DeviceId.getOrCreate();
+      final myId = await DeviceId.getOrCreate();
+      // The list itself is for whoever the screen was opened for —
+      // the local user by default, or the peer when navigating from
+      // someone else's profile.
+      final targetId = widget.userId ?? myId;
       final peers = await FriendshipApi.fetchAcceptedPeers(
-        meId: id,
+        meId: targetId,
         direction: widget.direction,
       );
-      final mine = await FriendshipApi.fetchMine(id);
+      // The "Follow / Following" affordance on each row is always
+      // relative to the LOCAL user (so we can offer follow-back),
+      // hence we still read MY edges below regardless of whose list
+      // we render.
+      final mine = await FriendshipApi.fetchMine(myId);
       final followingAccepted = <String>{};
       final followingPending = <String>{};
       for (final f in mine) {
-        if (f.requester == id) {
+        if (f.requester == myId) {
           if (f.status == 'accepted') {
             followingAccepted.add(f.addressee);
           } else if (f.status == 'pending') {
@@ -78,7 +96,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _myId = id;
+        _myId = myId;
         _peers = peers;
         _myFollowingIds = followingAccepted;
         _myFollowingPendingIds = followingPending;
