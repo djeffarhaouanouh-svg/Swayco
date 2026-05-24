@@ -12,8 +12,10 @@
 // Env vars (all required for this module to actually do anything):
 //   STRIPE_SECRET_KEY        — sk_live_… (NEVER ship to client)
 //   STRIPE_WEBHOOK_SECRET    — whsec_… (signature verification)
-//   STRIPE_PRICE_PRO         — price_… for the Pro €29/mo plan
-//   STRIPE_PRICE_ULTRA       — price_… for the Ultra €59/mo plan
+//   STRIPE_PRICE_PLUS        — price_… for the Plus €9.97/mo plan
+//   STRIPE_PRICE_ULTRA_PLUS  — price_… for the Ultra Plus €24.99/mo plan
+//                              (falls back to STRIPE_PRICE_PRO if unset
+//                              so existing deployments keep working)
 //   STRIPE_SUCCESS_URL       — optional, defaults to https://swayco.fr/?subscribed=1
 //   STRIPE_CANCEL_URL        — optional, defaults to https://swayco.fr/
 //   STRIPE_PORTAL_RETURN_URL — optional, defaults to https://swayco.fr/
@@ -24,9 +26,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET?.trim();
-const STRIPE_PRICE_PRO = process.env.STRIPE_PRICE_PRO?.trim();
 const STRIPE_PRICE_PLUS = process.env.STRIPE_PRICE_PLUS?.trim();
-const STRIPE_PRICE_ULTRA = process.env.STRIPE_PRICE_ULTRA?.trim();
+// Renamed from STRIPE_PRICE_PRO when the tier was rebranded to
+// "Ultra Plus". The old env var is still read as a fallback so existing
+// Railway deployments don't break before the rename propagates.
+const STRIPE_PRICE_ULTRA_PLUS =
+  (process.env.STRIPE_PRICE_ULTRA_PLUS || process.env.STRIPE_PRICE_PRO)?.trim();
 const SUCCESS_URL =
   process.env.STRIPE_SUCCESS_URL?.trim() || 'https://swayco.fr/?subscribed=1';
 const CANCEL_URL =
@@ -36,13 +41,11 @@ const PORTAL_RETURN_URL =
 
 const PRICE_BY_TIER = {
   plus: STRIPE_PRICE_PLUS,
-  pro: STRIPE_PRICE_PRO,
-  ultra: STRIPE_PRICE_ULTRA,
+  ultra_plus: STRIPE_PRICE_ULTRA_PLUS,
 };
 const TIER_BY_PRICE = {
   [STRIPE_PRICE_PLUS]: 'plus',
-  [STRIPE_PRICE_PRO]: 'pro',
-  [STRIPE_PRICE_ULTRA]: 'ultra',
+  [STRIPE_PRICE_ULTRA_PLUS]: 'ultra_plus',
 };
 
 let _stripe = null;

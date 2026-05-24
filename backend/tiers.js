@@ -11,7 +11,7 @@
 // Stripe pricing is wired separately in stripe.js (PRICE_BY_TIER /
 // TIER_BY_PRICE) — keep the two files in sync when adding a new tier.
 
-const TIERS = ['free', 'plus', 'pro', 'ultra'];
+const TIERS = ['free', 'plus', 'ultra_plus'];
 
 /**
  * @typedef {Object} TierFeatures
@@ -49,16 +49,10 @@ const FEATURES = Object.freeze({
                                       // promise on the marketing card.
     voiceClone: false,
   }),
-  pro: Object.freeze({
-    monthlySeconds: 1000 * 60,        // 1000 crédits / mois (~16.7 h)
-    voiceDub: 'generic',
-    voiceDubsPerMonth: Infinity,
-    voiceClone: false,
-  }),
-  ultra: Object.freeze({
+  ultra_plus: Object.freeze({
     monthlySeconds: 2000 * 60,        // 2000 crédits / mois fair-use cap.
                                       // Marketing copy advertises Ultra
-                                      // as "Illimité"; the soft cap here
+                                      // Plus as "Illimité"; the soft cap
                                       // exists only to bound runaway
                                       // OpenAI billing on a compromised
                                       // account, not to ration honest

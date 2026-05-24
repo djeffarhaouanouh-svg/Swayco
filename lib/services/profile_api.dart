@@ -10,17 +10,16 @@ import 'supabase_service.dart';
 /// per-tier values lives in `backend/tiers.js` (FEATURES); these
 /// constants exist so the local UI can pre-render a refill without
 /// waiting on the network.
-const int freeMonthlyCreditsSeconds = 75 * 60;     // 75 crédits / mois
-const int plusMonthlyCreditsSeconds = 300 * 60;    // 300 crédits / mois
-const int proMonthlyCreditsSeconds = 1000 * 60;    // 1000 crédits / mois
-const int ultraMonthlyCreditsSeconds = 2000 * 60;  // 2000 crédits / mois (fair use)
+const int freeMonthlyCreditsSeconds = 75 * 60;          // 75 crédits / mois
+const int plusMonthlyCreditsSeconds = 300 * 60;         // 300 crédits / mois
+const int ultraPlusMonthlyCreditsSeconds = 2000 * 60;   // 2000 crédits / mois (fair use)
 
 /// Legacy alias kept so older call sites that still read this name
 /// keep compiling during the rename. New code should use the
 /// `*MonthlyCreditsSeconds` constants above directly.
 const int freeWeeklyCreditsSeconds = freeMonthlyCreditsSeconds;
 const int freeWeeklyAdvertisedSeconds = freeMonthlyCreditsSeconds;
-const int proWeeklyCreditsSeconds = proMonthlyCreditsSeconds;
+const int proWeeklyCreditsSeconds = ultraPlusMonthlyCreditsSeconds;
 
 /// Refill cadence: every 30 days from the last refill. Aligned with
 /// Stripe's monthly invoice so "refill" and "new bill" land together.
@@ -91,9 +90,15 @@ class RemoteProfile {
   final String subscriptionTier;
 
   bool get isPlus => subscriptionTier == 'plus'
-      || subscriptionTier == 'pro'
-      || subscriptionTier == 'ultra';
-  bool get isUltra => subscriptionTier == 'ultra';
+      || subscriptionTier == 'ultra_plus';
+  /// True for the new top tier "Ultra Plus" (was historically "pro" /
+  /// "ultra" — both have been collapsed into this single tier).
+  bool get isUltraPlus => subscriptionTier == 'ultra_plus';
+
+  /// Legacy alias kept so chat_thread_screen / other call sites that
+  /// still read `isUltra` keep compiling during the rename. Same
+  /// semantics as [isUltraPlus] now that Ultra/Pro merged.
+  bool get isUltra => isUltraPlus;
 
   /// True when this user's tier unlocks /voice/dub — i.e. anything
   /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
@@ -165,7 +170,11 @@ class RemoteProfile {
         isPro: m['is_pro'] == true,
         subscriptionTier: () {
           final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
-          return (t == 'plus' || t == 'pro' || t == 'ultra') ? t : 'free';
+          // Soft-migrate any rows that still carry the old 'pro' /
+          // 'ultra' values (in case the DB migration lags the deploy)
+          // so the UI doesn't crash on a stale row.
+          if (t == 'pro' || t == 'ultra') return 'ultra_plus';
+          return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
         }(),
         elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
         creditsSeconds:

@@ -1342,7 +1342,7 @@ app.post('/api/stripe/checkout', async (req, res) => {
   const uid = await stripeAuthUserId(req);
   if (!uid) return res.status(401).json({ error: 'unauthenticated' });
   const tier = req.body?.tier;
-  if (tier !== 'plus' && tier !== 'pro' && tier !== 'ultra') {
+  if (tier !== 'plus' && tier !== 'ultra_plus') {
     return res.status(400).json({ error: 'invalid_tier' });
   }
   try {

@@ -823,10 +823,8 @@ class _CreditsCard extends StatelessWidget {
   /// constants exported by profile_api.dart.
   static int _monthlyAllotmentFor(String tier) {
     switch (tier) {
-      case 'ultra':
-        return ultraMonthlyCreditsSeconds;
-      case 'pro':
-        return proMonthlyCreditsSeconds;
+      case 'ultra_plus':
+        return ultraPlusMonthlyCreditsSeconds;
       case 'plus':
         return plusMonthlyCreditsSeconds;
       default:
@@ -834,27 +832,35 @@ class _CreditsCard extends StatelessWidget {
     }
   }
 
+  static String _formatMinutes(int totalSeconds) {
+    final minutes = totalSeconds ~/ 60;
+    if (minutes < 60) return '$minutes min';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (m == 0) return '${h}h';
+    return '${h}h ${m.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = profile;
     final tier = p?.subscriptionTier ?? 'free';
-    final isUltra = tier == 'ultra';
+    final isTopTier = tier == 'ultra_plus';
     final isPaid = tier != 'free';
     final creditsSeconds = p?.creditsSeconds ?? 0;
+    final lifetimeSeconds = p?.lifetimeCallSeconds ?? 0;
     final credits = creditsSeconds ~/ 60;
     final allotment = _monthlyAllotmentFor(tier) ~/ 60;
-    // Threshold for the low-credits warning. Hidden entirely for
-    // Ultra — they're marketed as "Illimité" so flashing a low-credits
+    // Threshold for the low-credits warning. Hidden entirely for the
+    // top tier — it's marketed as "Illimité" so flashing a low-credits
     // hint would contradict the brand promise.
     final lowThreshold = (allotment * 0.2).floor();
-    final lowCredits = !isUltra && allotment > 0 && credits <= lowThreshold;
+    final lowCredits = !isTopTier && allotment > 0 && credits <= lowThreshold;
 
     final tierLabel = () {
       switch (tier) {
-        case 'ultra':
-          return 'ULTRA';
-        case 'pro':
-          return 'PRO';
+        case 'ultra_plus':
+          return 'ULTRA PLUS';
         case 'plus':
           return 'PLUS';
         default:
@@ -889,7 +895,7 @@ class _CreditsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  isUltra
+                  isTopTier
                       ? AppStrings.t('credits_unlimited')
                       : AppStrings.t(
                           'credits_remaining_inline',
@@ -936,6 +942,23 @@ class _CreditsCard extends StatelessWidget {
               ),
             ),
           ],
+          // Discreet lifetime-call-time line under the main row.
+          // Kept small + subtle so it stays informative without
+          // turning the card back into a stopwatch.
+          if (lifetimeSeconds > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.t(
+                'credits_used_total_inline',
+                args: {'time': _formatMinutes(lifetimeSeconds)},
+              ),
+              style: const TextStyle(
+                color: WhatsAppCallTheme.subtleText,
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+          ],
           // Paid users on web get the Stripe Customer Portal link
           // (cancel, change card, swap tier). Native users go through
           // App Store / Play Store subscription management instead.
@@ -975,7 +998,7 @@ class _PlansSection extends StatefulWidget {
   /// Ordered tier ladder. The index of [tier] in this list is used to
   /// decide which cards are "above" the user's current tier — anything
   /// at a strictly greater index is a valid upgrade target.
-  static const List<String> _ladder = ['free', 'plus', 'pro', 'ultra'];
+  static const List<String> _ladder = ['free', 'plus', 'ultra_plus'];
 
   static int _rank(String tier) {
     final i = _ladder.indexOf(tier);
@@ -997,7 +1020,7 @@ class _PlansSectionState extends State<_PlansSection> {
   // place and the ladder in _PlansSection.
   static final Map<String, _PlanCopy> _copy = {
     'plus': _PlanCopy(
-      price: '9.99€/mois',
+      price: '9.97€/mois',
       audience:
           'Pour découvrir, dater, swiper sans limite et écouter la traduction des messages vocaux.',
       features: [
@@ -1008,19 +1031,8 @@ class _PlansSectionState extends State<_PlansSection> {
         '1 boost / semaine',
       ],
     ),
-    'pro': _PlanCopy(
+    'ultra_plus': _PlanCopy(
       price: '24.99€/mois',
-      audience: 'Pour voyageurs, dating sérieux, usage régulier.',
-      features: [
-        '1 000 crédits de traduction',
-        'doublage audio illimité',
-        'priorité serveur',
-        '5 boosts / semaine',
-        'filtres avancés',
-      ],
-    ),
-    'ultra': _PlanCopy(
-      price: '69.99€/mois',
       audience:
           'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
       features: [
@@ -1028,7 +1040,8 @@ class _PlansSectionState extends State<_PlansSection> {
         'doublage avec TA voix clonée',
         'top placement Discover',
         'voix premium ElevenLabs',
-        'tout le reste illimité',
+        '5 boosts / semaine',
+        'filtres avancés',
       ],
     ),
   };
@@ -1062,7 +1075,8 @@ class _PlansSectionState extends State<_PlansSection> {
         for (var i = 0; i < upgrades.length; i++) ...[
           if (i > 0) const SizedBox(height: 12),
           _PlanCard(
-            name: _capitalise(upgrades[i]),
+            tier: upgrades[i],
+            name: _displayName(upgrades[i]),
             price: _copy[upgrades[i]]!.price,
             audience: _copy[upgrades[i]]!.audience,
             features: _copy[upgrades[i]]!.features,
@@ -1077,8 +1091,14 @@ class _PlansSectionState extends State<_PlansSection> {
     );
   }
 
-  static String _capitalise(String tier) =>
-      tier.isEmpty ? tier : '${tier[0].toUpperCase()}${tier.substring(1)}';
+  /// Marketing-style display name for a tier key. Special-cased so the
+  /// composite key `ultra_plus` renders as "Ultra Plus" instead of the
+  /// generic capitalise-first-letter behaviour.
+  static String _displayName(String tier) {
+    if (tier == 'ultra_plus') return 'Ultra Plus';
+    if (tier.isEmpty) return tier;
+    return '${tier[0].toUpperCase()}${tier.substring(1)}';
+  }
 }
 
 /// Marketing copy for a single tier — small POD so the [build] method
@@ -1097,6 +1117,7 @@ class _PlanCopy {
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
+    required this.tier,
     required this.name,
     required this.price,
     required this.audience,
@@ -1106,6 +1127,11 @@ class _PlanCard extends StatelessWidget {
     this.onTap,
   });
 
+  /// Raw tier key (e.g. `ultra_plus`) — what we send to the backend
+  /// when starting checkout. Distinct from the display [name] so we
+  /// don't accidentally `name.toLowerCase()` a string like
+  /// "Ultra Plus" and end up posting `tier: "ultra plus"` (space).
+  final String tier;
   final String name;
   final String price;
   final String audience;
@@ -1219,7 +1245,7 @@ class _PlanCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          _SubscribeButton(tier: name.toLowerCase(), label: 'Souscrire $name'),
+          _SubscribeButton(tier: tier, label: 'Souscrire $name'),
         ],
       ),
     );
@@ -2593,7 +2619,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
     if (_uploading) return;
     setState(() => _uploading = true);
     try {
-      final url = await StripeApi.startCheckout('ultra');
+      final url = await StripeApi.startCheckout('ultra_plus');
       if (!mounted) return;
       if (url == null || url.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
