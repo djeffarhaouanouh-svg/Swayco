@@ -49,8 +49,11 @@ alter table public.profiles
 --    for the same (message, target_language) pair. Keyed by the
 --    composite primary key so concurrent requests don't blow up on
 --    duplicate inserts.
+-- NB: messages.id is a bigint on this schema (auto-increment), not
+-- uuid — match the type exactly or the FK creation fails with
+-- "key columns are of incompatible types".
 create table if not exists public.voice_dubs (
-  message_id uuid not null references public.messages(id) on delete cascade,
+  message_id bigint not null references public.messages(id) on delete cascade,
   target_language text not null,
   audio_url text not null,
   -- Track which model + voice produced the dub so we can clear /
