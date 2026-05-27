@@ -75,6 +75,30 @@ abstract final class ChatApi {
   /// regular chat thread.
   static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍'];
 
+  /// Every photo reaction the local user (`meId`) has ever sent, keyed
+  /// by the recipient's id and pointing to the set of emojis sent to
+  /// them. Lets the Discover rail render the buttons pre-filled when
+  /// the user has already reacted to that peer's card.
+  static Future<Map<String, Set<String>>> fetchMyOutgoingPhotoReactions(
+    String meId,
+  ) async {
+    if (meId.isEmpty) return const {};
+    final rows = await _client
+        .from('messages')
+        .select('recipient, body')
+        .eq('sender', meId)
+        .inFilter('body', photoReactionEmojis);
+    final out = <String, Set<String>>{};
+    for (final r in rows as List) {
+      final map = Map<String, dynamic>.from(r as Map);
+      final peer = map['recipient']?.toString() ?? '';
+      final emoji = map['body']?.toString() ?? '';
+      if (peer.isEmpty || emoji.isEmpty) continue;
+      out.putIfAbsent(peer, () => <String>{}).add(emoji);
+    }
+    return out;
+  }
+
   /// Most recent photo reactions (Discover-rail emoji taps) addressed
   /// to [meId]. One entry per sender — the latest emoji a given peer
   /// reacted with. Ordered by most recent first.

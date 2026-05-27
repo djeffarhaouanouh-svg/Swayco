@@ -8,7 +8,6 @@ import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
-import '../services/greetings.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
@@ -39,6 +38,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // multi-device; mutated optimistically on every tap, written through
   // LikeApi.like / LikeApi.unlike.
   Set<String> _likedIds = <String>{};
+
+  // peer id → set of photo-reaction emojis I've already sent them.
+  // Same persistence story as [_likedIds]: hydrated from the messages
+  // table on bootstrap so each reaction button on a Discover card
+  // renders pre-filled when I revisit.
+  Map<String, Set<String>> _myReactionsByPeer = const {};
 
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
@@ -83,10 +88,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     try {
       final mine = await FriendshipApi.fetchMine(_myId);
       final liked = await LikeApi.fetchMyLikedIds(_myId);
+      final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
+        _myReactionsByPeer = reactions;
       });
     } catch (_) {
       // Polling errors are non-fatal — next tick will retry.
@@ -104,11 +111,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     try {
       final mine = await FriendshipApi.fetchMine(id);
       final liked = await LikeApi.fetchMyLikedIds(id);
+      final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
+        _myReactionsByPeer = reactions;
         _profiles = feed;
         _feedLoading = false;
       });
@@ -230,9 +239,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (!mounted) return;
     if (f != null) {
       setState(() => _myFriendships = [..._myFriendships, f]);
-      // Seed a 👋 so the conversation appears on both sides immediately
-      // — best-effort, ignored on failure.
-      unawaited(Greetings.sendIntroMessage(myId: _myId, peerId: peer.id));
     }
     // No confirmation snackbar — adding is silent so swiping through the
     // Discover stack isn't interrupted by a toast on every card.
@@ -244,22 +250,59 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return status;
   }
 
-  /// Sends a "👋 Coucou !" message to the visible profile via ChatApi.
-  Future<void> _sendHello(RemoteProfile peer) => _sendQuickMessage(
-        peer,
-        body: '👋 Coucou !',
-        snack: 'Demande envoyée à ${peer.displayName}',
-      );
+  /// Cancel my outgoing friend request to [peer] — delete the pending
+  /// friendship row I created. Optimistic local update so the
+  /// "Ajouter" pill flips back instantly; rolls back on error.
+  Future<void> _cancelFriendRequest(RemoteProfile peer) async {
+    final (status, friendship) =
+        FriendshipApi.statusWith(_myId, peer.id, _myFriendships);
+    if (status != FriendshipStatus.pendingOutgoing || friendship == null) {
+      return;
+    }
+    final previous = _myFriendships;
+    setState(() {
+      _myFriendships =
+          _myFriendships.where((f) => f.id != friendship.id).toList();
+    });
+    try {
+      await FriendshipApi.remove(friendship.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _myFriendships = previous);
+    }
+  }
+
+  /// Hand the "Ajouter" pill behaviour over to the parent so a second
+  /// tap on a card I've already requested cancels that demande instead
+  /// of being a no-op. Status is recomputed from [_myFriendships] each
+  /// tap so the toggle stays in sync after refreshes.
+  Future<void> _toggleFriendRequest(RemoteProfile peer) async {
+    if (_statusFor(peer) == FriendshipStatus.pendingOutgoing) {
+      await _cancelFriendRequest(peer);
+    } else {
+      await _sendFriendRequest(peer);
+    }
+  }
 
   /// Sends a one-character reaction message (the tapped emoji) to [peer].
   /// Reuses the Coucou path so the receiver gets a real chat message
-  /// that opens the thread on their side.
-  Future<void> _sendEmojiReaction(RemoteProfile peer, String emoji) =>
-      _sendQuickMessage(
-        peer,
-        body: emoji,
-        snack: '$emoji envoyé à ${peer.displayName}',
-      );
+  /// that opens the thread on their side. Tracks the emoji locally so
+  /// the rail button stays filled when the card is revisited; the
+  /// hydration on bootstrap reads the same set from past messages.
+  Future<void> _sendEmojiReaction(RemoteProfile peer, String emoji) async {
+    // Optimistic local update so the button stays filled immediately
+    // without waiting for the round-trip.
+    final next = Map<String, Set<String>>.from(_myReactionsByPeer);
+    final current = Set<String>.from(next[peer.id] ?? const <String>{});
+    current.add(emoji);
+    next[peer.id] = current;
+    setState(() => _myReactionsByPeer = next);
+    await _sendQuickMessage(
+      peer,
+      body: emoji,
+      snack: '$emoji envoyé à ${peer.displayName}',
+    );
+  }
 
   /// Drop [body] into the deterministic dm-{a}-{b} thread for the local
   /// user and [peer], same conversation id the chat list uses. Shared by
@@ -480,10 +523,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               aspectRatio: 4 / 5,
               child: _ProfileCard(
                 profile: profile,
-                onAdd: () => _sendHello(profile),
+                onAdd: () => _toggleFriendRequest(profile),
+                pendingOutgoing: _statusFor(profile) ==
+                    FriendshipStatus.pendingOutgoing,
                 liked: _likedIds.contains(profile.id),
                 onToggleLike: () => _toggleLikeOnProfile(profile.id),
                 onSendEmoji: (emoji) => _sendEmojiReaction(profile, emoji),
+                reactedEmojis:
+                    _myReactionsByPeer[profile.id] ?? const <String>{},
               ),
             ),
           ),
@@ -818,13 +865,19 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.onAdd,
+    this.pendingOutgoing = false,
     this.liked = false,
     this.onToggleLike,
     this.onSendEmoji,
+    this.reactedEmojis = const <String>{},
   });
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
+  /// True when I already have a pending outgoing friend request to
+  /// [profile]. Drives the "Ajouter" pill into its "Envoyé" state;
+  /// re-tapping then cancels the request via [onAdd].
+  final bool pendingOutgoing;
   final bool liked;
   /// When non-null, a heart button is rendered to the right of "Envoyer 👋".
   /// Tap toggles liked state.
@@ -832,6 +885,9 @@ class _ProfileCard extends StatelessWidget {
   /// Fires with the emoji string when one of the reaction-rail buttons
   /// is tapped — sends that emoji as a chat message to [profile].
   final ValueChanged<String>? onSendEmoji;
+  /// Emojis I've already sent to [profile] — each matching button on
+  /// the rail renders pre-filled.
+  final Set<String> reactedEmojis;
 
   @override
   Widget build(BuildContext context) {
@@ -946,7 +1002,10 @@ class _ProfileCard extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 14),
-                      _AddButton(onTap: onAdd),
+                      _AddButton(
+                        onTap: onAdd,
+                        sent: pendingOutgoing,
+                      ),
                     ],
                   ),
                 ),
@@ -959,6 +1018,7 @@ class _ProfileCard extends StatelessWidget {
                     heart: _LikeHeart(
                         liked: liked, onTap: onToggleLike!),
                     onSendEmoji: onSendEmoji,
+                    reactedEmojis: reactedEmojis,
                   ),
                 ],
               ],
@@ -1009,13 +1069,20 @@ class _LikeHeart extends StatelessWidget {
 /// The same 4 ghosted "send-a-vibe" emojis are shown above [heart] on
 /// every card; each is dim by default and fills in when tapped.
 class _ReactionRail extends StatelessWidget {
-  const _ReactionRail({required this.heart, this.onSendEmoji});
+  const _ReactionRail({
+    required this.heart,
+    this.onSendEmoji,
+    this.reactedEmojis = const <String>{},
+  });
 
   final Widget heart;
   /// Fires with the tapped emoji string — handed to each
   /// [_ReactionEmojiButton]. Wired by the parent card to drop the emoji
   /// into the peer's DM thread, same behaviour as the legacy 👋 Coucou.
   final ValueChanged<String>? onSendEmoji;
+  /// Emojis the local user has already sent to this peer — each
+  /// matching button renders pre-filled so the rail survives refreshes.
+  final Set<String> reactedEmojis;
 
   // Fixed across all cards so users learn the rail by muscle memory.
   static const _emojis = <String>['🔥', '✨', '💯', '😍'];
@@ -1028,6 +1095,7 @@ class _ReactionRail extends StatelessWidget {
         for (final emoji in _emojis) ...[
           _ReactionEmojiButton(
             emoji: emoji,
+            reacted: reactedEmojis.contains(emoji),
             onSend: onSendEmoji == null ? null : () => onSendEmoji!(emoji),
           ),
           const SizedBox(height: 10),
@@ -1043,56 +1111,56 @@ class _ReactionRail extends StatelessWidget {
 /// dark glass chip when idle, same accented border when active, same
 /// 160 ms animation. State is local — refreshes when the parent card
 /// rebuilds (e.g. after swiping to a new profile).
-class _ReactionEmojiButton extends StatefulWidget {
-  const _ReactionEmojiButton({required this.emoji, this.onSend});
+/// One reaction-rail button. State is fully driven by [reacted] —
+/// the parent card hydrates the persisted set from past messages and
+/// updates it optimistically when [onSend] fires, so the fill survives
+/// refreshes and revisits.
+class _ReactionEmojiButton extends StatelessWidget {
+  const _ReactionEmojiButton({
+    required this.emoji,
+    required this.reacted,
+    this.onSend,
+  });
 
   final String emoji;
+  /// True when the local user has already sent this emoji to the peer.
+  /// Drives the filled / unfilled visuals; no local state.
+  final bool reacted;
   /// Fires when the user taps the button. Set by the rail to drop the
   /// emoji into the peer's DM thread (same path as the 👋 Coucou pill).
-  /// Tap visuals still update locally even when this is null.
+  /// Re-tapping when [reacted] is true is a no-op so a single emoji
+  /// can't be doubled by a slip of the finger.
   final VoidCallback? onSend;
-
-  @override
-  State<_ReactionEmojiButton> createState() => _ReactionEmojiButtonState();
-}
-
-class _ReactionEmojiButtonState extends State<_ReactionEmojiButton> {
-  bool _tapped = false;
-
-  void _handleTap() {
-    setState(() => _tapped = !_tapped);
-    widget.onSend?.call();
-  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _handleTap,
+      onTap: (reacted || onSend == null) ? null : onSend,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: _tapped
+          color: reacted
               ? Colors.white.withValues(alpha: 0.18)
               : Colors.black.withValues(alpha: 0.35),
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white
-                .withValues(alpha: _tapped ? 0.85 : 0.20),
-            width: _tapped ? 2 : 1,
+            color:
+                Colors.white.withValues(alpha: reacted ? 0.85 : 0.20),
+            width: reacted ? 2 : 1,
           ),
         ),
         child: Center(
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 160),
             style: TextStyle(
-              fontSize: _tapped ? 24 : 20,
-              color: Colors.white
-                  .withValues(alpha: _tapped ? 1.0 : 0.45),
+              fontSize: reacted ? 24 : 20,
+              color:
+                  Colors.white.withValues(alpha: reacted ? 1.0 : 0.45),
             ),
-            child: Text(widget.emoji),
+            child: Text(emoji),
           ),
         ),
       ),
@@ -1103,22 +1171,22 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton> {
 /// "Ajouter" pill — sends a friend-request-style action on tap, then
 /// flips its label to "Envoyé" and stops being tappable. Light haptic
 /// on the first press; the label transition cross-fades smoothly.
-class _AddButton extends StatefulWidget {
-  const _AddButton({required this.onTap});
+/// "Ajouter" pill on the Discover deck. Drives a friend-request
+/// toggle: first tap sends, a tap when already pending cancels.
+/// State is owned by the parent card so the pill survives card
+/// rebuilds (e.g. swiping back) and reflects the live friendship
+/// table on every refresh.
+class _AddButton extends StatelessWidget {
+  const _AddButton({required this.onTap, required this.sent});
   final VoidCallback onTap;
+  /// True when I have a pending outgoing friend request to this peer
+  /// — flips the label to "Envoyé" and still fires [onTap] on press
+  /// so the parent can cancel the demande.
+  final bool sent;
 
-  @override
-  State<_AddButton> createState() => _AddButtonState();
-}
-
-class _AddButtonState extends State<_AddButton> {
-  bool _sent = false;
-
-  void _onPress() {
-    if (_sent) return;
+  void _handleTap() {
     HapticFeedback.mediumImpact();
-    setState(() => _sent = true);
-    widget.onTap();
+    onTap();
   }
 
   @override
@@ -1128,14 +1196,14 @@ class _AddButtonState extends State<_AddButton> {
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: _sent ? null : _onPress,
+        onTap: _handleTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: Text(
-              _sent ? 'Envoyé' : 'Ajouter',
-              key: ValueKey(_sent),
+              sent ? 'Envoyé' : 'Ajouter',
+              key: ValueKey(sent),
               style: const TextStyle(
                 color: SC.bg,
                 fontSize: 15,
