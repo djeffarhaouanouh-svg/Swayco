@@ -332,25 +332,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: MeshBackground(
         child: Stack(
           children: [
-            // Cards fill the viewport but stop short of the floating
-            // nav bar so the bottom of the card (Send button, reaction
-            // rail, heart) stays clear of it. The header still floats
-            // freely over the top — its dark text on the dark mesh is
-            // legible against any photo, no padding needed there.
+            // Cards fill the entire viewport — no padding anywhere.
+            // The header and nav bar float on top; the card itself
+            // pushes its inner content (back button, name, Send,
+            // reactions, heart) past those chrome strips so they
+            // never get hidden.
             Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  // 12 = nav bar offset from screen bottom (RootShell)
-                  // 54 = nav bar height (GlassNavBar._height)
-                  // 12 = breathing room between the card and the bar
-                  bottom: 12 + 54 + 12 + MediaQuery.paddingOf(context).bottom,
-                ),
-                child: _feedLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: SC.accent),
-                      )
-                    : _buildStack(),
-              ),
+              child: _feedLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: SC.accent),
+                    )
+                  : _buildStack(),
             ),
             // Floating header — sits over the cards, padded below the
             // status bar / notch via the system safe-area inset.
@@ -417,24 +409,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (i >= _profiles.length) {
           return _Empty(onReset: _reset);
         }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: AspectRatio(
-                aspectRatio: 3 / 4,
-                child: _ProfileCard(
-                  profile: _profiles[i],
-                  onAdd: () {
-                    _sendHello(_profiles[i]);
-                    _advance();
-                  },
-                  onBack: i > 0 ? _back : null,
-                  liked: _likedIds.contains(_profiles[i].id),
-                  onToggleLike: () =>
-                      _toggleLikeOnProfile(_profiles[i].id),
-                ),
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: AspectRatio(
+              // Slightly shorter than 3:4 so the card naturally sits
+              // between the floating Discover header at the top and
+              // the floating nav bar at the bottom, without anyone
+              // having to reserve padding around it.
+              aspectRatio: 4 / 5,
+              child: _ProfileCard(
+                profile: _profiles[i],
+                onAdd: () {
+                  _sendHello(_profiles[i]);
+                  _advance();
+                },
+                onBack: i > 0 ? _back : null,
+                liked: _likedIds.contains(_profiles[i].id),
+                onToggleLike: () =>
+                    _toggleLikeOnProfile(_profiles[i].id),
               ),
             ),
           ),
