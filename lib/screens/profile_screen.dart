@@ -2186,13 +2186,12 @@ class _PhotosGrid extends StatelessWidget {
     if (viewerMode && !hasPhoto) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.centerLeft,
-      // Cap the tile at a comfortable thumbnail size on desktop while
-      // still letting phones fall back to ~1/3 of the viewport when
-      // that would be smaller.
+      // Fixed-ish tile size across phone + desktop: aims at 280 px
+      // wide, shrinks gracefully when the parent has less room
+      // (narrow phones). No more 1/3 width-factor — it made the
+      // tile far too small on phones.
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 280),
-        child: FractionallySizedBox(
-        widthFactor: 1 / 3,
         child: AspectRatio(
           aspectRatio: 1,
           child: hasPhoto
@@ -2211,7 +2210,6 @@ class _PhotosGrid extends StatelessWidget {
               // uploaded. Single photo only by design (economic).
               : _AddDiscoverPhotoCta(onTap: onPick),
         ),
-      ),
       ),
     );
   }
