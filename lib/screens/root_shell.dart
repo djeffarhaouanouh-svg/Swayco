@@ -7,6 +7,7 @@ import '../services/app_strings.dart';
 import '../services/call_alert.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/friend_request_unread.dart';
 import '../services/incoming_call_api.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
@@ -23,6 +24,7 @@ import '../widgets/profile_avatar.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'discover_screen.dart';
+import 'friend_requests_screen.dart';
 import 'profile_screen.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
@@ -92,6 +94,9 @@ class _RootShellState extends State<RootShell> {
     final myId = await DeviceId.getOrCreate();
     if (!mounted || myId.isEmpty) return;
     _myCalleeId = myId;
+    // Kick the pending-requests watcher so the Demandes nav badge stays
+    // live without waiting for the user to open the tab.
+    unawaited(FriendRequestUnread.start(myId));
     _callsChannel = IncomingCallApi.subscribe(
       calleeId: myId,
       onCall: _handleIncomingCall,
@@ -289,33 +294,39 @@ class _RootShellState extends State<RootShell> {
         valueListenable: NavTab.index,
         builder: (context, index, _) => ValueListenableBuilder<int>(
           valueListenable: ChatUnread.count,
-          builder: (context, unread, _) {
-            final pages = <Widget>[
-              ChatScreen(translation: widget.translation),
-              const DiscoverScreen(),
-              const ProfileScreen(),
-            ];
-            return Stack(
-              children: [
-                IndexedStack(index: index, children: pages),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 12 + MediaQuery.paddingOf(context).bottom,
-                  child: Center(
-                    child: GlassNavBar(
-                      selected: index,
-                      unreadChat: unread,
-                      onSelect: (i) {
-                        NavTab.select(i);
-                        if (i == NavTab.chat) ChatUnread.markAllSeen();
-                      },
+          builder: (context, unread, _) =>
+              ValueListenableBuilder<int>(
+            valueListenable: FriendRequestUnread.count,
+            builder: (context, pending, _) {
+              final pages = <Widget>[
+                ChatScreen(translation: widget.translation),
+                const DiscoverScreen(),
+                const FriendRequestsScreen(),
+                const ProfileScreen(),
+              ];
+              return Stack(
+                children: [
+                  IndexedStack(index: index, children: pages),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 12 + MediaQuery.paddingOf(context).bottom,
+                    child: Center(
+                      child: GlassNavBar(
+                        selected: index,
+                        unreadChat: unread,
+                        unreadRequests: pending,
+                        onSelect: (i) {
+                          NavTab.select(i);
+                          if (i == NavTab.chat) ChatUnread.markAllSeen();
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

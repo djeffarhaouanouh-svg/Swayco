@@ -6,11 +6,12 @@ import 'package:flutter/foundation.dart';
 /// tabs without holding a reference to the shell's private state.
 ///
 /// Tab indices match [RootShell]'s page list: Chat 0, Discover 1,
-/// Profile 2. Defaults to Discover, the launch tab.
+/// Demandes 2, Profile 3. Defaults to Discover, the launch tab.
 abstract final class NavTab {
   static const int chat = 0;
   static const int discover = 1;
-  static const int profile = 2;
+  static const int demandes = 2;
+  static const int profile = 3;
 
   static final ValueNotifier<int> index = ValueNotifier<int>(discover);
 

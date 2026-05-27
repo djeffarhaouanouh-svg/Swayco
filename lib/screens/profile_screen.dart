@@ -17,6 +17,7 @@ import '../services/voice_message_api.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
+import '../services/friend_request_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
@@ -732,17 +733,22 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                   builder: (context, navIndex, _) =>
                       ValueListenableBuilder<int>(
                     valueListenable: ChatUnread.count,
-                    builder: (context, unread, _) => GlassNavBar(
-                      selected: navIndex,
-                      unreadChat: unread,
-                      onSelect: (i) {
-                        NavTab.select(i);
-                        if (i == NavTab.chat) ChatUnread.markAllSeen();
-                        // Pop every pushed route so the shell — now on
-                        // tab [i] — is visible underneath.
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
-                      },
+                    builder: (context, unread, _) =>
+                        ValueListenableBuilder<int>(
+                      valueListenable: FriendRequestUnread.count,
+                      builder: (context, pending, _) => GlassNavBar(
+                        selected: navIndex,
+                        unreadChat: unread,
+                        unreadRequests: pending,
+                        onSelect: (i) {
+                          NavTab.select(i);
+                          if (i == NavTab.chat) ChatUnread.markAllSeen();
+                          // Pop every pushed route so the shell — now on
+                          // tab [i] — is visible underneath.
+                          Navigator.of(context)
+                              .popUntil((route) => route.isFirst);
+                        },
+                      ),
                     ),
                   ),
                 ),

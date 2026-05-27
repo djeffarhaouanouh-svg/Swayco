@@ -14,15 +14,19 @@ class GlassNavBar extends StatelessWidget {
     super.key,
     required this.selected,
     required this.unreadChat,
+    required this.unreadRequests,
     required this.onSelect,
   });
 
   final int selected;
   final int unreadChat;
+  /// Count of pending friend requests addressed to the local user —
+  /// drives the red badge on the Demandes tab.
+  final int unreadRequests;
   final ValueChanged<int> onSelect;
 
   static const double _height = 54;
-  static const double _itemWidth = 72;
+  static const double _itemWidth = 64;
   static const double _hPad = 10;
 
   @override
@@ -38,6 +42,12 @@ class GlassNavBar extends StatelessWidget {
         icon: Icons.search,
         selectedIcon: Icons.manage_search,
         label: AppStrings.t('nav_search'),
+      ),
+      _NavItemData(
+        icon: Icons.group_outlined,
+        selectedIcon: Icons.group,
+        label: AppStrings.t('nav_demandes'),
+        badge: unreadRequests,
       ),
       _NavItemData(
         icon: Icons.person_outline,
