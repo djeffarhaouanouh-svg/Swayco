@@ -23,7 +23,7 @@ class MeshBackground extends StatelessWidget {
           // navy bars on the edges.
           Positioned.fill(
             child: Image.asset(
-              'assets/swayco_mesh_bg.png',
+              'assets/mesh_midnight_bg.png',
               fit: BoxFit.cover,
               // If the asset is missing we silently keep the navy base
               // — better than crashing the screen.
