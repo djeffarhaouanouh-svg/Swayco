@@ -642,7 +642,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 // Horizontal gutter matches the chat / discover headers so
                 // the avatar and bio don't run into the screen edge.
                 padding: EdgeInsets.fromLTRB(
-                  28, 20, 28,
+                  // Bump the top gutter so the avatar sits lower —
+                  // was 20, felt cramped against the safe area on
+                  // larger viewports.
+                  28, 56, 28,
                   32 + 64 + MediaQuery.paddingOf(context).bottom,
                 ),
                 children: [
