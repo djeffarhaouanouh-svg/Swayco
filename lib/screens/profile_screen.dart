@@ -2093,7 +2093,62 @@ class _IdentitySection extends StatelessWidget {
           iLikePeer: iLikePeer,
           onTogglePeerLike: onTogglePeerLike,
         ),
+        // Tiny ⓘ hint under the photo tile — only on my own profile.
+        // Taps jump to Settings where the "Me cacher de mon pays"
+        // toggle lives.
+        if (!viewerMode) ...[
+          const SizedBox(height: 10),
+          _DiscoverVisibilityHint(
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Small ⓘ + text row rendered under the Discover photo tile on the
+/// user's own profile. Taps jump to Settings, where the "Hide me
+/// from my country" toggle lives — keeps the profile clean while
+/// still pointing the user at the visibility control.
+class _DiscoverVisibilityHint extends StatelessWidget {
+  const _DiscoverVisibilityHint({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.info_outline,
+              size: 14,
+              color: SC.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                AppStrings.t('discover_visibility_hint'),
+                style: const TextStyle(
+                  color: SC.textMuted,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
