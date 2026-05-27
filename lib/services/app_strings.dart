@@ -64,7 +64,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} a réagi {emoji} à votre photo',
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
     'discover_visibility_hint':
-        'Décide qui peut te voir dans Discover',
+        'Décide si les personnes de ton pays peuvent voir ta photo Discover',
     'tab_placeholder_soon': 'Bientôt',
     'profile_title': 'Profil',
     'profile_followers': 'Abonnés',
@@ -428,7 +428,8 @@ abstract final class AppStrings {
         'When someone adds you from Discover or Search, their request will appear here.',
     'demandes_reacted_to_photo': '{name} reacted {emoji} to your photo',
     'settings_hide_from_country': 'Hide me from people in my country',
-    'discover_visibility_hint': 'Choose who can see you in Discover',
+    'discover_visibility_hint':
+        'Choose whether people in your country can see your Discover photo',
     'tab_placeholder_soon': 'Soon',
     'profile_title': 'Profile',
     'profile_followers': 'Followers',
@@ -781,7 +782,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
-        'Decide quién puede verte en Discover',
+        'Decide si las personas de tu país pueden ver tu foto de Discover',
     'tab_placeholder_soon': 'Pronto',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1024,7 +1025,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
-        'Wähle, wer dich in Discover sehen kann',
+        'Lege fest, ob Leute aus deinem Land dein Discover-Foto sehen',
     'my_subscription_section': 'Mein Abo',
     'tab_placeholder_soon': 'Bald',
     'profile_title': 'Profil',
@@ -1210,7 +1211,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
-        'Decidi chi può vederti in Discover',
+        'Decidi se le persone del tuo paese possono vedere la tua foto Discover',
     'my_subscription_section': 'Il mio abbonamento',
     'tab_placeholder_soon': 'Presto',
     'profile_title': 'Profilo',
@@ -1396,7 +1397,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
-        'Decide quem te pode ver no Discover',
+        'Decide se as pessoas do teu país podem ver a tua foto Discover',
     'my_subscription_section': 'A minha subscrição',
     'tab_placeholder_soon': 'Em breve',
     'profile_title': 'Perfil',
@@ -1582,7 +1583,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
-        'Bepaal wie jou ziet in Discover',
+        'Bepaal of mensen uit jouw land je Discover-foto kunnen zien',
     'my_subscription_section': 'Mijn abonnement',
     'tab_placeholder_soon': 'Binnenkort',
     'profile_title': 'Profiel',
@@ -1767,7 +1768,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} تفاعل {emoji} مع صورتك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
     'discover_visibility_hint':
-        'قرّر من يمكنه رؤيتك في ديسكفر',
+        'قرّر إن كان بإمكان الأشخاص من بلدك رؤية صورتك في ديسكفر',
     'my_subscription_section': 'اشتراكي',
     'tab_placeholder_soon': 'قريباً',
     'profile_title': 'الملف الشخصي',
@@ -1953,7 +1954,7 @@ abstract final class AppStrings {
     'settings_hide_from_country':
         'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
-        'Выберите, кто может видеть вас в Discover',
+        'Решите, могут ли люди из вашей страны видеть ваше фото в Discover',
     'my_subscription_section': 'Моя подписка',
     'tab_placeholder_soon': 'Скоро',
     'profile_title': 'Профиль',
@@ -2136,7 +2137,8 @@ abstract final class AppStrings {
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
     'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
     'settings_hide_from_country': '对来自我国家的人隐藏',
-    'discover_visibility_hint': '决定谁可以在 Discover 中看到您',
+    'discover_visibility_hint':
+        '决定来自您国家的人是否能看到您的 Discover 照片',
     'my_subscription_section': '我的订阅',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
@@ -2318,7 +2320,8 @@ abstract final class AppStrings {
         '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
     'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
     'settings_hide_from_country': '自分の国の人から非表示にする',
-    'discover_visibility_hint': 'Discover で誰に表示するかを選ぶ',
+    'discover_visibility_hint':
+        '同じ国の人に Discover の写真を見せるか決める',
     'my_subscription_section': 'マイサブスクリプション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
@@ -2501,7 +2504,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
     'discover_visibility_hint':
-        'Discover에서 누가 회원님을 볼 수 있는지 선택하세요',
+        '같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택',
     'my_subscription_section': '내 구독',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',

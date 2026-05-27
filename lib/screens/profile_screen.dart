@@ -2122,31 +2122,34 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.info_outline,
-              size: 14,
-              color: SC.textMuted,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                AppStrings.t('discover_visibility_hint'),
-                style: const TextStyle(
-                  color: SC.textMuted,
-                  fontSize: 12,
-                  height: 1.3,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.info_outline,
+                size: 14,
+                color: SC.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  AppStrings.t('discover_visibility_hint'),
+                  style: const TextStyle(
+                    color: SC.textMuted,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
