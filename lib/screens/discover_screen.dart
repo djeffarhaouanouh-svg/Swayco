@@ -1221,10 +1221,13 @@ class _ReactionEmojiButton extends StatelessWidget {
             child: Center(
               child: AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 160),
+                // Keep the emojis at full opacity in both states —
+                // the background fill + bigger glyph still signal
+                // "this one is sent", but the un-tapped emojis stop
+                // reading as ghosted / disabled.
                 style: TextStyle(
-                  fontSize: reacted ? 24 : 20,
-                  color: Colors.white
-                      .withValues(alpha: reacted ? 1.0 : 0.45),
+                  fontSize: reacted ? 24 : 22,
+                  color: Colors.white,
                 ),
                 child: Text(emoji),
               ),
