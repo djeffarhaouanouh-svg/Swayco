@@ -15,8 +15,10 @@ import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_dialog.dart';
 import 'onboarding_screen.dart';
 
 /// Hosts every secondary account-level action that doesn't belong on the
@@ -224,7 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _pickAudioOutput() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: WhatsAppCallTheme.bar,
+      backgroundColor: SC.bubbleIn,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -239,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Text(
                   AppStrings.t('settings_audio_output'),
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                    color: SC.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -315,30 +317,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String confirmLabel,
     required bool destructive,
   }) {
-    return showDialog<bool>(
+    return showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
-        title: Text(title,
-            style: const TextStyle(color: WhatsAppCallTheme.strongText)),
-        content: Text(body,
-            style: const TextStyle(color: WhatsAppCallTheme.subtleText)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: destructive
-                  ? const Color(0xFFE53935)
-                  : WhatsAppCallTheme.accent,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
+      title: title,
+      body: body,
+      confirmLabel: confirmLabel,
+      destructive: destructive,
     );
   }
 
@@ -346,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -357,17 +341,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: WhatsAppCallTheme.scaffold,
-        foregroundColor: WhatsAppCallTheme.strongText,
+        backgroundColor: Colors.transparent,
+        foregroundColor: SC.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           AppStrings.t('settings_title'),
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          style: SCText.h3,
         ),
       ),
-      body: SafeArea(
+      body: MeshBackground(
+        child: SafeArea(
         child: AbsorbPointer(
           absorbing: _busy,
           child: ListView(
@@ -515,11 +503,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 20),
                 const Center(
                   child: CircularProgressIndicator(
-                      color: WhatsAppCallTheme.accent),
+                      color: SC.accent),
                 ),
               ],
             ],
           ),
+        ),
         ),
       ),
     );
@@ -539,7 +528,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: const TextStyle(
-          color: WhatsAppCallTheme.subtleText,
+          color: SC.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
@@ -569,9 +558,9 @@ class _SettingsCard extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
-        color: WhatsAppCallTheme.bar,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF2A3942)),
+        color: SC.glassStrong,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SC.glassBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: divided),
@@ -596,7 +585,7 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = color ?? WhatsAppCallTheme.strongText;
+    final fg = color ?? SC.textPrimary;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -621,10 +610,10 @@ class _SettingsRow extends StatelessWidget {
             ],
             if (onTap != null && trailing == null)
               const Icon(Icons.chevron_right,
-                  color: WhatsAppCallTheme.subtleText, size: 22)
+                  color: SC.textMuted, size: 22)
             else if (onTap != null)
               const Icon(Icons.chevron_right,
-                  color: WhatsAppCallTheme.subtleText, size: 22),
+                  color: SC.textMuted, size: 22),
           ],
         ),
       ),
@@ -653,13 +642,13 @@ class _SettingsToggleRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: WhatsAppCallTheme.strongText),
+            Icon(icon, size: 22, color: SC.textPrimary),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
                 style: const TextStyle(
-                  color: WhatsAppCallTheme.strongText,
+                  color: SC.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -669,7 +658,7 @@ class _SettingsToggleRow extends StatelessWidget {
               value: value,
               onChanged: onChanged,
               activeThumbColor: Colors.white,
-              activeTrackColor: WhatsAppCallTheme.accent,
+              activeTrackColor: SC.accent,
             ),
           ],
         ),
@@ -689,7 +678,7 @@ class _SubtleText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(
-        color: WhatsAppCallTheme.subtleText,
+        color: SC.textMuted,
         fontSize: 13,
       ),
     );
@@ -719,20 +708,20 @@ class _AudioOutputOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: WhatsAppCallTheme.strongText),
+            Icon(icon, color: SC.textPrimary),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
                 style: const TextStyle(
-                  color: WhatsAppCallTheme.strongText,
+                  color: SC.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             if (selected)
-              const Icon(Icons.check, color: WhatsAppCallTheme.accent),
+              const Icon(Icons.check, color: SC.accent),
           ],
         ),
       ),
@@ -773,32 +762,13 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
   }
 
   Future<void> _unblock(RemoteProfile p) async {
-    final ok = await showDialog<bool>(
+    final ok = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
-        title: Text(
-          AppStrings.t('blocked_unblock_title_q',
-              args: {'name': p.displayName}),
-          style: const TextStyle(color: WhatsAppCallTheme.strongText),
-        ),
-        content: Text(
-          AppStrings.t('blocked_unblock_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: WhatsAppCallTheme.accent),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(AppStrings.t('blocked_unblock_confirm')),
-          ),
-        ],
-      ),
+      title: AppStrings.t('blocked_unblock_title_q',
+          args: {'name': p.displayName}),
+      body: AppStrings.t('blocked_unblock_body'),
+      confirmLabel: AppStrings.t('blocked_unblock_confirm'),
+      destructive: false,
     );
     if (ok != true) return;
     try {
@@ -816,26 +786,30 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: WhatsAppCallTheme.scaffold,
-        foregroundColor: WhatsAppCallTheme.strongText,
+        backgroundColor: Colors.transparent,
+        foregroundColor: SC.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           AppStrings.t('blocked_title'),
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          style: SCText.h3,
         ),
       ),
-      body: _loading
+      body: MeshBackground(
+        child: _loading
           ? const Center(
               child: CircularProgressIndicator(
-                  color: WhatsAppCallTheme.accent),
+                  color: SC.accent),
             )
           : _blocked.isEmpty
               ? const _BlockedEmptyState()
               : RefreshIndicator(
-                  color: WhatsAppCallTheme.accent,
-                  backgroundColor: WhatsAppCallTheme.bar,
+                  color: SC.accent,
+                  backgroundColor: SC.bubbleIn,
                   onRefresh: _load,
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -845,10 +819,9 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                       final p = _blocked[i];
                       return Container(
                         decoration: BoxDecoration(
-                          color: WhatsAppCallTheme.bar,
-                          borderRadius: BorderRadius.circular(14),
-                          border:
-                              Border.all(color: const Color(0xFF2A3942)),
+                          color: SC.glassStrong,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: SC.glassBorder),
                         ),
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                         child: Row(
@@ -868,7 +841,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                                   Text(
                                     p.displayName.isEmpty ? '—' : p.displayName,
                                     style: const TextStyle(
-                                      color: WhatsAppCallTheme.strongText,
+                                      color: SC.textPrimary,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -877,7 +850,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                                     Text(
                                       '@${p.handle}',
                                       style: const TextStyle(
-                                        color: WhatsAppCallTheme.subtleText,
+                                        color: SC.textMuted,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -889,7 +862,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                               child: Text(
                                 AppStrings.t('unblock'),
                                 style: const TextStyle(
-                                    color: WhatsAppCallTheme.accent),
+                                    color: SC.accent),
                               ),
                             ),
                           ],
@@ -898,6 +871,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                     },
                   ),
                 ),
+      ),
     );
   }
 }
@@ -914,12 +888,12 @@ class _BlockedEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.block,
-                size: 56, color: WhatsAppCallTheme.subtleText),
+                size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('blocked_empty_title'),
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -929,7 +903,7 @@ class _BlockedEmptyState extends StatelessWidget {
               AppStrings.t('blocked_empty_body'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.subtleText,
+                color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,
               ),

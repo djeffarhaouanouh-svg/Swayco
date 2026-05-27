@@ -23,6 +23,7 @@ import '../translation/realtime_translation_port.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
+import '../widgets/swayco_dialog.dart';
 import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -217,31 +218,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// The peer's copy is untouched; the row reappears here if they send a
   /// new message later.
   Future<void> _deleteConversation(RemoteProfile peer) async {
-    final ok = await showDialog<bool>(
+    final ok = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
-        title: Text(
-          AppStrings.t('delete_conversation'),
-          style: const TextStyle(color: SC.textPrimary),
-        ),
-        content: Text(
-          AppStrings.t('delete_conversation_body'),
-          style: const TextStyle(color: SC.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935)),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(AppStrings.t('delete')),
-          ),
-        ],
-      ),
+      title: AppStrings.t('delete_conversation'),
+      body: AppStrings.t('delete_conversation_body'),
+      confirmLabel: AppStrings.t('delete'),
     );
     if (ok != true) return;
     await ChatUnread.markConversationCleared(_conversationIdFor(peer.id));
@@ -261,31 +242,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _blockPeer(RemoteProfile peer) async {
-    final ok = await showDialog<bool>(
+    final ok = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
-        title: Text(
-          AppStrings.t('block_peer_q', args: {'name': peer.displayName}),
-          style: const TextStyle(color: SC.textPrimary),
-        ),
-        content: Text(
-          AppStrings.t('block_peer_body'),
-          style: const TextStyle(color: SC.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935)),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(AppStrings.t('block')),
-          ),
-        ],
-      ),
+      title: AppStrings.t('block_peer_q', args: {'name': peer.displayName}),
+      body: AppStrings.t('block_peer_body'),
+      confirmLabel: AppStrings.t('block'),
     );
     if (ok != true || _myId.isEmpty) return;
     try {

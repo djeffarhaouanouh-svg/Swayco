@@ -27,6 +27,7 @@ import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
+import '../widgets/swayco_dialog.dart';
 import 'profile_screen.dart';
 
 /// One-to-one chat thread for [conversationId]. Title is the human-friendly
@@ -104,38 +105,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final peerName = _peer?.displayName.isNotEmpty == true
         ? _peer!.displayName
         : widget.title;
-    final ok = await showDialog<bool>(
+    final ok = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
-        title: Text(
-          AppStrings.t(
-            wasBlocked ? 'unblock_peer_q' : 'block_peer_q',
-            args: {'name': peerName},
-          ),
-          style: const TextStyle(color: SC.textPrimary),
-        ),
-        content: Text(
-          AppStrings.t(
-              wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
-          style: const TextStyle(color: SC.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: wasBlocked
-                  ? SC.accent
-                  : const Color(0xFFE53935),
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(AppStrings.t(wasBlocked ? 'unblock' : 'block')),
-          ),
-        ],
+      title: AppStrings.t(
+        wasBlocked ? 'unblock_peer_q' : 'block_peer_q',
+        args: {'name': peerName},
       ),
+      body: AppStrings.t(
+          wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
+      confirmLabel: AppStrings.t(wasBlocked ? 'unblock' : 'block'),
+      destructive: !wasBlocked,
     );
     if (ok != true) return;
     try {
@@ -472,31 +451,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   /// "unsend" — the row is removed for both sides). Removed optimistically;
   /// the realtime stream confirms it.
   Future<void> _deleteMessage(ChatMessage m) async {
-    final ok = await showDialog<bool>(
+    final ok = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
-        title: Text(
-          AppStrings.t('delete_message'),
-          style: const TextStyle(color: SC.textPrimary),
-        ),
-        content: Text(
-          AppStrings.t('delete_message_body'),
-          style: const TextStyle(color: SC.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(AppStrings.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935)),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(AppStrings.t('delete')),
-          ),
-        ],
-      ),
+      title: AppStrings.t('delete_message'),
+      body: AppStrings.t('delete_message_body'),
+      confirmLabel: AppStrings.t('delete'),
     );
     if (ok != true) return;
     try {
