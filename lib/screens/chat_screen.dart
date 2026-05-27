@@ -641,30 +641,41 @@ class _FriendChatRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (unread) ...[
-                  Container(
-                    width: 7,
-                    height: 7,
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
-                      color: SC.accent,
-                      shape: BoxShape.circle,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (unread) ...[
+                      Container(
+                        width: 7,
+                        height: 7,
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: const BoxDecoration(
+                          color: SC.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                    Text(
+                      lastMessage != null
+                          ? _formatTime(lastMessage!.createdAt)
+                          : '',
+                      style: SCText.meta.copyWith(
+                        color: unread ? SC.accent : SC.textMuted,
+                      ),
                     ),
-                  ),
-                ],
-                Text(
-                  lastMessage != null
-                      ? _formatTime(lastMessage!.createdAt)
-                      : '',
-                  style: SCText.meta.copyWith(
-                    color: unread ? SC.accent : SC.textMuted,
-                  ),
+                  ],
                 ),
               ],
             ),
+            const SizedBox(width: 8),
+            // Direct-call button anchored at the far right of every
+            // row — same path as the long-press menu's "call" entry,
+            // surfaced as a one-tap shortcut.
+            _RowCallButton(onTap: onCall),
           ],
         ),
         ),
@@ -699,6 +710,36 @@ class _FriendChatRow extends StatelessWidget {
         onDeleteConversation();
         break;
     }
+  }
+}
+
+/// Small round call shortcut at the far-right of every chat-list row.
+/// Reuses [CallLauncher.startCall] under the hood — same code path as
+/// the long-press menu's "call" entry — so the user can ring a friend
+/// without opening the thread first.
+class _RowCallButton extends StatelessWidget {
+  const _RowCallButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.glassStrong,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(9),
+          child: Icon(
+            Icons.phone_rounded,
+            color: SC.accent,
+            size: 18,
+          ),
+        ),
+      ),
+    );
   }
 }
 
