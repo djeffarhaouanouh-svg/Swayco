@@ -543,11 +543,12 @@ class _ThreadHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // No glass bar around the header — the back button, avatar+name and
-    // the trailing call / more icons float directly over the mesh
-    // background, edge-to-edge.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+    // Transparent glass bar kept, but with no surrounding / internal
+    // padding — back button, avatar+name and the trailing call / more
+    // icons sit flush against the bar's rounded edges.
+    return GlassContainer(
+      borderRadius: BorderRadius.zero,
+      padding: EdgeInsets.zero,
       child: Row(
         children: [
           GlassIconButton(
