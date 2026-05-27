@@ -81,3 +81,6 @@ app.*.map.json
 # Stray screenshots (French Windows default name)
 Capture d'écran*.png
 capture-*.png
+
+# Swayco design handoff reference (Next.js project, not part of the Flutter app)
+xxxx/

@@ -20,6 +20,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -404,62 +405,63 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
       onRefresh: _reload,
-      child: ListView.separated(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Clear the floating nav bar so the invite row (last item) can
-        // always be scrolled fully into view.
-        padding: EdgeInsets.only(
-          bottom: 84 + MediaQuery.paddingOf(context).bottom,
+        // Clear the floating nav bar so the invite row stays scrollable.
+        padding: EdgeInsets.fromLTRB(
+          16, 0, 16,
+          84 + MediaQuery.paddingOf(context).bottom,
         ),
-        // +1 for the "Invite to a call" row, placed right after the last
-        // conversation — same in-list position as the discussions.
-        itemCount: _friends.length + 1,
-        // Brighter separator so rows read distinctly against the dark
-        // scaffold (the previous near-black 0xFF1F2C34 was invisible).
-        separatorBuilder: (_, _) => const Divider(
-          height: 1,
-          thickness: 1,
-          color: SC.glassBorder,
-          indent: 68,
-        ),
-        itemBuilder: (ctx, i) {
-          // Last item: "Invite to a call", in the list flow just below
-          // the last discussion.
-          if (i == _friends.length) {
-            return _InviteToCallBar(
-              onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-              creatingInvite: _creatingInvite,
-            );
-          }
-          final p = _friends[i];
-          final convId = _conversationIdFor(p.id);
-          final last = _latestByConv[convId];
-          final lastSeen = _seenByConv[convId];
-          // "Unread" = the latest message was sent by the peer and is
-          // newer than the last time the user opened this thread (or the
-          // user has never opened the thread → all peer messages count).
-          final isUnread = last != null &&
-              last.senderId != _myId &&
-              (lastSeen == null || last.createdAt.isAfter(lastSeen));
-          return _FriendChatRow(
-            profile: p,
-            lastMessage: last,
-            isMine: last?.senderId == _myId,
-            unread: isUnread,
-            onTap: () => _openThread(p),
-            onViewProfile: () => _viewProfile(p),
-            onBlock: () => _blockPeer(p),
-            onReport: () => _reportPeer(p),
-            onDeleteConversation: () => _deleteConversation(p),
-            onCall: () => CallLauncher.startCall(
-              context,
-              peerDeviceId: p.id,
-              translation: widget.translation,
+        children: [
+          // Single glass card holding every conversation row — the rows
+          // are stacked without dividers so they read as one continuous
+          // surface, matching the Midnight visual reference.
+          GlassContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              children: [
+                for (final p in _friends)
+                  _FriendChatRow(
+                    profile: p,
+                    lastMessage: _latestByConv[_conversationIdFor(p.id)],
+                    isMine: _latestByConv[_conversationIdFor(p.id)]
+                            ?.senderId ==
+                        _myId,
+                    unread: _isUnread(p),
+                    onTap: () => _openThread(p),
+                    onViewProfile: () => _viewProfile(p),
+                    onBlock: () => _blockPeer(p),
+                    onReport: () => _reportPeer(p),
+                    onDeleteConversation: () => _deleteConversation(p),
+                    onCall: () => CallLauncher.startCall(
+                      context,
+                      peerDeviceId: p.id,
+                      translation: widget.translation,
+                    ),
+                  ),
+              ],
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 18),
+          _InviteToCallBar(
+            onInviteToCall: _creatingInvite ? null : _shareCallInvite,
+            creatingInvite: _creatingInvite,
+          ),
+        ],
       ),
     );
+  }
+
+  /// True when the peer's last message is newer than the last time I
+  /// opened the thread (or I've never opened it). Drives the cyan dot.
+  bool _isUnread(RemoteProfile p) {
+    final convId = _conversationIdFor(p.id);
+    final last = _latestByConv[convId];
+    final seen = _seenByConv[convId];
+    return last != null &&
+        last.senderId != _myId &&
+        (seen == null || last.createdAt.isAfter(seen));
   }
 }
 
@@ -551,13 +553,14 @@ class _FriendChatRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: () => _showRowMenu(context),
+      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            // Avatar = direct shortcut to the peer's profile (Insta-style).
-            // A green dot rides the bottom-right corner when the peer is
-            // currently online.
+            // Avatar — tap goes straight to the peer's profile. The cyan
+            // dot rides the bottom-right corner when they're online.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
@@ -567,66 +570,52 @@ class _FriendChatRow extends StatelessWidget {
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
                     avatarColorHex: profile.avatarColor,
-                    size: 60,
+                    size: 46,
                   ),
                   if (_peerOnline)
                     Positioned(
-                      right: 1,
-                      bottom: 1,
+                      right: 0,
+                      bottom: 0,
                       child: Container(
-                        width: 15,
-                        height: 15,
+                        width: 12,
+                        height: 12,
                         decoration: BoxDecoration(
                           color: SC.accent,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: SC.bg,
-                            width: 2.5,
-                          ),
+                          border: Border.all(color: SC.bg, width: 2),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Name on its own line — no more competing with the time
-                  // for horizontal space. Bolder + brighter when unread.
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onViewProfile,
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: TextStyle(
-                        color: SC.textPrimary,
-                        fontWeight:
-                            unread ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 17,
-                      ),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: SCText.name.copyWith(
+                      fontWeight:
+                          unread ? FontWeight.w800 : FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   RichText(
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     text: TextSpan(
-                      style: TextStyle(
-                        color: unread
-                            ? SC.textPrimary
-                            : SC.textMuted,
-                        fontSize: 14,
+                      style: SCText.preview.copyWith(
+                        color: unread ? SC.textPrimary : SC.textMuted,
                         fontWeight:
-                            unread ? FontWeight.w600 : FontWeight.normal,
+                            unread ? FontWeight.w600 : FontWeight.w400,
                       ),
                       children: subtitleParts,
                     ),
@@ -635,136 +624,154 @@ class _FriendChatRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Trailing column: time at top with its own space, phone +
-            // 3-dot menu below. Stops the time from being squeezed
-            // between the name ellipsis and the icons.
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (lastMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // The unread dot lives next to the time — never in
-                        // the buttons row — so the call + overflow icons
-                        // stay pinned at a fixed right-hand position
-                        // whether the row is read or unread.
-                        if (unread) ...[
-                          Container(
-                            width: 8,
-                            height: 8,
-                            margin: const EdgeInsets.only(right: 5),
-                            decoration: const BoxDecoration(
-                              color: SC.accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                        Text(
-                          _formatTime(lastMessage!.createdAt),
-                          style: TextStyle(
-                            color: unread
-                                ? SC.accent
-                                : SC.textMuted,
-                            fontSize: 12,
-                            fontWeight: unread
-                                ? FontWeight.w700
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ],
+                if (unread) ...[
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      color: SC.accent,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Call button — sits just before the overflow menu.
-                    // A tap dials the friend directly (LiveKit call +
-                    // ring) via the shared CallLauncher.
-                    IconButton(
-                      onPressed: onCall,
-                      tooltip: AppStrings.t('tooltip_call'),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints.tightFor(
-                          width: 34, height: 34),
-                      icon: const Icon(Icons.phone,
-                          color: Colors.white, size: 20),
-                    ),
-                    PopupMenuButton<String>(
-                      tooltip: AppStrings.t('tooltip_more'),
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.more_vert,
-                          color: SC.textMuted, size: 20),
-                      color: SC.bubbleIn,
-                      onSelected: (v) {
-                        if (v == 'profile') onViewProfile();
-                        if (v == 'report') onReport();
-                        if (v == 'block') onBlock();
-                        if (v == 'delete') onDeleteConversation();
-                      },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem<String>(
-                          value: 'profile',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.person_outline,
-                                  size: 18,
-                                  color: SC.textPrimary),
-                              const SizedBox(width: 10),
-                              Text(AppStrings.t('view_profile'),
-                                  style: const TextStyle(
-                                      color: SC.textPrimary)),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'report',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.flag_outlined,
-                                  size: 18, color: Color(0xFFE53935)),
-                              const SizedBox(width: 10),
-                              Text(AppStrings.t('report'),
-                                  style: const TextStyle(
-                                      color: Color(0xFFE53935))),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'block',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.block,
-                                  size: 18, color: Color(0xFFE53935)),
-                              const SizedBox(width: 10),
-                              Text(AppStrings.t('block'),
-                                  style: const TextStyle(
-                                      color: Color(0xFFE53935))),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.delete_outline,
-                                  size: 18, color: Color(0xFFE53935)),
-                              const SizedBox(width: 10),
-                              Text(AppStrings.t('delete_conversation'),
-                                  style: const TextStyle(
-                                      color: Color(0xFFE53935))),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                ],
+                Text(
+                  lastMessage != null
+                      ? _formatTime(lastMessage!.createdAt)
+                      : '',
+                  style: SCText.meta.copyWith(
+                    color: unread ? SC.accent : SC.textMuted,
+                  ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Long-press surface for the secondary actions that used to live as a
+  /// trailing phone icon + 3-dot popup. Matches the minimalist Midnight
+  /// row layout (avatar | name + preview | time) without dropping the
+  /// call / view profile / report / block / delete affordances.
+  Future<void> _showRowMenu(BuildContext context) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _RowActionsSheet(name: profile.displayName),
+    );
+    switch (picked) {
+      case 'call':
+        onCall();
+        break;
+      case 'profile':
+        onViewProfile();
+        break;
+      case 'report':
+        onReport();
+        break;
+      case 'block':
+        onBlock();
+        break;
+      case 'delete':
+        onDeleteConversation();
+        break;
+    }
+  }
+}
+
+class _RowActionsSheet extends StatelessWidget {
+  const _RowActionsSheet({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: SC.bubbleIn,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: SC.glassBorderStrong),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (name.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                  child: Text(name, style: SCText.h3),
+                ),
+              _RowAction(
+                icon: Icons.phone_rounded,
+                label: AppStrings.t('tooltip_call'),
+                onTap: () => Navigator.of(context).pop('call'),
+              ),
+              _RowAction(
+                icon: Icons.person_outline_rounded,
+                label: AppStrings.t('view_profile'),
+                onTap: () => Navigator.of(context).pop('profile'),
+              ),
+              _RowAction(
+                icon: Icons.flag_outlined,
+                label: AppStrings.t('report'),
+                destructive: true,
+                onTap: () => Navigator.of(context).pop('report'),
+              ),
+              _RowAction(
+                icon: Icons.block,
+                label: AppStrings.t('block'),
+                destructive: true,
+                onTap: () => Navigator.of(context).pop('block'),
+              ),
+              _RowAction(
+                icon: Icons.delete_outline,
+                label: AppStrings.t('delete_conversation'),
+                destructive: true,
+                onTap: () => Navigator.of(context).pop('delete'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RowAction extends StatelessWidget {
+  const _RowAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? const Color(0xFFE53935) : SC.textPrimary;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: SCText.body.copyWith(color: color, fontSize: 15),
             ),
           ],
         ),
@@ -790,23 +797,11 @@ class _InviteToCallBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            colors: [SC.accent, SC.accentDeep],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: SC.accent.withValues(alpha: 0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: GlassContainer(
+        borderRadius: BorderRadius.circular(22),
+        color: SC.glassStrong,
+        border: SC.glassBorderStrong,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
