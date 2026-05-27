@@ -19,15 +19,34 @@ class MeshBackground extends StatelessWidget {
       child: Stack(
         children: [
           // Designer-exported mesh (blue / violet / cyan / navy halos).
-          // BoxFit.cover so it scales to phone or tablet without leaving
-          // navy bars on the edges.
+          // We force the canvas to a landscape aspect so BoxFit.cover
+          // always crops the violet/cyan halos top & bottom and only
+          // the dark middle band shows through — same look on a 390-wide
+          // phone and a 1440-wide desktop window.
           Positioned.fill(
-            child: Image.asset(
-              'assets/mesh_midnight_bg.png',
-              fit: BoxFit.cover,
-              // If the asset is missing we silently keep the navy base
-              // — better than crashing the screen.
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            child: ClipRect(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const minAspect = 16 / 9;
+                  final h = constraints.maxHeight;
+                  final w = constraints.maxWidth;
+                  final canvasW =
+                      (w / h) < minAspect ? h * minAspect : w;
+                  return OverflowBox(
+                    minWidth: canvasW,
+                    maxWidth: canvasW,
+                    minHeight: h,
+                    maxHeight: h,
+                    child: Image.asset(
+                      'assets/mesh_midnight_bg.png',
+                      fit: BoxFit.cover,
+                      // If the asset is missing we silently keep the
+                      // navy base — better than crashing the screen.
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           // Vignette: nudges contrast up at the edges without going pitch black.
