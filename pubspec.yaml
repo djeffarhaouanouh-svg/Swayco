@@ -134,7 +134,7 @@ flutter:
     # Swayco Midnight ambient background — used by MeshBackground.
     - assets/mesh_midnight_bg.png
     # Illustration shown in the "add your photo" profile tip dialog.
-    - assets/add-photo.png
+    - assets/add-picture.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
