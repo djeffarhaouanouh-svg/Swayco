@@ -1514,7 +1514,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
               Icons.translate,
               size: 24,
               color: active
-                  ? SC.online
+                  ? SC.accent
                   : SC.textMuted,
             ),
             const SizedBox(width: 8),
