@@ -7,7 +7,10 @@ import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
+import '../theme/swayco_theme.dart';
 import '../theme/whatsapp_call_theme.dart';
+import '../widgets/glass.dart';
+import '../widgets/mesh_background.dart';
 
 /// First-run flow: first name + the user's own spoken language (stored locally).
 /// The remote participant's language is discovered from their LiveKit metadata
@@ -178,67 +181,102 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.editing) {
+      // Restyled to the Swayco Midnight DA: mesh background, glass
+      // header bar with the back button + title floating, glass
+      // inputs with cyan focus, and a SC.accent "Save" pill matching
+      // the rest of the migrated screens.
       return Scaffold(
-        backgroundColor: WhatsAppCallTheme.scaffold,
-        appBar: AppBar(
-          title: Text(AppStrings.t('onb_profile_title')),
-          backgroundColor: WhatsAppCallTheme.scaffold,
-          foregroundColor: WhatsAppCallTheme.strongText,
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        backgroundColor: SC.bg,
+        body: MeshBackground(
+          child: SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _nameCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(color: WhatsAppCallTheme.strongText),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.t('onb_first_name_label'),
-                    // The label floats up because the controller is
-                    // pre-populated by `_prefill`; the hint is only seen on
-                    // a brand-new account that landed here directly.
-                    hintText: AppStrings.t('onb_first_name_hint'),
-                    prefixIcon: const Icon(Icons.badge_outlined,
-                        color: WhatsAppCallTheme.subtleText),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                  child: GlassContainer(
+                    borderRadius: BorderRadius.circular(22),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      children: [
+                        GlassIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            AppStrings.t('onb_profile_title'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SCText.h3,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _bioCtrl,
-                  textCapitalization: TextCapitalization.sentences,
-                  maxLength: profileBioMaxLength,
-                  maxLines: 3,
-                  minLines: 2,
-                  style: const TextStyle(color: WhatsAppCallTheme.strongText),
-                  decoration: InputDecoration(
-                    labelText: 'Bio',
-                    hintText: AppStrings.t('profile_bio_placeholder'),
-                    prefixIcon: const Icon(Icons.short_text,
-                        color: WhatsAppCallTheme.subtleText),
-                    alignLabelWithHint: true,
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _GlassTextField(
+                          controller: _nameCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          label: AppStrings.t('onb_first_name_label'),
+                          hint: AppStrings.t('onb_first_name_hint'),
+                          icon: Icons.badge_outlined,
+                        ),
+                        const SizedBox(height: 14),
+                        _GlassTextField(
+                          controller: _bioCtrl,
+                          textCapitalization: TextCapitalization.sentences,
+                          maxLength: profileBioMaxLength,
+                          minLines: 2,
+                          maxLines: 3,
+                          label: 'Bio',
+                          hint: AppStrings.t('profile_bio_placeholder'),
+                          icon: Icons.short_text,
+                          alignLabelWithHint: true,
+                        ),
+                        const SizedBox(height: 22),
+                        Text(
+                          AppStrings.t('onb_language_picker_label'),
+                          style: SCText.body.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _LanguageGrid(
+                          selected: _selectedLang,
+                          onSelect: _onLanguageSelected,
+                        ),
+                        const SizedBox(height: 28),
+                        FilledButton(
+                          onPressed: _finish,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: SC.accent,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            AppStrings.t('onb_save'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  AppStrings.t('onb_language_picker_label'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _LanguageGrid(
-                  selected: _selectedLang,
-                  onSelect: _onLanguageSelected,
-                ),
-                const SizedBox(height: 28),
-                FilledButton(
-                  onPressed: _finish,
-                  child: Text(AppStrings.t('onb_save')),
                 ),
               ],
             ),
@@ -666,9 +704,9 @@ class _LanguageChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? WhatsAppCallTheme.accent : WhatsAppCallTheme.bar;
-    final border = selected ? WhatsAppCallTheme.accent : Colors.white.withValues(alpha: 0.08);
-    final fg = selected ? Colors.white : WhatsAppCallTheme.strongText;
+    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.bubbleIn;
+    final borderColor = selected ? SC.accent : SC.glassBorder;
+    final fg = selected ? SC.accent : SC.textPrimary;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(14),
@@ -679,7 +717,10 @@ class _LanguageChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border, width: 1),
+            border: Border.all(
+              color: borderColor,
+              width: selected ? 1.5 : 1,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -688,9 +729,85 @@ class _LanguageChip extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 language.label,
-                style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Glass-styled text field matching the Swayco Midnight DA — used by
+/// the "Your profile" edit form. Wraps a [TextField] so the
+/// surrounding screen doesn't have to repeat the border / fill /
+/// cursor configuration each time.
+class _GlassTextField extends StatelessWidget {
+  const _GlassTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.textCapitalization = TextCapitalization.none,
+    this.maxLength,
+    this.minLines,
+    this.maxLines = 1,
+    this.alignLabelWithHint = false,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final TextCapitalization textCapitalization;
+  final int? maxLength;
+  final int? minLines;
+  final int? maxLines;
+  final bool alignLabelWithHint;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextSelectionTheme(
+      data: TextSelectionThemeData(
+        cursorColor: SC.accent,
+        selectionColor: SC.accent.withValues(alpha: 0.35),
+        selectionHandleColor: SC.accent,
+      ),
+      child: TextField(
+        controller: controller,
+        textCapitalization: textCapitalization,
+        maxLength: maxLength,
+        minLines: minLines,
+        maxLines: maxLines,
+        cursorColor: SC.accent,
+        style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: SC.textMuted),
+          floatingLabelStyle: const TextStyle(color: SC.accent),
+          hintText: hint,
+          hintStyle: const TextStyle(color: SC.textMuted),
+          prefixIcon: Icon(icon, color: SC.textMuted),
+          filled: true,
+          fillColor: SC.bubbleIn,
+          alignLabelWithHint: alignLabelWithHint,
+          counterStyle: const TextStyle(color: SC.textMuted),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: SC.glassBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: SC.glassBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: SC.accent, width: 1.5),
           ),
         ),
       ),
