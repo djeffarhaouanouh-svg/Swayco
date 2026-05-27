@@ -619,6 +619,9 @@ abstract final class ProfileApi {
   ///   free proxy for "recently changed profile".
   /// • Cross-language bonus — Swayco is a translation app, so a peer
   ///   who speaks a different language is more interesting by default.
+  /// • Popularity bonus — log-scaled count of received likes so
+  ///   already-loved profiles drift to the top of the deck without one
+  ///   mega-popular account locking the #1 slot forever.
   /// • Bio bonus — completed profiles look more inviting on a card.
   /// • Random jitter (0..10) so identical scores shuffle gently across
   ///   refreshes.
@@ -630,6 +633,7 @@ abstract final class ProfileApi {
     RemoteProfile p,
     int positionInFetch,
     String myLang,
+    int receivedLikes,
   ) {
     double s = 0;
 
@@ -658,6 +662,13 @@ abstract final class ProfileApi {
         theirLang.isNotEmpty &&
         theirLang != myLang) {
       s += 30;
+    }
+
+    // Popularity boost: log10(likes + 1) * 18 → caps around +36 for
+    // 100+ likes, ~+18 for 10 likes, ~+5 for 1 like, 0 for none. The
+    // log scale prevents one viral account from flattening the deck.
+    if (receivedLikes > 0) {
+      s += log(receivedLikes + 1) / ln10 * 18;
     }
 
     if (p.bio.trim().isNotEmpty) s += 8;
@@ -705,12 +716,51 @@ abstract final class ProfileApi {
         myLang = me?.language.trim().toLowerCase() ?? '';
       } catch (_) {}
 
+      // Batched popularity counts for every candidate in one round-
+      // trip via the `received_likes_counts` SECURITY DEFINER RPC
+      // (migration 0027). Inlined rather than going through LikeApi
+      // because that file imports profile_api and we'd create a
+      // circular import. Best-effort: a failure just skips the
+      // popularity boost — every candidate is treated as 0 likes.
+      Map<String, int> likeCounts = const {};
+      try {
+        final result = await _c.rpc(
+          'received_likes_counts',
+          params: {
+            'p_ids': candidates
+                .map((p) => p.id)
+                .where((id) => id.isNotEmpty)
+                .toList(),
+          },
+        );
+        if (result is List) {
+          final out = <String, int>{};
+          for (final row in result) {
+            final m = Map<String, dynamic>.from(row as Map);
+            final id = m['liked']?.toString() ?? '';
+            final n = (m['n'] as num?)?.toInt() ?? 0;
+            if (id.isNotEmpty) out[id] = n;
+          }
+          likeCounts = out;
+        }
+      } catch (e) {
+        debugPrint('ProfileApi.fetchDiscoverFeed: like counts failed: $e');
+      }
+
       // Score each candidate up front so the random jitter in
       // [_scoreDiscoverCandidate] is computed once per row and the
       // sort comparator stays stable.
       final scored = <(RemoteProfile, double)>[
         for (var i = 0; i < candidates.length; i++)
-          (candidates[i], _scoreDiscoverCandidate(candidates[i], i, myLang)),
+          (
+            candidates[i],
+            _scoreDiscoverCandidate(
+              candidates[i],
+              i,
+              myLang,
+              likeCounts[candidates[i].id] ?? 0,
+            ),
+          ),
       ];
       scored.sort((a, b) => b.$2.compareTo(a.$2));
       return List<RemoteProfile>.unmodifiable(

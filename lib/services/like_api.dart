@@ -153,6 +153,36 @@ abstract final class LikeApi {
     }
   }
 
+  /// Batched count of `received likes` for a list of profile ids.
+  /// Calls the `received_likes_counts` SECURITY DEFINER RPC (migration
+  /// 0027) so a single round-trip yields the popularity metric for
+  /// every Discover candidate. Used by the feed scorer to boost
+  /// profiles that already have traction. Returns a map keyed by id;
+  /// ids absent from the result map have zero likes.
+  static Future<Map<String, int>> countLikersOfMany(
+    List<String> userIds,
+  ) async {
+    if (!isSupabaseReady || userIds.isEmpty) return const {};
+    try {
+      final result = await _c.rpc(
+        'received_likes_counts',
+        params: {'p_ids': userIds},
+      );
+      if (result is! List) return const {};
+      final out = <String, int>{};
+      for (final row in result) {
+        final m = Map<String, dynamic>.from(row as Map);
+        final id = m['liked']?.toString() ?? '';
+        final n = (m['n'] as num?)?.toInt() ?? 0;
+        if (id.isNotEmpty) out[id] = n;
+      }
+      return out;
+    } catch (e) {
+      debugPrint('LikeApi.countLikersOfMany failed: $e');
+      return const {};
+    }
+  }
+
   /// Quick count for the badge on the profile screen.
   static Future<int> countLikersOf(String userId) async {
     if (!isSupabaseReady || userId.isEmpty) return 0;
