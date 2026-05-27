@@ -551,11 +551,14 @@ class _FriendChatRow extends StatelessWidget {
       subtitleParts.add(TextSpan(text: AppStrings.t('chat_tap_to_chat')));
     }
 
-    return InkWell(
-      onTap: onTap,
-      onLongPress: () => _showRowMenu(context),
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: () => _showRowMenu(context),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
@@ -649,6 +652,7 @@ class _FriendChatRow extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );
