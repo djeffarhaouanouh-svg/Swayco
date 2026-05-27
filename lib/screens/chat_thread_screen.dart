@@ -543,93 +543,93 @@ class _ThreadHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Transparent glass bar kept, but with no surrounding / internal
-    // padding — back button, avatar+name and the trailing call / more
-    // icons sit flush against the bar's rounded edges.
-    return GlassContainer(
-      borderRadius: BorderRadius.zero,
-      padding: EdgeInsets.zero,
-      child: Row(
-        children: [
-          GlassIconButton(
-            icon: Icons.arrow_back_rounded,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onViewProfile,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    ProfileAvatar(
-                      displayName: title,
-                      avatarUrl: peer?.avatarUrl,
-                      avatarColorHex: peer?.avatarColor,
-                      size: 38,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: SCText.h3,
-                          ),
-                          if (_peerOnline) ...[
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: SC.online,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: SC.online,
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  AppStrings.t('online_now'),
-                                  style: SCText.accent.copyWith(
-                                    fontSize: 11,
-                                    color: SC.online,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+      child: GlassContainer(
+        borderRadius: BorderRadius.circular(22),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          children: [
+            GlassIconButton(
+              icon: Icons.arrow_back_rounded,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onViewProfile,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      ProfileAvatar(
+                        displayName: title,
+                        avatarUrl: peer?.avatarUrl,
+                        avatarColorHex: peer?.avatarColor,
+                        size: 38,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SCText.h3,
+                            ),
+                            if (_peerOnline) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: SC.online,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: SC.online,
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    AppStrings.t('online_now'),
+                                    style: SCText.accent.copyWith(
+                                      fontSize: 11,
+                                      color: SC.online,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          GlassIconButton(
-            icon: Icons.phone_rounded,
-            onTap: onCall,
-          ),
-          const SizedBox(width: 6),
-          _HeaderMoreButton(
-            peerBlocked: peerBlocked,
-            onToggleBlock: onToggleBlock,
-            onReport: onReport,
-          ),
-        ],
+            GlassIconButton(
+              icon: Icons.phone_rounded,
+              onTap: onCall,
+            ),
+            const SizedBox(width: 6),
+            _HeaderMoreButton(
+              peerBlocked: peerBlocked,
+              onToggleBlock: onToggleBlock,
+              onReport: onReport,
+            ),
+          ],
+        ),
       ),
     );
   }
