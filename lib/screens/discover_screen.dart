@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
-import '../services/friendship_api.dart';
-import '../services/greetings.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
@@ -17,8 +15,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
-import '../widgets/profile_avatar.dart';
-import 'profile_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -45,25 +41,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // previous. Snapping + the slide animation are handled by PageView.
   final PageController _pageController = PageController();
 
-  // Inline search state — bar expands, dropdown of matching profiles below.
-  bool _searchExpanded = false;
-  final _searchCtrl = TextEditingController();
-  final _searchFocus = FocusNode();
-  Timer? _searchDebounce;
   Timer? _pollTimer;
   String _myId = '';
-  bool _searching = false;
-  List<RemoteProfile> _searchResults = const [];
-  // Friendship rows involving me — used to label each result with its
-  // existing status (pending / accepted) so we don't show "send" twice.
-  List<Friendship> _myFriendships = const [];
 
   @override
   void initState() {
     super.initState();
-    _bootstrapSearch();
-    // Web: periodically refresh friendships + likes so a peer accepting
-    // / blocking / liking gets reflected on the Discover cards within
+    _bootstrap();
+    // Web: periodically refresh the likes I've given so a heart that
+    // got optimistically toggled on a different device converges within
     // ~10s. The feed itself is not re-fetched (it'd reset the swipe
     // position) — only the lightweight signal queries.
     _pollTimer = WebPoll.every(
@@ -72,24 +58,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  /// Lightweight refresh: only re-pulls friendship rows + likes I've
-  /// given. Keeps the card stack and `_topIndex` exactly where they are.
+  /// Lightweight refresh: re-pulls likes I've given. Keeps the card
+  /// stack and `_topIndex` exactly where they are.
   Future<void> _refreshLiveSignals() async {
     if (_myId.isEmpty || !isSupabaseReady) return;
     try {
-      final mine = await FriendshipApi.fetchMine(_myId);
       final liked = await LikeApi.fetchMyLikedIds(_myId);
       if (!mounted) return;
-      setState(() {
-        _myFriendships = mine;
-        _likedIds = liked;
-      });
+      setState(() => _likedIds = liked);
     } catch (_) {
       // Polling errors are non-fatal — next tick will retry.
     }
   }
 
-  Future<void> _bootstrapSearch() async {
+  Future<void> _bootstrap() async {
     final id = await DeviceId.getOrCreate();
     if (!mounted) return;
     setState(() => _myId = id);
@@ -98,12 +80,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       return;
     }
     try {
-      final mine = await FriendshipApi.fetchMine(id);
       final liked = await LikeApi.fetchMyLikedIds(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
       if (!mounted) return;
       setState(() {
-        _myFriendships = mine;
         _likedIds = liked;
         _profiles = feed;
         _feedLoading = false;
@@ -149,95 +129,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void dispose() {
     _pageController.dispose();
-    _searchDebounce?.cancel();
     _pollTimer?.cancel();
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
     super.dispose();
-  }
-
-  void _expandSearch() {
-    setState(() => _searchExpanded = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocus.requestFocus();
-    });
-  }
-
-  void _collapseSearch() {
-    _searchDebounce?.cancel();
-    _searchFocus.unfocus();
-    setState(() {
-      _searchExpanded = false;
-      _searchCtrl.clear();
-      _searchResults = const [];
-      _searching = false;
-    });
-  }
-
-  void _onSearchQueryChanged(String value) {
-    // Rebuild so the dropdown's "empty query" / "loading for X" hint
-    // reflects the typed text immediately, before the debounced search
-    // finishes resolving.
-    setState(() {});
-    _searchDebounce?.cancel();
-    _searchDebounce =
-        Timer(const Duration(milliseconds: 250), () => _runSearch(value));
-  }
-
-  Future<void> _runSearch(String value) async {
-    final q = value.trim();
-    if (q.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _searchResults = const [];
-        _searching = false;
-      });
-      return;
-    }
-    if (!isSupabaseReady || _myId.isEmpty) return;
-    setState(() => _searching = true);
-    try {
-      final results = await ProfileApi.searchByFirstName(
-        query: q,
-        myDeviceId: _myId,
-      );
-      if (!mounted) return;
-      setState(() => _searchResults = results);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _searchResults = const []);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  Future<void> _openSearchResult(RemoteProfile peer) async {
-    _collapseSearch();
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: peer.id)),
-    );
-    // Coming back from the profile, the user may have just followed —
-    // refresh so pills reflect reality without waiting for the 10s poll.
-    if (mounted) _refreshLiveSignals();
-  }
-
-  Future<void> _sendFriendRequest(RemoteProfile peer) async {
-    final f = await FriendshipApi.sendRequest(meId: _myId, peerId: peer.id);
-    if (!mounted) return;
-    if (f != null) {
-      setState(() => _myFriendships = [..._myFriendships, f]);
-      // Seed a 👋 so the conversation appears on both sides immediately
-      // — best-effort, ignored on failure.
-      unawaited(Greetings.sendIntroMessage(myId: _myId, peerId: peer.id));
-    }
-    // No confirmation snackbar — adding is silent so swiping through the
-    // Discover stack isn't interrupted by a toast on every card.
-  }
-
-  FriendshipStatus _statusFor(RemoteProfile peer) {
-    final (status, _) =
-        FriendshipApi.statusWith(_myId, peer.id, _myFriendships);
-    return status;
   }
 
   /// TikTok-style "next profile" — slides the next card up into view.
@@ -326,79 +219,31 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SC.bg,
+      // Cards extend behind the floating bottom nav for the TikTok-style
+      // full-bleed look (nav stays interactive on top via RootShell's
+      // Stack). extendBody achieves the same on the top edge w.r.t. the
+      // status bar — the photo bleeds under it through MeshBackground.
+      extendBody: true,
+      extendBodyBehindAppBar: true,
       body: MeshBackground(
-        child: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _DiscoverHeader(
-                  expanded: _searchExpanded,
-                  controller: _searchCtrl,
-                  focusNode: _searchFocus,
-                  onTapPill: _expandSearch,
-                  onSubmittedClose: _collapseSearch,
-                  onChanged: _onSearchQueryChanged,
-                ),
-                Expanded(
-                  child: _feedLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                              color: SC.accent),
-                        )
-                      // PageView swallows vertical drags so a RefreshIndicator
-                      // here would never fire — refresh is reached through the
-                      // explicit "Restart" button on the trailing empty page.
-                      : _buildStack(),
-                ),
-                // Spacer for the floating bottom nav.
-                SizedBox(
-                    height: 12 + MediaQuery.paddingOf(context).bottom + 64),
-              ],
-            ),
-            // Tap-outside scrim to dismiss the search.
-            if (_searchExpanded)
-              Positioned.fill(
-                top: 64, // start below the header so taps inside still hit the field
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _collapseSearch,
-                  child: const ColoredBox(color: Color(0x88000000)),
-                ),
-              ),
-            // Search results dropdown — overlays the cards.
-            if (_searchExpanded)
-              Positioned(
-                left: 16,
-                right: 16,
-                top: 60,
-                child: _SearchResultsPanel(
-                  loading: _searching,
-                  query: _searchCtrl.text.trim(),
-                  results: _searchResults,
-                  statusFor: _statusFor,
-                  onAdd: _sendFriendRequest,
-                  onOpen: _openSearchResult,
-                ),
-              ),
-          ],
-        ),
-        ),
+        child: _feedLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: SC.accent),
+              )
+            : _buildStack(),
       ),
     );
   }
 
   Widget _buildStack() {
-    // Each PageView page renders one profile card sized at 3:4 portrait,
-    // capped at 460 wide on desktop so the photo isn't stretched into
-    // the full width of a 1900-px viewport. PageView handles the
-    // vertical snap + slide animation natively — swipe up reveals the
-    // next profile, swipe down brings the previous one back.
+    // One profile per PageView page, capped at 460 wide on desktop so a
+    // 1900-px viewport doesn't stretch the photo across the whole screen.
+    // On mobile the card fills the viewport edge-to-edge — including
+    // under the floating nav bar — for the TikTok feel.
     //
-    // We add one extra page after the last profile: the "all caught up"
-    // empty state, so the user can scroll into it the same way they
-    // scroll between profiles.
+    // An extra page after the last profile shows the "all caught up"
+    // empty state so the user scrolls into it the same way they scroll
+    // between profiles.
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
@@ -408,338 +253,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (i >= _profiles.length) {
           return _Empty(onReset: _reset);
         }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: AspectRatio(
-                aspectRatio: 3 / 4,
-                child: _ProfileCard(
-                  profile: _profiles[i],
-                  onAdd: () {
-                    _sendHello(_profiles[i]);
-                    _advance();
-                  },
-                  onBack: i > 0 ? _back : null,
-                  liked: _likedIds.contains(_profiles[i].id),
-                  onToggleLike: () =>
-                      _toggleLikeOnProfile(_profiles[i].id),
-                ),
-              ),
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: _ProfileCard(
+              profile: _profiles[i],
+              onAdd: () {
+                _sendHello(_profiles[i]);
+                _advance();
+              },
+              onBack: i > 0 ? _back : null,
+              liked: _likedIds.contains(_profiles[i].id),
+              onToggleLike: () =>
+                  _toggleLikeOnProfile(_profiles[i].id),
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _DiscoverHeader extends StatelessWidget {
-  const _DiscoverHeader({
-    required this.expanded,
-    required this.controller,
-    required this.focusNode,
-    required this.onTapPill,
-    required this.onChanged,
-    required this.onSubmittedClose,
-  });
-
-  final bool expanded;
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final VoidCallback onTapPill;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onSubmittedClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Row(
-        children: [
-          Text(
-            AppStrings.t('discover_title'),
-            style: SCText.h1,
-          ),
-          const Spacer(),
-          // Search pill: compact button when collapsed, wider TextField
-          // when expanded — but never full-width.
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            width: expanded ? 200 : null,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: SC.glassStrong,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: SC.glassBorder),
-            ),
-            child: Row(
-              mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
-              children: [
-                const Icon(Icons.search,
-                    size: 16, color: SC.textMuted),
-                const SizedBox(width: 6),
-                if (expanded)
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onChanged: onChanged,
-                      textInputAction: TextInputAction.search,
-                      cursorColor: SC.accent,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 13,
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: AppStrings.t('search_friend_hint'),
-                        hintStyle: const TextStyle(
-                          color: SC.textMuted,
-                          fontSize: 13,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  )
-                else
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onTapPill,
-                    child: Text(
-                      AppStrings.t('search_chercher'),
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                if (expanded)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onSubmittedClose,
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.close,
-                          size: 16, color: SC.textMuted),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchResultsPanel extends StatelessWidget {
-  const _SearchResultsPanel({
-    required this.loading,
-    required this.query,
-    required this.results,
-    required this.statusFor,
-    required this.onAdd,
-    required this.onOpen,
-  });
-
-  final bool loading;
-  final String query;
-  final List<RemoteProfile> results;
-  final FriendshipStatus Function(RemoteProfile) statusFor;
-  final ValueChanged<RemoteProfile> onAdd;
-  final ValueChanged<RemoteProfile> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.bubbleIn,
-      borderRadius: BorderRadius.circular(16),
-      elevation: 8,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 360),
-        child: _buildBody(),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (query.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          AppStrings.t('search_intro_hint'),
-          style: const TextStyle(
-              color: SC.textMuted, fontSize: 13),
-        ),
-      );
-    }
-    if (loading) {
-      return const Padding(
-        padding: EdgeInsets.all(20),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-                color: SC.accent, strokeWidth: 2.4),
-          ),
-        ),
-      );
-    }
-    if (results.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          'Aucun profil pour « $query ».',
-          style: const TextStyle(
-              color: SC.textMuted, fontSize: 13),
-        ),
-      );
-    }
-    return ListView.separated(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      itemCount: results.length,
-      separatorBuilder: (_, _) => Divider(
-        color: Colors.white.withValues(alpha: 0.06),
-        height: 1,
-      ),
-      itemBuilder: (_, i) {
-        final p = results[i];
-        return _SearchResultRow(
-          profile: p,
-          status: statusFor(p),
-          onAdd: () => onAdd(p),
-          onTap: () => onOpen(p),
-        );
-      },
-    );
-  }
-}
-
-class _SearchResultRow extends StatelessWidget {
-  const _SearchResultRow({
-    required this.profile,
-    required this.status,
-    required this.onAdd,
-    required this.onTap,
-  });
-
-  final RemoteProfile profile;
-  final FriendshipStatus status;
-  final VoidCallback onAdd;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            ProfileAvatar(
-              displayName: profile.displayName,
-              avatarUrl: profile.avatarUrl,
-              avatarColorHex: profile.avatarColor,
-              size: 38,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    profile.displayName.isEmpty ? '—' : profile.displayName,
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (profile.handle.isNotEmpty)
-                    Text(
-                      '@${profile.handle}',
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            _statusButton(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _statusButton() {
-    switch (status) {
-      case FriendshipStatus.accepted:
-        return _StatusPill(
-            label: AppStrings.t('friendship_friend'),
-            color: SC.accent);
-      case FriendshipStatus.pendingOutgoing:
-        return _StatusPill(
-            label: AppStrings.t('friendship_sent'), color: Colors.amber);
-      case FriendshipStatus.pendingIncoming:
-        return _StatusPill(
-            label: AppStrings.t('friendship_pending_in'),
-            color: Colors.amber);
-      case FriendshipStatus.rejected:
-      case FriendshipStatus.none:
-        return Material(
-          color: SC.accent,
-          borderRadius: BorderRadius.circular(999),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(999),
-            onTap: onAdd,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 7),
-              child: Text(
-                // Reuses the search-result "Ajouter" button label —
-                // localised via the friendship_sent / etc. keys' sibling.
-                AppStrings.t('add_friend_short'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        );
-    }
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-            color: color, fontSize: 12, fontWeight: FontWeight.w600),
-      ),
     );
   }
 }
@@ -812,16 +342,21 @@ class _ProfileCard extends StatelessWidget {
               ),
             ),
           ),
+          // Inner inset values: enough breathing room for the back button
+          // to clear the notch / status bar at the top, and for the
+          // bottom content (name, Send, reaction rail) to clear the
+          // floating GlassNavBar (RootShell renders it at
+          // bottom = 12 + safeBottom with height 54).
           if (onBack != null)
             Positioned(
-              top: 14,
+              top: 14 + MediaQuery.paddingOf(context).top,
               left: 14,
               child: _BackButton(onTap: onBack!),
             ),
           Positioned(
             left: 22,
             right: 22,
-            bottom: 22,
+            bottom: 22 + 12 + 54 + MediaQuery.paddingOf(context).bottom,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
