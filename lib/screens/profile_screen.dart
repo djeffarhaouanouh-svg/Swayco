@@ -2123,37 +2123,38 @@ class _PhotosGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPhoto = discoverPhotoUrl.isNotEmpty;
     if (viewerMode && !hasPhoto) return const SizedBox.shrink();
-    // Own profile with no photo yet → a full-width call-to-action that
-    // explains why a Discover photo matters, instead of a lonely empty
-    // grid cell.
-    if (!viewerMode && !hasPhoto) {
-      return _AddDiscoverPhotoCta(onTap: onPick);
-    }
     return Align(
       alignment: Alignment.centerLeft,
       child: FractionallySizedBox(
         widthFactor: 1 / 3,
         child: AspectRatio(
           aspectRatio: 1,
-          child: _PhotoCell(
-            photoUrl: hasPhoto ? discoverPhotoUrl : null,
-            viewerMode: viewerMode,
-            onTap: onPick,
-            onDelete: onDelete,
-            likesCount: likesCount,
-            onTapLikes: onTapLikes,
-            iLikePeer: iLikePeer,
-            onTogglePeerLike: onTogglePeerLike,
-          ),
+          child: hasPhoto
+              ? _PhotoCell(
+                  photoUrl: discoverPhotoUrl,
+                  viewerMode: viewerMode,
+                  onTap: onPick,
+                  onDelete: onDelete,
+                  likesCount: likesCount,
+                  onTapLikes: onTapLikes,
+                  iLikePeer: iLikePeer,
+                  onTogglePeerLike: onTogglePeerLike,
+                )
+              // Own profile, no photo yet — a yellow "+" tile that
+              // sits in the same slot the photo would occupy once
+              // uploaded. Single photo only by design (economic).
+              : _AddDiscoverPhotoCta(onTap: onPick),
         ),
       ),
     );
   }
 }
 
-/// Shown on the user's own profile when they have no Discover photo yet
-/// — an accent-tinted card nudging them to add one so they appear in the
-/// Discover stack.
+/// Shown on the user's own profile when they have no Discover photo
+/// yet — a yellow square with a black "+" badge that sits in the same
+/// 1/3-width slot the eventual photo will occupy. Single photo only
+/// by design (economic reasons), so there's no "Tes photos (n)"
+/// header or "Tout voir" affordance — just this one tile.
 class _AddDiscoverPhotoCta extends StatelessWidget {
   const _AddDiscoverPhotoCta({required this.onTap});
 
@@ -2162,59 +2163,24 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SC.accent.withValues(alpha: 0.12),
+      color: const Color(0xFFFFE246),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: SC.accent.withValues(alpha: 0.45),
+        child: Center(
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFF111111),
+              shape: BoxShape.circle,
             ),
-          ),
-          padding: const EdgeInsets.fromLTRB(14, 16, 16, 16),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SC.accent.withValues(alpha: 0.20),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add_a_photo_rounded,
-                    color: SC.accent, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      AppStrings.t('discover_photo_cta_title'),
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      AppStrings.t('discover_photo_cta_body'),
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 12.5,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            child: const Icon(
+              Icons.add_rounded,
+              color: Color(0xFFFFE246),
+              size: 26,
+            ),
           ),
         ),
       ),
