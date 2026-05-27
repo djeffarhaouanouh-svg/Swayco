@@ -1038,8 +1038,10 @@ class _AddButtonState extends State<_AddButton> {
 
 /// Page-snap physics with a stiffer spring than Flutter's default, so
 /// a vertical flick lands on the next card faster. Critically damped
-/// (damping ≈ 2·√(mass·stiffness)) so it never oscillates past the
-/// target page — that was the "scrolls forever" bug.
+/// (damping ≈ 2·√(mass·stiffness)) so the spring never oscillates
+/// past the target page. The fling velocity itself is also clamped
+/// so a very fast flick still settles on the very next card instead
+/// of zooming through several before the spring catches it.
 class _SnappyPagePhysics extends PageScrollPhysics {
   const _SnappyPagePhysics({super.parent});
 
@@ -1055,6 +1057,17 @@ class _SnappyPagePhysics extends PageScrollPhysics {
         // 2 · √(0.5 · 220) ≈ 21 → critically damped, no overshoot.
         damping: 22,
       );
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    // Cap the launch velocity passed to the snap spring so a hard
+    // flick can't carry the offset visually past the next page
+    // before the spring pulls it back. PageScrollPhysics already
+    // limits the *target* to ±1 page; this controls the *path*.
+    final clamped = velocity.clamp(-900.0, 900.0);
+    return super.createBallisticSimulation(position, clamped);
+  }
 }
 
 class _Empty extends StatelessWidget {
