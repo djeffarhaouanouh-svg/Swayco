@@ -1032,8 +1032,9 @@ class _AddButtonState extends State<_AddButton> {
 }
 
 /// Page-snap physics with a stiffer spring than Flutter's default, so
-/// a vertical flick lands on the next card in roughly half the usual
-/// time. Keeps the one-page-per-swipe snapping of PageScrollPhysics.
+/// a vertical flick lands on the next card faster. Critically damped
+/// (damping ≈ 2·√(mass·stiffness)) so it never oscillates past the
+/// target page — that was the "scrolls forever" bug.
 class _SnappyPagePhysics extends PageScrollPhysics {
   const _SnappyPagePhysics({super.parent});
 
@@ -1044,9 +1045,10 @@ class _SnappyPagePhysics extends PageScrollPhysics {
 
   @override
   SpringDescription get spring => const SpringDescription(
-        mass: 30,
-        stiffness: 250,
-        damping: 1.0,
+        mass: 0.5,
+        stiffness: 220,
+        // 2 · √(0.5 · 220) ≈ 21 → critically damped, no overshoot.
+        damping: 22,
       );
 }
 
