@@ -378,11 +378,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       // was opening a visible gap above the first card / below the
       // last one.
       physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
-      itemCount: _profiles.length + 1,
+      // Unbounded itemCount + modulo on the index = the feed loops
+      // forever: after the last profile the user lands back on the
+      // first one (1 → 2 → 3 → 1 → 2 → 3 …).
       itemBuilder: (ctx, i) {
-        if (i >= _profiles.length) {
+        if (_profiles.isEmpty) {
           return _Empty(onReset: _reset);
         }
+        // Dart's `%` returns a non-negative result for a positive
+        // divisor, so this also wraps cleanly when the user swipes
+        // backward past the first card.
+        final profile = _profiles[i % _profiles.length];
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
@@ -393,11 +399,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               // having to reserve padding around it.
               aspectRatio: 4 / 5,
               child: _ProfileCard(
-                profile: _profiles[i],
-                onAdd: () => _sendHello(_profiles[i]),
-                liked: _likedIds.contains(_profiles[i].id),
-                onToggleLike: () =>
-                    _toggleLikeOnProfile(_profiles[i].id),
+                profile: profile,
+                onAdd: () => _sendHello(profile),
+                liked: _likedIds.contains(profile.id),
+                onToggleLike: () => _toggleLikeOnProfile(profile.id),
               ),
             ),
           ),
