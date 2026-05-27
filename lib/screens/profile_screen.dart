@@ -711,7 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                       ),
                       const SizedBox(height: 16),
                     ],
-                    _PlansSection(
+                    _MySubscriptionSection(
                       currentTier: _remote?.subscriptionTier ?? 'free',
                     ),
                   ],
@@ -931,6 +931,103 @@ class _CreditsCard extends StatelessWidget {
               child: const _ManageSubscriptionButton(),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Collapsible "Mon abonnement" card that gates the upgrade pricing
+/// cards behind a header tap. Mirrors the rest of the profile card
+/// stack (SC.bubbleIn surface, 16 px radius, slate border) and slides
+/// the [_PlansSection] in / out via an AnimatedSize. Hidden entirely
+/// when the user is on the top tier (Ultra Plus) — no upgrades to
+/// surface.
+class _MySubscriptionSection extends StatefulWidget {
+  const _MySubscriptionSection({required this.currentTier});
+
+  final String currentTier;
+
+  @override
+  State<_MySubscriptionSection> createState() =>
+      _MySubscriptionSectionState();
+}
+
+class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Same gate as _PlansSection: Ultra users see no upgrades, so the
+    // whole "Mon abonnement" affordance collapses to nothing.
+    final myRank = _PlansSection._rank(widget.currentTier);
+    final hasUpgrades = _PlansSection._ladder.skip(myRank + 1).isNotEmpty;
+    if (!hasUpgrades) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: SC.bubbleIn,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A3942)),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_outlined,
+                      color: SC.accent,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        AppStrings.t('my_subscription_section'),
+                        style: const TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      duration: const Duration(milliseconds: 180),
+                      turns: _expanded ? 0.5 : 0.0,
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: SC.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          ClipRect(
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: _expanded
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: _PlansSection(currentTier: widget.currentTier),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ),
         ],
       ),
     );
