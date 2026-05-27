@@ -245,9 +245,30 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   /// Sends a "👋 Coucou !" message to the visible profile via ChatApi.
-  /// The conversation id is the same deterministic dm-{a}-{b} key the
-  /// chat list uses, so the message lands directly in their thread.
-  Future<void> _sendHello(RemoteProfile peer) async {
+  Future<void> _sendHello(RemoteProfile peer) => _sendQuickMessage(
+        peer,
+        body: '👋 Coucou !',
+        snack: 'Demande envoyée à ${peer.displayName}',
+      );
+
+  /// Sends a one-character reaction message (the tapped emoji) to [peer].
+  /// Reuses the Coucou path so the receiver gets a real chat message
+  /// that opens the thread on their side.
+  Future<void> _sendEmojiReaction(RemoteProfile peer, String emoji) =>
+      _sendQuickMessage(
+        peer,
+        body: emoji,
+        snack: '$emoji envoyé à ${peer.displayName}',
+      );
+
+  /// Drop [body] into the deterministic dm-{a}-{b} thread for the local
+  /// user and [peer], same conversation id the chat list uses. Shared by
+  /// the "Ajouter" 👋 pill and the reaction-rail emoji taps.
+  Future<void> _sendQuickMessage(
+    RemoteProfile peer, {
+    required String body,
+    required String snack,
+  }) async {
     if (_myId.isEmpty || peer.id.isEmpty) return;
     try {
       final local = await UserPrefs.loadProfile();
@@ -266,13 +287,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         senderId: _myId,
         senderName: myName,
         recipientId: peer.id,
-        body: '👋 Coucou !',
+        body: body,
         language: myLang,
       );
       if (!mounted) return;
-      _showAddedSnack(
-        'Demande envoyée à ${peer.displayName}',
-      );
+      _showAddedSnack(snack);
     } catch (e) {
       if (!mounted) return;
       _showAddedSnack('Envoi échoué : $e', isError: true);
@@ -464,6 +483,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 onAdd: () => _sendHello(profile),
                 liked: _likedIds.contains(profile.id),
                 onToggleLike: () => _toggleLikeOnProfile(profile.id),
+                onSendEmoji: (emoji) => _sendEmojiReaction(profile, emoji),
               ),
             ),
           ),
@@ -800,6 +820,7 @@ class _ProfileCard extends StatelessWidget {
     required this.onAdd,
     this.liked = false,
     this.onToggleLike,
+    this.onSendEmoji,
   });
 
   final RemoteProfile profile;
@@ -808,6 +829,9 @@ class _ProfileCard extends StatelessWidget {
   /// When non-null, a heart button is rendered to the right of "Envoyer 👋".
   /// Tap toggles liked state.
   final VoidCallback? onToggleLike;
+  /// Fires with the emoji string when one of the reaction-rail buttons
+  /// is tapped — sends that emoji as a chat message to [profile].
+  final ValueChanged<String>? onSendEmoji;
 
   @override
   Widget build(BuildContext context) {
@@ -934,6 +958,7 @@ class _ProfileCard extends StatelessWidget {
                   _ReactionRail(
                     heart: _LikeHeart(
                         liked: liked, onTap: onToggleLike!),
+                    onSendEmoji: onSendEmoji,
                   ),
                 ],
               ],
@@ -984,9 +1009,13 @@ class _LikeHeart extends StatelessWidget {
 /// The same 4 ghosted "send-a-vibe" emojis are shown above [heart] on
 /// every card; each is dim by default and fills in when tapped.
 class _ReactionRail extends StatelessWidget {
-  const _ReactionRail({required this.heart});
+  const _ReactionRail({required this.heart, this.onSendEmoji});
 
   final Widget heart;
+  /// Fires with the tapped emoji string — handed to each
+  /// [_ReactionEmojiButton]. Wired by the parent card to drop the emoji
+  /// into the peer's DM thread, same behaviour as the legacy 👋 Coucou.
+  final ValueChanged<String>? onSendEmoji;
 
   // Fixed across all cards so users learn the rail by muscle memory.
   static const _emojis = <String>['🔥', '✨', '💯', '😍'];
@@ -997,7 +1026,10 @@ class _ReactionRail extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final emoji in _emojis) ...[
-          _ReactionEmojiButton(emoji: emoji),
+          _ReactionEmojiButton(
+            emoji: emoji,
+            onSend: onSendEmoji == null ? null : () => onSendEmoji!(emoji),
+          ),
           const SizedBox(height: 10),
         ],
         heart,
@@ -1012,9 +1044,13 @@ class _ReactionRail extends StatelessWidget {
 /// 160 ms animation. State is local — refreshes when the parent card
 /// rebuilds (e.g. after swiping to a new profile).
 class _ReactionEmojiButton extends StatefulWidget {
-  const _ReactionEmojiButton({required this.emoji});
+  const _ReactionEmojiButton({required this.emoji, this.onSend});
 
   final String emoji;
+  /// Fires when the user taps the button. Set by the rail to drop the
+  /// emoji into the peer's DM thread (same path as the 👋 Coucou pill).
+  /// Tap visuals still update locally even when this is null.
+  final VoidCallback? onSend;
 
   @override
   State<_ReactionEmojiButton> createState() => _ReactionEmojiButtonState();
@@ -1023,11 +1059,16 @@ class _ReactionEmojiButton extends StatefulWidget {
 class _ReactionEmojiButtonState extends State<_ReactionEmojiButton> {
   bool _tapped = false;
 
+  void _handleTap() {
+    setState(() => _tapped = !_tapped);
+    widget.onSend?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _tapped = !_tapped),
+      onTap: _handleTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: 48,
