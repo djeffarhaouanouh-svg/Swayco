@@ -495,25 +495,36 @@ class _DiscoverHeader extends StatelessWidget {
                 const SizedBox(width: 6),
                 if (expanded)
                   Expanded(
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onChanged: onChanged,
-                      textInputAction: TextInputAction.search,
-                      cursorColor: SC.accent,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 13,
+                    // Local TextSelectionTheme so the selection halo /
+                    // handles match the Midnight cyan instead of the
+                    // legacy WhatsApp-green accent inherited from the
+                    // global theme.
+                    child: TextSelectionTheme(
+                      data: TextSelectionThemeData(
+                        cursorColor: SC.accent,
+                        selectionColor: SC.accent.withValues(alpha: 0.35),
+                        selectionHandleColor: SC.accent,
                       ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: AppStrings.t('search_friend_hint'),
-                        hintStyle: const TextStyle(
-                          color: SC.textMuted,
+                      child: TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        onChanged: onChanged,
+                        textInputAction: TextInputAction.search,
+                        cursorColor: SC.accent,
+                        style: const TextStyle(
+                          color: SC.textPrimary,
                           fontSize: 13,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: AppStrings.t('search_friend_hint'),
+                          hintStyle: const TextStyle(
+                            color: SC.textMuted,
+                            fontSize: 13,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
                     ),
                   )

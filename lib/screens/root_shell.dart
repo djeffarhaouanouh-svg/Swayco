@@ -255,7 +255,7 @@ class _RootShellState extends State<RootShell> {
       title: AppStrings.t('tip_profile_here_title'),
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
-      imageAsset: 'assets/pop-up.png',
+      imageAsset: 'assets/add-photo.png',
     );
     _tipBusy = false;
   }
