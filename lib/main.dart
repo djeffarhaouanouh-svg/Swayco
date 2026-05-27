@@ -44,6 +44,10 @@ Future<void> main() async {
       debugPrint('Firebase init failed: $e');
     }
   }
+  // Seed the in-memory hide-online cache so presence renders are
+  // already correct on the first frame (no flash of "online" dots
+  // before the prefs read resolves).
+  await AppSettings.hydrate();
   // Analytics for the admin dashboard. Starts the batched flush loop and
   // records one `app_open` per launch — the basis for retention (D1/D7/
   // D30) and recurring-user counts.

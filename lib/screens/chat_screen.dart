@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
@@ -59,6 +60,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Rebuild when the local "hide my online status" toggle flips
+    // so the green dots on every row vanish (or come back)
+    // immediately, without waiting for the 7 s poll.
+    AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
     _reload();
     // Web build doesn't always get realtime push reliably — poll the list
     // silently so new messages / new friends appear without pull-to-refresh.
@@ -77,8 +82,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  void _onHideOnlineChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   @override
@@ -493,9 +504,12 @@ class _FriendChatRow extends StatelessWidget {
   /// Dials this friend — same call path as the chat thread header.
   final VoidCallback onCall;
 
-  /// True when the peer was active in the last 2 minutes and has not
-  /// hidden their online status.
+  /// True when the peer was active in the last 2 minutes, has not
+  /// hidden their own online status, AND the local user has not
+  /// opted out of presence (reciprocal rule — if I'm hiding I don't
+  /// see anyone else's dot either).
   bool get _peerOnline {
+    if (AppSettings.hideOnlineLocal.value) return false;
     final ls = profile.lastSeen;
     return !profile.hideOnlineStatus &&
         ls != null &&

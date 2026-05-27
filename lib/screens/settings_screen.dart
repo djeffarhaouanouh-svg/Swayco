@@ -39,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _kSounds = AppSettings.kSounds;
   static const _kInAppSounds = AppSettings.kInAppSounds;
   static const _kHideOnline = AppSettings.kHideOnline;
+  static const _kHideFromCountry = AppSettings.kHideFromCountry;
   static const _kAudioOutput = AppSettings.kAudioOutput;
 
   bool _busy = false;
@@ -46,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _sounds = true;
   bool _inAppSounds = true;
   bool _hideOnline = false;
+  bool _hideFromCountry = false;
   String _audioOutput = 'speaker';
 
   String get _email => AuthService.currentEmail;
@@ -78,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _inAppSounds = p.getBool(_kInAppSounds) ?? true;
       // Local cache used for instant render — DB value below overrides.
       _hideOnline = p.getBool(_kHideOnline) ?? false;
+      _hideFromCountry = p.getBool(_kHideFromCountry) ?? false;
       _audioOutput = p.getString(_kAudioOutput) ?? 'speaker';
     });
     // Pull the canonical hide_online_status from Supabase so what's on
@@ -98,6 +101,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setHideOnline(bool value) async {
     setState(() => _hideOnline = value);
     await _saveBool(_kHideOnline, value);
+    // Push the new value into the live in-memory notifier so every
+    // screen rendering presence (chat list, chat thread, own profile)
+    // hides peers' online dots immediately — the rule is reciprocal:
+    // if I'm hiding from the network I don't see anyone else either.
+    AppSettings.hideOnlineLocal.value = value;
     final uid = await DeviceId.getOrCreate();
     final ok = await ProfileApi.updateHideOnlineStatus(
       userId: uid, hide: value,
@@ -106,6 +114,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Roll back the optimistic UI if the DB write failed.
       setState(() => _hideOnline = !value);
       await _saveBool(_kHideOnline, !value);
+      AppSettings.hideOnlineLocal.value = !value;
+      _toast(AppStrings.t('settings_save_failed'));
+    }
+  }
+
+  Future<void> _setHideFromCountry(bool value) async {
+    setState(() => _hideFromCountry = value);
+    await _saveBool(_kHideFromCountry, value);
+    final uid = await DeviceId.getOrCreate();
+    final ok = await ProfileApi.updateHideFromCountry(
+      userId: uid, hide: value,
+    );
+    if (!ok && mounted) {
+      setState(() => _hideFromCountry = !value);
+      await _saveBool(_kHideFromCountry, !value);
       _toast(AppStrings.t('settings_save_failed'));
     }
   }
@@ -433,6 +456,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: AppStrings.t('settings_hide_online'),
                   value: _hideOnline,
                   onChanged: _setHideOnline,
+                ),
+                _SettingsToggleRow(
+                  icon: Icons.public_off_outlined,
+                  label: AppStrings.t('settings_hide_from_country'),
+                  value: _hideFromCountry,
+                  onChanged: _setHideFromCountry,
                 ),
               ]),
 

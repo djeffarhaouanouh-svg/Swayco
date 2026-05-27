@@ -37,6 +37,7 @@ class RemoteProfile {
     this.bio = '',
     this.gender = '',
     this.hideOnlineStatus = false,
+    this.hideFromCountry = false,
     this.isPro = false,
     this.subscriptionTier = 'free',
     this.elevenlabsVoiceId = '',
@@ -78,6 +79,12 @@ class RemoteProfile {
   /// their "last seen" timestamp. Source of truth lives on the server so it
   /// can't be bypassed by a tampered client.
   final bool hideOnlineStatus;
+
+  /// When true, this profile is hidden from the Discover feed for
+  /// users whose [language] matches theirs (used as a country proxy
+  /// because the schema has no `country` column). Client-side filter
+  /// + server column for defense-in-depth.
+  final bool hideFromCountry;
 
   /// Subscription state. `true` while the user has an active Premium
   /// entitlement (validated against the store IAP receipt server-side, later).
@@ -167,6 +174,7 @@ class RemoteProfile {
           return (g == 'm' || g == 'f' || g == 'x') ? g : '';
         }(),
         hideOnlineStatus: m['hide_online_status'] == true,
+        hideFromCountry: m['hide_from_country'] == true,
         isPro: m['is_pro'] == true,
         subscriptionTier: () {
           final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
@@ -523,6 +531,28 @@ abstract final class ProfileApi {
     }
   }
 
+  /// Persist the "hide me from people who speak my language" toggle.
+  /// We use `language` as a country proxy (no dedicated country
+  /// column). Discover excludes matching profiles client-side too,
+  /// but the server column is the source of truth so the rule stays
+  /// honoured if RLS lets others query the row directly.
+  static Future<bool> updateHideFromCountry({
+    required String userId,
+    required bool hide,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return false;
+    try {
+      await _c.from('profiles').update({
+        'hide_from_country': hide,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('ProfileApi.updateHideFromCountry failed: $e');
+      return false;
+    }
+  }
+
   /// Presence heartbeat — bump the caller's `last_seen` to now. Other
   /// clients read it to show an online indicator (gated by
   /// `hide_online_status`). Best-effort: a missing `last_seen` column
@@ -611,9 +641,24 @@ abstract final class ProfileApi {
         }
       } catch (_) {}
 
-      return candidates
-          .where((p) => !excluded.contains(p.id))
-          .toList(growable: false);
+      // Look up my language so we can drop any candidate that has
+      // hide_from_country=true AND shares it (the "people from my
+      // country" filter — language is the closest schema proxy).
+      String myLang = '';
+      try {
+        final me = await fetchById(myId);
+        myLang = me?.language.trim().toLowerCase() ?? '';
+      } catch (_) {}
+
+      return candidates.where((p) {
+        if (excluded.contains(p.id)) return false;
+        if (p.hideFromCountry &&
+            myLang.isNotEmpty &&
+            p.language.trim().toLowerCase() == myLang) {
+          return false;
+        }
+        return true;
+      }).toList(growable: false);
     } catch (e) {
       debugPrint('ProfileApi.fetchDiscoverFeed failed: $e');
       return const [];

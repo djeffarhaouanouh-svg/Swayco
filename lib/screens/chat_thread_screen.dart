@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
@@ -530,9 +531,11 @@ class _ThreadHeader extends StatelessWidget {
   final VoidCallback onToggleBlock;
   final VoidCallback onReport;
 
-  /// True when the peer was active in the last 2 minutes and hasn't
-  /// hidden their online state — drives the green dot + "en ligne" label.
+  /// True when the peer was active in the last 2 minutes, hasn't
+  /// hidden their online state, AND the local user hasn't opted out
+  /// of presence (reciprocal rule).
   bool get _peerOnline {
+    if (AppSettings.hideOnlineLocal.value) return false;
     final p = peer;
     if (p == null) return false;
     final ls = p.lastSeen;
