@@ -225,11 +225,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
         children: [
           // Empty state still gets the glass frame so the page never
-          // feels like a void — same surface the populated list uses,
-          // with the centered "no requests yet" copy inside.
+          // feels like a void — same surface the populated list uses
+          // (with the stronger glass shade so it doesn't read as a
+          // dark void on the mesh) and the centered copy inside.
           if (!hasContent)
             GlassContainer(
               borderRadius: BorderRadius.circular(24),
+              color: SC.glassStrong,
+              border: SC.glassBorderStrong,
               padding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 28),
               child: const _NoRequestsEmpty(),
@@ -485,13 +488,16 @@ class _NoRequestsEmpty extends StatelessWidget {
             Container(
               width: 72,
               height: 72,
-              decoration: const BoxDecoration(
-                color: SC.bubbleIn,
+              decoration: BoxDecoration(
+                color: SC.accent.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: SC.accent.withValues(alpha: 0.35),
+                ),
               ),
               child: const Icon(
                 Icons.group_outlined,
-                color: SC.textMuted,
+                color: SC.accent,
                 size: 34,
               ),
             ),
