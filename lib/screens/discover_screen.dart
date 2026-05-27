@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -822,58 +823,70 @@ class _ProfileCard extends StatelessWidget {
             left: 22,
             right: 22,
             bottom: 22,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        profile.displayName.isEmpty
-                            ? '—'
-                            : profile.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SCText.h1.copyWith(
-                          fontSize: 32,
-                          color: Colors.white,
+                // Left side: name + flag + bio + send button stacked vertically.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              profile.displayName.isEmpty
+                                  ? '—'
+                                  : profile.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SCText.h1.copyWith(
+                                fontSize: 32,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          if (flag.isNotEmpty) ...[
+                            const SizedBox(width: 10),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(flag,
+                                  style: const TextStyle(fontSize: 22)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (profile.bio.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          profile.bio,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 14,
+                            height: 1.35,
+                          ),
                         ),
-                      ),
-                    ),
-                    if (flag.isNotEmpty) ...[
-                      const SizedBox(width: 10),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(flag, style: const TextStyle(fontSize: 22)),
-                      ),
+                      ],
+                      const SizedBox(height: 14),
+                      _AddButton(onTap: onAdd),
                     ],
-                  ],
+                  ),
                 ),
-                if (profile.bio.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    profile.bio,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
-                      height: 1.35,
-                    ),
+                // Right rail: 4 random reaction emojis (ghosted until tapped)
+                // stacked above the heart. Skipped together with the heart
+                // for background-deck instances where interaction is off.
+                if (onToggleLike != null) ...[
+                  const SizedBox(width: 12),
+                  _ReactionRail(
+                    seed: profile.id,
+                    heart: _LikeHeart(
+                        liked: liked, onTap: onToggleLike!),
                   ),
                 ],
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    _AddButton(onTap: onAdd),
-                    if (onToggleLike != null) ...[
-                      const Spacer(),
-                      _LikeHeart(liked: liked, onTap: onToggleLike!),
-                    ],
-                  ],
-                ),
               ],
             ),
           ),
@@ -912,6 +925,101 @@ class _LikeHeart extends StatelessWidget {
           liked ? Icons.favorite : Icons.favorite_border,
           size: liked ? 26 : 22,
           color: liked ? red : Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+/// Vertical reaction rail rendered on the right side of a profile card.
+/// Picks 4 ghosted emojis at random (seeded by the profile id so the
+/// choice stays stable across rebuilds) and stacks them above [heart].
+/// Each emoji is dim by default and fills in when tapped.
+class _ReactionRail extends StatelessWidget {
+  const _ReactionRail({required this.seed, required this.heart});
+
+  final String seed;
+  final Widget heart;
+
+  // Pool of "send-a-vibe" emojis we draw from. Wider than 4 so each
+  // profile gets a different mix without us having to be clever.
+  static const _pool = <String>[
+    '🔥', '✨', '💯', '😍', '🥰', '💕',
+    '👀', '💫', '🥹', '😘', '⭐', '🌹',
+  ];
+
+  List<String> _pickFour() {
+    final rng = Random(seed.hashCode);
+    final shuffled = List<String>.of(_pool)..shuffle(rng);
+    return shuffled.take(4).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final picks = _pickFour();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final emoji in picks) ...[
+          _ReactionEmojiButton(emoji: emoji),
+          const SizedBox(height: 10),
+        ],
+        heart,
+      ],
+    );
+  }
+}
+
+/// One reaction-rail emoji: ghosted white outline by default, snaps to
+/// a filled-in glass chip when tapped. State is local — refreshes when
+/// the parent card is rebuilt (e.g. after swiping to a new profile).
+class _ReactionEmojiButton extends StatefulWidget {
+  const _ReactionEmojiButton({required this.emoji});
+
+  final String emoji;
+
+  @override
+  State<_ReactionEmojiButton> createState() => _ReactionEmojiButtonState();
+}
+
+class _ReactionEmojiButtonState extends State<_ReactionEmojiButton> {
+  bool _tapped = false;
+
+  void _toggle() {
+    HapticFeedback.lightImpact();
+    setState(() => _tapped = !_tapped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _toggle,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: _tapped
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.black.withValues(alpha: 0.30),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white
+                .withValues(alpha: _tapped ? 0.60 : 0.22),
+            width: _tapped ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: _tapped ? 1.0 : 0.45,
+            child: Text(
+              widget.emoji,
+              style: const TextStyle(fontSize: 18),
+            ),
+          ),
         ),
       ),
     );
