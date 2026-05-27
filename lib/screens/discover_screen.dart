@@ -27,8 +27,7 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen>
-    with SingleTickerProviderStateMixin {
+class _DiscoverScreenState extends State<DiscoverScreen> {
   // Real Supabase profiles, hydrated from ProfileApi.fetchDiscoverFeed at
   // bootstrap. Excludes me, anyone I've blocked / who's blocked me, and
   // accepted friends.
@@ -42,13 +41,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // LikeApi.like / LikeApi.unlike.
   Set<String> _likedIds = <String>{};
 
-  // Drag state for the top card.
-  Offset _drag = Offset.zero;
-  Size _cardSize = Size.zero;
-  late final AnimationController _ctrl;
-  Offset _animFrom = Offset.zero;
-  Offset _animTo = Offset.zero;
-  bool _isFlying = false; // true => on completion, advance the index
+  // TikTok-style vertical pager. Swipe up = next profile, swipe down =
+  // previous. Snapping + the slide animation are handled by PageView.
+  final PageController _pageController = PageController();
 
   // Inline search state — bar expands, dropdown of matching profiles below.
   bool _searchExpanded = false;
@@ -66,24 +61,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
-    )
-      ..addListener(() {
-        final t = Curves.easeOutCubic.transform(_ctrl.value);
-        setState(() => _drag = Offset.lerp(_animFrom, _animTo, t)!);
-      })
-      ..addStatusListener((s) {
-        if (s != AnimationStatus.completed) return;
-        if (_isFlying) {
-          setState(() {
-            _topIndex += 1;
-            _drag = Offset.zero;
-            _isFlying = false;
-          });
-        }
-      });
     _bootstrapSearch();
     // Web: periodically refresh friendships + likes so a peer accepting
     // / blocking / liking gets reflected on the Discover cards within
@@ -171,7 +148,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _pageController.dispose();
     _searchDebounce?.cancel();
     _pollTimer?.cancel();
     _searchCtrl.dispose();
@@ -263,84 +240,26 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     return status;
   }
 
-  void _onPanStart(DragStartDetails _) {
-    if (_ctrl.isAnimating) {
-      _ctrl.stop();
-      if (_isFlying) {
-        _topIndex += 1;
-        _isFlying = false;
-        _drag = Offset.zero;
-      }
-    }
-  }
-
-  void _onPanUpdate(DragUpdateDetails d) {
-    setState(() => _drag += d.delta);
-  }
-
-  void _onPanEnd(DragEndDetails d) {
-    final w = _cardSize.width;
-    final vx = d.velocity.pixelsPerSecond.dx;
-    // Trigger if dragged ~25% of the card OR flicked fast enough.
-    final triggered = (w > 0 && _drag.dx.abs() > w * 0.25) || vx.abs() > 500;
-    if (triggered) {
-      _flyOff(vx.abs() > 500 ? (vx >= 0 ? 1 : -1) : (_drag.dx >= 0 ? 1 : -1));
-    } else {
-      _springBack();
-    }
-  }
-
-  /// Animate the top card off-screen. [direction] is -1 for a swipe to the
-  /// LEFT and +1 for a swipe to the RIGHT.
-  ///
-  /// Tinder convention:
-  /// - Swipe right → send a friend request to the current profile so the
-  ///   conversation shows up in the Messages page, then advance.
-  /// - Swipe left  → just advance to the next profile (pass).
-  void _flyOff(int direction) {
-    if (direction > 0 && _topIndex < _profiles.length) {
-      _sendFriendRequest(_profiles[_topIndex]);
-    }
-    _animFrom = _drag;
-    _animTo = Offset(direction * (_cardSize.width + 200), _drag.dy + 80);
-    _isFlying = true;
-    _ctrl
-      ..duration = const Duration(milliseconds: 240)
-      ..forward(from: 0);
-  }
-
-  void _springBack() {
-    _animFrom = _drag;
-    _animTo = Offset.zero;
-    _isFlying = false;
-    _ctrl
-      ..duration = const Duration(milliseconds: 220)
-      ..forward(from: 0);
-  }
-
+  /// TikTok-style "next profile" — slides the next card up into view.
+  /// Wired to the explicit Send button (after sending the 👋) and any
+  /// other affordance that wants to programmatically advance.
   void _advance() {
+    if (!_pageController.hasClients) return;
     if (_topIndex >= _profiles.length) return;
-    setState(() => _topIndex += 1);
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
+  /// TikTok-style "previous profile" — slides the previous card down
+  /// into view. Wired to the circular back arrow on each card.
   void _back() {
-    if (_topIndex <= 0 || _ctrl.isAnimating) return;
-    final w = _cardSize.width == 0
-        ? MediaQuery.of(context).size.width
-        : _cardSize.width;
-    // Place the previous card off-screen on the left, then animate it back
-    // to centre. Slightly slower than the fly-off because users notice the
-    // returning motion more than the leaving one.
-    setState(() {
-      _topIndex -= 1;
-      _drag = Offset(-(w + 200), 60);
-    });
-    _animFrom = _drag;
-    _animTo = Offset.zero;
-    _isFlying = false;
-    _ctrl
-      ..duration = const Duration(milliseconds: 320)
-      ..forward(from: 0);
+    if (!_pageController.hasClients || _topIndex <= 0) return;
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   /// Sends a "👋 Coucou !" message to the visible profile via ChatApi.
@@ -387,12 +306,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Future<void> _reset() async {
     if (_myId.isEmpty) {
       setState(() => _topIndex = 0);
+      if (_pageController.hasClients) _pageController.jumpToPage(0);
       return;
     }
     setState(() {
       _topIndex = 0;
       _feedLoading = true;
     });
+    if (_pageController.hasClients) _pageController.jumpToPage(0);
     final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
     if (!mounted) return;
     setState(() {
@@ -426,30 +347,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                           child: CircularProgressIndicator(
                               color: SC.accent),
                         )
-                      : RefreshIndicator(
-                          color: SC.accent,
-                          backgroundColor: SC.bubbleIn,
-                          // Pull down anywhere on the cards area to re-pull
-                          // the Supabase feed (picks up freshly-uploaded
-                          // discover photos / new users without restart).
-                          onRefresh: _reset,
-                          child: _topIndex >= _profiles.length
-                              ? ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  children: [
-                                    SizedBox(
-                                      height: MediaQuery.of(context)
-                                              .size
-                                              .height *
-                                          0.6,
-                                      child: _Empty(
-                                          onReset: () => _reset()),
-                                    ),
-                                  ],
-                                )
-                              : _buildStack(),
-                        ),
+                      // PageView swallows vertical drags so a RefreshIndicator
+                      // here would never fire — refresh is reached through the
+                      // explicit "Restart" button on the trailing empty page.
+                      : _buildStack(),
                 ),
                 // Spacer for the floating bottom nav.
                 SizedBox(
@@ -489,81 +390,47 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Widget _buildStack() {
-    // Desktop / wide-web layout — without this the card stretches to
-    // the full viewport width (e.g. 1900 × 800) and BoxFit.cover crops
-    // the portrait photo down to a slice of the face. Cap at 460 wide
-    // and force a 3:4 portrait aspect ratio so the image always
-    // renders the way the photographer framed it.
+    // Each PageView page renders one profile card sized at 3:4 portrait,
+    // capped at 460 wide on desktop so the photo isn't stretched into
+    // the full width of a 1900-px viewport. PageView handles the
+    // vertical snap + slide animation natively — swipe up reveals the
+    // next profile, swipe down brings the previous one back.
     //
-    // On phones the screen is narrower than the cap, so this is a
-    // no-op for mobile builds; the AspectRatio just centres the card
-    // vertically when the available height exceeds 4/3 of the width.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: AspectRatio(
-            aspectRatio: 3 / 4,
-            child: LayoutBuilder(
-        builder: (ctx, constraints) {
-          _cardSize = Size(constraints.maxWidth, constraints.maxHeight);
-          final w = _cardSize.width;
-          final rotation = w == 0 ? 0.0 : (_drag.dx / w) * 0.25;
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // Up to 2 background cards, drawn first (bottom of z-order).
-              for (int depth = 2; depth >= 1; depth--)
-                if (_topIndex + depth < _profiles.length)
-                  Positioned.fill(
-                    child: Transform.translate(
-                      offset: Offset(0, depth * 14.0),
-                      child: Transform.scale(
-                        scale: 1 - depth * 0.05,
-                        child: IgnorePointer(
-                          child: _ProfileCard(
-                            profile: _profiles[_topIndex + depth],
-                            onAdd: () {},
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              // Top card — draggable horizontally. GestureDetector wraps the
-              // Transform-displaced card so the hit area follows the visual.
-              Positioned.fill(
-                child: Transform.translate(
-                  offset: _drag,
-                  child: Transform.rotate(
-                    angle: rotation,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onPanStart: _onPanStart,
-                      onPanUpdate: _onPanUpdate,
-                      onPanEnd: _onPanEnd,
-                      child: _ProfileCard(
-                        profile: _profiles[_topIndex],
-                        onAdd: () {
-                          _sendHello(_profiles[_topIndex]);
-                          _advance();
-                        },
-                        onBack: _topIndex > 0 ? _back : null,
-                        liked: _likedIds.contains(_profiles[_topIndex].id),
-                        onToggleLike: () =>
-                            _toggleLikeOnProfile(_profiles[_topIndex].id),
-                      ),
-                    ),
-                  ),
+    // We add one extra page after the last profile: the "all caught up"
+    // empty state, so the user can scroll into it the same way they
+    // scroll between profiles.
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      itemCount: _profiles.length + 1,
+      onPageChanged: (i) => setState(() => _topIndex = i),
+      itemBuilder: (ctx, i) {
+        if (i >= _profiles.length) {
+          return _Empty(onReset: _reset);
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: AspectRatio(
+                aspectRatio: 3 / 4,
+                child: _ProfileCard(
+                  profile: _profiles[i],
+                  onAdd: () {
+                    _sendHello(_profiles[i]);
+                    _advance();
+                  },
+                  onBack: i > 0 ? _back : null,
+                  liked: _likedIds.contains(_profiles[i].id),
+                  onToggleLike: () =>
+                      _toggleLikeOnProfile(_profiles[i].id),
                 ),
               ),
-            ],
-          );
-        },
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
