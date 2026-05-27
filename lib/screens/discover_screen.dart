@@ -33,7 +33,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
 
-  int _topIndex = 0;
   // Profile ids I've already liked — heart renders filled for these.
   // Hydrated from Supabase on bootstrap so the state survives restarts /
   // multi-device; mutated optimistically on every tap, written through
@@ -239,17 +238,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return status;
   }
 
-  /// TikTok-style "next profile" — slides the next card up into view.
-  /// Wired to the explicit Send button (after sending the 👋).
-  void _advance() {
-    if (!_pageController.hasClients) return;
-    if (_topIndex >= _profiles.length) return;
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
   /// Sends a "👋 Coucou !" message to the visible profile via ChatApi.
   /// The conversation id is the same deterministic dm-{a}-{b} key the
   /// chat list uses, so the message lands directly in their thread.
@@ -292,16 +280,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _reset() async {
-    if (_myId.isEmpty) {
-      setState(() => _topIndex = 0);
-      if (_pageController.hasClients) _pageController.jumpToPage(0);
-      return;
-    }
-    setState(() {
-      _topIndex = 0;
-      _feedLoading = true;
-    });
     if (_pageController.hasClients) _pageController.jumpToPage(0);
+    if (_myId.isEmpty) return;
+    setState(() => _feedLoading = true);
     final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
     if (!mounted) return;
     setState(() {
@@ -392,11 +373,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       controller: _pageController,
       scrollDirection: Axis.vertical,
       // Snappier than the default page physics — a quick flick lands on
-      // the next card in ~half the usual time, so the feed feels more
-      // like TikTok and less like a slow carousel.
-      physics: const _SnappyPagePhysics(),
+      // the next card in ~half the usual time. ClampingScrollPhysics as
+      // the parent so we don't get the iOS bouncing overscroll, which
+      // was opening a visible gap above the first card / below the
+      // last one.
+      physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
       itemCount: _profiles.length + 1,
-      onPageChanged: (i) => setState(() => _topIndex = i),
       itemBuilder: (ctx, i) {
         if (i >= _profiles.length) {
           return _Empty(onReset: _reset);
@@ -412,10 +394,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               aspectRatio: 4 / 5,
               child: _ProfileCard(
                 profile: _profiles[i],
-                onAdd: () {
-                  _sendHello(_profiles[i]);
-                  _advance();
-                },
+                onAdd: () => _sendHello(_profiles[i]),
                 liked: _likedIds.contains(_profiles[i].id),
                 onToggleLike: () =>
                     _toggleLikeOnProfile(_profiles[i].id),
@@ -1002,8 +981,9 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton> {
   }
 }
 
-/// "Envoyer 👋" — the emoji scales up briefly and the device gives a short
-/// haptic tap on press. Parent then advances to the next card.
+/// "Ajouter" pill — sends a friend-request-style action on tap, then
+/// flips its label to "Envoyé" and stops being tappable. Light haptic
+/// on the first press; the label transition cross-fades smoothly.
 class _AddButton extends StatefulWidget {
   const _AddButton({required this.onTap});
   final VoidCallback onTap;
@@ -1012,48 +992,13 @@ class _AddButton extends StatefulWidget {
   State<_AddButton> createState() => _AddButtonState();
 }
 
-class _AddButtonState extends State<_AddButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-  late final Animation<double> _rotate;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-    // Scale: 1 → 1.7 → 1, with overshoot.
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(
-          tween: Tween(begin: 1.0, end: 1.7)
-              .chain(CurveTween(curve: Curves.easeOut)),
-          weight: 40),
-      TweenSequenceItem(
-          tween: Tween(begin: 1.7, end: 1.0)
-              .chain(CurveTween(curve: Curves.easeIn)),
-          weight: 60),
-    ]).animate(_ctrl);
-    // Wave: -15° → +15° → -10° → 0 over the burst.
-    _rotate = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.26), weight: 25),
-      TweenSequenceItem(tween: Tween(begin: -0.26, end: 0.26), weight: 25),
-      TweenSequenceItem(tween: Tween(begin: 0.26, end: -0.17), weight: 25),
-      TweenSequenceItem(tween: Tween(begin: -0.17, end: 0.0), weight: 25),
-    ]).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+class _AddButtonState extends State<_AddButton> {
+  bool _sent = false;
 
   void _onPress() {
+    if (_sent) return;
     HapticFeedback.mediumImpact();
-    _ctrl.forward(from: 0);
+    setState(() => _sent = true);
     widget.onTap();
   }
 
@@ -1064,34 +1009,21 @@ class _AddButtonState extends State<_AddButton>
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: _onPress,
+        onTap: _sent ? null : _onPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Strip the 👋 from the i18n string so we can animate it on
-              // its own next to the localised verb.
-              Text(
-                '${AppStrings.t('send_emoji').replaceAll('👋', '').trim()} ',
-                style: const TextStyle(
-                  color: SC.bg,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.2,
-                ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              _sent ? 'Envoyé' : 'Ajouter',
+              key: ValueKey(_sent),
+              style: const TextStyle(
+                color: SC.bg,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
               ),
-              AnimatedBuilder(
-                animation: _ctrl,
-                builder: (_, _) => Transform.rotate(
-                  angle: _rotate.value,
-                  child: Transform.scale(
-                    scale: _scale.value,
-                    child: const Text('👋', style: TextStyle(fontSize: 16)),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1099,9 +1031,6 @@ class _AddButtonState extends State<_AddButton>
   }
 }
 
-/// "Rewind" button — top-left of the top card. Curved U-turn arrow,
-/// styled like the Chercher / Filtres pills in the header (same gray
-/// background, same height). Shown only when there's a previous profile.
 /// Page-snap physics with a stiffer spring than Flutter's default, so
 /// a vertical flick lands on the next card in roughly half the usual
 /// time. Keeps the one-page-per-swipe snapping of PageScrollPhysics.
