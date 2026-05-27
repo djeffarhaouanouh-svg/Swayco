@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -42,6 +43,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
   final PageController _pageController = PageController();
+
+  // Desktop mouse wheel / trackpad scrolls bypass PageView's snap and
+  // can blow through several pages in one gesture. We debounce wheel
+  // ticks here so one tick == one page change regardless of speed.
+  DateTime _lastWheel = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Inline search state — bar expands, dropdown of matching profiles below.
   bool _searchExpanded = false;
@@ -369,14 +375,42 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // We add one extra page after the last profile: the "all caught up"
     // empty state, so the user can scroll into it the same way they
     // scroll between profiles.
-    return PageView.builder(
+    return Listener(
+      // On desktop a trackpad/mouse-wheel scroll can deliver enough
+      // delta to skip several pages before the snap kicks in. We
+      // intercept wheel ticks here and advance/rewind the PageView
+      // by exactly one page, debounced so trackpad streams don't
+      // burn through profiles.
+      onPointerSignal: (event) {
+        if (event is! PointerScrollEvent) return;
+        final dy = event.scrollDelta.dy;
+        if (dy.abs() < 4) return;
+        final now = DateTime.now();
+        if (now.difference(_lastWheel) < const Duration(milliseconds: 220)) {
+          return;
+        }
+        _lastWheel = now;
+        if (dy > 0) {
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _pageController.previousPage(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+      child: PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
       // Snappier than the default page physics — a quick flick lands on
       // the next card in ~half the usual time. ClampingScrollPhysics as
       // the parent so we don't get the iOS bouncing overscroll, which
       // was opening a visible gap above the first card / below the
-      // last one.
+      // last one. On desktop the parent Listener also rate-limits
+      // wheel scrolling above this physics.
       physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
       // Unbounded itemCount + modulo on the index = the feed loops
       // forever: after the last profile the user lands back on the
@@ -408,6 +442,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
         );
       },
+      ),
     );
   }
 }
