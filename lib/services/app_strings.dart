@@ -799,6 +799,7 @@ abstract final class AppStrings {
     'settings_audio_speaker': 'Altavoz',
     'settings_audio_earpiece': 'Auricular',
     'settings_manage_sub': 'Gestionar suscripción',
+    'my_subscription_section': 'Mi suscripción',
     'settings_restore_purchase': 'Restaurar una compra',
     'settings_help_faq': 'Centro de ayuda / FAQ',
     'settings_contact': 'Contactar soporte',
@@ -1011,6 +1012,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'Wenn dich jemand über Discover oder die Suche hinzufügt, erscheint die Anfrage hier.',
     'demandes_reacted_to_photo': '{name} hat mit {emoji} auf dein Foto reagiert',
+    'my_subscription_section': 'Mein Abo',
     'tab_placeholder_soon': 'Bald',
     'profile_title': 'Profil',
     'profile_followers': 'Follower',
@@ -1192,6 +1194,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'Quando qualcuno ti aggiungerà da Discover o dalla ricerca, la sua richiesta apparirà qui.',
     'demandes_reacted_to_photo': '{name} ha reagito {emoji} alla tua foto',
+    'my_subscription_section': 'Il mio abbonamento',
     'tab_placeholder_soon': 'Presto',
     'profile_title': 'Profilo',
     'profile_followers': 'Follower',
@@ -1373,6 +1376,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'Quando alguém te adicionar do Discover ou da pesquisa, o pedido aparecerá aqui.',
     'demandes_reacted_to_photo': '{name} reagiu {emoji} à tua foto',
+    'my_subscription_section': 'A minha subscrição',
     'tab_placeholder_soon': 'Em breve',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1554,6 +1558,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'Wanneer iemand je toevoegt via Discover of de zoekbalk, verschijnt het verzoek hier.',
     'demandes_reacted_to_photo': '{name} reageerde {emoji} op je foto',
+    'my_subscription_section': 'Mijn abonnement',
     'tab_placeholder_soon': 'Binnenkort',
     'profile_title': 'Profiel',
     'profile_followers': 'Volgers',
@@ -1735,6 +1740,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'عندما يضيفك شخص من ديسكفر أو البحث، سيظهر طلبه هنا.',
     'demandes_reacted_to_photo': '{name} تفاعل {emoji} مع صورتك',
+    'my_subscription_section': 'اشتراكي',
     'tab_placeholder_soon': 'قريباً',
     'profile_title': 'الملف الشخصي',
     'profile_followers': 'المتابعون',
@@ -1916,6 +1922,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         'Когда кто-то добавит вас из Discover или поиска, его запрос появится здесь.',
     'demandes_reacted_to_photo': '{name} отреагировал(а) {emoji} на ваше фото',
+    'my_subscription_section': 'Моя подписка',
     'tab_placeholder_soon': 'Скоро',
     'profile_title': 'Профиль',
     'profile_followers': 'Подписчики',
@@ -2096,6 +2103,7 @@ abstract final class AppStrings {
     'demandes_empty_title': '暂无请求',
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
     'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
+    'my_subscription_section': '我的订阅',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
     'profile_followers': '粉丝',
@@ -2275,6 +2283,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
     'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
+    'my_subscription_section': 'マイサブスクリプション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
     'profile_followers': 'フォロワー',
@@ -2454,6 +2463,7 @@ abstract final class AppStrings {
     'demandes_empty_body':
         '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
     'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
+    'my_subscription_section': '내 구독',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',
     'profile_followers': '팔로워',
