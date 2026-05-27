@@ -583,7 +583,7 @@ class _FriendChatRow extends StatelessWidget {
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: SC.accent,
+                          color: SC.online,
                           shape: BoxShape.circle,
                           border: Border.all(color: SC.bg, width: 2),
                         ),
