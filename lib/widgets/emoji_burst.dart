@@ -131,18 +131,32 @@ class _EmojiBurstLayerState extends State<_EmojiBurstLayer>
 
   @override
   Widget build(BuildContext context) {
+    // Wrap in Directionality + DefaultTextStyle so the overlay'd Text
+    // widgets don't fall back to Flutter's debug underline (the yellow
+    // hatched line that shows up outside a Material ancestor). Style
+    // is empty — per-particle styles are applied in [_buildParticle].
     return IgnorePointer(
       ignoring: true,
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, _) {
-          final t = _ctrl.value;
-          return Stack(
-            children: [
-              for (final p in _particles) _buildParticle(p, t),
-            ],
-          );
-        },
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: DefaultTextStyle(
+          style: const TextStyle(
+            color: Colors.white,
+            decoration: TextDecoration.none,
+            fontSize: 28,
+          ),
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (_, _) {
+              final t = _ctrl.value;
+              return Stack(
+                children: [
+                  for (final p in _particles) _buildParticle(p, t),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -180,7 +194,25 @@ class _EmojiBurstLayerState extends State<_EmojiBurstLayer>
             scale: scale,
             child: Text(
               p.emoji,
-              style: const TextStyle(fontSize: 28),
+              // Two-layer drop shadow gives each particle a subtle 3D
+              // lift over the card behind it — a soft dark shadow for
+              // depth + a tighter sharper one for the edge.
+              style: const TextStyle(
+                fontSize: 28,
+                decoration: TextDecoration.none,
+                shadows: [
+                  Shadow(
+                    color: Color(0x66000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+                  Shadow(
+                    color: Color(0x99000000),
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

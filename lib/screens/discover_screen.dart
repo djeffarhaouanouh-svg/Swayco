@@ -1224,10 +1224,23 @@ class _ReactionEmojiButton extends StatelessWidget {
                 // Keep the emojis at full opacity in both states —
                 // the background fill + bigger glyph still signal
                 // "this one is sent", but the un-tapped emojis stop
-                // reading as ghosted / disabled.
+                // reading as ghosted / disabled. Drop shadow lifts
+                // each glyph off the chip for a subtle 3D feel.
                 style: TextStyle(
                   fontSize: reacted ? 24 : 22,
                   color: Colors.white,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 3),
+                    ),
+                    Shadow(
+                      color: Color(0x99000000),
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
                 ),
                 child: Text(emoji),
               ),
