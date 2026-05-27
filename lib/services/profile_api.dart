@@ -666,73 +666,52 @@ abstract final class ProfileApi {
     return s;
   }
 
-  /// People to surface on the Discover stack. Excludes the caller and
-  /// anyone the caller has blocked / who has blocked the caller, AND
-  /// anyone who hasn't uploaded a Discover photo yet (no card to show).
-  /// Friends are still included — the user explicitly wants to keep
-  /// seeing them in Discover. Re-ordered client-side by
-  /// [_scoreDiscoverCandidate] so the top of the deck mixes activity,
-  /// fresh profiles, cross-language vibes and a touch of randomness.
+  /// People to surface on the Discover stack. Backed by the
+  /// `discover_feed` SECURITY DEFINER RPC (migration 0026) which
+  /// applies every privacy filter in SQL:
+  ///   • caller excluded
+  ///   • profiles without a discover photo excluded
+  ///   • blocks (both directions) excluded
+  ///   • peers with hide_from_country=true AND a matching language
+  ///     excluded — opt-out can't be bypassed by a tampered client
+  ///     because the rows never leave the database.
+  ///
+  /// The composite scoring lives client-side: it carries a random
+  /// jitter between refreshes and only affects display order, so
+  /// keeping it here doesn't weaken any privacy guarantee.
   static Future<List<RemoteProfile>> fetchDiscoverFeed({
     required String myId,
     int limit = 50,
   }) async {
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
-      final rows = await _c
-          .from('profiles')
-          .select()
-          .neq('id', myId)
-          .neq('discover_photo_url', '')
-          .order('updated_at', ascending: false)
-          .limit(limit);
-      final candidates = (rows as List)
+      final result = await _c.rpc(
+        'discover_feed',
+        params: {'p_user_id': myId, 'p_limit': limit},
+      );
+      if (result is! List) return const [];
+      final candidates = result
           .map((r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)))
           .toList(growable: false);
       if (candidates.isEmpty) return const [];
 
-      final excluded = <String>{};
-      try {
-        final blocks = await _c
-            .from('blocked_users')
-            .select('blocker, blocked')
-            .or('blocker.eq.$myId,blocked.eq.$myId');
-        for (final row in (blocks as List)) {
-          final m = Map<String, dynamic>.from(row as Map);
-          final blocker = m['blocker']?.toString() ?? '';
-          final blocked = m['blocked']?.toString() ?? '';
-          if (blocker == myId && blocked.isNotEmpty) excluded.add(blocked);
-          if (blocked == myId && blocker.isNotEmpty) excluded.add(blocker);
-        }
-      } catch (_) {}
-
-      // Look up my language so we can drop any candidate that has
-      // hide_from_country=true AND shares it (the "people from my
-      // country" filter — language is the closest schema proxy).
+      // Look up my language for the client-side scoring (cross-
+      // language bonus). The peer privacy filter that depends on it
+      // already ran server-side in the RPC, so we no longer need it
+      // for correctness — just for ranking.
       String myLang = '';
       try {
         final me = await fetchById(myId);
         myLang = me?.language.trim().toLowerCase() ?? '';
       } catch (_) {}
 
-      // 1. Filter — drop blocks and country-hidden peers (the peer
-      //    explicitly opted out of being seen by users from their
-      //    same language / country in their privacy settings). Score
-      //    each survivor up front so the random jitter in
-      //    [_scoreDiscoverCandidate] is computed once and the sort
-      //    comparator stays stable.
-      final scored = <(RemoteProfile, double)>[];
-      for (var i = 0; i < candidates.length; i++) {
-        final p = candidates[i];
-        if (excluded.contains(p.id)) continue;
-        if (p.hideFromCountry &&
-            myLang.isNotEmpty &&
-            p.language.trim().toLowerCase() == myLang) {
-          continue;
-        }
-        scored.add((p, _scoreDiscoverCandidate(p, i, myLang)));
-      }
-      // 2. Sort by composite score, highest first.
+      // Score each candidate up front so the random jitter in
+      // [_scoreDiscoverCandidate] is computed once per row and the
+      // sort comparator stays stable.
+      final scored = <(RemoteProfile, double)>[
+        for (var i = 0; i < candidates.length; i++)
+          (candidates[i], _scoreDiscoverCandidate(candidates[i], i, myLang)),
+      ];
       scored.sort((a, b) => b.$2.compareTo(a.$2));
       return List<RemoteProfile>.unmodifiable(
         scored.map((s) => s.$1),
