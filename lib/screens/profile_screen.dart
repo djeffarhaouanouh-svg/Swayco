@@ -2186,30 +2186,35 @@ class _PhotosGrid extends StatelessWidget {
     if (viewerMode && !hasPhoto) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.centerLeft,
-      // Fixed-ish tile size across phone + desktop: aims at 280 px
-      // wide, shrinks gracefully when the parent has less room
-      // (narrow phones). No more 1/3 width-factor — it made the
-      // tile far too small on phones.
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: hasPhoto
-              ? _PhotoCell(
-                  photoUrl: discoverPhotoUrl,
-                  viewerMode: viewerMode,
-                  onTap: onPick,
-                  onDelete: onDelete,
-                  likesCount: likesCount,
-                  onTapLikes: onTapLikes,
-                  iLikePeer: iLikePeer,
-                  onTogglePeerLike: onTogglePeerLike,
-                )
-              // Own profile, no photo yet — a yellow "+" tile that
-              // sits in the same slot the photo would occupy once
-              // uploaded. Single photo only by design (economic).
-              : _AddDiscoverPhotoCta(onTap: onPick),
-        ),
+      // Phone: 1/3 of the available column width (original behaviour).
+      // Desktop / wide: same 1/3 formula but clamped to 280 px so the
+      // tile doesn't balloon to a third of a 1200-px viewport. The
+      // clamp only kicks in on wide layouts — phones stay unchanged.
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final w = (constraints.maxWidth / 3).clamp(0.0, 280.0);
+          return SizedBox(
+            width: w,
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: hasPhoto
+                  ? _PhotoCell(
+                      photoUrl: discoverPhotoUrl,
+                      viewerMode: viewerMode,
+                      onTap: onPick,
+                      onDelete: onDelete,
+                      likesCount: likesCount,
+                      onTapLikes: onTapLikes,
+                      iLikePeer: iLikePeer,
+                      onTogglePeerLike: onTogglePeerLike,
+                    )
+                  // Own profile, no photo yet — a yellow "+" tile that
+                  // sits in the same slot the photo would occupy once
+                  // uploaded. Single photo only by design (economic).
+                  : _AddDiscoverPhotoCta(onTap: onPick),
+            ),
+          );
+        },
       ),
     );
   }
