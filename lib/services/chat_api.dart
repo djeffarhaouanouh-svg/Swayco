@@ -69,6 +69,35 @@ class ChatMessage {
 abstract final class ChatApi {
   static SupabaseClient get _client => Supabase.instance.client;
 
+  /// The four emojis the Discover reaction rail can send. A chat
+  /// message whose body matches one of these is treated as a "photo
+  /// reaction" and surfaces on the Demandes feed in addition to the
+  /// regular chat thread.
+  static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍'];
+
+  /// Most recent photo reactions (Discover-rail emoji taps) addressed
+  /// to [meId]. One entry per sender — the latest emoji a given peer
+  /// reacted with. Ordered by most recent first.
+  static Future<List<ChatMessage>> fetchPhotoReactions(String meId) async {
+    if (meId.isEmpty) return const [];
+    final rows = await _client
+        .from('messages')
+        .select()
+        .eq('recipient', meId)
+        .inFilter('body', photoReactionEmojis)
+        .order('created_at', ascending: false)
+        .limit(200);
+    final seenSenders = <String>{};
+    final out = <ChatMessage>[];
+    for (final r in rows as List) {
+      final msg = ChatMessage.fromMap(Map<String, dynamic>.from(r as Map));
+      if (msg.senderId.isEmpty || msg.senderId == meId) continue;
+      if (!seenSenders.add(msg.senderId)) continue;
+      out.add(msg);
+    }
+    return out;
+  }
+
   /// Most-recent-first window of past messages for a conversation.
   static Future<List<ChatMessage>> fetchMessages(
     String conversationId, {

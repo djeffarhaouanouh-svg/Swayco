@@ -61,6 +61,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Pas encore de demandes',
     'demandes_empty_body':
         "Quand quelqu'un t'ajoutera depuis Discover ou la recherche, sa demande apparaîtra ici.",
+    'demandes_reacted_to_photo': '{name} a réagi {emoji} à votre photo',
     'tab_placeholder_soon': 'Bientôt',
     'profile_title': 'Profil',
     'profile_followers': 'Abonnés',
@@ -421,6 +422,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'No requests yet',
     'demandes_empty_body':
         'When someone adds you from Discover or Search, their request will appear here.',
+    'demandes_reacted_to_photo': '{name} reacted {emoji} to your photo',
     'tab_placeholder_soon': 'Soon',
     'profile_title': 'Profile',
     'profile_followers': 'Followers',
@@ -768,6 +770,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Aún no hay solicitudes',
     'demandes_empty_body':
         'Cuando alguien te añada desde Discover o la búsqueda, su solicitud aparecerá aquí.',
+    'demandes_reacted_to_photo': '{name} reaccionó {emoji} a tu foto',
     'tab_placeholder_soon': 'Pronto',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1005,6 +1008,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Noch keine Anfragen',
     'demandes_empty_body':
         'Wenn dich jemand über Discover oder die Suche hinzufügt, erscheint die Anfrage hier.',
+    'demandes_reacted_to_photo': '{name} hat mit {emoji} auf dein Foto reagiert',
     'tab_placeholder_soon': 'Bald',
     'profile_title': 'Profil',
     'profile_followers': 'Follower',
@@ -1185,6 +1189,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Nessuna richiesta',
     'demandes_empty_body':
         'Quando qualcuno ti aggiungerà da Discover o dalla ricerca, la sua richiesta apparirà qui.',
+    'demandes_reacted_to_photo': '{name} ha reagito {emoji} alla tua foto',
     'tab_placeholder_soon': 'Presto',
     'profile_title': 'Profilo',
     'profile_followers': 'Follower',
@@ -1365,6 +1370,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Ainda não há pedidos',
     'demandes_empty_body':
         'Quando alguém te adicionar do Discover ou da pesquisa, o pedido aparecerá aqui.',
+    'demandes_reacted_to_photo': '{name} reagiu {emoji} à tua foto',
     'tab_placeholder_soon': 'Em breve',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1545,6 +1551,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Nog geen verzoeken',
     'demandes_empty_body':
         'Wanneer iemand je toevoegt via Discover of de zoekbalk, verschijnt het verzoek hier.',
+    'demandes_reacted_to_photo': '{name} reageerde {emoji} op je foto',
     'tab_placeholder_soon': 'Binnenkort',
     'profile_title': 'Profiel',
     'profile_followers': 'Volgers',
@@ -1725,6 +1732,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'لا توجد طلبات بعد',
     'demandes_empty_body':
         'عندما يضيفك شخص من ديسكفر أو البحث، سيظهر طلبه هنا.',
+    'demandes_reacted_to_photo': '{name} تفاعل {emoji} مع صورتك',
     'tab_placeholder_soon': 'قريباً',
     'profile_title': 'الملف الشخصي',
     'profile_followers': 'المتابعون',
@@ -1905,6 +1913,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Запросов пока нет',
     'demandes_empty_body':
         'Когда кто-то добавит вас из Discover или поиска, его запрос появится здесь.',
+    'demandes_reacted_to_photo': '{name} отреагировал(а) {emoji} на ваше фото',
     'tab_placeholder_soon': 'Скоро',
     'profile_title': 'Профиль',
     'profile_followers': 'Подписчики',
@@ -2084,6 +2093,7 @@ abstract final class AppStrings {
     'demandes_title': '请求',
     'demandes_empty_title': '暂无请求',
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
+    'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
     'profile_followers': '粉丝',
@@ -2262,6 +2272,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'リクエストはまだありません',
     'demandes_empty_body':
         '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
+    'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
     'profile_followers': 'フォロワー',
@@ -2440,6 +2451,7 @@ abstract final class AppStrings {
     'demandes_empty_title': '아직 요청이 없습니다',
     'demandes_empty_body':
         '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
+    'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',
     'profile_followers': '팔로워',

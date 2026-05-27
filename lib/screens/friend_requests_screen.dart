@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
+import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
@@ -14,6 +15,15 @@ import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
+
+/// A reaction entry rendered on the Demandes feed — the chat message
+/// that was an emoji from [ChatApi.photoReactionEmojis], hydrated with
+/// the reacting user's profile.
+class _PhotoReaction {
+  const _PhotoReaction({required this.message, this.author});
+  final ChatMessage message;
+  final RemoteProfile? author;
+}
 
 /// Demandes — incoming pending friend requests. Each row exposes
 /// Accepter / Refuser actions; accepted requests disappear (they
@@ -29,6 +39,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     with WidgetsBindingObserver {
   String _myId = '';
   List<IncomingFriendRequest> _requests = const [];
+  List<_PhotoReaction> _reactions = const [];
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
@@ -73,6 +84,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       setState(() {
         _loading = false;
         _requests = const [];
+        _reactions = const [];
       });
       return;
     }
@@ -83,14 +95,31 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       });
     }
     try {
-      final rows =
+      final friendships =
           await FriendshipApi.fetchIncomingPendingWithProfiles(_myId);
+      final reactionMessages = await ChatApi.fetchPhotoReactions(_myId);
+      // Hydrate each reaction with the author's profile so we can
+      // render avatar + name. fetchByIds dedupes ids internally.
+      final authorIds = reactionMessages
+          .map((m) => m.senderId)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      final authors = authorIds.isEmpty
+          ? const <RemoteProfile>[]
+          : await ProfileApi.fetchByIds(authorIds);
+      final byId = {for (final p in authors) p.id: p};
+      final reactions = [
+        for (final m in reactionMessages)
+          _PhotoReaction(message: m, author: byId[m.senderId]),
+      ];
       if (!mounted) return;
       setState(() {
-        _requests = rows;
+        _requests = friendships;
+        _reactions = reactions;
         _loading = false;
       });
-      FriendRequestUnread.setCount(rows.length);
+      FriendRequestUnread.setCount(friendships.length);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -183,7 +212,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       );
     }
-    if (_requests.isEmpty) {
+    if (_requests.isEmpty && _reactions.isEmpty) {
       return const _NoRequestsEmpty();
     }
     return RefreshIndicator(
@@ -197,24 +226,44 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           16, 0, 16, 84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          GlassContainer(
-            borderRadius: BorderRadius.circular(24),
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              children: [
-                for (final req in _requests)
-                  _RequestRow(
-                    request: req,
-                    onTap: () {
-                      final p = req.requester;
-                      if (p != null) _openProfile(p);
-                    },
-                    onAccept: () => _accept(req),
-                    onReject: () => _reject(req),
-                  ),
-              ],
+          if (_requests.isNotEmpty)
+            GlassContainer(
+              borderRadius: BorderRadius.circular(24),
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                children: [
+                  for (final req in _requests)
+                    _RequestRow(
+                      request: req,
+                      onTap: () {
+                        final p = req.requester;
+                        if (p != null) _openProfile(p);
+                      },
+                      onAccept: () => _accept(req),
+                      onReject: () => _reject(req),
+                    ),
+                ],
+              ),
             ),
-          ),
+          if (_requests.isNotEmpty && _reactions.isNotEmpty)
+            const SizedBox(height: 18),
+          if (_reactions.isNotEmpty)
+            GlassContainer(
+              borderRadius: BorderRadius.circular(24),
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                children: [
+                  for (final r in _reactions)
+                    _ReactionRow(
+                      reaction: r,
+                      onTap: () {
+                        final a = r.author;
+                        if (a != null) _openProfile(a);
+                      },
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -290,6 +339,69 @@ class _RequestRow extends StatelessWidget {
               _AcceptButton(onTap: onAccept),
               const SizedBox(width: 6),
               _RejectButton(onTap: onReject),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Read-only row used to surface a Discover-rail emoji reaction sent to
+/// the local user. No accept / reject — tapping the row just opens the
+/// reacting peer's profile, same as on the Messages list.
+class _ReactionRow extends StatelessWidget {
+  const _ReactionRow({required this.reaction, required this.onTap});
+
+  final _PhotoReaction reaction;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = reaction.author;
+    final name = p?.displayName.isNotEmpty == true
+        ? p!.displayName
+        : (p?.handle.isNotEmpty == true
+            ? '@${p!.handle}'
+            : AppStrings.t('chat_no_name'));
+    final subtitle = AppStrings.t(
+      'demandes_reacted_to_photo',
+      args: {'name': name, 'emoji': reaction.message.body},
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                displayName: p?.displayName ?? '',
+                avatarUrl: p?.avatarUrl,
+                avatarColorHex: p?.avatarColor,
+                size: 46,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: SCText.body.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                reaction.message.body,
+                style: const TextStyle(fontSize: 26),
+              ),
             ],
           ),
         ),
