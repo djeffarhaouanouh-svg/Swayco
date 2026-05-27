@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
-import '../theme/swayco_theme.dart';
 import '../theme/whatsapp_call_theme.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
@@ -172,9 +171,13 @@ class _NavItem extends StatelessWidget {
                 selected ? data.selectedIcon : data.icon,
                 key: ValueKey(selected),
                 size: 22,
-                color: selected
-                    ? SC.accent
-                    : Colors.white.withValues(alpha: 0.78),
+                // Keep every nav icon white; the sliding pill behind
+                // the selected one already signals which tab is
+                // active, so tinting the icon cyan on hover / select
+                // was visual noise.
+                color: Colors.white.withValues(
+                  alpha: selected ? 1.0 : 0.78,
+                ),
               ),
             ),
             data.badge,
