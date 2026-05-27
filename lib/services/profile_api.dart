@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -603,11 +605,74 @@ abstract final class ProfileApi {
     }
   }
 
+  /// Random source used by [_scoreDiscoverCandidate] to jitter ties so
+  /// the deck doesn't feel deterministic between refreshes.
+  static final Random _feedRng = Random();
+
+  /// Score a Discover candidate from the local user's point of view.
+  /// Higher is "show me sooner". Components, all additive:
+  ///
+  /// • Activity recency (gated on the peer not hiding their online
+  ///   status). A peer active in the last 5 min beats a week-old one.
+  /// • Fetch-order bonus — the DB returns rows pre-sorted by
+  ///   `updated_at desc`, so the position in that returned list is a
+  ///   free proxy for "recently changed profile".
+  /// • Cross-language bonus — Swayco is a translation app, so a peer
+  ///   who speaks a different language is more interesting by default.
+  /// • Bio bonus — completed profiles look more inviting on a card.
+  /// • Random jitter (0..10) so identical scores shuffle gently across
+  ///   refreshes.
+  ///
+  /// Pure function over the candidate + the local user's context —
+  /// keeping the ranking client-side means we don't need a custom
+  /// Supabase RPC for ordering.
+  static double _scoreDiscoverCandidate(
+    RemoteProfile p,
+    int positionInFetch,
+    String myLang,
+  ) {
+    double s = 0;
+
+    final ls = p.lastSeen;
+    if (ls != null && !p.hideOnlineStatus) {
+      final mins = DateTime.now().difference(ls).inMinutes;
+      if (mins <= 5) {
+        s += 60;
+      } else if (mins <= 60) {
+        s += 40;
+      } else if (mins <= 60 * 24) {
+        s += 25;
+      } else if (mins <= 60 * 24 * 7) {
+        s += 10;
+      }
+    }
+
+    if (positionInFetch < 10) {
+      s += 20;
+    } else if (positionInFetch < 25) {
+      s += 10;
+    }
+
+    final theirLang = p.language.trim().toLowerCase();
+    if (myLang.isNotEmpty &&
+        theirLang.isNotEmpty &&
+        theirLang != myLang) {
+      s += 30;
+    }
+
+    if (p.bio.trim().isNotEmpty) s += 8;
+
+    s += _feedRng.nextDouble() * 10;
+    return s;
+  }
+
   /// People to surface on the Discover stack. Excludes the caller and
   /// anyone the caller has blocked / who has blocked the caller, AND
   /// anyone who hasn't uploaded a Discover photo yet (no card to show).
   /// Friends are still included — the user explicitly wants to keep
-  /// seeing them in Discover. Sorted most-recently-updated first.
+  /// seeing them in Discover. Re-ordered client-side by
+  /// [_scoreDiscoverCandidate] so the top of the deck mixes activity,
+  /// fresh profiles, cross-language vibes and a touch of randomness.
   static Future<List<RemoteProfile>> fetchDiscoverFeed({
     required String myId,
     int limit = 50,
@@ -650,15 +715,28 @@ abstract final class ProfileApi {
         myLang = me?.language.trim().toLowerCase() ?? '';
       } catch (_) {}
 
-      return candidates.where((p) {
-        if (excluded.contains(p.id)) return false;
+      // 1. Filter — drop blocks and country-hidden peers (the peer
+      //    explicitly opted out of being seen by users from their
+      //    same language / country in their privacy settings). Score
+      //    each survivor up front so the random jitter in
+      //    [_scoreDiscoverCandidate] is computed once and the sort
+      //    comparator stays stable.
+      final scored = <(RemoteProfile, double)>[];
+      for (var i = 0; i < candidates.length; i++) {
+        final p = candidates[i];
+        if (excluded.contains(p.id)) continue;
         if (p.hideFromCountry &&
             myLang.isNotEmpty &&
             p.language.trim().toLowerCase() == myLang) {
-          return false;
+          continue;
         }
-        return true;
-      }).toList(growable: false);
+        scored.add((p, _scoreDiscoverCandidate(p, i, myLang)));
+      }
+      // 2. Sort by composite score, highest first.
+      scored.sort((a, b) => b.$2.compareTo(a.$2));
+      return List<RemoteProfile>.unmodifiable(
+        scored.map((s) => s.$1),
+      );
     } catch (e) {
       debugPrint('ProfileApi.fetchDiscoverFeed failed: $e');
       return const [];
