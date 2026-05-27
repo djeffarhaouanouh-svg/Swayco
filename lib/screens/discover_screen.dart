@@ -236,10 +236,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _buildStack() {
-    // One profile per PageView page, capped at 460 wide on desktop so a
-    // 1900-px viewport doesn't stretch the photo across the whole screen.
-    // On mobile the card fills the viewport edge-to-edge — including
-    // under the floating nav bar — for the TikTok feel.
+    // Each PageView page renders one profile card sized at 3:4 portrait,
+    // capped at 460 wide on desktop so the photo isn't stretched into
+    // the full width of a 1900-px viewport. PageView handles the
+    // vertical snap + slide animation natively — swipe up reveals the
+    // next profile, swipe down brings the previous one back.
     //
     // An extra page after the last profile shows the "all caught up"
     // empty state so the user scrolls into it the same way they scroll
@@ -253,19 +254,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (i >= _profiles.length) {
           return _Empty(onReset: _reset);
         }
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: _ProfileCard(
-              profile: _profiles[i],
-              onAdd: () {
-                _sendHello(_profiles[i]);
-                _advance();
-              },
-              onBack: i > 0 ? _back : null,
-              liked: _likedIds.contains(_profiles[i].id),
-              onToggleLike: () =>
-                  _toggleLikeOnProfile(_profiles[i].id),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: AspectRatio(
+                aspectRatio: 3 / 4,
+                child: _ProfileCard(
+                  profile: _profiles[i],
+                  onAdd: () {
+                    _sendHello(_profiles[i]);
+                    _advance();
+                  },
+                  onBack: i > 0 ? _back : null,
+                  liked: _likedIds.contains(_profiles[i].id),
+                  onToggleLike: () =>
+                      _toggleLikeOnProfile(_profiles[i].id),
+                ),
+              ),
             ),
           ),
         );
@@ -342,21 +349,16 @@ class _ProfileCard extends StatelessWidget {
               ),
             ),
           ),
-          // Inner inset values: enough breathing room for the back button
-          // to clear the notch / status bar at the top, and for the
-          // bottom content (name, Send, reaction rail) to clear the
-          // floating GlassNavBar (RootShell renders it at
-          // bottom = 12 + safeBottom with height 54).
           if (onBack != null)
             Positioned(
-              top: 14 + MediaQuery.paddingOf(context).top,
+              top: 14,
               left: 14,
               child: _BackButton(onTap: onBack!),
             ),
           Positioned(
             left: 22,
             right: 22,
-            bottom: 22 + 12 + 54 + MediaQuery.paddingOf(context).bottom,
+            bottom: 22,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
