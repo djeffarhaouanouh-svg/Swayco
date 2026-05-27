@@ -1351,28 +1351,36 @@ class _PlanCard extends StatelessWidget {
       children: [
         wrap(card),
         Positioned(
-          top: -10,
+          top: -12,
           right: 14,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: SC.accent,
+              // Warm amber pops against the cyan / navy palette of the
+              // card body, so the badge reads at a glance instead of
+              // blending into the price column above the divider.
+              color: const Color(0xFFFFC247),
               borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 1,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: SC.accent.withValues(alpha: 0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: const Color(0xFFFFC247).withValues(alpha: 0.55),
+                  blurRadius: 14,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
             child: const Text(
               'Populaire',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
+                color: Color(0xFF1A1300),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -1434,7 +1442,10 @@ class _SubscribeButtonState extends State<_SubscribeButton> {
     return FilledButton(
       onPressed: _busy ? null : _onTap,
       style: FilledButton.styleFrom(
-        backgroundColor: SC.accent,
+        // Softer than SC.accent — the brighter cyan was too loud once
+        // both pricing cards stacked vertically. accentDeep keeps the
+        // Swayco identity while letting the badge / price text breathe.
+        backgroundColor: SC.accentDeep,
         foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(44),
       ),

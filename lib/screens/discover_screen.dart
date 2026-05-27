@@ -284,6 +284,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
+  /// Toggle a photo reaction on [peer] — send the emoji if I haven't
+  /// already, delete every matching reaction message I sent otherwise.
+  /// Optimistic local update on both branches so the rail button
+  /// flips immediately; rolls back to the cached set on failure.
+  Future<void> _toggleEmojiReaction(RemoteProfile peer, String emoji) async {
+    final wasReacted =
+        _myReactionsByPeer[peer.id]?.contains(emoji) ?? false;
+    if (wasReacted) {
+      await _unsendEmojiReaction(peer, emoji);
+    } else {
+      await _sendEmojiReaction(peer, emoji);
+    }
+  }
+
   /// Sends a one-character reaction message (the tapped emoji) to [peer].
   /// Reuses the Coucou path so the receiver gets a real chat message
   /// that opens the thread on their side. Tracks the emoji locally so
@@ -302,6 +316,35 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: emoji,
       snack: '$emoji envoyé à ${peer.displayName}',
     );
+  }
+
+  /// Undo a previously-sent reaction. Pulls the emoji out of the local
+  /// set, then deletes every matching message I sent so the peer's
+  /// thread / Demandes feed loses the entry too.
+  Future<void> _unsendEmojiReaction(
+    RemoteProfile peer,
+    String emoji,
+  ) async {
+    final previous = _myReactionsByPeer;
+    final next = Map<String, Set<String>>.from(previous);
+    final current = Set<String>.from(next[peer.id] ?? const <String>{});
+    current.remove(emoji);
+    if (current.isEmpty) {
+      next.remove(peer.id);
+    } else {
+      next[peer.id] = current;
+    }
+    setState(() => _myReactionsByPeer = next);
+    try {
+      await ChatApi.deleteMyReaction(
+        meId: _myId,
+        peerId: peer.id,
+        emoji: emoji,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _myReactionsByPeer = previous);
+    }
   }
 
   /// Drop [body] into the deterministic dm-{a}-{b} thread for the local
@@ -528,7 +571,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     FriendshipStatus.pendingOutgoing,
                 liked: _likedIds.contains(profile.id),
                 onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                onSendEmoji: (emoji) => _sendEmojiReaction(profile, emoji),
+                onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
                 reactedEmojis:
                     _myReactionsByPeer[profile.id] ?? const <String>{},
               ),
@@ -1126,17 +1169,18 @@ class _ReactionEmojiButton extends StatelessWidget {
   /// True when the local user has already sent this emoji to the peer.
   /// Drives the filled / unfilled visuals; no local state.
   final bool reacted;
-  /// Fires when the user taps the button. Set by the rail to drop the
-  /// emoji into the peer's DM thread (same path as the 👋 Coucou pill).
-  /// Re-tapping when [reacted] is true is a no-op so a single emoji
-  /// can't be doubled by a slip of the finger.
+  /// Fires when the user taps the button. The rail wires this to a
+  /// toggle on the parent — first tap drops the emoji into the peer's
+  /// DM thread, a second tap deletes it. Visuals are driven by
+  /// [reacted] so the button reflects the persisted state after the
+  /// parent's optimistic update lands.
   final VoidCallback? onSend;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: (reacted || onSend == null) ? null : onSend,
+      onTap: onSend,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: 48,

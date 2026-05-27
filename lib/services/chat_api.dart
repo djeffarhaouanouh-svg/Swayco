@@ -75,6 +75,24 @@ abstract final class ChatApi {
   /// regular chat thread.
   static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍'];
 
+  /// Delete every photo-reaction message the local user (`meId`) sent
+  /// to [peerId] with body [emoji]. Used by the Discover rail when the
+  /// user re-taps a filled reaction button to unsend it. Idempotent —
+  /// no row to delete is fine, the call still resolves cleanly.
+  static Future<void> deleteMyReaction({
+    required String meId,
+    required String peerId,
+    required String emoji,
+  }) async {
+    if (meId.isEmpty || peerId.isEmpty || emoji.isEmpty) return;
+    await _client
+        .from('messages')
+        .delete()
+        .eq('sender', meId)
+        .eq('recipient', peerId)
+        .eq('body', emoji);
+  }
+
   /// Every photo reaction the local user (`meId`) has ever sent, keyed
   /// by the recipient's id and pointing to the set of emojis sent to
   /// them. Lets the Discover rail render the buttons pre-filled when
