@@ -324,43 +324,43 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final safeTop = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: SC.bg,
+      // Cards extend behind the floating nav bar (rendered by RootShell).
+      extendBody: true,
       body: MeshBackground(
-        child: SafeArea(
-        bottom: false,
         child: Stack(
           children: [
-            Column(
-              children: [
-                _DiscoverHeader(
-                  expanded: _searchExpanded,
-                  controller: _searchCtrl,
-                  focusNode: _searchFocus,
-                  onTapPill: _expandSearch,
-                  onSubmittedClose: _collapseSearch,
-                  onChanged: _onSearchQueryChanged,
-                ),
-                Expanded(
-                  child: _feedLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                              color: SC.accent),
-                        )
-                      // PageView swallows vertical drags so a RefreshIndicator
-                      // here would never fire — refresh is reached through the
-                      // explicit "Restart" button on the trailing empty page.
-                      : _buildStack(),
-                ),
-                // Spacer for the floating bottom nav.
-                SizedBox(
-                    height: 12 + MediaQuery.paddingOf(context).bottom + 64),
-              ],
+            // Cards fill the entire viewport — no column slots eating
+            // height at the top for the header or at the bottom for the
+            // nav bar. The chrome floats on top of this layer instead.
+            Positioned.fill(
+              child: _feedLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: SC.accent),
+                    )
+                  : _buildStack(),
+            ),
+            // Floating header — sits over the cards, padded below the
+            // status bar / notch via the system safe-area inset.
+            Positioned(
+              top: safeTop,
+              left: 0,
+              right: 0,
+              child: _DiscoverHeader(
+                expanded: _searchExpanded,
+                controller: _searchCtrl,
+                focusNode: _searchFocus,
+                onTapPill: _expandSearch,
+                onSubmittedClose: _collapseSearch,
+                onChanged: _onSearchQueryChanged,
+              ),
             ),
             // Tap-outside scrim to dismiss the search.
             if (_searchExpanded)
               Positioned.fill(
-                top: 64, // start below the header so taps inside still hit the field
+                top: safeTop + 64,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _collapseSearch,
@@ -372,7 +372,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               Positioned(
                 left: 16,
                 right: 16,
-                top: 60,
+                top: safeTop + 60,
                 child: _SearchResultsPanel(
                   loading: _searching,
                   query: _searchCtrl.text.trim(),
@@ -383,7 +383,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ),
               ),
           ],
-        ),
         ),
       ),
     );
