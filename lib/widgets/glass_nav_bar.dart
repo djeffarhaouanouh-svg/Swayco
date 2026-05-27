@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
+import '../theme/swayco_theme.dart';
 import '../theme/whatsapp_call_theme.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
@@ -162,7 +163,7 @@ class _NavItem extends StatelessWidget {
                 key: ValueKey(selected),
                 size: 22,
                 color: selected
-                    ? WhatsAppCallTheme.accent
+                    ? SC.accent
                     : Colors.white.withValues(alpha: 0.78),
               ),
             ),
