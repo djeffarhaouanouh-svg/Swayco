@@ -15,7 +15,6 @@ import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -241,23 +240,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   /// TikTok-style "next profile" — slides the next card up into view.
-  /// Wired to the explicit Send button (after sending the 👋) and any
-  /// other affordance that wants to programmatically advance.
+  /// Wired to the explicit Send button (after sending the 👋).
   void _advance() {
     if (!_pageController.hasClients) return;
     if (_topIndex >= _profiles.length) return;
     _pageController.nextPage(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  /// TikTok-style "previous profile" — slides the previous card down
-  /// into view. Wired to the circular back arrow on each card.
-  void _back() {
-    if (!_pageController.hasClients || _topIndex <= 0) return;
-    _pageController.previousPage(
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
     );
   }
@@ -403,6 +391,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.vertical,
+      // Snappier than the default page physics — a quick flick lands on
+      // the next card in ~half the usual time, so the feed feels more
+      // like TikTok and less like a slow carousel.
+      physics: const _SnappyPagePhysics(),
       itemCount: _profiles.length + 1,
       onPageChanged: (i) => setState(() => _topIndex = i),
       itemBuilder: (ctx, i) {
@@ -424,7 +416,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   _sendHello(_profiles[i]);
                   _advance();
                 },
-                onBack: i > 0 ? _back : null,
                 liked: _likedIds.contains(_profiles[i].id),
                 onToggleLike: () =>
                     _toggleLikeOnProfile(_profiles[i].id),
@@ -750,16 +741,12 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.onAdd,
-    this.onBack,
     this.liked = false,
     this.onToggleLike,
   });
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
-  /// When non-null, a circular back arrow is rendered at the top-left of the
-  /// card. Tapping it returns to the previous profile.
-  final VoidCallback? onBack;
   final bool liked;
   /// When non-null, a heart button is rendered to the right of "Envoyer 👋".
   /// Tap toggles liked state.
@@ -814,12 +801,6 @@ class _ProfileCard extends StatelessWidget {
               ),
             ),
           ),
-          if (onBack != null)
-            Positioned(
-              top: 14,
-              left: 14,
-              child: _BackButton(onTap: onBack!),
-            ),
           Positioned(
             left: 22,
             right: 22,
@@ -837,15 +818,26 @@ class _ProfileCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Flexible(
-                            child: Text(
-                              profile.displayName.isEmpty
-                                  ? '—'
-                                  : profile.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SCText.h1.copyWith(
-                                fontSize: 32,
-                                color: Colors.white,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                Navigator.of(context).push<void>(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        ProfileScreen(userId: profile.id),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                profile.displayName.isEmpty
+                                    ? '—'
+                                    : profile.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SCText.h1.copyWith(
+                                  fontSize: 32,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -1110,19 +1102,23 @@ class _AddButtonState extends State<_AddButton>
 /// "Rewind" button — top-left of the top card. Curved U-turn arrow,
 /// styled like the Chercher / Filtres pills in the header (same gray
 /// background, same height). Shown only when there's a previous profile.
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.onTap});
-  final VoidCallback onTap;
+/// Page-snap physics with a stiffer spring than Flutter's default, so
+/// a vertical flick lands on the next card in roughly half the usual
+/// time. Keeps the one-page-per-swipe snapping of PageScrollPhysics.
+class _SnappyPagePhysics extends PageScrollPhysics {
+  const _SnappyPagePhysics({super.parent});
 
   @override
-  Widget build(BuildContext context) {
-    return GlassIconButton(
-      icon: Icons.replay,
-      size: 36,
-      iconSize: 18,
-      onTap: onTap,
-    );
+  _SnappyPagePhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnappyPagePhysics(parent: buildParent(ancestor));
   }
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+        mass: 30,
+        stiffness: 250,
+        damping: 1.0,
+      );
 }
 
 class _Empty extends StatelessWidget {
