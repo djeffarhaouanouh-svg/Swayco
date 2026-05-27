@@ -15,6 +15,7 @@ import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
+import '../theme/swayco_theme.dart';
 import '../theme/whatsapp_call_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
@@ -554,6 +555,10 @@ class _TipDialog extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: SC.accent,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(buttonLabel),
               ),

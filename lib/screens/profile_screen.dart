@@ -2710,6 +2710,10 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: SC.accent,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: _uploading ? null : _openUltraCheckout,
                 icon: _uploading
                     ? const SizedBox(
