@@ -332,15 +332,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: MeshBackground(
         child: Stack(
           children: [
-            // Cards fill the entire viewport — no column slots eating
-            // height at the top for the header or at the bottom for the
-            // nav bar. The chrome floats on top of this layer instead.
+            // Cards fill the viewport but stop short of the floating
+            // nav bar so the bottom of the card (Send button, reaction
+            // rail, heart) stays clear of it. The header still floats
+            // freely over the top — its dark text on the dark mesh is
+            // legible against any photo, no padding needed there.
             Positioned.fill(
-              child: _feedLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: SC.accent),
-                    )
-                  : _buildStack(),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  // 12 = nav bar offset from screen bottom (RootShell)
+                  // 54 = nav bar height (GlassNavBar._height)
+                  // 12 = breathing room between the card and the bar
+                  bottom: 12 + 54 + 12 + MediaQuery.paddingOf(context).bottom,
+                ),
+                child: _feedLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: SC.accent),
+                      )
+                    : _buildStack(),
+              ),
             ),
             // Floating header — sits over the cards, padded below the
             // status bar / notch via the system safe-area inset.
