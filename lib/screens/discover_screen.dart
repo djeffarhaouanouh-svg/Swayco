@@ -270,19 +270,46 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         language: myLang,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('👋 envoyé à ${peer.displayName}'),
-          duration: const Duration(seconds: 2),
-          backgroundColor: SC.bubbleIn,
-        ),
+      _showAddedSnack(
+        'Demande envoyée à ${peer.displayName}',
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Envoi échoué : $e')),
-      );
+      _showAddedSnack('Envoi échoué : $e', isError: true);
     }
+  }
+
+  /// Floating glass snackbar lifted above the floating GlassNavBar so
+  /// the message isn't hidden by it. Same Swayco Midnight palette as
+  /// the cards.
+  void _showAddedSnack(String text, {bool isError = false}) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    // RootShell offsets the nav by 12 + safeBottom; nav height = 54.
+    // Lift the snack ~16 px above that so the two never overlap.
+    final liftFromBottom = 12 + 54 + safeBottom + 16.0;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            text,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: isError
+              ? const Color(0xFF4A1A22)
+              : SC.bubbleIn,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+            side: const BorderSide(color: SC.glassBorder),
+          ),
+          margin: EdgeInsets.fromLTRB(24, 0, 24, liftFromBottom),
+        ),
+      );
   }
 
   Future<void> _reset() async {
