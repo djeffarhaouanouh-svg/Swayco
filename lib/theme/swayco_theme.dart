@@ -20,6 +20,11 @@ abstract final class SC {
   static const accent        = Color(0xFF22D3EE);
   static const accentDeep    = Color(0xFF0891B2);
 
+  // "Online" indicator — light green, used for presence dots / labels and
+  // the auto-translate toggle in the chat composer.
+  static const online        = Color(0xFF4ADE80);
+  static const onlineDeep    = Color(0xFF22C55E);
+
   // Text
   static const textPrimary   = Color(0xFFF5F7FF);
   static const textSecondary = Color(0xB3F5F7FF);

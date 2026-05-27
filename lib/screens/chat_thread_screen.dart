@@ -531,7 +531,7 @@ class _ThreadHeader extends StatelessWidget {
   final VoidCallback onReport;
 
   /// True when the peer was active in the last 2 minutes and hasn't
-  /// hidden their online state — drives the cyan dot + "en ligne" label.
+  /// hidden their online state — drives the green dot + "en ligne" label.
   bool get _peerOnline {
     final p = peer;
     if (p == null) return false;
@@ -589,11 +589,11 @@ class _ThreadHeader extends StatelessWidget {
                                     width: 6,
                                     height: 6,
                                     decoration: const BoxDecoration(
-                                      color: SC.accent,
+                                      color: SC.online,
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: SC.accent,
+                                          color: SC.online,
                                           blurRadius: 6,
                                         ),
                                       ],
@@ -602,8 +602,10 @@ class _ThreadHeader extends StatelessWidget {
                                   const SizedBox(width: 5),
                                   Text(
                                     AppStrings.t('online_now'),
-                                    style: SCText.accent
-                                        .copyWith(fontSize: 11),
+                                    style: SCText.accent.copyWith(
+                                      fontSize: 11,
+                                      color: SC.online,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1512,7 +1514,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
               Icons.translate,
               size: 24,
               color: active
-                  ? SC.accent
+                  ? SC.online
                   : SC.textMuted,
             ),
             const SizedBox(width: 8),
@@ -1522,7 +1524,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: active
-                    ? SC.accent.withValues(alpha: 0.55)
+                    ? SC.online.withValues(alpha: 0.55)
                     : SC.glassStrong,
                 borderRadius: BorderRadius.circular(999),
                 border:
@@ -1538,12 +1540,12 @@ class _ComposerTranslateToggle extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: active
-                        ? SC.accent
+                        ? SC.online
                         : Colors.white.withValues(alpha: 0.40),
                     boxShadow: active
                         ? [
                             BoxShadow(
-                              color: SC.accent
+                              color: SC.online
                                   .withValues(alpha: 0.55),
                               blurRadius: 8,
                             ),
