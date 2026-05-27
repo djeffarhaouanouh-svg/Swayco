@@ -2186,11 +2186,11 @@ class _PhotosGrid extends StatelessWidget {
     if (viewerMode && !hasPhoto) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.centerLeft,
-      // Cap the tile around an Instagram-thumbnail size so desktop /
-      // wide viewports don't blow it up to a third of the screen.
-      // The 1/3 width-factor still drives the sizing on phone widths.
+      // Cap the tile at a comfortable thumbnail size on desktop while
+      // still letting phones fall back to ~1/3 of the viewport when
+      // that would be smaller.
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 180),
+        constraints: const BoxConstraints(maxWidth: 280),
         child: FractionallySizedBox(
         widthFactor: 1 / 3,
         child: AspectRatio(
