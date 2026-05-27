@@ -254,6 +254,7 @@ class _RootShellState extends State<RootShell> {
       title: AppStrings.t('tip_profile_here_title'),
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
+      imageAsset: 'assets/pop-up.png',
     );
     _tipBusy = false;
   }
@@ -263,6 +264,7 @@ class _RootShellState extends State<RootShell> {
     required String title,
     required String body,
     required String buttonLabel,
+    String? imageAsset,
   }) {
     return showDialog<void>(
       context: context,
@@ -272,6 +274,7 @@ class _RootShellState extends State<RootShell> {
         title: title,
         body: body,
         buttonLabel: buttonLabel,
+        imageAsset: imageAsset,
       ),
     );
   }
@@ -484,12 +487,17 @@ class _TipDialog extends StatelessWidget {
     required this.title,
     required this.body,
     required this.buttonLabel,
+    this.imageAsset,
   });
 
   final IconData icon;
   final String title;
   final String body;
   final String buttonLabel;
+  /// Optional illustration asset shown in place of the round [icon].
+  /// Used by the "add your photo" tip to replace the camera bubble with
+  /// a richer drawing while keeping every other tip on the icon layout.
+  final String? imageAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -505,15 +513,23 @@ class _TipDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: WhatsAppCallTheme.accent.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+            if (imageAsset != null)
+              Image.asset(
+                imageAsset!,
+                width: 160,
+                height: 160,
+                fit: BoxFit.contain,
+              )
+            else
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: WhatsAppCallTheme.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: WhatsAppCallTheme.accent, size: 28),
               ),
-              child: Icon(icon, color: WhatsAppCallTheme.accent, size: 28),
-            ),
             const SizedBox(height: 18),
             Text(
               title,
