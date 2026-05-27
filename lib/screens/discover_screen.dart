@@ -16,6 +16,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/mesh_background.dart';
+import '../widgets/emoji_burst.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -1178,36 +1179,59 @@ class _ReactionEmojiButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onSend,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: reacted
-              ? Colors.white.withValues(alpha: 0.18)
-              : Colors.black.withValues(alpha: 0.35),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color:
-                Colors.white.withValues(alpha: reacted ? 0.85 : 0.20),
-            width: reacted ? 2 : 1,
-          ),
-        ),
-        child: Center(
-          child: AnimatedDefaultTextStyle(
+    // Builder so the [GestureDetector] gets its own BuildContext
+    // whose RenderObject is the actual button — we resolve its global
+    // position from there to anchor the emoji burst.
+    return Builder(
+      builder: (ctx) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onSend == null
+              ? null
+              : () {
+                  // Spawn a particle burst only on the send branch
+                  // (reacted=false now → about to flip to true). The
+                  // unsend branch fires without the celebration so the
+                  // gesture stays calm.
+                  if (!reacted) {
+                    final box = ctx.findRenderObject() as RenderBox?;
+                    if (box != null && box.hasSize) {
+                      final pos =
+                          box.localToGlobal(box.size.center(Offset.zero));
+                      EmojiBurst.show(ctx, position: pos, emoji: emoji);
+                    }
+                  }
+                  onSend!();
+                },
+          child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
-            style: TextStyle(
-              fontSize: reacted ? 24 : 20,
-              color:
-                  Colors.white.withValues(alpha: reacted ? 1.0 : 0.45),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: reacted
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.black.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white
+                    .withValues(alpha: reacted ? 0.85 : 0.20),
+                width: reacted ? 2 : 1,
+              ),
             ),
-            child: Text(emoji),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 160),
+                style: TextStyle(
+                  fontSize: reacted ? 24 : 20,
+                  color: Colors.white
+                      .withValues(alpha: reacted ? 1.0 : 0.45),
+                ),
+                child: Text(emoji),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
