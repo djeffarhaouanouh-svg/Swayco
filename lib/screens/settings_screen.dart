@@ -463,6 +463,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _hideFromCountry,
                   onChanged: _setHideFromCountry,
                 ),
+                const _PrivacyHintRow(),
               ]),
 
               _SectionHeader(label: AppStrings.t('settings_section_lang')),
@@ -691,6 +692,44 @@ class _SettingsToggleRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Small ⓘ explanation row under the "hide me from my country" toggle —
+/// muted text + info icon, sized to read as helper copy rather than
+/// another tappable setting.
+class _PrivacyHintRow extends StatelessWidget {
+  const _PrivacyHintRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.info_outline,
+              size: 14,
+              color: SC.textMuted,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              AppStrings.t('discover_visibility_hint'),
+              style: const TextStyle(
+                color: SC.textMuted,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

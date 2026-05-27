@@ -2093,62 +2093,7 @@ class _IdentitySection extends StatelessWidget {
           iLikePeer: iLikePeer,
           onTogglePeerLike: onTogglePeerLike,
         ),
-        // Tiny "ⓘ Décide qui peut te voir" link under the tile —
-        // only on my own profile. Taps jump straight to the privacy
-        // section of the Settings screen where the new country
-        // visibility toggle lives.
-        if (!viewerMode) ...[
-          const SizedBox(height: 10),
-          _DiscoverVisibilityHint(
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
-              ),
-            ),
-          ),
-        ],
       ],
-    );
-  }
-}
-
-/// Small "ⓘ <text>" link rendered under the Discover photo tile on the
-/// user's own profile. Taps open Settings so the user can flip the
-/// "hide me from people in my country" toggle without hunting for it.
-class _DiscoverVisibilityHint extends StatelessWidget {
-  const _DiscoverVisibilityHint({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.info_outline,
-              size: 14,
-              color: SC.textMuted,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                AppStrings.t('discover_visibility_hint'),
-                style: const TextStyle(
-                  color: SC.textMuted,
-                  fontSize: 12,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
