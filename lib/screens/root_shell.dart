@@ -255,6 +255,22 @@ class _RootShellState extends State<RootShell> {
     if (await _hasDiscoverPhoto() || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
     _tipBusy = true;
+    // Preload the illustration before showing the dialog so the image
+    // is in the cache when _TipDialog mounts — no flash of an empty
+    // square / popping pixels. Best-effort: a decode error still lets
+    // the dialog open with the icon fallback.
+    const asset = AssetImage('assets/add-picture.png');
+    try {
+      await precacheImage(asset, context);
+    } catch (_) {}
+    if (!mounted) {
+      _tipBusy = false;
+      return;
+    }
+    if (NavTab.index.value != NavTab.profile) {
+      _tipBusy = false;
+      return;
+    }
     await _showTip(
       icon: Icons.add_a_photo_rounded,
       title: AppStrings.t('tip_profile_here_title'),
