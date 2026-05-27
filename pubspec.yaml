@@ -60,6 +60,8 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^6.1.0
   path_provider: ^2.1.4
+  # Swayco Midnight design — Bricolage Grotesque (titles) + DM Sans (body).
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

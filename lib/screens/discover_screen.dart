@@ -14,7 +14,9 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
+import '../widgets/glass.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -371,7 +373,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         SnackBar(
           content: Text('👋 envoyé à ${peer.displayName}'),
           duration: const Duration(seconds: 2),
-          backgroundColor: WhatsAppCallTheme.bar,
+          backgroundColor: SC.bubbleIn,
         ),
       );
     } catch (e) {
@@ -402,8 +404,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
-      body: SafeArea(
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: SafeArea(
         bottom: false,
         child: Stack(
           children: [
@@ -421,11 +424,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   child: _feedLoading
                       ? const Center(
                           child: CircularProgressIndicator(
-                              color: WhatsAppCallTheme.accent),
+                              color: SC.accent),
                         )
                       : RefreshIndicator(
-                          color: WhatsAppCallTheme.accent,
-                          backgroundColor: WhatsAppCallTheme.bar,
+                          color: SC.accent,
+                          backgroundColor: SC.bubbleIn,
                           // Pull down anywhere on the cards area to re-pull
                           // the Supabase feed (picks up freshly-uploaded
                           // discover photos / new users without restart).
@@ -479,6 +482,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 ),
               ),
           ],
+        ),
         ),
       ),
     );
@@ -589,12 +593,7 @@ class _DiscoverHeader extends StatelessWidget {
         children: [
           Text(
             AppStrings.t('discover_title'),
-            style: const TextStyle(
-              color: WhatsAppCallTheme.strongText,
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
+            style: SCText.h1,
           ),
           const Spacer(),
           // Search pill: compact button when collapsed, wider TextField
@@ -603,17 +602,17 @@ class _DiscoverHeader extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOut,
             width: expanded ? 200 : null,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: WhatsAppCallTheme.bar,
+              color: SC.glassStrong,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: SC.glassBorder),
             ),
             child: Row(
               mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
               children: [
                 const Icon(Icons.search,
-                    size: 16, color: WhatsAppCallTheme.subtleText),
+                    size: 16, color: SC.textMuted),
                 const SizedBox(width: 6),
                 if (expanded)
                   Expanded(
@@ -622,16 +621,16 @@ class _DiscoverHeader extends StatelessWidget {
                       focusNode: focusNode,
                       onChanged: onChanged,
                       textInputAction: TextInputAction.search,
-                      cursorColor: WhatsAppCallTheme.accent,
+                      cursorColor: SC.accent,
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.strongText,
+                        color: SC.textPrimary,
                         fontSize: 13,
                       ),
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: AppStrings.t('search_friend_hint'),
                         hintStyle: const TextStyle(
-                          color: WhatsAppCallTheme.subtleText,
+                          color: SC.textMuted,
                           fontSize: 13,
                         ),
                         border: InputBorder.none,
@@ -646,7 +645,7 @@ class _DiscoverHeader extends StatelessWidget {
                     child: Text(
                       AppStrings.t('search_chercher'),
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.subtleText,
+                        color: SC.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -659,7 +658,7 @@ class _DiscoverHeader extends StatelessWidget {
                     child: const Padding(
                       padding: EdgeInsets.only(left: 4),
                       child: Icon(Icons.close,
-                          size: 16, color: WhatsAppCallTheme.subtleText),
+                          size: 16, color: SC.textMuted),
                     ),
                   ),
               ],
@@ -691,7 +690,7 @@ class _SearchResultsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: WhatsAppCallTheme.bar,
+      color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(16),
       elevation: 8,
       child: ConstrainedBox(
@@ -708,7 +707,7 @@ class _SearchResultsPanel extends StatelessWidget {
         child: Text(
           AppStrings.t('search_intro_hint'),
           style: const TextStyle(
-              color: WhatsAppCallTheme.subtleText, fontSize: 13),
+              color: SC.textMuted, fontSize: 13),
         ),
       );
     }
@@ -720,7 +719,7 @@ class _SearchResultsPanel extends StatelessWidget {
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-                color: WhatsAppCallTheme.accent, strokeWidth: 2.4),
+                color: SC.accent, strokeWidth: 2.4),
           ),
         ),
       );
@@ -731,7 +730,7 @@ class _SearchResultsPanel extends StatelessWidget {
         child: Text(
           'Aucun profil pour « $query ».',
           style: const TextStyle(
-              color: WhatsAppCallTheme.subtleText, fontSize: 13),
+              color: SC.textMuted, fontSize: 13),
         ),
       );
     }
@@ -792,7 +791,7 @@ class _SearchResultRow extends StatelessWidget {
                   Text(
                     profile.displayName.isEmpty ? '—' : profile.displayName,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -801,7 +800,7 @@ class _SearchResultRow extends StatelessWidget {
                     Text(
                       '@${profile.handle}',
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.subtleText,
+                        color: SC.textMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -820,7 +819,7 @@ class _SearchResultRow extends StatelessWidget {
       case FriendshipStatus.accepted:
         return _StatusPill(
             label: AppStrings.t('friendship_friend'),
-            color: WhatsAppCallTheme.accent);
+            color: SC.accent);
       case FriendshipStatus.pendingOutgoing:
         return _StatusPill(
             label: AppStrings.t('friendship_sent'), color: Colors.amber);
@@ -831,7 +830,7 @@ class _SearchResultRow extends StatelessWidget {
       case FriendshipStatus.rejected:
       case FriendshipStatus.none:
         return Material(
-          color: WhatsAppCallTheme.accent,
+          color: SC.accent,
           borderRadius: BorderRadius.circular(999),
           child: InkWell(
             borderRadius: BorderRadius.circular(999),
@@ -904,12 +903,23 @@ class _ProfileCard extends StatelessWidget {
     final photoUrl = profile.discoverPhotoUrl.isNotEmpty
         ? profile.discoverPhotoUrl
         : profile.avatarUrl;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: SC.meshCyan.withValues(alpha: 0.30),
+            blurRadius: 60,
+            offset: const Offset(0, 30),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+      borderRadius: BorderRadius.circular(30),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const ColoredBox(color: WhatsAppCallTheme.bar),
+          const ColoredBox(color: SC.bubbleIn),
           if (photoUrl.isNotEmpty)
             Image.network(
               photoUrl,
@@ -959,11 +969,9 @@ class _ProfileCard extends StatelessWidget {
                             : profile.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: SCText.h1.copyWith(
+                          fontSize: 32,
                           color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
                         ),
                       ),
                     ),
@@ -1003,6 +1011,7 @@ class _ProfileCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1100,13 +1109,13 @@ class _AddButtonState extends State<_AddButton>
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: WhatsAppCallTheme.accent,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: _onPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1115,9 +1124,9 @@ class _AddButtonState extends State<_AddButton>
               Text(
                 '${AppStrings.t('send_emoji').replaceAll('👋', '').trim()} ',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  color: SC.bg,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 0.2,
                 ),
               ),
@@ -1148,24 +1157,11 @@ class _BackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: WhatsAppCallTheme.bar,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Icon(
-            Icons.replay,
-            size: 18,
-            color: WhatsAppCallTheme.subtleText,
-          ),
-        ),
-      ),
+    return GlassIconButton(
+      icon: Icons.replay,
+      size: 36,
+      iconSize: 18,
+      onTap: onTap,
     );
   }
 }
@@ -1186,18 +1182,18 @@ class _Empty extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: WhatsAppCallTheme.bar,
+                color: SC.bubbleIn,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.favorite_border,
-                  color: WhatsAppCallTheme.subtleText, size: 34),
+                  color: SC.textMuted, size: 34),
             ),
             const SizedBox(height: 18),
             Text(
               AppStrings.t('discover_done'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -1205,10 +1201,10 @@ class _Empty extends StatelessWidget {
             const SizedBox(height: 20),
             TextButton.icon(
               onPressed: onReset,
-              icon: const Icon(Icons.refresh, color: WhatsAppCallTheme.accent),
+              icon: const Icon(Icons.refresh, color: SC.accent),
               label: Text(
                 AppStrings.t('restart'),
-                style: const TextStyle(color: WhatsAppCallTheme.accent),
+                style: const TextStyle(color: SC.accent),
               ),
             ),
           ],

@@ -18,8 +18,9 @@ import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import 'call_screen.dart';
@@ -219,14 +220,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         title: Text(
           AppStrings.t('delete_conversation'),
-          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+          style: const TextStyle(color: SC.textPrimary),
         ),
         content: Text(
           AppStrings.t('delete_conversation_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+          style: const TextStyle(color: SC.textMuted),
         ),
         actions: [
           TextButton(
@@ -263,14 +264,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         title: Text(
           AppStrings.t('block_peer_q', args: {'name': peer.displayName}),
-          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+          style: const TextStyle(color: SC.textPrimary),
         ),
         content: Text(
           AppStrings.t('block_peer_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+          style: const TextStyle(color: SC.textMuted),
         ),
         actions: [
           TextButton(
@@ -393,31 +394,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppStrings.t('messages_title'),
-                  style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    AppStrings.t('messages_title'),
+                    style: SCText.h1,
                   ),
                 ),
               ),
-            ),
-            // The list fills the full height (scrolling behind the
-            // floating nav bar). The "Invite to a call" row is the last
-            // item of the list — see _buildBody.
-            Expanded(child: _buildBody()),
-          ],
+              // The list fills the full height (scrolling behind the
+              // floating nav bar). The "Invite to a call" row is the last
+              // item of the list — see _buildBody.
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );
@@ -426,7 +424,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: WhatsAppCallTheme.accent),
+        child: CircularProgressIndicator(color: SC.accent),
       );
     }
     if (_error != null) {
@@ -442,8 +440,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return const _NoFriendsEmpty();
     }
     return RefreshIndicator(
-      color: WhatsAppCallTheme.accent,
-      backgroundColor: WhatsAppCallTheme.bar,
+      color: SC.accent,
+      backgroundColor: SC.bubbleIn,
       onRefresh: _reload,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -460,7 +458,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         separatorBuilder: (_, _) => const Divider(
           height: 1,
           thickness: 1,
-          color: Color(0xFF2F3D45),
+          color: SC.glassBorder,
           indent: 68,
         ),
         itemBuilder: (ctx, i) {
@@ -578,7 +576,7 @@ class _FriendChatRow extends StatelessWidget {
         subtitleParts.add(const TextSpan(
           text: 'Vous : ',
           style: TextStyle(
-            color: WhatsAppCallTheme.subtleText,
+            color: SC.textMuted,
             fontWeight: FontWeight.w500,
           ),
         ));
@@ -618,10 +616,10 @@ class _FriendChatRow extends StatelessWidget {
                         width: 15,
                         height: 15,
                         decoration: BoxDecoration(
-                          color: WhatsAppCallTheme.accent,
+                          color: SC.accent,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: WhatsAppCallTheme.scaffold,
+                            color: SC.bg,
                             width: 2.5,
                           ),
                         ),
@@ -648,7 +646,7 @@ class _FriendChatRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
                       style: TextStyle(
-                        color: WhatsAppCallTheme.strongText,
+                        color: SC.textPrimary,
                         fontWeight:
                             unread ? FontWeight.w800 : FontWeight.w600,
                         fontSize: 17,
@@ -663,8 +661,8 @@ class _FriendChatRow extends StatelessWidget {
                     text: TextSpan(
                       style: TextStyle(
                         color: unread
-                            ? WhatsAppCallTheme.strongText
-                            : WhatsAppCallTheme.subtleText,
+                            ? SC.textPrimary
+                            : SC.textMuted,
                         fontSize: 14,
                         fontWeight:
                             unread ? FontWeight.w600 : FontWeight.normal,
@@ -699,7 +697,7 @@ class _FriendChatRow extends StatelessWidget {
                             height: 8,
                             margin: const EdgeInsets.only(right: 5),
                             decoration: const BoxDecoration(
-                              color: WhatsAppCallTheme.accent,
+                              color: SC.accent,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -708,8 +706,8 @@ class _FriendChatRow extends StatelessWidget {
                           _formatTime(lastMessage!.createdAt),
                           style: TextStyle(
                             color: unread
-                                ? WhatsAppCallTheme.accent
-                                : WhatsAppCallTheme.subtleText,
+                                ? SC.accent
+                                : SC.textMuted,
                             fontSize: 12,
                             fontWeight: unread
                                 ? FontWeight.w700
@@ -739,8 +737,8 @@ class _FriendChatRow extends StatelessWidget {
                       tooltip: AppStrings.t('tooltip_more'),
                       padding: EdgeInsets.zero,
                       icon: const Icon(Icons.more_vert,
-                          color: WhatsAppCallTheme.subtleText, size: 20),
-                      color: WhatsAppCallTheme.bar,
+                          color: SC.textMuted, size: 20),
+                      color: SC.bubbleIn,
                       onSelected: (v) {
                         if (v == 'profile') onViewProfile();
                         if (v == 'report') onReport();
@@ -754,11 +752,11 @@ class _FriendChatRow extends StatelessWidget {
                             children: [
                               const Icon(Icons.person_outline,
                                   size: 18,
-                                  color: WhatsAppCallTheme.strongText),
+                                  color: SC.textPrimary),
                               const SizedBox(width: 10),
                               Text(AppStrings.t('view_profile'),
                                   style: const TextStyle(
-                                      color: WhatsAppCallTheme.strongText)),
+                                      color: SC.textPrimary)),
                             ],
                           ),
                         ),
@@ -830,39 +828,62 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: WhatsAppCallTheme.accent,
-      child: InkWell(
-        onTap: onInviteToCall,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (creatingInvite)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            colors: [SC.accent, SC.accentDeep],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: SC.accent.withValues(alpha: 0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(22),
+            onTap: onInviteToCall,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (creatingInvite)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    const Icon(Icons.videocam_rounded,
+                        color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    creatingInvite
+                        ? AppStrings.t('invite_call_creating')
+                        : AppStrings.t('invite_to_call'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                )
-              else
-                const Icon(Icons.videocam_rounded,
-                    color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                creatingInvite
-                    ? AppStrings.t('invite_call_creating')
-                    : AppStrings.t('invite_to_call'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -885,12 +906,12 @@ class _NoFriendsEmpty extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: WhatsAppCallTheme.bar,
+                color: SC.bubbleIn,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.people_outline,
-                color: WhatsAppCallTheme.subtleText,
+                color: SC.textMuted,
                 size: 34,
               ),
             ),
@@ -899,7 +920,7 @@ class _NoFriendsEmpty extends StatelessWidget {
               AppStrings.t('chat_no_friends_title'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -909,7 +930,7 @@ class _NoFriendsEmpty extends StatelessWidget {
               AppStrings.t('chat_no_friends_body'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: WhatsAppCallTheme.subtleText,
+                  color: SC.textMuted,
                   fontSize: 13,
                   height: 1.4),
             ),

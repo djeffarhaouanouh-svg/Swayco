@@ -21,8 +21,10 @@ import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/glass.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import 'profile_screen.dart';
@@ -105,18 +107,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         title: Text(
           AppStrings.t(
             wasBlocked ? 'unblock_peer_q' : 'block_peer_q',
             args: {'name': peerName},
           ),
-          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+          style: const TextStyle(color: SC.textPrimary),
         ),
         content: Text(
           AppStrings.t(
               wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+          style: const TextStyle(color: SC.textMuted),
         ),
         actions: [
           TextButton(
@@ -126,7 +128,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: wasBlocked
-                  ? WhatsAppCallTheme.accent
+                  ? SC.accent
                   : const Color(0xFFE53935),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -426,37 +428,42 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
-      appBar: _ThreadHeader(
-        title: widget.title,
-        peer: _peer,
-        onCall: () => CallLauncher.startCall(
-          context,
-          peerDeviceId: widget.peerDeviceId,
-          translation: widget.translation,
-        ),
-        onViewProfile: () => Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => ProfileScreen(userId: widget.peerDeviceId),
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _ThreadHeader(
+                title: widget.title,
+                peer: _peer,
+                onCall: () => CallLauncher.startCall(
+                  context,
+                  peerDeviceId: widget.peerDeviceId,
+                  translation: widget.translation,
+                ),
+                onViewProfile: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProfileScreen(userId: widget.peerDeviceId),
+                  ),
+                ),
+                peerBlocked: _peerBlocked,
+                onToggleBlock: _toggleBlockPeer,
+                onReport: _reportPeer,
+              ),
+              if (_error != null) _ErrorBanner(message: _error!),
+              Expanded(child: _buildMessageList()),
+              _Composer(
+                controller: _inputCtrl,
+                sending: _sending,
+                onSend: _send,
+                onSendVoice: _sendVoice,
+                autoTranslate: _autoTranslate,
+                onToggleTranslate: _toggleAutoTranslate,
+              ),
+            ],
           ),
         ),
-        peerBlocked: _peerBlocked,
-        onToggleBlock: _toggleBlockPeer,
-        onReport: _reportPeer,
-      ),
-      body: Column(
-        children: [
-          if (_error != null) _ErrorBanner(message: _error!),
-          Expanded(child: _buildMessageList()),
-          _Composer(
-            controller: _inputCtrl,
-            sending: _sending,
-            onSend: _send,
-            onSendVoice: _sendVoice,
-            autoTranslate: _autoTranslate,
-            onToggleTranslate: _toggleAutoTranslate,
-          ),
-        ],
       ),
     );
   }
@@ -468,14 +475,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         title: Text(
           AppStrings.t('delete_message'),
-          style: const TextStyle(color: WhatsAppCallTheme.strongText),
+          style: const TextStyle(color: SC.textPrimary),
         ),
         content: Text(
           AppStrings.t('delete_message_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+          style: const TextStyle(color: SC.textMuted),
         ),
         actions: [
           TextButton(
@@ -513,7 +520,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           child: Text(
             AppStrings.t('no_messages'),
             style: const TextStyle(
-              color: WhatsAppCallTheme.subtleText,
+              color: SC.textMuted,
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -546,7 +553,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 }
 
-class _ThreadHeader extends StatelessWidget implements PreferredSizeWidget {
+class _ThreadHeader extends StatelessWidget {
   const _ThreadHeader({
     required this.title,
     required this.peer,
@@ -564,92 +571,183 @@ class _ThreadHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onToggleBlock;
   final VoidCallback onReport;
 
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  /// True when the peer was active in the last 2 minutes and hasn't
+  /// hidden their online state — drives the cyan dot + "en ligne" label.
+  bool get _peerOnline {
+    final p = peer;
+    if (p == null) return false;
+    final ls = p.lastSeen;
+    return !p.hideOnlineStatus &&
+        ls != null &&
+        DateTime.now().difference(ls) < const Duration(minutes: 2);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      titleSpacing: 0,
-      title: InkWell(
-        onTap: onViewProfile,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+      child: GlassContainer(
+        borderRadius: BorderRadius.circular(22),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           children: [
-            ProfileAvatar(
-              displayName: title,
-              avatarUrl: peer?.avatarUrl,
-              avatarColorHex: peer?.avatarColor,
-              size: 36,
+            GlassIconButton(
+              icon: Icons.arrow_back_rounded,
+              onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w500),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onViewProfile,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      ProfileAvatar(
+                        displayName: title,
+                        avatarUrl: peer?.avatarUrl,
+                        avatarColorHex: peer?.avatarColor,
+                        size: 38,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SCText.h3,
+                            ),
+                            if (_peerOnline) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: SC.accent,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: SC.accent,
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    AppStrings.t('online_now'),
+                                    style: SCText.accent
+                                        .copyWith(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+            ),
+            GlassIconButton(
+              icon: Icons.phone_rounded,
+              onTap: onCall,
+            ),
+            const SizedBox(width: 6),
+            _HeaderMoreButton(
+              peerBlocked: peerBlocked,
+              onToggleBlock: onToggleBlock,
+              onReport: onReport,
             ),
           ],
         ),
       ),
-      actions: [
-        IconButton(
-          tooltip: AppStrings.t('tooltip_call'),
-          onPressed: onCall,
-          icon: const Icon(Icons.phone),
-        ),
-        PopupMenuButton<String>(
-          tooltip: AppStrings.t('tooltip_more'),
-          icon: const Icon(Icons.more_vert),
-          color: WhatsAppCallTheme.bar,
-          onSelected: (value) {
-            if (value == 'report') onReport();
-            if (value == 'block') onToggleBlock();
-          },
-          itemBuilder: (ctx) => [
-            PopupMenuItem<String>(
-              value: 'report',
-              child: Row(
-                children: [
-                  const Icon(Icons.flag_outlined,
-                      size: 18, color: Color(0xFFE53935)),
-                  const SizedBox(width: 10),
-                  Text(
-                    AppStrings.t('report'),
-                    style: const TextStyle(color: Color(0xFFE53935)),
-                  ),
-                ],
+    );
+  }
+}
+
+class _HeaderMoreButton extends StatelessWidget {
+  const _HeaderMoreButton({
+    required this.peerBlocked,
+    required this.onToggleBlock,
+    required this.onReport,
+  });
+
+  final bool peerBlocked;
+  final VoidCallback onToggleBlock;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: AppStrings.t('tooltip_more'),
+      padding: EdgeInsets.zero,
+      offset: const Offset(0, 44),
+      color: SC.bubbleIn,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: SC.glassBorder),
+      ),
+      onSelected: (value) {
+        if (value == 'report') onReport();
+        if (value == 'block') onToggleBlock();
+      },
+      itemBuilder: (ctx) => [
+        PopupMenuItem<String>(
+          value: 'report',
+          child: Row(
+            children: [
+              const Icon(Icons.flag_outlined,
+                  size: 18, color: Color(0xFFE53935)),
+              const SizedBox(width: 10),
+              Text(
+                AppStrings.t('report'),
+                style: const TextStyle(color: Color(0xFFE53935)),
               ),
-            ),
-            PopupMenuItem<String>(
-              value: 'block',
-              child: Row(
-                children: [
-                  Icon(
-                    peerBlocked ? Icons.lock_open : Icons.block,
-                    size: 18,
-                    color: peerBlocked
-                        ? WhatsAppCallTheme.accent
-                        : const Color(0xFFE53935),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    AppStrings.t(peerBlocked ? 'unblock' : 'block'),
-                    style: TextStyle(
-                      color: peerBlocked
-                          ? WhatsAppCallTheme.accent
-                          : const Color(0xFFE53935),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(width: 4),
+        PopupMenuItem<String>(
+          value: 'block',
+          child: Row(
+            children: [
+              Icon(
+                peerBlocked ? Icons.lock_open : Icons.block,
+                size: 18,
+                color: peerBlocked ? SC.accent : const Color(0xFFE53935),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                AppStrings.t(peerBlocked ? 'unblock' : 'block'),
+                style: TextStyle(
+                  color: peerBlocked ? SC.accent : const Color(0xFFE53935),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+      child: const _GlassMoreIcon(),
+    );
+  }
+}
+
+class _GlassMoreIcon extends StatelessWidget {
+  const _GlassMoreIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GlassIconButton(
+      icon: Icons.more_vert_rounded,
+      // No onTap — the parent PopupMenuButton handles the gesture.
     );
   }
 }
@@ -683,21 +781,13 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = mine ? WhatsAppCallTheme.accentMuted : WhatsAppCallTheme.bubbleIncoming;
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
-    final radius = mine
-        ? const BorderRadius.only(
-            topLeft: Radius.circular(14),
-            topRight: Radius.circular(14),
-            bottomLeft: Radius.circular(14),
-            bottomRight: Radius.circular(4),
-          )
-        : const BorderRadius.only(
-            topLeft: Radius.circular(14),
-            topRight: Radius.circular(14),
-            bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(14),
-          );
+    final radius = BorderRadius.only(
+      topLeft: Radius.circular(mine ? 18 : 8),
+      topRight: Radius.circular(mine ? 8 : 18),
+      bottomLeft: const Radius.circular(18),
+      bottomRight: const Radius.circular(18),
+    );
 
     final time =
         '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
@@ -709,11 +799,33 @@ class _MessageBubble extends StatelessWidget {
         onLongPress: onLongPressDelete,
         child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
-        decoration: BoxDecoration(color: bg, borderRadius: radius),
+        decoration: BoxDecoration(
+          color: mine ? null : SC.bubbleIn,
+          gradient: mine
+              ? const LinearGradient(
+                  colors: [SC.outBubbleStart, SC.outBubbleEnd],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          borderRadius: radius,
+          border: Border.all(
+            color: mine
+                ? SC.accent.withValues(alpha: 0.4)
+                : SC.bubbleInBorder,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -724,7 +836,7 @@ class _MessageBubble extends StatelessWidget {
                 child: Text(
                   message.senderName,
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.accent,
+                    color: SC.accent,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -750,8 +862,8 @@ class _MessageBubble extends StatelessWidget {
                 displayBody,
                 style: TextStyle(
                   color: translating
-                      ? WhatsAppCallTheme.strongText.withValues(alpha: 0.55)
-                      : WhatsAppCallTheme.strongText,
+                      ? SC.textPrimary.withValues(alpha: 0.55)
+                      : SC.textPrimary,
                   fontSize: 15,
                   height: 1.3,
                   fontStyle: translating ? FontStyle.italic : FontStyle.normal,
@@ -779,7 +891,7 @@ class _MessageBubble extends StatelessWidget {
               child: Text(
                 time,
                 style: TextStyle(
-                  color: WhatsAppCallTheme.strongText.withValues(alpha: 0.55),
+                  color: SC.textPrimary.withValues(alpha: 0.55),
                   fontSize: 10,
                 ),
               ),
@@ -903,20 +1015,20 @@ class _DubButtonState extends State<_DubButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: WhatsAppCallTheme.accent,
+                    color: SC.accent,
                   ),
                 )
               else
                 const Icon(
                   Icons.volume_up_outlined,
                   size: 16,
-                  color: WhatsAppCallTheme.accent,
+                  color: SC.accent,
                 ),
               const SizedBox(width: 6),
               Text(
                 _error ?? AppStrings.t('voice_dub_listen'),
                 style: const TextStyle(
-                  color: WhatsAppCallTheme.accent,
+                  color: SC.accent,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -994,7 +1106,7 @@ class _VoicePlayerState extends State<_VoicePlayer> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Material(
-          color: WhatsAppCallTheme.accent,
+          color: SC.accent,
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -1018,9 +1130,9 @@ class _VoicePlayerState extends State<_VoicePlayer> {
               value: progress,
               minHeight: 4,
               backgroundColor:
-                  WhatsAppCallTheme.strongText.withValues(alpha: 0.18),
+                  SC.textPrimary.withValues(alpha: 0.18),
               valueColor: const AlwaysStoppedAnimation<Color>(
-                WhatsAppCallTheme.accent,
+                SC.accent,
               ),
             ),
           ),
@@ -1029,7 +1141,7 @@ class _VoicePlayerState extends State<_VoicePlayer> {
         Text(
           label,
           style: TextStyle(
-            color: WhatsAppCallTheme.strongText.withValues(alpha: 0.75),
+            color: SC.textPrimary.withValues(alpha: 0.75),
             fontSize: 12,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
@@ -1233,61 +1345,56 @@ class _ComposerState extends State<_Composer> {
   Widget _buildIdleBar() {
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-        color: WhatsAppCallTheme.bar,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 140),
-                child: TextField(
-                  controller: widget.controller,
-                  enabled: !widget.sending,
-                  minLines: 1,
-                  maxLines: 6,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(color: WhatsAppCallTheme.strongText),
-                  decoration: InputDecoration(
-                    hintText: AppStrings.t('composer_message_hint'),
-                    hintStyle: const TextStyle(color: WhatsAppCallTheme.subtleText),
-                    filled: true,
-                    fillColor: WhatsAppCallTheme.surface,
-                    contentPadding: const EdgeInsets.fromLTRB(2, 10, 14, 10),
-                    prefixIcon: _ComposerTranslateToggle(
-                      active: widget.autoTranslate,
-                      onTap: widget.onToggleTranslate,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        child: GlassContainer(
+          borderRadius: BorderRadius.circular(28),
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 140),
+                  child: TextField(
+                    controller: widget.controller,
+                    enabled: !widget.sending,
+                    minLines: 1,
+                    maxLines: 6,
+                    textCapitalization: TextCapitalization.sentences,
+                    cursorColor: SC.accent,
+                    style: const TextStyle(color: SC.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: AppStrings.t('composer_message_hint'),
+                      hintStyle: const TextStyle(color: SC.textMuted),
+                      filled: false,
+                      contentPadding:
+                          const EdgeInsets.fromLTRB(2, 12, 14, 12),
+                      prefixIcon: _ComposerTranslateToggle(
+                        active: widget.autoTranslate,
+                        onTap: widget.onToggleTranslate,
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 96, minHeight: 40,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                     ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 96, minHeight: 40,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: BorderSide.none,
-                    ),
+                    onSubmitted: (_) => widget.onSend(),
                   ),
-                  onSubmitted: (_) => widget.onSend(),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            _CircleActionButton(
-              icon: _hasText ? Icons.send : Icons.mic,
-              busy: widget.sending,
-              onTap: widget.sending
-                  ? null
-                  : (_hasText ? widget.onSend : _startRecording),
-            ),
-          ],
+              const SizedBox(width: 6),
+              _CircleActionButton(
+                icon: _hasText ? Icons.send : Icons.mic,
+                busy: widget.sending,
+                onTap: widget.sending
+                    ? null
+                    : (_hasText ? widget.onSend : _startRecording),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1299,9 +1406,11 @@ class _ComposerState extends State<_Composer> {
     final s = (secs % 60).toString().padLeft(2, '0');
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-        color: WhatsAppCallTheme.bar,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        child: GlassContainer(
+        borderRadius: BorderRadius.circular(28),
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         child: Row(
           children: [
             // Cancel — drops the recording without sending.
@@ -1335,7 +1444,7 @@ class _ComposerState extends State<_Composer> {
                   Text(
                     '$m:$s',
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                       fontFeatures: [FontFeature.tabularFigures()],
@@ -1348,7 +1457,7 @@ class _ComposerState extends State<_Composer> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.subtleText,
+                        color: SC.textMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -1362,6 +1471,7 @@ class _ComposerState extends State<_Composer> {
               onTap: _stopAndSend,
             ),
           ],
+        ),
         ),
       ),
     );
@@ -1380,24 +1490,41 @@ class _CircleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: WhatsAppCallTheme.accent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: busy
-              ? const SizedBox(
-                  height: 22,
-                  width: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : Icon(icon, color: Colors.white, size: 22),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [SC.accent, SC.accentDeep],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: SC.accent.withValues(alpha: 0.45),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: busy
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(icon, color: Colors.white, size: 22),
+          ),
         ),
       ),
     );
@@ -1426,8 +1553,8 @@ class _ComposerTranslateToggle extends StatelessWidget {
               Icons.translate,
               size: 24,
               color: active
-                  ? WhatsAppCallTheme.accent
-                  : WhatsAppCallTheme.subtleText,
+                  ? SC.accent
+                  : SC.textMuted,
             ),
             const SizedBox(width: 8),
             // Sliding pill — bigger so it reads as a real toggle.
@@ -1436,11 +1563,11 @@ class _ComposerTranslateToggle extends StatelessWidget {
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: active
-                    ? WhatsAppCallTheme.accent.withValues(alpha: 0.45)
-                    : const Color(0xFF2A3942),
+                    ? SC.accent.withValues(alpha: 0.55)
+                    : SC.glassStrong,
                 borderRadius: BorderRadius.circular(999),
                 border:
-                    Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                    Border.all(color: SC.glassBorder),
               ),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 180),
@@ -1452,12 +1579,12 @@ class _ComposerTranslateToggle extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: active
-                        ? WhatsAppCallTheme.accent
+                        ? SC.accent
                         : Colors.white.withValues(alpha: 0.40),
                     boxShadow: active
                         ? [
                             BoxShadow(
-                              color: WhatsAppCallTheme.accent
+                              color: SC.accent
                                   .withValues(alpha: 0.55),
                               blurRadius: 8,
                             ),
@@ -1483,7 +1610,7 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      color: WhatsAppCallTheme.danger.withValues(alpha: 0.18),
+      color: Color(0xFFE53935).withValues(alpha: 0.18),
       child: Text(
         message,
         style: const TextStyle(color: Color(0xFFFFAB91), fontSize: 12, height: 1.35),
