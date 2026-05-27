@@ -2163,23 +2163,31 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFFFE246),
+      color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Center(
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFF111111),
-              shape: BoxShape.circle,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: SC.accent.withValues(alpha: 0.35),
             ),
-            child: const Icon(
-              Icons.add_rounded,
-              color: Color(0xFFFFE246),
-              size: 26,
+          ),
+          child: Center(
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: SC.accent.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: SC.accent,
+                size: 26,
+              ),
             ),
           ),
         ),
