@@ -212,9 +212,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       );
     }
-    if (_requests.isEmpty && _reactions.isEmpty) {
-      return const _NoRequestsEmpty();
-    }
+    final hasContent = _requests.isNotEmpty || _reactions.isNotEmpty;
     return RefreshIndicator(
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
@@ -226,6 +224,16 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           16, 0, 16, 84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
+          // Empty state still gets the glass frame so the page never
+          // feels like a void — same surface the populated list uses,
+          // with the centered "no requests yet" copy inside.
+          if (!hasContent)
+            GlassContainer(
+              borderRadius: BorderRadius.circular(24),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 28),
+              child: const _NoRequestsEmpty(),
+            ),
           if (_requests.isNotEmpty)
             GlassContainer(
               borderRadius: BorderRadius.circular(24),
