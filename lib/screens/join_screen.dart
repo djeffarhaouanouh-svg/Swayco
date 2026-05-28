@@ -165,6 +165,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
             displayName: _myName,
             mySourceLang: _mySourceLang,
             translation: widget.translation,
+            isCaller: true,
           ),
         ),
       );

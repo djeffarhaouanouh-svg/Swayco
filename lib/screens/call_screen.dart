@@ -34,6 +34,7 @@ class CallScreen extends StatefulWidget {
     required this.mySourceLang,
     required this.translation,
     this.inviteShareText,
+    this.isCaller = false,
   });
 
   final String wsUrl;
@@ -48,6 +49,15 @@ class CallScreen extends StatefulWidget {
   /// re-opens the share sheet with this text â€” used by the host of a
   /// guest-invite call so they can resend the link while waiting.
   final String? inviteShareText;
+
+  /// True when the local user initiated this call (dialled out, created
+  /// the room or the guest-invite link). Drives the "caller pays"
+  /// billing rule: a paying subscriber on the receiving end of a call
+  /// is never debited — the cost is borne by whoever started the
+  /// session, or by the free side if it's a free-vs-paying mix. Free
+  /// users are always debited regardless of which side they are on, so
+  /// this flag only affects paying users.
+  final bool isCaller;
 
   @override
   State<CallScreen> createState() => _CallScreenState();
@@ -228,6 +238,17 @@ class _CallScreenState extends State<CallScreen> {
     if (uid.isEmpty) return;
     final p = await ProfileApi.fetchById(uid);
     if (!mounted || p == null) return;
+    // "Caller pays" rule: a paying subscriber who is not the caller of
+    // this session is never debited. Their abonnement covers it. Free
+    // users fall through and are always debited (free vs free → both
+    // sides pay; free vs paying → only the free side pays).
+    if (p.isPro && !widget.isCaller) {
+      debugPrint(
+        '[usage] paying callee — skipping tracker '
+        '(tier=${p.subscriptionTier})',
+      );
+      return;
+    }
     UsageTracker.start(userId: uid, initialCredits: p.creditsSeconds);
     if (UsageTracker.isDisabled) return;
     // Don't bill the whole call â€” only while translation is live. Set the

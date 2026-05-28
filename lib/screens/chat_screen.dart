@@ -359,6 +359,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             mySourceLang: myLang,
             translation: widget.translation,
             inviteShareText: shareText,
+            isCaller: true,
           ),
         ),
       );

@@ -96,6 +96,7 @@ abstract final class CallLauncher {
             displayName: myName,
             mySourceLang: mySourceLang,
             translation: translation,
+            isCaller: true,
           ),
         ),
       );
