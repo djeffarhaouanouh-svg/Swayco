@@ -57,9 +57,18 @@ class ChatThreadScreen extends StatefulWidget {
   State<ChatThreadScreen> createState() => _ChatThreadScreenState();
 }
 
-class _ChatThreadScreenState extends State<ChatThreadScreen> {
+class _ChatThreadScreenState extends State<ChatThreadScreen>
+    with SingleTickerProviderStateMixin {
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+
+  /// Plays a one-shot white shimmer sweep across the whole chat whenever the
+  /// translate toggle is flipped from off → on. Idle the rest of the time so
+  /// the overlay paints nothing.
+  late final AnimationController _activationWave = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 750),
+  );
 
   StreamSubscription<List<ChatMessage>>? _sub;
   Timer? _pollTimer;
@@ -145,7 +154,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   /// visible foreign-language messages.
   void _toggleAutoTranslate() {
     setState(() => _autoTranslate = !_autoTranslate);
-    if (_autoTranslate) _ensureTranslationsForCurrent();
+    if (_autoTranslate) {
+      _activationWave.forward(from: 0);
+      _ensureTranslationsForCurrent();
+    }
   }
 
   /// For every message in [_messages] whose language differs from mine and
@@ -342,6 +354,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     _pollTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
+    _activationWave.dispose();
     super.dispose();
   }
 
@@ -409,41 +422,51 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SC.bg,
-      body: MeshBackground(
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _ThreadHeader(
-                title: widget.title,
-                peer: _peer,
-                onCall: () => CallLauncher.startCall(
-                  context,
-                  peerDeviceId: widget.peerDeviceId,
-                  translation: widget.translation,
-                ),
-                onViewProfile: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ProfileScreen(userId: widget.peerDeviceId),
+      body: Stack(
+        children: [
+          MeshBackground(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  _ThreadHeader(
+                    title: widget.title,
+                    peer: _peer,
+                    onCall: () => CallLauncher.startCall(
+                      context,
+                      peerDeviceId: widget.peerDeviceId,
+                      translation: widget.translation,
+                    ),
+                    onViewProfile: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            ProfileScreen(userId: widget.peerDeviceId),
+                      ),
+                    ),
+                    peerBlocked: _peerBlocked,
+                    onToggleBlock: _toggleBlockPeer,
+                    onReport: _reportPeer,
                   ),
-                ),
-                peerBlocked: _peerBlocked,
-                onToggleBlock: _toggleBlockPeer,
-                onReport: _reportPeer,
+                  if (_error != null) _ErrorBanner(message: _error!),
+                  Expanded(child: _buildMessageList()),
+                  _Composer(
+                    controller: _inputCtrl,
+                    sending: _sending,
+                    onSend: _send,
+                    onSendVoice: _sendVoice,
+                    autoTranslate: _autoTranslate,
+                    onToggleTranslate: _toggleAutoTranslate,
+                  ),
+                ],
               ),
-              if (_error != null) _ErrorBanner(message: _error!),
-              Expanded(child: _buildMessageList()),
-              _Composer(
-                controller: _inputCtrl,
-                sending: _sending,
-                onSend: _send,
-                onSendVoice: _sendVoice,
-                autoTranslate: _autoTranslate,
-                onToggleTranslate: _toggleAutoTranslate,
-              ),
-            ],
+            ),
           ),
-        ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _ActivationWaveOverlay(animation: _activationWave),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1561,6 +1584,57 @@ class _ComposerTranslateToggle extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Full-screen white shimmer that sweeps from left to right when the
+/// translate toggle is activated. Driven by a one-shot AnimationController
+/// kept on [_ChatThreadScreenState]; idle the rest of the time so it paints
+/// nothing and stays free.
+class _ActivationWaveOverlay extends StatelessWidget {
+  const _ActivationWaveOverlay({required this.animation});
+
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (_, child) {
+        final t = animation.value;
+        if (t == 0 || t == 1) return const SizedBox.shrink();
+        // Slide a soft white gradient from off-screen-left (-1.2) to
+        // off-screen-right (+1.2), expressed as a fractional offset of the
+        // overlay's own width.
+        final dx = -1.2 + 2.4 * t;
+        // Quick fade-in / fade-out so the band never appears or disappears
+        // abruptly at the edges of the sweep.
+        final fade = (t < 0.15)
+            ? t / 0.15
+            : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
+        return ClipRect(
+          child: FractionalTranslation(
+            translation: Offset(dx, 0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
+                  colors: [
+                    Colors.white.withValues(alpha: 0),
+                    Colors.white.withValues(alpha: 0.10 * fade),
+                    Colors.white.withValues(alpha: 0.28 * fade),
+                    Colors.white.withValues(alpha: 0.10 * fade),
+                    Colors.white.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
