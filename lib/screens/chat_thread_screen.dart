@@ -566,16 +566,11 @@ class _ThreadHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      // Same Hero tag as the row on the chat list so
-                      // the avatar flies into the header on push.
-                      Hero(
-                        tag: 'peer-avatar-${peer?.id ?? ''}',
-                        child: ProfileAvatar(
-                          displayName: title,
-                          avatarUrl: peer?.avatarUrl,
-                          avatarColorHex: peer?.avatarColor,
-                          size: 38,
-                        ),
+                      ProfileAvatar(
+                        displayName: title,
+                        avatarUrl: peer?.avatarUrl,
+                        avatarColorHex: peer?.avatarColor,
+                        size: 38,
                       ),
                       const SizedBox(width: 10),
                       Expanded(

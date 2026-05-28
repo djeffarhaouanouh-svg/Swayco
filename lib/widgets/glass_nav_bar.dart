@@ -1,20 +1,12 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/app_strings.dart';
-import '../theme/swayco_theme.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
 /// between selected tabs. Rendered by [RootShell] and re-used by screens
 /// pushed on top of it (e.g. a peer's profile) so the bar stays visible.
-///
-/// Premium-feel details: spring-out pill motion, cyan halo under the
-/// active slot, soft icon zoom + selection-click haptic on tap, and a
-/// brief press-squeeze on the icon being released. The whole thing
-/// sits on a heavy BackdropFilter so it reads as frosted glass over
-/// whatever's behind.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
@@ -93,13 +85,10 @@ class GlassNavBar extends StatelessWidget {
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
-              // Sliding highlight pill — spring-out curve gives a tiny
-              // overshoot/bounce when it lands on a new slot. The cyan
-              // halo underneath is what makes the active tab feel
-              // "lit up" instead of just tinted.
+              // Sliding highlight pill — animates between item slots.
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 420),
-                curve: Curves.elasticOut,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
                 left: _itemWidth * selected,
                 top: 0,
                 bottom: 0,
@@ -114,13 +103,6 @@ class GlassNavBar extends StatelessWidget {
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.28),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: SC.accent.withValues(alpha: 0.30),
-                          blurRadius: 16,
-                          spreadRadius: 0,
-                        ),
-                      ],
                     ),
                   ),
                 ),
@@ -135,13 +117,7 @@ class GlassNavBar extends StatelessWidget {
                       child: _NavItem(
                         data: items[i],
                         selected: selected == i,
-                        onTap: () {
-                          // Light haptic so the press registers
-                          // physically before the visual transition
-                          // even starts.
-                          HapticFeedback.selectionClick();
-                          onSelect(i);
-                        },
+                        onTap: () => onSelect(i),
                       ),
                     ),
                 ],
@@ -168,11 +144,7 @@ class _NavItemData {
   final int badge;
 }
 
-/// Single tab inside the glass bar. Stateful so we can run a
-/// press-squeeze on tap-down (icon scales to ~0.88) and let go on
-/// tap-up — same micro-feedback Apple uses on the App Store / Mail
-/// tab bars.
-class _NavItem extends StatefulWidget {
+class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.data,
     required this.selected,
@@ -184,62 +156,35 @@ class _NavItem extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    // Selected icons get a permanent 1.12 scale so the active slot
-    // reads as "bigger / louder". The press state stacks on top with
-    // a brief squeeze to ~0.88. AnimatedScale handles both with a
-    // 140 ms ease curve.
-    final scale = _pressed
-        ? 0.88
-        : widget.selected
-            ? 1.12
-            : 1.0;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: Center(
-        child: _badged(
-          AnimatedScale(
-            scale: scale,
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOut,
-            child: AnimatedSwitcher(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        onTap: onTap,
+        child: Center(
+          child: _badged(
+            AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
               child: Icon(
-                widget.selected
-                    ? widget.data.selectedIcon
-                    : widget.data.icon,
-                key: ValueKey(widget.selected),
+                selected ? data.selectedIcon : data.icon,
+                key: ValueKey(selected),
                 size: 22,
                 // Keep every nav icon white; the sliding pill behind
                 // the selected one already signals which tab is
-                // active. Selected gets a slight luminance boost via
-                // a soft white shadow to lift it off the pill.
+                // active, so tinting the icon cyan on hover / select
+                // was visual noise.
                 color: Colors.white.withValues(
-                  alpha: widget.selected ? 1.0 : 0.78,
+                  alpha: selected ? 1.0 : 0.78,
                 ),
-                shadows: widget.selected
-                    ? [
-                        Shadow(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          blurRadius: 12,
-                        ),
-                      ]
-                    : null,
               ),
             ),
+            data.badge,
           ),
-          widget.data.badge,
         ),
       ),
     );
