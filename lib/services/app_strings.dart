@@ -152,9 +152,10 @@ abstract final class AppStrings {
     // Discover
     'discover_title': 'Discover',
     'search_chercher': 'Chercher',
-    'search_friend_hint': "Prénom de l'ami",
+    'search_friend_hint': 'Nom ou @handle',
     'filters': 'Filtres',
-    'search_intro_hint': "Tape les premières lettres d'un prénom.",
+    'search_intro_hint':
+        "Tape un prénom, ou « @ » suivi du handle pour cibler une personne précise.",
     'discover_done': "C'est tout pour aujourd'hui",
     'send_emoji': 'Envoyer 👋',
     'add_friend_short': 'Ajouter',
@@ -519,9 +520,10 @@ abstract final class AppStrings {
     'report_reason_other': 'Other',
     'discover_title': 'Discover',
     'search_chercher': 'Search',
-    'search_friend_hint': "Friend's first name",
+    'search_friend_hint': 'Name or @handle',
     'filters': 'Filters',
-    'search_intro_hint': 'Type the first letters of a first name.',
+    'search_intro_hint':
+        'Type a name, or "@" followed by a handle to target a specific person.',
     'discover_done': "That's all for today",
     'send_emoji': 'Send 👋',
     'add_friend_short': 'Add',

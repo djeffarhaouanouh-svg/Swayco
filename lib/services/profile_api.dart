@@ -388,18 +388,37 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
-  /// Case-insensitive substring search by display name. Excludes my own profile.
-  static Future<List<RemoteProfile>> searchByFirstName({
+  /// Case-insensitive substring search across display name AND handle.
+  /// Excludes my own profile.
+  ///
+  /// "@" prefix narrows the search to handles only — same UX convention
+  /// as Twitter / Instagram. Without the prefix, both columns are
+  /// matched in a single OR query so the user can type either a real
+  /// name or a handle without thinking about which.
+  static Future<List<RemoteProfile>> searchProfiles({
     required String query,
     required String myDeviceId,
     int limit = 30,
   }) async {
-    final q = query.trim();
+    var q = query.trim();
     if (q.isEmpty) return const [];
-    final rows = await _c
-        .from('profiles')
-        .select()
-        .ilike('display_name', '%$q%')
+    // `@john` → search handle only; `@` alone is a no-op.
+    final handleOnly = q.startsWith('@');
+    if (handleOnly) {
+      q = q.substring(1).trim();
+      if (q.isEmpty) return const [];
+    }
+    // PostgREST escapes commas inside `or` clause arguments — strip
+    // them defensively so a stray comma in user input doesn't blow up
+    // the query parser.
+    final safe = q.replaceAll(',', ' ');
+    final builder = _c.from('profiles').select();
+    final filtered = handleOnly
+        ? builder.ilike('handle', '%$safe%')
+        : builder.or(
+            'display_name.ilike.%$safe%,handle.ilike.%$safe%',
+          );
+    final rows = await filtered
         .neq('id', myDeviceId)
         .order('display_name', ascending: true)
         .limit(limit);

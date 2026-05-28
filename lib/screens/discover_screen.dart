@@ -211,7 +211,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (!isSupabaseReady || _myId.isEmpty) return;
     setState(() => _searching = true);
     try {
-      final results = await ProfileApi.searchByFirstName(
+      final results = await ProfileApi.searchProfiles(
         query: q,
         myDeviceId: _myId,
       );
