@@ -30,7 +30,6 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -544,7 +543,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(_languageCode);
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       // AppBar only when pushed as a route to view someone else — gives a
       // back button. The "my profile" tab is mounted in IndexedStack, no
       // back navigation, so no AppBar needed.
@@ -614,7 +613,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               ],
             )
           : null,
-      body: MeshBackground(
+      body: ColoredBox(
+        color: const Color(0xFF0E0E0E),
         child: Stack(
         children: [
           SafeArea(
