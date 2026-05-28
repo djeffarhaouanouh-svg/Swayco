@@ -22,7 +22,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -376,8 +375,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
+      backgroundColor: const Color(0xFF0E0E0E),
+      body: ColoredBox(
+        color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
           child: Column(

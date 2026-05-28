@@ -12,7 +12,6 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -172,8 +171,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
+      backgroundColor: const Color(0xFF0E0E0E),
+      body: ColoredBox(
+        color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
           child: Column(
