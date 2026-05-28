@@ -8,7 +8,6 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
-import '../theme/whatsapp_call_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/mesh_background.dart';
 
@@ -291,7 +290,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // users. Cheap — _prefill is a single SharedPreferences read.
     if (!_prefillDone) {
       return const Scaffold(
-        backgroundColor: WhatsAppCallTheme.scaffold,
+        backgroundColor: SC.bg,
         body: SafeArea(child: SizedBox.shrink()),
       );
     }
@@ -301,8 +300,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         showGenderStep ? _goToGenderStep : _finish;
 
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
-      body: SafeArea(
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -354,6 +354,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -402,41 +403,34 @@ class _OnboardingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: WhatsAppCallTheme.scaffold,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.t(_titleKey),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-              ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.t(_titleKey),
+            style: SCText.h2.copyWith(fontSize: 26),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppStrings.t(_subtitleKey),
+            style: const TextStyle(
+              color: SC.textSecondary,
+              fontSize: 14,
+              height: 1.35,
             ),
-            const SizedBox(height: 6),
-            Text(
-              AppStrings.t(_subtitleKey),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 14,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                for (var i = 0; i < pageCount; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  _Dot(active: i == page),
-                ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (var i = 0; i < pageCount; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                _Dot(active: i == page),
               ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -454,7 +448,9 @@ class _Dot extends StatelessWidget {
       width: active ? 22 : 8,
       height: 8,
       decoration: BoxDecoration(
-        color: active ? Colors.white : Colors.white.withValues(alpha: 0.35),
+        color: active
+            ? SC.accent
+            : Colors.white.withValues(alpha: 0.30),
         borderRadius: BorderRadius.circular(4),
       ),
     );
@@ -475,22 +471,34 @@ class _StepWelcome extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
+          _GlassTextField(
             controller: nameCtrl,
             textCapitalization: TextCapitalization.words,
-            style: const TextStyle(color: WhatsAppCallTheme.strongText, fontSize: 16),
-            decoration: InputDecoration(
-              labelText: AppStrings.t('onb_first_name_label'),
-              hintText: AppStrings.t('onb_first_name_hint'),
-              prefixIcon: const Icon(Icons.badge_outlined, color: WhatsAppCallTheme.subtleText),
-            ),
+            label: AppStrings.t('onb_first_name_label'),
+            hint: AppStrings.t('onb_first_name_hint'),
+            icon: Icons.badge_outlined,
           ),
           const SizedBox(height: 28),
           FilledButton(
             onPressed: onNext,
-            child: Text(AppStrings.t('onb_next')),
+            style: FilledButton.styleFrom(
+              backgroundColor: SC.accent,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              AppStrings.t('onb_next'),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
+            ),
           ),
         ],
       ),
@@ -527,17 +535,40 @@ class _StepLanguage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             AppStrings.t('onb_translation_help'),
-            style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 13, height: 1.4),
+            style: const TextStyle(
+              color: SC.textMuted, fontSize: 13, height: 1.4,
+            ),
           ),
           const SizedBox(height: 28),
           Row(
             children: [
-              TextButton(onPressed: onBack, child: Text(AppStrings.t('onb_back'))),
+              TextButton(
+                onPressed: onBack,
+                style: TextButton.styleFrom(
+                  foregroundColor: SC.textMuted,
+                ),
+                child: Text(AppStrings.t('onb_back')),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
                   onPressed: onFinish,
-                  child: Text(AppStrings.t(finishLabelKey)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    AppStrings.t(finishLabelKey),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -595,12 +626,31 @@ class _StepGender extends StatelessWidget {
           const SizedBox(height: 28),
           Row(
             children: [
-              TextButton(onPressed: onBack, child: Text(AppStrings.t('onb_back'))),
+              TextButton(
+                onPressed: onBack,
+                style: TextButton.styleFrom(foregroundColor: SC.textMuted),
+                child: Text(AppStrings.t('onb_back')),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
                   onPressed: selected == null ? null : onFinish,
-                  child: Text(AppStrings.t('onb_finish')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    AppStrings.t('onb_finish'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -628,22 +678,23 @@ class _GenderOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? WhatsAppCallTheme.accent : WhatsAppCallTheme.bar;
-    final fg = selected ? Colors.white : WhatsAppCallTheme.strongText;
-    final border = selected
-        ? WhatsAppCallTheme.accent
-        : Colors.white.withValues(alpha: 0.08);
+    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.bubbleIn;
+    final fg = selected ? SC.accent : SC.textPrimary;
+    final border = selected ? SC.accent : SC.glassBorder;
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border, width: 1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: border,
+              width: selected ? 1.5 : 1,
+            ),
           ),
           child: Row(
             children: [
@@ -654,12 +705,12 @@ class _GenderOption extends StatelessWidget {
                 style: TextStyle(
                   color: fg,
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
               const Spacer(),
               if (selected)
-                const Icon(Icons.check_circle, color: Colors.white, size: 22),
+                const Icon(Icons.check_circle, color: SC.accent, size: 22),
             ],
           ),
         ),
