@@ -4,21 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/app_strings.dart';
-import '../services/nav_bar_visibility.dart';
 import '../theme/swayco_theme.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
 /// between selected tabs. Rendered by [RootShell] and re-used by screens
 /// pushed on top of it (e.g. a peer's profile) so the bar stays visible.
 ///
-/// iOS-26 Liquid-Glass behaviour:
-///   • collapses to just the active tab while the user scrolls down
-///     a long list (driven by [NavBarVisibility]) and pops back open
-///     on scroll-up,
-///   • subtle refraction gradient overlay so the surface reads as
-///     light-reactive rather than flat white-alpha,
-///   • cyan halo under the active pill, selection-click haptic, spring
-///     bounce on the pill, soft icon scale on press + selected.
+/// Premium-feel details: spring-out pill motion, cyan halo under the
+/// active slot, soft icon zoom + selection-click haptic on tap, and a
+/// brief press-squeeze on the icon being released. The whole thing
+/// sits on a heavy BackdropFilter so it reads as frosted glass over
+/// whatever's behind.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
@@ -49,6 +45,10 @@ class GlassNavBar extends StatelessWidget {
         badge: unreadChat,
       ),
       _NavItemData(
+        // Card-stack glyph (Discover deck metaphor) replaces the
+        // magnifier — search now lives in the dedicated bar at the
+        // top of the Discover tab, so the icon no longer needed to
+        // read as "search".
         icon: Icons.style_outlined,
         selectedIcon: Icons.style,
         label: AppStrings.t('nav_search'),
@@ -66,19 +66,21 @@ class GlassNavBar extends StatelessWidget {
       ),
     ];
 
-    final expandedWidth = _hPad * 2 + _itemWidth * items.length;
-    final collapsedWidth = _itemWidth + _hPad * 2;
+    final totalWidth = _hPad * 2 + _itemWidth * items.length;
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: NavBarVisibility.collapsed,
-      builder: (_, collapsed, _) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 360),
-          curve: Curves.easeOutCubic,
-          width: collapsed ? collapsedWidth : expandedWidth,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          width: totalWidth,
           height: _height,
           decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.20),
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.30),
@@ -87,163 +89,67 @@ class GlassNavBar extends StatelessWidget {
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-              child: Stack(
+          padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 6),
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              // Sliding highlight pill — spring-out curve gives a tiny
+              // overshoot/bounce when it lands on a new slot. The cyan
+              // halo underneath is what makes the active tab feel
+              // "lit up" instead of just tinted.
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.elasticOut,
+                left: _itemWidth * selected,
+                top: 0,
+                bottom: 0,
+                width: _itemWidth,
+                child: Center(
+                  child: Container(
+                    width: _itemWidth - 4,
+                    height: _height - 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.28),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: SC.accent.withValues(alpha: 0.30),
+                          blurRadius: 16,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Items.
+              Row(
                 children: [
-                  // Base translucent fill + border.
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.20),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Refraction overlay — a slim diagonal white-alpha
-                  // gradient that simulates the light bleed across a
-                  // glass surface. Subtle on purpose; under the
-                  // backdrop blur it reads as a highlight, not a tint.
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.18),
-                            Colors.white.withValues(alpha: 0.0),
-                            Colors.white.withValues(alpha: 0.08),
-                          ],
-                          stops: const [0.0, 0.55, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: _hPad,
-                      vertical: 6,
-                    ),
-                    child: _NavContent(
-                      items: items,
-                      selected: selected,
-                      collapsed: collapsed,
-                      itemWidth: _itemWidth,
+                  for (var i = 0; i < items.length; i++)
+                    SizedBox(
+                      width: _itemWidth,
                       height: _height,
-                      onSelect: (i) {
-                        HapticFeedback.selectionClick();
-                        NavBarVisibility.reveal();
-                        onSelect(i);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Inner row of items + sliding pill. Split out so the AnimatedContainer
-/// above can resize cleanly while this widget cross-fades between the
-/// expanded (4 items) and collapsed (just-selected) layouts.
-class _NavContent extends StatelessWidget {
-  const _NavContent({
-    required this.items,
-    required this.selected,
-    required this.collapsed,
-    required this.itemWidth,
-    required this.height,
-    required this.onSelect,
-  });
-
-  final List<_NavItemData> items;
-  final int selected;
-  final bool collapsed;
-  final double itemWidth;
-  final double height;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.centerLeft,
-      children: [
-        // Sliding pill. In collapsed mode it sits at index 0 because
-        // only the selected item is rendered; in expanded mode it
-        // walks across the row with an elastic-out spring.
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.elasticOut,
-          left: collapsed ? 0 : itemWidth * selected,
-          top: 0,
-          bottom: 0,
-          width: itemWidth,
-          child: Center(
-            child: Container(
-              width: itemWidth - 4,
-              height: height - 16,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.28),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: SC.accent.withValues(alpha: 0.30),
-                    blurRadius: 16,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Item row. AnimatedSwitcher gives a soft cross-fade between
-        // the full row and the single-active layout when collapse /
-        // expand toggles.
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 240),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: collapsed
-              ? SizedBox(
-                  key: const ValueKey('collapsed'),
-                  width: itemWidth,
-                  height: height,
-                  child: _NavItem(
-                    data: items[selected],
-                    selected: true,
-                    onTap: () => onSelect(selected),
-                  ),
-                )
-              : Row(
-                  key: const ValueKey('expanded'),
-                  children: [
-                    for (var i = 0; i < items.length; i++)
-                      SizedBox(
-                        width: itemWidth,
-                        height: height,
-                        child: _NavItem(
-                          data: items[i],
-                          selected: selected == i,
-                          onTap: () => onSelect(i),
-                        ),
+                      child: _NavItem(
+                        data: items[i],
+                        selected: selected == i,
+                        onTap: () {
+                          // Light haptic so the press registers
+                          // physically before the visual transition
+                          // even starts.
+                          HapticFeedback.selectionClick();
+                          onSelect(i);
+                        },
                       ),
-                  ],
-                ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -286,6 +192,10 @@ class _NavItemState extends State<_NavItem> {
 
   @override
   Widget build(BuildContext context) {
+    // Selected icons get a permanent 1.12 scale so the active slot
+    // reads as "bigger / louder". The press state stacks on top with
+    // a brief squeeze to ~0.88. AnimatedScale handles both with a
+    // 140 ms ease curve.
     final scale = _pressed
         ? 0.88
         : widget.selected
@@ -311,6 +221,10 @@ class _NavItemState extends State<_NavItem> {
                     : widget.data.icon,
                 key: ValueKey(widget.selected),
                 size: 22,
+                // Keep every nav icon white; the sliding pill behind
+                // the selected one already signals which tab is
+                // active. Selected gets a slight luminance boost via
+                // a soft white shadow to lift it off the pill.
                 color: Colors.white.withValues(
                   alpha: widget.selected ? 1.0 : 0.78,
                 ),

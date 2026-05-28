@@ -14,7 +14,6 @@ import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
 import '../services/languages.dart';
-import '../services/nav_bar_visibility.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
@@ -413,16 +412,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
-    return NotificationListener<ScrollNotification>(
-      onNotification: (n) {
-        NavBarVisibility.onScroll(n);
-        return false;
-      },
-      child: RefreshIndicator(
-        color: SC.accent,
-        backgroundColor: SC.bubbleIn,
-        onRefresh: _reload,
-        child: ListView(
+    return RefreshIndicator(
+      color: SC.accent,
+      backgroundColor: SC.bubbleIn,
+      onRefresh: _reload,
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         // Clear the floating nav bar so the invite row stays scrollable.
         padding: EdgeInsets.fromLTRB(
@@ -466,7 +460,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             creatingInvite: _creatingInvite,
           ),
         ],
-        ),
       ),
     );
   }

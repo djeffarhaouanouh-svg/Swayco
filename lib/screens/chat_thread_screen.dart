@@ -1314,27 +1314,11 @@ class _ComposerState extends State<_Composer> {
   Widget _buildIdleBar() {
     return SafeArea(
       top: false,
-      // iOS-26 floating composer: bigger side / bottom margins so the
-      // bar visibly hovers over the messages, deeper shadow + brighter
-      // glass for the lifted feel.
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 22,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: GlassContainer(
-            borderRadius: BorderRadius.circular(30),
-            color: SC.glassStrong,
-            border: SC.glassBorderStrong,
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        child: GlassContainer(
+          borderRadius: BorderRadius.circular(28),
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1379,7 +1363,6 @@ class _ComposerState extends State<_Composer> {
                     : (_hasText ? widget.onSend : _startRecording),
               ),
             ],
-          ),
           ),
         ),
       ),
