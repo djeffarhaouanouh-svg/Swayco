@@ -118,14 +118,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
         return;
       }
-      final followers = await FriendshipApi.fetchAcceptedPeers(
-        meId: id,
-        direction: FriendDirection.followers,
-      );
-      final following = await FriendshipApi.fetchAcceptedPeers(
-        meId: id,
-        direction: FriendDirection.following,
-      );
+      // Fire every independent request in parallel — previously each
+      // await sat in front of the next, so the list staggered in over
+      // 6-7× the latency of one request. Future.wait collapses them
+      // into a single round-trip from the user's point of view.
+      final results = await Future.wait([
+        FriendshipApi.fetchAcceptedPeers(
+          meId: id,
+          direction: FriendDirection.followers,
+        ),
+        FriendshipApi.fetchAcceptedPeers(
+          meId: id,
+          direction: FriendDirection.following,
+        ),
+        // Latest message per conversation involving me — used for the
+        // "WhatsApp-style" last-message preview and the sort order.
+        ChatApi.fetchLatestPerConversation(id),
+        ChatUnread.readPerConversationSeen(),
+        // Conversations the user deleted from their list (local
+        // "delete for me"). A row stays hidden until a message newer
+        // than the clear timestamp arrives.
+        ChatUnread.clearedConversations(),
+        // Either side of a block hides the row in both directions.
+        BlockApi.fetchMyBlockedProfiles(id),
+        BlockApi.fetchMyBlockerIds(),
+      ]);
+      final followers = results[0] as List<RemoteProfile>;
+      final following = results[1] as List<RemoteProfile>;
+      final latest = results[2] as Map<String, ChatMessage>;
+      final seen = results[3] as Map<String, DateTime>;
+      final cleared = results[4] as Map<String, DateTime>;
+      final iBlocked = results[5] as List<RemoteProfile>;
+      final blockedMe = results[6] as Set<String>;
+
       final byId = <String, RemoteProfile>{};
       for (final p in followers) {
         byId[p.id] = p;
@@ -133,24 +158,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       for (final p in following) {
         byId[p.id] = p;
       }
-
-      // Fetch the latest message for each conversation involving me — used
-      // to render the last-message preview and to sort rows by most-recent
-      // activity (WhatsApp style).
-      final latest = await ChatApi.fetchLatestPerConversation(id);
-      final seen = await ChatUnread.readPerConversationSeen();
-      // Conversations the user deleted from their list (local "delete for
-      // me"). A row stays hidden until a message newer than the clear
-      // timestamp arrives.
-      final cleared = await ChatUnread.clearedConversations();
-      // Drop any conversation where either side has blocked the other —
-      // I blocked them (BlockApi.fetchMyBlockedProfiles) or they blocked
-      // me (my_blockers RPC). Both directions should make the row
-      // disappear from this chat list so the user can't keep messaging
-      // into a void.
-      final iBlocked = await BlockApi.fetchMyBlockedProfiles(id);
       final blockedByMe = iBlocked.map((p) => p.id).toSet();
-      final blockedMe = await BlockApi.fetchMyBlockerIds();
       final hiddenPeers = {...blockedByMe, ...blockedMe};
       byId.removeWhere((k, _) => hiddenPeers.contains(k));
 
@@ -396,8 +404,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: SC.accent),
+      // Skeleton list while data lands — keeps the layout in place
+      // instead of swapping a centred spinner for a populated list
+      // (the old behaviour made rows pop in one by one as each
+      // request resolved).
+      return _ChatListSkeleton(
+        bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
       );
     }
     if (_error != null) {
@@ -901,6 +913,141 @@ class _InviteToCallBar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Placeholder list shown while the chat-list data is loading. Same
+/// glass card + same row geometry as the real list, with each row
+/// replaced by shimmering bars. Keeps the page layout stable so the
+/// content doesn't pop in / shift when the data lands.
+class _ChatListSkeleton extends StatefulWidget {
+  const _ChatListSkeleton({required this.bottomInset});
+
+  final double bottomInset;
+
+  @override
+  State<_ChatListSkeleton> createState() => _ChatListSkeletonState();
+}
+
+class _ChatListSkeletonState extends State<_ChatListSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, widget.bottomInset),
+      children: [
+        GlassContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(6),
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (_, _) {
+              final t = Curves.easeInOut.transform(_ctrl.value);
+              // 0.10 → 0.18 alpha so the shimmer breathes gently
+              // without strobing the screen.
+              final shimmer =
+                  Colors.white.withValues(alpha: 0.10 + 0.08 * t);
+              return Column(
+                children: [
+                  for (var i = 0; i < 5; i++)
+                    _SkeletonRow(shimmer: shimmer),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SkeletonRow extends StatelessWidget {
+  const _SkeletonRow({required this.shimmer});
+
+  final Color shimmer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        children: [
+          // Avatar placeholder — same 46 px circle the real row uses.
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: shimmer,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 120,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: shimmer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 180,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: shimmer,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Timestamp bar.
+          Container(
+            width: 28,
+            height: 10,
+            decoration: BoxDecoration(
+              color: shimmer,
+              borderRadius: BorderRadius.circular(5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Phone-button placeholder.
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: shimmer,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
       ),
     );
   }
