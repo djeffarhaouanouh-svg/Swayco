@@ -23,6 +23,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
+import '../widgets/liquid_scroll_header.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -370,40 +371,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: SC.bg,
       body: MeshBackground(
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    AppStrings.t('messages_title'),
-                    style: SCText.h1,
-                  ),
-                ),
-              ),
-              // The list fills the full height (scrolling behind the
-              // floating nav bar). The "Invite to a call" row is the last
-              // item of the list — see _buildBody.
-              Expanded(child: _buildBody()),
-            ],
-          ),
+        child: LiquidScrollHeader(
+          title: AppStrings.t('messages_title'),
+          builder: (ctx, controller, topInset) =>
+              _buildBody(controller, topInset),
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ScrollController controller, double topInset) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: SC.accent),
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: const Center(
+          child: CircularProgressIndicator(color: SC.accent),
+        ),
       );
     }
     if (_error != null) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, topInset + 8, 24, 24),
         child: Text(
           _error!,
           style: const TextStyle(color: Color(0xFFFFAB91), height: 1.35, fontSize: 13),
@@ -411,7 +399,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
     }
     if (_friends.isEmpty) {
-      return const _NoFriendsEmpty();
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: const _NoFriendsEmpty(),
+      );
     }
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
@@ -423,10 +414,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         backgroundColor: SC.bubbleIn,
         onRefresh: _reload,
         child: ListView(
+        controller: controller,
         physics: const AlwaysScrollableScrollPhysics(),
-        // Clear the floating nav bar so the invite row stays scrollable.
+        // Top inset clears the floating liquid header so the first
+        // row appears just below the bar at all collapse states.
+        // Bottom inset clears the floating nav bar so the invite
+        // row stays fully scrollable into view.
         padding: EdgeInsets.fromLTRB(
-          16, 0, 16,
+          16, topInset + 4, 16,
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
