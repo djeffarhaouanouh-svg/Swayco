@@ -22,6 +22,7 @@ import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
+import '../services/nav_bar_visibility.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
@@ -611,7 +612,12 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         children: [
           SafeArea(
             bottom: false,
-            child: RefreshIndicator(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                NavBarVisibility.onScroll(n);
+                return false;
+              },
+              child: RefreshIndicator(
         color: SC.accent,
         backgroundColor: SC.bubbleIn,
         onRefresh: _reload,
@@ -721,6 +727,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 ],
               ),
         ),
+          ),
           ),
           // When viewing someone else's profile this screen is a route
           // pushed on top of [RootShell], so the shell's floating nav bar
