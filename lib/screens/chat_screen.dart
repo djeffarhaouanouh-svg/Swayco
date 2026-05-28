@@ -576,32 +576,29 @@ class _FriendChatRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            // Avatar — tap goes straight to the peer's profile. The cyan
-            // dot rides the bottom-right corner when they're online.
+            // Avatar — tap goes straight to the peer's profile. The
+            // cyan dot rides the bottom-right corner when they're
+            // online. Wrapped in a Hero so the avatar flies from the
+            // list into the chat thread header on push.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
               child: Stack(
                 children: [
-                  ProfileAvatar(
-                    displayName: profile.displayName,
-                    avatarUrl: profile.avatarUrl,
-                    avatarColorHex: profile.avatarColor,
-                    size: 46,
+                  Hero(
+                    tag: 'peer-avatar-${profile.id}',
+                    child: ProfileAvatar(
+                      displayName: profile.displayName,
+                      avatarUrl: profile.avatarUrl,
+                      avatarColorHex: profile.avatarColor,
+                      size: 46,
+                    ),
                   ),
                   if (_peerOnline)
                     Positioned(
                       right: 0,
                       bottom: 0,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: SC.online,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: SC.bg, width: 2),
-                        ),
-                      ),
+                      child: _OnlinePulseDot(),
                     ),
                 ],
               ),
@@ -717,6 +714,62 @@ class _FriendChatRow extends StatelessWidget {
 /// Reuses [CallLauncher.startCall] under the hood — same code path as
 /// the long-press menu's "call" entry — so the user can ring a friend
 /// without opening the thread first.
+/// Tiny green presence indicator that breathes in and out on a 2.2 s
+/// loop — the same micro-animation Apple uses on the active-call pill
+/// and WhatsApp uses on its typing dots, just slower / subtler.
+class _OnlinePulseDot extends StatefulWidget {
+  @override
+  State<_OnlinePulseDot> createState() => _OnlinePulseDotState();
+}
+
+class _OnlinePulseDotState extends State<_OnlinePulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, _) {
+        // Map 0..1 → 1.0..1.18 scale, and 0..1 → 0.55..1.0 halo alpha.
+        final t = Curves.easeInOut.transform(_ctrl.value);
+        final scale = 1.0 + 0.18 * t;
+        final haloAlpha = 0.55 + 0.45 * t;
+        return Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: SC.online,
+            shape: BoxShape.circle,
+            border: Border.all(color: SC.bg, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: SC.online.withValues(alpha: haloAlpha * 0.55),
+                blurRadius: 8 * scale,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _RowCallButton extends StatelessWidget {
   const _RowCallButton({required this.onTap});
 
