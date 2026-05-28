@@ -1,4 +1,4 @@
-import 'dart:math';
+﻿import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -11,12 +11,12 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import 'call_screen.dart';
 import 'onboarding_screen.dart';
 
-/// "Appel" tab — instead of a manual room-name + name form, this lists the
+/// "Appel" tab â€” instead of a manual room-name + name form, this lists the
 /// user's accepted friends. Tapping a row starts the call directly with a
 /// deterministic room name derived from the two device ids, so both sides
 /// land on the same LiveKit room without ever typing it.
@@ -125,7 +125,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   /// Deterministic LiveKit room name derived from the two device ids. Kept
   /// short to satisfy the backend's 3-64 char limit on room names. The 12
-  /// hex chars per side give ~10^14 unique pairs — plenty.
+  /// hex chars per side give ~10^14 unique pairs â€” plenty.
   String _roomNameFor(String otherId) {
     final a = _myId.replaceAll('-', '');
     final b = otherId.replaceAll('-', '');
@@ -182,7 +182,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     final myLang = findLanguageByCode(_mySourceLang);
 
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -212,13 +212,13 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: WhatsAppCallTheme.accent),
+        child: CircularProgressIndicator(color: SC.accent),
       );
     }
     if (!isSupabaseReady) {
       return const _CenteredHint(
         icon: Icons.cloud_off,
-        title: 'Supabase non configuré',
+        title: 'Supabase non configurÃ©',
         body: 'L\'appel automatique a besoin de la liste d\'amis. '
             'Configure Supabase pour activer cet onglet.',
       );
@@ -226,15 +226,15 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _CenteredHint(
         icon: Icons.people_outline,
-        title: 'Aucun ami à appeler',
+        title: 'Aucun ami Ã  appeler',
         body: 'Va dans l\'onglet Recherche pour trouver quelqu\'un par son '
-            'prénom, puis envoie-lui une demande d\'ami. Une fois acceptée, '
-            'il apparaîtra ici et tu pourras le rappeler en un tap.',
+            'prÃ©nom, puis envoie-lui une demande d\'ami. Une fois acceptÃ©e, '
+            'il apparaÃ®tra ici et tu pourras le rappeler en un tap.',
       );
     }
     return RefreshIndicator(
-      color: WhatsAppCallTheme.accent,
-      backgroundColor: WhatsAppCallTheme.bar,
+      color: SC.accent,
+      backgroundColor: SC.bubbleIn,
       onRefresh: _bootstrap,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -294,7 +294,7 @@ class _CallableFriendRow extends StatelessWidget {
               alignment: Alignment.center,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: WhatsAppCallTheme.accentMuted,
+                color: SC.accentDeep,
               ),
               child: Text(
                 initial,
@@ -318,7 +318,7 @@ class _CallableFriendRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -331,7 +331,7 @@ class _CallableFriendRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.subtleText,
+                        color: SC.textMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -341,7 +341,7 @@ class _CallableFriendRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Material(
-              color: WhatsAppCallTheme.accent,
+              color: SC.accent,
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -389,13 +389,13 @@ class _MyProfileStrip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
       decoration: BoxDecoration(
-        color: WhatsAppCallTheme.bar,
+        color: SC.bubbleIn,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           Text(
-            lang?.flag ?? '🌐',
+            lang?.flag ?? 'ðŸŒ',
             style: const TextStyle(fontSize: 22),
           ),
           const SizedBox(width: 10),
@@ -409,7 +409,7 @@ class _MyProfileStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                    color: SC.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -421,7 +421,7 @@ class _MyProfileStrip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.subtleText,
+                    color: SC.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -431,7 +431,7 @@ class _MyProfileStrip extends StatelessWidget {
           IconButton(
             onPressed: onEdit,
             tooltip: AppStrings.t('join_edit_profile'),
-            icon: const Icon(Icons.edit_outlined, color: WhatsAppCallTheme.subtleText),
+            icon: const Icon(Icons.edit_outlined, color: SC.textMuted),
           ),
         ],
       ),
@@ -461,17 +461,17 @@ class _CenteredHint extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: WhatsAppCallTheme.bar,
+                color: SC.bubbleIn,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: WhatsAppCallTheme.subtleText, size: 34),
+              child: Icon(icon, color: SC.textMuted, size: 34),
             ),
             const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -481,7 +481,7 @@ class _CenteredHint extends StatelessWidget {
               body,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.subtleText,
+                color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -505,7 +505,7 @@ class _WhatsAppCallHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: WhatsAppCallTheme.scaffold,
+      color: SC.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(

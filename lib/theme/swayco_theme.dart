@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Swayco "Midnight" palette — deep navy mesh background, glass surfaces,
-/// cyan accent. Use alongside [WhatsAppCallTheme] in screens that have
-/// been restyled (Messages / Discover / Chat thread); other screens keep
-/// the legacy WhatsApp-green palette until they're migrated too.
+/// Swayco "Midnight" palette — deep navy mesh background, glass
+/// surfaces, cyan accent. Source of truth for every theme-aware
+/// surface in the app since the legacy WhatsApp-green palette was
+/// retired.
 abstract final class SC {
   // Backgrounds
   static const bg            = Color(0xFF0A1024);
@@ -43,6 +43,76 @@ abstract final class SC {
   // Outgoing bubble gradient stops.
   static const outBubbleStart = Color(0xFF0891B2);
   static const outBubbleEnd   = Color(0xFF0E7490);
+
+  /// Global Material 3 theme used by [MaterialApp.theme]. Mirrors the
+  /// Midnight palette so any widget that opts into the inherited
+  /// theme (default FilledButton, InputDecoration, AppBar, etc.) lands
+  /// on cyan + navy instead of the old WhatsApp green + black.
+  static ThemeData material() {
+    const base = ColorScheme.dark(
+      primary: accent,
+      onPrimary: Colors.white,
+      surface: bubbleIn,
+      onSurface: textPrimary,
+      error: Color(0xFFE53935),
+      onError: Colors.white,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: base,
+      scaffoldBackgroundColor: bg,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: bg,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: bubbleIn,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: glassBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: glassBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: accent, width: 1.5),
+        ),
+        hintStyle: const TextStyle(color: textMuted),
+        labelStyle: const TextStyle(color: textMuted),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(48),
+          padding:
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: accent,
+        selectionColor: accent.withValues(alpha: 0.35),
+        selectionHandleColor: accent,
+      ),
+      dividerTheme: const DividerThemeData(color: glassBorder),
+    );
+  }
 }
 
 abstract final class SCText {

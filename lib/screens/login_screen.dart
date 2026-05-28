@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 
 /// Welcome screen shown when the user has no Supabase Auth session. Lets them
 /// either sign in or create a new account with email + password. After a
@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPassword = false;
   String? _error;
   String? _info;
-  /// True once we know the entered email exists but isn't confirmed yet —
+  /// True once we know the entered email exists but isn't confirmed yet â€”
   /// drives the "Resend confirmation email" affordance.
   bool _showResendConfirmation = false;
 
@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         await AuthService.signIn(email: email, password: password);
       }
-      // Parent listens to auth state changes — it'll route us away.
+      // Parent listens to auth state changes â€” it'll route us away.
     } on AuthException catch (e) {
       if (!mounted) return;
       // Surface the "Resend confirmation" affordance when the failure is
@@ -172,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isSignUp = _mode == _Mode.signUp;
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -188,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? AppStrings.t('login_title_signup')
                         : AppStrings.t('login_title_signin'),
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                     ),
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? AppStrings.t('login_subtitle_signup')
                         : AppStrings.t('login_subtitle_signin'),
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.subtleText,
+                      color: SC.textMuted,
                       fontSize: 14,
                       height: 1.35,
                     ),
@@ -212,14 +212,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     enabled: !_busy,
                     textCapitalization: TextCapitalization.none,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 16,
                     ),
                     decoration: InputDecoration(
                       labelText: AppStrings.t('login_email_label'),
                       hintText: AppStrings.t('login_email_hint'),
                       prefixIcon: const Icon(Icons.alternate_email,
-                          color: WhatsAppCallTheme.subtleText),
+                          color: SC.textMuted),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -228,13 +228,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: !_showPassword,
                     enabled: !_busy,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 16,
                     ),
                     decoration: InputDecoration(
                       labelText: AppStrings.t('login_password_label'),
                       prefixIcon: const Icon(Icons.lock_outline,
-                          color: WhatsAppCallTheme.subtleText),
+                          color: SC.textMuted),
                       suffixIcon: IconButton(
                         onPressed: () =>
                             setState(() => _showPassword = !_showPassword),
@@ -242,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           _showPassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: WhatsAppCallTheme.subtleText,
+                          color: SC.textMuted,
                         ),
                       ),
                     ),
@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(
                       _info!,
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.accent,
+                        color: SC.accent,
                         fontSize: 13,
                         height: 1.35,
                       ),
@@ -295,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   FilledButton(
                     onPressed: _busy ? null : _submit,
                     style: FilledButton.styleFrom(
-                      backgroundColor: WhatsAppCallTheme.accent,
+                      backgroundColor: SC.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -327,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? AppStrings.t('login_have_account')
                             : AppStrings.t('login_no_account'),
                         style: const TextStyle(
-                          color: WhatsAppCallTheme.subtleText,
+                          color: SC.textMuted,
                           fontSize: 13,
                         ),
                       ),

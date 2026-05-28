@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -7,7 +7,7 @@ import '../services/device_id.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
 import '../services/web_poll.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -56,10 +56,10 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       appBar: AppBar(
-        backgroundColor: WhatsAppCallTheme.scaffold,
-        foregroundColor: WhatsAppCallTheme.strongText,
+        backgroundColor: SC.bg,
+        foregroundColor: SC.textPrimary,
         elevation: 0,
         title: Text(
           AppStrings.t('who_liked_me'),
@@ -69,12 +69,12 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
-                  color: WhatsAppCallTheme.accent))
+                  color: SC.accent))
           : _likers.isEmpty
               ? const _EmptyState()
               : RefreshIndicator(
-                  color: WhatsAppCallTheme.accent,
-                  backgroundColor: WhatsAppCallTheme.bar,
+                  color: SC.accent,
+                  backgroundColor: SC.bubbleIn,
                   onRefresh: _load,
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -105,7 +105,7 @@ class _LikerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: WhatsAppCallTheme.bar,
+      color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -131,9 +131,9 @@ class _LikerRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      profile.displayName.isEmpty ? '—' : profile.displayName,
+                      profile.displayName.isEmpty ? 'â€”' : profile.displayName,
                       style: const TextStyle(
-                        color: WhatsAppCallTheme.strongText,
+                        color: SC.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -142,7 +142,7 @@ class _LikerRow extends StatelessWidget {
                       Text(
                         '@${profile.handle}',
                         style: const TextStyle(
-                          color: WhatsAppCallTheme.subtleText,
+                          color: SC.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -171,12 +171,12 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.favorite_border,
-                size: 56, color: WhatsAppCallTheme.subtleText),
+                size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('no_one_liked_yet'),
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -186,7 +186,7 @@ class _EmptyState extends StatelessWidget {
               AppStrings.t('like_explainer'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WhatsAppCallTheme.subtleText,
+                color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,
               ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 
 /// Reusable circular avatar: shows the network photo when [avatarUrl] is
 /// provided, falls back to the first letter of [displayName] on a colored
@@ -88,14 +88,14 @@ class ProfileAvatar extends StatelessWidget {
               loadingBuilder: (ctx, child, progress) {
                 if (progress == null) return child;
                 return Container(
-                  color: WhatsAppCallTheme.bar,
+                  color: SC.bubbleIn,
                   alignment: Alignment.center,
                   child: SizedBox(
                     width: size * 0.4,
                     height: size * 0.4,
                     child: const CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: WhatsAppCallTheme.accent,
+                      color: SC.accent,
                     ),
                   ),
                 );

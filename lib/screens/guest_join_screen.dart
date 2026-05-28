@@ -1,4 +1,4 @@
-import 'dart:math';
+﻿import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -6,12 +6,12 @@ import '../services/app_strings.dart';
 import '../services/guest_invite_api.dart';
 import '../services/languages.dart';
 import '../services/token_api.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import 'call_screen.dart';
 
-/// Landing screen for an invite link (`/c/<room>?t=…&e=…`). The guest enters
-/// a first name + spoken language and joins the call — no account, no signup.
+/// Landing screen for an invite link (`/c/<room>?t=â€¦&e=â€¦`). The guest enters
+/// a first name + spoken language and joins the call â€” no account, no signup.
 /// Only ever shown on web, routed to from `main.dart` when the URL carries a
 /// guest-invite deep link.
 class GuestJoinScreen extends StatefulWidget {
@@ -33,7 +33,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
   bool _joining = false;
   String? _error;
 
-  /// Random LiveKit identity for this guest. `guest-` prefix only — guests
+  /// Random LiveKit identity for this guest. `guest-` prefix only â€” guests
   /// have no device id or account to derive a stable one from.
   String _newIdentity() {
     final r = Random();
@@ -54,7 +54,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
       );
       return;
     }
-    // No name is asked of the guest — they show up as "Invité" / "Guest".
+    // No name is asked of the guest â€” they show up as "InvitÃ©" / "Guest".
     final name = AppStrings.t('guest_default_name');
     setState(() {
       _joining = true;
@@ -82,7 +82,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
           ),
         ),
       );
-      // Returned from the call — let the guest rejoin if they want.
+      // Returned from the call â€” let the guest rejoin if they want.
       if (mounted) setState(() => _joining = false);
     } on TokenApiException catch (e) {
       if (!mounted) return;
@@ -104,7 +104,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -121,7 +121,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                     alignment: Alignment.center,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: WhatsAppCallTheme.accentMuted,
+                      color: SC.accentDeep,
                     ),
                     child: const Icon(Icons.videocam_rounded,
                         color: Colors.white, size: 36),
@@ -131,7 +131,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                     AppStrings.t('guest_title'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                     ),
@@ -141,7 +141,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                     AppStrings.t('guest_subtitle'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.subtleText,
+                      color: SC.textMuted,
                       fontSize: 14,
                       height: 1.4,
                     ),
@@ -150,7 +150,7 @@ class _GuestJoinScreenState extends State<GuestJoinScreen> {
                   Text(
                     AppStrings.t('guest_lang_label'),
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -226,10 +226,10 @@ class _LangChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? WhatsAppCallTheme.accent : WhatsAppCallTheme.bar;
+    final bg = selected ? SC.accent : SC.bubbleIn;
     final border =
-        selected ? WhatsAppCallTheme.accent : Colors.white.withValues(alpha: 0.08);
-    final fg = selected ? Colors.white : WhatsAppCallTheme.strongText;
+        selected ? SC.accent : Colors.white.withValues(alpha: 0.08);
+    final fg = selected ? Colors.white : SC.textPrimary;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(14),

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -19,7 +19,7 @@ import '../services/call_alert.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/usage_tracker.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
 import '../widgets/translation_feedback_ribbon.dart';
@@ -45,7 +45,7 @@ class CallScreen extends StatefulWidget {
   final String mySourceLang;
   final RealtimeTranslationPort translation;
   /// When set, the empty-room "waiting" placeholder shows a button that
-  /// re-opens the share sheet with this text — used by the host of a
+  /// re-opens the share sheet with this text â€” used by the host of a
   /// guest-invite call so they can resend the link while waiting.
   final String? inviteShareText;
 
@@ -67,13 +67,13 @@ class _CallScreenState extends State<CallScreen> {
   /// The remote BCP-47 we have attached the translation pipeline with, so we
   /// only re-attach when it actually changes.
   String _attachedRemoteLang = '';
-  /// The local output language the pipeline is currently attached with —
+  /// The local output language the pipeline is currently attached with â€”
   /// tracked alongside [_attachedRemoteLang] so a mid-call language change
   /// also triggers a re-attach.
   String _attachedMyLang = '';
   /// The language the local user currently *hears* the remote translated
   /// into. Starts at the user's own language; changeable mid-call via the
-  /// language button. Local-only — it is never written to LiveKit
+  /// language button. Local-only â€” it is never written to LiveKit
   /// metadata, so the remote participant is completely unaffected.
   late String _myOutputLang = widget.mySourceLang;
   bool _refreshingTranslation = false;
@@ -90,12 +90,12 @@ class _CallScreenState extends State<CallScreen> {
   final Stopwatch _translationLive = Stopwatch();
   /// Set to true the first time any RemoteParticipant joins the room.
   /// Used by the ParticipantDisconnectedEvent handler to distinguish
-  /// "caller waiting alone before pickup" (empty + !_hadRemote → keep
+  /// "caller waiting alone before pickup" (empty + !_hadRemote â†’ keep
   /// the room open) from "peer just left a 1:1 call" (empty +
-  /// _hadRemote → auto-hangup so we don't burn credits on a ghost room).
+  /// _hadRemote â†’ auto-hangup so we don't burn credits on a ghost room).
   bool _hadRemote = false;
 
-  /// When the LiveKit room finished connecting — null until then. Used
+  /// When the LiveKit room finished connecting â€” null until then. Used
   /// to emit the analytics `call_ended` duration from [dispose] (which
   /// always runs, whatever the exit path: hang-up, peer-left, back nav).
   DateTime? _connectedAt;
@@ -121,13 +121,13 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// Translation credits should only burn while the OpenAI pipeline is
-  /// actually live — not for the whole call. Pause the meter while
+  /// actually live â€” not for the whole call. Pause the meter while
   /// waiting for the peer / connecting / idle, resume it once OpenAI is
   /// connected and translating.
   void _syncUsageMeter() {
     final live = widget.translation.translationFeedbackPhase ==
         TranslationFeedbackPhase.live;
-    // The stopwatch tracks real translation time for the cost analytics —
+    // The stopwatch tracks real translation time for the cost analytics â€”
     // kept running even when UsageTracker is disabled (test mode).
     if (live) {
       _translationLive.start();
@@ -214,7 +214,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// Pull the user's current credit balance and start the call timer. The
-  /// call itself runs regardless — we just decide whether translation is
+  /// call itself runs regardless â€” we just decide whether translation is
   /// allowed on top.
   Future<void> _initUsageTracking() async {
     final uid = AuthService.currentUserId;
@@ -223,11 +223,11 @@ class _CallScreenState extends State<CallScreen> {
     if (!mounted || p == null) return;
     UsageTracker.start(userId: uid, initialCredits: p.creditsSeconds);
     if (UsageTracker.isDisabled) return;
-    // Don't bill the whole call — only while translation is live. Set the
+    // Don't bill the whole call â€” only while translation is live. Set the
     // meter to whatever the pipeline's state is right now.
     _syncUsageMeter();
     if (p.creditsSeconds <= 0) {
-      // Already empty before the call started — kill translation now.
+      // Already empty before the call started â€” kill translation now.
       await widget.translation.detach();
     }
   }
@@ -261,7 +261,7 @@ class _CallScreenState extends State<CallScreen> {
 
     // Android 12+ requires BLUETOOTH_CONNECT at runtime before in-call
     // audio can be routed to a Bluetooth headset. Ask once here, but
-    // never block the call on it — a refused grant just keeps audio on
+    // never block the call on it â€” a refused grant just keeps audio on
     // the speaker/earpiece. No-op on iOS / web (the OS auto-routes).
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       await Permission.bluetoothConnect.request();
@@ -271,7 +271,7 @@ class _CallScreenState extends State<CallScreen> {
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
-      // time → ParticipantConnectedEvent never fires for them and our
+      // time â†’ ParticipantConnectedEvent never fires for them and our
       // `_hadRemote` flag would otherwise stay false, defeating the
       // "auto-hangup when peer leaves" logic. Seed the flag from the
       // initial participant snapshot.
@@ -316,7 +316,7 @@ class _CallScreenState extends State<CallScreen> {
           if (mounted) setState(() {});
         })
         ..on<ParticipantConnectedEvent>((_) {
-          // First remote joining = call answered → silence the caller's
+          // First remote joining = call answered â†’ silence the caller's
           // dial tone (no-op on native via the stub).
           CallAlert.stop();
           _hadRemote = true;
@@ -326,7 +326,7 @@ class _CallScreenState extends State<CallScreen> {
         ..on<ParticipantDisconnectedEvent>((_) {
           unawaited(_refreshTranslationBinding(room));
           if (mounted) setState(() {});
-          // 1:1 calls only — if we had a peer and they just left,
+          // 1:1 calls only â€” if we had a peer and they just left,
           // there's no reason to keep the room (or our credit meter)
           // running. Auto-hangup so the caller doesn't burn minutes
           // sitting alone in an empty room.
@@ -339,7 +339,7 @@ class _CallScreenState extends State<CallScreen> {
           if (mounted) setState(() {});
         });
       // A participant may have joined in the window between connect() and
-      // this listener being attached — very likely in live calls where
+      // this listener being attached â€” very likely in live calls where
       // both peers join at once, and the slow translation setup above
       // widens the window. That ParticipantConnectedEvent would be missed,
       // leaving _hadRemote false and defeating the auto-hangup when the
@@ -349,7 +349,7 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await _audio.bind(room);
-      // Apply the user's default call audio output (Settings → Audio
+      // Apply the user's default call audio output (Settings â†’ Audio
       // output). AudioController already defaults to speaker, so only
       // the earpiece choice needs to be applied here.
       try {
@@ -402,13 +402,13 @@ class _CallScreenState extends State<CallScreen> {
     final n = p.name.trim();
     if (n.isNotEmpty) return n;
     final id = p.identity;
-    if (id.length > 14) return '${id.substring(0, 14)}…';
+    if (id.length > 14) return '${id.substring(0, 14)}â€¦';
     return id;
   }
 
   /// Whether we should draw the small PiP at all. We always show it as
   /// long as a participant exists on the side that PiP would represent,
-  /// even when their camera is off — the cell falls back to an avatar
+  /// even when their camera is off â€” the cell falls back to an avatar
   /// placeholder so the layout doesn't collapse mid-call.
   bool _pipFeedAvailable({
     VideoTrack? local,
@@ -423,7 +423,7 @@ class _CallScreenState extends State<CallScreen> {
     for (final p in room.remoteParticipants.values) {
       for (final pub in p.videoTrackPublications) {
         // A muted publication means the participant turned their camera
-        // off — LiveKit mutes the track instead of unpublishing it. Treat
+        // off â€” LiveKit mutes the track instead of unpublishing it. Treat
         // it as "no video" so the camera-off tile shows instead of a
         // frozen / black VideoTrackRenderer.
         if (pub.muted) continue;
@@ -478,14 +478,14 @@ class _CallScreenState extends State<CallScreen> {
         ),
       );
     } catch (_) {
-      // Sheet dismissed or sharing unavailable — nothing to do.
+      // Sheet dismissed or sharing unavailable â€” nothing to do.
     }
   }
 
   void _openAudioSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: WhatsAppCallTheme.bar,
+      backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -497,7 +497,7 @@ class _CallScreenState extends State<CallScreen> {
   void _openLanguageSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: WhatsAppCallTheme.bar,
+      backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -514,7 +514,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Change the language the local user hears the remote translated into.
   /// Local-only: it rebuilds our incoming translation pipeline with a new
-  /// output language. The remote participant is not affected — we never
+  /// output language. The remote participant is not affected â€” we never
   /// touch our LiveKit metadata, so they keep translating our speech from
   /// our real spoken language.
   Future<void> _changeOutputLanguage(String code) async {
@@ -544,12 +544,12 @@ class _CallScreenState extends State<CallScreen> {
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: WhatsAppCallTheme.bar,
+        backgroundColor: SC.bubbleIn,
         title: Text(AppStrings.t('call_leave_q'),
-            style: const TextStyle(color: WhatsAppCallTheme.strongText)),
+            style: const TextStyle(color: SC.textPrimary)),
         content: Text(
           AppStrings.t('call_leave_body'),
-          style: const TextStyle(color: WhatsAppCallTheme.subtleText),
+          style: const TextStyle(color: SC.textMuted),
         ),
         actions: [
           TextButton(
@@ -558,7 +558,7 @@ class _CallScreenState extends State<CallScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: WhatsAppCallTheme.danger),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE53935)),
             child: Text(AppStrings.t('call_leave')),
           ),
         ],
@@ -571,7 +571,7 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     // call_ended is emitted here, not in _hangUp(), because dispose()
     // runs on every exit path (hang-up, peer-left auto-hangup, system
-    // back) — so the call is counted exactly once with its duration.
+    // back) â€” so the call is counted exactly once with its duration.
     final startedAt = _connectedAt;
     if (startedAt != null) {
       Analytics.track(
@@ -582,7 +582,7 @@ class _CallScreenState extends State<CallScreen> {
         props: {
           'kind': _callKind,
           'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
-          // Real translation-live time — drives the OpenAI Realtime cost
+          // Real translation-live time â€” drives the OpenAI Realtime cost
           // estimate in the admin dashboard.
           'translation_ms': _translationLive.elapsed.inMilliseconds,
         },
@@ -592,7 +592,7 @@ class _CallScreenState extends State<CallScreen> {
     _audio.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     // Flush whatever seconds were used since the last tick before tearing
-    // everything down. Fire-and-forget — disposing a State must be sync.
+    // everything down. Fire-and-forget â€” disposing a State must be sync.
     unawaited(UsageTracker.stop());
     final ev = _roomEvents;
     _roomEvents = null;
@@ -614,10 +614,10 @@ class _CallScreenState extends State<CallScreen> {
   Widget build(BuildContext context) {
     if (_connectError != null) {
       return Scaffold(
-        backgroundColor: WhatsAppCallTheme.scaffold,
+        backgroundColor: SC.bg,
         appBar: AppBar(
-          backgroundColor: WhatsAppCallTheme.scaffold,
-          foregroundColor: WhatsAppCallTheme.strongText,
+          backgroundColor: SC.bg,
+          foregroundColor: SC.textPrimary,
           title: Text(AppStrings.t('call_could_not_join')),
           leading: IconButton(
             icon: const Icon(Icons.close),
@@ -630,12 +630,12 @@ class _CallScreenState extends State<CallScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.error_outline, size: 48, color: WhatsAppCallTheme.danger.withValues(alpha: 0.9)),
+                Icon(Icons.error_outline, size: 48, color: const Color(0xFFE53935).withValues(alpha: 0.9)),
                 const SizedBox(height: 16),
                 Text(
                   _connectError!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: WhatsAppCallTheme.subtleText, height: 1.4),
+                  style: const TextStyle(color: SC.textMuted, height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -652,13 +652,13 @@ class _CallScreenState extends State<CallScreen> {
     if (_connecting || _room == null) {
       // Splash-style connecting state. Showing the room name + a bare
       // spinner during LiveKit's handshake felt clinical and gave the
-      // caller no signal about the credit deduction — switch to the
+      // caller no signal about the credit deduction â€” switch to the
       // app's splash image with a single one-liner hint clarifying
       // that only the caller's monthly credits are debited (the peer
       // listens free). Keeps the spinner so the user still has motion
       // feedback that something is happening.
       return Scaffold(
-        backgroundColor: WhatsAppCallTheme.scaffold,
+        backgroundColor: SC.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
@@ -679,14 +679,14 @@ class _CallScreenState extends State<CallScreen> {
                   width: 28,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    color: WhatsAppCallTheme.accent,
+                    color: SC.accent,
                   ),
                 ),
                 const SizedBox(height: 14),
                 Text(
                   AppStrings.t('call_connecting_short'),
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                    color: SC.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -696,7 +696,7 @@ class _CallScreenState extends State<CallScreen> {
                   AppStrings.t('call_connecting_caller_pays'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: WhatsAppCallTheme.subtleText,
+                    color: SC.textMuted,
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -757,7 +757,7 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   )
                 else if (_selfMain && remoteCount > 0)
-                  // Self-main but local cam off → still let the user tap to
+                  // Self-main but local cam off â†’ still let the user tap to
                   // swap back to the remote. Show the local user's first
                   // name as placeholder.
                   GestureDetector(
@@ -771,12 +771,12 @@ class _CallScreenState extends State<CallScreen> {
                     mirrorMode: VideoViewMirrorMode.off,
                   )
                 else if (remoteCount > 0)
-                  // Remote is connected but has their camera off — keep the
+                  // Remote is connected but has their camera off â€” keep the
                   // tile visible, the call (audio + translation) is still up.
                   _CameraOffTile(label: peerFirstName)
                 else
                   Container(
-                    color: WhatsAppCallTheme.surface,
+                    color: SC.bubbleIn,
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -829,7 +829,7 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
                 // swap. Always rendered when the corresponding party
-                // exists, even if their camera is off — falls back to a
+                // exists, even if their camera is off â€” falls back to a
                 // tiny "camera off" tile so the layout doesn't pop.
                 if (_pipFeedAvailable(
                     local: local, remote: remote, hasRemote: remoteCount > 0))
@@ -919,10 +919,10 @@ class _CallScreenState extends State<CallScreen> {
                           label: _micOn
                               ? AppStrings.t('call_mute')
                               : AppStrings.t('call_unmute'),
-                          background: WhatsAppCallTheme.bar,
+                          background: SC.bubbleIn,
                           onTap: _toggleMic,
                         ),
-                        // Live broadcasts keep the camera on — no toggle.
+                        // Live broadcasts keep the camera on â€” no toggle.
                         if (_callKind != 'live')
                           _RoundCallButton(
                             icon: _camOn
@@ -931,25 +931,25 @@ class _CallScreenState extends State<CallScreen> {
                             label: _camOn
                                 ? AppStrings.t('call_video')
                                 : AppStrings.t('call_video_off'),
-                            background: WhatsAppCallTheme.bar,
+                            background: SC.bubbleIn,
                             onTap: _toggleCam,
                           ),
                         _RoundCallButton(
                           icon: Icons.tune_rounded,
                           label: AppStrings.t('call_audio'),
-                          background: WhatsAppCallTheme.bar,
+                          background: SC.bubbleIn,
                           onTap: _openAudioSheet,
                         ),
                         _RoundCallButton(
                           icon: Icons.translate,
                           label: AppStrings.t('call_language'),
-                          background: WhatsAppCallTheme.bar,
+                          background: SC.bubbleIn,
                           onTap: _openLanguageSheet,
                         ),
                         _RoundCallButton(
                           icon: Icons.call_end_rounded,
                           label: AppStrings.t('call_end'),
-                          background: WhatsAppCallTheme.danger,
+                          background: const Color(0xFFE53935),
                           onTap: _hangUp,
                         ),
                       ],
@@ -1045,7 +1045,7 @@ class _AudioSettingsSheet extends StatelessWidget {
                 Text(
                   AppStrings.t('call_audio'),
                   style: const TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                    color: SC.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1060,7 +1060,7 @@ class _AudioSettingsSheet extends StatelessWidget {
                 Slider(
                   value: controller.translatedVolume,
                   onChanged: (v) => controller.setTranslatedVolume(v),
-                  activeColor: WhatsAppCallTheme.accent,
+                  activeColor: SC.accent,
                   inactiveColor: Colors.white24,
                 ),
                 const SizedBox(height: 6),
@@ -1071,24 +1071,24 @@ class _AudioSettingsSheet extends StatelessWidget {
                 Slider(
                   value: controller.originalVolume,
                   onChanged: (v) => controller.setOriginalVolume(v),
-                  activeColor: WhatsAppCallTheme.accent,
+                  activeColor: SC.accent,
                   inactiveColor: Colors.white24,
                 ),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: controller.duckingEnabled,
                   onChanged: controller.setDuckingEnabled,
-                  activeTrackColor: WhatsAppCallTheme.accent,
+                  activeTrackColor: SC.accent,
                   title: Text(
                     AppStrings.t('call_ducking_title'),
                     style: const TextStyle(
-                        color: WhatsAppCallTheme.strongText, fontSize: 15),
+                        color: SC.textPrimary, fontSize: 15),
                   ),
                   subtitle: Text(
                     controller.isDucking
                         ? AppStrings.t('call_ducking_on')
                         : AppStrings.t('call_ducking_off'),
-                    style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 12),
+                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1104,7 +1104,7 @@ class _AudioSettingsSheet extends StatelessWidget {
 
 /// Bottom sheet to change the language the local user hears the remote
 /// translated into. Picking a language only re-routes our own incoming
-/// translation pipeline — the remote side is untouched.
+/// translation pipeline â€” the remote side is untouched.
 class _OutputLanguageSheet extends StatelessWidget {
   const _OutputLanguageSheet({
     required this.currentCode,
@@ -1139,7 +1139,7 @@ class _OutputLanguageSheet extends StatelessWidget {
             Text(
               AppStrings.t('call_output_language_title'),
               style: const TextStyle(
-                color: WhatsAppCallTheme.strongText,
+                color: SC.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -1148,7 +1148,7 @@ class _OutputLanguageSheet extends StatelessWidget {
             Text(
               AppStrings.t('call_output_language_hint'),
               style: const TextStyle(
-                color: WhatsAppCallTheme.subtleText,
+                color: SC.textMuted,
                 fontSize: 12,
                 height: 1.4,
               ),
@@ -1202,7 +1202,7 @@ class _LanguageRow extends StatelessWidget {
                 child: Text(
                   lang.label,
                   style: TextStyle(
-                    color: WhatsAppCallTheme.strongText,
+                    color: SC.textPrimary,
                     fontSize: 15,
                     fontWeight:
                         selected ? FontWeight.w700 : FontWeight.w500,
@@ -1211,7 +1211,7 @@ class _LanguageRow extends StatelessWidget {
               ),
               if (selected)
                 const Icon(Icons.check_rounded,
-                    color: WhatsAppCallTheme.accent, size: 20),
+                    color: SC.accent, size: 20),
             ],
           ),
         ),
@@ -1231,11 +1231,11 @@ class _SheetLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: WhatsAppCallTheme.subtleText),
+          Icon(icon, size: 18, color: SC.textMuted),
           const SizedBox(width: 8),
           Text(
             text,
-            style: const TextStyle(color: WhatsAppCallTheme.strongText, fontSize: 14, fontWeight: FontWeight.w600),
+            style: const TextStyle(color: SC.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1252,7 +1252,7 @@ class _MicLevelStrip extends StatelessWidget {
     final clamped = level.clamp(0.0, 1.0).toDouble();
     return Row(
       children: [
-        const Icon(Icons.mic_rounded, size: 16, color: WhatsAppCallTheme.subtleText),
+        const Icon(Icons.mic_rounded, size: 16, color: SC.textMuted),
         const SizedBox(width: 8),
         Expanded(
           child: ClipRRect(
@@ -1262,7 +1262,7 @@ class _MicLevelStrip extends StatelessWidget {
               minHeight: 6,
               backgroundColor: Colors.white12,
               valueColor: AlwaysStoppedAnimation<Color>(
-                clamped > 0.85 ? WhatsAppCallTheme.danger : WhatsAppCallTheme.accent,
+                clamped > 0.85 ? const Color(0xFFE53935) : SC.accent,
               ),
             ),
           ),
@@ -1300,18 +1300,18 @@ class _RouteRow extends StatelessWidget {
             text: AppStrings.t('call_audio_output')),
         Row(
           children: [
-            Icon(routeIcon, color: WhatsAppCallTheme.strongText),
+            Icon(routeIcon, color: SC.textPrimary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 routeLabel,
-                style: const TextStyle(color: WhatsAppCallTheme.strongText, fontSize: 14),
+                style: const TextStyle(color: SC.textPrimary, fontSize: 14),
               ),
             ),
             Switch.adaptive(
               value: controller.speakerOn,
               onChanged: external ? null : controller.setSpeakerOn,
-              activeTrackColor: WhatsAppCallTheme.accent,
+              activeTrackColor: SC.accent,
             ),
           ],
         ),
@@ -1321,7 +1321,7 @@ class _RouteRow extends StatelessWidget {
             external
                 ? AppStrings.t('call_route_external_hint')
                 : AppStrings.t('call_route_internal_hint'),
-            style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 12),
+            style: const TextStyle(color: SC.textMuted, fontSize: 12),
           ),
         ),
       ],

@@ -17,7 +17,6 @@ import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../theme/whatsapp_call_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
@@ -304,7 +303,7 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       extendBody: true,
       body: ValueListenableBuilder<int>(
         valueListenable: NavTab.index,
@@ -389,7 +388,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: WhatsAppCallTheme.bar,
+      backgroundColor: SC.bubbleIn,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -419,7 +418,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.strongText,
+                      color: SC.textPrimary,
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                     ),
@@ -428,7 +427,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                   Text(
                     AppStrings.t('incoming_call_label'),
                     style: const TextStyle(
-                      color: WhatsAppCallTheme.subtleText,
+                      color: SC.textMuted,
                       fontSize: 14,
                     ),
                   ),
@@ -450,7 +449,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                 _RoundActionButton(
                   icon: Icons.call,
                   label: AppStrings.t('accept'),
-                  color: WhatsAppCallTheme.accent,
+                  color: SC.accent,
                   onTap: () => Navigator.of(context).pop(true),
                 ),
               ],
@@ -497,7 +496,7 @@ class _RoundActionButton extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: WhatsAppCallTheme.strongText,
+            color: SC.textPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
@@ -530,7 +529,7 @@ class _TipDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       insetPadding: const EdgeInsets.symmetric(horizontal: 36),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
@@ -553,10 +552,10 @@ class _TipDialog extends StatelessWidget {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: WhatsAppCallTheme.accent.withValues(alpha: 0.15),
+                  color: SC.accent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: WhatsAppCallTheme.accent, size: 28),
+                child: Icon(icon, color: SC.accent, size: 28),
               ),
             const SizedBox(height: 18),
             Text(

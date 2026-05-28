@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
-import '../theme/whatsapp_call_theme.dart';
 
 /// Floating glass-morphism bottom-nav with a sliding pill that animates
 /// between selected tabs. Rendered by [RootShell] and re-used by screens
@@ -195,7 +194,7 @@ class _NavItem extends StatelessWidget {
     if (count <= 0) return child;
     return Badge.count(
       count: count,
-      backgroundColor: WhatsAppCallTheme.danger,
+      backgroundColor: const Color(0xFFE53935),
       textColor: Colors.white,
       child: child,
     );

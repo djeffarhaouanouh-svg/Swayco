@@ -23,7 +23,7 @@ import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
-import 'theme/whatsapp_call_theme.dart';
+import 'theme/swayco_theme.dart';
 import 'translation/openai_realtime_translation.dart';
 
 Future<void> main() async {
@@ -221,7 +221,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         return MaterialApp(
           title: 'Swayco',
           debugShowCheckedModeBanner: false,
-          theme: WhatsAppCallTheme.material(),
+          theme: SC.material(),
           home: _buildHome(),
         );
       },
@@ -231,9 +231,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   Widget _buildHome() {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: WhatsAppCallTheme.scaffold,
+        backgroundColor: SC.bg,
         body: Center(
-          child: CircularProgressIndicator(color: WhatsAppCallTheme.accent),
+          child: CircularProgressIndicator(color: SC.accent),
         ),
       );
     }

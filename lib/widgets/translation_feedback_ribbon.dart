@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 
 /// In-call feedback so translation *feels* responsive (progress, chip, pulse when remote talks).
@@ -31,7 +31,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
             const LinearProgressIndicator(
               minHeight: 2.5,
               backgroundColor: Colors.transparent,
-              color: WhatsAppCallTheme.accent,
+              color: SC.accent,
             ),
           if (phase == TranslationFeedbackPhase.standby)
             Padding(
@@ -60,14 +60,14 @@ class TranslationFeedbackRibbon extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: remoteHot
-                        ? WhatsAppCallTheme.accent.withValues(alpha: 0.95)
+                        ? SC.accent.withValues(alpha: 0.95)
                         : Colors.white.withValues(alpha: 0.12),
                     width: remoteHot ? 1.5 : 1,
                   ),
                   boxShadow: remoteHot
                       ? [
                           BoxShadow(
-                            color: WhatsAppCallTheme.accent.withValues(alpha: 0.35),
+                            color: SC.accent.withValues(alpha: 0.35),
                             blurRadius: 12,
                             spreadRadius: 0,
                           ),
@@ -77,7 +77,7 @@ class TranslationFeedbackRibbon extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.translate_rounded, size: 16, color: WhatsAppCallTheme.accent),
+                    Icon(Icons.translate_rounded, size: 16, color: SC.accent),
                     const SizedBox(width: 8),
                     Text(
                       remoteHot ? 'Translation · listening' : 'Translation on',

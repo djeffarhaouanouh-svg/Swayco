@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -8,7 +8,7 @@ import '../services/friendship_api.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/web_poll.dart';
-import '../theme/whatsapp_call_theme.dart';
+import '../theme/swayco_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -28,7 +28,7 @@ class FriendsListScreen extends StatefulWidget {
   /// When set, list the followers / following of THIS user instead of
   /// the local user. Used when opening the screen from someone else's
   /// profile so tapping their follower count actually shows their
-  /// followers, not yours. Null → defaults to the device's own id.
+  /// followers, not yours. Null â†’ defaults to the device's own id.
   final String? userId;
 
   @override
@@ -70,7 +70,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     }
     try {
       final myId = await DeviceId.getOrCreate();
-      // The list itself is for whoever the screen was opened for —
+      // The list itself is for whoever the screen was opened for â€”
       // the local user by default, or the peer when navigating from
       // someone else's profile.
       final targetId = widget.userId ?? myId;
@@ -117,7 +117,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       if (!mounted) return;
       if (f == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Supabase non configuré.")),
+          const SnackBar(content: Text("Supabase non configurÃ©.")),
         );
         return;
       }
@@ -136,12 +136,12 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
         ? AppStrings.t('profile_followers')
         : AppStrings.t('profile_following');
     return Scaffold(
-      backgroundColor: WhatsAppCallTheme.scaffold,
+      backgroundColor: SC.bg,
       appBar: AppBar(
         title: Text(title),
         actions: [
           IconButton(
-            tooltip: 'Rafraîchir',
+            tooltip: 'RafraÃ®chir',
             onPressed: _load,
             icon: const Icon(Icons.refresh),
           ),
@@ -154,7 +154,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: WhatsAppCallTheme.accent),
+        child: CircularProgressIndicator(color: SC.accent),
       );
     }
     if (_error != null) {
@@ -175,7 +175,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                 ? 'Personne ne te suit encore.'
                 : 'Tu ne suis personne encore.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: WhatsAppCallTheme.subtleText, fontSize: 14),
+            style: const TextStyle(color: SC.textMuted, fontSize: 14),
           ),
         ),
       );
@@ -231,7 +231,7 @@ class _FriendRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
-        color: WhatsAppCallTheme.bar,
+        color: SC.bubbleIn,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -261,7 +261,7 @@ class _FriendRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: const TextStyle(
-                            color: WhatsAppCallTheme.strongText,
+                            color: SC.textPrimary,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -274,7 +274,7 @@ class _FriendRow extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             softWrap: false,
                             style: const TextStyle(
-                              color: WhatsAppCallTheme.subtleText,
+                              color: SC.textMuted,
                               fontSize: 13,
                             ),
                           ),
@@ -301,7 +301,7 @@ class _FollowBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: WhatsAppCallTheme.accent,
+      color: SC.accent,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -339,18 +339,18 @@ class _MutedPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: WhatsAppCallTheme.bubbleIncoming,
+        color: SC.bubbleIn,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: WhatsAppCallTheme.subtleText),
+          Icon(icon, size: 13, color: SC.textMuted),
           const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
-              color: WhatsAppCallTheme.subtleText,
+              color: SC.textMuted,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
