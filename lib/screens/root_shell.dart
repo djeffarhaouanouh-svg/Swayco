@@ -545,11 +545,17 @@ class _TipDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (imageAsset != null)
-              Image.asset(
-                imageAsset!,
-                width: 160,
-                height: 160,
-                fit: BoxFit.contain,
+              // The source PNG ships with a black square framing the
+              // illustration — crop into the artwork (BoxFit.cover) so
+              // the popup shows just the picture, not the bleed.
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  imageAsset!,
+                  width: 180,
+                  height: 180,
+                  fit: BoxFit.cover,
+                ),
               )
             else
               Container(

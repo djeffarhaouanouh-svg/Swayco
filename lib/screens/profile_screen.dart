@@ -484,6 +484,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         creditsResetAt: _remote!.creditsResetAt,
         lifetimeCallSeconds: _remote!.lifetimeCallSeconds,
         proExpiresAt: _remote!.proExpiresAt,
+        referralCode: _remote!.referralCode,
       );
     });
   }
@@ -491,14 +492,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   /// Opens the OS share sheet to invite a friend to Swayco. The native
   /// sheet lists every app that can receive text — WhatsApp, Instagram,
   /// SMS, Mail… — so there's no need for per-app buttons.
+  ///
+  /// The shared link carries the local user's `referral_code` as a
+  /// `?ref=…` query so a new sign-up coming through it can be
+  /// attributed back and the "3 amis = +30 min" bonus paid out by
+  /// `attribute_referral` on the server.
   Future<void> _shareInvite() async {
-    // sharePositionOrigin is required on iPad (anchors the popover) and
-    // harmless elsewhere — pass this screen's bounds.
     final box = context.findRenderObject() as RenderBox?;
+    final code = _remote?.referralCode ?? '';
+    final link = code.isEmpty
+        ? 'https://www.swayco.fr'
+        : 'https://www.swayco.fr/?ref=$code';
     try {
       await SharePlus.instance.share(
         ShareParams(
-          text: AppStrings.t('invite_share_text'),
+          text: AppStrings.t('invite_share_text', args: {'link': link}),
           subject: AppStrings.t('invite_friend'),
           sharePositionOrigin: box != null
               ? box.localToGlobal(Offset.zero) & box.size
@@ -793,7 +801,7 @@ class _CreditsCard extends StatelessWidget {
       case 'plus':
         return plusMonthlyCreditsSeconds;
       default:
-        return freeMonthlyCreditsSeconds;
+        return freeWeeklyCreditsSeconds;
     }
   }
 
@@ -1082,20 +1090,20 @@ class _PlansSectionState extends State<_PlansSection> {
   // place and the ladder in _PlansSection.
   static final Map<String, _PlanCopy> _copy = {
     'plus': _PlanCopy(
-      price: '9.97€/mois',
+      price: '7,97€/mois',
       audience:
           'Pour écouter la traduction des messages vocaux et débloquer plus de traductions live.',
       features: [
-        '360 crédits de traduction (≈ 6 h / mois)',
+        '180 crédits de traduction (≈ 3 h / mois)',
         'doublage audio des messages vocaux',
       ],
     ),
     'ultra_plus': _PlanCopy(
-      price: '19.97€/mois',
+      price: '15,97€/mois',
       audience:
           'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
       features: [
-        'Traduction illimitée',
+        '360 crédits de traduction (≈ 6 h / mois)',
         'doublage avec TA voix clonée',
       ],
     ),

@@ -100,6 +100,13 @@ class _CallScreenState extends State<CallScreen> {
   /// always runs, whatever the exit path: hang-up, peer-left, back nav).
   DateTime? _connectedAt;
 
+  /// Guard against showing the invite-friends popup twice in the same
+  /// call session — fires once on the credits-exhaustion edge AND once
+  /// at init time when credits were already 0 at call start (the
+  /// notifier was already `true` from a previous call, so addListener
+  /// won't re-fire on the second set-to-true).
+  bool _inviteDialogShown = false;
+
   /// `guest` / `live` / `friend`, inferred from the room-name prefix the
   /// backend mints. Tags every call analytics event.
   String get _callKind {
@@ -227,24 +234,156 @@ class _CallScreenState extends State<CallScreen> {
     // meter to whatever the pipeline's state is right now.
     _syncUsageMeter();
     if (p.creditsSeconds <= 0) {
-      // Already empty before the call started â€” kill translation now.
+      // Already empty before the call started â€” kill translation now,
+      // and surface the invite-friends popup directly (the
+      // `creditsExhausted` listener won't fire because the notifier
+      // was already `true` from a prior session, so no value change).
       await widget.translation.detach();
+      if (mounted && !_inviteDialogShown) {
+        unawaited(_showInviteFriendsDialog());
+      }
     }
   }
 
   /// Triggered when credits hit 0 mid-call. We detach the translation
   /// pipeline so the OpenAI session stops billing, but leave the LiveKit
-  /// connection alone so people can keep talking (untranslated).
+  /// connection alone so people can keep talking (untranslated). Then
+  /// surface the "Invite 3 amis = +30 min" dialog so the user has a
+  /// concrete way to earn more time without forcing them to upgrade.
   void _onCreditsExhausted() {
     if (!UsageTracker.creditsExhausted.value) return;
     unawaited(widget.translation.detach());
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('credits_exhausted_banner')),
-          duration: const Duration(seconds: 6),
+    if (!mounted) return;
+    if (_inviteDialogShown) return;
+    unawaited(_showInviteFriendsDialog());
+  }
+
+  /// Modal shown when the user runs out of credits — explains the bonus
+  /// and offers to open the OS share sheet with their personal referral
+  /// link. Best-effort: a missing profile / referral_code falls back to
+  /// the generic `https://www.swayco.fr` URL so the share still works.
+  Future<void> _showInviteFriendsDialog() async {
+    _inviteDialogShown = true;
+    final uid = AuthService.currentUserId;
+    String code = '';
+    int referrals = 0;
+    if (uid.isNotEmpty) {
+      final p = await ProfileApi.fetchById(uid);
+      code = p?.referralCode ?? '';
+      referrals = await ProfileApi.countReferrals(uid);
+    }
+    if (!mounted) return;
+    final progress = referrals % 3;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        // Match the _TipDialog surface (root_shell.dart) — SC.bg would
+        // bleed the popup into the mesh background, so we anchor to the
+        // same near-black the post-onboarding tips use.
+        backgroundColor: const Color(0xFF0A0A0A),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: SC.accent.withValues(alpha: 0.15),
+                ),
+                child: const Icon(
+                  Icons.group_add_rounded,
+                  color: SC.accent,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                AppStrings.t('invite_bonus_title'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                AppStrings.t('invite_bonus_body'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.5,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppStrings.t(
+                  'invite_bonus_progress',
+                  args: {'count': '$progress', 'total': '3'},
+                ),
+                style: const TextStyle(
+                  color: SC.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _shareReferral(code);
+                  },
+                  child: Text(AppStrings.t('invite_bonus_share_cta')),
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  AppStrings.t('invite_bonus_later'),
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareReferral(String code) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final link = code.isEmpty
+        ? 'https://www.swayco.fr'
+        : 'https://www.swayco.fr/?ref=$code';
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: AppStrings.t('invite_share_text', args: {'link': link}),
+          subject: AppStrings.t('invite_friend'),
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
         ),
       );
+    } catch (_) {
+      // User cancelled or sharing unavailable.
     }
   }
 

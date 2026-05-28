@@ -531,6 +531,52 @@ export async function getRetention(days = 30): Promise<Retention> {
   return { cohorts: cohortRows, overall, lostUsers, dau };
 }
 
+// ─── referrals ────────────────────────────────────────────────────────────
+
+export type ReferralStats = {
+  /** Profiles whose `referred_by` is non-null = filleuls captured by
+   *  the `attribute_referral` RPC since the system shipped. */
+  totalAttributed: number;
+  /** Number of distinct referrers that have at least one filleul. */
+  activeReferrers: number;
+  /** Sum of bonus tranches already paid (1 tranche = 3 filleuls = 30 min
+   *  of credits credited to a referrer). */
+  bonusTranchesPaid: number;
+  /** Bonus tranches × 30 min = total free minutes given out via referrals. */
+  bonusMinutesGranted: number;
+};
+
+/**
+ * Snapshot of the "Invite 3 amis = +30 min" growth loop. Reads the
+ * referral columns added by migration 0028 — falls back to zeros when
+ * the columns aren't there yet (e.g. on a stale DB), so the dashboard
+ * still renders during a rolling deploy.
+ */
+export async function getReferralStats(): Promise<ReferralStats> {
+  const [attributed, refRows] = await Promise.all([
+    safeCount("profiles", (q) => q.not("referred_by", "is", null)),
+    safeRows("profiles", "referral_credits_granted", (q) =>
+      q.gt("referral_credits_granted", 0).limit(100000),
+    ),
+  ]);
+
+  const activeReferrers = refRows.length;
+  let tranches = 0;
+  for (const r of refRows) {
+    // referral_credits_granted is stored in "filleuls counted" (multiples
+    // of 3 = paid tranches). One tranche = 30 min.
+    const counted = num(r.referral_credits_granted, 0);
+    tranches += Math.floor(counted / 3);
+  }
+
+  return {
+    totalAttributed: attributed,
+    activeReferrers,
+    bonusTranchesPaid: tranches,
+    bonusMinutesGranted: tranches * 30,
+  };
+}
+
 // ─── monetisation ─────────────────────────────────────────────────────────
 
 export type CostBreakdown = {
@@ -542,8 +588,10 @@ export type CostBreakdown = {
   costLivekitUsd: number;
   costTextUsd: number;
   costTotalEur: number;
-  proCount: number;
-  ultraCount: number;
+  /** Paying subscribers on the entry tier (€7,97 — was "pro"). */
+  plusCount: number;
+  /** Paying subscribers on the top tier (€15,97 — was "ultra"). */
+  ultraPlusCount: number;
   freeCount: number;
   mrrEur: number;
   marginEur: number;
@@ -558,14 +606,16 @@ export type CostBreakdown = {
  * and the cost panels show a "configure the rates" hint.
  */
 export async function getCosts(days = 30): Promise<CostBreakdown> {
-  const rateRealtime = num(process.env.COST_REALTIME_USD_PER_MIN, 0);
-  const rateLivekit = num(process.env.COST_LIVEKIT_USD_PER_MIN, 0);
-  const rateText = num(process.env.COST_TEXT_USD_PER_1K_TOKENS, 0);
+  // Defaults reflect public pricing as of 2026-05 — see admin/env.example
+  // for the source links. Override via .env.local when rates change.
+  const rateRealtime = num(process.env.COST_REALTIME_USD_PER_MIN, 0.10);
+  const rateLivekit = num(process.env.COST_LIVEKIT_USD_PER_MIN, 0.0005);
+  const rateText = num(process.env.COST_TEXT_USD_PER_1K_TOKENS, 0.001);
   const usdToEur = num(process.env.USD_TO_EUR, 0.92);
-  const pricePro = num(process.env.PRICE_PRO_EUR, 29);
-  const priceUltra = num(process.env.PRICE_ULTRA_EUR, 59);
+  const pricePlus = num(process.env.PRICE_PLUS_EUR, 7.97);
+  const priceUltraPlus = num(process.env.PRICE_ULTRA_PLUS_EUR, 15.97);
 
-  const [calls, texts, proCount, ultraCount, freeCount] = await Promise.all([
+  const [calls, texts, plusCount, ultraPlusCount, freeCount] = await Promise.all([
     safeRows("analytics_events", "props", (q) =>
       q.eq("event", "call_ended").gte("created_at", sinceISO(days)).limit(100000),
     ),
@@ -575,8 +625,8 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
         .gte("created_at", sinceISO(days))
         .limit(100000),
     ),
-    safeCount("profiles", (q) => q.eq("subscription_tier", "pro")),
-    safeCount("profiles", (q) => q.eq("subscription_tier", "ultra")),
+    safeCount("profiles", (q) => q.eq("subscription_tier", "plus")),
+    safeCount("profiles", (q) => q.eq("subscription_tier", "ultra_plus")),
     safeCount("profiles", (q) => q.eq("subscription_tier", "free")),
   ]);
 
@@ -609,7 +659,7 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
   const costTextUsd = (textTokens / 1000) * rateText;
   const costTotalEur =
     (costRealtimeUsd + costLivekitUsd + costTextUsd) * usdToEur;
-  const mrrEur = proCount * pricePro + ultraCount * priceUltra;
+  const mrrEur = plusCount * pricePlus + ultraPlusCount * priceUltraPlus;
 
   return {
     callMinutes,
@@ -619,8 +669,8 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
     costLivekitUsd,
     costTextUsd,
     costTotalEur,
-    proCount,
-    ultraCount,
+    plusCount,
+    ultraPlusCount,
     freeCount,
     mrrEur,
     marginEur: mrrEur - costTotalEur,

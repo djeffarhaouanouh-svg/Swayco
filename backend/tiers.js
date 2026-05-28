@@ -37,26 +37,23 @@ const TIERS = ['free', 'plus', 'ultra_plus'];
 /** @type {Object<string, TierFeatures>} */
 const FEATURES = Object.freeze({
   free: Object.freeze({
-    monthlySeconds: 75 * 60,          // 75 crédits / mois (1.25 h)
+    // Free refills weekly, not monthly — `monthlySeconds` here is the
+    // *weekly* allotment for the free tier (the field name is kept to
+    // avoid churning every callsite; paid tiers still refill monthly).
+    monthlySeconds: 15 * 60,          // 15 crédits / semaine
     voiceDub: 'none',
     voiceDubsPerMonth: 0,
     voiceClone: false,
   }),
   plus: Object.freeze({
-    monthlySeconds: 360 * 60,         // 360 crédits / mois (6 h)
+    monthlySeconds: 180 * 60,         // 180 crédits / mois (3 h)
     voiceDub: 'generic',
     voiceDubsPerMonth: 60,            // cap matches the "60 vocaux/mois"
                                       // promise on the marketing card.
     voiceClone: false,
   }),
   ultra_plus: Object.freeze({
-    monthlySeconds: 1300 * 60,        // 1300 crédits / mois ≈ 5 h / week
-                                      // fair-use cap. Marketing copy
-                                      // advertises Ultra Plus as
-                                      // "Illimité"; the cap exists to
-                                      // bound runaway OpenAI billing on
-                                      // a compromised account, not to
-                                      // ration honest power users.
+    monthlySeconds: 360 * 60,         // 360 crédits / mois (6 h)
     voiceDub: 'cloned',
     voiceDubsPerMonth: Infinity,
     voiceClone: true,

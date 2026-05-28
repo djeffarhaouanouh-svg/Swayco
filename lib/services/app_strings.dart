@@ -171,7 +171,14 @@ abstract final class AppStrings {
     'chat_tap_to_chat': 'Toucher pour discuter',
     'invite_friend': 'Inviter un ami sur Swayco',
     'invite_share_text':
-        'Rejoins-moi sur Swayco 🌍 — appels vidéo avec traduction en temps réel : https://www.swayco.fr',
+        'Rejoins-moi sur Swayco 🌍 — appels vidéo avec traduction en temps réel. En t\'inscrivant via mon lien, on gagne tous les deux du temps d\'appel : {link}',
+    // Out-of-credits / invite-friends popup
+    'invite_bonus_title': 'Invite 3 amis, gagne 30 min',
+    'invite_bonus_body':
+        'Tu n\'as plus de crédits de traduction. Parraine 3 amis qui s\'inscrivent avec ton lien et reçois +30 min, automatiquement.',
+    'invite_bonus_progress': 'Filleuls inscrits : {count} / {total}',
+    'invite_bonus_share_cta': 'Partager mon lien',
+    'invite_bonus_later': 'Plus tard',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Inviter à un appel',
     'invite_call_share_text':
@@ -530,7 +537,14 @@ abstract final class AppStrings {
     'chat_tap_to_chat': 'Tap to chat',
     'invite_friend': 'Invite a friend to Swayco',
     'invite_share_text':
-        'Join me on Swayco 🌍 — video calls with real-time translation: https://www.swayco.fr',
+        'Join me on Swayco 🌍 — video calls with real-time translation. Sign up with my link and we both earn extra call time: {link}',
+    // Out-of-credits / invite-friends popup
+    'invite_bonus_title': 'Invite 3 friends, earn 30 min',
+    'invite_bonus_body':
+        'You\'re out of translation credits. Refer 3 friends who sign up with your link and you\'ll get +30 min, automatically.',
+    'invite_bonus_progress': 'Signed-up referrals: {count} / {total}',
+    'invite_bonus_share_cta': 'Share my link',
+    'invite_bonus_later': 'Later',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Invite to a call',
     'invite_call_share_text':

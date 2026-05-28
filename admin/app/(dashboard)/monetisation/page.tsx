@@ -1,4 +1,4 @@
-import { getCosts } from "@/lib/metrics";
+import { getCosts, getReferralStats } from "@/lib/metrics";
 import { SectionHeader } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { StatList } from "@/components/stat-list";
 import { fmtEur, fmtInt, fmtMinutes, fmtUsd } from "@/lib/format";
 
 export default async function MonetisationPage() {
-  const c = await getCosts(30);
+  const [c, r] = await Promise.all([getCosts(30), getReferralStats()]);
 
   return (
     <>
@@ -46,8 +46,8 @@ export default async function MonetisationPage() {
         />
         <KpiCard
           label="Abonnés payants"
-          value={fmtInt(c.proCount + c.ultraCount)}
-          sub={`${fmtInt(c.proCount)} Pro · ${fmtInt(c.ultraCount)} Ultra`}
+          value={fmtInt(c.plusCount + c.ultraPlusCount)}
+          sub={`${fmtInt(c.plusCount)} Plus · ${fmtInt(c.ultraPlusCount)} Ultra+`}
         />
       </div>
 
@@ -88,8 +88,8 @@ export default async function MonetisationPage() {
             <StatList
               items={[
                 { label: "Free", value: fmtInt(c.freeCount), tone: "muted" },
-                { label: "Pro", value: fmtInt(c.proCount) },
-                { label: "Ultra", value: fmtInt(c.ultraCount) },
+                { label: "Plus (7,97 €)", value: fmtInt(c.plusCount) },
+                { label: "Ultra Plus (15,97 €)", value: fmtInt(c.ultraPlusCount) },
                 {
                   label: "MRR estimé",
                   value: fmtEur(c.mrrEur),
@@ -101,7 +101,7 @@ export default async function MonetisationPage() {
         </Card>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Usage facturable — {c.windowDays} j</CardTitle>
@@ -125,13 +125,42 @@ export default async function MonetisationPage() {
             />
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Parrainage (Invite 3 amis = +30 min)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatList
+              items={[
+                {
+                  label: "Filleuls attribués",
+                  value: fmtInt(r.totalAttributed),
+                },
+                {
+                  label: "Parrains actifs",
+                  value: fmtInt(r.activeReferrers),
+                },
+                {
+                  label: "Paliers payés (× 3 filleuls)",
+                  value: fmtInt(r.bonusTranchesPaid),
+                },
+                {
+                  label: "Minutes offertes",
+                  value: fmtMinutes(r.bonusMinutesGranted),
+                  tone: "muted",
+                },
+              ]}
+            />
+          </CardContent>
+        </Card>
       </div>
 
       <p className="mt-4 text-xs text-zinc-600">
-        Coûts = usage mesuré × taux configurés. Le revenu (MRR) vient des
-        paliers d&apos;abonnement de la table{" "}
-        <code className="text-zinc-500">profiles</code> ; pour le revenu
-        encaissé réel, brancher l&apos;API Stripe.
+        Coûts = usage mesuré × taux configurés (voir{" "}
+        <code className="text-zinc-500">admin/env.example</code> pour les
+        sources). Le revenu (MRR) vient des paliers d&apos;abonnement de
+        la table <code className="text-zinc-500">profiles</code> ; pour le
+        revenu encaissé réel, brancher l&apos;API Stripe.
       </p>
     </>
   );

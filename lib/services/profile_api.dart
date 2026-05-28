@@ -5,27 +5,30 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
 
-/// Translation credits, refilled every 30 days. UI-side we expose
-/// these as "crédits" where 1 crédit = 60 s of translated call, so the
-/// per-tier numbers read as 75 / 300 / 1000 / 2000 — abstract and
-/// generous instead of stopwatch-y. Source of truth for the matching
-/// per-tier values lives in `backend/tiers.js` (FEATURES); these
-/// constants exist so the local UI can pre-render a refill without
-/// waiting on the network.
-const int freeMonthlyCreditsSeconds = 75 * 60;          // 75 crédits / mois
-const int plusMonthlyCreditsSeconds = 360 * 60;         // 360 crédits / mois (6 h)
-const int ultraPlusMonthlyCreditsSeconds = 1300 * 60;   // 1300 crédits / mois ≈ 5 h / semaine (cap fair-use)
+/// Translation credits. UI-side we expose these as "crédits" where
+/// 1 crédit = 60 s of translated call, so the per-tier numbers read
+/// abstract and generous instead of stopwatch-y. Source of truth for
+/// the matching per-tier values lives in `backend/tiers.js` (FEATURES);
+/// these constants exist so the local UI can pre-render a refill
+/// without waiting on the network.
+///
+/// Free is refilled every 7 days ([freeRefillPeriod]); paid tiers
+/// every 30 days ([paidRefillPeriod]) to match Stripe's monthly
+/// invoice.
+const int freeWeeklyCreditsSeconds = 15 * 60;           // 15 crédits / semaine
+const int plusMonthlyCreditsSeconds = 180 * 60;         // 180 crédits / mois (3 h)
+const int ultraPlusMonthlyCreditsSeconds = 360 * 60;    // 360 crédits / mois (6 h)
 
 /// Legacy alias kept so older call sites that still read this name
-/// keep compiling during the rename. New code should use the
-/// `*MonthlyCreditsSeconds` constants above directly.
-const int freeWeeklyCreditsSeconds = freeMonthlyCreditsSeconds;
-const int freeWeeklyAdvertisedSeconds = freeMonthlyCreditsSeconds;
+/// keep compiling during the rename. New code should use
+/// `ultraPlusMonthlyCreditsSeconds` directly.
 const int proWeeklyCreditsSeconds = ultraPlusMonthlyCreditsSeconds;
 
-/// Refill cadence: every 30 days from the last refill. Aligned with
-/// Stripe's monthly invoice so "refill" and "new bill" land together.
-const Duration creditsRefillPeriod = Duration(days: 30);
+/// Refill cadence per tier. Free rolls over weekly; paid tiers roll
+/// over every 30 days to land on the same date as Stripe's monthly
+/// invoice ("refill" and "new bill" feel like the same event).
+const Duration freeRefillPeriod = Duration(days: 7);
+const Duration paidRefillPeriod = Duration(days: 30);
 
 class RemoteProfile {
   const RemoteProfile({
@@ -48,6 +51,7 @@ class RemoteProfile {
     this.lifetimeCallSeconds = 0,
     this.proExpiresAt,
     this.lastSeen,
+    this.referralCode = '',
   });
 
   final String id;
@@ -129,7 +133,7 @@ class RemoteProfile {
   final int creditsSeconds;
 
   /// Next refill — when `now()` passes this, credits are reset to the tier's
-  /// weekly allotment ([proWeeklyCreditsSeconds] / [freeWeeklyCreditsSeconds]).
+  /// allotment ([proWeeklyCreditsSeconds] / [freeWeeklyCreditsSeconds]).
   final DateTime? creditsResetAt;
 
   /// Lifetime stat (never reset). Used for "X minutes used" on the profile.
@@ -142,6 +146,12 @@ class RemoteProfile {
   /// Null when unknown. Whether it is surfaced as "online" is gated by
   /// [hideOnlineStatus] on the client.
   final DateTime? lastSeen;
+
+  /// Short URL-safe slug appended to share links as `?ref=<code>` so a
+  /// new sign-up can be attributed back to whoever sent the invite.
+  /// Server-assigned at profile insert (see migration 0028); empty
+  /// only on legacy rows that haven't been fetched since the backfill.
+  final String referralCode;
 
   /// Backwards-compat shim — the rest of the UI still reads `firstName` /
   /// `sourceLang`. Same data, different schema names.
@@ -193,6 +203,7 @@ class RemoteProfile {
         lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
         proExpiresAt: _parseDate(m['pro_expires_at']),
         lastSeen: _parseDate(m['last_seen']),
+        referralCode: m['referral_code']?.toString() ?? '',
       );
 }
 
@@ -424,9 +435,13 @@ abstract final class ProfileApi {
     final resetAt = p.creditsResetAt;
     if (resetAt == null) return null;
     if (DateTime.now().isBefore(resetAt)) return null;
-    final allotment =
-        p.isPro ? proWeeklyCreditsSeconds : freeWeeklyCreditsSeconds;
-    final nextReset = DateTime.now().toUtc().add(creditsRefillPeriod);
+    final allotment = switch (p.subscriptionTier) {
+      'ultra_plus' => ultraPlusMonthlyCreditsSeconds,
+      'plus' => plusMonthlyCreditsSeconds,
+      _ => freeWeeklyCreditsSeconds,
+    };
+    final period = p.isPro ? paidRefillPeriod : freeRefillPeriod;
+    final nextReset = DateTime.now().toUtc().add(period);
     try {
       await _c.from('profiles').update({
         'credits_seconds': allotment,
@@ -451,7 +466,47 @@ abstract final class ProfileApi {
       creditsResetAt: nextReset.toLocal(),
       lifetimeCallSeconds: p.lifetimeCallSeconds,
       proExpiresAt: p.proExpiresAt,
+      referralCode: p.referralCode,
     );
+  }
+
+  /// Tell the server "I was invited by the holder of [code]". Idempotent
+  /// — a second call (or a self-referral) is rejected without throwing.
+  /// Returns null when the RPC fails entirely; otherwise a parsed
+  /// result map: `{ok, reason?, referralsTotal?, bonusAddedSeconds?}`.
+  static Future<Map<String, dynamic>?> attributeReferral(String code) async {
+    if (!isSupabaseReady) return null;
+    final trimmed = code.trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      final res = await _c.rpc(
+        'attribute_referral',
+        params: {'p_code': trimmed},
+      );
+      if (res is Map) return Map<String, dynamic>.from(res);
+      return {'ok': false, 'reason': 'malformed_response'};
+    } catch (e) {
+      debugPrint('ProfileApi.attributeReferral failed: $e');
+      return null;
+    }
+  }
+
+  /// Count of users who signed up with [userId] as their referrer.
+  /// Used by the invite-friends popup to render "X / 3" progress. Falls
+  /// back to 0 on failure rather than throwing — the popup shouldn't
+  /// blow up when the network is flaky.
+  static Future<int> countReferrals(String userId) async {
+    if (!isSupabaseReady || userId.isEmpty) return 0;
+    try {
+      final rows = await _c
+          .from('profiles')
+          .select('id')
+          .eq('referred_by', userId);
+      return rows.length;
+    } catch (e) {
+      debugPrint('ProfileApi.countReferrals failed: $e');
+      return 0;
+    }
   }
 
   /// Decrement `credits_seconds` by [seconds] and bump `lifetime_call_seconds`

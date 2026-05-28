@@ -12,8 +12,8 @@
 // Env vars (all required for this module to actually do anything):
 //   STRIPE_SECRET_KEY        — sk_live_… (NEVER ship to client)
 //   STRIPE_WEBHOOK_SECRET    — whsec_… (signature verification)
-//   STRIPE_PRICE_PLUS        — price_… for the Plus €9.97/mo plan
-//   STRIPE_PRICE_ULTRA_PLUS  — price_… for the Ultra Plus €19.97/mo plan
+//   STRIPE_PRICE_PLUS        — price_… for the Plus €7.97/mo plan
+//   STRIPE_PRICE_ULTRA_PLUS  — price_… for the Ultra Plus €15.97/mo plan
 //                              (falls back to STRIPE_PRICE_PRO if unset
 //                              so existing deployments keep working)
 //   STRIPE_SUCCESS_URL       — optional, defaults to https://swayco.fr/?subscribed=1

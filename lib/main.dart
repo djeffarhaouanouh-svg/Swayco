@@ -116,6 +116,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       });
       return;
     }
+    // Referral pickup: when the app is opened from `https://swayco.fr/?ref=<code>`
+    // (the link a user shared from the profile screen), stash the code in
+    // prefs so we can credit the referrer once this visitor has finished
+    // sign-up + onboarding. Cleared by `_maybeAttributePendingReferral`.
+    if (kIsWeb) {
+      final ref = Uri.base.queryParameters['ref']?.trim() ?? '';
+      if (ref.isNotEmpty) {
+        await UserPrefs.writePendingReferralCode(ref);
+      }
+    }
     // Restore the UI language from local prefs as early as possible so the
     // login screen renders in whatever the user picked last time on this
     // device (no-op for a fresh install — falls back to the default).
@@ -163,6 +173,22 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     });
   }
 
+  /// Consume the pending `?ref=<code>` captured at boot (if any) and call
+  /// the `attribute_referral` RPC so the referrer gets credit for this
+  /// new sign-up. Cleared regardless of outcome — bad codes / self-refs
+  /// shouldn't get retried forever on subsequent launches.
+  Future<void> _maybeAttributePendingReferral() async {
+    final code = await UserPrefs.readPendingReferralCode();
+    if (code.isEmpty) return;
+    try {
+      await ProfileApi.attributeReferral(code);
+    } catch (e) {
+      debugPrint('attributeReferral failed: $e');
+    } finally {
+      await UserPrefs.clearPendingReferralCode();
+    }
+  }
+
   /// True when this auth user has never completed onboarding — detected by
   /// the absence of a `profiles` row (or one with no display name) on
   /// Supabase. This is the source of truth so a returning user signing in
@@ -196,6 +222,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         gender: profile.gender,
       );
     }
+    // Once the profile row exists, fire the deferred referral attribution
+    // captured at boot. Best-effort — failure is silent so a flaky network
+    // never blocks the user from entering the app.
+    unawaited(_maybeAttributePendingReferral());
     unawaited(ChatUnread.start(uid));
     // Presence heartbeat — keeps profiles.last_seen fresh for the online
     // indicator (gated by each user's hide-online-status setting).
