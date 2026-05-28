@@ -1890,8 +1890,8 @@ class _IdentitySection extends StatelessWidget {
               displayName: displayName,
               avatarUrl: avatarUrl,
               avatarColorHex: avatarColorHex,
-              size: 128,
-              fontSize: 54,
+              size: 120,
+              fontSize: 50,
               onTap: viewerMode ? null : onTapAvatar,
             ),
             if (!viewerMode)
