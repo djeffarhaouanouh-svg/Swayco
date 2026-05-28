@@ -1604,10 +1604,10 @@ class _ActivationWaveOverlay extends StatelessWidget {
       builder: (_, child) {
         final t = animation.value;
         if (t == 0 || t == 1) return const SizedBox.shrink();
-        // Slide a soft white gradient from off-screen-left (-1.2) to
-        // off-screen-right (+1.2), expressed as a fractional offset of the
-        // overlay's own width.
-        final dx = -1.2 + 2.4 * t;
+        // Slide a soft white gradient from off-screen-bottom (+1.2) to
+        // off-screen-top (-1.2), expressed as a fractional offset of the
+        // overlay's own height.
+        final dy = 1.2 - 2.4 * t;
         // Quick fade-in / fade-out so the band never appears or disappears
         // abruptly at the edges of the sweep.
         final fade = (t < 0.15)
@@ -1615,12 +1615,12 @@ class _ActivationWaveOverlay extends StatelessWidget {
             : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
         return ClipRect(
           child: FractionalTranslation(
-            translation: Offset(dx, 0),
+            translation: Offset(0, dy),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                   stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
                   colors: [
                     Colors.white.withValues(alpha: 0),
