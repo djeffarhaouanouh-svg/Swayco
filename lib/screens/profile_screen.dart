@@ -850,14 +850,14 @@ class _CreditsCard extends StatelessWidget {
                 end: Alignment.bottomRight,
               )
             : null,
-        color: isPaid ? null : SC.bubbleIn,
+        color: isPaid ? null : SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: lowCredits
               ? const Color(0xFFFFA726)
               : (isPaid
                   ? SC.accent.withValues(alpha: 0.45)
-                  : const Color(0xFF2A3942)),
+                  : SC.glassBorder),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -977,9 +977,9 @@ class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A3942)),
+        border: Border.all(color: SC.glassBorder),
       ),
       padding: const EdgeInsets.all(4),
       child: Column(
@@ -1270,7 +1270,7 @@ class _PlanCard extends StatelessWidget {
     );
     final card = Container(
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: featured ? 1.5 : 1),
       ),
@@ -1548,7 +1548,7 @@ class _ManageOnWebCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SC.bubbleIn,
+      color: SC.glassStrong,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -1556,7 +1556,7 @@ class _ManageOnWebCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF2A3942)),
+            border: Border.all(color: SC.glassBorder),
           ),
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(
@@ -1623,9 +1623,9 @@ class _LanguageCard extends StatelessWidget {
         : null;
     return Container(
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A3942)),
+        border: Border.all(color: SC.glassBorder),
       ),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
@@ -2802,12 +2802,12 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: enrolled
               ? SC.accent
-              : const Color(0xFF2A3942),
+              : SC.glassBorder,
         ),
       ),
       child: Column(
