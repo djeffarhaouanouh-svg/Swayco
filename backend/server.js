@@ -1403,6 +1403,10 @@ if (hasLegalSite) {
     '/terms': 'terms.html',
     '/privacy': 'privacy.html',
     '/help': 'help.html',
+    // App Store Connect requires a "Support URL" in app metadata.
+    // /support serves the same FAQ page as /help so the URL we hand
+    // to Apple (https://www.swayco.fr/support) is self-explanatory.
+    '/support': 'help.html',
     '/child-safety': 'child-safety.html',
   };
   for (const [route, file] of Object.entries(legalRoutes)) {
@@ -1429,6 +1433,7 @@ if (hasWebUi) {
       p === '/terms' ||
       p === '/privacy' ||
       p === '/help' ||
+      p === '/support' ||
       p === '/child-safety'
     ) {
       return next();
