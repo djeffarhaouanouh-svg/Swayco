@@ -30,24 +30,36 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Supabase keys come from --dart-define at build time (Railway / IDE
   // launch.json). No .env loading on the deployed web build.
-  await initSupabase();
+  // Hard 5s cap so a reviewer device on a bad network (App Store / Play
+  // Store pre-launch tests) still boots to the login screen instead of
+  // hanging on a grey unresponsive view.
+  try {
+    await initSupabase().timeout(const Duration(seconds: 5));
+  } catch (e) {
+    debugPrint('Supabase init slow/failed: $e');
+  }
   // Native push (FCM). Best-effort: a missing google-services.json /
   // GoogleService-Info.plist on dev builds shouldn't crash the app —
   // just skip Firebase init and the notification_client_io will fail
-  // its registration silently.
+  // its registration silently. Same 5s cap as Supabase above.
   if (!kIsWeb) {
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
-      );
+      ).timeout(const Duration(seconds: 5));
     } catch (e) {
-      debugPrint('Firebase init failed: $e');
+      debugPrint('Firebase init slow/failed: $e');
     }
   }
   // Seed the in-memory hide-online cache so presence renders are
   // already correct on the first frame (no flash of "online" dots
-  // before the prefs read resolves).
-  await AppSettings.hydrate();
+  // before the prefs read resolves). Cap at 2s — a stuck
+  // SharedPreferences read must never block the splash.
+  try {
+    await AppSettings.hydrate().timeout(const Duration(seconds: 2));
+  } catch (e) {
+    debugPrint('AppSettings hydrate slow/failed: $e');
+  }
   // Analytics for the admin dashboard. Starts the batched flush loop and
   // records one `app_open` per launch — the basis for retention (D1/D7/
   // D30) and recurring-user counts.

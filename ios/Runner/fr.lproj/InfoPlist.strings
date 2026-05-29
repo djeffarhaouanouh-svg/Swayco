@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "La caméra est utilisée pour les appels vidéo.";
+"NSMicrophoneUsageDescription" = "Le micro est utilisé pour les appels vidéo et les messages vocaux.";
+"NSPhotoLibraryUsageDescription" = "Utilisé pour choisir votre photo de profil et vos photos Discover depuis votre galerie.";
+"NSPhotoLibraryAddUsageDescription" = "Utilisé pour enregistrer les photos partagées dans votre galerie.";
+"NSUserTrackingUsageDescription" = "Utilisé pour offrir une expérience plus pertinente. Vous pouvez refuser sans perdre l'accès à aucune fonctionnalité.";

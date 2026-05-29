@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "ビデオ通話にカメラを使用します。";
+"NSMicrophoneUsageDescription" = "ビデオ通話とボイスメッセージにマイクを使用します。";
+"NSPhotoLibraryUsageDescription" = "ギャラリーからプロフィール写真とDiscover写真を選ぶために使用します。";
+"NSPhotoLibraryAddUsageDescription" = "共有された写真をギャラリーに保存するために使用します。";
+"NSUserTrackingUsageDescription" = "より関連性の高い体験を提供するために使用します。拒否しても機能の利用に影響はありません。";

@@ -6,6 +6,19 @@
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleLocalizations</key>
+		<array>
+			<string>en</string>
+			<string>fr</string>
+			<string>es</string>
+			<string>de</string>
+			<string>it</string>
+			<string>pt-BR</string>
+			<string>ja</string>
+			<string>zh-Hans</string>
+			<string>ko</string>
+			<string>ar</string>
+		</array>
 		<key>CFBundleDisplayName</key>
 		<string>Swayco</string>
 		<key>LSApplicationCategoryType</key>
@@ -59,6 +72,10 @@
 		<string>Microphone is used for video calls.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>Used to save shared photos to your gallery.</string>
+		<key>NSUserTrackingUsageDescription</key>
+		<string>Used to deliver a more relevant experience. You can decline without losing access to any feature.</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>audio</string>

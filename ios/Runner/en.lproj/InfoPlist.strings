@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Camera is used for video calls.";
+"NSMicrophoneUsageDescription" = "Microphone is used for video calls and voice messages.";
+"NSPhotoLibraryUsageDescription" = "Used to pick your profile photo and Discover photo from your gallery.";
+"NSPhotoLibraryAddUsageDescription" = "Used to save shared photos to your gallery.";
+"NSUserTrackingUsageDescription" = "Used to deliver a more relevant experience. You can decline without losing access to any feature.";

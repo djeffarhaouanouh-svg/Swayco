@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "La fotocamera è usata per le videochiamate.";
+"NSMicrophoneUsageDescription" = "Il microfono è usato per le videochiamate e i messaggi vocali.";
+"NSPhotoLibraryUsageDescription" = "Usato per scegliere la tua foto profilo e le foto di Discover dalla galleria.";
+"NSPhotoLibraryAddUsageDescription" = "Usato per salvare le foto condivise nella tua galleria.";
+"NSUserTrackingUsageDescription" = "Usato per offrire un'esperienza più pertinente. Puoi rifiutare senza perdere l'accesso ad alcuna funzione.";

@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "تُستخدم الكاميرا لمكالمات الفيديو.";
+"NSMicrophoneUsageDescription" = "يُستخدم الميكروفون لمكالمات الفيديو والرسائل الصوتية.";
+"NSPhotoLibraryUsageDescription" = "يُستخدم لاختيار صورة ملفك الشخصي وصور Discover من معرض الصور.";
+"NSPhotoLibraryAddUsageDescription" = "يُستخدم لحفظ الصور المشاركة في معرض الصور.";
+"NSUserTrackingUsageDescription" = "يُستخدم لتقديم تجربة أكثر ملاءمة. يمكنك الرفض دون فقدان الوصول إلى أي ميزة.";

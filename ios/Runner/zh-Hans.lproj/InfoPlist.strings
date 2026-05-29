@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "相机用于视频通话。";
+"NSMicrophoneUsageDescription" = "麦克风用于视频通话和语音消息。";
+"NSPhotoLibraryUsageDescription" = "用于从相册中选择你的个人头像和 Discover 照片。";
+"NSPhotoLibraryAddUsageDescription" = "用于将分享的照片保存到你的相册。";
+"NSUserTrackingUsageDescription" = "用于提供更相关的体验。你可以拒绝,不会失去任何功能的访问权限。";

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2
+version: 6.1.2+4
 
 environment:
   sdk: ^3.11.0
@@ -57,7 +57,14 @@ dependencies:
   # Voice messages: record on iOS/Android/web (AAC/m4a + WebM on web),
   # play back the original recording on the receiving end. Both packages
   # request mic / playback permissions through permission_handler above.
-  record: ^5.1.2
+  # 6.x — required because record_linux 0.7.2 (the latest in the 5.x
+  # tree) doesn't implement the streaming API introduced in
+  # record_platform_interface 1.4+, breaking the Android release build
+  # at kernel_snapshot time. 6.x ships a record_linux that satisfies
+  # the new interface; AudioRecorder / RecordConfig / AudioEncoder
+  # are unchanged so no app-side migration is needed. 7.x bumps the
+  # min Dart SDK to 3.12, which we can't take yet.
+  record: ^6.2.1
   audioplayers: ^6.1.0
   path_provider: ^2.1.4
   # Swayco Midnight design — Bricolage Grotesque (titles) + DM Sans (body).
