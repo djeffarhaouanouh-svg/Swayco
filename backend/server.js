@@ -145,6 +145,35 @@ const hasWebUi = fs.existsSync(webIndex);
 const legalPath = path.join(__dirname, 'legal-site');
 const hasLegalSite = fs.existsSync(path.join(legalPath, 'terms.html'));
 
+// Boot-time diagnostic endpoint hit by lib/services/diag.dart. The
+// Flutter app fire-and-forgets one GET /diag per startup step so we
+// can see — from Railway logs alone — how far a Release build on a
+// real device gets before going silent. Returns instantly, never
+// blocks, never throws. Logged with [diag] prefix so a Railway
+// search for "[diag]" filters the whole boot trace per session.
+app.get('/diag', (req, res) => {
+  try {
+    const ip =
+      req.headers['x-forwarded-for'] ||
+      req.headers['cf-connecting-ip'] ||
+      req.socket?.remoteAddress ||
+      '';
+    const safe = {
+      step: String(req.query.step || '').slice(0, 64),
+      session: String(req.query.session || '').slice(0, 64),
+      seq: String(req.query.seq || '').slice(0, 8),
+      platform: String(req.query.platform || '').slice(0, 16),
+      build: String(req.query.build || '').slice(0, 32),
+      note: String(req.query.note || '').slice(0, 800),
+      ip: String(ip).split(',')[0].trim(),
+    };
+    console.log(`[diag] ${JSON.stringify(safe)}`);
+  } catch (_) {
+    // Never let a diagnostic ping take the server down.
+  }
+  res.json({ ok: true });
+});
+
 function assertEnv() {
   const missing = [];
   if (!LIVEKIT_URL) missing.push('LIVEKIT_URL');

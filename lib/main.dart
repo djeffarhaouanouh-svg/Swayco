@@ -17,6 +17,7 @@ import 'services/app_strings.dart';
 import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
+import 'services/diag.dart';
 import 'services/guest_invite_api.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
@@ -27,47 +28,65 @@ import 'theme/swayco_theme.dart';
 import 'translation/openai_realtime_translation.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Supabase keys come from --dart-define at build time (Railway / IDE
-  // launch.json). No .env loading on the deployed web build.
-  // Hard 5s cap so a reviewer device on a bad network (App Store / Play
-  // Store pre-launch tests) still boots to the login screen instead of
-  // hanging on a grey unresponsive view.
-  try {
-    await initSupabase().timeout(const Duration(seconds: 5));
-  } catch (e) {
-    debugPrint('Supabase init slow/failed: $e');
-  }
-  // Native push (FCM). Best-effort: a missing google-services.json /
-  // GoogleService-Info.plist on dev builds shouldn't crash the app —
-  // just skip Firebase init and the notification_client_io will fail
-  // its registration silently. Same 5s cap as Supabase above.
-  if (!kIsWeb) {
+  // Capture every uncaught error path so a Release crash doesn't end up
+  // as a silent black screen on a real device. Every channel reports to
+  // /diag — together with the boot-step pings below they tell us, from
+  // the Railway logs alone, exactly where the app went dark.
+  await runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (details) {
+      Diag.error('flutter-error', details.exception,
+          details.stack ?? StackTrace.empty);
+      FlutterError.presentError(details);
+    };
+    PlatformDispatcher.instance.onError = (e, s) {
+      Diag.error('platform-error', e, s);
+      return true;
+    };
+    // First ping AFTER the binding is up so http works.
+    unawaited(Diag.ping('main-start'));
+
+    // Supabase keys come from --dart-define at build time. Hard 5s cap
+    // so a reviewer device on a bad network still boots.
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      debugPrint('Firebase init slow/failed: $e');
+      await initSupabase().timeout(const Duration(seconds: 5));
+    } catch (e, s) {
+      Diag.error('supabase-fail', e, s);
     }
-  }
-  // Seed the in-memory hide-online cache so presence renders are
-  // already correct on the first frame (no flash of "online" dots
-  // before the prefs read resolves). Cap at 2s — a stuck
-  // SharedPreferences read must never block the splash.
-  try {
-    await AppSettings.hydrate().timeout(const Duration(seconds: 2));
-  } catch (e) {
-    debugPrint('AppSettings hydrate slow/failed: $e');
-  }
-  // Analytics for the admin dashboard. Starts the batched flush loop and
-  // records one `app_open` per launch — the basis for retention (D1/D7/
-  // D30) and recurring-user counts.
-  Analytics.start();
-  Analytics.track('app_open', props: {
-    'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+    // Native push (FCM). Best-effort — missing google-services on dev
+    // builds shouldn't crash the app.
+    if (!kIsWeb) {
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(const Duration(seconds: 5));
+      } catch (e, s) {
+        Diag.error('firebase-fail', e, s);
+      }
+    }
+    // Seed the hide-online cache so presence renders are correct on
+    // the first frame. 2s cap — SharedPreferences must never block.
+    try {
+      await AppSettings.hydrate().timeout(const Duration(seconds: 2));
+    } catch (e, s) {
+      Diag.error('hydrate-fail', e, s);
+    }
+    // Analytics for the admin dashboard. Wrapped because a flaky
+    // PlatformDispatcher.locale read on a niche device shouldn't
+    // gate runApp.
+    try {
+      Analytics.start();
+      Analytics.track('app_open', props: {
+        'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+      });
+    } catch (e, s) {
+      Diag.error('analytics-fail', e, s);
+    }
+    unawaited(Diag.ping('runapp-called'));
+    runApp(const LiveKitTranslateApp());
+  }, (e, s) {
+    Diag.error('zone-fail', e, s);
   });
-  runApp(const LiveKitTranslateApp());
 }
 
 class LiveKitTranslateApp extends StatefulWidget {
@@ -84,14 +103,36 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
-  late final OpenAiRealtimeTranslation _translation;
+  /// Lazy — constructed on first access via [_getTranslation]. The
+  /// point: nobody in the boot path touches it, so `livekit_client` +
+  /// `flutter_webrtc` Dart-side warm-up is deferred until the user
+  /// actually navigates to a call. If LiveKit/WebRTC is what's hanging
+  /// Release builds on real devices, keeping it dormant lets the login
+  /// screen render and confirms the diagnosis by elimination.
+  OpenAiRealtimeTranslation? _translation;
+  OpenAiRealtimeTranslation _getTranslation() {
+    final existing = _translation;
+    if (existing != null) return existing;
+    Diag.ping('translation-construct');
+    final created = OpenAiRealtimeTranslation();
+    Diag.ping('translation-constructed');
+    _translation = created;
+    return created;
+  }
   StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
     super.initState();
-    _translation = OpenAiRealtimeTranslation();
+    // Don't construct _translation here — let the lazy `late final`
+    // initialiser fire the first time something actually reads it
+    // (GuestJoinScreen or RootShell).
     _bootstrap();
+    // First post-mount ping — if Railway sees this, the Flutter
+    // widget tree did render at least once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Diag.ping('first-frame');
+    });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
@@ -111,7 +152,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   @override
   void dispose() {
     _authSub?.cancel();
-    _translation.dispose();
+    // Only dispose if we actually ever constructed it — otherwise the
+    // null-coalescing here would defeat the whole "stay dormant until
+    // needed" diagnosis.
+    _translation?.dispose();
     super.dispose();
   }
 
@@ -283,7 +327,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     if (_guestInvite != null) {
       return GuestJoinScreen(
         invite: _guestInvite!,
-        translation: _translation,
+        translation: _getTranslation(),
       );
     }
     // Login first. Onboarding only runs for brand-new accounts (no Supabase
@@ -300,6 +344,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         },
       );
     }
-    return RootShell(translation: _translation);
+    return RootShell(translation: _getTranslation());
   }
 }
