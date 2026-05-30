@@ -709,19 +709,24 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     // Réservé Ultra" hint is a deliberate upsell hook;
                     // hiding the feature for non-Ultra would forfeit
                     // the conversion event.
-                    if (!_isViewingOther) ...[
-                      _VoiceCloneCard(
-                        isUltra: _remote?.isUltra == true,
-                        alreadyEnrolled: _remote?.hasClonedVoice == true,
-                        onEnrolled: () {
-                          // Refresh the remote profile so the badge
-                          // flips to "Voix clonée" without a manual
-                          // pull-to-refresh.
-                          unawaited(_reload(silent: true));
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                    // TEMPORARILY HIDDEN — "Clone my voice" card removed from
+                    // the UI on request. The widget and all supporting code
+                    // (_VoiceCloneCard, enrollClonedVoice, etc.) are left
+                    // intact so this block can simply be uncommented to
+                    // restore the feature.
+                    // if (!_isViewingOther) ...[
+                    //   _VoiceCloneCard(
+                    //     isUltra: _remote?.isUltra == true,
+                    //     alreadyEnrolled: _remote?.hasClonedVoice == true,
+                    //     onEnrolled: () {
+                    //       // Refresh the remote profile so the badge
+                    //       // flips to "Voix clonée" without a manual
+                    //       // pull-to-refresh.
+                    //       unawaited(_reload(silent: true));
+                    //     },
+                    //   ),
+                    //   const SizedBox(height: 16),
+                    // ],
                     _MySubscriptionSection(
                       currentTier: _remote?.subscriptionTier ?? 'free',
                     ),
@@ -2589,6 +2594,8 @@ class _GhostIconButton extends StatelessWidget {
 /// ElevenLabs processes → state updates. Re-enrolment is supported
 /// (record again to overwrite the stored voice_id; backend deletes the
 /// previous one to free the slot).
+// ignore: unused_element  — temporarily not rendered (see profile build),
+// kept intact so the "Clone my voice" card can be restored later.
 class _VoiceCloneCard extends StatefulWidget {
   const _VoiceCloneCard({
     required this.isUltra,
