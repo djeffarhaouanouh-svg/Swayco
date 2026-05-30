@@ -74,8 +74,6 @@
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>Used to save shared photos to your gallery.</string>
-		<key>NSUserTrackingUsageDescription</key>
-		<string>Used to deliver a more relevant experience. You can decline without losing access to any feature.</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>audio</string>
