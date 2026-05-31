@@ -20,10 +20,19 @@ Future<void> initSupabase() async {
 }
 
 /// Whether [Supabase.instance] is usable. False when the keys were missing at
-/// build time. Callers that touch the client must guard on this.
+/// build time AND when `Supabase.initialize` did not finish setting the
+/// underlying client — touching `.client` is what surfaces that, because
+/// `Supabase.instance` returns the wrapper even when its late `client`
+/// field hasn't been assigned yet. Without this stricter check, a
+/// half-initialized Supabase (e.g. when an outer `Future.timeout` cuts
+/// `initSupabase` before Hive session recovery completes on a fresh iOS
+/// release install) flagged as ready and the very first
+/// `_auth.onAuthStateChange` read crashed initState with a
+/// `LateInitializationError: Field 'client' has not been initialized`.
 bool get isSupabaseReady {
   try {
-    Supabase.instance;
+    // ignore: unnecessary_statements
+    Supabase.instance.client;
     return true;
   } catch (_) {
     return false;

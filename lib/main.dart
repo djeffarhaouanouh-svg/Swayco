@@ -46,10 +46,19 @@ Future<void> main() async {
     // First ping AFTER the binding is up so http works.
     unawaited(Diag.ping('main-start'));
 
-    // Supabase keys come from --dart-define at build time. Hard 5s cap
-    // so a reviewer device on a bad network still boots.
+    // Supabase keys come from --dart-define at build time. 15s cap so a
+    // reviewer device on a bad network still boots. The earlier 5s cap
+    // was actively harmful: on first-install iOS Release builds,
+    // Supabase.initialize routinely takes 6–10s for Hive session
+    // recovery, and cutting the await mid-initialise left the singleton
+    // alive but with its late `client` field unset — a downstream
+    // initState read of `_auth.onAuthStateChange` then crashed with
+    // `LateInitializationError: Field 'client' has not been
+    // initialized` (the bug behind the post-splash black screen we
+    // were chasing). 15s is well past the normal worst case and still
+    // short enough not to register as a hang in App Review.
     try {
-      await initSupabase().timeout(const Duration(seconds: 5));
+      await initSupabase().timeout(const Duration(seconds: 15));
     } catch (e, s) {
       Diag.error('supabase-fail', e, s);
     }
