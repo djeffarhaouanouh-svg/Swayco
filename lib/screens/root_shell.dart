@@ -9,6 +9,7 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/incoming_call_api.dart';
+import '../services/local_notifications.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
 import '../services/profile_api.dart';
@@ -121,6 +122,9 @@ class _RootShellState extends State<RootShell> {
     if (!mounted || _ringingDialogOpen) return;
     if (_handledCallIds.contains(call.id)) return;
     _handledCallIds.add(call.id);
+    // The app is now in the foreground handling the call via the in-app
+    // dialog — silence the full-screen background ringer if it fired.
+    unawaited(LocalNotifications.cancelIncomingCall());
     final caller = isSupabaseReady
         ? await ProfileApi.fetchById(call.callerId)
         : null;

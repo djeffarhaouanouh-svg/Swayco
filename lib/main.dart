@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,6 +19,7 @@ import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
 import 'services/guest_invite_api.dart';
+import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
@@ -25,6 +27,45 @@ import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
 import 'translation/openai_realtime_translation.dart';
+
+/// Runs in a dedicated background isolate when a data push lands while the
+/// app is backgrounded or killed. For an incoming call it rings a
+/// full-screen, ongoing notification (WhatsApp-style). Other event types
+/// carry a `notification` block and are shown by the OS automatically, so
+/// there's nothing to do for them here.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (_) {}
+  final data = message.data;
+  if (data['type'] != 'incoming_call') return;
+  final title = (data['title'] ?? data['callerName'] ?? '').toString().trim();
+  final body = (data['body'] ?? '').toString().trim();
+  await LocalNotifications.showIncomingCall(
+    title: title.isEmpty ? 'Appel entrant' : title,
+    body: body.isEmpty ? null : body,
+  );
+}
+
+/// Foreground push: the OS suppresses the tray banner while the app is
+/// open, so present it ourselves. Incoming calls are already surfaced by
+/// the in-app dialog (see RootShell), so they're skipped here.
+void _handleForegroundMessage(RemoteMessage message) {
+  final data = message.data;
+  if (data['type'] == 'incoming_call') return;
+  final n = message.notification;
+  final title = (n?.title ?? data['title'] ?? '').toString().trim();
+  final body = (n?.body ?? data['body'] ?? '').toString().trim();
+  if (title.isEmpty) return;
+  unawaited(LocalNotifications.showMessage(
+    id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+    title: title,
+    body: body.isEmpty ? null : body,
+  ));
+}
 
 Future<void> main() async {
   // Wrap the whole boot in runZonedGuarded + FlutterError.onError so a
@@ -58,6 +99,14 @@ Future<void> main() async {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(const Duration(seconds: 5));
+        // WhatsApp-style incoming calls + chat banners. The background
+        // isolate handler rings full-screen on a data-only call push even
+        // when the app is killed; foreground pushes are shown inline (the
+        // OS suppresses the tray banner while the app is open).
+        FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler,
+        );
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       } catch (e) {
         debugPrint('Firebase init slow/failed: $e');
       }

@@ -147,17 +147,33 @@ async function notifyUser(recipientUid, payload) {
             out.results.push({ id: t.id, skipped: 'firebase-missing' });
             return;
           }
+          // Android incoming calls go out DATA-ONLY: a `notification`
+          // block would make the OS draw a plain tray banner and skip our
+          // Dart background isolate, so the full-screen WhatsApp-style
+          // ringer (flutter_local_notifications, fullScreenIntent) would
+          // never run. Without the notification block the background
+          // handler wakes and builds the call UI itself — title/body are
+          // passed inside `data` instead. iOS keeps the notification block
+          // (CallKit/VoIP is a separate follow-up) so it still rings.
+          const isCallAndroid =
+            payload.type === 'incoming_call' && t.platform === 'android';
+          const data = {
+            ...Object.fromEntries(
+              Object.entries(payload.data || {}).map(([k, v]) => [k, String(v)]),
+            ),
+            // Carry the notification type so a tap can route the app
+            // to the right screen (see NotificationRouter on the client).
+            ...(payload.type ? { type: String(payload.type) } : {}),
+            ...(isCallAndroid
+              ? { title: String(payload.title || ''), body: String(payload.body || '') }
+              : {}),
+          };
           const msg = {
             token: t.fcm_token,
-            notification: { title: payload.title, body: payload.body || '' },
-            data: {
-              ...Object.fromEntries(
-                Object.entries(payload.data || {}).map(([k, v]) => [k, String(v)]),
-              ),
-              // Carry the notification type so a tap can route the app
-              // to the right screen (see NotificationRouter on the client).
-              ...(payload.type ? { type: String(payload.type) } : {}),
-            },
+            ...(isCallAndroid
+              ? {}
+              : { notification: { title: payload.title, body: payload.body || '' } }),
+            data,
             android: { priority: 'high' },
             apns: {
               payload: { aps: { sound: 'default' } },
