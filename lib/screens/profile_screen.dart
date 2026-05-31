@@ -74,6 +74,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   // `_peerFollowsMe` → they added me; `_iFollowPeer` → I added them.
   bool _peerFollowsMe = false;
   bool _iFollowPeer = false;
+  // Viewer-mode only: I sent the peer a friend request that's still
+  // pending (they haven't accepted yet). Drives the "Demande envoyée"
+  // state on the "Ajouter" button.
+  bool _iRequestedPeer = false;
   Timer? _pollTimer;
 
   bool get _isViewingOther => widget.userId != null;
@@ -142,6 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     // Directional follow state — drives the "Follow back" button.
     var peerFollowsMe = false;
     var iFollowPeer = false;
+    var iRequestedPeer = false;
     if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
       final rel = await FriendshipApi.directionalWith(
         meId: deviceId,
@@ -149,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       );
       peerFollowsMe = rel.peerFollowsMe;
       iFollowPeer = rel.iFollowPeer;
+      iRequestedPeer = rel.iRequestedPeer;
     }
     if (!mounted) return;
     setState(() {
@@ -161,6 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       _iLikePeer = iLike;
       _peerFollowsMe = peerFollowsMe;
       _iFollowPeer = iFollowPeer;
+      _iRequestedPeer = iRequestedPeer;
       _loading = false;
     });
   }
@@ -225,20 +232,38 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
-  /// Follow the displayed peer back. Reachable only when they already
-  /// follow me and I haven't followed them yet (see the button gating in
-  /// [_IdentitySection]). Optimistic — roll back if the write fails.
+  /// "S'abonner en retour": the peer already follows me, so following
+  /// them back is an instant abonnement — no approval step (see
+  /// [FriendshipApi.follow]). Optimistic — roll back if the write fails.
   Future<void> _followBack() async {
     if (_targetId.isEmpty || _deviceId.isEmpty) return;
     setState(() => _iFollowPeer = true);
     try {
-      await FriendshipApi.sendRequest(meId: _deviceId, peerId: _targetId);
+      await FriendshipApi.follow(meId: _deviceId, peerId: _targetId);
       if (!mounted) return;
       // Re-pull so the followers/following counts reflect the new edge.
       await _reload(silent: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _iFollowPeer = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
+  /// "Ajouter": the peer is a stranger (doesn't follow me, I don't
+  /// follow them). Unlike follow-back this SENDS A REQUEST that they
+  /// must accept — lands as `pending`. Optimistic: flip the button to
+  /// "Demande envoyée"; roll back if the write fails.
+  Future<void> _addPeer() async {
+    if (_targetId.isEmpty || _deviceId.isEmpty) return;
+    setState(() => _iRequestedPeer = true);
+    try {
+      await FriendshipApi.sendRequest(meId: _deviceId, peerId: _targetId);
+      if (!mounted) return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _iRequestedPeer = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
@@ -672,6 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     viewerMode: _isViewingOther,
                     peerFollowsMe: _peerFollowsMe,
                     iFollowPeer: _iFollowPeer,
+                    iRequestedPeer: _iRequestedPeer,
                     iLikePeer: _iLikePeer,
                     onTapAvatar: _pickAndUploadAvatar,
                     onEditBio: _saveBio,
@@ -683,6 +709,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     onEdit: _openEditor,
                     onSettings: _openSettings,
                     onFollowBack: _followBack,
+                    onAddPeer: _addPeer,
                     onUnfollow: _unfollowPeer,
                     onTogglePeerLike: _togglePeerLike,
                     onMessagePeer: _openChatWithPeer,
@@ -1768,7 +1795,9 @@ class _IdentitySection extends StatelessWidget {
     this.viewerMode = false,
     this.peerFollowsMe = false,
     this.iFollowPeer = false,
+    this.iRequestedPeer = false,
     this.onFollowBack,
+    this.onAddPeer,
     this.onUnfollow,
     this.iLikePeer = false,
     this.onTogglePeerLike,
@@ -1804,8 +1833,12 @@ class _IdentitySection extends StatelessWidget {
   final bool peerFollowsMe;
   /// Viewer-mode only: do I already follow the displayed peer?
   final bool iFollowPeer;
-  /// Viewer-mode only: follow the peer back.
+  /// Viewer-mode only: I sent a still-pending request via "Ajouter".
+  final bool iRequestedPeer;
+  /// Viewer-mode only: follow the peer back (instant abonnement).
   final VoidCallback? onFollowBack;
+  /// Viewer-mode only: send a friend request to a stranger ("Ajouter").
+  final VoidCallback? onAddPeer;
   /// Viewer-mode only: unfollow the peer (removes them from my friends).
   final VoidCallback? onUnfollow;
   /// Viewer-mode only: have I liked this peer? Drives the heart overlay
@@ -1956,7 +1989,7 @@ class _IdentitySection extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: SC.accent,
+                  color: SC.online,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1964,7 +1997,7 @@ class _IdentitySection extends StatelessWidget {
               Text(
                 AppStrings.t('online_now'),
                 style: const TextStyle(
-                  color: SC.accent,
+                  color: SC.online,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2065,24 +2098,42 @@ class _IdentitySection extends StatelessWidget {
                       onTap: onMessagePeer ?? () {},
                     ),
                     // Second action depends on the follow relation:
-                    //  • peer follows me, I don't follow back → "Follow back"
                     //  • I already follow them → "Unfollow" (removes them
                     //    from my friends)
-                    //  • strangers → nothing (Message button on its own)
-                    if (peerFollowsMe && !iFollowPeer) ...[
-                      const SizedBox(height: 10),
-                      _GradientActionButton(
-                        label: AppStrings.t('follow_back'),
-                        icon: Icons.person_add_alt_1,
-                        onTap: onFollowBack ?? () {},
-                      ),
-                    ] else if (iFollowPeer) ...[
+                    //  • peer follows me, I don't → "S'abonner en retour":
+                    //    INSTANT follow, no approval (FriendshipApi.follow).
+                    //  • stranger, request already sent → "Demande envoyée".
+                    //  • stranger → "Ajouter": SENDS A REQUEST they must
+                    //    accept (FriendshipApi.sendRequest).
+                    if (iFollowPeer) ...[
                       const SizedBox(height: 10),
                       _GradientActionButton(
                         label: AppStrings.t('follow_unfollow'),
                         icon: Icons.person_remove_alt_1,
                         onTap: onUnfollow ?? () {},
                         subdued: true,
+                      ),
+                    ] else if (peerFollowsMe) ...[
+                      const SizedBox(height: 10),
+                      _GradientActionButton(
+                        label: AppStrings.t('follow_back'),
+                        icon: Icons.person_add_alt_1,
+                        onTap: onFollowBack ?? () {},
+                      ),
+                    ] else if (iRequestedPeer) ...[
+                      const SizedBox(height: 10),
+                      _GradientActionButton(
+                        label: AppStrings.t('friendship_sent'),
+                        icon: Icons.schedule,
+                        onTap: () {},
+                        subdued: true,
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 10),
+                      _GradientActionButton(
+                        label: AppStrings.t('profile_add'),
+                        icon: Icons.person_add_alt_1,
+                        onTap: onAddPeer ?? () {},
                       ),
                     ],
                   ],

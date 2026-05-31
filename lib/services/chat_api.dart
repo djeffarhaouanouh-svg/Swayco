@@ -9,6 +9,7 @@ class ChatMessage {
     required this.id,
     required this.conversationId,
     required this.senderId,
+    this.recipientId = '',
     required this.senderName,
     required this.body,
     required this.createdAt,
@@ -20,6 +21,11 @@ class ChatMessage {
   final String id;
   final String conversationId;
   final String senderId;
+  /// The peer this message was addressed to (`recipient` column). Empty
+  /// when the column isn't populated. Together with [senderId] this lets
+  /// the chat list resolve the "other party" of a conversation without
+  /// parsing the (UUID-laden, dash-ambiguous) conversation id.
+  final String recipientId;
   final String senderName;
   /// Text body. For voice messages this carries the STT transcription
   /// produced by the backend so the existing chat translator path
@@ -49,6 +55,7 @@ class ChatMessage {
       // `sender_id` (the name my earlier migration assumed) — whichever
       // is populated.
       senderId: (m['sender'] ?? m['sender_id'])?.toString() ?? '',
+      recipientId: (m['recipient'] ?? m['recipient_id'])?.toString() ?? '',
       senderName: m['sender_name']?.toString() ?? '',
       body: m['body']?.toString() ?? '',
       createdAt: created is String

@@ -232,6 +232,55 @@ abstract final class FriendshipApi {
     return Friendship.fromMap(Map<String, dynamic>.from(inserted));
   }
 
+  /// Follow [peerId] outright — TikTok / Instagram style, no approval
+  /// step. Lands the edge as `accepted` immediately so the "following"
+  /// count and the mutual relation update on the spot. This is what the
+  /// profile's "Ajouter" / "S'abonner en retour" buttons use — they are
+  /// instant follows, NOT friend requests that the peer has to accept.
+  ///
+  /// Idempotent: a same-direction row is reused, and a leftover `pending`
+  /// row (e.g. a request sent before this flow existed) is promoted to
+  /// `accepted` rather than duplicated.
+  static Future<Friendship?> follow({
+    required String meId,
+    required String peerId,
+  }) async {
+    if (!isSupabaseReady) return null;
+    if (meId.isEmpty || peerId.isEmpty || meId == peerId) return null;
+
+    final sameDir = await _c
+        .from('friendships')
+        .select()
+        .eq('requester', meId)
+        .eq('addressee', peerId)
+        .limit(1)
+        .maybeSingle();
+    if (sameDir != null) {
+      final existing = Friendship.fromMap(Map<String, dynamic>.from(sameDir));
+      if (existing.status == 'accepted') return existing;
+      final promoted = await _c
+          .from('friendships')
+          .update({'status': 'accepted'})
+          .eq('id', existing.id)
+          .select()
+          .single();
+      return Friendship.fromMap(Map<String, dynamic>.from(promoted));
+    }
+
+    final inserted = await _c
+        .from('friendships')
+        .insert({
+          'requester': meId,
+          'addressee': peerId,
+          'status': 'accepted',
+        })
+        .select()
+        .single();
+    // Tell the peer they have a new follower. Best-effort.
+    unawaited(_notifyNewFollower(meId, peerId));
+    return Friendship.fromMap(Map<String, dynamic>.from(inserted));
+  }
+
   static Future<void> _notifyNewFollower(String meId, String peerId) async {
     if (!isSupabaseReady) return;
     try {
@@ -287,31 +336,44 @@ abstract final class FriendshipApi {
         .eq('addressee', peerId);
   }
 
-  /// Viewer-mode helper for the profile screen: resolves the two
-  /// independent directions of the relation between me ([meId]) and a
-  /// [peerId]. `peerFollowsMe` is true when the peer sent me a request
-  /// (their row: requester = peer, addressee = me); `iFollowPeer` is true
-  /// when I sent them one. Both can be true (mutual) or false (strangers).
-  static Future<({bool peerFollowsMe, bool iFollowPeer})> directionalWith({
+  /// Viewer-mode helper for the profile screen: resolves the relation
+  /// between me ([meId]) and a [peerId].
+  ///   * `peerFollowsMe`   → peer's accepted row (requester = peer).
+  ///   * `iFollowPeer`     → my accepted row (requester = me).
+  ///   * `iRequestedPeer`  → my still-`pending` outgoing request — the
+  ///     "Ajouter" button sent a request the peer hasn't accepted yet.
+  /// Both directions can be true (mutual) or false (strangers).
+  static Future<({bool peerFollowsMe, bool iFollowPeer, bool iRequestedPeer})>
+      directionalWith({
     required String meId,
     required String peerId,
   }) async {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty || meId == peerId) {
-      return (peerFollowsMe: false, iFollowPeer: false);
+      return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
     }
     try {
       final mine = await fetchMine(meId);
       var peerFollowsMe = false;
       var iFollowPeer = false;
+      var iRequestedPeer = false;
       for (final f in mine) {
-        if (f.status != 'accepted') continue;
-        if (f.requester == peerId && f.addressee == meId) peerFollowsMe = true;
-        if (f.requester == meId && f.addressee == peerId) iFollowPeer = true;
+        final iSentToPeer = f.requester == meId && f.addressee == peerId;
+        final peerSentToMe = f.requester == peerId && f.addressee == meId;
+        if (f.status == 'accepted') {
+          if (peerSentToMe) peerFollowsMe = true;
+          if (iSentToPeer) iFollowPeer = true;
+        } else if (f.status == 'pending' && iSentToPeer) {
+          iRequestedPeer = true;
+        }
       }
-      return (peerFollowsMe: peerFollowsMe, iFollowPeer: iFollowPeer);
+      return (
+        peerFollowsMe: peerFollowsMe,
+        iFollowPeer: iFollowPeer,
+        iRequestedPeer: iRequestedPeer,
+      );
     } catch (e) {
       debugPrint('FriendshipApi.directionalWith failed: $e');
-      return (peerFollowsMe: false, iFollowPeer: false);
+      return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
     }
   }
 

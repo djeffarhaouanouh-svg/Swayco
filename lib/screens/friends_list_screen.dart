@@ -113,7 +113,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
 
   Future<void> _followBack(RemoteProfile peer) async {
     try {
-      final f = await FriendshipApi.sendRequest(meId: _myId, peerId: peer.id);
+      final f = await FriendshipApi.follow(meId: _myId, peerId: peer.id);
       if (!mounted) return;
       if (f == null) {
         ScaffoldMessenger.of(context).showSnackBar(

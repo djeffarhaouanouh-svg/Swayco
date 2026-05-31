@@ -157,6 +157,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       for (final p in following) {
         byId[p.id] = p;
       }
+      // Keep conversations alive after the friendship ends. Removing
+      // (unfollowing) someone deletes the friendship edge but not the
+      // messages, so any peer we have a thread with — even a now-stranger —
+      // still earns a row here. Pull the profiles the friends lists missed.
+      final convPeerIds = <String>{};
+      for (final msg in latest.values) {
+        final peer = msg.senderId == id ? msg.recipientId : msg.senderId;
+        if (peer.isEmpty || peer == id || byId.containsKey(peer)) continue;
+        convPeerIds.add(peer);
+      }
+      if (convPeerIds.isNotEmpty) {
+        for (final p in await ProfileApi.fetchByIds(convPeerIds.toList())) {
+          byId[p.id] = p;
+        }
+      }
       final blockedByMe = iBlocked.map((p) => p.id).toSet();
       final hiddenPeers = {...blockedByMe, ...blockedMe};
       byId.removeWhere((k, _) => hiddenPeers.contains(k));
@@ -589,8 +604,8 @@ class _FriendChatRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            // Avatar — tap goes straight to the peer's profile. The cyan
-            // dot rides the bottom-right corner when they're online.
+            // Avatar — tap goes straight to the peer's profile. The light-
+            // green presence dot rides the bottom-right corner when online.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
