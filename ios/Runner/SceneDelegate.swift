@@ -19,6 +19,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   ) {
     guard let windowScene = scene as? UIWindowScene else { return }
     let flutterVC = FlutterViewController()
+    // Plugins must be registered on THIS FlutterViewController's
+    // engine — registering on AppDelegate instead targets the implicit
+    // engine and leaves every plugin channel disconnected from the
+    // scene's Flutter UI (confirmed by Railway pings on 6.1.2+15).
+    GeneratedPluginRegistrant.register(with: flutterVC)
     let window = UIWindow(windowScene: windowScene)
     window.rootViewController = flutterVC
     window.makeKeyAndVisible()

@@ -422,20 +422,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
   @override
   Widget build(BuildContext context) {
-    // BISECT STEP: skip ValueListenableBuilder + SC.material() + the
-    // _buildHome tree entirely and render a flat red ColoredBox under
-    // a vanilla MaterialApp. Everything BEFORE this — runZonedGuarded,
-    // Supabase / Firebase / AppSettings init, LiveKitTranslateApp
-    // mounting, _bootstrap, the _captureAndUploadFrame schedule — is
-    // unchanged. If the device still shows red, the bug is inside
-    // _buildHome / LoginScreen / RepaintBoundary / SC.material() /
-    // ValueListenableBuilder. If the device shows black, the bug is
-    // earlier — somewhere in main() or in the LiveKitTranslateApp
-    // initState / plugin imports.
-    unawaited(Diag.ping('bisect-build-red'));
-    return const MaterialApp(
+    // BISECT STEP 2: same red home, but now with SC.material() theme
+    // applied (and still no ValueListenableBuilder, no RepaintBoundary,
+    // no _buildHome tree). If the device shows red, SC.material() is
+    // fine and the bug is in ValueListenableBuilder / RepaintBoundary /
+    // _buildHome. If it shows black, SC.material() itself is the bug
+    // (most likely the GoogleFonts-backed text styles in SCText
+    // initialising lazily and throwing in Release).
+    unawaited(Diag.ping('bisect-build-red-themed'));
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: ColoredBox(color: Color(0xFFFF0000)),
+      theme: SC.material(),
+      home: const ColoredBox(color: Color(0xFFFF0000)),
     );
   }
 
