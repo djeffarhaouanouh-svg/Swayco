@@ -270,6 +270,19 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// locally-stored onboarding data (display name + spoken language) up
   /// to the Supabase `profiles` row, then start the unread-count
   /// listener.
+  /// Pull the Supabase profile's interface language and apply it to
+  /// [AppStrings]. Best-effort — a network failure just leaves the
+  /// current locale untouched.
+  Future<void> _applyRemoteLanguage(String uid) async {
+    try {
+      final remote = await ProfileApi.fetchById(uid);
+      final code = remote?.language.trim() ?? '';
+      if (code.isNotEmpty) AppStrings.setFromCode(code);
+    } catch (e) {
+      debugPrint('applyRemoteLanguage failed: $e');
+    }
+  }
+
   Future<void> _hydrateAuthedSession() async {
     final uid = AuthService.currentUserId;
     if (uid.isEmpty) return;
@@ -281,6 +294,38 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         language: profile.sourceLang,
         gender: profile.gender,
       );
+      // Local prefs may predate the language picker, or hold an empty
+      // source lang — fall back to the Supabase value so the UI still
+      // speaks the user's chosen language.
+      if (profile.sourceLang.trim().isEmpty) {
+        await _applyRemoteLanguage(uid);
+      }
+    } else {
+      // Returning user on a fresh device / freshly-installed app: local
+      // prefs are empty but the Supabase profile holds their name +
+      // language. The boot-time restore reads ONLY local prefs, so
+      // without this the UI stays on the English default even though the
+      // account is set to French. Pull the remote profile down, apply its
+      // language, and cache it locally so the next cold boot restores
+      // instantly with no round-trip.
+      try {
+        final remote = await ProfileApi.fetchById(uid);
+        if (remote != null) {
+          if (remote.language.trim().isNotEmpty) {
+            AppStrings.setFromCode(remote.language);
+          }
+          if (remote.displayName.trim().isNotEmpty) {
+            await UserPrefs.completeOnboarding(
+              firstName: remote.displayName,
+              sourceLang: remote.language,
+              targetLang: '',
+              gender: remote.gender,
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('hydrate remote profile/language failed: $e');
+      }
     }
     // Once the profile row exists, fire the deferred referral
     // attribution captured at boot. Best-effort — failure is silent so
