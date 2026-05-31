@@ -1,8 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
+import '../services/diag.dart';
 import '../theme/swayco_theme.dart';
 
 /// Welcome screen shown when the user has no Supabase Auth session. Lets them
@@ -170,6 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    unawaited(Diag.ping('login-screen-build'));
     final isSignUp = _mode == _Mode.signUp;
     return Scaffold(
       backgroundColor: SC.bg,

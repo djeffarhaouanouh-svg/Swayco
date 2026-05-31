@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../config/app_config.dart';
 
@@ -21,6 +22,25 @@ abstract final class Diag {
   /// concurrency / retries.
   static int _seq = 0;
   static String? _sessionId;
+  /// Cached "version+buildNumber" of the running binary, populated once
+  /// by [bind] from `package_info_plus`. Hardcoding this field had been
+  /// actively misleading — every iOS install reported `6.1.2+6` no
+  /// matter what was actually compiled, which made it impossible to
+  /// tell from a Railway log whether the device was on the build that
+  /// included a specific fix.
+  static String _build = 'unknown';
+
+  /// Read once at boot and cache. Safe to call multiple times. Never
+  /// throws — falls back to the previous value if the platform channel
+  /// is unavailable (early in WidgetsFlutterBinding initialisation).
+  static Future<void> bind() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _build = '${info.version}+${info.buildNumber}';
+    } catch (_) {
+      // Leave the previous fallback in place.
+    }
+  }
 
   /// Cheap session id so a backend reader can group one device's
   /// startup pings. Not a UUID — `${ts}-${rnd}` is plenty for log
@@ -74,7 +94,7 @@ abstract final class Diag {
         'session': _session(),
         'seq': n.toString(),
         'platform': _platform(),
-        'build': '6.1.2+6',
+        'build': _build,
         if (note != null && note.isNotEmpty) 'note': note,
       };
       final uri = Uri.parse('$base/diag').replace(queryParameters: params);

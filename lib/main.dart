@@ -43,6 +43,15 @@ Future<void> main() async {
       Diag.error('platform-error', e, s);
       return true;
     };
+    // Read the real version+build so Diag pings stop reporting the
+    // hardcoded string they used to ship with. Awaited because the
+    // earliest pings should already carry the correct id — the channel
+    // is cheap once the binding is up.
+    try {
+      await Diag.bind().timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Leave the fallback "unknown" in place.
+    }
     // First ping AFTER the binding is up so http works.
     unawaited(Diag.ping('main-start'));
 
@@ -169,6 +178,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   Future<void> _bootstrap() async {
+    unawaited(Diag.ping('bootstrap-start'));
     // A guest-invite deep link (`/c/<room>` on web) bypasses login entirely:
     // the visitor joins the call with no account. Detected before anything
     // else so an auth check never gates them.
@@ -212,6 +222,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       _needsOnboarding = needsOnboarding;
       _loading = false;
     });
+    Diag.ping('bootstrap-end',
+        note: 'authed=$authed onboarding=$needsOnboarding');
   }
 
   /// Called whenever a fresh sign-in happens (login or signup confirmation).
@@ -325,6 +337,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
   Widget _buildHome() {
     if (_loading) {
+      unawaited(Diag.ping('build-home-loading'));
       return const Scaffold(
         backgroundColor: SC.bg,
         body: Center(
@@ -334,6 +347,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {
+      unawaited(Diag.ping('build-home-guest'));
       return GuestJoinScreen(
         invite: _guestInvite!,
         translation: _getTranslation(),
@@ -342,9 +356,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // Login first. Onboarding only runs for brand-new accounts (no Supabase
     // profile row) — returning users go straight to the shell.
     if (!_authed) {
+      unawaited(Diag.ping('build-home-login'));
       return const LoginScreen();
     }
     if (_needsOnboarding) {
+      unawaited(Diag.ping('build-home-onboarding'));
       return OnboardingScreen(
         onCompleted: () async {
           await _hydrateAuthedSession();
@@ -353,6 +369,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         },
       );
     }
+    unawaited(Diag.ping('build-home-shell'));
     return RootShell(translation: _getTranslation());
   }
 }
