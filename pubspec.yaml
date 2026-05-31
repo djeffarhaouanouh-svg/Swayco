@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 6.1.2+9
+version: 6.1.2+10
 
 environment:
   sdk: ^3.11.0
@@ -87,7 +87,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_native_splash: ^2.4.6
+  # flutter_native_splash retired in 6.1.2+10 — its in-app overlay
+  # was never being dismissed in Release builds on real iPhone /
+  # Android devices, leaving a pure-black surface over a correctly
+  # rendered LoginScreen (confirmed by Railway pings showing
+  # `login-screen-build` + `first-frame` while the user only saw
+  # black). The iOS LaunchScreen.storyboard and the Android
+  # launch_background drawable still display during cold start
+  # (they're handled by the OS, not the plugin), so the user keeps
+  # the brief logo flash without the broken overlay.
   # Generates the launcher icons (Android / iOS / web) from icon-swayco.png.
   flutter_launcher_icons: ^0.14.1
 
@@ -114,22 +122,8 @@ flutter_launcher_icons:
     background_color: "#000000"
     theme_color: "#00A884"
 
-flutter_native_splash:
-  color: "#000000"
-  image: assets/test-splashscreen.png
-  color_dark: "#000000"
-  image_dark: assets/test-splashscreen.png
-  # Android 12+ masks the splash icon into a circle, so it needs its own
-  # padded image (logo centred with transparent margin) — otherwise the
-  # full-bleed splash gets its corners clipped.
-  android_12:
-    color: "#000000"
-    image: assets/splash-android12.png
-    color_dark: "#000000"
-    image_dark: assets/splash-android12.png
-  android: true
-  ios: true
-  web: true
+# flutter_native_splash config retired in 6.1.2+10. See the
+# `dev_dependencies` comment above for the diagnosis.
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
