@@ -205,17 +205,33 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// distinguish "Flutter rendered black" from "Flutter rendered
   /// LoginScreen and something covered it".
   Future<void> _captureAndUploadFrame() async {
+    RenderRepaintBoundary? capturedBoundary;
     try {
       final ctx = _captureKey.currentContext;
       if (ctx == null) {
         unawaited(Diag.ping('capture-no-context'));
         return;
       }
+      // Ping the dimensions Flutter THINKS the device has — if this
+      // reports 0×0 the FlutterView itself is mis-sized by iOS native,
+      // not anything Dart-side.
+      try {
+        final mq = MediaQuery.of(ctx);
+        unawaited(Diag.ping('capture-media-query',
+            note: 'w=${mq.size.width.toStringAsFixed(1)} '
+                'h=${mq.size.height.toStringAsFixed(1)} '
+                'devicePixelRatio=${mq.devicePixelRatio.toStringAsFixed(2)}'));
+      } catch (_) {}
       final ro = ctx.findRenderObject();
       if (ro is! RenderRepaintBoundary) {
         unawaited(Diag.ping('capture-no-boundary'));
         return;
       }
+      capturedBoundary = ro;
+      unawaited(Diag.ping('capture-boundary-size',
+          note: 'w=${ro.size.width.toStringAsFixed(1)} '
+              'h=${ro.size.height.toStringAsFixed(1)} '
+              'hasSize=${ro.hasSize}'));
       final image = await ro.toImage(pixelRatio: 0.2);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
@@ -235,7 +251,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       );
       unawaited(Diag.upload('capture-png-b64', b64));
     } catch (e, s) {
-      Diag.error('capture-fail', e, s);
+      final size = capturedBoundary?.size;
+      Diag.error(
+        'capture-fail',
+        e,
+        s,
+        note: size == null
+            ? 'size=unknown'
+            : 'w=${size.width.toStringAsFixed(1)} '
+                'h=${size.height.toStringAsFixed(1)}',
+      );
     }
   }
 
