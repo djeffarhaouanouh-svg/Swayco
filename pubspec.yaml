@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 6.1.2+8
+version: 6.1.2+7
 
 environment:
   sdk: ^3.11.0
@@ -34,15 +34,8 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  # DIAGNOSTIC BUILD 6.1.2+8: livekit_client and flutter_webrtc are
-  # commented out so their native plugins are NOT registered at engine
-  # init on iOS / Android. This is the only test that isolates whether
-  # those plugins' native registration is what hangs the Release build
-  # on a real device. Restore both lines once the diagnostic proves
-  # (or rules out) the hypothesis. Stubs in lib/translation/ and
-  # lib/screens/call_screen.dart keep the rest of the code compiling.
-  # livekit_client: 2.7.0
-  # flutter_webrtc: 1.4.0
+  livekit_client: 2.7.0
+  flutter_webrtc: 1.4.0
   web: ^1.1.0
   http: ^1.6.0
   permission_handler: ^12.0.1
