@@ -97,6 +97,9 @@ abstract final class CallLauncher {
             mySourceLang: mySourceLang,
             translation: translation,
             isCaller: true,
+            // Lets the waiting screen close itself the moment the callee
+            // declines, instead of ringing into an empty room.
+            outgoingCallId: ringId,
           ),
         ),
       );

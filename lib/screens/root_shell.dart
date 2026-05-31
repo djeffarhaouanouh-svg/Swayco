@@ -145,6 +145,11 @@ class _RootShellState extends State<RootShell> {
     _ringingDialogOpen = false;
     // Either side of the answer collapses the row so the caller knows.
     await IncomingCallApi.cancel(callId: call.id);
+    // Declined (tapped "Refuser" or the ring auto-dismissed): tell the
+    // caller so their waiting screen closes instead of ringing forever.
+    if (accepted != true) {
+      await IncomingCallApi.broadcastDecline(callId: call.id);
+    }
     if (!mounted) return;
     if (accepted == true) {
       await _joinCallRoom(call);

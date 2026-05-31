@@ -288,6 +288,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Appel entrant…',
     'decline': 'Refuser',
     'accept': 'Accepter',
+    'call_declined': 'Appel refusé',
     // Likes received
     'who_liked_me': "Qui m'a liké",
     'no_one_liked_yet': "Personne ne t'a encore liké",
@@ -653,6 +654,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Incoming call…',
     'decline': 'Decline',
     'accept': 'Accept',
+    'call_declined': 'Call declined',
     'who_liked_me': 'Who liked me',
     'no_one_liked_yet': 'No one has liked you yet',
     'like_explainer':
@@ -976,6 +978,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Llamada entrante…',
     'decline': 'Rechazar',
     'accept': 'Aceptar',
+    'call_declined': 'Llamada rechazada',
     'who_liked_me': 'Quién me dio like',
     'no_one_liked_yet': 'Nadie te ha dado like todavía',
     'like_explainer':
@@ -1165,6 +1168,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Eingehender Anruf…',
     'decline': 'Ablehnen',
     'accept': 'Annehmen',
+    'call_declined': 'Anruf abgelehnt',
     'who_liked_me': 'Wer mich gelikt hat',
     'no_one_liked_yet': 'Noch niemand hat dich gelikt',
     'like_explainer':
@@ -1352,6 +1356,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Chiamata in arrivo…',
     'decline': 'Rifiuta',
     'accept': 'Accetta',
+    'call_declined': 'Chiamata rifiutata',
     'who_liked_me': 'Chi mi ha messo mi piace',
     'no_one_liked_yet': 'Nessuno ti ha ancora messo mi piace',
     'like_explainer':
@@ -1539,6 +1544,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Chamada recebida…',
     'decline': 'Recusar',
     'accept': 'Aceitar',
+    'call_declined': 'Chamada recusada',
     'who_liked_me': 'Quem me curtiu',
     'no_one_liked_yet': 'Ninguém te curtiu ainda',
     'like_explainer':
@@ -1726,6 +1732,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Inkomende oproep…',
     'decline': 'Weigeren',
     'accept': 'Accepteren',
+    'call_declined': 'Oproep geweigerd',
     'who_liked_me': 'Wie heeft mij geliket',
     'no_one_liked_yet': 'Niemand heeft je nog geliket',
     'like_explainer':
@@ -1912,6 +1919,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'مكالمة واردة…',
     'decline': 'رفض',
     'accept': 'قبول',
+    'call_declined': 'تم رفض المكالمة',
     'who_liked_me': 'من أعجب بي',
     'no_one_liked_yet': 'لم يعجب بك أحد بعد',
     'like_explainer':
@@ -2099,6 +2107,7 @@ abstract final class AppStrings {
     'incoming_call_label': 'Входящий звонок…',
     'decline': 'Отклонить',
     'accept': 'Принять',
+    'call_declined': 'Звонок отклонён',
     'who_liked_me': 'Кто мне поставил лайк',
     'no_one_liked_yet': 'Тебя ещё никто не лайкнул',
     'like_explainer':
@@ -2282,6 +2291,7 @@ abstract final class AppStrings {
     'incoming_call_label': '来电…',
     'decline': '拒绝',
     'accept': '接受',
+    'call_declined': '通话被拒绝',
     'who_liked_me': '谁喜欢我',
     'no_one_liked_yet': '还没有人喜欢你',
     'like_explainer':
@@ -2466,6 +2476,7 @@ abstract final class AppStrings {
     'incoming_call_label': '着信中…',
     'decline': '拒否',
     'accept': '応答',
+    'call_declined': '通話が拒否されました',
     'who_liked_me': 'いいねをくれた人',
     'no_one_liked_yet': 'まだ誰もあなたにいいねしていません',
     'like_explainer':
@@ -2650,6 +2661,7 @@ abstract final class AppStrings {
     'incoming_call_label': '수신 전화…',
     'decline': '거절',
     'accept': '수락',
+    'call_declined': '통화가 거절되었습니다',
     'who_liked_me': '나를 좋아한 사람',
     'no_one_liked_yet': '아직 아무도 좋아요를 누르지 않았습니다',
     'like_explainer':

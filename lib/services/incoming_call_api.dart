@@ -201,6 +201,44 @@ abstract final class IncomingCallApi {
   static Future<void> cancel({required String callId}) =>
       endCall(callId: callId);
 
+  /// Callee-side: tell the caller their ring [callId] was declined so the
+  /// caller's waiting screen can close instead of sitting on an empty
+  /// room. Fires a one-off broadcast on a per-call channel. We can't
+  /// reuse the `ended_at` DB stamp for this because the *accept* path
+  /// also stamps it (just before the callee joins LiveKit), so it
+  /// wouldn't distinguish "declined" from "accepted". Best-effort —
+  /// `sendBroadcastMessage` falls back to the REST endpoint when the
+  /// channel isn't joined, so no explicit subscribe is needed here.
+  static Future<void> broadcastDecline({required String callId}) async {
+    if (!isSupabaseReady || callId.isEmpty) return;
+    try {
+      final channel = _c.channel('call-decline:$callId');
+      await channel.sendBroadcastMessage(
+        event: 'declined',
+        payload: const {},
+      );
+      await _c.removeChannel(channel);
+    } catch (e) {
+      debugPrint('IncomingCallApi.broadcastDecline failed: $e');
+    }
+  }
+
+  /// Caller-side counterpart to [broadcastDecline]: subscribe to the
+  /// per-call channel and fire [onDeclined] when the callee declines the
+  /// ring [callId]. Returns the channel so the caller can remove it when
+  /// the call screen tears down.
+  static RealtimeChannel subscribeDecline({
+    required String callId,
+    required void Function() onDeclined,
+  }) {
+    final channel = _c.channel('call-decline:$callId').onBroadcast(
+          event: 'declined',
+          callback: (_) => onDeclined(),
+        );
+    channel.subscribe();
+    return channel;
+  }
+
   /// Subscribe to incoming-call rows for [calleeId]. The returned channel
   /// must be `unsubscribe()`d when the listener tears down (e.g. on sign
   /// out). [onCall] fires for every fresh INSERT.

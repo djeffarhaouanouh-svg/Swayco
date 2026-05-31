@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show RealtimeChannel, Supabase;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +18,7 @@ import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_alert.dart';
+import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/usage_tracker.dart';
@@ -35,6 +38,7 @@ class CallScreen extends StatefulWidget {
     required this.translation,
     this.inviteShareText,
     this.isCaller = false,
+    this.outgoingCallId,
   });
 
   final String wsUrl;
@@ -58,6 +62,12 @@ class CallScreen extends StatefulWidget {
   /// users are always debited regardless of which side they are on, so
   /// this flag only affects paying users.
   final bool isCaller;
+
+  /// Caller-only: the `incoming_calls` row id of the ring we sent. When
+  /// set, the waiting screen listens for the callee declining and closes
+  /// itself instead of ringing into an empty room. Null for the callee
+  /// and for guest/live calls that have no ring row.
+  final String? outgoingCallId;
 
   @override
   State<CallScreen> createState() => _CallScreenState();
@@ -104,6 +114,13 @@ class _CallScreenState extends State<CallScreen> {
   /// the room open) from "peer just left a 1:1 call" (empty +
   /// _hadRemote â†’ auto-hangup so we don't burn credits on a ghost room).
   bool _hadRemote = false;
+
+  /// Caller-only: realtime channel that listens for the callee declining
+  /// our ring so the waiting screen can close. Null for the callee and
+  /// for calls with no ring row. Removed on teardown.
+  RealtimeChannel? _declineChannel;
+  /// Guards [_onDeclinedByCallee] so we pop / snackbar at most once.
+  bool _declinedHandled = false;
 
   /// When the LiveKit room finished connecting â€” null until then. Used
   /// to emit the analytics `call_ended` duration from [dispose] (which
@@ -228,6 +245,28 @@ class _CallScreenState extends State<CallScreen> {
     _start();
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
+    // Caller waiting for pickup: listen for the callee declining so we
+    // can close this screen instead of ringing into an empty room.
+    final callId = widget.outgoingCallId;
+    if (widget.isCaller && callId != null && callId.isNotEmpty) {
+      _declineChannel = IncomingCallApi.subscribeDecline(
+        callId: callId,
+        onDeclined: _onDeclinedByCallee,
+      );
+    }
+  }
+
+  /// The callee declined our ring. As long as they haven't actually
+  /// joined yet ([_hadRemote] still false), stop waiting: silence the
+  /// dial tone, tell the user, and close the call screen.
+  void _onDeclinedByCallee() {
+    if (_declinedHandled || _hadRemote || !mounted) return;
+    _declinedHandled = true;
+    CallAlert.stop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.t('call_declined'))),
+    );
+    unawaited(_hangUp());
   }
 
   /// Pull the user's current credit balance and start the call timer. The
@@ -751,6 +790,11 @@ class _CallScreenState extends State<CallScreen> {
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
+    final declineCh = _declineChannel;
+    _declineChannel = null;
+    if (declineCh != null) {
+      unawaited(Supabase.instance.client.removeChannel(declineCh));
+    }
     // Flush whatever seconds were used since the last tick before tearing
     // everything down. Fire-and-forget â€” disposing a State must be sync.
     unawaited(UsageTracker.stop());
