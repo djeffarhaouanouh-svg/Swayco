@@ -283,8 +283,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     setState(() {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
-      _myLang = profile?.sourceLang.trim() ?? '';
-      _myGender = profile?.gender.trim() ?? '';
+      // Prefer the locally-stored spoken language, but fall back to the
+      // Supabase profile when local prefs are empty — otherwise a
+      // returning user on a freshly-installed app has an empty _myLang,
+      // which makes _maybeFetchTranslation bail out and the translate
+      // toggle silently does nothing (works on web only because the
+      // browser session still holds the onboarding prefs).
+      _myLang = (profile?.sourceLang.trim().isNotEmpty ?? false)
+          ? profile!.sourceLang.trim()
+          : (mine?.language.trim() ?? '');
+      _myGender = (profile?.gender.trim().isNotEmpty ?? false)
+          ? profile!.gender.trim()
+          : (mine?.gender.trim() ?? '');
       _myTier = mine?.subscriptionTier ?? 'free';
       _peer = peer;
       _peerBlocked = blocked;
