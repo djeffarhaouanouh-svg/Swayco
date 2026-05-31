@@ -62,6 +62,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Disable Impeller, Flutter's new GPU renderer (default since
+             3.27). Impeller has known bugs that surface as a fully
+             black screen in Release builds on certain devices (Dart
+             runs, widgets build, no crash — just an empty rendering
+             surface). Falling back to the legacy Skia renderer fixes
+             the issue. Same fix is applied iOS-side via
+             FLTEnableImpeller in Info.plist. See
+             github.com/flutter/flutter/issues/179592 + 161584. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <!-- FCM: white-silhouette notification icon + accent tint, so
              push notifications show the Swayco logo instead of a white
              square (Android renders the small icon as a monochrome mask). -->

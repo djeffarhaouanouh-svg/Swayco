@@ -4,6 +4,17 @@
 	<dict>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
+		<!-- Disable Impeller, Flutter's new GPU renderer enabled by default
+		     from Flutter 3.27+. Impeller has known bugs on iOS 26.x that
+		     make Release apps render a 0×0 surface — Dart runs, widgets
+		     build, but the screen stays pure black with only the iOS
+		     status bar visible (confirmed by Railway pings showing
+		     login-screen-build + first-frame + RenderRepaintBoundary
+		     "Invalid image dimensions"). Falling back to the legacy Skia
+		     renderer fixes the visible black screen. See
+		     github.com/flutter/flutter/issues/179592. -->
+		<key>FLTEnableImpeller</key>
+		<false/>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleLocalizations</key>
