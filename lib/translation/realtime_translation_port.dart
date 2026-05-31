@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:livekit_client/livekit_client.dart';
 
 import 'translation_route.dart';
 
@@ -16,13 +15,14 @@ enum TranslationFeedbackPhase {
 
 /// Abstraction for bidirectional realtime speech translation.
 ///
-/// Next steps (server-side recommended):
-/// - Create ephemeral OpenAI Realtime sessions in `backend` (never ship API keys in Flutter).
-/// - Stream microphone audio to your bridge; receive translated audio or text.
-/// - Optionally mix translated audio or publish via a second LiveKit track / data channel.
+/// DIAGNOSTIC BUILD 6.1.2+8: the `attachToRoom` parameter type was
+/// `livekit_client.Room` — that's the only place the LiveKit Dart
+/// package types leaked into the interface. Switched to `Object?` so
+/// the file no longer imports `package:livekit_client/...`, which keeps
+/// the whole call-path module chain free of LiveKit at boot.
 abstract class RealtimeTranslationPort {
   Future<void> attachToRoom(
-    Room room, {
+    Object? room, {
     required TranslationRoute route,
   });
 
@@ -36,27 +36,26 @@ abstract class RealtimeTranslationPort {
   Widget? buildTranslationAudioOverlay() => null;
 
   /// Shown in-call for immediate feedback (progress, chips).
-  TranslationFeedbackPhase get translationFeedbackPhase => TranslationFeedbackPhase.hidden;
+  TranslationFeedbackPhase get translationFeedbackPhase =>
+      TranslationFeedbackPhase.hidden;
 
   /// LiveKit active speaker list includes a remote participant (for a subtle pulse).
   bool get translationRemoteVoiceHot => false;
 
-  /// True while the translated audio is actually playing back. Lets the
-  /// call screen duck the original remote audio for the exact window the
-  /// translation can be heard.
+  /// True while the translated audio is actually playing back.
   bool get translationSpeaking => false;
 
-  /// Set the playback volume of the translated audio in [0, 1]. No-op when
-  /// the implementation has no translated audio stream of its own.
+  /// Set the playback volume of the translated audio in [0, 1].
   Future<void> setTranslatedAudioVolume(double volume) async {}
 }
 
-/// Default: no processing; keeps call path simple until you add an adapter.
+/// Default: no processing. The diagnostic build wires this up everywhere
+/// the previous `OpenAiRealtimeTranslation` used to be wired.
 class NoOpRealtimeTranslation implements RealtimeTranslationPort {
   const NoOpRealtimeTranslation();
   @override
   Future<void> attachToRoom(
-    Room room, {
+    Object? room, {
     required TranslationRoute route,
   }) async {}
 
@@ -70,7 +69,8 @@ class NoOpRealtimeTranslation implements RealtimeTranslationPort {
   Widget? buildTranslationAudioOverlay() => null;
 
   @override
-  TranslationFeedbackPhase get translationFeedbackPhase => TranslationFeedbackPhase.hidden;
+  TranslationFeedbackPhase get translationFeedbackPhase =>
+      TranslationFeedbackPhase.hidden;
 
   @override
   bool get translationRemoteVoiceHot => false;
