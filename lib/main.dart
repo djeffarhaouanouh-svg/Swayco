@@ -422,18 +422,22 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
   @override
   Widget build(BuildContext context) {
-    // BISECT STEP 2: same red home, but now with SC.material() theme
-    // applied (and still no ValueListenableBuilder, no RepaintBoundary,
-    // no _buildHome tree). If the device shows red, SC.material() is
-    // fine and the bug is in ValueListenableBuilder / RepaintBoundary /
-    // _buildHome. If it shows black, SC.material() itself is the bug
-    // (most likely the GoogleFonts-backed text styles in SCText
-    // initialising lazily and throwing in Release).
-    unawaited(Diag.ping('bisect-build-red-themed'));
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: SC.material(),
-      home: const ColoredBox(color: Color(0xFFFF0000)),
+    return ValueListenableBuilder<String>(
+      valueListenable: AppStrings.currentBcp47,
+      builder: (context, _, _) {
+        return MaterialApp(
+          title: 'Swayco',
+          debugShowCheckedModeBanner: false,
+          theme: SC.material(),
+          // RepaintBoundary so [_captureAndUploadFrame] has something
+          // to call `toImage()` on. Always the outermost wrapper of
+          // home so the captured PNG reflects what the user sees.
+          home: RepaintBoundary(
+            key: _captureKey,
+            child: _buildHome(),
+          ),
+        );
+      },
     );
   }
 
