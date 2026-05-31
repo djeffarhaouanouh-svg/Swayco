@@ -336,6 +336,48 @@ app.get('/diag', (req, res) => {
   res.json({ ok: true });
 });
 
+// POST companion to /diag for payloads that don't fit in a query
+// string — widget tree dumps (multi-kB strings) and pixel captures
+// (base64-encoded PNG bytes from `RepaintBoundary.toImage`). 1 MB
+// JSON limit so a runaway client can't blow up Railway memory.
+app.post('/diag', express.json({ limit: '1mb' }), (req, res) => {
+  try {
+    const ip =
+      req.headers['x-forwarded-for'] ||
+      req.headers['cf-connecting-ip'] ||
+      req.socket?.remoteAddress ||
+      '';
+    const body = req.body || {};
+    const payload = String(body.payload || '');
+    const meta = {
+      step: String(body.step || '').slice(0, 64),
+      session: String(body.session || '').slice(0, 64),
+      seq: String(body.seq || '').slice(0, 8),
+      platform: String(body.platform || '').slice(0, 16),
+      build: String(body.build || '').slice(0, 32),
+      bytes: payload.length,
+      ip: String(ip).split(',')[0].trim(),
+    };
+    // Log the meta line first so a Railway viewer can see the upload
+    // arrived even when the payload is large enough to scroll the
+    // console out of view.
+    console.log(`[diag-post] ${JSON.stringify(meta)}`);
+    // Then the payload itself in 4-kB chunks so Railway's log viewer
+    // doesn't truncate a single line and lose the tail.
+    for (let i = 0; i < payload.length; i += 4000) {
+      console.log(
+        `[diag-payload] ${meta.session} ${meta.step} ${i}: ${payload.slice(
+          i,
+          i + 4000,
+        )}`,
+      );
+    }
+  } catch (_) {
+    // Never let a diagnostic upload take the server down.
+  }
+  res.json({ ok: true });
+});
+
 app.get('/api', (_req, res) => {
   res.json({
     service: 'livekit-translate',

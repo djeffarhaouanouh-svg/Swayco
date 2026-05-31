@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -127,6 +130,15 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// actually navigates to a call. If LiveKit/WebRTC is what's hanging
   /// Release builds on real devices, keeping it dormant lets the login
   /// screen render and confirms the diagnosis by elimination.
+  /// Key on the RepaintBoundary that wraps _buildHome — used by
+  /// [_captureRenderedFrame] to ask the engine for a PNG of exactly the
+  /// pixels Flutter shipped to the platform compositor. If the device
+  /// shows pure black but the captured PNG shows our LoginScreen, the
+  /// bug is downstream of Flutter (something is drawing on top); the
+  /// reverse means Flutter itself rendered black.
+  final GlobalKey _captureKey = GlobalKey();
+  bool _captureDone = false;
+
   OpenAiRealtimeTranslation? _translation;
   OpenAiRealtimeTranslation _getTranslation() {
     final existing = _translation;
@@ -147,9 +159,19 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // (GuestJoinScreen or RootShell).
     _bootstrap();
     // First post-mount ping — if Railway sees this, the Flutter
-    // widget tree did render at least once.
+    // widget tree did render at least once. We then schedule a delayed
+    // capture so the LoginScreen rebuild has time to land.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Diag.ping('first-frame');
+    });
+    // Capture the actual painted pixels + the widget tree dump 1.5s
+    // after mount so any post-bootstrap rebuild (loading → login) has
+    // already happened. Uploaded via POST /diag.
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted || _captureDone) return;
+      _captureDone = true;
+      unawaited(_captureAndUploadFrame());
+      unawaited(_uploadWidgetTreeDump());
     });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
@@ -175,6 +197,59 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // needed" diagnosis.
     _translation?.dispose();
     super.dispose();
+  }
+
+  /// Snapshot the RepaintBoundary that wraps the home widget and POST
+  /// the PNG bytes (base64) to /diag. Tiny pixelRatio because we just
+  /// need to see *something* — a colour and rough layout is enough to
+  /// distinguish "Flutter rendered black" from "Flutter rendered
+  /// LoginScreen and something covered it".
+  Future<void> _captureAndUploadFrame() async {
+    try {
+      final ctx = _captureKey.currentContext;
+      if (ctx == null) {
+        unawaited(Diag.ping('capture-no-context'));
+        return;
+      }
+      final ro = ctx.findRenderObject();
+      if (ro is! RenderRepaintBoundary) {
+        unawaited(Diag.ping('capture-no-boundary'));
+        return;
+      }
+      final image = await ro.toImage(pixelRatio: 0.2);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) {
+        unawaited(Diag.ping('capture-no-bytes'));
+        return;
+      }
+      final bytes = byteData.buffer.asUint8List();
+      final b64 = base64Encode(bytes);
+      unawaited(
+        Diag.ping(
+          'capture-meta',
+          note: 'w=${ro.size.width.toStringAsFixed(0)} '
+              'h=${ro.size.height.toStringAsFixed(0)} '
+              'png_bytes=${bytes.length}',
+        ),
+      );
+      unawaited(Diag.upload('capture-png-b64', b64));
+    } catch (e, s) {
+      Diag.error('capture-fail', e, s);
+    }
+  }
+
+  /// Dump the live widget tree (toStringDeep) and POST it. Lets us see
+  /// from Railway alone whether LoginScreen is genuinely mounted, what
+  /// its layout constraints are, and whether something else is on top.
+  Future<void> _uploadWidgetTreeDump() async {
+    try {
+      final root = WidgetsBinding.instance.rootElement;
+      final dump = root?.toStringDeep() ?? '<no root element>';
+      unawaited(Diag.upload('tree-dump', dump));
+    } catch (e, s) {
+      Diag.error('tree-dump-fail', e, s);
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -329,7 +404,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           title: 'Swayco',
           debugShowCheckedModeBanner: false,
           theme: SC.material(),
-          home: _buildHome(),
+          // RepaintBoundary so [_captureAndUploadFrame] has something
+          // to call `toImage()` on. Always the outermost wrapper of
+          // home so the captured PNG reflects what the user sees.
+          home: RepaintBoundary(
+            key: _captureKey,
+            child: _buildHome(),
+          ),
         );
       },
     );

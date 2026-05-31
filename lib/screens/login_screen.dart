@@ -37,6 +37,21 @@ class _LoginScreenState extends State<LoginScreen> {
       RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(Diag.ping('login-screen-initState'));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(Diag.ping('login-screen-postFrame'));
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    unawaited(Diag.ping('login-screen-didChangeDependencies'));
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
