@@ -1,11 +1,8 @@
-﻿import 'dart:async';
-
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
-import '../services/diag.dart';
 import '../theme/swayco_theme.dart';
 
 /// Welcome screen shown when the user has no Supabase Auth session. Lets them
@@ -35,21 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   static final _emailRegex =
       RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(Diag.ping('login-screen-initState'));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(Diag.ping('login-screen-postFrame'));
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    unawaited(Diag.ping('login-screen-didChangeDependencies'));
-  }
 
   @override
   void dispose() {
@@ -188,7 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    unawaited(Diag.ping('login-screen-build'));
     final isSignUp = _mode == _Mode.signUp;
     return Scaffold(
       backgroundColor: SC.bg,
