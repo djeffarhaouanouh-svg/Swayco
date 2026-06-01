@@ -9,6 +9,7 @@ import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
@@ -1223,48 +1224,59 @@ class _ProfileCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Name + flag on the left, the "Ajouter" button on the
+                        // SAME line (pushed to the right edge).
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Flexible(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  Navigator.of(context).push<void>(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          ProfileScreen(userId: profile.id),
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Flexible(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () {
+                                        Navigator.of(context).push<void>(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => ProfileScreen(
+                                                userId: profile.id),
+                                          ),
+                                        );
+                                      },
+                                      child: Text(
+                                        profile.displayName.isEmpty
+                                            ? '—'
+                                            : profile.displayName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: SCText.h1.copyWith(
+                                          fontSize: 32,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                                     ),
-                                  );
-                                },
-                                child: Text(
-                                  profile.displayName.isEmpty
-                                      ? '—'
-                                      : profile.displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: SCText.h1.copyWith(
-                                    fontSize: 32,
-                                    color: Colors.white,
                                   ),
-                                ),
+                                  if (flag.isNotEmpty) ...[
+                                    const SizedBox(width: 10),
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Text(
+                                        flag,
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                            if (flag.isNotEmpty) ...[
-                              const SizedBox(width: 10),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Text(
-                                  flag,
-                                  style: const TextStyle(fontSize: 22),
-                                ),
-                              ),
-                            ],
+                            const SizedBox(width: 12),
+                            _AddButton(onTap: onAdd, sent: pendingOutgoing),
                           ],
                         ),
                         // Location (ville, pays) — small, just under the name.
                         if (locationLabel.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1289,6 +1301,7 @@ class _ProfileCard extends StatelessWidget {
                             ],
                           ),
                         ],
+                        // Bio under the name line.
                         if (profile.bio.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -1302,8 +1315,18 @@ class _ProfileCard extends StatelessWidget {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 14),
-                        _AddButton(onTap: onAdd, sent: pendingOutgoing),
+                        // Centres d'intérêt — coloured chips under the bio.
+                        if (profile.interests.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final tag in profile.interests.take(6))
+                                _DiscoverInterestChip(label: tag),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1544,6 +1567,33 @@ class _ReactionEmojiButton extends StatelessWidget {
 
 /// "Ajouter" pill — sends a friend-request-style action on tap, then
 /// flips its label to "Envoyé" and stops being tappable. Light haptic
+/// A compact "centre d'intérêt" chip on the Discover card — category-coloured
+/// translucent pill with white text, legible over the photo.
+class _DiscoverInterestChip extends StatelessWidget {
+  const _DiscoverInterestChip({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    final color = interestColor(label);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.85)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 /// on the first press; the label transition cross-fades smoothly.
 /// "Ajouter" pill on the Discover deck. Drives a friend-request
 /// toggle: first tap sends, a tap when already pending cancels.
