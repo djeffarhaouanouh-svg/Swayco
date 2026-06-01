@@ -70,10 +70,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // existing status (pending / accepted) so we don't show "send" twice.
   List<Friendship> _myFriendships = const [];
 
+  // Idle swipe-hint: a bouncing chevron nudges the user to swipe to the
+  // next profile if they linger. Shown after [_swipeHintDelay] of no page
+  // change; reset on every swipe.
+  Timer? _swipeHintTimer;
+  bool _showSwipeHint = false;
+  static const _swipeHintDelay = Duration(seconds: 5);
+
   @override
   void initState() {
     super.initState();
     _bootstrapSearch();
+    _scheduleSwipeHint();
     // Web: periodically refresh friendships + likes so a peer accepting
     // / blocking / liking gets reflected on the Discover cards within
     // ~10s. The feed itself is not re-fetched (it'd reset the swipe
@@ -167,9 +175,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _pageController.dispose();
     _searchDebounce?.cancel();
     _pollTimer?.cancel();
+    _swipeHintTimer?.cancel();
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  /// (Re)arm the idle swipe-hint countdown — called on first load and on
+  /// every page change. Hides any visible hint immediately, then shows a
+  /// fresh one only once the user has sat still for [_swipeHintDelay].
+  void _scheduleSwipeHint() {
+    _swipeHintTimer?.cancel();
+    if (_showSwipeHint && mounted) setState(() => _showSwipeHint = false);
+    _swipeHintTimer = Timer(_swipeHintDelay, () {
+      if (mounted) setState(() => _showSwipeHint = true);
+    });
   }
 
   void _expandSearch() {
@@ -439,6 +459,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    // Nav bar (+ safe-area) reserved at the bottom — used to lift the swipe
+    // hint clear of it.
+    final deckBottom = GlassNavBar.height + safeBottom;
     return Scaffold(
       backgroundColor: SC.bg,
       // Cards extend behind the floating nav bar (rendered by RootShell).
@@ -446,11 +470,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: MeshBackground(
         child: Stack(
           children: [
-            // Cards fill the entire viewport — no padding anywhere.
-            // The header and nav bar float on top; the card itself
-            // pushes its inner content (back button, name, Send,
-            // reactions, heart) past those chrome strips so they
-            // never get hidden.
+            // The photo deck runs full-bleed behind both frosted bars. Because
+            // the photo is continuous behind them, each bar's rounded inner
+            // corner clips the photo with a perfect curve — no mesh gap — and
+            // consecutive full-screen pages slide in flush with no gap.
             Positioned.fill(
               child: _feedLoading
                   ? const Center(
@@ -498,6 +521,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   onAdd: _sendFriendRequest,
                   onOpen: _openSearchResult,
                 ),
+              ),
+            // Idle nudge: if the user lingers on one profile, a bouncing
+            // chevron near the bottom hints there's more to see below
+            // (swipe to the next card). Hidden as soon as they move.
+            if (_showSwipeHint && _profiles.length > 1 && !_searchExpanded)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: deckBottom + 20,
+                child: const IgnorePointer(child: _SwipeHint()),
               ),
           ],
         ),
@@ -552,6 +585,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         // last one. On desktop the parent Listener also rate-limits
         // wheel scrolling above this physics.
         physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
+        // Reset the idle swipe-hint timer every time a new profile lands.
+        onPageChanged: (_) => _scheduleSwipeHint(),
         // Unbounded itemCount + modulo on the index = the feed loops
         // forever: after the last profile the user lands back on the
         // first one (1 → 2 → 3 → 1 → 2 → 3 …).
@@ -563,32 +598,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           // divisor, so this also wraps cleanly when the user swipes
           // backward past the first card.
           final profile = _profiles[i % _profiles.length];
-          // The card stops flush against both bars instead of running
-          // behind them: reserve the frosted top bar (safe-area + its
-          // content) above and the nav bar (+ its safe-area) below, then
-          // fill the gap. The photo touches each bar's edge, no overlap.
-          final media = MediaQuery.paddingOf(ctx);
-          return Padding(
-            padding: EdgeInsets.only(
-              top: media.top + _DiscoverHeader.height,
-              bottom: GlassNavBar.height + media.bottom,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: SizedBox.expand(
-                  child: _ProfileCard(
-                    profile: profile,
-                    onAdd: () => _toggleFriendRequest(profile),
-                    pendingOutgoing:
-                        _statusFor(profile) == FriendshipStatus.pendingOutgoing,
-                    liked: _likedIds.contains(profile.id),
-                    onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                    onSendEmoji: (emoji) =>
-                        _toggleEmojiReaction(profile, emoji),
-                    reactedEmojis:
-                        _myReactionsByPeer[profile.id] ?? const <String>{},
-                  ),
+          // The deck is already inset between the two bars (see build), so
+          // the card just fills its page — that keeps consecutive cards
+          // contiguous, sliding in flush with no gap between them.
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: SizedBox.expand(
+                child: _ProfileCard(
+                  profile: profile,
+                  bottomInset:
+                      GlassNavBar.height + MediaQuery.paddingOf(ctx).bottom,
+                  onAdd: () => _toggleFriendRequest(profile),
+                  pendingOutgoing:
+                      _statusFor(profile) == FriendshipStatus.pendingOutgoing,
+                  liked: _likedIds.contains(profile.id),
+                  onToggleLike: () => _toggleLikeOnProfile(profile.id),
+                  onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
+                  reactedEmojis:
+                      _myReactionsByPeer[profile.id] ?? const <String>{},
                 ),
               ),
             ),
@@ -627,7 +655,10 @@ class _DiscoverHeader extends StatelessWidget {
     // fills up to the screen edge (behind the notch / status bar) while
     // the title + search pill stay below it.
     final topInset = MediaQuery.paddingOf(context).top;
-    return ClipRect(
+    return ClipRRect(
+      // Rounded bottom corners so the bar curves down around the top corners
+      // of the Discover photo, mirroring the nav bar at the bottom.
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
@@ -968,7 +999,13 @@ class _ProfileCard extends StatelessWidget {
     this.onToggleLike,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
+    this.bottomInset = 0,
   });
+
+  /// Space below the card's bottom content row so the name / bio / add
+  /// button / reaction rail clear the full-width nav bar the photo runs
+  /// full-bleed behind.
+  final double bottomInset;
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
@@ -1045,7 +1082,7 @@ class _ProfileCard extends StatelessWidget {
             Positioned(
               left: 22,
               right: 22,
-              bottom: 22,
+              bottom: 22 + bottomInset,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1176,8 +1213,11 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
           ),
         ),
         if (photos.length > 1)
+          // Top-centre, tucked just under the frosted top bar (the photo
+          // runs full-bleed behind it, so offset past the bar + safe-area).
           Positioned(
-            top: 14,
+            top:
+                MediaQuery.paddingOf(context).top + _DiscoverHeader.height + 12,
             left: 0,
             right: 0,
             child: _CarouselDots(count: photos.length, index: _page),
@@ -1217,6 +1257,62 @@ class _CarouselDots extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Idle nudge shown when the user lingers on a profile: a frosted pill with
+/// a chevron that bounces downward, reading as "there's more below — keep
+/// swiping". Fades in on mount; the parent removes it on the next swipe.
+class _SwipeHint extends StatefulWidget {
+  const _SwipeHint();
+
+  @override
+  State<_SwipeHint> createState() => _SwipeHintState();
+}
+
+class _SwipeHintState extends State<_SwipeHint>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+        builder: (_, fade, child) => Opacity(opacity: fade, child: child),
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, child) {
+            final dy = Curves.easeInOut.transform(_ctrl.value) * 7;
+            return Transform.translate(offset: Offset(0, dy), child: child);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            ),
+            child: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

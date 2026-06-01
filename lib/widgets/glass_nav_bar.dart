@@ -68,7 +68,11 @@ class GlassNavBar extends StatelessWidget {
     // while the icons stay above it.
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return ClipRect(
+    return ClipRRect(
+      // Rounded top corners so the bar curves up around the bottom corners
+      // of the Discover photo (and reads as a soft glass shelf on the other
+      // tabs too).
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
