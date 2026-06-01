@@ -2225,15 +2225,15 @@ class _IdentitySection extends StatelessWidget {
           ),
         ],
         // Bio (read-only) — sits between the PDP/name block and the stats,
-        // left-aligned.
+        // centred to match the rest of the identity block.
         if (!emptyBio) ...[
           const SizedBox(height: 14),
           Text(
             bio,
-            textAlign: TextAlign.left,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: SC.textPrimary,
-              fontSize: 14.5,
+              fontSize: 16.5,
               height: 1.4,
             ),
           ),
