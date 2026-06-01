@@ -57,15 +57,14 @@ class GlassNavBar extends StatelessWidget {
         badge: unreadChat,
       ),
       _NavItemData(
-        // Rounded stacked-cards glyph (Discover swipe-deck metaphor).
-        icon: Icons.dynamic_feed_outlined,
-        selectedIcon: Icons.dynamic_feed,
+        // Card-stack glyph (Discover deck metaphor).
+        icon: Icons.style_outlined,
+        selectedIcon: Icons.style,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
-        // "Add person" — the Demandes tab reads as "add friends".
-        icon: Icons.person_add_alt,
-        selectedIcon: Icons.person_add_alt_1,
+        icon: Icons.group_outlined,
+        selectedIcon: Icons.group,
         label: AppStrings.t('nav_demandes'),
         badge: unreadRequests,
       ),
