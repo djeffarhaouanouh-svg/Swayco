@@ -27,8 +27,8 @@ import 'discover_screen.dart';
 import 'friend_requests_screen.dart';
 import 'profile_screen.dart';
 
-/// Floating glass-morphism bottom-nav with a sliding pill that animates
-/// between selected tabs.
+/// Hosts the tab pages and the full-width glass bottom-nav (flush to the
+/// screen bottom) with a sliding pill that animates between selected tabs.
 class RootShell extends StatefulWidget {
   const RootShell({super.key, required this.translation});
 
@@ -47,6 +47,7 @@ class _RootShellState extends State<RootShell> {
   bool _ringingDialogOpen = false;
   Timer? _callPollTimer;
   String _myCalleeId = '';
+
   /// Call ids that have already triggered the modal — keeps the realtime
   /// channel and the polling backup from racing into two dialogs for the
   /// same ring. Cleared lazily; bounded by call rate so it won't blow up.
@@ -188,7 +189,9 @@ class _RootShellState extends State<RootShell> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('cant_join_call', args: {'msg': '$e'}))),
+        SnackBar(
+          content: Text(AppStrings.t('cant_join_call', args: {'msg': '$e'})),
+        ),
       );
     }
   }
@@ -318,8 +321,7 @@ class _RootShellState extends State<RootShell> {
         valueListenable: NavTab.index,
         builder: (context, index, _) => ValueListenableBuilder<int>(
           valueListenable: ChatUnread.count,
-          builder: (context, unread, _) =>
-              ValueListenableBuilder<int>(
+          builder: (context, unread, _) => ValueListenableBuilder<int>(
             valueListenable: FriendRequestUnread.count,
             builder: (context, pending, _) {
               final pages = <Widget>[
@@ -334,17 +336,15 @@ class _RootShellState extends State<RootShell> {
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: 12 + MediaQuery.paddingOf(context).bottom,
-                    child: Center(
-                      child: GlassNavBar(
-                        selected: index,
-                        unreadChat: unread,
-                        unreadRequests: pending,
-                        onSelect: (i) {
-                          NavTab.select(i);
-                          if (i == NavTab.chat) ChatUnread.markAllSeen();
-                        },
-                      ),
+                    bottom: 0,
+                    child: GlassNavBar(
+                      selected: index,
+                      unreadChat: unread,
+                      unreadRequests: pending,
+                      onSelect: (i) {
+                        NavTab.select(i);
+                        if (i == NavTab.chat) ChatUnread.markAllSeen();
+                      },
                     ),
                   ),
                 ],
@@ -435,10 +435,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                   const SizedBox(height: 4),
                   Text(
                     AppStrings.t('incoming_call_label'),
-                    style: const TextStyle(
-                      color: SC.textMuted,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: SC.textMuted, fontSize: 14),
                   ),
                 ],
               ),
@@ -530,6 +527,7 @@ class _TipDialog extends StatelessWidget {
   final String title;
   final String body;
   final String buttonLabel;
+
   /// Optional illustration asset shown in place of the round [icon].
   /// Used by the "add your photo" tip to replace the camera bubble with
   /// a richer drawing while keeping every other tip on the icon layout.

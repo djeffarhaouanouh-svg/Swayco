@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/profile_avatar.dart';
@@ -154,9 +156,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           _likedIds = {..._likedIds}..remove(profileId);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('like_save_failed'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('like_save_failed'))));
     }
   }
 
@@ -194,8 +196,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // finishes resolving.
     setState(() {});
     _searchDebounce?.cancel();
-    _searchDebounce =
-        Timer(const Duration(milliseconds: 250), () => _runSearch(value));
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () => _runSearch(value),
+    );
   }
 
   Future<void> _runSearch(String value) async {
@@ -246,8 +250,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   FriendshipStatus _statusFor(RemoteProfile peer) {
-    final (status, _) =
-        FriendshipApi.statusWith(_myId, peer.id, _myFriendships);
+    final (status, _) = FriendshipApi.statusWith(
+      _myId,
+      peer.id,
+      _myFriendships,
+    );
     return status;
   }
 
@@ -255,15 +262,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// friendship row I created. Optimistic local update so the
   /// "Ajouter" pill flips back instantly; rolls back on error.
   Future<void> _cancelFriendRequest(RemoteProfile peer) async {
-    final (status, friendship) =
-        FriendshipApi.statusWith(_myId, peer.id, _myFriendships);
+    final (status, friendship) = FriendshipApi.statusWith(
+      _myId,
+      peer.id,
+      _myFriendships,
+    );
     if (status != FriendshipStatus.pendingOutgoing || friendship == null) {
       return;
     }
     final previous = _myFriendships;
     setState(() {
-      _myFriendships =
-          _myFriendships.where((f) => f.id != friendship.id).toList();
+      _myFriendships = _myFriendships
+          .where((f) => f.id != friendship.id)
+          .toList();
     });
     try {
       await FriendshipApi.remove(friendship.id);
@@ -290,8 +301,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// Optimistic local update on both branches so the rail button
   /// flips immediately; rolls back to the cached set on failure.
   Future<void> _toggleEmojiReaction(RemoteProfile peer, String emoji) async {
-    final wasReacted =
-        _myReactionsByPeer[peer.id]?.contains(emoji) ?? false;
+    final wasReacted = _myReactionsByPeer[peer.id]?.contains(emoji) ?? false;
     if (wasReacted) {
       await _unsendEmojiReaction(peer, emoji);
     } else {
@@ -322,10 +332,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// Undo a previously-sent reaction. Pulls the emoji out of the local
   /// set, then deletes every matching message I sent so the peer's
   /// thread / Demandes feed loses the entry too.
-  Future<void> _unsendEmojiReaction(
-    RemoteProfile peer,
-    String emoji,
-  ) async {
+  Future<void> _unsendEmojiReaction(RemoteProfile peer, String emoji) async {
     final previous = _myReactionsByPeer;
     final next = Map<String, Set<String>>.from(previous);
     final current = Set<String>.from(next[peer.id] ?? const <String>{});
@@ -359,8 +366,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (_myId.isEmpty || peer.id.isEmpty) return;
     try {
       final local = await UserPrefs.loadProfile();
-      final myProfile =
-          isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
+      final myProfile = isSupabaseReady
+          ? await ProfileApi.fetchById(_myId)
+          : null;
       final myName = (myProfile?.displayName.trim().isNotEmpty == true)
           ? myProfile!.displayName
           : (local?.firstName.trim() ?? '');
@@ -390,9 +398,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// the cards.
   void _showAddedSnack(String text, {bool isError = false}) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // RootShell offsets the nav by 12 + safeBottom; nav height = 54.
+    // The nav is now flush to the bottom: its height + the safe-area inset.
     // Lift the snack ~16 px above that so the two never overlap.
-    final liftFromBottom = 12 + 54 + safeBottom + 16.0;
+    final liftFromBottom = GlassNavBar.height + safeBottom + 16.0;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
@@ -406,9 +414,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: isError
-              ? const Color(0xFF4A1A22)
-              : SC.bubbleIn,
+          backgroundColor: isError ? const Color(0xFF4A1A22) : SC.bubbleIn,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
             side: const BorderSide(color: SC.glassBorder),
@@ -452,10 +458,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     )
                   : _buildStack(),
             ),
-            // Floating header — sits over the cards, padded below the
-            // status bar / notch via the system safe-area inset.
+            // Full-width frosted-glass top bar — mirrors the bottom nav so
+            // the full-bleed photo runs behind both with no empty strip at
+            // the top. The bar bakes in the safe-area inset itself.
             Positioned(
-              top: safeTop,
+              top: 0,
               left: 0,
               right: 0,
               child: _DiscoverHeader(
@@ -536,50 +543,51 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         }
       },
       child: PageView.builder(
-      controller: _pageController,
-      scrollDirection: Axis.vertical,
-      // Snappier than the default page physics — a quick flick lands on
-      // the next card in ~half the usual time. ClampingScrollPhysics as
-      // the parent so we don't get the iOS bouncing overscroll, which
-      // was opening a visible gap above the first card / below the
-      // last one. On desktop the parent Listener also rate-limits
-      // wheel scrolling above this physics.
-      physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
-      // Unbounded itemCount + modulo on the index = the feed loops
-      // forever: after the last profile the user lands back on the
-      // first one (1 → 2 → 3 → 1 → 2 → 3 …).
-      itemBuilder: (ctx, i) {
-        if (_profiles.isEmpty) {
-          return _Empty(onReset: _reset);
-        }
-        // Dart's `%` returns a non-negative result for a positive
-        // divisor, so this also wraps cleanly when the user swipes
-        // backward past the first card.
-        final profile = _profiles[i % _profiles.length];
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: AspectRatio(
-              // Slightly shorter than 3:4 so the card naturally sits
-              // between the floating Discover header at the top and
-              // the floating nav bar at the bottom, without anyone
-              // having to reserve padding around it.
-              aspectRatio: 4 / 5,
-              child: _ProfileCard(
-                profile: profile,
-                onAdd: () => _toggleFriendRequest(profile),
-                pendingOutgoing: _statusFor(profile) ==
-                    FriendshipStatus.pendingOutgoing,
-                liked: _likedIds.contains(profile.id),
-                onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
-                reactedEmojis:
-                    _myReactionsByPeer[profile.id] ?? const <String>{},
+        controller: _pageController,
+        scrollDirection: Axis.vertical,
+        // Snappier than the default page physics — a quick flick lands on
+        // the next card in ~half the usual time. ClampingScrollPhysics as
+        // the parent so we don't get the iOS bouncing overscroll, which
+        // was opening a visible gap above the first card / below the
+        // last one. On desktop the parent Listener also rate-limits
+        // wheel scrolling above this physics.
+        physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
+        // Unbounded itemCount + modulo on the index = the feed loops
+        // forever: after the last profile the user lands back on the
+        // first one (1 → 2 → 3 → 1 → 2 → 3 …).
+        itemBuilder: (ctx, i) {
+          if (_profiles.isEmpty) {
+            return _Empty(onReset: _reset);
+          }
+          // Dart's `%` returns a non-negative result for a positive
+          // divisor, so this also wraps cleanly when the user swipes
+          // backward past the first card.
+          final profile = _profiles[i % _profiles.length];
+          // The photo runs full-bleed — edge to edge, top to bottom — so it
+          // touches both the frosted top bar and the bottom nav with no empty
+          // "hole" left around it. The card's own bottom content is lifted
+          // clear of the nav via [bottomInset].
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: SizedBox.expand(
+                child: _ProfileCard(
+                  profile: profile,
+                  bottomInset:
+                      GlassNavBar.height + MediaQuery.paddingOf(ctx).bottom,
+                  onAdd: () => _toggleFriendRequest(profile),
+                  pendingOutgoing:
+                      _statusFor(profile) == FriendshipStatus.pendingOutgoing,
+                  liked: _likedIds.contains(profile.id),
+                  onToggleLike: () => _toggleLikeOnProfile(profile.id),
+                  onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
+                  reactedEmojis:
+                      _myReactionsByPeer[profile.id] ?? const <String>{},
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
       ),
     );
   }
@@ -604,95 +612,124 @@ class _DiscoverHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Row(
-        children: [
-          Text(
-            AppStrings.t('discover_title'),
-            style: SCText.h1,
-          ),
-          const Spacer(),
-          // Search pill: compact button when collapsed, wider TextField
-          // when expanded — but never full-width.
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            width: expanded ? 200 : null,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: SC.glassStrong,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: SC.glassBorder),
+    // Pad the bar's own top by the system safe-area inset so the glass
+    // fills up to the screen edge (behind the notch / status bar) while
+    // the title + search pill stay below it.
+    final topInset = MediaQuery.paddingOf(context).top;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.30),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.only(top: topInset),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Row(
-              mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
               children: [
-                const Icon(Icons.search,
-                    size: 16, color: SC.textMuted),
-                const SizedBox(width: 6),
-                if (expanded)
-                  Expanded(
-                    // Local TextSelectionTheme so the selection halo /
-                    // handles match the Midnight cyan instead of the
-                    // legacy WhatsApp-green accent inherited from the
-                    // global theme.
-                    child: TextSelectionTheme(
-                      data: TextSelectionThemeData(
-                        cursorColor: SC.accent,
-                        selectionColor: SC.accent.withValues(alpha: 0.35),
-                        selectionHandleColor: SC.accent,
-                      ),
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onChanged: onChanged,
-                        textInputAction: TextInputAction.search,
-                        cursorColor: SC.accent,
-                        style: const TextStyle(
-                          color: SC.textPrimary,
-                          fontSize: 13,
-                        ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: AppStrings.t('search_friend_hint'),
-                          hintStyle: const TextStyle(
-                            color: SC.textMuted,
-                            fontSize: 13,
+                Text(AppStrings.t('discover_title'), style: SCText.h1),
+                const Spacer(),
+                // Search pill: compact button when collapsed, wider TextField
+                // when expanded — but never full-width.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  width: expanded ? 200 : null,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: SC.glassStrong,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: SC.glassBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: expanded
+                        ? MainAxisSize.max
+                        : MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.search, size: 16, color: SC.textMuted),
+                      const SizedBox(width: 6),
+                      if (expanded)
+                        Expanded(
+                          // Local TextSelectionTheme so the selection halo /
+                          // handles match the Midnight cyan instead of the
+                          // legacy WhatsApp-green accent inherited from the
+                          // global theme.
+                          child: TextSelectionTheme(
+                            data: TextSelectionThemeData(
+                              cursorColor: SC.accent,
+                              selectionColor: SC.accent.withValues(alpha: 0.35),
+                              selectionHandleColor: SC.accent,
+                            ),
+                            child: TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              onChanged: onChanged,
+                              textInputAction: TextInputAction.search,
+                              cursorColor: SC.accent,
+                              style: const TextStyle(
+                                color: SC.textPrimary,
+                                fontSize: 13,
+                              ),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                hintText: AppStrings.t('search_friend_hint'),
+                                hintStyle: const TextStyle(
+                                  color: SC.textMuted,
+                                  fontSize: 13,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
                           ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
+                        )
+                      else
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onTapPill,
+                          child: Text(
+                            AppStrings.t('search_chercher'),
+                            style: const TextStyle(
+                              color: SC.textMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  )
-                else
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onTapPill,
-                    child: Text(
-                      AppStrings.t('search_chercher'),
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                      if (expanded)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onSubmittedClose,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: SC.textMuted,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                if (expanded)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onSubmittedClose,
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.close,
-                          size: 16, color: SC.textMuted),
-                    ),
-                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -734,8 +771,7 @@ class _SearchResultsPanel extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Text(
           AppStrings.t('search_intro_hint'),
-          style: const TextStyle(
-              color: SC.textMuted, fontSize: 13),
+          style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
       );
     }
@@ -747,7 +783,9 @@ class _SearchResultsPanel extends StatelessWidget {
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-                color: SC.accent, strokeWidth: 2.4),
+              color: SC.accent,
+              strokeWidth: 2.4,
+            ),
           ),
         ),
       );
@@ -757,8 +795,7 @@ class _SearchResultsPanel extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Text(
           'Aucun profil pour « $query ».',
-          style: const TextStyle(
-              color: SC.textMuted, fontSize: 13),
+          style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
       );
     }
@@ -766,10 +803,8 @@ class _SearchResultsPanel extends StatelessWidget {
       shrinkWrap: true,
       padding: const EdgeInsets.symmetric(vertical: 6),
       itemCount: results.length,
-      separatorBuilder: (_, _) => Divider(
-        color: Colors.white.withValues(alpha: 0.06),
-        height: 1,
-      ),
+      separatorBuilder: (_, _) =>
+          Divider(color: Colors.white.withValues(alpha: 0.06), height: 1),
       itemBuilder: (_, i) {
         final p = results[i];
         return _SearchResultRow(
@@ -827,10 +862,7 @@ class _SearchResultRow extends StatelessWidget {
                   if (profile.handle.isNotEmpty)
                     Text(
                       '@${profile.handle}',
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 12,
-                      ),
+                      style: const TextStyle(color: SC.textMuted, fontSize: 12),
                     ),
                 ],
               ),
@@ -846,15 +878,19 @@ class _SearchResultRow extends StatelessWidget {
     switch (status) {
       case FriendshipStatus.accepted:
         return _StatusPill(
-            label: AppStrings.t('friendship_friend'),
-            color: SC.accent);
+          label: AppStrings.t('friendship_friend'),
+          color: SC.accent,
+        );
       case FriendshipStatus.pendingOutgoing:
         return _StatusPill(
-            label: AppStrings.t('friendship_sent'), color: Colors.amber);
+          label: AppStrings.t('friendship_sent'),
+          color: Colors.amber,
+        );
       case FriendshipStatus.pendingIncoming:
         return _StatusPill(
-            label: AppStrings.t('friendship_pending_in'),
-            color: Colors.amber);
+          label: AppStrings.t('friendship_pending_in'),
+          color: Colors.amber,
+        );
       case FriendshipStatus.rejected:
       case FriendshipStatus.none:
         return Material(
@@ -864,8 +900,7 @@ class _SearchResultRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             onTap: onAdd,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               child: Text(
                 // Reuses the search-result "Ajouter" button label —
                 // localised via the friendship_sent / etc. keys' sibling.
@@ -899,7 +934,10 @@ class _StatusPill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-            color: color, fontSize: 12, fontWeight: FontWeight.w600),
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -914,21 +952,31 @@ class _ProfileCard extends StatelessWidget {
     this.onToggleLike,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
+    this.bottomInset = 0,
   });
+
+  /// Extra space below the card's bottom content row so the name / bio /
+  /// add button / reaction rail clear the full-width nav bar the photo
+  /// now runs full-bleed behind.
+  final double bottomInset;
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
+
   /// True when I already have a pending outgoing friend request to
   /// [profile]. Drives the "Ajouter" pill into its "Envoyé" state;
   /// re-tapping then cancels the request via [onAdd].
   final bool pendingOutgoing;
   final bool liked;
+
   /// When non-null, a heart button is rendered to the right of "Envoyer 👋".
   /// Tap toggles liked state.
   final VoidCallback? onToggleLike;
+
   /// Fires with the emoji string when one of the reaction-rail buttons
   /// is tapped — sends that emoji as a chat message to [profile].
   final ValueChanged<String>? onSendEmoji;
+
   /// Emojis I've already sent to [profile] — each matching button on
   /// the rail renders pre-filled.
   final Set<String> reactedEmojis;
@@ -952,124 +1000,122 @@ class _ProfileCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const ColoredBox(color: SC.bubbleIn),
-          if (photoUrl.isNotEmpty)
-            Image.network(
-              photoUrl,
-              fit: BoxFit.cover,
-              // Centre crop — keeps the face roughly in the middle of the
-              // card whether the source is portrait, square, or landscape.
-              alignment: Alignment.center,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.10),
-                    Colors.black.withValues(alpha: 0.85),
-                  ],
-                  stops: const [0.45, 0.65, 1.0],
+        borderRadius: BorderRadius.circular(30),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: SC.bubbleIn),
+            if (photoUrl.isNotEmpty)
+              Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                // Centre crop — keeps the face roughly in the middle of the
+                // card whether the source is portrait, square, or landscape.
+                alignment: Alignment.center,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.10),
+                      Colors.black.withValues(alpha: 0.85),
+                    ],
+                    stops: const [0.45, 0.65, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: 22,
-            right: 22,
-            bottom: 22,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Left side: name + flag + bio + send button stacked vertically.
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Flexible(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                Navigator.of(context).push<void>(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        ProfileScreen(userId: profile.id),
+            Positioned(
+              left: 22,
+              right: 22,
+              bottom: 22 + bottomInset,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Left side: name + flag + bio + send button stacked vertically.
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Flexible(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  Navigator.of(context).push<void>(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          ProfileScreen(userId: profile.id),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  profile.displayName.isEmpty
+                                      ? '—'
+                                      : profile.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SCText.h1.copyWith(
+                                    fontSize: 32,
+                                    color: Colors.white,
                                   ),
-                                );
-                              },
-                              child: Text(
-                                profile.displayName.isEmpty
-                                    ? '—'
-                                    : profile.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: SCText.h1.copyWith(
-                                  fontSize: 32,
-                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                          ),
-                          if (flag.isNotEmpty) ...[
-                            const SizedBox(width: 10),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Text(flag,
-                                  style: const TextStyle(fontSize: 22)),
-                            ),
+                            if (flag.isNotEmpty) ...[
+                              const SizedBox(width: 10),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  flag,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      if (profile.bio.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          profile.bio,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 14,
-                            height: 1.35,
-                          ),
                         ),
+                        if (profile.bio.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            profile.bio,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 14,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        _AddButton(onTap: onAdd, sent: pendingOutgoing),
                       ],
-                      const SizedBox(height: 14),
-                      _AddButton(
-                        onTap: onAdd,
-                        sent: pendingOutgoing,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                // Right rail: 4 random reaction emojis (ghosted until tapped)
-                // stacked above the heart. Skipped together with the heart
-                // for background-deck instances where interaction is off.
-                if (onToggleLike != null) ...[
-                  const SizedBox(width: 12),
-                  _ReactionRail(
-                    heart: _LikeHeart(
-                        liked: liked, onTap: onToggleLike!),
-                    onSendEmoji: onSendEmoji,
-                    reactedEmojis: reactedEmojis,
-                  ),
+                  // Right rail: 4 random reaction emojis (ghosted until tapped)
+                  // stacked above the heart. Skipped together with the heart
+                  // for background-deck instances where interaction is off.
+                  if (onToggleLike != null) ...[
+                    const SizedBox(width: 12),
+                    _ReactionRail(
+                      heart: _LikeHeart(liked: liked, onTap: onToggleLike!),
+                      onSendEmoji: onSendEmoji,
+                      reactedEmojis: reactedEmojis,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1088,7 +1134,8 @@ class _LikeHeart extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        width: 48, height: 48,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
           color: liked
               ? red.withValues(alpha: 0.18)
@@ -1120,10 +1167,12 @@ class _ReactionRail extends StatelessWidget {
   });
 
   final Widget heart;
+
   /// Fires with the tapped emoji string — handed to each
   /// [_ReactionEmojiButton]. Wired by the parent card to drop the emoji
   /// into the peer's DM thread, same behaviour as the legacy 👋 Coucou.
   final ValueChanged<String>? onSendEmoji;
+
   /// Emojis the local user has already sent to this peer — each
   /// matching button renders pre-filled so the rail survives refreshes.
   final Set<String> reactedEmojis;
@@ -1167,9 +1216,11 @@ class _ReactionEmojiButton extends StatelessWidget {
   });
 
   final String emoji;
+
   /// True when the local user has already sent this emoji to the peer.
   /// Drives the filled / unfilled visuals; no local state.
   final bool reacted;
+
   /// Fires when the user taps the button. The rail wires this to a
   /// toggle on the parent — first tap drops the emoji into the peer's
   /// DM thread, a second tap deletes it. Visuals are driven by
@@ -1196,8 +1247,9 @@ class _ReactionEmojiButton extends StatelessWidget {
                   if (!reacted) {
                     final box = ctx.findRenderObject() as RenderBox?;
                     if (box != null && box.hasSize) {
-                      final pos =
-                          box.localToGlobal(box.size.center(Offset.zero));
+                      final pos = box.localToGlobal(
+                        box.size.center(Offset.zero),
+                      );
                       EmojiBurst.show(ctx, position: pos, emoji: emoji);
                     }
                   }
@@ -1213,8 +1265,7 @@ class _ReactionEmojiButton extends StatelessWidget {
                   : Colors.black.withValues(alpha: 0.35),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white
-                    .withValues(alpha: reacted ? 0.85 : 0.20),
+                color: Colors.white.withValues(alpha: reacted ? 0.85 : 0.20),
                 width: reacted ? 2 : 1,
               ),
             ),
@@ -1263,6 +1314,7 @@ class _ReactionEmojiButton extends StatelessWidget {
 class _AddButton extends StatelessWidget {
   const _AddButton({required this.onTap, required this.sent});
   final VoidCallback onTap;
+
   /// True when I have a pending outgoing friend request to this peer
   /// — flips the label to "Envoyé" and still fires [onTap] on press
   /// so the parent can cancel the demande.
@@ -1318,15 +1370,17 @@ class _SnappyPagePhysics extends PageScrollPhysics {
 
   @override
   SpringDescription get spring => const SpringDescription(
-        mass: 0.5,
-        stiffness: 220,
-        // 2 · √(0.5 · 220) ≈ 21 → critically damped, no overshoot.
-        damping: 22,
-      );
+    mass: 0.5,
+    stiffness: 220,
+    // 2 · √(0.5 · 220) ≈ 21 → critically damped, no overshoot.
+    damping: 22,
+  );
 
   @override
   Simulation? createBallisticSimulation(
-      ScrollMetrics position, double velocity) {
+    ScrollMetrics position,
+    double velocity,
+  ) {
     // Cap the launch velocity passed to the snap spring so a hard
     // flick can't carry the offset visually past the next page
     // before the spring pulls it back. PageScrollPhysics already
@@ -1355,8 +1409,11 @@ class _Empty extends StatelessWidget {
                 color: SC.bubbleIn,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.favorite_border,
-                  color: SC.textMuted, size: 34),
+              child: const Icon(
+                Icons.favorite_border,
+                color: SC.textMuted,
+                size: 34,
+              ),
             ),
             const SizedBox(height: 18),
             Text(

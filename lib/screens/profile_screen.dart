@@ -63,7 +63,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
+class _ProfileScreenState extends State<ProfileScreen>
+    with WidgetsBindingObserver {
   String _deviceId = '';
   RemoteProfile? _remote;
   ProfileSnapshot? _local;
@@ -86,6 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   Timer? _pollTimer;
 
   bool get _isViewingOther => widget.userId != null;
+
   /// True when previewing my own profile (read-only, but it's still "me").
   bool get _isPreview => widget.preview;
   String get _targetId => widget.userId ?? _deviceId;
@@ -128,8 +130,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     // Local prefs only matter for my own profile (offline fallback). When
     // viewing someone else there's no local cache to consult.
     final local = _isViewingOther ? null : await UserPrefs.loadProfile();
-    final remote =
-        isSupabaseReady ? await ProfileApi.fetchById(targetId) : null;
+    final remote = isSupabaseReady
+        ? await ProfileApi.fetchById(targetId)
+        : null;
     final counts = isSupabaseReady
         ? await FriendshipApi.countsFor(targetId)
         : const FriendshipCounts(followers: 0, following: 0);
@@ -218,8 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         wasBlocked ? 'unblock_peer_q' : 'block_peer_q',
         args: {'name': name},
       ),
-      body: AppStrings.t(
-          wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
+      body: AppStrings.t(wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
       confirmLabel: AppStrings.t(wasBlocked ? 'unblock' : 'block'),
       destructive: !wasBlocked,
     );
@@ -234,8 +236,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       setState(() => _peerBlocked = !wasBlocked);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
@@ -253,8 +256,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     } catch (e) {
       if (!mounted) return;
       setState(() => _iFollowPeer = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
@@ -271,8 +275,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     } catch (e) {
       if (!mounted) return;
       setState(() => _iRequestedPeer = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
@@ -300,8 +305,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     } catch (e) {
       if (!mounted) return;
       setState(() => _iFollowPeer = true);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
@@ -331,10 +337,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     final targetId = _isViewingOther ? widget.userId : null;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => FriendsListScreen(
-          direction: direction,
-          userId: targetId,
-        ),
+        builder: (_) =>
+            FriendsListScreen(direction: direction, userId: targetId),
       ),
     );
     // Counts may have changed (follow-back).
@@ -388,16 +392,16 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   Future<void> _pickAndAddPhoto() async {
     if (_deviceId.isEmpty) return;
     if (!isSupabaseReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Supabase non configuré.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Supabase non configuré.')));
       return;
     }
     final current = _remote?.photos ?? const <String>[];
     if (current.length >= profilePhotosMax) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('photos_full'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('photos_full'))));
       return;
     }
     final picker = ImagePicker();
@@ -455,9 +459,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       await _reload();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Suppression échouée : $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Suppression échouée : $e')));
     }
   }
 
@@ -478,9 +482,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     final saved = await ProfileApi.updateMyBio(userId: _deviceId, bio: bio);
     if (saved == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sauvegarde échouée.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
       return;
     }
     if (!mounted || _remote == null) return;
@@ -489,13 +493,15 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
 
   Future<void> _saveEmojis(List<String> emojis) async {
     if (_deviceId.isEmpty) return;
-    final saved =
-        await ProfileApi.updateMyEmojis(userId: _deviceId, emojis: emojis);
+    final saved = await ProfileApi.updateMyEmojis(
+      userId: _deviceId,
+      emojis: emojis,
+    );
     if (saved == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sauvegarde échouée.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
       return;
     }
     if (!mounted || _remote == null) return;
@@ -573,226 +579,231 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 _isPreview
                     ? AppStrings.t('profile_preview')
                     : (_displayName.isEmpty
-                        ? AppStrings.t('profile_default_title')
-                        : _displayName),
+                          ? AppStrings.t('profile_default_title')
+                          : _displayName),
                 style: SCText.h3,
               ),
               actions: [
                 // No report / block menu when previewing my own profile.
                 if (!_isPreview)
-                PopupMenuButton<String>(
-                  tooltip: AppStrings.t('tooltip_more'),
-                  icon: const Icon(Icons.more_vert),
-                  color: SC.bubbleIn,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: SC.glassBorder),
+                  PopupMenuButton<String>(
+                    tooltip: AppStrings.t('tooltip_more'),
+                    icon: const Icon(Icons.more_vert),
+                    color: SC.bubbleIn,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: SC.glassBorder),
+                    ),
+                    onSelected: (v) {
+                      if (v == 'report') _reportPeer();
+                      if (v == 'block') _toggleBlock();
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem<String>(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.flag_outlined,
+                              size: 18,
+                              color: Color(0xFFE53935),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              AppStrings.t('report'),
+                              style: const TextStyle(color: Color(0xFFE53935)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'block',
+                        child: Row(
+                          children: [
+                            Icon(
+                              _peerBlocked ? Icons.lock_open : Icons.block,
+                              size: 18,
+                              color: const Color(0xFFE53935),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              AppStrings.t(_peerBlocked ? 'unblock' : 'block'),
+                              style: const TextStyle(color: Color(0xFFE53935)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  onSelected: (v) {
-                    if (v == 'report') _reportPeer();
-                    if (v == 'block') _toggleBlock();
-                  },
-                  itemBuilder: (ctx) => [
-                    PopupMenuItem<String>(
-                      value: 'report',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.flag_outlined,
-                              size: 18, color: Color(0xFFE53935)),
-                          const SizedBox(width: 10),
-                          Text(
-                            AppStrings.t('report'),
-                            style: const TextStyle(
-                                color: Color(0xFFE53935)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          Icon(
-                            _peerBlocked ? Icons.lock_open : Icons.block,
-                            size: 18,
-                            color: const Color(0xFFE53935),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            AppStrings.t(_peerBlocked ? 'unblock' : 'block'),
-                            style: const TextStyle(
-                                color: Color(0xFFE53935)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ],
             )
           : null,
       body: ColoredBox(
         color: const Color(0xFF0E0E0E),
         child: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: RefreshIndicator(
-        color: SC.accent,
-        backgroundColor: SC.bubbleIn,
-        onRefresh: _reload,
-        child: _loading
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  const SizedBox(height: 120),
-                  Center(
-                    child: Column(
-                      children: [
-                        const CircularProgressIndicator(color: SC.accent),
-                        const SizedBox(height: 12),
-                        Text(
-                          AppStrings.t('profile_loading'),
-                          style: const TextStyle(color: SC.textMuted),
+          children: [
+            SafeArea(
+              bottom: false,
+              child: RefreshIndicator(
+                color: SC.accent,
+                backgroundColor: SC.bubbleIn,
+                onRefresh: _reload,
+                child: _loading
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 120),
+                          Center(
+                            child: Column(
+                              children: [
+                                const CircularProgressIndicator(
+                                  color: SC.accent,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  AppStrings.t('profile_loading'),
+                                  style: const TextStyle(color: SC.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        // Reserve room for the floating bottom nav (height 54 + 12 gap)
+                        // plus the device's bottom safe-area inset, otherwise the last
+                        // card gets occluded.
+                        // Horizontal gutter matches the chat / discover headers so
+                        // the avatar and bio don't run into the screen edge.
+                        padding: EdgeInsets.fromLTRB(
+                          // Bump the top gutter so the avatar sits lower —
+                          // was 20, felt cramped against the safe area on
+                          // larger viewports.
+                          28,
+                          56,
+                          28,
+                          32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                // Reserve room for the floating bottom nav (height 54 + 12 gap)
-                // plus the device's bottom safe-area inset, otherwise the last
-                // card gets occluded.
-                // Horizontal gutter matches the chat / discover headers so
-                // the avatar and bio don't run into the screen edge.
-                padding: EdgeInsets.fromLTRB(
-                  // Bump the top gutter so the avatar sits lower —
-                  // was 20, felt cramped against the safe area on
-                  // larger viewports.
-                  28, 56, 28,
-                  32 + 64 + MediaQuery.paddingOf(context).bottom,
-                ),
-                children: [
-                  _IdentitySection(
-                    displayName: _displayName.isEmpty
-                        ? AppStrings.t('profile_anonymous')
-                        : _displayName,
-                    handle: _handle,
-                    online: _peerOnline,
-                    bio: _remote?.bio ?? '',
-                    emojis: _remote?.emojis ?? const [],
-                    photos: _remote?.photos ?? const [],
-                    counts: _counts,
-                    likesCount: _likesCount,
-                    viewerMode: _isViewingOther,
-                    preview: _isPreview,
-                    peerFollowsMe: _peerFollowsMe,
-                    iFollowPeer: _iFollowPeer,
-                    iRequestedPeer: _iRequestedPeer,
-                    iLikePeer: _iLikePeer,
-                    onEditBio: _saveBio,
-                    onEditEmojis: _saveEmojis,
-                    onTapFollowers: () => _openFriendsList(FriendDirection.followers),
-                    onTapFollowing: () => _openFriendsList(FriendDirection.following),
-                    onTapLikes: _openLikesReceived,
-                    onPickPhoto: _pickAndAddPhoto,
-                    onRemovePhoto: _removePhoto,
-                    onPreview: _openPreview,
-                    onEdit: _openEditor,
-                    onSettings: _openSettings,
-                    onFollowBack: _followBack,
-                    onAddPeer: _addPeer,
-                    onUnfollow: _unfollowPeer,
-                    onTogglePeerLike: _togglePeerLike,
-                    onMessagePeer: _openChatWithPeer,
-                  ),
-                  const SizedBox(height: 20),
-                  // "Invite a friend to Swayco" — own profile only, sits
-                  // between the identity block and the language card.
-                  if (!_isViewingOther) ...[
-                    _InviteFriendCard(onTap: _shareInvite),
-                    const SizedBox(height: 16),
-                  ],
-                  _LanguageCard(
-                    language: lang,
-                    showCallWarning: !_isViewingOther,
-                  ),
-                  if (!_isViewingOther) ...[
-                    const SizedBox(height: 16),
-                    _CreditsCard(profile: _remote),
-                    const SizedBox(height: 16),
-                    // Voice-clone card. Shown to ALL tiers when viewing
-                    // your own profile — Ultra users get the recording
-                    // flow, everyone else gets a locked state that
-                    // points at the Ultra checkout. The visible "🔒
-                    // Réservé Ultra" hint is a deliberate upsell hook;
-                    // hiding the feature for non-Ultra would forfeit
-                    // the conversion event.
-                    // TEMPORARILY HIDDEN — "Clone my voice" card removed from
-                    // the UI on request. The widget and all supporting code
-                    // (_VoiceCloneCard, enrollClonedVoice, etc.) are left
-                    // intact so this block can simply be uncommented to
-                    // restore the feature.
-                    // if (!_isViewingOther) ...[
-                    //   _VoiceCloneCard(
-                    //     isUltra: _remote?.isUltra == true,
-                    //     alreadyEnrolled: _remote?.hasClonedVoice == true,
-                    //     onEnrolled: () {
-                    //       // Refresh the remote profile so the badge
-                    //       // flips to "Voix clonée" without a manual
-                    //       // pull-to-refresh.
-                    //       unawaited(_reload(silent: true));
-                    //     },
-                    //   ),
-                    //   const SizedBox(height: 16),
-                    // ],
-                    _MySubscriptionSection(
-                      currentTier: _remote?.subscriptionTier ?? 'free',
-                    ),
-                  ],
-                ],
+                        children: [
+                          _IdentitySection(
+                            displayName: _displayName.isEmpty
+                                ? AppStrings.t('profile_anonymous')
+                                : _displayName,
+                            handle: _handle,
+                            online: _peerOnline,
+                            bio: _remote?.bio ?? '',
+                            emojis: _remote?.emojis ?? const [],
+                            photos: _remote?.photos ?? const [],
+                            counts: _counts,
+                            likesCount: _likesCount,
+                            viewerMode: _isViewingOther,
+                            preview: _isPreview,
+                            peerFollowsMe: _peerFollowsMe,
+                            iFollowPeer: _iFollowPeer,
+                            iRequestedPeer: _iRequestedPeer,
+                            iLikePeer: _iLikePeer,
+                            onEditBio: _saveBio,
+                            onEditEmojis: _saveEmojis,
+                            onTapFollowers: () =>
+                                _openFriendsList(FriendDirection.followers),
+                            onTapFollowing: () =>
+                                _openFriendsList(FriendDirection.following),
+                            onTapLikes: _openLikesReceived,
+                            onPickPhoto: _pickAndAddPhoto,
+                            onRemovePhoto: _removePhoto,
+                            onPreview: _openPreview,
+                            onEdit: _openEditor,
+                            onSettings: _openSettings,
+                            onFollowBack: _followBack,
+                            onAddPeer: _addPeer,
+                            onUnfollow: _unfollowPeer,
+                            onTogglePeerLike: _togglePeerLike,
+                            onMessagePeer: _openChatWithPeer,
+                          ),
+                          const SizedBox(height: 20),
+                          // "Invite a friend to Swayco" — own profile only, sits
+                          // between the identity block and the language card.
+                          if (!_isViewingOther) ...[
+                            _InviteFriendCard(onTap: _shareInvite),
+                            const SizedBox(height: 16),
+                          ],
+                          _LanguageCard(
+                            language: lang,
+                            showCallWarning: !_isViewingOther,
+                          ),
+                          if (!_isViewingOther) ...[
+                            const SizedBox(height: 16),
+                            _CreditsCard(profile: _remote),
+                            const SizedBox(height: 16),
+                            // Voice-clone card. Shown to ALL tiers when viewing
+                            // your own profile — Ultra users get the recording
+                            // flow, everyone else gets a locked state that
+                            // points at the Ultra checkout. The visible "🔒
+                            // Réservé Ultra" hint is a deliberate upsell hook;
+                            // hiding the feature for non-Ultra would forfeit
+                            // the conversion event.
+                            // TEMPORARILY HIDDEN — "Clone my voice" card removed from
+                            // the UI on request. The widget and all supporting code
+                            // (_VoiceCloneCard, enrollClonedVoice, etc.) are left
+                            // intact so this block can simply be uncommented to
+                            // restore the feature.
+                            // if (!_isViewingOther) ...[
+                            //   _VoiceCloneCard(
+                            //     isUltra: _remote?.isUltra == true,
+                            //     alreadyEnrolled: _remote?.hasClonedVoice == true,
+                            //     onEnrolled: () {
+                            //       // Refresh the remote profile so the badge
+                            //       // flips to "Voix clonée" without a manual
+                            //       // pull-to-refresh.
+                            //       unawaited(_reload(silent: true));
+                            //     },
+                            //   ),
+                            //   const SizedBox(height: 16),
+                            // ],
+                            _MySubscriptionSection(
+                              currentTier: _remote?.subscriptionTier ?? 'free',
+                            ),
+                          ],
+                        ],
+                      ),
               ),
-        ),
-          ),
-          // When viewing someone else's profile this screen is a route
-          // pushed on top of [RootShell], so the shell's floating nav bar
-          // is hidden. Re-render it here and route taps back to the shell.
-          if (_isViewingOther)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 12 + MediaQuery.paddingOf(context).bottom,
-              child: Center(
+            ),
+            // When viewing someone else's profile this screen is a route
+            // pushed on top of [RootShell], so the shell's floating nav bar
+            // is hidden. Re-render it here and route taps back to the shell.
+            if (_isViewingOther)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: ValueListenableBuilder<int>(
                   valueListenable: NavTab.index,
-                  builder: (context, navIndex, _) =>
-                      ValueListenableBuilder<int>(
+                  builder: (context, navIndex, _) => ValueListenableBuilder<int>(
                     valueListenable: ChatUnread.count,
                     builder: (context, unread, _) =>
                         ValueListenableBuilder<int>(
-                      valueListenable: FriendRequestUnread.count,
-                      builder: (context, pending, _) => GlassNavBar(
-                        selected: navIndex,
-                        unreadChat: unread,
-                        unreadRequests: pending,
-                        onSelect: (i) {
-                          NavTab.select(i);
-                          if (i == NavTab.chat) ChatUnread.markAllSeen();
-                          // Pop every pushed route so the shell — now on
-                          // tab [i] — is visible underneath.
-                          Navigator.of(context)
-                              .popUntil((route) => route.isFirst);
-                        },
-                      ),
-                    ),
+                          valueListenable: FriendRequestUnread.count,
+                          builder: (context, pending, _) => GlassNavBar(
+                            selected: navIndex,
+                            unreadChat: unread,
+                            unreadRequests: pending,
+                            onSelect: (i) {
+                              NavTab.select(i);
+                              if (i == NavTab.chat) ChatUnread.markAllSeen();
+                              // Pop every pushed route so the shell — now on
+                              // tab [i] — is visible underneath.
+                              Navigator.of(
+                                context,
+                              ).popUntil((route) => route.isFirst);
+                            },
+                          ),
+                        ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -881,9 +892,7 @@ class _CreditsCard extends StatelessWidget {
         border: Border.all(
           color: lowCredits
               ? const Color(0xFFFFA726)
-              : (isPaid
-                  ? SC.accent.withValues(alpha: 0.45)
-                  : SC.glassBorder),
+              : (isPaid ? SC.accent.withValues(alpha: 0.45) : SC.glassBorder),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -913,7 +922,9 @@ class _CreditsCard extends StatelessWidget {
               if (tierLabel.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: SC.accent,
                     borderRadius: BorderRadius.circular(10),
@@ -986,8 +997,7 @@ class _MySubscriptionSection extends StatefulWidget {
   final String currentTier;
 
   @override
-  State<_MySubscriptionSection> createState() =>
-      _MySubscriptionSectionState();
+  State<_MySubscriptionSection> createState() => _MySubscriptionSectionState();
 }
 
 class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
@@ -1019,8 +1029,10 @@ class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
               borderRadius: BorderRadius.circular(12),
               onTap: () => setState(() => _expanded = !_expanded),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
                 child: Row(
                   children: [
                     const Icon(
@@ -1158,8 +1170,8 @@ class _PlansSectionState extends State<_PlansSection> {
     final defaultSelected = upgrades.last;
     final effectiveSelected =
         (_selected != null && upgrades.contains(_selected!))
-            ? _selected!
-            : defaultSelected;
+        ? _selected!
+        : defaultSelected;
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
@@ -1277,17 +1289,13 @@ class _PlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = featured
-        ? SC.accent
-        : const Color(0xFF2A3942);
+    final borderColor = featured ? SC.accent : const Color(0xFF2A3942);
     // GestureDetector around the whole body so users can claim the
     // accent border by tapping anywhere on the card. The Souscrire
     // FilledButton has its own gesture arena and still wins on its
     // own bounds, so this doesn't steal checkout taps.
     Widget wrap(Widget child) => MouseRegion(
-      cursor: onTap == null
-          ? MouseCursor.defer
-          : SystemMouseCursors.click,
+      cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -1318,9 +1326,7 @@ class _PlanCard extends StatelessWidget {
               Text(
                 price,
                 style: TextStyle(
-                  color: featured
-                      ? SC.accent
-                      : SC.textPrimary,
+                  color: featured ? SC.accent : SC.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1348,9 +1354,7 @@ class _PlanCard extends StatelessWidget {
                     child: Icon(
                       Icons.check_circle,
                       size: 16,
-                      color: featured
-                          ? SC.accent
-                          : SC.textMuted,
+                      color: featured ? SC.accent : SC.textMuted,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1391,8 +1395,7 @@ class _PlanCard extends StatelessWidget {
           top: -12,
           right: 14,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               // Warm amber pops against the cyan / navy palette of the
               // card body, so the badge reads at a glance instead of
@@ -1633,6 +1636,7 @@ class _ManageOnWebCard extends StatelessWidget {
 class _LanguageCard extends StatelessWidget {
   const _LanguageCard({required this.language, this.showCallWarning = true});
   final AppLanguage? language;
+
   /// The "during calls you have to speak only X" hint only makes sense on
   /// my own profile — not when peeking at someone else's.
   final bool showCallWarning;
@@ -1644,8 +1648,10 @@ class _LanguageCard extends StatelessWidget {
         ? AppStrings.t('profile_speaks', args: {'lang': language!.label})
         : AppStrings.t('profile_no_language');
     final warning = (showCallWarning && language != null)
-        ? AppStrings.t('profile_call_language_warning',
-            args: {'lang': language!.label})
+        ? AppStrings.t(
+            'profile_call_language_warning',
+            args: {'lang': language!.label},
+          )
         : null;
     return Container(
       decoration: BoxDecoration(
@@ -1680,8 +1686,11 @@ class _LanguageCard extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.only(top: 1),
-                  child: Icon(Icons.info_outline,
-                      size: 14, color: SC.textMuted),
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: SC.textMuted,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1722,9 +1731,7 @@ class _InviteFriendCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: SC.accent.withValues(alpha: 0.45),
-            ),
+            border: Border.all(color: SC.accent.withValues(alpha: 0.45)),
           ),
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(
@@ -1737,8 +1744,11 @@ class _InviteFriendCard extends StatelessWidget {
                   color: SC.accent.withValues(alpha: 0.20),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.person_add_alt_1,
-                    color: SC.accent, size: 20),
+                child: const Icon(
+                  Icons.person_add_alt_1,
+                  color: SC.accent,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1751,8 +1761,7 @@ class _InviteFriendCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Icon(Icons.chevron_right,
-                  color: SC.textMuted, size: 22),
+              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22),
             ],
           ),
         ),
@@ -1801,63 +1810,80 @@ class _IdentitySection extends StatelessWidget {
 
   final String displayName;
   final String handle;
+
   /// Viewer-mode only: show a green "online" line under the handle.
   final bool online;
   final String bio;
+
   /// Emojis the user pinned to their profile. Rendered in the "Emojis"
   /// section; editable on my own profile (tap a tile), read-only otherwise.
   final List<String> emojis;
+
   /// Photo gallery ("Tes photos"). `photos[0]` is the PDP. Editable (add /
   /// remove) on my own profile, read-only otherwise.
   final List<String> photos;
   final FriendshipCounts counts;
+
   /// Number of users who liked me. Only shown on my own profile (private).
   final int likesCount;
   final Future<void> Function(String) onEditBio;
+
   /// Persist the edited emoji list. Null in viewer mode (read-only).
   final Future<void> Function(List<String>)? onEditEmojis;
   final VoidCallback onTapFollowers;
   final VoidCallback onTapFollowing;
   final VoidCallback onTapLikes;
+
   /// Own profile: append a photo to the gallery.
   final VoidCallback onPickPhoto;
+
   /// Own profile: remove the given gallery photo by URL.
   final void Function(String url) onRemovePhoto;
+
   /// Own profile: open the read-only "Aperçu" of how others see me.
   final VoidCallback onPreview;
   final VoidCallback onEdit;
   final VoidCallback onSettings;
+
   /// True when this section is rendering someone else's profile read-only
   /// (or my own in "Aperçu" mode). Hides editing affordances and swaps
   /// Edit/Paramètres for Message / Follow-back.
   final bool viewerMode;
+
   /// True when [viewerMode] is actually a preview of MY OWN profile — hide
   /// the follow/message actions (they'd target myself) and show a banner.
   final bool preview;
+
   /// Viewer-mode only: does the displayed peer follow me? Gates the
   /// "Follow back" button.
   final bool peerFollowsMe;
+
   /// Viewer-mode only: do I already follow the displayed peer?
   final bool iFollowPeer;
+
   /// Viewer-mode only: I sent a still-pending request via "Ajouter".
   final bool iRequestedPeer;
+
   /// Viewer-mode only: follow the peer back (instant abonnement).
   final VoidCallback? onFollowBack;
+
   /// Viewer-mode only: send a friend request to a stranger ("Ajouter").
   final VoidCallback? onAddPeer;
+
   /// Viewer-mode only: unfollow the peer (removes them from my friends).
   final VoidCallback? onUnfollow;
+
   /// Viewer-mode only: have I liked this peer? Drives the heart overlay
   /// on their photo cell.
   final bool iLikePeer;
   final VoidCallback? onTogglePeerLike;
+
   /// Viewer-mode only: opens the DM thread with this peer.
   final VoidCallback? onMessagePeer;
 
   // Pulled from AppStrings so it follows the user's chosen interface
   // language (fr / en / es supplied; others fall back to en).
-  static String get _bioPlaceholder =>
-      AppStrings.t('profile_bio_placeholder');
+  static String get _bioPlaceholder => AppStrings.t('profile_bio_placeholder');
 
   Future<void> _openBioEditor(BuildContext context) async {
     final ctrl = TextEditingController(text: bio);
@@ -1870,7 +1896,10 @@ class _IdentitySection extends StatelessWidget {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 16 + MediaQuery.of(ctx).viewInsets.bottom,
+          20,
+          16,
+          20,
+          16 + MediaQuery.of(ctx).viewInsets.bottom,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1944,7 +1973,10 @@ class _IdentitySection extends StatelessWidget {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 16 + MediaQuery.of(ctx).viewInsets.bottom,
+          20,
+          16,
+          20,
+          16 + MediaQuery.of(ctx).viewInsets.bottom,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1983,8 +2015,7 @@ class _IdentitySection extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: () =>
-                  Navigator.of(ctx).pop(_parseEmojis(ctrl.text)),
+              onPressed: () => Navigator.of(ctx).pop(_parseEmojis(ctrl.text)),
               style: FilledButton.styleFrom(
                 backgroundColor: SC.accent,
                 foregroundColor: Colors.white,
@@ -2113,10 +2144,7 @@ class _IdentitySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Preview banner — only when looking at my own profile via Aperçu.
-        if (preview) ...[
-          const _PreviewBanner(),
-          const SizedBox(height: 16),
-        ],
+        if (preview) ...[const _PreviewBanner(), const SizedBox(height: 16)],
         // Read-only photo gallery (hidden when the peer has none). In my own
         // Aperçu with no photo yet, show an empty PDP bubble placeholder so
         // the preview makes clear where the profile picture will appear.
@@ -2332,7 +2360,10 @@ class _PhotoGallery extends StatelessWidget {
     final canAdd = !viewerMode && photos.length < profilePhotosMax;
     final items = <Widget>[
       if (canAdd)
-        SizedBox(width: _width, child: _AddDiscoverPhotoCta(onTap: onPick)),
+        SizedBox(
+          width: _width,
+          child: _AddDiscoverPhotoCta(onTap: onPick),
+        ),
       for (var i = 0; i < photos.length; i++)
         SizedBox(
           width: _width,
@@ -2347,8 +2378,7 @@ class _PhotoGallery extends StatelessWidget {
             onTapLikes: (!viewerMode && i == 0) ? onTapLikes : null,
             // Like-this-peer heart only on the PDP in viewer mode.
             iLikePeer: iLikePeer,
-            onTogglePeerLike:
-                (viewerMode && i == 0) ? onTogglePeerLike : null,
+            onTogglePeerLike: (viewerMode && i == 0) ? onTogglePeerLike : null,
           ),
         ),
     ];
@@ -2383,8 +2413,11 @@ class _PreviewPill extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.visibility_outlined,
-                  size: 16, color: Colors.white),
+              const Icon(
+                Icons.visibility_outlined,
+                size: 16,
+                color: Colors.white,
+              ),
               const SizedBox(width: 6),
               Text(
                 AppStrings.t('profile_preview'),
@@ -2418,11 +2451,7 @@ class _EmptyPdpBubble extends StatelessWidget {
           shape: BoxShape.circle,
           border: Border.all(color: const Color(0xFF2A3942)),
         ),
-        child: const Icon(
-          Icons.person_outline,
-          size: 48,
-          color: SC.textMuted,
-        ),
+        child: const Icon(Icons.person_outline, size: 48, color: SC.textMuted),
       ),
     );
   }
@@ -2538,11 +2567,7 @@ class _DiscoverVisibilityHint extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.info_outline,
-                size: 14,
-                color: SC.textMuted,
-              ),
+              const Icon(Icons.info_outline, size: 14, color: SC.textMuted),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -2582,9 +2607,7 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: SC.accent.withValues(alpha: 0.35),
-            ),
+            border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
           ),
           child: Center(
             child: Container(
@@ -2594,11 +2617,7 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
                 color: SC.accent.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: SC.accent,
-                size: 26,
-              ),
+              child: const Icon(Icons.add_rounded, color: SC.accent, size: 26),
             ),
           ),
         ),
@@ -2622,6 +2641,7 @@ class _PhotoCell extends StatelessWidget {
   final String? photoUrl;
   final bool viewerMode;
   final VoidCallback onTap;
+
   /// When non-null and a photo is set on my own profile, a small trash
   /// button appears top-right to delete the photo.
   final VoidCallback? onDelete;
@@ -2659,8 +2679,10 @@ class _PhotoCell extends StatelessWidget {
                     photoUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => const Center(
-                      child: Icon(Icons.broken_image_outlined,
-                          color: SC.textMuted),
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: SC.textMuted,
+                      ),
                     ),
                   )
                 : Center(
@@ -2668,16 +2690,15 @@ class _PhotoCell extends StatelessWidget {
                       tappable
                           ? Icons.add_a_photo_outlined
                           : Icons.image_not_supported_outlined,
-                      color: tappable
-                          ? SC.accent
-                          : SC.textMuted,
+                      color: tappable ? SC.accent : SC.textMuted,
                       size: 22,
                     ),
                   ),
           ),
           if (showLikesBadge)
             Positioned(
-              left: 6, bottom: 6,
+              left: 6,
+              bottom: 6,
               child: Material(
                 color: Colors.black.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(999),
@@ -2686,12 +2707,17 @@ class _PhotoCell extends StatelessWidget {
                   onTap: onTapLikes,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.favorite,
-                            size: 12, color: Color(0xFFFF3B5C)),
+                        const Icon(
+                          Icons.favorite,
+                          size: 12,
+                          color: Color(0xFFFF3B5C),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '$likesCount',
@@ -2709,7 +2735,8 @@ class _PhotoCell extends StatelessWidget {
             ),
           if (showDeleteAction)
             Positioned(
-              right: 4, top: 4,
+              right: 4,
+              top: 4,
               child: Material(
                 color: Colors.black.withValues(alpha: 0.55),
                 shape: const CircleBorder(),
@@ -2717,17 +2744,22 @@ class _PhotoCell extends StatelessWidget {
                   customBorder: const CircleBorder(),
                   onTap: onDelete,
                   child: Container(
-                    width: 28, height: 28,
+                    width: 28,
+                    height: 28,
                     alignment: Alignment.center,
-                    child: const Icon(Icons.delete_outline,
-                        color: Color(0xFFFF6B6B), size: 16),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFFF6B6B),
+                      size: 16,
+                    ),
                   ),
                 ),
               ),
             ),
           if (showLikeAction)
             Positioned(
-              right: 4, bottom: 4,
+              right: 4,
+              bottom: 4,
               child: Material(
                 color: iLikePeer
                     ? const Color(0xFFFF3B5C).withValues(alpha: 0.18)
@@ -2737,7 +2769,8 @@ class _PhotoCell extends StatelessWidget {
                   customBorder: const CircleBorder(),
                   onTap: onTogglePeerLike,
                   child: Container(
-                    width: 30, height: 30,
+                    width: 30,
+                    height: 30,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -2751,9 +2784,7 @@ class _PhotoCell extends StatelessWidget {
                     child: Icon(
                       iLikePeer ? Icons.favorite : Icons.favorite_border,
                       size: iLikePeer ? 16 : 14,
-                      color: iLikePeer
-                          ? const Color(0xFFFF3B5C)
-                          : Colors.white,
+                      color: iLikePeer ? const Color(0xFFFF3B5C) : Colors.white,
                     ),
                   ),
                 ),
@@ -2766,14 +2797,11 @@ class _PhotoCell extends StatelessWidget {
 }
 
 class _InlineStat extends StatelessWidget {
-  const _InlineStat({
-    required this.value,
-    required this.label,
-    this.onTap,
-  });
+  const _InlineStat({required this.value, required this.label, this.onTap});
 
   final int value;
   final String label;
+
   /// Optional — when null the stat is purely decorative (used for the
   /// posts count, which doesn't navigate anywhere yet).
   final VoidCallback? onTap;
@@ -2792,13 +2820,7 @@ class _InlineStat extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            color: SC.textMuted,
-            fontSize: 13,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: SC.textMuted, fontSize: 13)),
       ],
     );
     if (onTap == null) {
@@ -2822,10 +2844,7 @@ class _StatDivider extends StatelessWidget {
   const _StatDivider();
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1, height: 28,
-      color: const Color(0xFF2A3942),
-    );
+    return Container(width: 1, height: 28, color: const Color(0xFF2A3942));
   }
 }
 
@@ -2840,6 +2859,7 @@ class _GradientActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+
   /// Muted, non-emphasised style — used for the inert "Following" state.
   final bool subdued;
 
@@ -2900,13 +2920,13 @@ class _GhostIconButton extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               border: Border.all(color: const Color(0xFF2A3942)),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Icon(icon, size: 18,
-                color: SC.textMuted),
+            child: Icon(icon, size: 18, color: SC.textMuted),
           ),
         ),
       ),
@@ -2930,6 +2950,7 @@ class _VoiceCloneCard extends StatefulWidget {
     required this.alreadyEnrolled,
     required this.onEnrolled,
   });
+
   /// When false, the card renders a locked state with a "Passer Ultra"
   /// CTA instead of the recording controls — non-Ultra tiers still
   /// see the feature exists so it acts as an upsell.
@@ -2948,6 +2969,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
   DateTime? _recordStart;
   Timer? _tick;
   Duration _elapsed = Duration.zero;
+
   /// Local override of [widget.alreadyEnrolled] for the moment between
   /// a successful enrol and the parent's profile refetch landing.
   bool _justEnrolled = false;
@@ -3015,9 +3037,9 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur micro: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur micro: $e')));
     }
   }
 
@@ -3069,9 +3091,9 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lecture audio échouée: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lecture audio échouée: $e')));
       }
       return;
     }
@@ -3139,11 +3161,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
       decoration: BoxDecoration(
         color: SC.glassStrong,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: enrolled
-              ? SC.accent
-              : SC.glassBorder,
-        ),
+        border: Border.all(color: enrolled ? SC.accent : SC.glassBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3156,9 +3174,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
                     : (enrolled ? Icons.check_circle : Icons.mic_none),
                 color: locked
                     ? SC.textMuted
-                    : (enrolled
-                        ? SC.accent
-                        : SC.textPrimary),
+                    : (enrolled ? SC.accent : SC.textPrimary),
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -3176,7 +3192,10 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
               ),
               if (locked)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: SC.accent.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
@@ -3277,10 +3296,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
                 const SizedBox(width: 10),
                 Text(
                   AppStrings.t('voice_clone_processing'),
-                  style: const TextStyle(
-                    color: SC.textMuted,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: SC.textMuted, fontSize: 13),
                 ),
               ],
             )

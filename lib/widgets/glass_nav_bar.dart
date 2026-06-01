@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
 
-/// Floating glass-morphism bottom-nav with a sliding pill that animates
-/// between selected tabs. Rendered by [RootShell] and re-used by screens
-/// pushed on top of it (e.g. a peer's profile) so the bar stays visible.
+/// Full-width glass-morphism bottom-nav, flush against the screen bottom,
+/// with a sliding pill that animates between selected tabs. Rendered by
+/// [RootShell] and re-used by screens pushed on top of it (e.g. a peer's
+/// profile) so the bar stays visible. The bar pads its own bottom by the
+/// system safe-area inset, so callers anchor it at `bottom: 0`.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
@@ -18,14 +20,17 @@ class GlassNavBar extends StatelessWidget {
 
   final int selected;
   final int unreadChat;
+
   /// Count of pending friend requests addressed to the local user —
   /// drives the red badge on the Demandes tab.
   final int unreadRequests;
   final ValueChanged<int> onSelect;
 
-  static const double _height = 54;
-  static const double _itemWidth = 64;
-  static const double _hPad = 10;
+  /// Height of the bar's content row (excludes the bottom safe-area inset,
+  /// which the bar pads internally). Exposed so screens that let content
+  /// run behind the bar — e.g. the full-bleed Discover card — can reserve
+  /// exactly this much space and sit flush against the bar's top edge.
+  static const double height = 56;
 
   @override
   Widget build(BuildContext context) {
@@ -58,71 +63,81 @@ class GlassNavBar extends StatelessWidget {
       ),
     ];
 
-    final totalWidth = _hPad * 2 + _itemWidth * items.length;
+    // Pad the bar's own bottom by the system safe-area inset so the glass
+    // fills all the way to the screen edge (behind the home indicator)
+    // while the icons stay above it.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
+    return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
-          width: totalWidth,
-          height: _height,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.20),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.30),
                 blurRadius: 20,
-                offset: const Offset(0, 4),
+                offset: const Offset(0, -4),
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: _hPad, vertical: 6),
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              // Sliding highlight pill — animates between item slots.
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                left: _itemWidth * selected,
-                top: 0,
-                bottom: 0,
-                width: _itemWidth,
-                child: Center(
-                  child: Container(
-                    width: _itemWidth - 4,
-                    height: _height - 16,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SizedBox(
+            height: height,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Each tab gets an equal slice of the full width; the pill
+                // and the icons share the same slot geometry so they line up.
+                final slot = constraints.maxWidth / items.length;
+                return Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    // Sliding highlight pill — animates between item slots.
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                      left: slot * selected,
+                      top: 0,
+                      bottom: 0,
+                      width: slot,
+                      child: Center(
+                        child: Container(
+                          width: slot - 24,
+                          height: height - 16,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              // Items.
-              Row(
-                children: [
-                  for (var i = 0; i < items.length; i++)
-                    SizedBox(
-                      width: _itemWidth,
-                      height: _height,
-                      child: _NavItem(
-                        data: items[i],
-                        selected: selected == i,
-                        onTap: () => onSelect(i),
-                      ),
+                    // Items — one equal-width slot each.
+                    Row(
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          Expanded(
+                            child: SizedBox(
+                              height: height,
+                              child: _NavItem(
+                                data: items[i],
+                                selected: selected == i,
+                                onTap: () => onSelect(i),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-            ],
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -178,9 +193,7 @@ class _NavItem extends StatelessWidget {
                 // the selected one already signals which tab is
                 // active, so tinting the icon cyan on hover / select
                 // was visual noise.
-                color: Colors.white.withValues(
-                  alpha: selected ? 1.0 : 0.78,
-                ),
+                color: Colors.white.withValues(alpha: selected ? 1.0 : 0.78),
               ),
             ),
             data.badge,
