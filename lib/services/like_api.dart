@@ -126,6 +126,36 @@ abstract final class LikeApi {
     }
   }
 
+  /// Hydrated list of profiles that liked [userId] strictly after [since],
+  /// newest first. Used by the Demandes feed so only post-feature likes show
+  /// (stale historical likes are filtered out).
+  static Future<List<RemoteProfile>> fetchLikersSince(
+    String userId,
+    DateTime since,
+  ) async {
+    if (!isSupabaseReady || userId.isEmpty) return const [];
+    try {
+      final rows = await _c
+          .from('likes')
+          .select('liker, created_at')
+          .eq('liked', userId)
+          .gt('created_at', since.toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+      final ids = (rows as List)
+          .map(
+            (r) =>
+                Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '',
+          )
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false);
+      if (ids.isEmpty) return const [];
+      return ProfileApi.fetchByIds(ids);
+    } catch (e) {
+      debugPrint('LikeApi.fetchLikersSince failed: $e');
+      return const [];
+    }
+  }
+
   /// Wipe every like row pointing at the current auth user. Called when
   /// the user deletes their Discover photo so the heart badge — which
   /// represents likes received on that photo — doesn't linger over an

@@ -8,50 +8,76 @@ import 'like_api.dart';
 import 'supabase_service.dart';
 
 /// Counts received "activity" the local user hasn't seen yet — likes on their
-/// photos plus emoji photo-reactions — so the Demandes tab can badge it. The
-/// "seen" point is a single timestamp in SharedPreferences; opening the
-/// Demandes tab moves it to now via [markSeen].
+/// photos plus emoji photo-reactions — so the Demandes tab can badge it.
 ///
-/// Unlike friend requests (a pending queue tracked separately by
-/// [FriendRequestUnread]), likes and reactions are fire-and-forget events, so
-/// the badge is "how many arrived since I last looked". A plain periodic poll
-/// keeps it fresh on every platform (the likes table / reaction messages
-/// aren't worth a dedicated realtime subscription here).
+/// Two timestamps, both seeded to "now" the first time the feature runs:
+///   • [featureStartAt] — fixed; the Demandes list only shows likes / reactions
+///     received AFTER this, so stale historical activity (e.g. an old like on a
+///     photo that's since been deleted) never surfaces.
+///   • the rolling "seen" pointer — the badge counts what arrived since it, and
+///     [markSeen] pushes it to now when the user opens the tab.
+///
+/// A plain periodic poll keeps the count fresh on every platform.
 abstract final class ReceivedActivityUnread {
   static final ValueNotifier<int> count = ValueNotifier<int>(0);
 
   static const _seenKey = 'demandes_activity_seen_iso';
+  static const _startKey = 'demandes_activity_start_iso';
   static const _pollInterval = Duration(seconds: 15);
 
   static String _meId = '';
-  static DateTime _seenAt = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  static DateTime _seenAt = _epoch;
+  static DateTime _featureStart = _epoch;
   static Timer? _poll;
-
-  /// Start tracking for [meId]. Safe to call repeatedly. Until the user has
-  /// opened the Demandes tab at least once (no stored timestamp), the seen
-  /// pointer is the epoch — so the badge surfaces the whole backlog of
-  /// already-received likes / reactions, and clears once they look.
-  static Future<void> start(String meId) async {
-    if (meId.isEmpty || !isSupabaseReady) return;
-    _meId = meId;
-
-    final prefs = await SharedPreferences.getInstance();
-    final iso = prefs.getString(_seenKey);
-    _seenAt = iso != null
-        ? (DateTime.tryParse(iso)?.toUtc() ?? _epoch)
-        : _epoch;
-
-    await refresh();
-    _poll?.cancel();
-    _poll = Timer.periodic(_pollInterval, (_) => refresh());
-  }
 
   static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(
     0,
     isUtc: true,
   );
 
-  /// Re-count likes + reactions received since [_seenAt].
+  /// The point from which received activity is considered "current". Likes /
+  /// reactions older than this are pre-feature backlog and never shown.
+  static DateTime get featureStartAt => _featureStart;
+
+  /// Start tracking for [meId]. Safe to call repeatedly. On the very first run
+  /// both timestamps are set to now, so neither the badge nor the Demandes
+  /// list surfaces anything that arrived before the feature existed.
+  static Future<void> start(String meId) async {
+    if (meId.isEmpty || !isSupabaseReady) return;
+    _meId = meId;
+
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().toUtc();
+
+    final startIso = prefs.getString(_startKey);
+    if (startIso != null) {
+      _featureStart = DateTime.tryParse(startIso)?.toUtc() ?? now;
+    } else {
+      _featureStart = now;
+      await prefs.setString(_startKey, now.toIso8601String());
+    }
+
+    final seenIso = prefs.getString(_seenKey);
+    if (seenIso != null) {
+      _seenAt = DateTime.tryParse(seenIso)?.toUtc() ?? _featureStart;
+    } else {
+      _seenAt = _featureStart;
+      await prefs.setString(_seenKey, _seenAt.toIso8601String());
+    }
+    // Heal an old "epoch" pointer left by a previous build: the seen point
+    // can never be earlier than when the feature started, otherwise the badge
+    // would re-count the whole backlog.
+    if (_seenAt.isBefore(_featureStart)) {
+      _seenAt = _featureStart;
+      await prefs.setString(_seenKey, _seenAt.toIso8601String());
+    }
+
+    await refresh();
+    _poll?.cancel();
+    _poll = Timer.periodic(_pollInterval, (_) => refresh());
+  }
+
+  /// Re-count likes + reactions received since the rolling seen pointer.
   static Future<void> refresh() async {
     if (_meId.isEmpty || !isSupabaseReady) return;
     try {
@@ -65,7 +91,7 @@ abstract final class ReceivedActivityUnread {
   }
 
   /// Call when the user opens the Demandes tab — moves the seen pointer to
-  /// now and clears the badge.
+  /// now and clears the badge. Does NOT touch [featureStartAt].
   static Future<void> markSeen() async {
     _seenAt = DateTime.now().toUtc();
     final prefs = await SharedPreferences.getInstance();

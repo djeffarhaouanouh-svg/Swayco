@@ -11,6 +11,7 @@ import '../services/friendship_api.dart';
 import '../services/like_api.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
+import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
@@ -113,8 +114,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       final friendships = await FriendshipApi.fetchIncomingPendingWithProfiles(
         _myId,
       );
-      final likers = await LikeApi.fetchLikersOf(_myId);
-      final reactionMessages = await ChatApi.fetchPhotoReactions(_myId);
+      // Only show likes / reactions received since the feature went live, so
+      // stale historical activity (e.g. an old like on a now-deleted photo)
+      // never surfaces here.
+      final since = ReceivedActivityUnread.featureStartAt;
+      final likers = await LikeApi.fetchLikersSince(_myId, since);
+      final reactionMessages = (await ChatApi.fetchPhotoReactions(_myId))
+          .where((m) => m.createdAt.toUtc().isAfter(since))
+          .toList(growable: false);
       // Hydrate each reaction with the author's profile so we can
       // render avatar + name. fetchByIds dedupes ids internally.
       final authorIds = reactionMessages
