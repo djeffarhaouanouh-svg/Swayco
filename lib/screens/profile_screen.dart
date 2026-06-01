@@ -1813,74 +1813,6 @@ class _IdentitySection extends StatelessWidget {
   // language (fr / en / es supplied; others fall back to en).
   static String get _bioPlaceholder => AppStrings.t('profile_bio_placeholder');
 
-  Future<void> _openBioEditor(BuildContext context) async {
-    final ctrl = TextEditingController(text: bio);
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: SC.bubbleIn,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          16 + MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.t('bio_editor_title'),
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLength: profileBioMaxLength,
-              maxLines: 3,
-              minLines: 2,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: SC.textPrimary),
-              decoration: InputDecoration(
-                hintText: _bioPlaceholder,
-                hintStyle: const TextStyle(color: SC.textMuted),
-                filled: true,
-                fillColor: SC.bg,
-                border: const OutlineInputBorder(
-                  borderSide: BorderSide.none,
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(AppStrings.t('save')),
-            ),
-          ],
-        ),
-      ),
-    );
-    ctrl.dispose();
-    if (result != null && result != bio) {
-      await onEditBio(result);
-    }
-  }
-
   /// Splits free-typed text into individual emoji/grapheme tiles, dropping
   /// blanks and capping at [profileEmojisMax].
   static List<String> _parseEmojis(String raw) => raw.characters
@@ -2010,50 +1942,52 @@ class _IdentitySection extends StatelessWidget {
   /// "Emojis" section. Everything is editable in place; the pencil opens the
   /// name / language editor.
   Widget _buildOwn(BuildContext context) {
-    final emptyBio = bio.trim().isEmpty;
     final photosTitle = photos.isEmpty
         ? AppStrings.t('profile_photos_section')
         : '${AppStrings.t('profile_photos_section')} (${photos.length})';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — title pushed to the far left, the Aperçu pill to the far
-        // right. The settings gear moved down to the stats row (below),
-        // freeing this line up. Title flexes / ellipsises on narrow phones.
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                AppStrings.t('onb_profile_title'),
-                style: SCText.h1,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Pencil — opens the editor (name / language).
-            _GhostIconButton(
-              icon: Icons.edit_outlined,
-              onTap: onEdit,
-              tooltip: AppStrings.t('profile_edit'),
-            ),
-          ],
+        // Header — just the "Ton profil" title.
+        Text(
+          AppStrings.t('onb_profile_title'),
+          style: SCText.h1,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 26),
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name + @handle, centred under the PDP.
-        Text(
-          displayName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+        // Name + a small edit pencil (opens the name / language editor),
+        // centred under the PDP.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onEdit,
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.edit_outlined,
+                    size: 16, color: SC.textMuted),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 2),
         Text(
@@ -2063,29 +1997,14 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // Bio — between the name block and the stats, centred + tap-to-edit.
-        // Shows the placeholder when empty so it stays an obvious edit
-        // affordance.
+        // Bio — between the name block and the stats. Edited IN PLACE (tap
+        // the text → it turns into a field), no bottom-sheet popup. Shows
+        // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        Center(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => _openBioEditor(context),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              child: Text(
-                emptyBio ? _bioPlaceholder : bio,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: emptyBio ? SC.textMuted : SC.textPrimary,
-                  fontSize: 16.5,
-                  height: 1.4,
-                  fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-          ),
+        _EditableBio(
+          bio: bio,
+          placeholder: _bioPlaceholder,
+          onSave: onEditBio,
         ),
         const SizedBox(height: 16),
         // Stats — posts | followers | following — kept centred on the full
@@ -2402,6 +2321,121 @@ class _PhotoGallery extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => items[i],
       ),
+    );
+  }
+}
+
+/// Inline, in-place bio editor — no bottom sheet. Shows the bio (or the
+/// placeholder) as centred tappable text; tapping turns it into a centred
+/// field that commits on submit (keyboard "done") or when focus leaves.
+class _EditableBio extends StatefulWidget {
+  const _EditableBio({
+    required this.bio,
+    required this.placeholder,
+    required this.onSave,
+  });
+  final String bio;
+  final String placeholder;
+  final Future<void> Function(String) onSave;
+  @override
+  State<_EditableBio> createState() => _EditableBioState();
+}
+
+class _EditableBioState extends State<_EditableBio> {
+  bool _editing = false;
+  bool _saving = false;
+  final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    _ctrl.text = widget.bio;
+    _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+    setState(() => _editing = true);
+    _focus.requestFocus();
+  }
+
+  Future<void> _commit() async {
+    if (!_editing || _saving) return;
+    final value = _ctrl.text.trim();
+    _focus.unfocus();
+    setState(() => _editing = false);
+    if (value != widget.bio.trim()) {
+      _saving = true;
+      await widget.onSave(value);
+      _saving = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_editing) {
+      final empty = widget.bio.trim().isEmpty;
+      return Center(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: _start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            child: Text(
+              empty ? widget.placeholder : widget.bio,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: empty ? SC.textMuted : SC.textPrimary,
+                fontSize: 16.5,
+                height: 1.4,
+                fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return TextField(
+      controller: _ctrl,
+      focusNode: _focus,
+      autofocus: true,
+      textAlign: TextAlign.center,
+      maxLength: profileBioMaxLength,
+      maxLines: 2,
+      minLines: 1,
+      cursorColor: SC.accent,
+      textInputAction: TextInputAction.done,
+      style: const TextStyle(
+        color: SC.textPrimary,
+        fontSize: 16.5,
+        height: 1.4,
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: widget.placeholder,
+        hintStyle: const TextStyle(color: SC.textMuted),
+        counterText: '',
+        filled: true,
+        fillColor: SC.bubbleIn,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: SC.glassBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: SC.glassBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: SC.accent, width: 1.5),
+        ),
+      ),
+      onSubmitted: (_) => _commit(),
+      onTapOutside: (_) => _commit(),
     );
   }
 }
