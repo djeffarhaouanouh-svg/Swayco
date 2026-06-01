@@ -2051,25 +2051,19 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — centred "Ton profil" title on its own line so it never
-        // collides with the buttons on narrow phones; the Aperçu pill +
-        // settings gear sit on a separate row below, right-aligned.
-        Center(
-          child: Text(
-            AppStrings.t('onb_profile_title'),
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        // Header — title left-aligned in the shared h1 style (same as the
+        // Discover / Messages screens), with the Aperçu pill + settings gear
+        // on a right-aligned row just below so they never crowd the title.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(AppStrings.t('onb_profile_title'), style: SCText.h1),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             _PreviewPill(onTap: onPreview),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             _GhostIconButton(
               icon: Icons.settings_outlined,
               onTap: onSettings,
@@ -2077,7 +2071,7 @@ class _IdentitySection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 26),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle),
         const SizedBox(height: 12),
@@ -2312,14 +2306,7 @@ class _ProfileSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: SC.textPrimary,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      child: Text(title, style: SCText.h2),
     );
   }
 }
@@ -2351,8 +2338,8 @@ class _PhotoGallery extends StatelessWidget {
   final bool iLikePeer;
   final VoidCallback? onTogglePeerLike;
 
-  static const double _height = 188;
-  static const double _width = 140;
+  static const double _height = 216;
+  static const double _width = 162;
 
   @override
   Widget build(BuildContext context) {
@@ -2409,21 +2396,21 @@ class _PreviewPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.visibility_outlined,
-                size: 16,
+                size: 18,
                 color: Colors.white,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
                 AppStrings.t('profile_preview'),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 13,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2920,13 +2907,13 @@ class _GhostIconButton extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: Container(
-            width: 44,
-            height: 44,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               border: Border.all(color: const Color(0xFF2A3942)),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Icon(icon, size: 18, color: SC.textMuted),
+            child: Icon(icon, size: 20, color: SC.textMuted),
           ),
         ),
       ),
