@@ -859,11 +859,36 @@ class CreditsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = profile;
-    final tier = p?.subscriptionTier ?? 'free';
+    // Still loading: render a neutral skeleton instead of computing the card
+    // from a null profile — which would read as 0 credits on the free tier
+    // and briefly FLASH the orange "low credits" warning before the real
+    // value lands. A muted placeholder bar avoids that flicker.
+    if (p == null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: SC.glassStrong,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: SC.glassBorder),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 150,
+            height: 14,
+            decoration: BoxDecoration(
+              color: SC.textMuted.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(7),
+            ),
+          ),
+        ),
+      );
+    }
+    final tier = p.subscriptionTier;
     final isTopTier = tier == 'ultra_plus';
     final isPaid = tier != 'free';
-    final creditsSeconds = p?.creditsSeconds ?? 0;
-    final lifetimeSeconds = p?.lifetimeCallSeconds ?? 0;
+    final creditsSeconds = p.creditsSeconds;
+    final lifetimeSeconds = p.lifetimeCallSeconds;
     final credits = creditsSeconds ~/ 60;
     final allotment = _monthlyAllotmentFor(tier) ~/ 60;
     // Threshold for the low-credits warning. Hidden entirely for the
