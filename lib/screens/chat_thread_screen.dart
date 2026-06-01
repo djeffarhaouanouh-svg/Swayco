@@ -1410,13 +1410,6 @@ class _ComposerState extends State<_Composer> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Image button — pick + send a photo.
-              IconButton(
-                onPressed: widget.sending ? null : widget.onSendImage,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                color: SC.textMuted,
-                splashRadius: 22,
-              ),
               Expanded(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 140),
@@ -1432,14 +1425,36 @@ class _ComposerState extends State<_Composer> {
                       hintText: AppStrings.t('composer_message_hint'),
                       hintStyle: const TextStyle(color: SC.textMuted),
                       filled: false,
-                      contentPadding: const EdgeInsets.fromLTRB(2, 12, 14, 12),
-                      prefixIcon: _ComposerTranslateToggle(
-                        active: widget.autoTranslate,
-                        onTap: widget.onToggleTranslate,
+                      contentPadding: const EdgeInsets.fromLTRB(4, 12, 14, 12),
+                      // Image button + translate toggle grouped together in
+                      // the prefix so they share one baseline and stay aligned.
+                      prefixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(width: 4),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap:
+                                widget.sending ? null : widget.onSendImage,
+                            child: const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.add_photo_alternate_outlined,
+                                size: 22,
+                                color: SC.textMuted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          _ComposerTranslateToggle(
+                            active: widget.autoTranslate,
+                            onTap: widget.onToggleTranslate,
+                          ),
+                        ],
                       ),
                       prefixIconConstraints: const BoxConstraints(
-                        minWidth: 96,
-                        minHeight: 40,
+                        minWidth: 0,
+                        minHeight: 44,
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
