@@ -433,11 +433,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+      backgroundColor: const Color(0xFF0E0E0E),
       body: Stack(
         children: [
           ColoredBox(
-            color: const Color(0xFF000000),
+            color: const Color(0xFF0E0E0E),
             child: SafeArea(
               bottom: false,
               child: Column(
@@ -461,14 +461,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     onReport: _reportPeer,
                   ),
                   if (_error != null) _ErrorBanner(message: _error!),
-                  // Tapping anywhere in the message area dismisses the
-                  // keyboard when the composer is open. Translucent so the
-                  // list still scrolls and message taps still register.
+                  // Pure-black background ONLY behind the messages zone — the
+                  // header and composer keep the lighter 0E0E0E surface.
+                  // Tapping anywhere in the area dismisses the keyboard;
+                  // translucent so the list still scrolls and taps register.
                   Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () => FocusScope.of(context).unfocus(),
-                      child: _buildMessageList(),
+                    child: ColoredBox(
+                      color: const Color(0xFF000000),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () => FocusScope.of(context).unfocus(),
+                        child: _buildMessageList(),
+                      ),
                     ),
                   ),
                   _Composer(

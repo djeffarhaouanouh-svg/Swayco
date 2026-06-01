@@ -2168,9 +2168,29 @@ class _IdentitySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 26),
-        // Round PDP bubble (the first photo as a circular avatar), above the
-        // gallery — tap to add a photo.
+        // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
+        const SizedBox(height: 20),
+        // Stats — posts (= gallery size) | followers | following, between the
+        // PDP and the photo gallery.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _InlineStat(value: photos.length, label: 'posts'),
+            const _StatDivider(),
+            _InlineStat(
+              value: counts.followers,
+              label: AppStrings.t('profile_followers').toLowerCase(),
+              onTap: onTapFollowers,
+            ),
+            const _StatDivider(),
+            _InlineStat(
+              value: counts.following,
+              label: AppStrings.t('profile_following').toLowerCase(),
+              onTap: onTapFollowing,
+            ),
+          ],
+        ),
         const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle),
@@ -2341,7 +2361,7 @@ class _IdentitySection extends StatelessWidget {
             label: AppStrings.t('profile_message'),
             icon: Icons.chat_bubble_outline,
             onTap: onMessagePeer ?? () {},
-            white: true,
+            glass: true,
           ),
           // Second action depends on the follow relation:
           //  • I already follow them → "Unfollow".
@@ -2495,21 +2515,21 @@ class _PreviewPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.visibility_outlined,
-                size: 18,
+                size: 15,
                 color: Colors.white,
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 6),
               Text(
                 AppStrings.t('profile_preview'),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 14.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2918,7 +2938,7 @@ class _GradientActionButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.subdued = false,
-    this.white = false,
+    this.glass = false,
   });
 
   final String label;
@@ -2928,18 +2948,22 @@ class _GradientActionButton extends StatelessWidget {
   /// Muted, non-emphasised style — used for the inert "Following" state.
   final bool subdued;
 
-  /// White fill with dark content — used for the primary "Message" action.
-  final bool white;
+  /// Dark frosted-glass fill with a hairline border (same surface as the
+  /// language card) and white content — used for the primary "Message"
+  /// action.
+  final bool glass;
 
   @override
   Widget build(BuildContext context) {
-    // Solid colors instead of gradients — white for the primary Message
-    // action, accent for the default, dark card for the subdued state.
-    final bg = white ? Colors.white : (subdued ? SC.bubbleIn : SC.accent);
-    final fg = white ? const Color(0xFF0E0E0E) : Colors.white;
+    // Solid colors — glass card for the primary Message action, accent for
+    // the default action, dark bubble for the subdued state.
+    final bg = glass ? SC.glassStrong : (subdued ? SC.bubbleIn : SC.accent);
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(999),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: glass ? const BorderSide(color: SC.glassBorder) : BorderSide.none,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
@@ -2949,12 +2973,12 @@ class _GradientActionButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: fg),
+              Icon(icon, size: 18, color: Colors.white),
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(
-                  color: fg,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2989,13 +3013,13 @@ class _GhostIconButton extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: Container(
-            width: 46,
-            height: 46,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               border: Border.all(color: const Color(0xFF2A3942)),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Icon(icon, size: 20, color: SC.textMuted),
+            child: Icon(icon, size: 17, color: SC.textMuted),
           ),
         ),
       ),
