@@ -9,7 +9,6 @@ import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/block_api.dart';
-import '../services/call_alert.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
@@ -38,13 +37,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Toggle preferences are stored in SharedPreferences. Keys are namespaced
   // so they don't collide with the existing UserPrefs keys.
   static const _kPush = AppSettings.kPush;
-  static const _kInAppSounds = AppSettings.kInAppSounds;
   static const _kHideOnline = AppSettings.kHideOnline;
   static const _kHideFromCountry = AppSettings.kHideFromCountry;
 
   bool _busy = false;
   bool _push = true;
-  bool _inAppSounds = true;
   bool _hideOnline = false;
   bool _hideFromCountry = false;
   // My profile — used to render the translation-credits card (moved here
@@ -77,7 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _push = p.getBool(_kPush) ?? true;
-      _inAppSounds = p.getBool(_kInAppSounds) ?? true;
       // Local cache used for instant render — DB value below overrides.
       _hideOnline = p.getBool(_kHideOnline) ?? false;
       _hideFromCountry = p.getBool(_kHideFromCountry) ?? false;
@@ -406,18 +402,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: AppStrings.t('settings_change_password'),
                       onTap: _changePassword,
                     ),
-                    _SettingsRow(
-                      icon: Icons.logout,
-                      label: AppStrings.t('profile_signout'),
-                      color: const Color(0xFFE53935),
-                      onTap: _signOut,
-                    ),
-                    _SettingsRow(
-                      icon: Icons.delete_forever,
-                      label: AppStrings.t('settings_delete_account'),
-                      color: const Color(0xFFE53935),
-                      onTap: _deleteAccount,
-                    ),
                   ],
                 ),
 
@@ -434,16 +418,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         setState(() => _push = v);
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
-                      },
-                    ),
-                    _SettingsToggleRow(
-                      icon: Icons.music_note_outlined,
-                      label: AppStrings.t('settings_in_app_sounds'),
-                      value: _inAppSounds,
-                      onChanged: (v) {
-                        setState(() => _inAppSounds = v);
-                        _saveBool(_kInAppSounds, v);
-                        CallAlert.soundsEnabled = v;
                       },
                     ),
                   ],
@@ -533,6 +507,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.info_outline,
                       label: AppStrings.t('settings_version'),
                       trailing: _SubtleText(_appVersion),
+                    ),
+                  ],
+                ),
+
+                // Destructive actions — kept at the very bottom.
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.logout,
+                      label: AppStrings.t('profile_signout'),
+                      color: const Color(0xFFE53935),
+                      onTap: _signOut,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.delete_forever,
+                      label: AppStrings.t('settings_delete_account'),
+                      color: const Color(0xFFE53935),
+                      onTap: _deleteAccount,
                     ),
                   ],
                 ),
