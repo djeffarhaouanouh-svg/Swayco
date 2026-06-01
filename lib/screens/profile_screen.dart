@@ -1946,12 +1946,15 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name — tap it to edit in place (like the bio); a small pencil
-        // beside it opens the full editor (language, etc.). Centred.
+        // Name (centred, tap to edit in place) with a pencil button pinned
+        // to the right — opens the full editor (name / bio / location /
+        // language). The left spacer (52 = button 44 + gap 8) keeps the name
+        // visually centred.
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Flexible(
+            const SizedBox(width: 52),
+            Expanded(
               child: _InlineEditable(
                 value: displayName,
                 placeholder: AppStrings.t('profile_anonymous'),
@@ -1964,15 +1967,11 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            InkWell(
-              borderRadius: BorderRadius.circular(20),
+            const SizedBox(width: 8),
+            _GhostIconButton(
+              icon: Icons.edit_outlined,
               onTap: onEdit,
-              child: const Padding(
-                padding: EdgeInsets.all(4),
-                child: Icon(Icons.edit_outlined,
-                    size: 16, color: SC.textMuted),
-              ),
+              tooltip: AppStrings.t('profile_edit'),
             ),
           ],
         ),
