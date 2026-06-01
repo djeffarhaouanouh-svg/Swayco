@@ -76,6 +76,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _myName = '';
   String _myLang = '';
   String _myGender = '';
+
   /// `'free' | 'plus' | 'pro' | 'ultra'` — read from my own
   /// Supabase profile during [_bootstrap]. Gates the /voice/dub CTA
   /// rendered on incoming voice messages.
@@ -120,8 +121,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         wasBlocked ? 'unblock_peer_q' : 'block_peer_q',
         args: {'name': peerName},
       ),
-      body: AppStrings.t(
-          wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
+      body: AppStrings.t(wasBlocked ? 'unblock_peer_body' : 'block_peer_body'),
       confirmLabel: AppStrings.t(wasBlocked ? 'unblock' : 'block'),
       destructive: !wasBlocked,
     );
@@ -129,17 +129,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     try {
       if (wasBlocked) {
         await BlockApi.unblock(
-            blockerId: _myId, blockedId: widget.peerDeviceId);
+          blockerId: _myId,
+          blockedId: widget.peerDeviceId,
+        );
       } else {
-        await BlockApi.block(
-            blockerId: _myId, blockedId: widget.peerDeviceId);
+        await BlockApi.block(blockerId: _myId, blockedId: widget.peerDeviceId);
       }
       if (!mounted) return;
       setState(() => _peerBlocked = !wasBlocked);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
@@ -272,9 +274,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       } catch (_) {}
     }
     final blocked = isSupabaseReady && id.isNotEmpty
-        ? await BlockApi.isBlocked(
-            blockerId: id, otherId: widget.peerDeviceId,
-          )
+        ? await BlockApi.isBlocked(blockerId: id, otherId: widget.peerDeviceId)
         : false;
     // Opening this thread = peer's messages here are now "seen". Clears
     // the per-row dot on the chat list for this conversation.
@@ -301,7 +301,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
 
     if (!isSupabaseReady) {
-      setState(() => _error = 'Supabase non configuré — les messages ne sont pas disponibles.');
+      setState(
+        () => _error =
+            'Supabase non configuré — les messages ne sont pas disponibles.',
+      );
       return;
     }
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
@@ -458,7 +461,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     onReport: _reportPeer,
                   ),
                   if (_error != null) _ErrorBanner(message: _error!),
-                  Expanded(child: _buildMessageList()),
+                  // Tapping anywhere in the message area dismisses the
+                  // keyboard when the composer is open. Translucent so the
+                  // list still scrolls and message taps still register.
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: _buildMessageList(),
+                    ),
+                  ),
                   _Composer(
                     controller: _inputCtrl,
                     sending: _sending,
@@ -500,8 +512,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -512,10 +523,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           padding: const EdgeInsets.all(32),
           child: Text(
             AppStrings.t('no_messages'),
-            style: const TextStyle(
-              color: SC.textMuted,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: SC.textMuted, fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ),
@@ -580,9 +588,10 @@ class _ThreadHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
+      // No frosted block behind the header any more — only the round glass
+      // buttons keep their glass. The row sits transparently over the chat.
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-      child: GlassContainer(
-        borderRadius: BorderRadius.circular(22),
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           children: [
@@ -654,10 +663,7 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ),
             ),
-            GlassIconButton(
-              icon: Icons.phone_rounded,
-              onTap: onCall,
-            ),
+            GlassIconButton(icon: Icons.phone_rounded, onTap: onCall),
             const SizedBox(width: 6),
             _HeaderMoreButton(
               peerBlocked: peerBlocked,
@@ -702,8 +708,11 @@ class _HeaderMoreButton extends StatelessWidget {
           value: 'report',
           child: Row(
             children: [
-              const Icon(Icons.flag_outlined,
-                  size: 18, color: Color(0xFFE53935)),
+              const Icon(
+                Icons.flag_outlined,
+                size: 18,
+                color: Color(0xFFE53935),
+              ),
               const SizedBox(width: 10),
               Text(
                 AppStrings.t('report'),
@@ -761,17 +770,22 @@ class _MessageBubble extends StatelessWidget {
   });
   final ChatMessage message;
   final bool mine;
+
   /// Long-press handler — non-null only for the user's own messages.
   final VoidCallback? onLongPressDelete;
+
   /// Body text actually rendered — may be the translated version when the
   /// thread-level auto-translate toggle is on.
   final String displayBody;
+
   /// Show a subtle indicator while the translation is being fetched.
   final bool translating;
+
   /// True when the local user's tier unlocks /voice/dub. Plus / Pro /
   /// Ultra → true; Free → false. Server-side gating is the final word,
   /// so this only drives whether we render the CTA at all.
   final bool canDubAudio;
+
   /// BCP-47 primary subtag of the local user's language — the
   /// translation target for any incoming foreign voice message.
   final String myLang;
@@ -795,106 +809,108 @@ class _MessageBubble extends StatelessWidget {
         // Long-press one of my own bubbles → offer to delete it.
         onLongPress: onLongPressDelete,
         child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
-        ),
-        decoration: BoxDecoration(
-          color: mine ? null : SC.bubbleIn,
-          gradient: mine
-              ? const LinearGradient(
-                  colors: [SC.outBubbleStart, SC.outBubbleEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          borderRadius: radius,
-          border: Border.all(
-            color: mine
-                ? SC.accent.withValues(alpha: 0.4)
-                : SC.bubbleInBorder,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+          decoration: BoxDecoration(
+            color: mine ? null : SC.bubbleIn,
+            gradient: mine
+                ? const LinearGradient(
+                    colors: [SC.outBubbleStart, SC.outBubbleEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            borderRadius: radius,
+            border: Border.all(
+              color: mine
+                  ? SC.accent.withValues(alpha: 0.4)
+                  : SC.bubbleInBorder,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!mine && message.senderName.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!mine && message.senderName.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    message.senderName,
+                    style: const TextStyle(
+                      color: SC.accent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              // Voice messages render an inline mini-player above the body.
+              // The body itself stays so the transcript / translation is
+              // always visible underneath the audio control.
+              if (message.isVoice)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _VoicePlayer(
+                    audioUrl: message.audioUrl,
+                    durationMs: message.audioDurationMs,
+                  ),
+                ),
+              // For voice messages we still surface the transcription /
+              // translation as text. When [displayBody] is empty (raw
+              // STT returned nothing), drop the Text node entirely so
+              // the bubble doesn't show a phantom blank line.
+              if (displayBody.isNotEmpty)
+                Text(
+                  displayBody,
+                  style: TextStyle(
+                    color: translating
+                        ? SC.textPrimary.withValues(alpha: 0.55)
+                        : SC.textPrimary,
+                    fontSize: 15,
+                    height: 1.3,
+                    fontStyle: translating
+                        ? FontStyle.italic
+                        : FontStyle.normal,
+                  ),
+                ),
+              // "🔊 Écouter la traduction" CTA. Only shown for incoming
+              // foreign voice messages when the local user is on a paid
+              // tier and we already have a translated body to dub.
+              if (message.isVoice &&
+                  !mine &&
+                  canDubAudio &&
+                  !translating &&
+                  displayBody.isNotEmpty &&
+                  displayBody != message.body &&
+                  myLang.isNotEmpty)
+                _DubButton(
+                  key: ValueKey('dub-${message.id}-$myLang'),
+                  messageId: message.id,
+                  targetLang: myLang,
+                  translatedText: displayBody,
+                ),
+              const SizedBox(height: 2),
+              Align(
+                alignment: Alignment.bottomRight,
                 child: Text(
-                  message.senderName,
-                  style: const TextStyle(
-                    color: SC.accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                  time,
+                  style: TextStyle(
+                    color: SC.textPrimary.withValues(alpha: 0.55),
+                    fontSize: 10,
                   ),
                 ),
               ),
-            // Voice messages render an inline mini-player above the body.
-            // The body itself stays so the transcript / translation is
-            // always visible underneath the audio control.
-            if (message.isVoice)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _VoicePlayer(
-                  audioUrl: message.audioUrl,
-                  durationMs: message.audioDurationMs,
-                ),
-              ),
-            // For voice messages we still surface the transcription /
-            // translation as text. When [displayBody] is empty (raw
-            // STT returned nothing), drop the Text node entirely so
-            // the bubble doesn't show a phantom blank line.
-            if (displayBody.isNotEmpty)
-              Text(
-                displayBody,
-                style: TextStyle(
-                  color: translating
-                      ? SC.textPrimary.withValues(alpha: 0.55)
-                      : SC.textPrimary,
-                  fontSize: 15,
-                  height: 1.3,
-                  fontStyle: translating ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            // "🔊 Écouter la traduction" CTA. Only shown for incoming
-            // foreign voice messages when the local user is on a paid
-            // tier and we already have a translated body to dub.
-            if (message.isVoice &&
-                !mine &&
-                canDubAudio &&
-                !translating &&
-                displayBody.isNotEmpty &&
-                displayBody != message.body &&
-                myLang.isNotEmpty)
-              _DubButton(
-                key: ValueKey('dub-${message.id}-$myLang'),
-                messageId: message.id,
-                targetLang: myLang,
-                translatedText: displayBody,
-              ),
-            const SizedBox(height: 2),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Text(
-                time,
-                style: TextStyle(
-                  color: SC.textPrimary.withValues(alpha: 0.55),
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -1078,9 +1094,9 @@ class _VoicePlayerState extends State<_VoicePlayer> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lecture impossible: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lecture impossible: $e')));
     }
   }
 
@@ -1098,7 +1114,9 @@ class _VoicePlayerState extends State<_VoicePlayer> {
         ? 0.0
         : (_position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
     final remaining = total - _position;
-    final label = _playing ? _fmt(_position) : _fmt(total > Duration.zero ? total : remaining);
+    final label = _playing
+        ? _fmt(_position)
+        : _fmt(total > Duration.zero ? total : remaining);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1126,11 +1144,8 @@ class _VoicePlayerState extends State<_VoicePlayer> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 4,
-              backgroundColor:
-                  SC.textPrimary.withValues(alpha: 0.18),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                SC.accent,
-              ),
+              backgroundColor: SC.textPrimary.withValues(alpha: 0.18),
+              valueColor: const AlwaysStoppedAnimation<Color>(SC.accent),
             ),
           ),
         ),
@@ -1166,12 +1181,14 @@ class _Composer extends StatefulWidget {
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+
   /// Hand the parent the raw recording so it can run the backend upload.
   final Future<void> Function({
     required Uint8List bytes,
     required String mimeType,
     required int durationMs,
-  }) onSendVoice;
+  })
+  onSendVoice;
   final bool autoTranslate;
   final VoidCallback onToggleTranslate;
 
@@ -1181,9 +1198,11 @@ class _Composer extends StatefulWidget {
 
 class _ComposerState extends State<_Composer> {
   final AudioRecorder _recorder = AudioRecorder();
+
   /// True while the recorder is active. The composer collapses into a
   /// "recording UI" with timer + cancel/send buttons during this state.
   bool _recording = false;
+
   /// True while the input field has any text — in that case we render
   /// the send button (instead of the mic) so the gesture matches the
   /// user's clear intent.
@@ -1269,9 +1288,9 @@ class _ComposerState extends State<_Composer> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur micro: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur micro: $e')));
     }
   }
 
@@ -1321,9 +1340,9 @@ class _ComposerState extends State<_Composer> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lecture audio échouée: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lecture audio échouée: $e')));
       }
       return;
     }
@@ -1365,14 +1384,14 @@ class _ComposerState extends State<_Composer> {
                       hintText: AppStrings.t('composer_message_hint'),
                       hintStyle: const TextStyle(color: SC.textMuted),
                       filled: false,
-                      contentPadding:
-                          const EdgeInsets.fromLTRB(2, 12, 14, 12),
+                      contentPadding: const EdgeInsets.fromLTRB(2, 12, 14, 12),
                       prefixIcon: _ComposerTranslateToggle(
                         active: widget.autoTranslate,
                         onTap: widget.onToggleTranslate,
                       ),
                       prefixIconConstraints: const BoxConstraints(
-                        minWidth: 96, minHeight: 40,
+                        minWidth: 96,
+                        minHeight: 40,
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -1406,69 +1425,69 @@ class _ComposerState extends State<_Composer> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
         child: GlassContainer(
-        borderRadius: BorderRadius.circular(28),
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-        child: Row(
-          children: [
-            // Cancel — drops the recording without sending.
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _cancelRecording,
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: Color(0xFFE57373),
-                    size: 26,
+          borderRadius: BorderRadius.circular(28),
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          child: Row(
+            children: [
+              // Cancel — drops the recording without sending.
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _cancelRecording,
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFE57373),
+                      size: 26,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE53935),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '$m:$s',
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      AppStrings.t('voice_recording_hint'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 13,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE53935),
+                        shape: BoxShape.circle,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Text(
+                      '$m:$s',
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        AppStrings.t('voice_recording_hint'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SC.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            _CircleActionButton(
-              icon: Icons.send,
-              busy: false,
-              onTap: _stopAndSend,
-            ),
-          ],
-        ),
+              _CircleActionButton(
+                icon: Icons.send,
+                busy: false,
+                onTap: _stopAndSend,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1549,30 +1568,30 @@ class _ComposerTranslateToggle extends StatelessWidget {
             Icon(
               Icons.translate,
               size: 24,
-              color: active
-                  ? SC.accent
-                  : SC.textMuted,
+              color: active ? SC.accent : SC.textMuted,
             ),
             const SizedBox(width: 8),
             // Sliding pill — bigger so it reads as a real toggle.
             Container(
-              width: 42, height: 22,
+              width: 42,
+              height: 22,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: active
                     ? SC.online.withValues(alpha: 0.55)
                     : SC.glassStrong,
                 borderRadius: BorderRadius.circular(999),
-                border:
-                    Border.all(color: SC.glassBorder),
+                border: Border.all(color: SC.glassBorder),
               ),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                alignment:
-                    active ? Alignment.centerRight : Alignment.centerLeft,
+                alignment: active
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
                 child: Container(
-                  width: 16, height: 16,
+                  width: 16,
+                  height: 16,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: active
@@ -1581,8 +1600,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
                     boxShadow: active
                         ? [
                             BoxShadow(
-                              color: SC.online
-                                  .withValues(alpha: 0.55),
+                              color: SC.online.withValues(alpha: 0.55),
                               blurRadius: 8,
                             ),
                           ]
@@ -1620,9 +1638,7 @@ class _ActivationWaveOverlay extends StatelessWidget {
         final dy = 1.2 - 2.4 * t;
         // Quick fade-in / fade-out so the band never appears or disappears
         // abruptly at the edges of the sweep.
-        final fade = (t < 0.15)
-            ? t / 0.15
-            : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
+        final fade = (t < 0.15) ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
         return ClipRect(
           child: FractionalTranslation(
             translation: Offset(0, dy),
@@ -1661,7 +1677,11 @@ class _ErrorBanner extends StatelessWidget {
       color: Color(0xFFE53935).withValues(alpha: 0.18),
       child: Text(
         message,
-        style: const TextStyle(color: Color(0xFFFFAB91), fontSize: 12, height: 1.35),
+        style: const TextStyle(
+          color: Color(0xFFFFAB91),
+          fontSize: 12,
+          height: 1.35,
+        ),
       ),
     );
   }
