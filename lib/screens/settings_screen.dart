@@ -40,14 +40,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _kInAppSounds = AppSettings.kInAppSounds;
   static const _kHideOnline = AppSettings.kHideOnline;
   static const _kHideFromCountry = AppSettings.kHideFromCountry;
-  static const _kAudioOutput = AppSettings.kAudioOutput;
 
   bool _busy = false;
   bool _push = true;
   bool _inAppSounds = true;
   bool _hideOnline = false;
   bool _hideFromCountry = false;
-  String _audioOutput = 'speaker';
   // My profile — used to render the translation-credits card (moved here
   // from the profile screen).
   RemoteProfile? _profile;
@@ -82,7 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Local cache used for instant render — DB value below overrides.
       _hideOnline = p.getBool(_kHideOnline) ?? false;
       _hideFromCountry = p.getBool(_kHideFromCountry) ?? false;
-      _audioOutput = p.getString(_kAudioOutput) ?? 'speaker';
     });
     // Pull the canonical hide_online_status from Supabase so what's on
     // screen matches what other clients see.
@@ -137,11 +134,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveBool(String key, bool value) async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(key, value);
-  }
-
-  Future<void> _saveString(String key, String value) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString(key, value);
   }
 
   /// Register or drop the push transport target when the user flips the
@@ -245,56 +237,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _pickAudioOutput() async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: SC.bubbleIn,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppStrings.t('settings_audio_output'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            _AudioOutputOption(
-              label: AppStrings.t('settings_audio_speaker'),
-              icon: Icons.volume_up,
-              value: 'speaker',
-              selected: _audioOutput == 'speaker',
-              onTap: () => Navigator.of(ctx).pop('speaker'),
-            ),
-            _AudioOutputOption(
-              label: AppStrings.t('settings_audio_earpiece'),
-              icon: Icons.hearing,
-              value: 'earpiece',
-              selected: _audioOutput == 'earpiece',
-              onTap: () => Navigator.of(ctx).pop('earpiece'),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-    if (picked != null && picked != _audioOutput) {
-      setState(() => _audioOutput = picked);
-      await _saveString(_kAudioOutput, picked);
-    }
   }
 
   void _openBlockedUsers() {
@@ -472,16 +414,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.language,
                       label: AppStrings.t('settings_lang_interface'),
                       onTap: _openLanguageEditor,
-                    ),
-                    _SettingsRow(
-                      icon: Icons.speaker_outlined,
-                      label: AppStrings.t('settings_audio_output'),
-                      trailing: _SubtleText(
-                        _audioOutput == 'speaker'
-                            ? AppStrings.t('settings_audio_speaker')
-                            : AppStrings.t('settings_audio_earpiece'),
-                      ),
-                      onTap: _pickAudioOutput,
                     ),
                   ],
                 ),
@@ -710,49 +642,6 @@ class _SubtleText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(color: SC.textMuted, fontSize: 13),
-    );
-  }
-}
-
-class _AudioOutputOption extends StatelessWidget {
-  const _AudioOutputOption({
-    required this.label,
-    required this.icon,
-    required this.value,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final String value;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: SC.textPrimary),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            if (selected) const Icon(Icons.check, color: SC.accent),
-          ],
-        ),
-      ),
     );
   }
 }

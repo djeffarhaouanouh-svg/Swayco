@@ -10,10 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../services/analytics.dart';
-import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
@@ -548,15 +545,8 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await _audio.bind(room);
-      // Apply the user's default call audio output (Settings â†’ Audio
-      // output). AudioController already defaults to speaker, so only
-      // the earpiece choice needs to be applied here.
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        if (prefs.getString(AppSettings.kAudioOutput) == 'earpiece') {
-          await _audio.setSpeakerOn(false);
-        }
-      } catch (_) {}
+      // Call audio plays through the loudspeaker (AudioController's default);
+      // users route to earphones/AirPods themselves at the OS level.
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       if (mounted) {
         setState(() {

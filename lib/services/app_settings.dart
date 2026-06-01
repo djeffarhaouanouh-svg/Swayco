@@ -22,9 +22,6 @@ abstract final class AppSettings {
   /// (used as a country proxy — see RemoteProfile.language).
   static const kHideFromCountry = 'pref_hide_from_country';
 
-  /// Default call audio output: `'speaker'` or `'earpiece'`.
-  static const kAudioOutput = 'pref_audio_output';
-
   /// Live cache of the local user's "hide online status" toggle. Used
   /// by every screen that renders presence (chat list, chat thread,
   /// own profile) so the rule is reciprocal: if I'm hiding from the
