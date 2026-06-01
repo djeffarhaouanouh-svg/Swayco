@@ -711,8 +711,10 @@ class _FriendChatRow extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 8),
-            // 3-dots menu anchored at the far right of every row — opens
-            // the actions sheet (Appeler / Vidéo / profil / signaler…).
+            // Quick audio-call shortcut, then the 3-dots menu (Appeler /
+            // Vidéo / profil / signaler…) on the far right.
+            _RowCallButton(onTap: onCall),
+            const SizedBox(width: 6),
             _RowMoreButton(onTap: () => _showRowMenu(context)),
           ],
         ),
@@ -751,6 +753,29 @@ class _FriendChatRow extends StatelessWidget {
         onDeleteConversation();
         break;
     }
+  }
+}
+
+/// Small round audio-call shortcut at the far-right of every chat-list row.
+class _RowCallButton extends StatelessWidget {
+  const _RowCallButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.glassStrong,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(9),
+          child: Icon(Icons.phone_rounded, color: SC.accent, size: 18),
+        ),
+      ),
+    );
   }
 }
 

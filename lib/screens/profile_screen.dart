@@ -1946,34 +1946,38 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name (centred, tap to edit in place) with a pencil button pinned
-        // to the right — opens the full editor (name / bio / location /
-        // language). The left spacer (52 = button 44 + gap 8) keeps the name
-        // visually centred.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(width: 52),
-            Expanded(
-              child: _InlineEditable(
-                value: displayName,
-                placeholder: AppStrings.t('profile_anonymous'),
-                onSave: onEditName,
-                maxLength: profileNameMaxLength,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+        // Name (tap to edit in place) with a small pencil button right
+        // beside it — the pair is centred as a tight group so the pencil
+        // sits next to the name, not out at the screen edge.
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 240),
+                child: _InlineEditable(
+                  value: displayName,
+                  placeholder: AppStrings.t('profile_anonymous'),
+                  onSave: onEditName,
+                  maxLength: profileNameMaxLength,
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            _GhostIconButton(
-              icon: Icons.edit_outlined,
-              onTap: onEdit,
-              tooltip: AppStrings.t('profile_edit'),
-            ),
-          ],
+              const SizedBox(width: 6),
+              IconButton(
+                onPressed: onEdit,
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                color: SC.textMuted,
+                tooltip: AppStrings.t('profile_edit'),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 2),
         Text(
