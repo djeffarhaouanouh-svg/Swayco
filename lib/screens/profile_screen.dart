@@ -47,17 +47,11 @@ import 'settings_screen.dart';
 ///     warning are dropped (private to me), and the action row becomes
 ///     Bloquer / Débloquer instead of Edit / Paramètres.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.userId, this.preview = false});
+  const ProfileScreen({super.key, this.userId});
 
   /// When non-null, render the profile of the given Supabase auth user id
   /// in read-only "viewer" mode rather than my own profile.
   final String? userId;
-
-  /// "Aperçu" mode: render MY OWN profile ([userId] set to my device id) in
-  /// the read-only viewer layout so I can preview how others see me. Hides
-  /// the report/block menu and the follow/message actions that would
-  /// otherwise target myself.
-  final bool preview;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -87,9 +81,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   Timer? _pollTimer;
 
   bool get _isViewingOther => widget.userId != null;
-
-  /// True when previewing my own profile (read-only, but it's still "me").
-  bool get _isPreview => widget.preview;
   String get _targetId => widget.userId ?? _deviceId;
 
   @override
@@ -508,18 +499,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// "Aperçu" — open my own profile in read-only preview mode so I can see
-  /// it the way other users do (no edit affordances, no follow/message
-  /// actions). Pushes the same screen pointed at my own id with [preview].
-  Future<void> _openPreview() async {
-    if (_deviceId.isEmpty) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ProfileScreen(userId: _deviceId, preview: true),
-      ),
-    );
-  }
-
   Future<void> _saveBio(String bio) async {
     if (_deviceId.isEmpty) return;
     final saved = await ProfileApi.updateMyBio(userId: _deviceId, bio: bio);
@@ -590,16 +569,12 @@ class _ProfileScreenState extends State<ProfileScreen>
               scrolledUnderElevation: 0,
               surfaceTintColor: Colors.transparent,
               title: Text(
-                _isPreview
-                    ? AppStrings.t('profile_preview')
-                    : (_displayName.isEmpty
-                          ? AppStrings.t('profile_default_title')
-                          : _displayName),
+                _displayName.isEmpty
+                    ? AppStrings.t('profile_default_title')
+                    : _displayName,
                 style: SCText.h3,
               ),
               actions: [
-                // No report / block menu when previewing my own profile.
-                if (!_isPreview)
                   PopupMenuButton<String>(
                     tooltip: AppStrings.t('tooltip_more'),
                     icon: const Icon(Icons.more_vert),
@@ -713,7 +688,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             counts: _counts,
                             likesCount: _likesCount,
                             viewerMode: _isViewingOther,
-                            preview: _isPreview,
                             peerFollowsMe: _peerFollowsMe,
                             iFollowPeer: _iFollowPeer,
                             iRequestedPeer: _iRequestedPeer,
@@ -728,7 +702,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onPickPhoto: _pickAndAddPhoto,
                             onPickAvatar: _pickAndSetAvatar,
                             onRemovePhoto: _removePhoto,
-                            onPreview: _openPreview,
                             onEdit: _openEditor,
                             onSettings: _openSettings,
                             onFollowBack: _followBack,
@@ -1747,11 +1720,9 @@ class _IdentitySection extends StatelessWidget {
     required this.onTapLikes,
     required this.onPickPhoto,
     required this.onRemovePhoto,
-    required this.onPreview,
     required this.onEdit,
     required this.onSettings,
     this.viewerMode = false,
-    this.preview = false,
     this.peerFollowsMe = false,
     this.iFollowPeer = false,
     this.iRequestedPeer = false,
@@ -1802,19 +1773,14 @@ class _IdentitySection extends StatelessWidget {
   /// Own profile: remove the given gallery photo by URL.
   final void Function(String url) onRemovePhoto;
 
-  /// Own profile: open the read-only "Aperçu" of how others see me.
-  final VoidCallback onPreview;
+  /// Own profile: open the editor (name / language) — the header pencil.
   final VoidCallback onEdit;
   final VoidCallback onSettings;
 
-  /// True when this section is rendering someone else's profile read-only
-  /// (or my own in "Aperçu" mode). Hides editing affordances and swaps
-  /// Edit/Paramètres for Message / Follow-back.
+  /// True when this section is rendering someone else's profile read-only.
+  /// Hides editing affordances and swaps Edit/Paramètres for Message /
+  /// Follow-back.
   final bool viewerMode;
-
-  /// True when [viewerMode] is actually a preview of MY OWN profile — hide
-  /// the follow/message actions (they'd target myself) and show a banner.
-  final bool preview;
 
   /// Viewer-mode only: does the displayed peer follow me? Gates the
   /// "Follow back" button.
@@ -2038,11 +2004,11 @@ class _IdentitySection extends StatelessWidget {
     );
   }
 
-  /// My own profile — capture-1 layout: a "Ton profil" header with an
-  /// Aperçu (preview) pill + settings gear, then the "Tes photos" gallery,
-  /// the "Emojis" section and the "Bio" section. No avatar circle, name,
-  /// handle or follower stats here (that's what Aperçu / the viewer layout
-  /// is for) — this surface is purely "edit how my profile looks".
+  /// My own profile — capture-1 layout: a "Ton profil" header with an edit
+  /// pencil, the round PDP bubble, name + @handle, the bio, the stats row
+  /// (with the settings gear), then the "Tes photos" gallery and the
+  /// "Emojis" section. Everything is editable in place; the pencil opens the
+  /// name / language editor.
   Widget _buildOwn(BuildContext context) {
     final emptyBio = bio.trim().isEmpty;
     final photosTitle = photos.isEmpty
@@ -2065,15 +2031,42 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            _PreviewPill(onTap: onPreview),
+            // Pencil — opens the editor (name / language).
+            _GhostIconButton(
+              icon: Icons.edit_outlined,
+              onTap: onEdit,
+              tooltip: AppStrings.t('profile_edit'),
+            ),
           ],
         ),
         const SizedBox(height: 26),
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
-        // Bio — between the PDP and the stats, centred + tap-to-edit. Shows
-        // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 14),
+        // Name + @handle, centred under the PDP.
+        Text(
+          displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: SC.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          handle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: SC.textMuted, fontSize: 13),
+        ),
+        // Bio — between the name block and the stats, centred + tap-to-edit.
+        // Shows the placeholder when empty so it stays an obvious edit
+        // affordance.
+        const SizedBox(height: 12),
         Center(
           child: InkWell(
             borderRadius: BorderRadius.circular(8),
@@ -2166,17 +2159,14 @@ class _IdentitySection extends StatelessWidget {
     );
   }
 
-  /// Someone else's profile (read-only), or my own profile in "Aperçu"
-  /// preview mode. Photo gallery + name/handle + stats + (unless preview)
-  /// the Message / Follow-back / Add action stack, then the peer's emojis
-  /// and bio when present.
+  /// Someone else's profile (read-only). Photo gallery + name/handle +
+  /// stats + the Message / Follow-back / Add action stack, then the peer's
+  /// emojis and bio when present.
   Widget _buildViewer(BuildContext context) {
     final emptyBio = bio.trim().isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Preview banner — only when looking at my own profile via Aperçu.
-        if (preview) ...[const _PreviewBanner(), const SizedBox(height: 16)],
         // Round PDP bubble (the first photo as a circular avatar) at the top —
         // shows the user's initials when they have no photo yet.
         _pdpBubble(editable: false),
@@ -2201,8 +2191,8 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // Online indicator — hidden in my own Aperçu (it's always "me").
-        if (online && !preview) ...[
+        // Online indicator — peer active in the last 2 min, not hidden.
+        if (online) ...[
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2260,51 +2250,48 @@ class _IdentitySection extends StatelessWidget {
             ),
           ],
         ),
-        // Action stack — hidden in preview (the buttons would target myself).
-        if (!preview) ...[
-          const SizedBox(height: 16),
+        // Action stack: Message + (Unfollow / Follow-back / Add) by relation:
+        //  • I already follow them → "Unfollow".
+        //  • peer follows me, I don't → "S'abonner en retour" (instant).
+        //  • stranger, request already sent → "Demande envoyée".
+        //  • stranger → "Ajouter" (sends a request they must accept).
+        const SizedBox(height: 16),
+        _GradientActionButton(
+          label: AppStrings.t('profile_message'),
+          icon: Icons.chat_bubble_outline,
+          onTap: onMessagePeer ?? () {},
+          glass: true,
+        ),
+        if (iFollowPeer) ...[
+          const SizedBox(height: 10),
           _GradientActionButton(
-            label: AppStrings.t('profile_message'),
-            icon: Icons.chat_bubble_outline,
-            onTap: onMessagePeer ?? () {},
-            glass: true,
+            label: AppStrings.t('follow_unfollow'),
+            icon: Icons.person_remove_alt_1,
+            onTap: onUnfollow ?? () {},
+            subdued: true,
           ),
-          // Second action depends on the follow relation:
-          //  • I already follow them → "Unfollow".
-          //  • peer follows me, I don't → "S'abonner en retour" (instant).
-          //  • stranger, request already sent → "Demande envoyée".
-          //  • stranger → "Ajouter" (sends a request they must accept).
-          if (iFollowPeer) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('follow_unfollow'),
-              icon: Icons.person_remove_alt_1,
-              onTap: onUnfollow ?? () {},
-              subdued: true,
-            ),
-          ] else if (peerFollowsMe) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('follow_back'),
-              icon: Icons.person_add_alt_1,
-              onTap: onFollowBack ?? () {},
-            ),
-          ] else if (iRequestedPeer) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('friendship_sent'),
-              icon: Icons.schedule,
-              onTap: () {},
-              subdued: true,
-            ),
-          ] else ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('profile_add'),
-              icon: Icons.person_add_alt_1,
-              onTap: onAddPeer ?? () {},
-            ),
-          ],
+        ] else if (peerFollowsMe) ...[
+          const SizedBox(height: 10),
+          _GradientActionButton(
+            label: AppStrings.t('follow_back'),
+            icon: Icons.person_add_alt_1,
+            onTap: onFollowBack ?? () {},
+          ),
+        ] else if (iRequestedPeer) ...[
+          const SizedBox(height: 10),
+          _GradientActionButton(
+            label: AppStrings.t('friendship_sent'),
+            icon: Icons.schedule,
+            onTap: () {},
+            subdued: true,
+          ),
+        ] else ...[
+          const SizedBox(height: 10),
+          _GradientActionButton(
+            label: AppStrings.t('profile_add'),
+            icon: Icons.person_add_alt_1,
+            onTap: onAddPeer ?? () {},
+          ),
         ],
         // Read-only photo gallery — positioned below the action buttons.
         if (photos.isNotEmpty) ...[
@@ -2315,7 +2302,7 @@ class _IdentitySection extends StatelessWidget {
             onPick: () {},
             onRemove: (_) {},
             iLikePeer: iLikePeer,
-            onTogglePeerLike: preview ? null : onTogglePeerLike,
+            onTogglePeerLike: onTogglePeerLike,
           ),
         ],
         // Emojis (read-only) — only when the peer has some.
@@ -2414,79 +2401,6 @@ class _PhotoGallery extends StatelessWidget {
         itemCount: items.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) => items[i],
-      ),
-    );
-  }
-}
-
-/// The yellow "Aperçu" pill in the profile header (capture-1 style, tinted to
-/// the app's cyan DA). Opens a read-only preview of how others see me.
-class _PreviewPill extends StatelessWidget {
-  const _PreviewPill({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.visibility_outlined,
-                size: 15,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                AppStrings.t('profile_preview'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Banner shown at the top of the Aperçu preview so the user understands
-/// they're looking at the public view of their own profile.
-class _PreviewBanner extends StatelessWidget {
-  const _PreviewBanner();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: SC.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: SC.accent.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.visibility_outlined, size: 18, color: SC.accent),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              AppStrings.t('profile_preview_banner'),
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 13,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
