@@ -40,14 +40,11 @@ abstract final class LikeApi {
     if (!isSupabaseReady) return;
     if (likerId.isEmpty || likedId.isEmpty || likerId == likedId) return;
     try {
-      await _c.from('likes').upsert(
-        {
-          'liker': likerId,
-          'liked': likedId,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        onConflict: 'liker,liked',
-      );
+      await _c.from('likes').upsert({
+        'liker': likerId,
+        'liked': likedId,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'liker,liked');
       unawaited(_notifyLike(likerId, likedId));
     } catch (e) {
       debugPrint('LikeApi.like failed: $e');
@@ -78,11 +75,7 @@ abstract final class LikeApi {
   }) async {
     if (!isSupabaseReady || likerId.isEmpty || likedId.isEmpty) return;
     try {
-      await _c
-          .from('likes')
-          .delete()
-          .eq('liker', likerId)
-          .eq('liked', likedId);
+      await _c.from('likes').delete().eq('liker', likerId).eq('liked', likedId);
     } catch (e) {
       debugPrint('LikeApi.unlike failed: $e');
       rethrow;
@@ -94,12 +87,12 @@ abstract final class LikeApi {
   static Future<Set<String>> fetchMyLikedIds(String likerId) async {
     if (!isSupabaseReady || likerId.isEmpty) return const <String>{};
     try {
-      final rows = await _c
-          .from('likes')
-          .select('liked')
-          .eq('liker', likerId);
+      final rows = await _c.from('likes').select('liked').eq('liker', likerId);
       return (rows as List)
-          .map((r) => Map<String, dynamic>.from(r as Map)['liked']?.toString() ?? '')
+          .map(
+            (r) =>
+                Map<String, dynamic>.from(r as Map)['liked']?.toString() ?? '',
+          )
           .where((id) => id.isNotEmpty)
           .toSet();
     } catch (e) {
@@ -119,7 +112,10 @@ abstract final class LikeApi {
           .eq('liked', userId)
           .order('created_at', ascending: false);
       final ids = (rows as List)
-          .map((r) => Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '')
+          .map(
+            (r) =>
+                Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '',
+          )
           .where((id) => id.isNotEmpty)
           .toList(growable: false);
       if (ids.isEmpty) return const [];
@@ -187,13 +183,30 @@ abstract final class LikeApi {
   static Future<int> countLikersOf(String userId) async {
     if (!isSupabaseReady || userId.isEmpty) return 0;
     try {
-      final rows = await _c
-          .from('likes')
-          .select('liker')
-          .eq('liked', userId);
+      final rows = await _c.from('likes').select('liker').eq('liked', userId);
       return (rows as List).length;
     } catch (e) {
       debugPrint('LikeApi.countLikersOf failed: $e');
+      return 0;
+    }
+  }
+
+  /// Count of likes received by [userId] strictly after [since] — drives the
+  /// "new activity" badge on the Demandes tab so a fresh like lights it up.
+  static Future<int> countReceivedLikesSince(
+    String userId,
+    DateTime since,
+  ) async {
+    if (!isSupabaseReady || userId.isEmpty) return 0;
+    try {
+      final rows = await _c
+          .from('likes')
+          .select('liker')
+          .eq('liked', userId)
+          .gt('created_at', since.toUtc().toIso8601String());
+      return (rows as List).length;
+    } catch (e) {
+      debugPrint('LikeApi.countReceivedLikesSince failed: $e');
       return 0;
     }
   }

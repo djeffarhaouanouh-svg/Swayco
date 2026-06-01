@@ -13,6 +13,7 @@ import '../services/local_notifications.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
 import '../services/profile_api.dart';
+import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
@@ -98,6 +99,8 @@ class _RootShellState extends State<RootShell> {
     // Kick the pending-requests watcher so the Demandes nav badge stays
     // live without waiting for the user to open the tab.
     unawaited(FriendRequestUnread.start(myId));
+    // Same for received likes / photo-reactions — they also badge Demandes.
+    unawaited(ReceivedActivityUnread.start(myId));
     _callsChannel = IncomingCallApi.subscribe(
       calleeId: myId,
       onCall: _handleIncomingCall,
@@ -323,36 +326,44 @@ class _RootShellState extends State<RootShell> {
           valueListenable: ChatUnread.count,
           builder: (context, unread, _) => ValueListenableBuilder<int>(
             valueListenable: FriendRequestUnread.count,
-            builder: (context, pending, _) {
-              final pages = <Widget>[
-                ChatScreen(translation: widget.translation),
-                const DiscoverScreen(),
-                const FriendRequestsScreen(),
-                const ProfileScreen(),
-              ];
-              return Stack(
-                children: [
-                  IndexedStack(index: index, children: pages),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: GlassNavBar(
-                      selected: index,
-                      unreadChat: unread,
-                      unreadRequests: pending,
-                      // Only the Discover tab has a card resting on the nav
-                      // that the concave notches should hug.
-                      hugTopCorners: index == NavTab.discover,
-                      onSelect: (i) {
-                        NavTab.select(i);
-                        if (i == NavTab.chat) ChatUnread.markAllSeen();
-                      },
+            builder: (context, pending, _) => ValueListenableBuilder<int>(
+              valueListenable: ReceivedActivityUnread.count,
+              builder: (context, activity, _) {
+                final pages = <Widget>[
+                  ChatScreen(translation: widget.translation),
+                  const DiscoverScreen(),
+                  const FriendRequestsScreen(),
+                  const ProfileScreen(),
+                ];
+                return Stack(
+                  children: [
+                    IndexedStack(index: index, children: pages),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: GlassNavBar(
+                        selected: index,
+                        unreadChat: unread,
+                        // Demandes badge = pending friend requests + unseen
+                        // likes / photo-reactions.
+                        unreadRequests: pending + activity,
+                        // Only the Discover tab has a card resting on the nav
+                        // that the concave notches should hug.
+                        hugTopCorners: index == NavTab.discover,
+                        onSelect: (i) {
+                          NavTab.select(i);
+                          if (i == NavTab.chat) ChatUnread.markAllSeen();
+                          if (i == NavTab.demandes) {
+                            ReceivedActivityUnread.markSeen();
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),

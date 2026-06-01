@@ -8,6 +8,8 @@ import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
+import '../services/like_api.dart';
+import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
@@ -39,6 +41,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   String _myId = '';
   List<IncomingFriendRequest> _requests = const [];
   List<_PhotoReaction> _reactions = const [];
+  // Profiles who liked one of my photos, newest first.
+  List<RemoteProfile> _likers = const [];
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
@@ -47,12 +51,23 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // This screen lives in RootShell's IndexedStack (always built), so
+    // refresh its list each time the user actually lands on the Demandes
+    // tab — that's when a fresh like / reaction should appear.
+    NavTab.index.addListener(_onNavTabChanged);
     _bootstrap();
+  }
+
+  void _onNavTabChanged() {
+    if (NavTab.index.value == NavTab.demandes && mounted) {
+      _reload(silent: true);
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NavTab.index.removeListener(_onNavTabChanged);
     final ch = _channel;
     if (ch != null) {
       Supabase.instance.client.removeChannel(ch);
@@ -84,6 +99,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _loading = false;
         _requests = const [];
         _reactions = const [];
+        _likers = const [];
       });
       return;
     }
@@ -94,8 +110,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       });
     }
     try {
-      final friendships =
-          await FriendshipApi.fetchIncomingPendingWithProfiles(_myId);
+      final friendships = await FriendshipApi.fetchIncomingPendingWithProfiles(
+        _myId,
+      );
+      final likers = await LikeApi.fetchLikersOf(_myId);
       final reactionMessages = await ChatApi.fetchPhotoReactions(_myId);
       // Hydrate each reaction with the author's profile so we can
       // render avatar + name. fetchByIds dedupes ids internally.
@@ -115,6 +133,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       if (!mounted) return;
       setState(() {
         _requests = friendships;
+        _likers = likers;
         _reactions = reactions;
         _loading = false;
       });
@@ -129,7 +148,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   }
 
   Future<void> _accept(IncomingFriendRequest req) async {
-    final next = _requests.where((r) => r.friendship.id != req.friendship.id).toList();
+    final next = _requests
+        .where((r) => r.friendship.id != req.friendship.id)
+        .toList();
     setState(() => _requests = next);
     FriendRequestUnread.setCount(next.length);
     try {
@@ -138,14 +159,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       if (!mounted) return;
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
   Future<void> _reject(IncomingFriendRequest req) async {
-    final next = _requests.where((r) => r.friendship.id != req.friendship.id).toList();
+    final next = _requests
+        .where((r) => r.friendship.id != req.friendship.id)
+        .toList();
     setState(() => _requests = next);
     FriendRequestUnread.setCount(next.length);
     try {
@@ -154,17 +175,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       if (!mounted) return;
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
   void _openProfile(RemoteProfile peer) {
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ProfileScreen(userId: peer.id),
-      ),
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: peer.id)),
     );
   }
 
@@ -182,10 +199,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    AppStrings.t('demandes_title'),
-                    style: SCText.h1,
-                  ),
+                  child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
                 ),
               ),
               Expanded(child: _buildBody()),
@@ -198,9 +212,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: SC.accent),
-      );
+      return const Center(child: CircularProgressIndicator(color: SC.accent));
     }
     if (_error != null) {
       return Padding(
@@ -208,11 +220,15 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         child: Text(
           _error!,
           style: const TextStyle(
-              color: Color(0xFFFFAB91), height: 1.35, fontSize: 13),
+            color: Color(0xFFFFAB91),
+            height: 1.35,
+            fontSize: 13,
+          ),
         ),
       );
     }
-    final hasContent = _requests.isNotEmpty || _reactions.isNotEmpty;
+    final hasContent =
+        _requests.isNotEmpty || _likers.isNotEmpty || _reactions.isNotEmpty;
     return RefreshIndicator(
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
@@ -221,7 +237,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         physics: const AlwaysScrollableScrollPhysics(),
         // Clear the floating nav bar so the last row stays reachable.
         padding: EdgeInsets.fromLTRB(
-          16, 0, 16, 84 + MediaQuery.paddingOf(context).bottom,
+          16,
+          0,
+          16,
+          84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
           // Empty state still gets the glass frame so the page never
@@ -233,8 +252,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
               borderRadius: BorderRadius.circular(24),
               color: SC.glassStrong,
               border: SC.glassBorderStrong,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
               child: const _NoRequestsEmpty(),
             ),
           if (_requests.isNotEmpty)
@@ -256,7 +274,22 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 ],
               ),
             ),
-          if (_requests.isNotEmpty && _reactions.isNotEmpty)
+          if (_requests.isNotEmpty &&
+              (_likers.isNotEmpty || _reactions.isNotEmpty))
+            const SizedBox(height: 18),
+          // Likes received on my photos.
+          if (_likers.isNotEmpty)
+            GlassContainer(
+              borderRadius: BorderRadius.circular(24),
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                children: [
+                  for (final p in _likers)
+                    _LikeRow(liker: p, onTap: () => _openProfile(p)),
+                ],
+              ),
+            ),
+          if (_likers.isNotEmpty && _reactions.isNotEmpty)
             const SizedBox(height: 18),
           if (_reactions.isNotEmpty)
             GlassContainer(
@@ -300,8 +333,8 @@ class _RequestRow extends StatelessWidget {
     final name = p?.displayName.isNotEmpty == true
         ? p!.displayName
         : (p?.handle.isNotEmpty == true
-            ? '@${p!.handle}'
-            : AppStrings.t('chat_no_name'));
+              ? '@${p!.handle}'
+              : AppStrings.t('chat_no_name'));
     final handle = (p?.handle.isNotEmpty ?? false) ? '@${p!.handle}' : '';
 
     return Material(
@@ -373,8 +406,8 @@ class _ReactionRow extends StatelessWidget {
     final name = p?.displayName.isNotEmpty == true
         ? p!.displayName
         : (p?.handle.isNotEmpty == true
-            ? '@${p!.handle}'
-            : AppStrings.t('chat_no_name'));
+              ? '@${p!.handle}'
+              : AppStrings.t('chat_no_name'));
     final subtitle = AppStrings.t(
       'demandes_reacted_to_photo',
       args: {'name': name, 'emoji': reaction.message.body},
@@ -409,10 +442,65 @@ class _ReactionRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                reaction.message.body,
-                style: const TextStyle(fontSize: 26),
+              Text(reaction.message.body, style: const TextStyle(fontSize: 26)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A "X liked your photo ❤" row on the Demandes feed — mirrors
+/// [_ReactionRow] but for the heart-like sent on a Discover photo card.
+class _LikeRow extends StatelessWidget {
+  const _LikeRow({required this.liker, required this.onTap});
+
+  final RemoteProfile liker;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = liker.displayName.isNotEmpty
+        ? liker.displayName
+        : (liker.handle.isNotEmpty
+              ? '@${liker.handle}'
+              : AppStrings.t('chat_no_name'));
+    final subtitle = AppStrings.t(
+      'demandes_liked_your_photo',
+      args: {'name': name},
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                displayName: liker.displayName,
+                avatarUrl: liker.avatarUrl,
+                avatarColorHex: liker.avatarColor,
+                size: 46,
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: SCText.body.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('❤', style: TextStyle(fontSize: 24)),
             ],
           ),
         ),
@@ -463,11 +551,7 @@ class _RejectButton extends StatelessWidget {
         onTap: onTap,
         child: const Padding(
           padding: EdgeInsets.all(6),
-          child: Icon(
-            Icons.close_rounded,
-            color: SC.textMuted,
-            size: 22,
-          ),
+          child: Icon(Icons.close_rounded, color: SC.textMuted, size: 22),
         ),
       ),
     );
@@ -491,9 +575,7 @@ class _NoRequestsEmpty extends StatelessWidget {
               decoration: BoxDecoration(
                 color: SC.accent.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: SC.accent.withValues(alpha: 0.35),
-                ),
+                border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
               ),
               child: const Icon(
                 Icons.group_outlined,

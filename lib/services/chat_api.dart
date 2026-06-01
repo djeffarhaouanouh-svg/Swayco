@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'push_dispatcher.dart';
@@ -21,24 +22,29 @@ class ChatMessage {
   final String id;
   final String conversationId;
   final String senderId;
+
   /// The peer this message was addressed to (`recipient` column). Empty
   /// when the column isn't populated. Together with [senderId] this lets
   /// the chat list resolve the "other party" of a conversation without
   /// parsing the (UUID-laden, dash-ambiguous) conversation id.
   final String recipientId;
   final String senderName;
+
   /// Text body. For voice messages this carries the STT transcription
   /// produced by the backend so the existing chat translator path
   /// works unchanged.
   final String body;
   final DateTime createdAt;
+
   /// BCP-47 primary subtag describing what [body] is written in. Sent
   /// at insertion time by [ChatApi.sendMessage] / `/messages/voice`.
   /// Empty when unknown.
   final String language;
+
   /// Public URL of the original voice recording. Empty for plain text
   /// messages.
   final String audioUrl;
+
   /// Recording length in milliseconds. 0 when [audioUrl] is empty.
   final int audioDurationMs;
 
@@ -65,7 +71,9 @@ class ChatMessage {
       audioUrl: m['audio_url']?.toString() ?? '',
       audioDurationMs: dur is int
           ? dur
-          : (dur is num ? dur.toInt() : int.tryParse(dur?.toString() ?? '') ?? 0),
+          : (dur is num
+                ? dur.toInt()
+                : int.tryParse(dur?.toString() ?? '') ?? 0),
     );
   }
 }
@@ -145,6 +153,33 @@ abstract final class ChatApi {
       out.add(msg);
     }
     return out;
+  }
+
+  /// Count of photo reactions addressed to [meId] strictly after [since] —
+  /// feeds the Demandes "new activity" badge alongside fresh likes.
+  static Future<int> countPhotoReactionsSince(
+    String meId,
+    DateTime since,
+  ) async {
+    if (meId.isEmpty) return 0;
+    try {
+      final rows = await _client
+          .from('messages')
+          .select('sender')
+          .eq('recipient', meId)
+          .inFilter('body', photoReactionEmojis)
+          .gt('created_at', since.toUtc().toIso8601String());
+      var n = 0;
+      for (final r in rows as List) {
+        final s =
+            Map<String, dynamic>.from(r as Map)['sender']?.toString() ?? '';
+        if (s.isNotEmpty && s != meId) n++;
+      }
+      return n;
+    } catch (e) {
+      debugPrint('ChatApi.countPhotoReactionsSince failed: $e');
+      return 0;
+    }
   }
 
   /// Most-recent-first window of past messages for a conversation.
