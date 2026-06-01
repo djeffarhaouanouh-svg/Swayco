@@ -17,6 +17,7 @@ class ChatMessage {
     this.language = '',
     this.audioUrl = '',
     this.audioDurationMs = 0,
+    this.imageUrl = '',
   });
 
   final String id;
@@ -48,8 +49,14 @@ class ChatMessage {
   /// Recording length in milliseconds. 0 when [audioUrl] is empty.
   final int audioDurationMs;
 
+  /// Public URL of an image sent in the thread. Empty for text / voice.
+  final String imageUrl;
+
   /// True when this message was recorded as audio (has a playable URL).
   bool get isVoice => audioUrl.isNotEmpty;
+
+  /// True when this message carries an image.
+  bool get isImage => imageUrl.isNotEmpty;
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) {
     final created = m['created_at'];
@@ -69,6 +76,7 @@ class ChatMessage {
           : DateTime.now(),
       language: m['language']?.toString().trim() ?? '',
       audioUrl: m['audio_url']?.toString() ?? '',
+      imageUrl: m['image_url']?.toString() ?? '',
       audioDurationMs: dur is int
           ? dur
           : (dur is num
@@ -221,6 +229,51 @@ abstract final class ChatApi {
         recipientUid: recipientId,
         title: senderName.isEmpty ? 'Nouveau message' : senderName,
         body: body,
+        type: 'message',
+        data: {'conversationId': conversationId, 'senderId': senderId},
+      ),
+    );
+  }
+
+  /// Upload [bytes] as a chat image and insert an image message. The file
+  /// goes to the existing `avatars` bucket under `chat/<conversation>/` and
+  /// its public URL is stored in `image_url`. Best-effort push notification,
+  /// like [sendMessage].
+  static Future<void> sendImage({
+    required String conversationId,
+    required String senderId,
+    required String senderName,
+    required String recipientId,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    if (bytes.isEmpty) throw ArgumentError('image vide');
+    final ext = contentType.endsWith('png') ? 'png' : 'jpg';
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'chat/$conversationId/$stamp.$ext';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: contentType,
+            cacheControl: '3600',
+          ),
+        );
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+    await _client.from('messages').insert({
+      'conversation_id': conversationId,
+      'sender': senderId,
+      'recipient': recipientId,
+      'sender_name': senderName,
+      'body': '',
+      'image_url': url,
+    });
+    unawaited(
+      PushDispatcher.notify(
+        recipientUid: recipientId,
+        title: senderName.isEmpty ? 'Nouveau message' : senderName,
+        body: '📷 Photo',
         type: 'message',
         data: {'conversationId': conversationId, 'senderId': senderId},
       ),

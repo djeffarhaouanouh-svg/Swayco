@@ -57,17 +57,15 @@ class GlassNavBar extends StatelessWidget {
         badge: unreadChat,
       ),
       _NavItemData(
-        // Card-stack glyph (Discover deck metaphor) replaces the
-        // magnifier — search now lives in the dedicated bar at the
-        // top of the Discover tab, so the icon no longer needed to
-        // read as "search".
-        icon: Icons.style_outlined,
-        selectedIcon: Icons.style,
+        // Stacked-cards glyph (Discover swipe-deck metaphor).
+        icon: Icons.filter_none,
+        selectedIcon: Icons.filter_none,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
-        icon: Icons.group_outlined,
-        selectedIcon: Icons.group,
+        // "+" — the Demandes tab reads as "add people".
+        icon: Icons.add,
+        selectedIcon: Icons.add,
         label: AppStrings.t('nav_demandes'),
         badge: unreadRequests,
       ),

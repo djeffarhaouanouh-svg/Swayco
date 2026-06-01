@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -430,6 +431,41 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// Pick an image from the gallery and send it as an image message.
+  Future<void> _sendImage() async {
+    if (_myId.isEmpty || _sending) return;
+    if (!isSupabaseReady) {
+      setState(() => _error = 'Supabase non configuré.');
+      return;
+    }
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    final isPng = file.name.toLowerCase().endsWith('.png');
+    setState(() => _sending = true);
+    try {
+      await ChatApi.sendImage(
+        conversationId: widget.conversationId,
+        senderId: _myId,
+        senderName: _myName.isEmpty ? 'Moi' : _myName,
+        recipientId: widget.peerDeviceId,
+        bytes: bytes,
+        contentType: isPng ? 'image/png' : 'image/jpeg',
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Envoi image échoué: $e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -480,6 +516,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     sending: _sending,
                     onSend: _send,
                     onSendVoice: _sendVoice,
+                    onSendImage: _sendImage,
                     autoTranslate: _autoTranslate,
                     onToggleTranslate: _toggleAutoTranslate,
                   ),
@@ -857,6 +894,45 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+              // Image messages: show the photo (tap to view full-screen).
+              if (message.isImage)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: GestureDetector(
+                    onTap: () => _openFullImage(context, message.imageUrl),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 280),
+                        child: Image.network(
+                          message.imageUrl,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (ctx, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : const SizedBox(
+                                      height: 160,
+                                      width: 200,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: SC.accent,
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                          errorBuilder: (_, _, _) => const SizedBox(
+                            height: 120,
+                            width: 200,
+                            child: Center(
+                              child: Icon(Icons.broken_image_outlined,
+                                  color: SC.textMuted),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               // Voice messages render an inline mini-player above the body.
               // The body itself stays so the transcript / translation is
               // always visible underneath the audio control.
@@ -914,6 +990,31 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Full-screen image viewer — tap anywhere or pinch to zoom; tap to close.
+  void _openFullImage(BuildContext context, String url) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.92),
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.of(ctx).pop(),
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4,
+          child: Center(
+            child: Image.network(
+              url,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white54,
+                size: 48,
+              ),
+            ),
           ),
         ),
       ),
@@ -1178,6 +1279,7 @@ class _Composer extends StatefulWidget {
     required this.sending,
     required this.onSend,
     required this.onSendVoice,
+    required this.onSendImage,
     required this.autoTranslate,
     required this.onToggleTranslate,
   });
@@ -1193,6 +1295,9 @@ class _Composer extends StatefulWidget {
     required int durationMs,
   })
   onSendVoice;
+
+  /// Pick + send an image. Wired to the image button on the left.
+  final Future<void> Function() onSendImage;
   final bool autoTranslate;
   final VoidCallback onToggleTranslate;
 
@@ -1373,6 +1478,13 @@ class _ComposerState extends State<_Composer> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // Image button — pick + send a photo.
+              IconButton(
+                onPressed: widget.sending ? null : widget.onSendImage,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                color: SC.textMuted,
+                splashRadius: 22,
+              ),
               Expanded(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 140),
