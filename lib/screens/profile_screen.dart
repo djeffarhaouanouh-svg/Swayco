@@ -2224,28 +2224,17 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Bio (read-only) — between the PDP/name block and the stats. Its
-        // left edge lines up with the first stat number: the stats are laid
-        // out with spaceEvenly, so a 1/6 leading flex matches where "posts"
-        // sits, whatever the screen width.
+        // Bio (read-only) — between the PDP/name block and the stats, centred.
         if (!emptyBio) ...[
           const SizedBox(height: 14),
-          Row(
-            children: [
-              const Spacer(flex: 1),
-              Expanded(
-                flex: 5,
-                child: Text(
-                  bio,
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 16.5,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            bio,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 16.5,
+              height: 1.4,
+            ),
           ),
         ],
         const SizedBox(height: 16),
