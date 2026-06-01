@@ -182,14 +182,49 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   /// (Re)arm the idle swipe-hint countdown — called on first load and on
-  /// every page change. Hides any visible hint immediately, then shows a
-  /// fresh one only once the user has sat still for [_swipeHintDelay].
+  /// every page change. Hides any visible hint immediately, then fires a
+  /// fresh nudge only once the user has sat still for [_swipeHintDelay].
   void _scheduleSwipeHint() {
     _swipeHintTimer?.cancel();
     if (_showSwipeHint && mounted) setState(() => _showSwipeHint = false);
-    _swipeHintTimer = Timer(_swipeHintDelay, () {
-      if (mounted) setState(() => _showSwipeHint = true);
-    });
+    _swipeHintTimer = Timer(_swipeHintDelay, _fireSwipeHint);
+  }
+
+  /// Idle nudge: peek the next card up a touch (so the user sees there's a
+  /// card below to swipe to) and show the chevron. Re-arms itself so the
+  /// nudge repeats every few seconds until the user moves.
+  void _fireSwipeHint() {
+    if (!mounted) return;
+    setState(() => _showSwipeHint = true);
+    _runNudge();
+    _swipeHintTimer = Timer(const Duration(seconds: 3), _fireSwipeHint);
+  }
+
+  /// Animate the deck up by a few pixels and back, revealing a sliver of the
+  /// next card — a "swipe up for more" demo. Uses the real PageController so
+  /// no gap opens up. Skipped while the user is already dragging.
+  Future<void> _runNudge() async {
+    if (!_pageController.hasClients) return;
+    final pos = _pageController.position;
+    if (pos.isScrollingNotifier.value) return;
+    // Capture the resting offset up front — pos.pixels moves as we animate.
+    final start = pos.pixels;
+    const peek = 34.0;
+    try {
+      await _pageController.animateTo(
+        start + peek,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+      );
+      if (!mounted || !_pageController.hasClients) return;
+      await _pageController.animateTo(
+        start,
+        duration: const Duration(milliseconds: 340),
+        curve: Curves.easeOut,
+      );
+    } catch (_) {
+      // Controller detached mid-animation (page rebuild) — harmless.
+    }
   }
 
   void _expandSearch() {
@@ -460,8 +495,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // Nav bar (+ safe-area) reserved at the bottom — used to lift the swipe
-    // hint clear of it.
+    // The card deck sits strictly between the two bars' bodies. The bars
+    // then grow over these edges with concave notches (see GlassNavBar /
+    // _DiscoverHeader) that hug the card's rounded corners, no gap.
+    final deckTop = safeTop + _DiscoverHeader.height;
     final deckBottom = GlassNavBar.height + safeBottom;
     return Scaffold(
       backgroundColor: SC.bg,
@@ -470,11 +507,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: MeshBackground(
         child: Stack(
           children: [
-            // The photo deck runs full-bleed behind both frosted bars. Because
-            // the photo is continuous behind them, each bar's rounded inner
-            // corner clips the photo with a perfect curve — no mesh gap — and
-            // consecutive full-screen pages slide in flush with no gap.
-            Positioned.fill(
+            // The card deck, inset to the gap between the two bar bodies.
+            // Each page is exactly the gap height, so cards slide in flush.
+            // When the user lingers, _fireSwipeHint peeks the next card up
+            // through the PageController to demo the swipe.
+            Positioned(
+              left: 0,
+              right: 0,
+              top: deckTop,
+              bottom: deckBottom,
               child: _feedLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: SC.accent),
@@ -607,8 +648,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               child: SizedBox.expand(
                 child: _ProfileCard(
                   profile: profile,
-                  bottomInset:
-                      GlassNavBar.height + MediaQuery.paddingOf(ctx).bottom,
                   onAdd: () => _toggleFriendRequest(profile),
                   pendingOutgoing:
                       _statusFor(profile) == FriendshipStatus.pendingOutgoing,
@@ -655,27 +694,21 @@ class _DiscoverHeader extends StatelessWidget {
     // fills up to the screen edge (behind the notch / status bar) while
     // the title + search pill stay below it.
     final topInset = MediaQuery.paddingOf(context).top;
-    return ClipRRect(
-      // Rounded bottom corners so the bar curves down around the top corners
-      // of the Discover photo, mirroring the nav bar at the bottom.
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+    return ClipPath(
+      // Concave notches at the two bottom corners — the bar grows down by
+      // hugRadius at the edges and curves in, wrapping snugly around the
+      // rounded top corners of the Discover card below it (no gap).
+      clipper: const _BottomHugClipper(GlassNavBar.hugRadius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.30),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
+          color: Colors.white.withValues(alpha: 0.12),
+          // Bottom pad by the notch strip so the title / search stay in the
+          // body above the corner notches; top pad by the safe-area inset.
+          padding: EdgeInsets.only(
+            top: topInset,
+            bottom: GlassNavBar.hugRadius,
           ),
-          padding: EdgeInsets.only(top: topInset),
           child: SizedBox(
             height: height,
             child: Padding(
@@ -780,6 +813,40 @@ class _DiscoverHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Mirror of GlassNavBar's top-corner clipper: a full-width rectangle whose
+/// two BOTTOM corners are carved out by a concave notch of [radius], so the
+/// top bar wraps the rounded top corners of the Discover card below it.
+class _BottomHugClipper extends CustomClipper<Path> {
+  const _BottomHugClipper(this.radius);
+
+  final double radius;
+
+  @override
+  Path getClip(Size size) {
+    final r = radius;
+    final w = size.width;
+    final h = size.height;
+    final leftNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(0, h - r, r, h)),
+      Path()..addOval(Rect.fromCircle(center: Offset(r, h), radius: r)),
+    );
+    final rightNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(w - r, h - r, w, h)),
+      Path()..addOval(Rect.fromCircle(center: Offset(w - r, h), radius: r)),
+    );
+    var path = Path()..addRect(Rect.fromLTRB(0, 0, w, h - r));
+    path = Path.combine(PathOperation.union, path, leftNotch);
+    path = Path.combine(PathOperation.union, path, rightNotch);
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_BottomHugClipper oldClipper) =>
+      oldClipper.radius != radius;
 }
 
 class _SearchResultsPanel extends StatelessWidget {
@@ -999,13 +1066,7 @@ class _ProfileCard extends StatelessWidget {
     this.onToggleLike,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
-    this.bottomInset = 0,
   });
-
-  /// Space below the card's bottom content row so the name / bio / add
-  /// button / reaction rail clear the full-width nav bar the photo runs
-  /// full-bleed behind.
-  final double bottomInset;
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
@@ -1044,7 +1105,9 @@ class _ProfileCard extends StatelessWidget {
     }
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        // Match the bars' notch radius so the card's rounded corners nest
+        // exactly into the concave notches of the top bar / nav.
+        borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         boxShadow: [
           BoxShadow(
             color: SC.meshCyan.withValues(alpha: 0.30),
@@ -1054,7 +1117,7 @@ class _ProfileCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -1082,7 +1145,7 @@ class _ProfileCard extends StatelessWidget {
             Positioned(
               left: 22,
               right: 22,
-              bottom: 22 + bottomInset,
+              bottom: 22,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1213,11 +1276,10 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
           ),
         ),
         if (photos.length > 1)
-          // Top-centre, tucked just under the frosted top bar (the photo
-          // runs full-bleed behind it, so offset past the bar + safe-area).
+          // Top-centre of the card (which already starts just under the
+          // top bar, so a small inset is enough).
           Positioned(
-            top:
-                MediaQuery.paddingOf(context).top + _DiscoverHeader.height + 12,
+            top: 14,
             left: 0,
             right: 0,
             child: _CarouselDots(count: photos.length, index: _page),

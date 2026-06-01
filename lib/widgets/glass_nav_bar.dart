@@ -16,6 +16,7 @@ class GlassNavBar extends StatelessWidget {
     required this.unreadChat,
     required this.unreadRequests,
     required this.onSelect,
+    this.hugTopCorners = false,
   });
 
   final int selected;
@@ -26,11 +27,25 @@ class GlassNavBar extends StatelessWidget {
   final int unreadRequests;
   final ValueChanged<int> onSelect;
 
-  /// Height of the bar's content row (excludes the bottom safe-area inset,
-  /// which the bar pads internally). Exposed so screens that let content
-  /// run behind the bar — e.g. the full-bleed Discover card — can reserve
-  /// exactly this much space and sit flush against the bar's top edge.
+  /// When true, the bar grows upward by [hugRadius] at its two top corners
+  /// and carves a concave notch into each so it wraps the rounded bottom
+  /// corners of the Discover card resting on it. The icon row stays in the
+  /// same place either way (the notch strip is added above the body), so
+  /// toggling this between tabs never shifts the icons. Off elsewhere.
+  final bool hugTopCorners;
+
+  /// Height of the bar's content row (excludes the bottom safe-area inset
+  /// and the [hugRadius] notch strip, both padded internally). Exposed so
+  /// the Discover deck can reserve exactly this much space and sit flush
+  /// against the bar's body top edge.
   static const double height = 56;
+
+  /// Radius of the concave notches carved into the bar's two top corners.
+  /// The bar grows upward by this much at the corners so it wraps snugly
+  /// around the rounded bottom corners of the Discover card sitting on it —
+  /// must match the card's corner radius. Exposed so the card and the
+  /// Discover top bar stay in sync.
+  static const double hugRadius = 28;
 
   @override
   Widget build(BuildContext context) {
@@ -68,85 +83,116 @@ class GlassNavBar extends StatelessWidget {
     // while the icons stay above it.
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return ClipRRect(
-      // Rounded top corners so the bar curves up around the bottom corners
-      // of the Discover photo (and reads as a soft glass shelf on the other
-      // tabs too).
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.30),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: SizedBox(
-            height: height,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Each tab gets an equal slice of the full width; the pill
-                // and the icons share the same slot geometry so they line up.
-                final slot = constraints.maxWidth / items.length;
-                return Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    // Sliding highlight pill — animates between item slots.
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                      left: slot * selected,
-                      top: 0,
-                      bottom: 0,
-                      width: slot,
-                      child: Center(
-                        child: Container(
-                          width: slot - 24,
-                          height: height - 16,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.28),
-                            ),
+    final bar = BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+      child: Container(
+        color: Colors.white.withValues(alpha: 0.12),
+        // Reserve the notch strip on top only when hugging, so the icon row
+        // sits in exactly the same place whether or not the notches are
+        // carved; bottom pad by the safe-area inset.
+        padding: EdgeInsets.only(
+          top: hugTopCorners ? hugRadius : 0,
+          bottom: bottomInset,
+        ),
+        child: SizedBox(
+          height: height,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Each tab gets an equal slice of the full width; the pill
+              // and the icons share the same slot geometry so they line up.
+              final slot = constraints.maxWidth / items.length;
+              return Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  // Sliding highlight pill — animates between item slots.
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    left: slot * selected,
+                    top: 0,
+                    bottom: 0,
+                    width: slot,
+                    child: Center(
+                      child: Container(
+                        width: slot - 24,
+                        height: height - 16,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
                           ),
                         ),
                       ),
                     ),
-                    // Items — one equal-width slot each.
-                    Row(
-                      children: [
-                        for (var i = 0; i < items.length; i++)
-                          Expanded(
-                            child: SizedBox(
-                              height: height,
-                              child: _NavItem(
-                                data: items[i],
-                                selected: selected == i,
-                                onTap: () => onSelect(i),
-                              ),
+                  ),
+                  // Items — one equal-width slot each.
+                  Row(
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Expanded(
+                          child: SizedBox(
+                            height: height,
+                            child: _NavItem(
+                              data: items[i],
+                              selected: selected == i,
+                              onTap: () => onSelect(i),
                             ),
                           ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
     );
+
+    // Concave corner notches that hug the Discover card; a plain rounded
+    // top on every other tab. The body height is identical either way.
+    return hugTopCorners
+        ? ClipPath(clipper: const _TopHugClipper(hugRadius), child: bar)
+        : ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            child: bar,
+          );
   }
+}
+
+/// Clips a bar into a full-width rectangle whose two TOP corners are carved
+/// out by a concave quarter-circle notch of [radius]. Each notch is the
+/// corner square minus the disc that the resting card's rounded corner
+/// fills, so the bar and the card tile that corner with no gap or overlap.
+class _TopHugClipper extends CustomClipper<Path> {
+  const _TopHugClipper(this.radius);
+
+  final double radius;
+
+  @override
+  Path getClip(Size size) {
+    final r = radius;
+    final w = size.width;
+    final h = size.height;
+    final leftNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(0, 0, r, r)),
+      Path()..addOval(Rect.fromCircle(center: Offset(r, 0), radius: r)),
+    );
+    final rightNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(w - r, 0, w, r)),
+      Path()..addOval(Rect.fromCircle(center: Offset(w - r, 0), radius: r)),
+    );
+    var path = Path()..addRect(Rect.fromLTRB(0, r, w, h));
+    path = Path.combine(PathOperation.union, path, leftNotch);
+    path = Path.combine(PathOperation.union, path, rightNotch);
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_TopHugClipper oldClipper) => oldClipper.radius != radius;
 }
 
 class _NavItemData {

@@ -341,6 +341,9 @@ class _RootShellState extends State<RootShell> {
                       selected: index,
                       unreadChat: unread,
                       unreadRequests: pending,
+                      // Only the Discover tab has a card resting on the nav
+                      // that the concave notches should hug.
+                      hugTopCorners: index == NavTab.discover,
                       onSelect: (i) {
                         NavTab.select(i);
                         if (i == NavTab.chat) ChatUnread.markAllSeen();
