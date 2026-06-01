@@ -37,7 +37,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Toggle preferences are stored in SharedPreferences. Keys are namespaced
   // so they don't collide with the existing UserPrefs keys.
   static const _kPush = AppSettings.kPush;
-  static const _kSounds = AppSettings.kSounds;
   static const _kInAppSounds = AppSettings.kInAppSounds;
   static const _kHideOnline = AppSettings.kHideOnline;
   static const _kHideFromCountry = AppSettings.kHideFromCountry;
@@ -45,7 +44,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _busy = false;
   bool _push = true;
-  bool _sounds = true;
   bool _inAppSounds = true;
   bool _hideOnline = false;
   bool _hideFromCountry = false;
@@ -80,7 +78,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _push = p.getBool(_kPush) ?? true;
-      _sounds = p.getBool(_kSounds) ?? true;
       _inAppSounds = p.getBool(_kInAppSounds) ?? true;
       // Local cache used for instant render — DB value below overrides.
       _hideOnline = p.getBool(_kHideOnline) ?? false;
@@ -430,15 +427,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         setState(() => _push = v);
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
-                      },
-                    ),
-                    _SettingsToggleRow(
-                      icon: Icons.volume_up_outlined,
-                      label: AppStrings.t('settings_sounds'),
-                      value: _sounds,
-                      onChanged: (v) {
-                        setState(() => _sounds = v);
-                        _saveBool(_kSounds, v);
                       },
                     ),
                     _SettingsToggleRow(
