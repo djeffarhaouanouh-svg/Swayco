@@ -1162,6 +1162,10 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(profile.language);
     final flag = lang?.flag ?? '';
+    // "Ville, Pays" shown small under the name (either part may be empty).
+    final locationLabel = [profile.city.trim(), profile.country.trim()]
+        .where((s) => s.isNotEmpty)
+        .join(', ');
     return DecoratedBox(
       decoration: BoxDecoration(
         // Match the bars' notch radius so the card's rounded corners nest
@@ -1258,6 +1262,33 @@ class _ProfileCard extends StatelessWidget {
                             ],
                           ],
                         ),
+                        // Location (ville, pays) — small, just under the name.
+                        if (locationLabel.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.place_outlined,
+                                size: 14,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  locationLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         if (profile.bio.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(

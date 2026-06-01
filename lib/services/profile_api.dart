@@ -43,6 +43,8 @@ class RemoteProfile {
     this.bio = '',
     this.emojis = const [],
     this.interests = const [],
+    this.country = '',
+    this.city = '',
     this.gender = '',
     this.hideOnlineStatus = false,
     this.hideFromCountry = false,
@@ -91,6 +93,12 @@ class RemoteProfile {
   /// "Football"), rendered as colour-coded chips in the "Centres d'intérêt"
   /// section. Capped at [profileInterestsMax] client-side.
   final List<String> interests;
+
+  /// Free-text country + city entered in the profile editor (e.g. "France" /
+  /// "Paris"). Shown together in small text under the name on the Discover
+  /// card. Either may be empty.
+  final String country;
+  final String city;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -234,6 +242,8 @@ class RemoteProfile {
       }
       return const <String>[];
     }(),
+    country: m['country']?.toString() ?? '',
+    city: m['city']?.toString() ?? '',
     gender: () {
       final g = m['gender']?.toString().trim() ?? '';
       return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -273,6 +283,8 @@ class RemoteProfile {
     String? bio,
     List<String>? emojis,
     List<String>? interests,
+    String? country,
+    String? city,
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
@@ -297,6 +309,8 @@ class RemoteProfile {
     bio: bio ?? this.bio,
     emojis: emojis ?? this.emojis,
     interests: interests ?? this.interests,
+    country: country ?? this.country,
+    city: city ?? this.city,
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
     hideFromCountry: hideFromCountry ?? this.hideFromCountry,
@@ -876,6 +890,31 @@ abstract final class ProfileApi {
     } catch (e) {
       debugPrint('ProfileApi.updateMyEmojis failed: $e');
       return null;
+    }
+  }
+
+  /// Persist the user's free-text country + city (profile editor). Trims both;
+  /// stores empty strings when blank. Returns true on success.
+  static Future<bool> updateMyLocation({
+    required String userId,
+    required String country,
+    required String city,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return false;
+    String cap(String s) => s.trim().length > 60 ? s.trim().substring(0, 60) : s.trim();
+    try {
+      await _c
+          .from('profiles')
+          .update({
+            'country': cap(country),
+            'city': cap(city),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('ProfileApi.updateMyLocation failed: $e');
+      return false;
     }
   }
 

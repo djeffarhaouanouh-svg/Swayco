@@ -34,6 +34,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _pageController = PageController();
   final _nameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
+  final _countryCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
   String? _selectedLang;
   /// `m` / `f` / `x` or null. Asked once on the gender step right after
   /// language. Skipped entirely on subsequent runs (see [_genderAlreadySet]).
@@ -94,6 +96,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (remote.bio.isNotEmpty) {
           _bioCtrl.text = remote.bio;
         }
+        if (remote.country.isNotEmpty) {
+          _countryCtrl.text = remote.country;
+        }
+        if (remote.city.isNotEmpty) {
+          _cityCtrl.text = remote.city;
+        }
         if (remote.language.trim().isNotEmpty &&
             findLanguageByCode(remote.language) != null) {
           _selectedLang = remote.language;
@@ -115,6 +123,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _pageController.dispose();
     _nameCtrl.dispose();
     _bioCtrl.dispose();
+    _countryCtrl.dispose();
+    _cityCtrl.dispose();
     super.dispose();
   }
 
@@ -170,6 +180,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await ProfileApi.updateMyBio(
           userId: deviceId,
           bio: _bioCtrl.text.trim(),
+        );
+        await ProfileApi.updateMyLocation(
+          userId: deviceId,
+          country: _countryCtrl.text.trim(),
+          city: _cityCtrl.text.trim(),
         );
       }
     }
@@ -236,6 +251,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           hint: AppStrings.t('profile_bio_placeholder'),
                           icon: Icons.short_text,
                           alignLabelWithHint: true,
+                        ),
+                        const SizedBox(height: 14),
+                        _GlassTextField(
+                          controller: _countryCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          label: AppStrings.t('onb_country_label'),
+                          hint: AppStrings.t('onb_country_hint'),
+                          icon: Icons.public,
+                        ),
+                        const SizedBox(height: 14),
+                        _GlassTextField(
+                          controller: _cityCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          label: AppStrings.t('onb_city_label'),
+                          hint: AppStrings.t('onb_city_hint'),
+                          icon: Icons.location_city_outlined,
                         ),
                         const SizedBox(height: 22),
                         Text(
