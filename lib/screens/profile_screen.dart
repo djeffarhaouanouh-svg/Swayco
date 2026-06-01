@@ -19,6 +19,7 @@ import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/like_api.dart';
 import '../services/nav_tab.dart';
@@ -531,11 +532,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _remote = _remote!.copyWith(bio: saved));
   }
 
-  Future<void> _saveEmojis(List<String> emojis) async {
+  Future<void> _saveInterests(List<String> interests) async {
     if (_deviceId.isEmpty) return;
-    final saved = await ProfileApi.updateMyEmojis(
+    final saved = await ProfileApi.updateMyInterests(
       userId: _deviceId,
-      emojis: emojis,
+      interests: interests,
     );
     if (saved == null) {
       if (!mounted) return;
@@ -545,7 +546,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     if (!mounted || _remote == null) return;
-    setState(() => _remote = _remote!.copyWith(emojis: saved));
+    setState(() => _remote = _remote!.copyWith(interests: saved));
   }
 
   Future<void> _reportPeer() async {
@@ -701,7 +702,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             handle: _handle,
                             online: _peerOnline,
                             bio: _remote?.bio ?? '',
-                            emojis: _remote?.emojis ?? const [],
+                            interests: _remote?.interests ?? const [],
                             photos: _remote?.photos ?? const [],
                             avatarUrl: _remote?.avatarUrl ?? '',
                             counts: _counts,
@@ -713,7 +714,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             iLikePeer: _iLikePeer,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
-                            onEditEmojis: _saveEmojis,
+                            onEditInterests: _saveInterests,
                             onTapFollowers: () =>
                                 _openFriendsList(FriendDirection.followers),
                             onTapFollowing: () =>
@@ -1727,7 +1728,7 @@ class _IdentitySection extends StatelessWidget {
     required this.handle,
     this.online = false,
     required this.bio,
-    required this.emojis,
+    required this.interests,
     required this.photos,
     required this.avatarUrl,
     required this.counts,
@@ -1735,7 +1736,7 @@ class _IdentitySection extends StatelessWidget {
     required this.onEditName,
     required this.onEditBio,
     this.onPickAvatar,
-    this.onEditEmojis,
+    this.onEditInterests,
     required this.onTapFollowers,
     required this.onTapFollowing,
     required this.onTapLikes,
@@ -1762,9 +1763,10 @@ class _IdentitySection extends StatelessWidget {
   final bool online;
   final String bio;
 
-  /// Emojis the user pinned to their profile. Rendered in the "Emojis"
-  /// section; editable on my own profile (tap a tile), read-only otherwise.
-  final List<String> emojis;
+  /// "Centres d'intérêt" the user picked (predefined tags). Rendered as
+  /// colour-coded chips; editable on my own profile (opens the picker),
+  /// read-only otherwise.
+  final List<String> interests;
 
   /// Photo gallery ("Tes photos"). Drives the Discover card via `photos[0]`.
   /// Editable (add / remove) on my own profile, read-only otherwise.
@@ -1782,8 +1784,8 @@ class _IdentitySection extends StatelessWidget {
   final Future<void> Function(String) onEditName;
   final Future<void> Function(String) onEditBio;
 
-  /// Persist the edited emoji list. Null in viewer mode (read-only).
-  final Future<void> Function(List<String>)? onEditEmojis;
+  /// Persist the edited interests list. Null in viewer mode (read-only).
+  final Future<void> Function(List<String>)? onEditInterests;
   final VoidCallback onTapFollowers;
   final VoidCallback onTapFollowing;
   final VoidCallback onTapLikes;
@@ -1837,81 +1839,17 @@ class _IdentitySection extends StatelessWidget {
   // language (fr / en / es supplied; others fall back to en).
   static String get _bioPlaceholder => AppStrings.t('profile_bio_placeholder');
 
-  /// Splits free-typed text into individual emoji/grapheme tiles, dropping
-  /// blanks and capping at [profileEmojisMax].
-  static List<String> _parseEmojis(String raw) => raw.characters
-      .where((c) => c.trim().isNotEmpty)
-      .take(profileEmojisMax)
-      .toList(growable: false);
-
-  Future<void> _openEmojiEditor(BuildContext context) async {
-    final save = onEditEmojis;
+  /// Opens the "Centres d'intérêt" picker (a styled bottom sheet of coloured
+  /// category groups) and persists the new selection.
+  Future<void> _openInterestPicker(BuildContext context) async {
+    final save = onEditInterests;
     if (save == null) return;
-    final ctrl = TextEditingController(text: emojis.join(' '));
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: SC.bubbleIn,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          16 + MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.t('emojis_editor_title'),
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              AppStrings.t('emojis_editor_hint'),
-              style: const TextStyle(color: SC.textMuted, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLines: 1,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: SC.textPrimary, fontSize: 22),
-              decoration: InputDecoration(
-                hintText: '🐯 🖤 🎧 💀',
-                hintStyle: const TextStyle(color: SC.textMuted, fontSize: 22),
-                filled: true,
-                fillColor: SC.bg,
-                border: const OutlineInputBorder(
-                  borderSide: BorderSide.none,
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(_parseEmojis(ctrl.text)),
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(AppStrings.t('save')),
-            ),
-          ],
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _InterestPickerSheet(initial: interests),
     );
-    ctrl.dispose();
     if (result != null) {
       await save(result);
     }
@@ -2091,18 +2029,23 @@ class _IdentitySection extends StatelessWidget {
             MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
         ),
-        // Emojis.
+        // Centres d'intérêt — coloured chips of the picked tags + an "add"
+        // chip; tapping any of them opens the styled category picker.
         const SizedBox(height: 24),
-        _ProfileSectionHeader(AppStrings.t('profile_emojis_section')),
+        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
         const SizedBox(height: 12),
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: [
-            for (final e in emojis)
-              _EmojiTile(emoji: e, onTap: () => _openEmojiEditor(context)),
-            if (emojis.length < profileEmojisMax)
-              _EmojiAddTile(onTap: () => _openEmojiEditor(context)),
+            for (final tag in interests)
+              _InterestChip(
+                label: tag,
+                color: interestColor(tag),
+                onTap: () => _openInterestPicker(context),
+              ),
+            if (interests.length < profileInterestsMax)
+              _InterestAddChip(onTap: () => _openInterestPicker(context)),
           ],
         ),
       ],
@@ -2258,15 +2201,18 @@ class _IdentitySection extends StatelessWidget {
             onTogglePeerLike: onTogglePeerLike,
           ),
         ],
-        // Emojis (read-only) — only when the peer has some.
-        if (emojis.isNotEmpty) ...[
+        // Centres d'intérêt (read-only) — only when the peer has some.
+        if (interests.isNotEmpty) ...[
           const SizedBox(height: 24),
-          _ProfileSectionHeader(AppStrings.t('profile_emojis_section')),
+          _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
           const SizedBox(height: 12),
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: [for (final e in emojis) _EmojiTile(emoji: e)],
+            children: [
+              for (final tag in interests)
+                _InterestChip(label: tag, color: interestColor(tag)),
+            ],
           ),
         ],
       ],
@@ -2479,56 +2425,254 @@ class _InlineEditableState extends State<_InlineEditable> {
   }
 }
 
-/// A single emoji tile in the "Emojis" section. Tappable on my own
-/// profile (opens the emoji editor), inert when read-only.
-class _EmojiTile extends StatelessWidget {
-  const _EmojiTile({required this.emoji, this.onTap});
-  final String emoji;
+/// A "centre d'intérêt" chip — a category-coloured pill. Used both on the
+/// profile (display) and, with [selected], inside the picker. Tapping it on
+/// my own profile opens the picker.
+class _InterestChip extends StatelessWidget {
+  const _InterestChip({
+    required this.label,
+    required this.color,
+    this.selected = true,
+    this.showCheck = false,
+    this.onTap,
+  });
+
+  final String label;
+  final Color color;
+
+  /// Filled (true) vs faint outline (false). Display chips are always filled;
+  /// the picker uses false for the unpicked options.
+  final bool selected;
+
+  /// Show a leading check — only used by the picker for picked options.
+  final bool showCheck;
   final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
+    final bg = color.withValues(alpha: selected ? 0.20 : 0.06);
+    final border = color.withValues(alpha: selected ? 0.85 : 0.28);
+    final fg = selected ? color : color.withValues(alpha: 0.75);
     return Material(
-      color: SC.bubbleIn,
-      borderRadius: BorderRadius.circular(14),
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          width: 54,
-          height: 54,
-          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF2A3942)),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: border,
+              width: selected ? 1.4 : 1,
+            ),
           ),
-          child: Text(emoji, style: const TextStyle(fontSize: 26)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showCheck) ...[
+                Icon(Icons.check_rounded, size: 15, color: fg),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// The "+" tile that opens the emoji editor on my own profile.
-class _EmojiAddTile extends StatelessWidget {
-  const _EmojiAddTile({required this.onTap});
+/// The "+ Ajouter" chip that opens the interest picker on my own profile.
+class _InterestAddChip extends StatelessWidget {
+  const _InterestAddChip({required this.onTap});
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     return Material(
       color: SC.accent.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(999),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          width: 54,
-          height: 54,
-          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(999),
             border: Border.all(color: SC.accent.withValues(alpha: 0.4)),
           ),
-          child: const Icon(Icons.add_rounded, color: SC.accent, size: 24),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
+              const SizedBox(width: 4),
+              Text(
+                AppStrings.t('interests_add'),
+                style: const TextStyle(
+                  color: SC.accent,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The "Centres d'intérêt" picker: a tall, styled bottom sheet listing every
+/// category (coloured emoji-led header) with its options as toggle chips.
+/// Enforces the [profileInterestsMax] cap and returns the picked list.
+class _InterestPickerSheet extends StatefulWidget {
+  const _InterestPickerSheet({required this.initial});
+  final List<String> initial;
+  @override
+  State<_InterestPickerSheet> createState() => _InterestPickerSheetState();
+}
+
+class _InterestPickerSheetState extends State<_InterestPickerSheet> {
+  late final Set<String> _sel = {...widget.initial};
+
+  void _toggle(String tag) {
+    setState(() {
+      if (_sel.contains(tag)) {
+        _sel.remove(tag);
+      } else if (_sel.length < profileInterestsMax) {
+        _sel.add(tag);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final full = _sel.length >= profileInterestsMax;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (ctx, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: SC.bubbleIn,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: Column(
+          children: [
+            // Grab handle.
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SC.textMuted.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            // Title + live counter.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppStrings.t('profile_interests_section'),
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${_sel.length}/$profileInterestsMax',
+                    style: TextStyle(
+                      color: full ? SC.accent : SC.textMuted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                children: [
+                  for (final cat in kInterestCategories) ...[
+                    Row(
+                      children: [
+                        Text(cat.emoji,
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 8),
+                        Text(
+                          cat.label,
+                          style: TextStyle(
+                            color: cat.color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final opt in cat.options)
+                          _InterestChip(
+                            label: opt,
+                            color: cat.color,
+                            selected: _sel.contains(opt),
+                            showCheck: _sel.contains(opt),
+                            // When the cap is hit, leave only the already
+                            // picked chips tappable (to deselect).
+                            onTap: (!_sel.contains(opt) && full)
+                                ? null
+                                : () => _toggle(opt),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                  ],
+                ],
+              ),
+            ),
+            // Done button.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                4,
+                20,
+                12 + MediaQuery.paddingOf(context).bottom,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(_sel.toList()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(AppStrings.t('save')),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

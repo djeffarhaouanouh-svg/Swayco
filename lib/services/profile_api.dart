@@ -42,6 +42,7 @@ class RemoteProfile {
     this.photos = const [],
     this.bio = '',
     this.emojis = const [],
+    this.interests = const [],
     this.gender = '',
     this.hideOnlineStatus = false,
     this.hideFromCountry = false,
@@ -82,7 +83,14 @@ class RemoteProfile {
   /// A short, expressive list of emojis the user picks to decorate their
   /// profile (rendered as tiles in the "Emojis" section). Each element is
   /// one grapheme/emoji; capped at [profileEmojisMax] client-side.
+  ///
+  /// Legacy: superseded by [interests] in the UI; kept for back-compat.
   final List<String> emojis;
+
+  /// Predefined "centres d'intérêt" tags the user picked (e.g. "K-pop",
+  /// "Football"), rendered as colour-coded chips in the "Centres d'intérêt"
+  /// section. Capped at [profileInterestsMax] client-side.
+  final List<String> interests;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -216,6 +224,16 @@ class RemoteProfile {
       }
       return const <String>[];
     }(),
+    interests: () {
+      final raw = m['interests'];
+      if (raw is List) {
+        return raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false);
+      }
+      return const <String>[];
+    }(),
     gender: () {
       final g = m['gender']?.toString().trim() ?? '';
       return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -254,6 +272,7 @@ class RemoteProfile {
     List<String>? photos,
     String? bio,
     List<String>? emojis,
+    List<String>? interests,
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
@@ -277,6 +296,7 @@ class RemoteProfile {
     photos: photos ?? this.photos,
     bio: bio ?? this.bio,
     emojis: emojis ?? this.emojis,
+    interests: interests ?? this.interests,
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
     hideFromCountry: hideFromCountry ?? this.hideFromCountry,
@@ -306,6 +326,10 @@ const int profileEmojisMax = 5;
 
 /// Maximum number of photos in a user's gallery ("Tes photos" section).
 const int profilePhotosMax = 6;
+
+/// Maximum number of "centres d'intérêt" tags a user can pin to their
+/// profile. The full taxonomy of selectable tags lives in `interests.dart`.
+const int profileInterestsMax = 8;
 
 /// Supabase `profiles` table. Mirror of the local UserPrefs profile so that
 /// other users can discover each other by display name.
@@ -851,6 +875,38 @@ abstract final class ProfileApi {
       return cleaned;
     } catch (e) {
       debugPrint('ProfileApi.updateMyEmojis failed: $e');
+      return null;
+    }
+  }
+
+  /// Persist the user's chosen "centres d'intérêt". Trims blanks, dedupes and
+  /// caps at [profileInterestsMax] so a client without the right limit can't
+  /// push an oversize list. Returns the saved list (for optimistic updates),
+  /// or null on failure.
+  static Future<List<String>?> updateMyInterests({
+    required String userId,
+    required List<String> interests,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return null;
+    final seen = <String>{};
+    final cleaned = <String>[];
+    for (final raw in interests) {
+      final v = raw.trim();
+      if (v.isEmpty || !seen.add(v)) continue;
+      cleaned.add(v);
+      if (cleaned.length >= profileInterestsMax) break;
+    }
+    try {
+      await _c
+          .from('profiles')
+          .update({
+            'interests': cleaned,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+      return cleaned;
+    } catch (e) {
+      debugPrint('ProfileApi.updateMyInterests failed: $e');
       return null;
     }
   }
