@@ -2214,19 +2214,7 @@ class _IdentitySection extends StatelessWidget {
             onTap: onAddPeer ?? () {},
           ),
         ],
-        // Read-only photo gallery — positioned below the action buttons.
-        if (photos.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _PhotoGallery(
-            photos: photos,
-            viewerMode: true,
-            onPick: () {},
-            onRemove: (_) {},
-            iLikePeer: iLikePeer,
-            onTogglePeerLike: onTogglePeerLike,
-          ),
-        ],
-        // Centres d'intérêt (read-only) — only when the peer has some.
+        // Centres d'intérêt (read-only) — just above the photos.
         if (interests.isNotEmpty) ...[
           const SizedBox(height: 24),
           _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
@@ -2238,6 +2226,18 @@ class _IdentitySection extends StatelessWidget {
               for (final tag in interests)
                 _InterestChip(label: tag, color: interestColor(tag)),
             ],
+          ),
+        ],
+        // Read-only photo gallery — below the interests.
+        if (photos.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _PhotoGallery(
+            photos: photos,
+            viewerMode: true,
+            onPick: () {},
+            onRemove: (_) {},
+            iLikePeer: iLikePeer,
+            onTogglePeerLike: onTogglePeerLike,
           ),
         ],
       ],
