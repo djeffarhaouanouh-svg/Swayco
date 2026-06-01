@@ -2071,7 +2071,30 @@ class _IdentitySection extends StatelessWidget {
         const SizedBox(height: 26),
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
-        const SizedBox(height: 20),
+        // Bio — between the PDP and the stats, centred + tap-to-edit. Shows
+        // the placeholder when empty so it stays an obvious edit affordance.
+        const SizedBox(height: 14),
+        Center(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _openBioEditor(context),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              child: Text(
+                emptyBio ? _bioPlaceholder : bio,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: emptyBio ? SC.textMuted : SC.textPrimary,
+                  fontSize: 16.5,
+                  height: 1.4,
+                  fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         // Stats — posts | followers | following — kept centred on the full
         // width by balancing the right-side gear (38 + 8 gap) with an equal
         // invisible spacer on the left. The gear sits at the stats level.
@@ -2138,26 +2161,6 @@ class _IdentitySection extends StatelessWidget {
             if (emojis.length < profileEmojisMax)
               _EmojiAddTile(onTap: () => _openEmojiEditor(context)),
           ],
-        ),
-        // Bio.
-        const SizedBox(height: 24),
-        _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
-        const SizedBox(height: 8),
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _openBioEditor(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              emptyBio ? _bioPlaceholder : bio,
-              style: TextStyle(
-                color: emptyBio ? SC.textMuted : SC.textPrimary,
-                fontSize: 15,
-                height: 1.45,
-                fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
-              ),
-            ),
-          ),
         ),
       ],
     );
