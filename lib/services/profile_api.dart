@@ -343,7 +343,7 @@ const int profilePhotosMax = 6;
 
 /// Maximum number of "centres d'intérêt" tags a user can pin to their
 /// profile. The full taxonomy of selectable tags lives in `interests.dart`.
-const int profileInterestsMax = 4;
+const int profileInterestsMax = 6;
 
 /// Supabase `profiles` table. Mirror of the local UserPrefs profile so that
 /// other users can discover each other by display name.
