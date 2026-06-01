@@ -30,6 +30,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'chat_thread_screen.dart';
@@ -2038,6 +2039,44 @@ class _IdentitySection extends StatelessWidget {
     return viewerMode ? _buildViewer(context) : _buildOwn(context);
   }
 
+  /// The round PDP bubble — the profile's first photo (`photos[0]`) shown as
+  /// a circular avatar at the top of both layouts (above the gallery). On my
+  /// own profile it carries the camera badge and a tap appends a photo;
+  /// read-only (no badge / tap) in the viewer.
+  Widget _pdpBubble({required bool editable}) {
+    final pdp = photos.isNotEmpty ? photos.first : null;
+    return Center(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          ProfileAvatar(
+            displayName: displayName,
+            avatarUrl: pdp,
+            size: 128,
+            fontSize: 54,
+            onTap: editable ? onPickPhoto : null,
+          ),
+          if (editable)
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: SC.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: SC.bg, width: 2),
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// My own profile — capture-1 layout: a "Ton profil" header with an
   /// Aperçu (preview) pill + settings gear, then the "Tes photos" gallery,
   /// the "Emojis" section and the "Bio" section. No avatar circle, name,
@@ -2072,6 +2111,10 @@ class _IdentitySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 26),
+        // Round PDP bubble (the first photo as a circular avatar), above the
+        // gallery — tap to add a photo.
+        _pdpBubble(editable: true),
+        const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle),
         const SizedBox(height: 12),
@@ -2139,9 +2182,11 @@ class _IdentitySection extends StatelessWidget {
       children: [
         // Preview banner — only when looking at my own profile via Aperçu.
         if (preview) ...[const _PreviewBanner(), const SizedBox(height: 16)],
-        // Read-only photo gallery (hidden when the peer has none). In my own
-        // Aperçu with no photo yet, show an empty PDP bubble placeholder so
-        // the preview makes clear where the profile picture will appear.
+        // Round PDP bubble (the first photo as a circular avatar) at the top —
+        // shows the user's initials when they have no photo yet.
+        _pdpBubble(editable: false),
+        const SizedBox(height: 16),
+        // Read-only photo gallery below it (hidden when there are no photos).
         if (photos.isNotEmpty) ...[
           _PhotoGallery(
             photos: photos,
@@ -2151,9 +2196,6 @@ class _IdentitySection extends StatelessWidget {
             iLikePeer: iLikePeer,
             onTogglePeerLike: preview ? null : onTogglePeerLike,
           ),
-          const SizedBox(height: 20),
-        ] else if (preview) ...[
-          const _EmptyPdpBubble(),
           const SizedBox(height: 20),
         ],
         // Centred name + handle.
@@ -2417,28 +2459,6 @@ class _PreviewPill extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Empty circular PDP placeholder shown in the Aperçu preview when the user
-/// hasn't added a photo yet — makes clear where their profile picture will
-/// appear once uploaded.
-class _EmptyPdpBubble extends StatelessWidget {
-  const _EmptyPdpBubble();
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          color: SC.bubbleIn,
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF2A3942)),
-        ),
-        child: const Icon(Icons.person_outline, size: 48, color: SC.textMuted),
       ),
     );
   }
