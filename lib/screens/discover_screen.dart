@@ -76,7 +76,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // move in sync). Any swipe / touch resets it.
   Timer? _swipeHintTimer;
   bool _showSwipeHint = false;
-  static const _swipeHintDelay = Duration(seconds: 10);
+  static const _swipeHintDelay = Duration(seconds: 7);
   // Drives both the card peek (via PageController.jumpTo) and the arrow's
   // translation, so the two animate together.
   late final AnimationController _hintCtrl;
