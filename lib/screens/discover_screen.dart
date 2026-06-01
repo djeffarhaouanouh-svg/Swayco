@@ -1322,7 +1322,8 @@ class _ProfileCard extends StatelessWidget {
                             spacing: 6,
                             runSpacing: 6,
                             children: [
-                              for (final tag in profile.interests.take(6))
+                              for (final tag
+                                  in profile.interests.take(profileInterestsMax))
                                 _DiscoverInterestChip(label: tag),
                             ],
                           ),
