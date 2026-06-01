@@ -67,6 +67,14 @@ abstract final class UserPrefs {
     }
   }
 
+  /// Update just the user's spoken/interface language (drives the app
+  /// locale). Used by the Settings language picker without touching the
+  /// other onboarding fields.
+  static Future<void> setSourceLang(String code) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(keySourceLang, code.trim());
+  }
+
   static Future<ProfileSnapshot?> loadProfile() async {
     final p = await SharedPreferences.getInstance();
     final name = p.getString(keyFirstName);

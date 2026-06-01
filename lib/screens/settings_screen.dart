@@ -11,15 +11,16 @@ import '../services/auth_service.dart';
 import '../services/block_api.dart';
 import '../services/call_alert.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
+import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
-import 'onboarding_screen.dart';
 import 'profile_screen.dart' show CreditsCard;
 
 /// Hosts every secondary account-level action that doesn't belong on the
@@ -228,15 +229,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _openLanguageEditor() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (ctx) => OnboardingScreen(
-          editing: true,
-          onCompleted: () => Navigator.of(ctx).pop(),
+  /// Interface-language picker — a simple bottom sheet listing the available
+  /// UI languages (flag + native label), no longer the whole profile editor.
+  Future<void> _openLanguagePicker() async {
+    final current = AppStrings.currentBcp47.value;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: SC.bubbleIn,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  AppStrings.t('settings_lang_interface'),
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final lang in supportedLanguages)
+                    _LanguageOption(
+                      flag: lang.flag,
+                      label: lang.label,
+                      selected: current == lang.code,
+                      onTap: () => Navigator.of(ctx).pop(lang.code),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );
+    if (picked != null && picked != current) {
+      await _setInterfaceLanguage(picked);
+    }
+  }
+
+  /// Apply + persist the chosen UI language. The app's locale follows the
+  /// profile's `language`, so we set it live, cache it locally and push it to
+  /// Supabase so it sticks across cold boots.
+  Future<void> _setInterfaceLanguage(String code) async {
+    AppStrings.setFromCode(code);
+    await UserPrefs.setSourceLang(code);
+    final profile = _profile;
+    if (profile != null &&
+        profile.displayName.trim().isNotEmpty &&
+        AuthService.isAuthenticated) {
+      final uid = await DeviceId.getOrCreate();
+      await ProfileApi.upsertMyProfile(
+        deviceId: uid,
+        displayName: profile.displayName,
+        language: code,
+        gender: profile.gender,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _profile = _profile?.copyWith(language: code));
   }
 
   void _openBlockedUsers() {
@@ -413,7 +478,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _SettingsRow(
                       icon: Icons.language,
                       label: AppStrings.t('settings_lang_interface'),
-                      onTap: _openLanguageEditor,
+                      trailing: _SubtleText(
+                        findLanguageByCode(AppStrings.currentBcp47.value)
+                                ?.label ??
+                            AppStrings.currentBcp47.value.toUpperCase(),
+                      ),
+                      onTap: _openLanguagePicker,
                     ),
                   ],
                 ),
@@ -642,6 +712,48 @@ class _SubtleText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(color: SC.textMuted, fontSize: 13),
+    );
+  }
+}
+
+/// One row in the interface-language picker (flag + native label + check).
+class _LanguageOption extends StatelessWidget {
+  const _LanguageOption({
+    required this.flag,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String flag;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Text(flag, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected) const Icon(Icons.check, color: SC.accent),
+          ],
+        ),
+      ),
     );
   }
 }
