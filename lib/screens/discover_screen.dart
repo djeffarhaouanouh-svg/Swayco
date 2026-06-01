@@ -563,26 +563,32 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           // divisor, so this also wraps cleanly when the user swipes
           // backward past the first card.
           final profile = _profiles[i % _profiles.length];
-          // The photo runs full-bleed — edge to edge, top to bottom — so it
-          // touches both the frosted top bar and the bottom nav with no empty
-          // "hole" left around it. The card's own bottom content is lifted
-          // clear of the nav via [bottomInset].
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: SizedBox.expand(
-                child: _ProfileCard(
-                  profile: profile,
-                  bottomInset:
-                      GlassNavBar.height + MediaQuery.paddingOf(ctx).bottom,
-                  onAdd: () => _toggleFriendRequest(profile),
-                  pendingOutgoing:
-                      _statusFor(profile) == FriendshipStatus.pendingOutgoing,
-                  liked: _likedIds.contains(profile.id),
-                  onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                  onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
-                  reactedEmojis:
-                      _myReactionsByPeer[profile.id] ?? const <String>{},
+          // The card stops flush against both bars instead of running
+          // behind them: reserve the frosted top bar (safe-area + its
+          // content) above and the nav bar (+ its safe-area) below, then
+          // fill the gap. The photo touches each bar's edge, no overlap.
+          final media = MediaQuery.paddingOf(ctx);
+          return Padding(
+            padding: EdgeInsets.only(
+              top: media.top + _DiscoverHeader.height,
+              bottom: GlassNavBar.height + media.bottom,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SizedBox.expand(
+                  child: _ProfileCard(
+                    profile: profile,
+                    onAdd: () => _toggleFriendRequest(profile),
+                    pendingOutgoing:
+                        _statusFor(profile) == FriendshipStatus.pendingOutgoing,
+                    liked: _likedIds.contains(profile.id),
+                    onToggleLike: () => _toggleLikeOnProfile(profile.id),
+                    onSendEmoji: (emoji) =>
+                        _toggleEmojiReaction(profile, emoji),
+                    reactedEmojis:
+                        _myReactionsByPeer[profile.id] ?? const <String>{},
+                  ),
                 ),
               ),
             ),
@@ -610,6 +616,11 @@ class _DiscoverHeader extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onSubmittedClose;
 
+  /// Height of the bar's content row (below the safe-area inset, which the
+  /// bar pads itself). Exposed so the Discover card can reserve exactly
+  /// this much space at the top and sit flush against the bar's edge.
+  static const double height = 60;
+
   @override
   Widget build(BuildContext context) {
     // Pad the bar's own top by the system safe-area inset so the glass
@@ -634,99 +645,104 @@ class _DiscoverHeader extends StatelessWidget {
             ],
           ),
           padding: EdgeInsets.only(top: topInset),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Row(
-              children: [
-                Text(AppStrings.t('discover_title'), style: SCText.h1),
-                const Spacer(),
-                // Search pill: compact button when collapsed, wider TextField
-                // when expanded — but never full-width.
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOut,
-                  width: expanded ? 200 : null,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: SC.glassStrong,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: SC.glassBorder),
-                  ),
-                  child: Row(
-                    mainAxisSize: expanded
-                        ? MainAxisSize.max
-                        : MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.search, size: 16, color: SC.textMuted),
-                      const SizedBox(width: 6),
-                      if (expanded)
-                        Expanded(
-                          // Local TextSelectionTheme so the selection halo /
-                          // handles match the Midnight cyan instead of the
-                          // legacy WhatsApp-green accent inherited from the
-                          // global theme.
-                          child: TextSelectionTheme(
-                            data: TextSelectionThemeData(
-                              cursorColor: SC.accent,
-                              selectionColor: SC.accent.withValues(alpha: 0.35),
-                              selectionHandleColor: SC.accent,
-                            ),
-                            child: TextField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              onChanged: onChanged,
-                              textInputAction: TextInputAction.search,
-                              cursorColor: SC.accent,
-                              style: const TextStyle(
-                                color: SC.textPrimary,
-                                fontSize: 13,
+          child: SizedBox(
+            height: height,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(AppStrings.t('discover_title'), style: SCText.h1),
+                  const Spacer(),
+                  // Search pill: compact button when collapsed, wider TextField
+                  // when expanded — but never full-width.
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    width: expanded ? 200 : null,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SC.glassStrong,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: SC.glassBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: expanded
+                          ? MainAxisSize.max
+                          : MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.search, size: 16, color: SC.textMuted),
+                        const SizedBox(width: 6),
+                        if (expanded)
+                          Expanded(
+                            // Local TextSelectionTheme so the selection halo /
+                            // handles match the Midnight cyan instead of the
+                            // legacy WhatsApp-green accent inherited from the
+                            // global theme.
+                            child: TextSelectionTheme(
+                              data: TextSelectionThemeData(
+                                cursorColor: SC.accent,
+                                selectionColor: SC.accent.withValues(
+                                  alpha: 0.35,
+                                ),
+                                selectionHandleColor: SC.accent,
                               ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText: AppStrings.t('search_friend_hint'),
-                                hintStyle: const TextStyle(
-                                  color: SC.textMuted,
+                              child: TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                onChanged: onChanged,
+                                textInputAction: TextInputAction.search,
+                                cursorColor: SC.accent,
+                                style: const TextStyle(
+                                  color: SC.textPrimary,
                                   fontSize: 13,
                                 ),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  hintText: AppStrings.t('search_friend_hint'),
+                                  hintStyle: const TextStyle(
+                                    color: SC.textMuted,
+                                    fontSize: 13,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onTapPill,
+                            child: Text(
+                              AppStrings.t('search_chercher'),
+                              style: const TextStyle(
+                                color: SC.textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
-                        )
-                      else
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onTapPill,
-                          child: Text(
-                            AppStrings.t('search_chercher'),
-                            style: const TextStyle(
-                              color: SC.textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                        if (expanded)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onSubmittedClose,
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.close,
+                                size: 16,
+                                color: SC.textMuted,
+                              ),
                             ),
                           ),
-                        ),
-                      if (expanded)
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onSubmittedClose,
-                          child: const Padding(
-                            padding: EdgeInsets.only(left: 4),
-                            child: Icon(
-                              Icons.close,
-                              size: 16,
-                              color: SC.textMuted,
-                            ),
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -952,13 +968,7 @@ class _ProfileCard extends StatelessWidget {
     this.onToggleLike,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
-    this.bottomInset = 0,
   });
-
-  /// Extra space below the card's bottom content row so the name / bio /
-  /// add button / reaction rail clear the full-width nav bar the photo
-  /// now runs full-bleed behind.
-  final double bottomInset;
 
   final RemoteProfile profile;
   final VoidCallback onAdd;
@@ -985,9 +995,16 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(profile.language);
     final flag = lang?.flag ?? '';
-    final photoUrl = profile.discoverPhotoUrl.isNotEmpty
-        ? profile.discoverPhotoUrl
-        : profile.avatarUrl;
+    // The card now browses the profile's whole photo gallery. Fall back to
+    // the single Discover photo / avatar for profiles that predate the
+    // gallery (or only ever set one), dropping any empty URLs.
+    final photos = <String>[...profile.photos.where((u) => u.isNotEmpty)];
+    if (photos.isEmpty) {
+      final single = profile.discoverPhotoUrl.isNotEmpty
+          ? profile.discoverPhotoUrl
+          : profile.avatarUrl;
+      if (single.isNotEmpty) photos.add(single);
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
@@ -1005,15 +1022,10 @@ class _ProfileCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: SC.bubbleIn),
-            if (photoUrl.isNotEmpty)
-              Image.network(
-                photoUrl,
-                fit: BoxFit.cover,
-                // Centre crop — keeps the face roughly in the middle of the
-                // card whether the source is portrait, square, or landscape.
-                alignment: Alignment.center,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
+            if (photos.isNotEmpty)
+              // Fresh carousel state per profile (keyed by id) so swiping to
+              // a new card always starts on its first photo.
+              _PhotoCarousel(key: ValueKey(profile.id), photos: photos),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -1033,7 +1045,7 @@ class _ProfileCard extends StatelessWidget {
             Positioned(
               left: 22,
               right: 22,
-              bottom: 22 + bottomInset,
+              bottom: 22,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1117,6 +1129,94 @@ class _ProfileCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Horizontal photo carousel filling a Discover card. Swipe left / right to
+/// browse the profile's gallery; the parent (vertical) PageView keeps
+/// handling up / down swipes to change profiles, so the two gestures don't
+/// fight. Page dots ride the top edge when there's more than one photo.
+class _PhotoCarousel extends StatefulWidget {
+  const _PhotoCarousel({super.key, required this.photos});
+
+  final List<String> photos;
+
+  @override
+  State<_PhotoCarousel> createState() => _PhotoCarouselState();
+}
+
+class _PhotoCarouselState extends State<_PhotoCarousel> {
+  final PageController _ctrl = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = widget.photos;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _ctrl,
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (_, i) => Image.network(
+            photos[i],
+            fit: BoxFit.cover,
+            // Centre crop — keeps the face roughly in the middle of the
+            // card whether the source is portrait, square, or landscape.
+            alignment: Alignment.center,
+            errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+          ),
+        ),
+        if (photos.length > 1)
+          Positioned(
+            top: 14,
+            left: 0,
+            right: 0,
+            child: _CarouselDots(count: photos.length, index: _page),
+          ),
+      ],
+    );
+  }
+}
+
+/// Instagram-style page dots for [_PhotoCarousel]: the active photo's dot
+/// stretches into a pill, the rest stay small. Sits over the photo so it
+/// needs its own contrast — a soft shadow lifts it off bright images.
+class _CarouselDots extends StatelessWidget {
+  const _CarouselDots({required this.count, required this.index});
+
+  final int count;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == index ? 20 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: i == index ? 0.95 : 0.5),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: const [
+                BoxShadow(color: Color(0x55000000), blurRadius: 4),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
