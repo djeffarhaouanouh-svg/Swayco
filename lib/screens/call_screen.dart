@@ -36,6 +36,7 @@ class CallScreen extends StatefulWidget {
     this.inviteShareText,
     this.isCaller = false,
     this.outgoingCallId,
+    this.startWithCamera = false,
   });
 
   final String wsUrl;
@@ -66,6 +67,11 @@ class CallScreen extends StatefulWidget {
   /// and for guest/live calls that have no ring row.
   final String? outgoingCallId;
 
+  /// Start the call with the local camera ON (a "video" call). When false
+  /// the call starts audio-only — the camera stays off and isn't even
+  /// requested until the user taps the in-call camera toggle.
+  final bool startWithCamera;
+
   @override
   State<CallScreen> createState() => _CallScreenState();
 }
@@ -75,7 +81,7 @@ class _CallScreenState extends State<CallScreen> {
   String? _connectError;
   bool _connecting = true;
   bool _micOn = true;
-  bool _camOn = true;
+  late bool _camOn = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
   /// lives in the small PiP. Tap either to swap back.
   bool _selfMain = false;
@@ -445,14 +451,26 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _start() async {
-    final cam = await Permission.camera.request();
     final mic = await Permission.microphone.request();
-    if (!cam.isGranted || !mic.isGranted) {
+    if (!mic.isGranted) {
       setState(() {
         _connecting = false;
         _connectError = AppStrings.t('call_perm_required');
       });
       return;
+    }
+    // Camera permission is only needed for a video call. Audio calls never
+    // touch the camera (it can still be turned on later from the in-call
+    // toggle, which requests permission then).
+    if (widget.startWithCamera) {
+      final cam = await Permission.camera.request();
+      if (!cam.isGranted) {
+        setState(() {
+          _connecting = false;
+          _connectError = AppStrings.t('call_perm_required');
+        });
+        return;
+      }
     }
 
     // Android 12+ requires BLUETOOTH_CONNECT at runtime before in-call
@@ -474,7 +492,7 @@ class _CallScreenState extends State<CallScreen> {
       if (room.remoteParticipants.isNotEmpty) {
         _hadRemote = true;
       }
-      await room.localParticipant?.setCameraEnabled(true);
+      await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
       // EC + NS on, AGC OFF. Rationale: the translation pipeline plays
       // a second audio stream on the speakers that the browser's EC
       // doesn't fully account for, so any captured leak goes back into
@@ -553,7 +571,7 @@ class _CallScreenState extends State<CallScreen> {
           _room = room;
           _connecting = false;
           _micOn = true;
-          _camOn = true;
+          _camOn = widget.startWithCamera;
         });
       }
       _connectedAt = DateTime.now();
@@ -646,6 +664,19 @@ class _CallScreenState extends State<CallScreen> {
     final room = _room;
     if (room == null) return;
     final next = !_camOn;
+    // Audio calls don't request camera permission upfront, so the first
+    // time the user turns the camera on we ask for it here.
+    if (next) {
+      final cam = await Permission.camera.request();
+      if (!cam.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppStrings.t('call_perm_required'))),
+          );
+        }
+        return;
+      }
+    }
     await room.localParticipant?.setCameraEnabled(next);
     if (mounted) setState(() => _camOn = next);
   }

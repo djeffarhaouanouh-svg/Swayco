@@ -17,7 +17,6 @@ import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
-import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -312,11 +311,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     setState(() => _creatingInvite = true);
     try {
       // The host needs a name + spoken language for the call's translation
-      // route — the same profile fields onboarding collects.
-      final profile = await UserPrefs.loadProfile();
-      final myName = profile?.firstName.trim() ?? '';
-      final myLang = profile?.sourceLang.trim() ?? '';
-      if (myName.isEmpty || myLang.isEmpty) {
+      // route — the same profile fields onboarding collects. Resolved via
+      // the shared helper so the local→Supabase fallback is identical to a
+      // direct peer call (and can't drift out of sync).
+      final me = await CallLauncher.resolveMyIdentity();
+      final myName = me.name;
+      final myLang = me.sourceLang;
+      if (!me.isComplete) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppStrings.t('invite_call_need_profile'))),
@@ -478,6 +479,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       peerDeviceId: p.id,
                       translation: widget.translation,
                     ),
+                    onCallVideo: () => CallLauncher.startCall(
+                      context,
+                      peerDeviceId: p.id,
+                      translation: widget.translation,
+                      startWithCamera: true,
+                    ),
                   ),
               ],
             ),
@@ -516,6 +523,7 @@ class _FriendChatRow extends StatelessWidget {
     required this.onReport,
     required this.onDeleteConversation,
     required this.onCall,
+    required this.onCallVideo,
   });
   final RemoteProfile profile;
   final ChatMessage? lastMessage;
@@ -529,8 +537,11 @@ class _FriendChatRow extends StatelessWidget {
   final VoidCallback onReport;
   /// Removes this conversation from the chat list (local "delete for me").
   final VoidCallback onDeleteConversation;
-  /// Dials this friend — same call path as the chat thread header.
+  /// Dials this friend (audio) — same call path as the chat thread header.
   final VoidCallback onCall;
+
+  /// Dials this friend with the camera on (video call).
+  final VoidCallback onCallVideo;
 
   /// True when the peer was active in the last 2 minutes, has not
   /// hidden their own online status, AND the local user has not
@@ -700,10 +711,9 @@ class _FriendChatRow extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 8),
-            // Direct-call button anchored at the far right of every
-            // row — same path as the long-press menu's "call" entry,
-            // surfaced as a one-tap shortcut.
-            _RowCallButton(onTap: onCall),
+            // 3-dots menu anchored at the far right of every row — opens
+            // the actions sheet (Appeler / Vidéo / profil / signaler…).
+            _RowMoreButton(onTap: () => _showRowMenu(context)),
           ],
         ),
         ),
@@ -725,6 +735,9 @@ class _FriendChatRow extends StatelessWidget {
       case 'call':
         onCall();
         break;
+      case 'video':
+        onCallVideo();
+        break;
       case 'profile':
         onViewProfile();
         break;
@@ -741,12 +754,10 @@ class _FriendChatRow extends StatelessWidget {
   }
 }
 
-/// Small round call shortcut at the far-right of every chat-list row.
-/// Reuses [CallLauncher.startCall] under the hood — same code path as
-/// the long-press menu's "call" entry — so the user can ring a friend
-/// without opening the thread first.
-class _RowCallButton extends StatelessWidget {
-  const _RowCallButton({required this.onTap});
+/// Small round "more" (⋮) button at the far-right of every chat-list row.
+/// Opens the actions sheet (Appeler / Vidéo / view profile / report…).
+class _RowMoreButton extends StatelessWidget {
+  const _RowMoreButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -761,8 +772,8 @@ class _RowCallButton extends StatelessWidget {
         child: const Padding(
           padding: EdgeInsets.all(9),
           child: Icon(
-            Icons.phone_rounded,
-            color: SC.accent,
+            Icons.more_vert,
+            color: SC.textPrimary,
             size: 18,
           ),
         ),
@@ -800,6 +811,11 @@ class _RowActionsSheet extends StatelessWidget {
                 icon: Icons.phone_rounded,
                 label: AppStrings.t('tooltip_call'),
                 onTap: () => Navigator.of(context).pop('call'),
+              ),
+              _RowAction(
+                icon: Icons.videocam_rounded,
+                label: AppStrings.t('call_video'),
+                onTap: () => Navigator.of(context).pop('video'),
               ),
               _RowAction(
                 icon: Icons.person_outline_rounded,

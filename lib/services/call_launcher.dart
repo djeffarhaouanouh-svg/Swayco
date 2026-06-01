@@ -22,6 +22,34 @@ abstract final class CallLauncher {
     return 'u${DateTime.now().millisecondsSinceEpoch}${r.nextInt(999999)}';
   }
 
+  /// The caller's identity for an outgoing call or guest invite: display
+  /// name + spoken language, both needed for the translation route. Read
+  /// local prefs first (instant, works offline) then fill any gap from the
+  /// canonical Supabase profile row — the boot-time hydration in main.dart
+  /// usually beats us to it, but this guarantees no call-site ever refuses
+  /// an action just because local prefs were empty (fresh build install,
+  /// hydration still in flight, or a prior network blip). Empty fields mean
+  /// the profile is genuinely incomplete everywhere.
+  ///
+  /// Single source of truth — every screen that needs the caller's name +
+  /// language MUST go through here instead of reading [UserPrefs.loadProfile]
+  /// directly, so the local→remote fallback never has to be re-implemented
+  /// (and drift) per call-site.
+  static Future<MyCallIdentity> resolveMyIdentity() async {
+    final local = await UserPrefs.loadProfile();
+    var name = local?.firstName.trim() ?? '';
+    var sourceLang = local?.sourceLang.trim() ?? '';
+    if ((name.isEmpty || sourceLang.isEmpty) && isSupabaseReady) {
+      final myId = await DeviceId.getOrCreate();
+      final remote = await ProfileApi.fetchById(myId);
+      if (remote != null) {
+        if (name.isEmpty) name = remote.displayName.trim();
+        if (sourceLang.isEmpty) sourceLang = remote.language.trim();
+      }
+    }
+    return MyCallIdentity(name: name, sourceLang: sourceLang);
+  }
+
   /// Deterministic LiveKit room name derived from both device ids. Sorted
   /// pair → both peers compute the same room. Trimmed to fit the backend's
   /// 3-64 char regex.
@@ -41,21 +69,12 @@ abstract final class CallLauncher {
     BuildContext context, {
     required String peerDeviceId,
     required RealtimeTranslationPort translation,
+    bool startWithCamera = false,
   }) async {
     final myId = await DeviceId.getOrCreate();
-    final localProfile = await UserPrefs.loadProfile();
-    var myName = localProfile?.firstName.trim() ?? '';
-    var mySourceLang = localProfile?.sourceLang.trim() ?? '';
-
-    // Local prefs are empty on first sign-in from a new device — fall back
-    // to the canonical Supabase profile row before giving up.
-    if ((myName.isEmpty || mySourceLang.isEmpty) && isSupabaseReady) {
-      final remote = await ProfileApi.fetchById(myId);
-      if (remote != null) {
-        if (myName.isEmpty) myName = remote.displayName.trim();
-        if (mySourceLang.isEmpty) mySourceLang = remote.language.trim();
-      }
-    }
+    final me = await resolveMyIdentity();
+    final myName = me.name;
+    final mySourceLang = me.sourceLang;
 
     try {
       final room = roomNameFor(myId, peerDeviceId);
@@ -97,6 +116,7 @@ abstract final class CallLauncher {
             mySourceLang: mySourceLang,
             translation: translation,
             isCaller: true,
+            startWithCamera: startWithCamera,
             // Lets the waiting screen close itself the moment the callee
             // declines, instead of ringing into an empty room.
             outgoingCallId: ringId,
@@ -121,4 +141,17 @@ abstract final class CallLauncher {
       return false;
     }
   }
+}
+
+/// The caller's resolved name + spoken language for an outgoing call or
+/// guest invite. Produced by [CallLauncher.resolveMyIdentity]. Empty fields
+/// mean the profile is incomplete on both local prefs and Supabase.
+class MyCallIdentity {
+  const MyCallIdentity({required this.name, required this.sourceLang});
+
+  final String name;
+  final String sourceLang;
+
+  /// True once both fields are present — the minimum to route translation.
+  bool get isComplete => name.isNotEmpty && sourceLang.isNotEmpty;
 }
