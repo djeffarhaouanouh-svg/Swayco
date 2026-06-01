@@ -380,7 +380,7 @@ abstract final class AppStrings {
     'onb_need_name': 'Entre ton prénom.',
     'onb_need_language': 'Choisis la langue que tu parles.',
     'onb_language_picker_label': 'La langue que tu parles',
-    'onb_profile_title': 'Ton profil',
+    'onb_profile_title': 'PROFIL',
     'onb_translation_help':
         "En appel, on traduira automatiquement la voix de l'autre dans ta langue, et la tienne dans la sienne.",
     'onb_gender_title': 'Toi, c\'est…',
@@ -760,7 +760,7 @@ abstract final class AppStrings {
     'onb_need_name': 'Enter your first name.',
     'onb_need_language': 'Pick the language you speak.',
     'onb_language_picker_label': 'The language you speak',
-    'onb_profile_title': 'Your profile',
+    'onb_profile_title': 'PROFILE',
     'onb_translation_help':
         "In a call, we'll automatically translate the other person's voice into your language and yours into theirs.",
     'onb_gender_title': 'You are…',
@@ -1061,7 +1061,7 @@ abstract final class AppStrings {
     'onb_need_name': 'Introduce tu nombre.',
     'onb_need_language': 'Elige el idioma que hablas.',
     'onb_language_picker_label': 'El idioma que hablas',
-    'onb_profile_title': 'Tu perfil',
+    'onb_profile_title': 'PERFIL',
     'onb_translation_help':
         'En una llamada, traduciremos automáticamente la voz de la otra persona a tu idioma y la tuya al suyo.',
 

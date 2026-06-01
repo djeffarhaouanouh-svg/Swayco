@@ -499,6 +499,24 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _saveName(String name) async {
+    if (_deviceId.isEmpty) return;
+    final trimmed = name.trim();
+    // Ignore an empty name — a profile must keep one.
+    if (trimmed.isEmpty) return;
+    final saved =
+        await ProfileApi.updateMyName(userId: _deviceId, name: trimmed);
+    if (saved == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
+      return;
+    }
+    if (!mounted || _remote == null) return;
+    setState(() => _remote = _remote!.copyWith(displayName: saved));
+  }
+
   Future<void> _saveBio(String bio) async {
     if (_deviceId.isEmpty) return;
     final saved = await ProfileApi.updateMyBio(userId: _deviceId, bio: bio);
@@ -676,9 +694,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         children: [
                           _IdentitySection(
-                            displayName: _displayName.isEmpty
-                                ? AppStrings.t('profile_anonymous')
-                                : _displayName,
+                            // Raw name (may be empty) — the section shows the
+                            // "anonymous" fallback itself in viewer mode and
+                            // an editable field on my own profile.
+                            displayName: _displayName,
                             handle: _handle,
                             online: _peerOnline,
                             bio: _remote?.bio ?? '',
@@ -692,6 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             iFollowPeer: _iFollowPeer,
                             iRequestedPeer: _iRequestedPeer,
                             iLikePeer: _iLikePeer,
+                            onEditName: _saveName,
                             onEditBio: _saveBio,
                             onEditEmojis: _saveEmojis,
                             onTapFollowers: () =>
@@ -1712,6 +1732,7 @@ class _IdentitySection extends StatelessWidget {
     required this.avatarUrl,
     required this.counts,
     required this.likesCount,
+    required this.onEditName,
     required this.onEditBio,
     this.onPickAvatar,
     this.onEditEmojis,
@@ -1756,6 +1777,9 @@ class _IdentitySection extends StatelessWidget {
 
   /// Number of users who liked me. Only shown on my own profile (private).
   final int likesCount;
+
+  /// Persist the edited display name (own profile, inline).
+  final Future<void> Function(String) onEditName;
   final Future<void> Function(String) onEditBio;
 
   /// Persist the edited emoji list. Null in viewer mode (read-only).
@@ -1959,17 +1983,17 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name + a small edit pencil (opens the name / language editor),
-        // centred under the PDP.
+        // Name — tap it to edit in place (like the bio); a small pencil
+        // beside it opens the full editor (language, etc.). Centred.
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Flexible(
-              child: Text(
-                displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+              child: _InlineEditable(
+                value: displayName,
+                placeholder: AppStrings.t('profile_anonymous'),
+                onSave: onEditName,
+                maxLength: profileNameMaxLength,
                 style: const TextStyle(
                   color: SC.textPrimary,
                   fontSize: 20,
@@ -2001,10 +2025,17 @@ class _IdentitySection extends StatelessWidget {
         // the text → it turns into a field), no bottom-sheet popup. Shows
         // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        _EditableBio(
-          bio: bio,
+        _InlineEditable(
+          value: bio,
           placeholder: _bioPlaceholder,
           onSave: onEditBio,
+          maxLength: profileBioMaxLength,
+          maxLines: 2,
+          style: const TextStyle(
+            color: SC.textPrimary,
+            fontSize: 16.5,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 16),
         // Stats — posts | followers | following — kept centred on the full
@@ -2090,9 +2121,12 @@ class _IdentitySection extends StatelessWidget {
         // shows the user's initials when they have no photo yet.
         _pdpBubble(editable: false),
         const SizedBox(height: 16),
-        // Centred name + handle.
+        // Centred name + handle. Falls back to the anonymous label when the
+        // peer has no display name set.
         Text(
-          displayName,
+          displayName.trim().isEmpty
+              ? AppStrings.t('profile_anonymous')
+              : displayName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
@@ -2325,23 +2359,34 @@ class _PhotoGallery extends StatelessWidget {
   }
 }
 
-/// Inline, in-place bio editor — no bottom sheet. Shows the bio (or the
-/// placeholder) as centred tappable text; tapping turns it into a centred
-/// field that commits on submit (keyboard "done") or when focus leaves.
-class _EditableBio extends StatefulWidget {
-  const _EditableBio({
-    required this.bio,
+/// Inline, in-place text editor — no bottom sheet. Shows [value] (or the
+/// [placeholder] when empty) as centred tappable text; tapping turns it into
+/// a centred field that commits on submit (keyboard "done") or when focus
+/// leaves. Reused for the name and the bio on my own profile.
+class _InlineEditable extends StatefulWidget {
+  const _InlineEditable({
+    required this.value,
     required this.placeholder,
     required this.onSave,
+    required this.maxLength,
+    required this.style,
+    this.maxLines = 1,
   });
-  final String bio;
+  final String value;
   final String placeholder;
   final Future<void> Function(String) onSave;
+  final int maxLength;
+
+  /// Text style used both for the display text and the field — so editing
+  /// looks like the static text it replaces.
+  final TextStyle style;
+  final int maxLines;
+
   @override
-  State<_EditableBio> createState() => _EditableBioState();
+  State<_InlineEditable> createState() => _InlineEditableState();
 }
 
-class _EditableBioState extends State<_EditableBio> {
+class _InlineEditableState extends State<_InlineEditable> {
   bool _editing = false;
   bool _saving = false;
   final TextEditingController _ctrl = TextEditingController();
@@ -2355,7 +2400,7 @@ class _EditableBioState extends State<_EditableBio> {
   }
 
   void _start() {
-    _ctrl.text = widget.bio;
+    _ctrl.text = widget.value;
     _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
     setState(() => _editing = true);
     _focus.requestFocus();
@@ -2366,7 +2411,7 @@ class _EditableBioState extends State<_EditableBio> {
     final value = _ctrl.text.trim();
     _focus.unfocus();
     setState(() => _editing = false);
-    if (value != widget.bio.trim()) {
+    if (value != widget.value.trim()) {
       _saving = true;
       await widget.onSave(value);
       _saving = false;
@@ -2376,23 +2421,21 @@ class _EditableBioState extends State<_EditableBio> {
   @override
   Widget build(BuildContext context) {
     if (!_editing) {
-      final empty = widget.bio.trim().isEmpty;
-      return Center(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: _start,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            child: Text(
-              empty ? widget.placeholder : widget.bio,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: empty ? SC.textMuted : SC.textPrimary,
-                fontSize: 16.5,
-                height: 1.4,
-                fontStyle: empty ? FontStyle.italic : FontStyle.normal,
-              ),
-            ),
+      final empty = widget.value.trim().isEmpty;
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: _start,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          child: Text(
+            empty ? widget.placeholder : widget.value,
+            textAlign: TextAlign.center,
+            maxLines: widget.maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: empty
+                ? widget.style.copyWith(
+                    color: SC.textMuted, fontStyle: FontStyle.italic)
+                : widget.style,
           ),
         ),
       );
@@ -2402,16 +2445,12 @@ class _EditableBioState extends State<_EditableBio> {
       focusNode: _focus,
       autofocus: true,
       textAlign: TextAlign.center,
-      maxLength: profileBioMaxLength,
-      maxLines: 2,
+      maxLength: widget.maxLength,
+      maxLines: widget.maxLines,
       minLines: 1,
       cursorColor: SC.accent,
       textInputAction: TextInputAction.done,
-      style: const TextStyle(
-        color: SC.textPrimary,
-        fontSize: 16.5,
-        height: 1.4,
-      ),
+      style: widget.style.copyWith(color: SC.textPrimary),
       decoration: InputDecoration(
         isDense: true,
         hintText: widget.placeholder,

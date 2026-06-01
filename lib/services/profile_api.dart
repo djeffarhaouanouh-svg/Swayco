@@ -296,6 +296,10 @@ class RemoteProfile {
 /// client; the DB column should also have a `length(bio) <= 80` check.
 const int profileBioMaxLength = 80;
 
+/// Maximum number of characters allowed in a display name. Matches the
+/// clamp applied when deriving the handle in [ProfileApi._deriveHandle].
+const int profileNameMaxLength = 24;
+
 /// Maximum number of emojis a user can pin to their profile. Kept small so
 /// the "Emojis" section stays a single tidy row across phone widths.
 const int profileEmojisMax = 5;
@@ -762,6 +766,36 @@ abstract final class ProfileApi {
       return next;
     } catch (e) {
       debugPrint('ProfileApi.consumeCredits failed: $e');
+      return null;
+    }
+  }
+
+  /// Persist the user's display name (the "prénom"). Trims to
+  /// [profileNameMaxLength]; ignores a blank value (a profile must keep a
+  /// name). Only `display_name` is written — the `@handle` is a stable,
+  /// unique slug and is intentionally left untouched. Returns the saved
+  /// value for optimistic updates, or null on failure / empty input.
+  static Future<String?> updateMyName({
+    required String userId,
+    required String name,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return null;
+    var trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.length > profileNameMaxLength) {
+      trimmed = trimmed.substring(0, profileNameMaxLength);
+    }
+    try {
+      await _c
+          .from('profiles')
+          .update({
+            'display_name': trimmed,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+      return trimmed;
+    } catch (e) {
+      debugPrint('ProfileApi.updateMyName failed: $e');
       return null;
     }
   }

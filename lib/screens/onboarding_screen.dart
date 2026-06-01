@@ -180,14 +180,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.editing) {
-      // Restyled to the Swayco Midnight DA: mesh background, glass
-      // header bar with the back button + title floating, glass
-      // inputs with cyan focus, and a SC.accent "Save" pill matching
-      // the rest of the migrated screens.
+      // Solid near-black background to match the rest of the app (the
+      // profile screen et al.), instead of the navy mesh — glass header
+      // bar with the back button + title, glass inputs with cyan focus,
+      // and a SC.accent "Save" pill.
       return Scaffold(
-        backgroundColor: SC.bg,
-        body: MeshBackground(
-          child: SafeArea(
+        backgroundColor: const Color(0xFF0E0E0E),
+        body: SafeArea(
             child: Column(
               children: [
                 Padding(
@@ -280,7 +279,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ],
             ),
           ),
-        ),
       );
     }
 
