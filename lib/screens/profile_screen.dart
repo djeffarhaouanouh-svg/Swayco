@@ -2072,10 +2072,12 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 20),
-        // Stats — posts | followers | following — with the settings gear
-        // sitting at the same level on the far right.
+        // Stats — posts | followers | following — kept centred on the full
+        // width by balancing the right-side gear (38 + 8 gap) with an equal
+        // invisible spacer on the left. The gear sits at the stats level.
         Row(
           children: [
+            const SizedBox(width: 46),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -2222,12 +2224,13 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Bio (read-only) — sits between the PDP/name block and the stats.
+        // Bio (read-only) — sits between the PDP/name block and the stats,
+        // left-aligned.
         if (!emptyBio) ...[
           const SizedBox(height: 14),
           Text(
             bio,
-            textAlign: TextAlign.center,
+            textAlign: TextAlign.left,
             style: const TextStyle(
               color: SC.textPrimary,
               fontSize: 14.5,
