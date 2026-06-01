@@ -32,10 +32,35 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen>
     with SingleTickerProviderStateMixin {
   // Real Supabase profiles, hydrated from ProfileApi.fetchDiscoverFeed at
-  // bootstrap. Excludes me, anyone I've blocked / who's blocked me, and
-  // accepted friends.
+  // bootstrap. Excludes me and anyone I've blocked / who's blocked me, but
+  // intentionally KEEPS people I follow so their new photos show up here.
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
+
+  // The feed is now one card per PHOTO, not per profile: every profile is
+  // flattened into its photos (newest first), so a friend's new photos each
+  // get their own swipeable card. Rebuilt whenever [_profiles] changes.
+  final List<({RemoteProfile profile, String photo})> _cards = [];
+
+  void _rebuildCards() {
+    _cards.clear();
+    for (final p in _profiles) {
+      final photos = p.photos.where((u) => u.isNotEmpty).toList();
+      if (photos.isEmpty) {
+        // Legacy rows with no gallery: fall back to the single photo.
+        final single = p.discoverPhotoUrl.isNotEmpty
+            ? p.discoverPhotoUrl
+            : p.avatarUrl;
+        if (single.isNotEmpty) _cards.add((profile: p, photo: single));
+      } else {
+        // Newest photos sit at the end of the array (append-on-upload), so
+        // reverse to show the most recent first.
+        for (final url in photos.reversed) {
+          _cards.add((profile: p, photo: url));
+        }
+      }
+    }
+  }
 
   // Profile ids I've already liked — heart renders filled for these.
   // Hydrated from Supabase on bootstrap so the state survives restarts /
@@ -145,6 +170,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _likedIds = liked;
         _myReactionsByPeer = reactions;
         _profiles = feed;
+        _rebuildCards();
         _feedLoading = false;
       });
     } catch (_) {
@@ -506,6 +532,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (!mounted) return;
     setState(() {
       _profiles = feed;
+      _rebuildCards();
       _feedLoading = false;
     });
   }
@@ -585,7 +612,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             // Idle nudge: an up-arrow near the bottom that rides up in sync
             // with the card peek (both driven by [_hintCtrl]) to show the
             // user they can swipe up to the next card.
-            if (_showSwipeHint && _profiles.length > 1 && !_searchExpanded)
+            if (_showSwipeHint && _cards.length > 1 && !_searchExpanded)
               Positioned(
                 left: 0,
                 right: 0,
@@ -666,13 +693,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         // forever: after the last profile the user lands back on the
         // first one (1 → 2 → 3 → 1 → 2 → 3 …).
         itemBuilder: (ctx, i) {
-          if (_profiles.isEmpty) {
+          if (_cards.isEmpty) {
             return _Empty(onReset: _reset);
           }
           // Dart's `%` returns a non-negative result for a positive
           // divisor, so this also wraps cleanly when the user swipes
-          // backward past the first card.
-          final profile = _profiles[i % _profiles.length];
+          // backward past the first card. One card == one photo.
+          final card = _cards[i % _cards.length];
+          final profile = card.profile;
           // The deck is already inset between the two bars (see build), so
           // the card just fills its page — that keeps consecutive cards
           // contiguous, sliding in flush with no gap between them.
@@ -682,6 +710,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               child: SizedBox.expand(
                 child: _ProfileCard(
                   profile: profile,
+                  photoUrl: card.photo,
                   onAdd: () => _toggleFriendRequest(profile),
                   pendingOutgoing:
                       _statusFor(profile) == FriendshipStatus.pendingOutgoing,
@@ -1094,6 +1123,7 @@ class _StatusPill extends StatelessWidget {
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
+    required this.photoUrl,
     required this.onAdd,
     this.pendingOutgoing = false,
     this.liked = false,
@@ -1103,6 +1133,11 @@ class _ProfileCard extends StatelessWidget {
   });
 
   final RemoteProfile profile;
+
+  /// The single photo this card shows. The Discover feed is one card per
+  /// photo, so each of a profile's gallery photos gets its own card.
+  final String photoUrl;
+
   final VoidCallback onAdd;
 
   /// True when I already have a pending outgoing friend request to
@@ -1127,16 +1162,6 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(profile.language);
     final flag = lang?.flag ?? '';
-    // The card now browses the profile's whole photo gallery. Fall back to
-    // the single Discover photo / avatar for profiles that predate the
-    // gallery (or only ever set one), dropping any empty URLs.
-    final photos = <String>[...profile.photos.where((u) => u.isNotEmpty)];
-    if (photos.isEmpty) {
-      final single = profile.discoverPhotoUrl.isNotEmpty
-          ? profile.discoverPhotoUrl
-          : profile.avatarUrl;
-      if (single.isNotEmpty) photos.add(single);
-    }
     return DecoratedBox(
       decoration: BoxDecoration(
         // Match the bars' notch radius so the card's rounded corners nest
@@ -1156,10 +1181,15 @@ class _ProfileCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: SC.bubbleIn),
-            if (photos.isNotEmpty)
-              // Fresh carousel state per profile (keyed by id) so swiping to
-              // a new card always starts on its first photo.
-              _PhotoCarousel(key: ValueKey(profile.id), photos: photos),
+            if (photoUrl.isNotEmpty)
+              Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                // Centre crop — keeps the subject roughly in the middle of
+                // the card whatever the source aspect ratio.
+                alignment: Alignment.center,
+                errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+              ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -1263,96 +1293,6 @@ class _ProfileCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Horizontal photo carousel filling a Discover card. Swipe left / right to
-/// browse the profile's gallery; the parent (vertical) PageView keeps
-/// handling up / down swipes to change profiles, so the two gestures don't
-/// fight. Page dots ride the top edge when there's more than one photo.
-class _PhotoCarousel extends StatefulWidget {
-  const _PhotoCarousel({super.key, required this.photos});
-
-  final List<String> photos;
-
-  @override
-  State<_PhotoCarousel> createState() => _PhotoCarouselState();
-}
-
-class _PhotoCarouselState extends State<_PhotoCarousel> {
-  final PageController _ctrl = PageController();
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final photos = widget.photos;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        PageView.builder(
-          controller: _ctrl,
-          itemCount: photos.length,
-          onPageChanged: (i) => setState(() => _page = i),
-          itemBuilder: (_, i) => Image.network(
-            photos[i],
-            fit: BoxFit.cover,
-            // Centre crop — keeps the face roughly in the middle of the
-            // card whether the source is portrait, square, or landscape.
-            alignment: Alignment.center,
-            errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-          ),
-        ),
-        if (photos.length > 1)
-          // Top-centre of the card (which already starts just under the
-          // top bar, so a small inset is enough).
-          Positioned(
-            top: 14,
-            left: 0,
-            right: 0,
-            child: _CarouselDots(count: photos.length, index: _page),
-          ),
-      ],
-    );
-  }
-}
-
-/// Instagram-style page dots for [_PhotoCarousel]: the active photo's dot
-/// stretches into a pill, the rest stay small. Sits over the photo so it
-/// needs its own contrast — a soft shadow lifts it off bright images.
-class _CarouselDots extends StatelessWidget {
-  const _CarouselDots({required this.count, required this.index});
-
-  final int count;
-  final int index;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < count; i++)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: i == index ? 20 : 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: i == index ? 0.95 : 0.5),
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: const [
-                BoxShadow(color: Color(0x55000000), blurRadius: 4),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }
