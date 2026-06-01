@@ -1967,7 +1967,7 @@ class _IdentitySection extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 28),
               IconButton(
                 onPressed: onEdit,
                 visualDensity: VisualDensity.compact,

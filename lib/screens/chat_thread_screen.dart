@@ -486,6 +486,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       peerDeviceId: widget.peerDeviceId,
                       translation: widget.translation,
                     ),
+                    onCallVideo: () => CallLauncher.startCall(
+                      context,
+                      peerDeviceId: widget.peerDeviceId,
+                      translation: widget.translation,
+                      startWithCamera: true,
+                    ),
                     onViewProfile: () => Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
                         builder: (_) =>
@@ -600,18 +606,28 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
+    required this.onCallVideo,
     required this.onViewProfile,
-    required this.peerBlocked,
-    required this.onToggleBlock,
-    required this.onReport,
+    this.peerBlocked = false,
+    this.onToggleBlock,
+    this.onReport,
   });
   final String title;
   final RemoteProfile? peer;
+
+  /// Audio call (phone icon).
   final VoidCallback onCall;
+
+  /// Video call (camera icon).
+  final VoidCallback onCallVideo;
   final VoidCallback onViewProfile;
+
+  // Block / report are no longer surfaced in the header (the ⋮ menu was
+  // removed in favour of the phone + camera buttons) — they remain reachable
+  // from the peer's profile. Kept as optional params so the wiring survives.
   final bool peerBlocked;
-  final VoidCallback onToggleBlock;
-  final VoidCallback onReport;
+  final VoidCallback? onToggleBlock;
+  final VoidCallback? onReport;
 
   /// True when the peer was active in the last 2 minutes, hasn't
   /// hidden their online state, AND the local user hasn't opted out
@@ -704,97 +720,13 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ),
             ),
+            // Audio call (phone) + video call (camera).
             GlassIconButton(icon: Icons.phone_rounded, onTap: onCall),
             const SizedBox(width: 6),
-            _HeaderMoreButton(
-              peerBlocked: peerBlocked,
-              onToggleBlock: onToggleBlock,
-              onReport: onReport,
-            ),
+            GlassIconButton(icon: Icons.videocam_rounded, onTap: onCallVideo),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _HeaderMoreButton extends StatelessWidget {
-  const _HeaderMoreButton({
-    required this.peerBlocked,
-    required this.onToggleBlock,
-    required this.onReport,
-  });
-
-  final bool peerBlocked;
-  final VoidCallback onToggleBlock;
-  final VoidCallback onReport;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: AppStrings.t('tooltip_more'),
-      padding: EdgeInsets.zero,
-      offset: const Offset(0, 44),
-      color: SC.bubbleIn,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: SC.glassBorder),
-      ),
-      onSelected: (value) {
-        if (value == 'report') onReport();
-        if (value == 'block') onToggleBlock();
-      },
-      itemBuilder: (ctx) => [
-        PopupMenuItem<String>(
-          value: 'report',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.flag_outlined,
-                size: 18,
-                color: Color(0xFFE53935),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                AppStrings.t('report'),
-                style: const TextStyle(color: Color(0xFFE53935)),
-              ),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'block',
-          child: Row(
-            children: [
-              Icon(
-                peerBlocked ? Icons.lock_open : Icons.block,
-                size: 18,
-                color: peerBlocked ? SC.accent : const Color(0xFFE53935),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                AppStrings.t(peerBlocked ? 'unblock' : 'block'),
-                style: TextStyle(
-                  color: peerBlocked ? SC.accent : const Color(0xFFE53935),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-      child: const _GlassMoreIcon(),
-    );
-  }
-}
-
-class _GlassMoreIcon extends StatelessWidget {
-  const _GlassMoreIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return const GlassIconButton(
-      icon: Icons.more_vert_rounded,
-      // No onTap — the parent PopupMenuButton handles the gesture.
     );
   }
 }
