@@ -15,9 +15,9 @@ import 'supabase_service.dart';
 /// Free is refilled every 7 days ([freeRefillPeriod]); paid tiers
 /// every 30 days ([paidRefillPeriod]) to match Stripe's monthly
 /// invoice.
-const int freeWeeklyCreditsSeconds = 15 * 60;           // 15 crédits / semaine
-const int plusMonthlyCreditsSeconds = 180 * 60;         // 180 crédits / mois (3 h)
-const int ultraPlusMonthlyCreditsSeconds = 360 * 60;    // 360 crédits / mois (6 h)
+const int freeWeeklyCreditsSeconds = 15 * 60; // 15 crédits / semaine
+const int plusMonthlyCreditsSeconds = 180 * 60; // 180 crédits / mois (3 h)
+const int ultraPlusMonthlyCreditsSeconds = 360 * 60; // 360 crédits / mois (6 h)
 
 /// Legacy alias kept so older call sites that still read this name
 /// keep compiling during the rename. New code should use
@@ -69,9 +69,10 @@ class RemoteProfile {
   final String discoverPhotoUrl;
 
   /// Ordered photo gallery shown in the "Tes photos" section. Each element is
-  /// a public URL; `photos[0]` is the PDP (avatar) used everywhere in the app
-  /// and the Discover-card photo. Kept in sync with [avatarUrl] /
-  /// [discoverPhotoUrl] by [ProfileApi.addProfilePhoto] / [removeProfilePhoto].
+  /// a public URL. `photos[0]` drives the Discover-card photo
+  /// ([discoverPhotoUrl], kept in sync by [ProfileApi.addProfilePhoto] /
+  /// [removeProfilePhoto]). The PDP / [avatarUrl] is now independent — set
+  /// separately via [ProfileApi.uploadAvatar].
   final List<String> photos;
 
   /// Free-form short tagline shown on the user's own profile and on their
@@ -115,8 +116,9 @@ class RemoteProfile {
   /// on every paid endpoint — this field only drives client-side hints.
   final String subscriptionTier;
 
-  bool get isPlus => subscriptionTier == 'plus'
-      || subscriptionTier == 'ultra_plus';
+  bool get isPlus =>
+      subscriptionTier == 'plus' || subscriptionTier == 'ultra_plus';
+
   /// True for the new top tier "Ultra Plus" (was historically "pro" /
   /// "ultra" — both have been collapsed into this single tier).
   bool get isUltraPlus => subscriptionTier == 'ultra_plus';
@@ -186,58 +188,57 @@ class RemoteProfile {
   }
 
   factory RemoteProfile.fromMap(Map<String, dynamic> m) => RemoteProfile(
-        id: m['id']?.toString() ?? '',
-        handle: m['handle']?.toString() ?? '',
-        displayName: m['display_name']?.toString() ?? '',
-        language: m['language']?.toString() ?? '',
-        avatarColor: m['avatar_color']?.toString() ?? '',
-        avatarUrl: m['avatar_url']?.toString() ?? '',
-        discoverPhotoUrl: m['discover_photo_url']?.toString() ?? '',
-        photos: () {
-          final raw = m['photos'];
-          if (raw is List) {
-            return raw
-                .map((e) => e.toString().trim())
-                .where((e) => e.isNotEmpty)
-                .toList(growable: false);
-          }
-          return const <String>[];
-        }(),
-        bio: m['bio']?.toString() ?? '',
-        emojis: () {
-          final raw = m['emojis'];
-          if (raw is List) {
-            return raw
-                .map((e) => e.toString().trim())
-                .where((e) => e.isNotEmpty)
-                .toList(growable: false);
-          }
-          return const <String>[];
-        }(),
-        gender: () {
-          final g = m['gender']?.toString().trim() ?? '';
-          return (g == 'm' || g == 'f' || g == 'x') ? g : '';
-        }(),
-        hideOnlineStatus: m['hide_online_status'] == true,
-        hideFromCountry: m['hide_from_country'] == true,
-        isPro: m['is_pro'] == true,
-        subscriptionTier: () {
-          final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
-          // Soft-migrate any rows that still carry the old 'pro' /
-          // 'ultra' values (in case the DB migration lags the deploy)
-          // so the UI doesn't crash on a stale row.
-          if (t == 'pro' || t == 'ultra') return 'ultra_plus';
-          return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
-        }(),
-        elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
-        creditsSeconds:
-            _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
-        creditsResetAt: _parseDate(m['credits_reset_at']),
-        lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
-        proExpiresAt: _parseDate(m['pro_expires_at']),
-        lastSeen: _parseDate(m['last_seen']),
-        referralCode: m['referral_code']?.toString() ?? '',
-      );
+    id: m['id']?.toString() ?? '',
+    handle: m['handle']?.toString() ?? '',
+    displayName: m['display_name']?.toString() ?? '',
+    language: m['language']?.toString() ?? '',
+    avatarColor: m['avatar_color']?.toString() ?? '',
+    avatarUrl: m['avatar_url']?.toString() ?? '',
+    discoverPhotoUrl: m['discover_photo_url']?.toString() ?? '',
+    photos: () {
+      final raw = m['photos'];
+      if (raw is List) {
+        return raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false);
+      }
+      return const <String>[];
+    }(),
+    bio: m['bio']?.toString() ?? '',
+    emojis: () {
+      final raw = m['emojis'];
+      if (raw is List) {
+        return raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false);
+      }
+      return const <String>[];
+    }(),
+    gender: () {
+      final g = m['gender']?.toString().trim() ?? '';
+      return (g == 'm' || g == 'f' || g == 'x') ? g : '';
+    }(),
+    hideOnlineStatus: m['hide_online_status'] == true,
+    hideFromCountry: m['hide_from_country'] == true,
+    isPro: m['is_pro'] == true,
+    subscriptionTier: () {
+      final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
+      // Soft-migrate any rows that still carry the old 'pro' /
+      // 'ultra' values (in case the DB migration lags the deploy)
+      // so the UI doesn't crash on a stale row.
+      if (t == 'pro' || t == 'ultra') return 'ultra_plus';
+      return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
+    }(),
+    elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
+    creditsSeconds: _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
+    creditsResetAt: _parseDate(m['credits_reset_at']),
+    lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
+    proExpiresAt: _parseDate(m['pro_expires_at']),
+    lastSeen: _parseDate(m['last_seen']),
+    referralCode: m['referral_code']?.toString() ?? '',
+  );
 
   /// Returns a copy with the given fields overridden. Used by the few call
   /// sites that mutate a single attribute (bio / emojis save, credit refill)
@@ -265,31 +266,30 @@ class RemoteProfile {
     DateTime? proExpiresAt,
     DateTime? lastSeen,
     String? referralCode,
-  }) =>
-      RemoteProfile(
-        id: id,
-        handle: handle ?? this.handle,
-        displayName: displayName ?? this.displayName,
-        language: language ?? this.language,
-        avatarColor: avatarColor ?? this.avatarColor,
-        avatarUrl: avatarUrl ?? this.avatarUrl,
-        discoverPhotoUrl: discoverPhotoUrl ?? this.discoverPhotoUrl,
-        photos: photos ?? this.photos,
-        bio: bio ?? this.bio,
-        emojis: emojis ?? this.emojis,
-        gender: gender ?? this.gender,
-        hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
-        hideFromCountry: hideFromCountry ?? this.hideFromCountry,
-        isPro: isPro ?? this.isPro,
-        subscriptionTier: subscriptionTier ?? this.subscriptionTier,
-        elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
-        creditsSeconds: creditsSeconds ?? this.creditsSeconds,
-        creditsResetAt: creditsResetAt ?? this.creditsResetAt,
-        lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
-        proExpiresAt: proExpiresAt ?? this.proExpiresAt,
-        lastSeen: lastSeen ?? this.lastSeen,
-        referralCode: referralCode ?? this.referralCode,
-      );
+  }) => RemoteProfile(
+    id: id,
+    handle: handle ?? this.handle,
+    displayName: displayName ?? this.displayName,
+    language: language ?? this.language,
+    avatarColor: avatarColor ?? this.avatarColor,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+    discoverPhotoUrl: discoverPhotoUrl ?? this.discoverPhotoUrl,
+    photos: photos ?? this.photos,
+    bio: bio ?? this.bio,
+    emojis: emojis ?? this.emojis,
+    gender: gender ?? this.gender,
+    hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
+    hideFromCountry: hideFromCountry ?? this.hideFromCountry,
+    isPro: isPro ?? this.isPro,
+    subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+    elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
+    creditsSeconds: creditsSeconds ?? this.creditsSeconds,
+    creditsResetAt: creditsResetAt ?? this.creditsResetAt,
+    lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
+    proExpiresAt: proExpiresAt ?? this.proExpiresAt,
+    lastSeen: lastSeen ?? this.lastSeen,
+    referralCode: referralCode ?? this.referralCode,
+  );
 }
 
 /// Maximum number of characters allowed in a profile bio. Enforced on the
@@ -309,11 +309,7 @@ const int profilePhotosMax = 6;
 /// the Profile screen so users can see whether their row actually reached
 /// Supabase, and what the failure was if it did not.
 class ProfileSyncStatus {
-  ProfileSyncStatus({
-    required this.attemptedAt,
-    required this.ok,
-    this.error,
-  });
+  ProfileSyncStatus({required this.attemptedAt, required this.ok, this.error});
   final DateTime attemptedAt;
   final bool ok;
   final String? error;
@@ -341,9 +337,18 @@ abstract final class ProfileApi {
   /// uploaded photo. Returns a 7-char `#RRGGBB`.
   static String _deriveAvatarColor(String seed) {
     const palette = <String>[
-      '#00A884', '#128C7E', '#075E54', '#34B7F1', '#1F6FEB',
-      '#7B61FF', '#A855F7', '#EC4899', '#F97316', '#EAB308',
-      '#22C55E', '#14B8A6',
+      '#00A884',
+      '#128C7E',
+      '#075E54',
+      '#34B7F1',
+      '#1F6FEB',
+      '#7B61FF',
+      '#A855F7',
+      '#EC4899',
+      '#F97316',
+      '#EAB308',
+      '#22C55E',
+      '#14B8A6',
     ];
     if (seed.isEmpty) return palette[0];
     var hash = 0;
@@ -367,7 +372,8 @@ abstract final class ProfileApi {
       lastSync = ProfileSyncStatus(
         attemptedAt: now,
         ok: false,
-        error: 'Supabase client not initialized (missing SUPABASE_URL / '
+        error:
+            'Supabase client not initialized (missing SUPABASE_URL / '
             'SUPABASE_PUBLISHABLE_KEY at build time).',
       );
       debugPrint('ProfileApi.upsertMyProfile: Supabase not ready, skipping');
@@ -425,7 +431,9 @@ abstract final class ProfileApi {
 
     final ext = contentType.endsWith('png') ? 'png' : 'jpg';
     final path = '$deviceId.$ext';
-    await _c.storage.from('avatars').uploadBinary(
+    await _c.storage
+        .from('avatars')
+        .uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(
@@ -435,12 +443,14 @@ abstract final class ProfileApi {
           ),
         );
     final baseUrl = _c.storage.from('avatars').getPublicUrl(path);
-    final urlWithBuster =
-        '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
-    await _c.from('profiles').update({
-      'avatar_url': urlWithBuster,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', deviceId);
+    final urlWithBuster = '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    await _c
+        .from('profiles')
+        .update({
+          'avatar_url': urlWithBuster,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
     return urlWithBuster;
   }
 
@@ -461,7 +471,9 @@ abstract final class ProfileApi {
 
     final ext = contentType.endsWith('png') ? 'png' : 'jpg';
     final path = 'discover/$deviceId.$ext';
-    await _c.storage.from('avatars').uploadBinary(
+    await _c.storage
+        .from('avatars')
+        .uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(
@@ -471,20 +483,22 @@ abstract final class ProfileApi {
           ),
         );
     final baseUrl = _c.storage.from('avatars').getPublicUrl(path);
-    final urlWithBuster =
-        '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
-    await _c.from('profiles').update({
-      'discover_photo_url': urlWithBuster,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', deviceId);
+    final urlWithBuster = '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    await _c
+        .from('profiles')
+        .update({
+          'discover_photo_url': urlWithBuster,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
     return urlWithBuster;
   }
 
   /// Append [bytes] as a new photo in the user's gallery ("Tes photos").
   /// Each upload gets a unique storage path so the gallery can hold several
-  /// distinct files. The FIRST photo in the gallery doubles as the PDP
-  /// (avatar) shown everywhere in the app AND the Discover-card photo, so
-  /// `photos[0]` is mirrored into both `avatar_url` and `discover_photo_url`.
+  /// distinct files. `photos[0]` still drives the Discover-card photo
+  /// (`discover_photo_url`), but the PDP / avatar is independent now — set
+  /// separately via [uploadAvatar] — so this never touches `avatar_url`.
   ///
   /// [current] is the gallery as the client currently knows it; the new URL
   /// is appended (capped at [profilePhotosMax]) and the full new list is
@@ -509,7 +523,9 @@ abstract final class ProfileApi {
     // photos coexist instead of overwriting a single fixed key.
     final stamp = DateTime.now().millisecondsSinceEpoch;
     final path = 'discover/$deviceId/$stamp.$ext';
-    await _c.storage.from('avatars').uploadBinary(
+    await _c.storage
+        .from('avatars')
+        .uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(
@@ -520,22 +536,26 @@ abstract final class ProfileApi {
         );
     final url = _c.storage.from('avatars').getPublicUrl(path);
     final next = [...current, url].take(profilePhotosMax).toList();
-    await _c.from('profiles').update({
-      'photos': next,
-      // photos[0] is the PDP — keep avatar + discover columns in sync.
-      'avatar_url': next.first,
-      'discover_photo_url': next.first,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', deviceId);
+    await _c
+        .from('profiles')
+        .update({
+          'photos': next,
+          // The gallery drives the Discover card (photos[0]), but the PDP /
+          // avatar is now an independent picture set via [uploadAvatar] — so we
+          // no longer touch `avatar_url` here.
+          'discover_photo_url': next.first,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
     return next;
   }
 
-  /// Remove [url] from the user's gallery. Re-syncs `avatar_url` /
-  /// `discover_photo_url` to the new `photos[0]` (or empties them when the
-  /// gallery becomes empty), best-effort deletes the underlying storage
-  /// object, and — when the gallery is now empty — drops received likes
-  /// (they were earned on a Discover card that no longer has a photo).
-  /// Returns the new gallery list.
+  /// Remove [url] from the user's gallery. Re-syncs `discover_photo_url` to
+  /// the new `photos[0]` (or empties it when the gallery becomes empty) —
+  /// the independent PDP (`avatar_url`) is left untouched — best-effort
+  /// deletes the underlying storage object, and, when the gallery is now
+  /// empty, drops received likes (earned on a Discover card that no longer
+  /// has a photo). Returns the new gallery list.
   static Future<List<String>> removeProfilePhoto({
     required String deviceId,
     required String url,
@@ -546,13 +566,17 @@ abstract final class ProfileApi {
     }
     if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
     final next = current.where((p) => p != url).toList(growable: false);
-    final pdp = next.isEmpty ? '' : next.first;
-    await _c.from('profiles').update({
-      'photos': next,
-      'avatar_url': pdp,
-      'discover_photo_url': pdp,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', deviceId);
+    // Keep the Discover card in sync with the gallery's first photo; the PDP
+    // (avatar_url) is independent now and left untouched.
+    final discover = next.isEmpty ? '' : next.first;
+    await _c
+        .from('profiles')
+        .update({
+          'photos': next,
+          'discover_photo_url': discover,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
     // Best-effort storage cleanup: the public URL is
     // ".../object/public/avatars/<path>" — strip the prefix to recover the
     // storage key. A failure here is at worst a few KB of orphaned bytes.
@@ -603,9 +627,7 @@ abstract final class ProfileApi {
     final builder = _c.from('profiles').select();
     final filtered = handleOnly
         ? builder.ilike('handle', '%$safe%')
-        : builder.or(
-            'display_name.ilike.%$safe%,handle.ilike.%$safe%',
-          );
+        : builder.or('display_name.ilike.%$safe%,handle.ilike.%$safe%');
     final rows = await filtered
         .neq('id', myDeviceId)
         .order('display_name', ascending: true)
@@ -650,10 +672,13 @@ abstract final class ProfileApi {
     final period = p.isPro ? paidRefillPeriod : freeRefillPeriod;
     final nextReset = DateTime.now().toUtc().add(period);
     try {
-      await _c.from('profiles').update({
-        'credits_seconds': allotment,
-        'credits_reset_at': nextReset.toIso8601String(),
-      }).eq('id', p.id);
+      await _c
+          .from('profiles')
+          .update({
+            'credits_seconds': allotment,
+            'credits_reset_at': nextReset.toIso8601String(),
+          })
+          .eq('id', p.id);
     } catch (e) {
       debugPrint('ProfileApi._maybeRefillCredits failed: $e');
       return null;
@@ -725,13 +750,15 @@ abstract final class ProfileApi {
           .maybeSingle();
       if (row == null) return null;
       final current = RemoteProfile._parseInt(row['credits_seconds'], 0);
-      final lifetime =
-          RemoteProfile._parseInt(row['lifetime_call_seconds'], 0);
+      final lifetime = RemoteProfile._parseInt(row['lifetime_call_seconds'], 0);
       final next = (current - seconds).clamp(0, 1 << 31);
-      await _c.from('profiles').update({
-        'credits_seconds': next,
-        'lifetime_call_seconds': lifetime + seconds,
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'credits_seconds': next,
+            'lifetime_call_seconds': lifetime + seconds,
+          })
+          .eq('id', userId);
       return next;
     } catch (e) {
       debugPrint('ProfileApi.consumeCredits failed: $e');
@@ -751,10 +778,13 @@ abstract final class ProfileApi {
         ? bio.substring(0, profileBioMaxLength)
         : bio;
     try {
-      await _c.from('profiles').update({
-        'bio': trimmed,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'bio': trimmed,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return trimmed;
     } catch (e) {
       debugPrint('ProfileApi.updateMyBio failed: $e');
@@ -777,10 +807,13 @@ abstract final class ProfileApi {
         .take(profileEmojisMax)
         .toList(growable: false);
     try {
-      await _c.from('profiles').update({
-        'emojis': cleaned,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'emojis': cleaned,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return cleaned;
     } catch (e) {
       debugPrint('ProfileApi.updateMyEmojis failed: $e');
@@ -797,10 +830,13 @@ abstract final class ProfileApi {
   }) async {
     if (!isSupabaseReady || userId.isEmpty) return false;
     try {
-      await _c.from('profiles').update({
-        'hide_online_status': hide,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'hide_online_status': hide,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return true;
     } catch (e) {
       debugPrint('ProfileApi.updateHideOnlineStatus failed: $e');
@@ -819,10 +855,13 @@ abstract final class ProfileApi {
   }) async {
     if (!isSupabaseReady || userId.isEmpty) return false;
     try {
-      await _c.from('profiles').update({
-        'hide_from_country': hide,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'hide_from_country': hide,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return true;
     } catch (e) {
       debugPrint('ProfileApi.updateHideFromCountry failed: $e');
@@ -837,9 +876,10 @@ abstract final class ProfileApi {
   static Future<void> touchLastSeen(String userId) async {
     if (!isSupabaseReady || userId.isEmpty) return;
     try {
-      await _c.from('profiles').update({
-        'last_seen': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({'last_seen': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', userId);
     } catch (e) {
       debugPrint('ProfileApi.touchLastSeen failed: $e');
     }
@@ -857,11 +897,14 @@ abstract final class ProfileApi {
       // The single photo doubles as the avatar (PDP), so clearing it must
       // wipe both columns — otherwise the deleted photo would linger as the
       // user's avatar everywhere else in the app.
-      await _c.from('profiles').update({
-        'discover_photo_url': '',
-        'avatar_url': '',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await _c
+          .from('profiles')
+          .update({
+            'discover_photo_url': '',
+            'avatar_url': '',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
     } catch (e) {
       debugPrint('ProfileApi.deleteMyDiscoverPhoto: DB update failed: $e');
       rethrow;
@@ -871,8 +914,7 @@ abstract final class ProfileApi {
     try {
       await _c.from('likes').delete().eq('liked', userId);
     } catch (e) {
-      debugPrint(
-          'ProfileApi.deleteMyDiscoverPhoto: likes cleanup failed: $e');
+      debugPrint('ProfileApi.deleteMyDiscoverPhoto: likes cleanup failed: $e');
     }
     try {
       await _c.storage.from('avatars').remove([
@@ -880,7 +922,9 @@ abstract final class ProfileApi {
         'discover/$userId.png',
       ]);
     } catch (e) {
-      debugPrint('ProfileApi.deleteMyDiscoverPhoto: storage cleanup failed: $e');
+      debugPrint(
+        'ProfileApi.deleteMyDiscoverPhoto: storage cleanup failed: $e',
+      );
     }
   }
 
@@ -937,9 +981,7 @@ abstract final class ProfileApi {
     }
 
     final theirLang = p.language.trim().toLowerCase();
-    if (myLang.isNotEmpty &&
-        theirLang.isNotEmpty &&
-        theirLang != myLang) {
+    if (myLang.isNotEmpty && theirLang.isNotEmpty && theirLang != myLang) {
       s += 30;
     }
 
@@ -981,7 +1023,9 @@ abstract final class ProfileApi {
       );
       if (result is! List) return const [];
       final candidates = result
-          .map((r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)))
+          .map(
+            (r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)),
+          )
           .toList(growable: false);
       if (candidates.isEmpty) return const [];
 
@@ -1042,9 +1086,7 @@ abstract final class ProfileApi {
           ),
       ];
       scored.sort((a, b) => b.$2.compareTo(a.$2));
-      return List<RemoteProfile>.unmodifiable(
-        scored.map((s) => s.$1),
-      );
+      return List<RemoteProfile>.unmodifiable(scored.map((s) => s.$1));
     } catch (e) {
       debugPrint('ProfileApi.fetchDiscoverFeed failed: $e');
       return const [];
@@ -1068,5 +1110,4 @@ abstract final class ProfileApi {
     }
     await _c.from('profiles').delete().eq('id', userId);
   }
-
 }

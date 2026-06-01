@@ -433,11 +433,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
           ColoredBox(
-            color: const Color(0xFF0E0E0E),
+            color: const Color(0xFF000000),
             child: SafeArea(
               bottom: false,
               child: Column(

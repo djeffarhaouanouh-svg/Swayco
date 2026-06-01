@@ -438,9 +438,52 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// Remove a single gallery photo. Re-syncs the PDP server-side; cascades a
-  /// like wipe only when the gallery becomes empty (see [ProfileApi.
-  /// removeProfilePhoto]).
+  /// PDP bubble — pick an image and set it as the (independent) profile
+  /// avatar via [ProfileApi.uploadAvatar]. Separate from the gallery: this
+  /// only writes `avatar_url`, leaving "Tes photos" untouched.
+  Future<void> _pickAndSetAvatar() async {
+    if (_deviceId.isEmpty) return;
+    if (!isSupabaseReady) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Supabase non configuré.')));
+      return;
+    }
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: ImageSource.gallery,
+      // The avatar renders small and round — 1024² is plenty and keeps the
+      // upload light.
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 88,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    try {
+      await ProfileApi.uploadAvatar(
+        deviceId: _deviceId,
+        bytes: bytes,
+        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+      );
+      if (!mounted) return;
+      await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload échoué : $e'),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
+  }
+
+  /// Remove a single gallery photo. Re-syncs the Discover photo server-side;
+  /// cascades a like wipe only when the gallery becomes empty (see
+  /// [ProfileApi.removeProfilePhoto]).
   Future<void> _removePhoto(String url) async {
     if (_deviceId.isEmpty) return;
     final ok = await showSwaycoConfirm(
@@ -678,11 +721,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // Horizontal gutter matches the chat / discover headers so
                         // the avatar and bio don't run into the screen edge.
                         padding: EdgeInsets.fromLTRB(
-                          // Bump the top gutter so the avatar sits lower —
-                          // was 20, felt cramped against the safe area on
-                          // larger viewports.
                           28,
-                          56,
+                          // Own profile: title sits at the very top like the
+                          // other tabs (Discover / Messages). Viewer: leave
+                          // room for the transparent AppBar drawn behind it.
+                          _isViewingOther ? 56 : 12,
                           28,
                           32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
@@ -696,6 +739,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             bio: _remote?.bio ?? '',
                             emojis: _remote?.emojis ?? const [],
                             photos: _remote?.photos ?? const [],
+                            avatarUrl: _remote?.avatarUrl ?? '',
                             counts: _counts,
                             likesCount: _likesCount,
                             viewerMode: _isViewingOther,
@@ -712,6 +756,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 _openFriendsList(FriendDirection.following),
                             onTapLikes: _openLikesReceived,
                             onPickPhoto: _pickAndAddPhoto,
+                            onPickAvatar: _pickAndSetAvatar,
                             onRemovePhoto: _removePhoto,
                             onPreview: _openPreview,
                             onEdit: _openEditor,
@@ -1784,9 +1829,11 @@ class _IdentitySection extends StatelessWidget {
     required this.bio,
     required this.emojis,
     required this.photos,
+    required this.avatarUrl,
     required this.counts,
     required this.likesCount,
     required this.onEditBio,
+    this.onPickAvatar,
     this.onEditEmojis,
     required this.onTapFollowers,
     required this.onTapFollowing,
@@ -1820,9 +1867,13 @@ class _IdentitySection extends StatelessWidget {
   /// section; editable on my own profile (tap a tile), read-only otherwise.
   final List<String> emojis;
 
-  /// Photo gallery ("Tes photos"). `photos[0]` is the PDP. Editable (add /
-  /// remove) on my own profile, read-only otherwise.
+  /// Photo gallery ("Tes photos"). Drives the Discover card via `photos[0]`.
+  /// Editable (add / remove) on my own profile, read-only otherwise.
   final List<String> photos;
+
+  /// The profile picture (PDP) shown in the round bubble — an independent
+  /// image, no longer tied to `photos[0]`. Empty falls back to initials.
+  final String avatarUrl;
   final FriendshipCounts counts;
 
   /// Number of users who liked me. Only shown on my own profile (private).
@@ -1837,6 +1888,9 @@ class _IdentitySection extends StatelessWidget {
 
   /// Own profile: append a photo to the gallery.
   final VoidCallback onPickPhoto;
+
+  /// Own profile: pick + set the independent PDP (avatar). Null in viewer.
+  final VoidCallback? onPickAvatar;
 
   /// Own profile: remove the given gallery photo by URL.
   final void Function(String url) onRemovePhoto;
@@ -2039,12 +2093,12 @@ class _IdentitySection extends StatelessWidget {
     return viewerMode ? _buildViewer(context) : _buildOwn(context);
   }
 
-  /// The round PDP bubble — the profile's first photo (`photos[0]`) shown as
-  /// a circular avatar at the top of both layouts (above the gallery). On my
-  /// own profile it carries the camera badge and a tap appends a photo;
-  /// read-only (no badge / tap) in the viewer.
+  /// The round PDP bubble — the independent profile picture ([avatarUrl])
+  /// shown as a circular avatar at the top of both layouts. On my own
+  /// profile it carries the camera badge and a tap sets a new PDP (separate
+  /// from the gallery); read-only (no badge / tap) in the viewer.
   Widget _pdpBubble({required bool editable}) {
-    final pdp = photos.isNotEmpty ? photos.first : null;
+    final pdp = avatarUrl.isEmpty ? null : avatarUrl;
     return Center(
       child: Stack(
         alignment: Alignment.bottomRight,
@@ -2054,7 +2108,7 @@ class _IdentitySection extends StatelessWidget {
             avatarUrl: pdp,
             size: 128,
             fontSize: 54,
-            onTap: editable ? onPickPhoto : null,
+            onTap: editable ? onPickAvatar : null,
           ),
           if (editable)
             Container(
@@ -2247,6 +2301,19 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
+        // Bio (read-only) — sits between the PDP/name block and the stats.
+        if (!emptyBio) ...[
+          const SizedBox(height: 14),
+          Text(
+            bio,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 14.5,
+              height: 1.4,
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         // Stats — posts (= gallery size) | followers | following.
         Row(
@@ -2274,6 +2341,7 @@ class _IdentitySection extends StatelessWidget {
             label: AppStrings.t('profile_message'),
             icon: Icons.chat_bubble_outline,
             onTap: onMessagePeer ?? () {},
+            white: true,
           ),
           // Second action depends on the follow relation:
           //  • I already follow them → "Unfollow".
@@ -2321,20 +2389,6 @@ class _IdentitySection extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [for (final e in emojis) _EmojiTile(emoji: e)],
-          ),
-        ],
-        // Bio (read-only) — only when non-empty.
-        if (!emptyBio) ...[
-          const SizedBox(height: 24),
-          _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
-          const SizedBox(height: 8),
-          Text(
-            bio,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 15,
-              height: 1.45,
-            ),
           ),
         ],
       ],
@@ -2864,6 +2918,7 @@ class _GradientActionButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.subdued = false,
+    this.white = false,
   });
 
   final String label;
@@ -2873,11 +2928,15 @@ class _GradientActionButton extends StatelessWidget {
   /// Muted, non-emphasised style — used for the inert "Following" state.
   final bool subdued;
 
+  /// White fill with dark content — used for the primary "Message" action.
+  final bool white;
+
   @override
   Widget build(BuildContext context) {
-    // Solid colors instead of gradients — primary accent (site green) for
-    // the default action, dark card for the subdued "Following" state.
-    final bg = subdued ? SC.bubbleIn : SC.accent;
+    // Solid colors instead of gradients — white for the primary Message
+    // action, accent for the default, dark card for the subdued state.
+    final bg = white ? Colors.white : (subdued ? SC.bubbleIn : SC.accent);
+    final fg = white ? const Color(0xFF0E0E0E) : Colors.white;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(999),
@@ -2890,12 +2949,12 @@ class _GradientActionButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: Colors.white),
+              Icon(icon, size: 18, color: fg),
               const SizedBox(width: 8),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: fg,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
