@@ -86,7 +86,16 @@ class GlassNavBar extends StatelessWidget {
     final bar = BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
       child: Container(
-        color: Colors.white.withValues(alpha: 0.12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          // Plain bar: a hairline top edge. The hugging bar's outline is
+          // defined by the concave notch clip instead, so no border there.
+          border: hugTopCorners
+              ? null
+              : Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+        ),
         // Reserve the notch strip on top only when hugging, so the icon row
         // sits in exactly the same place whether or not the notches are
         // carved; bottom pad by the safe-area inset.
@@ -150,14 +159,11 @@ class GlassNavBar extends StatelessWidget {
       ),
     );
 
-    // Concave corner notches that hug the Discover card; a plain rounded
-    // top on every other tab. The body height is identical either way.
+    // Concave corner notches that hug the Discover card; a plain flat bar
+    // on every other tab. The body height is identical either way.
     return hugTopCorners
         ? ClipPath(clipper: const _TopHugClipper(hugRadius), child: bar)
-        : ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-            child: bar,
-          );
+        : ClipRect(child: bar);
   }
 }
 

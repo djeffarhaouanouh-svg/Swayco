@@ -29,7 +29,8 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
+class _DiscoverScreenState extends State<DiscoverScreen>
+    with SingleTickerProviderStateMixin {
   // Real Supabase profiles, hydrated from ProfileApi.fetchDiscoverFeed at
   // bootstrap. Excludes me, anyone I've blocked / who's blocked me, and
   // accepted friends.
@@ -70,16 +71,30 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // existing status (pending / accepted) so we don't show "send" twice.
   List<Friendship> _myFriendships = const [];
 
-  // Idle swipe-hint: a bouncing chevron nudges the user to swipe to the
-  // next profile if they linger. Shown after [_swipeHintDelay] of no page
-  // change; reset on every swipe.
+  // Idle swipe-hint: after [_swipeHintDelay] of inactivity, the deck peeks
+  // the next card up and an up-arrow rides along (same controller, so they
+  // move in sync). Any swipe / touch resets it.
   Timer? _swipeHintTimer;
   bool _showSwipeHint = false;
-  static const _swipeHintDelay = Duration(seconds: 5);
+  static const _swipeHintDelay = Duration(seconds: 10);
+  // Drives both the card peek (via PageController.jumpTo) and the arrow's
+  // translation, so the two animate together.
+  late final AnimationController _hintCtrl;
+  // Page offset the nudge started from, restored when it finishes.
+  double _nudgeStart = 0;
+  // True while [_hintCtrl] is actively driving the page peek.
+  bool _nudging = false;
+  // How far the next card peeks up during the nudge.
+  static const double _peek = 34;
 
   @override
   void initState() {
     super.initState();
+    _hintCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      reverseDuration: const Duration(milliseconds: 380),
+    )..addListener(_onHintTick);
     _bootstrapSearch();
     _scheduleSwipeHint();
     // Web: periodically refresh friendships + likes so a peer accepting
@@ -172,6 +187,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    _hintCtrl.dispose();
     _pageController.dispose();
     _searchDebounce?.cancel();
     _pollTimer?.cancel();
@@ -181,51 +197,54 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     super.dispose();
   }
 
-  /// (Re)arm the idle swipe-hint countdown — called on first load and on
-  /// every page change. Hides any visible hint immediately, then fires a
-  /// fresh nudge only once the user has sat still for [_swipeHintDelay].
+  /// (Re)arm the idle swipe-hint countdown — called on first load, on every
+  /// page change, and on any touch. Hides any visible hint and stops a
+  /// running nudge, then fires a fresh one only once the user has sat still
+  /// for [_swipeHintDelay].
   void _scheduleSwipeHint() {
     _swipeHintTimer?.cancel();
+    _nudging = false;
+    _hintCtrl.stop();
     if (_showSwipeHint && mounted) setState(() => _showSwipeHint = false);
     _swipeHintTimer = Timer(_swipeHintDelay, _fireSwipeHint);
   }
 
-  /// Idle nudge: peek the next card up a touch (so the user sees there's a
-  /// card below to swipe to) and show the chevron. Re-arms itself so the
-  /// nudge repeats every few seconds until the user moves.
+  /// Idle nudge: show the up-arrow and peek the next card up (both driven by
+  /// [_hintCtrl] so they move together). Re-arms so the nudge repeats every
+  /// few seconds until the user moves.
   void _fireSwipeHint() {
     if (!mounted) return;
     setState(() => _showSwipeHint = true);
-    _runNudge();
-    _swipeHintTimer = Timer(const Duration(seconds: 3), _fireSwipeHint);
+    _startNudge();
+    _swipeHintTimer = Timer(const Duration(seconds: 4), _fireSwipeHint);
   }
 
-  /// Animate the deck up by a few pixels and back, revealing a sliver of the
-  /// next card — a "swipe up for more" demo. Uses the real PageController so
-  /// no gap opens up. Skipped while the user is already dragging.
-  Future<void> _runNudge() async {
+  /// Run one peek: forward (card lifts, revealing a sliver of the next card)
+  /// then reverse (settles back). [_onHintTick] mirrors [_hintCtrl] onto the
+  /// PageController so no gap ever opens. Skipped while the user is dragging.
+  void _startNudge() {
     if (!_pageController.hasClients) return;
     final pos = _pageController.position;
     if (pos.isScrollingNotifier.value) return;
-    // Capture the resting offset up front — pos.pixels moves as we animate.
-    final start = pos.pixels;
-    const peek = 34.0;
-    try {
-      await _pageController.animateTo(
-        start + peek,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOut,
-      );
-      if (!mounted || !_pageController.hasClients) return;
-      await _pageController.animateTo(
-        start,
-        duration: const Duration(milliseconds: 340),
-        curve: Curves.easeOut,
-      );
-    } catch (_) {
-      // Controller detached mid-animation (page rebuild) — harmless.
-    }
+    _nudgeStart = pos.pixels;
+    _nudging = true;
+    _hintCtrl.forward(from: 0).then((_) {
+      if (mounted && _nudging) _hintCtrl.reverse();
+    });
   }
+
+  /// Mirror [_hintCtrl] onto the page offset so the real next card peeks up
+  /// (no mesh gap), kept in lock-step with the arrow that reads the same
+  /// controller.
+  void _onHintTick() {
+    if (!_nudging || !_pageController.hasClients) return;
+    final t = Curves.easeOut.transform(_hintCtrl.value);
+    _pageController.jumpTo(_nudgeStart + t * _peek);
+  }
+
+  /// Any direct touch counts as activity: stop a running nudge and restart
+  /// the idle countdown so the hint doesn't fight the user.
+  void _onUserActivity() => _scheduleSwipeHint();
 
   void _expandSearch() {
     setState(() => _searchExpanded = true);
@@ -563,15 +582,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   onOpen: _openSearchResult,
                 ),
               ),
-            // Idle nudge: if the user lingers on one profile, a bouncing
-            // chevron near the bottom hints there's more to see below
-            // (swipe to the next card). Hidden as soon as they move.
+            // Idle nudge: an up-arrow near the bottom that rides up in sync
+            // with the card peek (both driven by [_hintCtrl]) to show the
+            // user they can swipe up to the next card.
             if (_showSwipeHint && _profiles.length > 1 && !_searchExpanded)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: deckBottom + 20,
-                child: const IgnorePointer(child: _SwipeHint()),
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _hintCtrl,
+                    builder: (_, child) {
+                      final t = Curves.easeOut.transform(_hintCtrl.value);
+                      return Transform.translate(
+                        offset: Offset(0, -t * 14),
+                        child: child,
+                      );
+                    },
+                    child: const _SwipeHint(),
+                  ),
+                ),
               ),
           ],
         ),
@@ -590,6 +621,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // empty state, so the user can scroll into it the same way they
     // scroll between profiles.
     return Listener(
+      // Any touch on the deck is activity — stop a running hint nudge and
+      // restart the idle countdown so we never fight the user's gesture.
+      onPointerDown: (_) => _onUserActivity(),
       // On desktop a trackpad/mouse-wheel scroll can deliver enough
       // delta to skip several pages before the snap kicks in. We
       // intercept wheel ticks here and advance/rewind the PageView
@@ -1323,28 +1357,11 @@ class _CarouselDots extends StatelessWidget {
   }
 }
 
-/// Idle nudge shown when the user lingers on a profile: a frosted pill with
-/// a chevron that bounces downward, reading as "there's more below — keep
-/// swiping". Fades in on mount; the parent removes it on the next swipe.
-class _SwipeHint extends StatefulWidget {
+/// Idle nudge pill with an up-arrow, pointing the way of the swipe. Its
+/// vertical motion is driven by the parent (the same controller that peeks
+/// the card), so the arrow and the card move as one. Fades in on mount.
+class _SwipeHint extends StatelessWidget {
   const _SwipeHint();
-
-  @override
-  State<_SwipeHint> createState() => _SwipeHintState();
-}
-
-class _SwipeHintState extends State<_SwipeHint>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 850),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1354,24 +1371,17 @@ class _SwipeHintState extends State<_SwipeHint>
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
         builder: (_, fade, child) => Opacity(opacity: fade, child: child),
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (_, child) {
-            final dy = Curves.easeInOut.transform(_ctrl.value) * 7;
-            return Transform.translate(offset: Offset(0, dy), child: child);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.42),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-            ),
-            child: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Colors.white,
-              size: 26,
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          ),
+          child: const Icon(
+            Icons.keyboard_arrow_up_rounded,
+            color: Colors.white,
+            size: 26,
           ),
         ),
       ),
