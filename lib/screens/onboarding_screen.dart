@@ -189,29 +189,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         body: SafeArea(
             child: Column(
               children: [
+                // Header matching the rest of the app: a big left-aligned
+                // SCText.h1 title (same font as Discover / Chat / Messages),
+                // preceded by a plain back button.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-                  child: GlassContainer(
-                    borderRadius: BorderRadius.circular(22),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    child: Row(
-                      children: [
-                        GlassIconButton(
-                          icon: Icons.arrow_back_rounded,
-                          onTap: () => Navigator.of(context).maybePop(),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 4),
+                  child: Row(
+                    children: [
+                      GlassIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          AppStrings.t('onb_profile_title'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SCText.h1,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            AppStrings.t('onb_profile_title'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: SCText.h3,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
