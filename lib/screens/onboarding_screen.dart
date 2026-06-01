@@ -4,6 +4,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
@@ -116,6 +117,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _onLanguageSelected(String code) {
     AppStrings.setFromCode(code);
     setState(() => _selectedLang = code);
+  }
+
+  /// Opens the cascading country → city picker and stores the result in the
+  /// (hidden) country / city controllers so [_finish] persists them.
+  Future<void> _openLocationPicker() async {
+    final result = await showModalBottomSheet<(String, String)>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _LocationPickerSheet(
+        initialCountry: _countryCtrl.text.trim(),
+        initialCity: _cityCtrl.text.trim(),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _countryCtrl.text = result.$1;
+      _cityCtrl.text = result.$2;
+    });
   }
 
   @override
@@ -253,20 +273,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           alignLabelWithHint: true,
                         ),
                         const SizedBox(height: 14),
-                        _GlassTextField(
-                          controller: _countryCtrl,
-                          textCapitalization: TextCapitalization.words,
-                          label: AppStrings.t('onb_country_label'),
-                          hint: AppStrings.t('onb_country_hint'),
+                        // Single field: tap to pick country → then city.
+                        _GlassSelectField(
                           icon: Icons.public,
-                        ),
-                        const SizedBox(height: 14),
-                        _GlassTextField(
-                          controller: _cityCtrl,
-                          textCapitalization: TextCapitalization.words,
-                          label: AppStrings.t('onb_city_label'),
-                          hint: AppStrings.t('onb_city_hint'),
-                          icon: Icons.location_city_outlined,
+                          label: AppStrings.t('onb_location_label'),
+                          hint: AppStrings.t('onb_location_hint'),
+                          value: [_cityCtrl.text.trim(), _countryCtrl.text.trim()]
+                              .where((s) => s.isNotEmpty)
+                              .join(', '),
+                          onTap: _openLocationPicker,
                         ),
                         const SizedBox(height: 22),
                         Text(
@@ -889,6 +904,318 @@ class _GlassTextField extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A read-only, tappable field styled like [_GlassTextField] — shows a label
+/// + the current [value] (or [hint] when empty) and a chevron. Used for the
+/// country/city location picker.
+class _GlassSelectField extends StatelessWidget {
+  const _GlassSelectField({
+    required this.icon,
+    required this.label,
+    required this.hint,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String hint;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value.trim().isNotEmpty;
+    return Material(
+      color: SC.bubbleIn,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: SC.glassBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: SC.textMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: hasValue ? SC.accent : SC.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasValue ? value : hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: hasValue ? SC.textPrimary : SC.textMuted,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down_rounded, color: SC.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-step picker: choose a country (searchable list with flags), then a
+/// city from that country's curated list — with an always-present "Autre
+/// ville…" free-text field for anything not listed. Pops a `(country, city)`
+/// record.
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet({
+    required this.initialCountry,
+    required this.initialCity,
+  });
+  final String initialCountry;
+  final String initialCity;
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  Country? _country;
+  bool _onCityStep = false;
+  String _search = '';
+  final TextEditingController _otherCityCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _otherCityCtrl.dispose();
+    super.dispose();
+  }
+
+  void _pickCountry(Country c) {
+    setState(() {
+      _country = c;
+      _onCityStep = true;
+      _otherCityCtrl.text =
+          c.name == widget.initialCountry ? widget.initialCity : '';
+    });
+  }
+
+  void _commitCity(String city) {
+    final c = _country;
+    if (c == null) return;
+    Navigator.of(context).pop((c.name, city.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (ctx, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: SC.bubbleIn,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SC.textMuted.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+              child: Row(
+                children: [
+                  if (_onCityStep)
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_rounded,
+                          color: SC.textPrimary),
+                      onPressed: () => setState(() => _onCityStep = false),
+                    )
+                  else
+                    const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _onCityStep
+                          ? '${_country!.flag}  ${_country!.name}'
+                          : AppStrings.t('onb_location_label'),
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _onCityStep
+                  ? _buildCityList(scrollController)
+                  : _buildCountryList(scrollController),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountryList(ScrollController sc) {
+    final q = _search.trim().toLowerCase();
+    final list = q.isEmpty
+        ? kCountries
+        : kCountries
+            .where((c) => c.name.toLowerCase().contains(q))
+            .toList(growable: false);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: TextField(
+            autofocus: false,
+            cursorColor: SC.accent,
+            onChanged: (v) => setState(() => _search = v),
+            style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+            decoration: InputDecoration(
+              isDense: true,
+              prefixIcon: const Icon(Icons.search, color: SC.textMuted),
+              hintText: AppStrings.t('loc_search_country'),
+              hintStyle: const TextStyle(color: SC.textMuted),
+              filled: true,
+              fillColor: SC.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: SC.glassBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: SC.glassBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: SC.accent, width: 1.5),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            controller: sc,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            itemCount: list.length,
+            itemBuilder: (_, i) {
+              final c = list[i];
+              return ListTile(
+                leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
+                title: Text(
+                  c.name,
+                  style: const TextStyle(
+                      color: SC.textPrimary, fontWeight: FontWeight.w600),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
+                onTap: () => _pickCountry(c),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCityList(ScrollController sc) {
+    final cities = _country?.cities ?? const <String>[];
+    return ListView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        // Always-present free-text fallback for unlisted cities.
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _otherCityCtrl,
+                textCapitalization: TextCapitalization.words,
+                cursorColor: SC.accent,
+                style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty) _commitCity(v);
+                },
+                decoration: InputDecoration(
+                  isDense: true,
+                  prefixIcon:
+                      const Icon(Icons.edit_location_alt_outlined,
+                          color: SC.textMuted),
+                  hintText: AppStrings.t('loc_other_city_hint'),
+                  hintStyle: const TextStyle(color: SC.textMuted),
+                  filled: true,
+                  fillColor: SC.bg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SC.glassBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SC.glassBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SC.accent, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              style: IconButton.styleFrom(
+                backgroundColor: SC.accent,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.check_rounded),
+              onPressed: () {
+                final v = _otherCityCtrl.text.trim();
+                if (v.isNotEmpty) _commitCity(v);
+              },
+            ),
+          ],
+        ),
+        if (cities.isNotEmpty) const SizedBox(height: 8),
+        for (final city in cities)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            title: Text(
+              city,
+              style: const TextStyle(
+                  color: SC.textPrimary, fontWeight: FontWeight.w600),
+            ),
+            trailing: city == widget.initialCity &&
+                    _country?.name == widget.initialCountry
+                ? const Icon(Icons.check_rounded, color: SC.accent)
+                : null,
+            onTap: () => _commitCity(city),
+          ),
+      ],
     );
   }
 }
