@@ -2144,9 +2144,9 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — title (shared h1 style) on the left with the Aperçu pill +
-        // settings gear on the same top row, right-aligned. The title flexes
-        // and ellipsises so the buttons never get pushed off a narrow phone.
+        // Header — title pushed to the far left, the Aperçu pill to the far
+        // right. The settings gear moved down to the stats row (below),
+        // freeing this line up. Title flexes / ellipsises on narrow phones.
         Row(
           children: [
             Expanded(
@@ -2159,35 +2159,41 @@ class _IdentitySection extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             _PreviewPill(onTap: onPreview),
-            const SizedBox(width: 10),
-            _GhostIconButton(
-              icon: Icons.settings_outlined,
-              onTap: onSettings,
-              tooltip: AppStrings.t('settings_title'),
-            ),
           ],
         ),
         const SizedBox(height: 26),
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 20),
-        // Stats — posts (= gallery size) | followers | following, between the
-        // PDP and the photo gallery.
+        // Stats — posts | followers | following — with the settings gear
+        // sitting at the same level on the far right.
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _InlineStat(value: photos.length, label: 'posts'),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.followers,
-              label: AppStrings.t('profile_followers').toLowerCase(),
-              onTap: onTapFollowers,
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _InlineStat(value: photos.length, label: 'posts'),
+                  const _StatDivider(),
+                  _InlineStat(
+                    value: counts.followers,
+                    label: AppStrings.t('profile_followers').toLowerCase(),
+                    onTap: onTapFollowers,
+                  ),
+                  const _StatDivider(),
+                  _InlineStat(
+                    value: counts.following,
+                    label: AppStrings.t('profile_following').toLowerCase(),
+                    onTap: onTapFollowing,
+                  ),
+                ],
+              ),
             ),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.following,
-              label: AppStrings.t('profile_following').toLowerCase(),
-              onTap: onTapFollowing,
+            const SizedBox(width: 8),
+            _GhostIconButton(
+              icon: Icons.settings_outlined,
+              onTap: onSettings,
+              tooltip: AppStrings.t('settings_title'),
             ),
           ],
         ),
