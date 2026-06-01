@@ -22,7 +22,8 @@ abstract final class AppStrings {
   /// Translate by key. Supports simple `{var}` placeholder substitution.
   static String t(String key, {Map<String, String>? args}) {
     final code = currentBcp47.value;
-    final raw = _maps[code]?[key] ?? _maps['en']?[key] ?? _maps['fr']?[key] ?? key;
+    final raw =
+        _maps[code]?[key] ?? _maps['en']?[key] ?? _maps['fr']?[key] ?? key;
     if (args == null || args.isEmpty) return raw;
     var out = raw;
     args.forEach((k, v) => out = out.replaceAll('{$k}', v));
@@ -83,6 +84,7 @@ abstract final class AppStrings {
     // Settings page
     'settings_title': 'Paramètres',
     'settings_section_account': 'Compte',
+    'settings_section_credits': 'Crédits',
     'settings_section_notifications': 'Notifications',
     'settings_section_privacy': 'Confidentialité',
     'settings_section_lang': 'Langue & traduction',
@@ -126,8 +128,7 @@ abstract final class AppStrings {
     'settings_contact_soon':
         'Écris-nous à support@swayco.app (à venir : ouverture mailto).',
     'settings_terms_soon': "Conditions d'utilisation — bientôt en ligne.",
-    'settings_privacy_soon':
-        'Politique de confidentialité — bientôt en ligne.',
+    'settings_privacy_soon': 'Politique de confidentialité — bientôt en ligne.',
     // Blocked-users sub-screen
     'blocked_title': 'Bloqués',
     'blocked_unblock_title_q': 'Débloquer {name} ?',
@@ -135,8 +136,7 @@ abstract final class AppStrings {
         'Cette personne pourra à nouveau te trouver, te contacter et voir tes messages.',
     'blocked_unblock_confirm': 'Débloquer',
     'blocked_empty_title': 'Aucun utilisateur bloqué',
-    'blocked_empty_body':
-        "Bloque un profil depuis le menu d'une discussion.",
+    'blocked_empty_body': "Bloque un profil depuis le menu d'une discussion.",
     'error_prefix': 'Erreur : {msg}',
     // Generic actions
     'block': 'Bloquer',
@@ -201,8 +201,7 @@ abstract final class AppStrings {
     'call_share_invite': 'Partager le lien',
     // Guest join screen (opened from an invite link)
     'guest_title': "Rejoindre l'appel",
-    'guest_subtitle':
-        'Pas besoin de compte. Choisis ta langue, puis rejoins.',
+    'guest_subtitle': 'Pas besoin de compte. Choisis ta langue, puis rejoins.',
     'guest_default_name': 'Invité',
     'guest_lang_label': 'Tu parles…',
     'guest_join_cta': "Rejoindre l'appel",
@@ -223,17 +222,21 @@ abstract final class AppStrings {
     'no_messages': 'Aucun message — écris le premier !',
     'tooltip_call': 'Appeler',
     'tip_photo_title': 'Apparais dans le Discover ✨',
-    'tip_photo_body': 'Ajoute une photo de toi pour apparaître dans le Discover et recevoir plein d’ajouts du monde entier 😉',
+    'tip_photo_body':
+        'Ajoute une photo de toi pour apparaître dans le Discover et recevoir plein d’ajouts du monde entier 😉',
     'tip_photo_where_title': 'Et ça se passe où ?',
-    'tip_photo_where_body': 'Tu peux ajouter ta photo dès maintenant depuis ta page Profil.',
+    'tip_photo_where_body':
+        'Tu peux ajouter ta photo dès maintenant depuis ta page Profil.',
     'tip_profile_here_title': 'Ta photo, c’est ici 👇',
-    'tip_profile_here_body': 'Ajoute une photo de toi et tu apparaîtras dans le Discover.',
+    'tip_profile_here_body':
+        'Ajoute une photo de toi et tu apparaîtras dans le Discover.',
     'tip_next': 'Suivant',
     'tip_got_it': 'J’ai compris',
     'live_search_failed': 'Impossible de lancer la recherche : {error}',
     'live_connect_failed': 'Connexion impossible : {error}',
     'live_unavailable_title': 'Appel live indisponible',
-    'live_unavailable_body': 'La mise en relation aléatoire a besoin de Supabase. Configure-le pour activer cet onglet.',
+    'live_unavailable_body':
+        'La mise en relation aléatoire a besoin de Supabase. Configure-le pour activer cet onglet.',
     'live_title': 'Appel aléatoire',
     'live_subtitle': 'Rencontre quelqu’un au hasard, traduit en direct.',
     'live_searching_count': '{count} en recherche d’un live',
@@ -242,7 +245,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Caméra non autorisée',
     'live_camera_denied_body': 'Tu peux quand même lancer un appel live.',
     'live_searching_title': 'Recherche d’une personne…',
-    'live_searching_body': 'On te met en relation avec quelqu’un, quelque part dans le monde 🌍 — traduit en direct.',
+    'live_searching_body':
+        'On te met en relation avec quelqu’un, quelque part dans le monde 🌍 — traduit en direct.',
     'live_cancel': 'Annuler',
     'online_now': 'En ligne',
     'discover_photo_cta_title': 'Ajoute une photo de toi',
@@ -250,8 +254,10 @@ abstract final class AppStrings {
     'delete_message': 'Supprimer le message',
     'delete_message_body': 'Ce message sera supprimé pour tout le monde.',
     'delete_conversation': 'Supprimer la conversation',
-    'delete_conversation_body': 'La conversation disparaîtra de ta liste. Elle réapparaîtra si la personne t’envoie un nouveau message.',
-    'call_perm_required': 'L’accès à la caméra et au micro est nécessaire pour rejoindre l’appel.',
+    'delete_conversation_body':
+        'La conversation disparaîtra de ta liste. Elle réapparaîtra si la personne t’envoie un nouveau message.',
+    'call_perm_required':
+        'L’accès à la caméra et au micro est nécessaire pour rejoindre l’appel.',
     'call_could_not_join': 'Connexion impossible',
     'call_go_back': 'Retour',
     'call_connecting': 'Connexion à {room}…',
@@ -279,8 +285,10 @@ abstract final class AppStrings {
     'call_route_speaker': 'Haut-parleur',
     'call_route_earpiece': 'Écouteur',
     'call_audio_output': 'Sortie audio',
-    'call_route_external_hint': 'Sortie gérée par votre appareil tant qu’un casque ou Bluetooth est connecté.',
-    'call_route_internal_hint': 'Active le haut-parleur ou repasse à l’écouteur.',
+    'call_route_external_hint':
+        'Sortie gérée par votre appareil tant qu’un casque ou Bluetooth est connecté.',
+    'call_route_internal_hint':
+        'Active le haut-parleur ou repasse à l’écouteur.',
     'call_language': 'Langue',
     'call_output_language_title': 'Langue que j’entends',
     'call_output_language_hint':
@@ -405,8 +413,7 @@ abstract final class AppStrings {
     'voice_clone_success': 'Voix clonée ! 🎙',
     'voice_clone_too_short': 'Il faut au moins 20 secondes pour cloner.',
     'voice_clone_failed': 'Clonage échoué, réessaie dans un instant.',
-    'voice_clone_ultra_only':
-        'Le clonage est réservé aux abonnés Ultra Plus.',
+    'voice_clone_ultra_only': 'Le clonage est réservé aux abonnés Ultra Plus.',
     'voice_clone_enrolled_title': 'Voix clonée',
     'voice_clone_enrolled_subtitle':
         'Tes messages vocaux sont désormais doublés dans ta voix pour les Ultra Plus. Recommence à tout moment pour mettre à jour la clone.',
@@ -467,6 +474,7 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Pick up to 5 emojis that represent you',
     'settings_title': 'Settings',
     'settings_section_account': 'Account',
+    'settings_section_credits': 'Credits',
     'settings_section_notifications': 'Notifications',
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Language & translation',
@@ -517,8 +525,7 @@ abstract final class AppStrings {
         'They will be able to find you, contact you and see your messages again.',
     'blocked_unblock_confirm': 'Unblock',
     'blocked_empty_title': 'No blocked users',
-    'blocked_empty_body':
-        'Block a profile from the menu of a conversation.',
+    'blocked_empty_body': 'Block a profile from the menu of a conversation.',
     'error_prefix': 'Error: {msg}',
     'block': 'Block',
     'unblock': 'Unblock',
@@ -527,8 +534,7 @@ abstract final class AppStrings {
     'restart': 'Restart',
     'report': 'Report',
     'report_q': 'Report {name}?',
-    'report_body':
-        'Pick a reason. Our team reviews every report.',
+    'report_body': 'Pick a reason. Our team reviews every report.',
     'report_details_hint': 'More details (optional)',
     'report_submit': 'Submit report',
     'report_thanks': 'Report submitted. Thank you.',
@@ -580,8 +586,7 @@ abstract final class AppStrings {
     'call_share_invite': 'Share the link',
     // Guest join screen (opened from an invite link)
     'guest_title': 'Join the call',
-    'guest_subtitle':
-        'No account needed. Pick your language, then join.',
+    'guest_subtitle': 'No account needed. Pick your language, then join.',
     'guest_default_name': 'Guest',
     'guest_lang_label': 'You speak…',
     'guest_join_cta': 'Join the call',
@@ -601,17 +606,21 @@ abstract final class AppStrings {
     'no_messages': 'No messages — write the first one!',
     'tooltip_call': 'Call',
     'tip_photo_title': 'Show up in Discover ✨',
-    'tip_photo_body': 'Add a photo of yourself to appear in Discover and get loads of adds from all over the world 😉',
+    'tip_photo_body':
+        'Add a photo of yourself to appear in Discover and get loads of adds from all over the world 😉',
     'tip_photo_where_title': 'Where does it happen?',
-    'tip_photo_where_body': 'You can add your photo right now from your Profile page.',
+    'tip_photo_where_body':
+        'You can add your photo right now from your Profile page.',
     'tip_profile_here_title': 'Your photo goes here 👇',
-    'tip_profile_here_body': 'Add a photo of yourself and you’ll show up in Discover.',
+    'tip_profile_here_body':
+        'Add a photo of yourself and you’ll show up in Discover.',
     'tip_next': 'Next',
     'tip_got_it': 'Got it',
     'live_search_failed': 'Couldn’t start the search: {error}',
     'live_connect_failed': 'Connection failed: {error}',
     'live_unavailable_title': 'Live call unavailable',
-    'live_unavailable_body': 'Random matchmaking needs Supabase. Set it up to enable this tab.',
+    'live_unavailable_body':
+        'Random matchmaking needs Supabase. Set it up to enable this tab.',
     'live_title': 'Random call',
     'live_subtitle': 'Meet someone at random, translated live.',
     'live_searching_count': '{count} looking for a live',
@@ -620,7 +629,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Camera not allowed',
     'live_camera_denied_body': 'You can still start a live call.',
     'live_searching_title': 'Looking for someone…',
-    'live_searching_body': 'We’re connecting you with someone, somewhere in the world 🌍 — translated live.',
+    'live_searching_body':
+        'We’re connecting you with someone, somewhere in the world 🌍 — translated live.',
     'live_cancel': 'Cancel',
     'online_now': 'Online',
     'discover_photo_cta_title': 'Add a photo of you',
@@ -628,8 +638,10 @@ abstract final class AppStrings {
     'delete_message': 'Delete message',
     'delete_message_body': 'This message will be deleted for everyone.',
     'delete_conversation': 'Delete conversation',
-    'delete_conversation_body': 'The conversation will disappear from your list. It reappears if the person sends you a new message.',
-    'call_perm_required': 'Camera and microphone permission are required to join the call.',
+    'delete_conversation_body':
+        'The conversation will disappear from your list. It reappears if the person sends you a new message.',
+    'call_perm_required':
+        'Camera and microphone permission are required to join the call.',
     'call_could_not_join': 'Could not join',
     'call_go_back': 'Go back',
     'call_connecting': 'Connecting to {room}…',
@@ -657,8 +669,10 @@ abstract final class AppStrings {
     'call_route_speaker': 'Speaker',
     'call_route_earpiece': 'Earpiece',
     'call_audio_output': 'Audio output',
-    'call_route_external_hint': 'Output is handled by your device while headphones or Bluetooth are connected.',
-    'call_route_internal_hint': 'Turn on the speaker or switch back to the earpiece.',
+    'call_route_external_hint':
+        'Output is handled by your device while headphones or Bluetooth are connected.',
+    'call_route_internal_hint':
+        'Turn on the speaker or switch back to the earpiece.',
     'call_language': 'Language',
     'call_output_language_title': 'Language I hear',
     'call_output_language_hint':
@@ -758,7 +772,8 @@ abstract final class AppStrings {
     'onb_need_gender': 'Pick an option to continue.',
 
     // Voice messages — chat composer + bubble.
-    'voice_mic_denied': "Microphone access denied. Enable it in the app settings.",
+    'voice_mic_denied':
+        "Microphone access denied. Enable it in the app settings.",
     'voice_recording_hint': 'Tap to send, or delete to cancel',
     'voice_message': 'Voice message',
     'voice_dub_listen': 'Listen to translation',
@@ -778,7 +793,8 @@ abstract final class AppStrings {
     'voice_clone_success': 'Voice cloned! 🎙',
     'voice_clone_too_short': 'You need at least 20 seconds to clone.',
     'voice_clone_failed': 'Cloning failed, please try again.',
-    'voice_clone_ultra_only': 'Voice cloning is reserved for Ultra Plus subscribers.',
+    'voice_clone_ultra_only':
+        'Voice cloning is reserved for Ultra Plus subscribers.',
     'voice_clone_enrolled_title': 'Voice cloned',
     'voice_clone_enrolled_subtitle':
         'Your voice messages are now dubbed in your own voice for Ultra Plus listeners. Re-record any time to refresh the clone.',
@@ -794,7 +810,8 @@ abstract final class AppStrings {
     'join_name_hint': 'As others will see you',
     'join_speak': 'You speak {lang}',
     'join_no_lang': 'No language selected',
-    'join_lang_subtitle': "The other person's language is detected automatically.",
+    'join_lang_subtitle':
+        "The other person's language is detected automatically.",
     'join_edit_profile': 'Edit your profile',
     'join_error_room': 'Enter a room name (3+ characters) and your first name.',
     'join_error_room_format':
@@ -820,8 +837,7 @@ abstract final class AppStrings {
         'Cuando alguien te añada desde Discover o la búsqueda, su solicitud aparecerá aquí.',
     'demandes_reacted_to_photo': '{name} reaccionó {emoji} a tu foto',
     'demandes_liked_your_photo': 'A {name} le gustó tu foto',
-    'settings_hide_from_country':
-        'Ocultarme de las personas de mi país',
+    'settings_hide_from_country': 'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
         'En los ajustes, decide si las personas de tu país pueden ver tu foto de Discover',
     'tab_placeholder_soon': 'Pronto',
@@ -840,6 +856,7 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Elige hasta 5 emojis que te representen',
     'settings_title': 'Ajustes',
     'settings_section_account': 'Cuenta',
+    'settings_section_credits': 'Créditos',
     'settings_section_notifications': 'Notificaciones',
     'settings_section_privacy': 'Privacidad',
     'settings_section_lang': 'Idioma y traducción',
@@ -927,9 +944,11 @@ abstract final class AppStrings {
     'no_messages': 'Sin mensajes — ¡escribe el primero!',
     'tooltip_call': 'Llamar',
     'tip_photo_title': 'Aparece en Discover ✨',
-    'tip_photo_body': 'Añade una foto tuya para aparecer en Discover y recibir un montón de contactos de todo el mundo 😉',
+    'tip_photo_body':
+        'Añade una foto tuya para aparecer en Discover y recibir un montón de contactos de todo el mundo 😉',
     'tip_photo_where_title': '¿Y dónde se hace?',
-    'tip_photo_where_body': 'Puedes añadir tu foto ahora mismo desde tu página de Perfil.',
+    'tip_photo_where_body':
+        'Puedes añadir tu foto ahora mismo desde tu página de Perfil.',
     'tip_profile_here_title': 'Tu foto va aquí 👇',
     'tip_profile_here_body': 'Añade una foto tuya y aparecerás en Discover.',
     'tip_next': 'Siguiente',
@@ -937,7 +956,8 @@ abstract final class AppStrings {
     'live_search_failed': 'No se pudo iniciar la búsqueda: {error}',
     'live_connect_failed': 'No se pudo conectar: {error}',
     'live_unavailable_title': 'Llamada en vivo no disponible',
-    'live_unavailable_body': 'El emparejamiento aleatorio necesita Supabase. Configúralo para activar esta pestaña.',
+    'live_unavailable_body':
+        'El emparejamiento aleatorio necesita Supabase. Configúralo para activar esta pestaña.',
     'live_title': 'Llamada aleatoria',
     'live_subtitle': 'Conoce a alguien al azar, traducido en directo.',
     'live_searching_count': '{count} buscando un directo',
@@ -946,7 +966,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Cámara no autorizada',
     'live_camera_denied_body': 'Aun así puedes iniciar una llamada en vivo.',
     'live_searching_title': 'Buscando a alguien…',
-    'live_searching_body': 'Te estamos conectando con alguien, en algún lugar del mundo 🌍 — traducido en directo.',
+    'live_searching_body':
+        'Te estamos conectando con alguien, en algún lugar del mundo 🌍 — traducido en directo.',
     'live_cancel': 'Cancelar',
     'online_now': 'En línea',
     'discover_photo_cta_title': 'Añade una foto tuya',
@@ -954,8 +975,10 @@ abstract final class AppStrings {
     'delete_message': 'Eliminar el mensaje',
     'delete_message_body': 'Este mensaje se eliminará para todos.',
     'delete_conversation': 'Eliminar la conversación',
-    'delete_conversation_body': 'La conversación desaparecerá de tu lista. Reaparecerá si la persona te envía un nuevo mensaje.',
-    'call_perm_required': 'Se necesita permiso de cámara y micrófono para unirse a la llamada.',
+    'delete_conversation_body':
+        'La conversación desaparecerá de tu lista. Reaparecerá si la persona te envía un nuevo mensaje.',
+    'call_perm_required':
+        'Se necesita permiso de cámara y micrófono para unirse a la llamada.',
     'call_could_not_join': 'No se pudo unir',
     'call_go_back': 'Volver',
     'call_connecting': 'Conectando a {room}…',
@@ -963,7 +986,8 @@ abstract final class AppStrings {
     'call_connecting_caller_pays':
         'Una sola suscripción basta para la llamada — solo se cobra a quien llama.',
     'call_waiting_title': 'Esperando a la otra persona…',
-    'call_waiting_body': 'Comparte el mismo nombre de sala en otro dispositivo.',
+    'call_waiting_body':
+        'Comparte el mismo nombre de sala en otro dispositivo.',
     'call_leave_q': '¿Salir de la llamada?',
     'call_leave_body': 'Te desconectarás de esta sala.',
     'call_stay': 'Quedarse',
@@ -983,7 +1007,8 @@ abstract final class AppStrings {
     'call_route_speaker': 'Altavoz',
     'call_route_earpiece': 'Auricular',
     'call_audio_output': 'Salida de audio',
-    'call_route_external_hint': 'Tu dispositivo gestiona la salida mientras haya auriculares o Bluetooth conectados.',
+    'call_route_external_hint':
+        'Tu dispositivo gestiona la salida mientras haya auriculares o Bluetooth conectados.',
     'call_route_internal_hint': 'Activa el altavoz o vuelve al auricular.',
     'invite_friend': 'Invitar a un amigo a Swayco',
     'follow_back': 'Seguir también',
@@ -1049,9 +1074,11 @@ abstract final class AppStrings {
     'join_name_hint': 'Como los demás te verán',
     'join_speak': 'Hablas {lang}',
     'join_no_lang': 'Ningún idioma elegido',
-    'join_lang_subtitle': 'El idioma de la otra persona se detecta automáticamente.',
+    'join_lang_subtitle':
+        'El idioma de la otra persona se detecta automáticamente.',
     'join_edit_profile': 'Editar tu perfil',
-    'join_error_room': 'Introduce un nombre de sala (3+ caracteres) y tu nombre.',
+    'join_error_room':
+        'Introduce un nombre de sala (3+ caracteres) y tu nombre.',
     'join_error_room_format':
         'El nombre de la sala debe tener 3-64 caracteres: solo letras, números, _ y - (sin espacios ni #). Ejemplo: cena-con-sam',
     'join_error_lang': 'Elige tu idioma en tu perfil antes de unirte.',
@@ -1073,10 +1100,10 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Noch keine Anfragen',
     'demandes_empty_body':
         'Wenn dich jemand über Discover oder die Suche hinzufügt, erscheint die Anfrage hier.',
-    'demandes_reacted_to_photo': '{name} hat mit {emoji} auf dein Foto reagiert',
+    'demandes_reacted_to_photo':
+        '{name} hat mit {emoji} auf dein Foto reagiert',
     'demandes_liked_your_photo': '{name} gefällt dein Foto',
-    'settings_hide_from_country':
-        'Mich vor Leuten aus meinem Land verbergen',
+    'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
         'Lege in den Einstellungen fest, ob Leute aus deinem Land dein Discover-Foto sehen',
     'my_subscription_section': 'Mein Abo',
@@ -1118,17 +1145,21 @@ abstract final class AppStrings {
     'no_messages': 'Keine Nachrichten — schreibe die erste!',
     'tooltip_call': 'Anrufen',
     'tip_photo_title': 'Erscheine im Discover ✨',
-    'tip_photo_body': 'Füge ein Foto von dir hinzu, um im Discover zu erscheinen und jede Menge Kontakte aus aller Welt zu bekommen 😉',
+    'tip_photo_body':
+        'Füge ein Foto von dir hinzu, um im Discover zu erscheinen und jede Menge Kontakte aus aller Welt zu bekommen 😉',
     'tip_photo_where_title': 'Und wo geht das?',
-    'tip_photo_where_body': 'Du kannst dein Foto gleich jetzt auf deiner Profilseite hinzufügen.',
+    'tip_photo_where_body':
+        'Du kannst dein Foto gleich jetzt auf deiner Profilseite hinzufügen.',
     'tip_profile_here_title': 'Dein Foto kommt hierhin 👇',
-    'tip_profile_here_body': 'Füge ein Foto von dir hinzu und du erscheinst im Discover.',
+    'tip_profile_here_body':
+        'Füge ein Foto von dir hinzu und du erscheinst im Discover.',
     'tip_next': 'Weiter',
     'tip_got_it': 'Verstanden',
     'live_search_failed': 'Suche konnte nicht gestartet werden: {error}',
     'live_connect_failed': 'Verbindung fehlgeschlagen: {error}',
     'live_unavailable_title': 'Live-Anruf nicht verfügbar',
-    'live_unavailable_body': 'Das Zufalls-Matchmaking benötigt Supabase. Richte es ein, um diesen Tab zu aktivieren.',
+    'live_unavailable_body':
+        'Das Zufalls-Matchmaking benötigt Supabase. Richte es ein, um diesen Tab zu aktivieren.',
     'live_title': 'Zufallsanruf',
     'live_subtitle': 'Triff jemanden zufällig, live übersetzt.',
     'live_searching_count': '{count} suchen einen Live-Anruf',
@@ -1137,7 +1168,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Kamera nicht erlaubt',
     'live_camera_denied_body': 'Du kannst trotzdem einen Live-Anruf starten.',
     'live_searching_title': 'Suche jemanden…',
-    'live_searching_body': 'Wir verbinden dich mit jemandem, irgendwo auf der Welt 🌍 — live übersetzt.',
+    'live_searching_body':
+        'Wir verbinden dich mit jemandem, irgendwo auf der Welt 🌍 — live übersetzt.',
     'live_cancel': 'Abbrechen',
     'online_now': 'Online',
     'discover_photo_cta_title': 'Füge ein Foto von dir hinzu',
@@ -1145,8 +1177,10 @@ abstract final class AppStrings {
     'delete_message': 'Nachricht löschen',
     'delete_message_body': 'Diese Nachricht wird für alle gelöscht.',
     'delete_conversation': 'Unterhaltung löschen',
-    'delete_conversation_body': 'Die Unterhaltung verschwindet aus deiner Liste. Sie erscheint wieder, wenn die Person dir eine neue Nachricht schickt.',
-    'call_perm_required': 'Kamera- und Mikrofonzugriff sind nötig, um dem Anruf beizutreten.',
+    'delete_conversation_body':
+        'Die Unterhaltung verschwindet aus deiner Liste. Sie erscheint wieder, wenn die Person dir eine neue Nachricht schickt.',
+    'call_perm_required':
+        'Kamera- und Mikrofonzugriff sind nötig, um dem Anruf beizutreten.',
     'call_could_not_join': 'Beitritt fehlgeschlagen',
     'call_go_back': 'Zurück',
     'call_connecting': 'Verbinde mit {room}…',
@@ -1174,8 +1208,10 @@ abstract final class AppStrings {
     'call_route_speaker': 'Lautsprecher',
     'call_route_earpiece': 'Hörmuschel',
     'call_audio_output': 'Audioausgabe',
-    'call_route_external_hint': 'Die Ausgabe steuert dein Gerät, solange Kopfhörer oder Bluetooth verbunden sind.',
-    'call_route_internal_hint': 'Schalte den Lautsprecher ein oder wechsle zurück zur Hörmuschel.',
+    'call_route_external_hint':
+        'Die Ausgabe steuert dein Gerät, solange Kopfhörer oder Bluetooth verbunden sind.',
+    'call_route_internal_hint':
+        'Schalte den Lautsprecher ein oder wechsle zurück zur Hörmuschel.',
     'invite_friend': 'Einen Freund zu Swayco einladen',
     'follow_back': 'Zurückfolgen',
     'profile_add': 'Hinzufügen',
@@ -1238,9 +1274,11 @@ abstract final class AppStrings {
     'join_name_hint': 'Wie andere dich sehen',
     'join_speak': 'Du sprichst {lang}',
     'join_no_lang': 'Keine Sprache gewählt',
-    'join_lang_subtitle': 'Die Sprache der anderen Person wird automatisch erkannt.',
+    'join_lang_subtitle':
+        'Die Sprache der anderen Person wird automatisch erkannt.',
     'join_edit_profile': 'Profil bearbeiten',
-    'join_error_room': 'Gib einen Raumnamen (mindestens 3 Zeichen) und deinen Vornamen ein.',
+    'join_error_room':
+        'Gib einen Raumnamen (mindestens 3 Zeichen) und deinen Vornamen ein.',
     'join_error_room_format':
         'Der Raumname muss 3-64 Zeichen lang sein: nur Buchstaben, Zahlen, _ und - (keine Leerzeichen oder #). Beispiel: abendessen-mit-sam',
     'join_error_lang': 'Wähle deine Sprache im Profil, bevor du beitrittst.',
@@ -1264,8 +1302,7 @@ abstract final class AppStrings {
         'Quando qualcuno ti aggiungerà da Discover o dalla ricerca, la sua richiesta apparirà qui.',
     'demandes_reacted_to_photo': '{name} ha reagito {emoji} alla tua foto',
     'demandes_liked_your_photo': 'A {name} è piaciuta la tua foto',
-    'settings_hide_from_country':
-        'Nascondimi dalle persone del mio paese',
+    'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
         'Nelle impostazioni, decidi se le persone del tuo paese possono vedere la tua foto Discover',
     'my_subscription_section': 'Il mio abbonamento',
@@ -1307,9 +1344,11 @@ abstract final class AppStrings {
     'no_messages': 'Nessun messaggio — scrivi il primo!',
     'tooltip_call': 'Chiama',
     'tip_photo_title': 'Mostrati nel Discover ✨',
-    'tip_photo_body': 'Aggiungi una tua foto per apparire nel Discover e ricevere un sacco di contatti da tutto il mondo 😉',
+    'tip_photo_body':
+        'Aggiungi una tua foto per apparire nel Discover e ricevere un sacco di contatti da tutto il mondo 😉',
     'tip_photo_where_title': 'E dove si fa?',
-    'tip_photo_where_body': 'Puoi aggiungere la tua foto subito dalla tua pagina Profilo.',
+    'tip_photo_where_body':
+        'Puoi aggiungere la tua foto subito dalla tua pagina Profilo.',
     'tip_profile_here_title': 'La tua foto va qui 👇',
     'tip_profile_here_body': 'Aggiungi una tua foto e apparirai nel Discover.',
     'tip_next': 'Avanti',
@@ -1317,7 +1356,8 @@ abstract final class AppStrings {
     'live_search_failed': 'Impossibile avviare la ricerca: {error}',
     'live_connect_failed': 'Connessione non riuscita: {error}',
     'live_unavailable_title': 'Chiamata live non disponibile',
-    'live_unavailable_body': 'L’abbinamento casuale richiede Supabase. Configuralo per attivare questa scheda.',
+    'live_unavailable_body':
+        'L’abbinamento casuale richiede Supabase. Configuralo per attivare questa scheda.',
     'live_title': 'Chiamata casuale',
     'live_subtitle': 'Incontra qualcuno a caso, tradotto in diretta.',
     'live_searching_count': '{count} alla ricerca di un live',
@@ -1326,7 +1366,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Fotocamera non autorizzata',
     'live_camera_denied_body': 'Puoi comunque avviare una chiamata live.',
     'live_searching_title': 'Sto cercando qualcuno…',
-    'live_searching_body': 'Ti stiamo mettendo in contatto con qualcuno, da qualche parte nel mondo 🌍 — tradotto in diretta.',
+    'live_searching_body':
+        'Ti stiamo mettendo in contatto con qualcuno, da qualche parte nel mondo 🌍 — tradotto in diretta.',
     'live_cancel': 'Annulla',
     'online_now': 'Online',
     'discover_photo_cta_title': 'Aggiungi una tua foto',
@@ -1334,8 +1375,10 @@ abstract final class AppStrings {
     'delete_message': 'Elimina il messaggio',
     'delete_message_body': 'Questo messaggio sarà eliminato per tutti.',
     'delete_conversation': 'Elimina la conversazione',
-    'delete_conversation_body': 'La conversazione sparirà dalla tua lista. Riapparirà se la persona ti invia un nuovo messaggio.',
-    'call_perm_required': 'Servono i permessi di fotocamera e microfono per unirti alla chiamata.',
+    'delete_conversation_body':
+        'La conversazione sparirà dalla tua lista. Riapparirà se la persona ti invia un nuovo messaggio.',
+    'call_perm_required':
+        'Servono i permessi di fotocamera e microfono per unirti alla chiamata.',
     'call_could_not_join': 'Impossibile unirsi',
     'call_go_back': 'Indietro',
     'call_connecting': 'Connessione a {room}…',
@@ -1343,7 +1386,8 @@ abstract final class AppStrings {
     'call_connecting_caller_pays':
         'Un solo abbonamento basta per la chiamata — viene addebitato solo chi chiama.',
     'call_waiting_title': 'In attesa dell’altra persona…',
-    'call_waiting_body': 'Condividi lo stesso nome stanza su un altro dispositivo.',
+    'call_waiting_body':
+        'Condividi lo stesso nome stanza su un altro dispositivo.',
     'call_leave_q': 'Uscire dalla chiamata?',
     'call_leave_body': 'Verrai disconnesso da questa stanza.',
     'call_stay': 'Resta',
@@ -1363,7 +1407,8 @@ abstract final class AppStrings {
     'call_route_speaker': 'Altoparlante',
     'call_route_earpiece': 'Auricolare',
     'call_audio_output': 'Uscita audio',
-    'call_route_external_hint': 'L’uscita è gestita dal dispositivo finché cuffie o Bluetooth sono collegati.',
+    'call_route_external_hint':
+        'L’uscita è gestita dal dispositivo finché cuffie o Bluetooth sono collegati.',
     'call_route_internal_hint': 'Attiva l’altoparlante o torna all’auricolare.',
     'invite_friend': 'Invita un amico su Swayco',
     'follow_back': 'Segui anche tu',
@@ -1427,9 +1472,11 @@ abstract final class AppStrings {
     'join_name_hint': 'Come gli altri ti vedranno',
     'join_speak': 'Parli {lang}',
     'join_no_lang': 'Nessuna lingua scelta',
-    'join_lang_subtitle': "La lingua dell'altra persona viene rilevata automaticamente.",
+    'join_lang_subtitle':
+        "La lingua dell'altra persona viene rilevata automaticamente.",
     'join_edit_profile': 'Modifica il tuo profilo',
-    'join_error_room': 'Inserisci un nome di stanza (3+ caratteri) e il tuo nome.',
+    'join_error_room':
+        'Inserisci un nome di stanza (3+ caratteri) e il tuo nome.',
     'join_error_room_format':
         'Il nome della stanza deve avere 3-64 caratteri: solo lettere, numeri, _ e - (niente spazi né #). Esempio: cena-con-sam',
     'join_error_lang': 'Scegli la tua lingua nel profilo prima di entrare.',
@@ -1453,8 +1500,7 @@ abstract final class AppStrings {
         'Quando alguém te adicionar do Discover ou da pesquisa, o pedido aparecerá aqui.',
     'demandes_reacted_to_photo': '{name} reagiu {emoji} à tua foto',
     'demandes_liked_your_photo': '{name} curtiu a tua foto',
-    'settings_hide_from_country':
-        'Esconder-me das pessoas do meu país',
+    'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
         'Nas definições, decide se as pessoas do teu país podem ver a tua foto Discover',
     'my_subscription_section': 'A minha subscrição',
@@ -1496,17 +1542,21 @@ abstract final class AppStrings {
     'no_messages': 'Sem mensagens — escreva a primeira!',
     'tooltip_call': 'Ligar',
     'tip_photo_title': 'Apareça no Discover ✨',
-    'tip_photo_body': 'Adicione uma foto sua para aparecer no Discover e receber muitos contatos do mundo inteiro 😉',
+    'tip_photo_body':
+        'Adicione uma foto sua para aparecer no Discover e receber muitos contatos do mundo inteiro 😉',
     'tip_photo_where_title': 'E onde é que se faz?',
-    'tip_photo_where_body': 'Você pode adicionar sua foto agora mesmo na sua página de Perfil.',
+    'tip_photo_where_body':
+        'Você pode adicionar sua foto agora mesmo na sua página de Perfil.',
     'tip_profile_here_title': 'Sua foto vai aqui 👇',
-    'tip_profile_here_body': 'Adicione uma foto sua e você vai aparecer no Discover.',
+    'tip_profile_here_body':
+        'Adicione uma foto sua e você vai aparecer no Discover.',
     'tip_next': 'Próximo',
     'tip_got_it': 'Entendi',
     'live_search_failed': 'Não foi possível iniciar a busca: {error}',
     'live_connect_failed': 'Falha na conexão: {error}',
     'live_unavailable_title': 'Chamada ao vivo indisponível',
-    'live_unavailable_body': 'O emparelhamento aleatório precisa do Supabase. Configure-o para ativar esta aba.',
+    'live_unavailable_body':
+        'O emparelhamento aleatório precisa do Supabase. Configure-o para ativar esta aba.',
     'live_title': 'Chamada aleatória',
     'live_subtitle': 'Conheça alguém ao acaso, traduzido ao vivo.',
     'live_searching_count': '{count} à procura de um ao vivo',
@@ -1515,7 +1565,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Câmera não autorizada',
     'live_camera_denied_body': 'Você ainda pode iniciar uma chamada ao vivo.',
     'live_searching_title': 'Procurando alguém…',
-    'live_searching_body': 'Estamos conectando você com alguém, em algum lugar do mundo 🌍 — traduzido ao vivo.',
+    'live_searching_body':
+        'Estamos conectando você com alguém, em algum lugar do mundo 🌍 — traduzido ao vivo.',
     'live_cancel': 'Cancelar',
     'online_now': 'Online',
     'discover_photo_cta_title': 'Adiciona uma foto tua',
@@ -1523,8 +1574,10 @@ abstract final class AppStrings {
     'delete_message': 'Eliminar a mensagem',
     'delete_message_body': 'Esta mensagem será eliminada para todos.',
     'delete_conversation': 'Eliminar a conversa',
-    'delete_conversation_body': 'A conversa desaparecerá da tua lista. Reaparecerá se a pessoa te enviar uma nova mensagem.',
-    'call_perm_required': 'É necessária permissão de câmara e microfone para entrar na chamada.',
+    'delete_conversation_body':
+        'A conversa desaparecerá da tua lista. Reaparecerá se a pessoa te enviar uma nova mensagem.',
+    'call_perm_required':
+        'É necessária permissão de câmara e microfone para entrar na chamada.',
     'call_could_not_join': 'Não foi possível entrar',
     'call_go_back': 'Voltar',
     'call_connecting': 'A ligar a {room}…',
@@ -1552,7 +1605,8 @@ abstract final class AppStrings {
     'call_route_speaker': 'Altifalante',
     'call_route_earpiece': 'Auricular',
     'call_audio_output': 'Saída de áudio',
-    'call_route_external_hint': 'A saída é gerida pelo teu dispositivo enquanto houver auscultadores ou Bluetooth ligados.',
+    'call_route_external_hint':
+        'A saída é gerida pelo teu dispositivo enquanto houver auscultadores ou Bluetooth ligados.',
     'call_route_internal_hint': 'Ativa o altifalante ou volta ao auricular.',
     'invite_friend': 'Convidar um amigo para o Swayco',
     'follow_back': 'Seguir de volta',
@@ -1616,7 +1670,8 @@ abstract final class AppStrings {
     'join_name_hint': 'Como os outros te verão',
     'join_speak': 'Falas {lang}',
     'join_no_lang': 'Nenhuma língua escolhida',
-    'join_lang_subtitle': 'A língua da outra pessoa é detetada automaticamente.',
+    'join_lang_subtitle':
+        'A língua da outra pessoa é detetada automaticamente.',
     'join_edit_profile': 'Editar o teu perfil',
     'join_error_room': 'Insere um nome de sala (3+ caracteres) e o teu nome.',
     'join_error_room_format':
@@ -1642,8 +1697,7 @@ abstract final class AppStrings {
         'Wanneer iemand je toevoegt via Discover of de zoekbalk, verschijnt het verzoek hier.',
     'demandes_reacted_to_photo': '{name} reageerde {emoji} op je foto',
     'demandes_liked_your_photo': '{name} vindt je foto leuk',
-    'settings_hide_from_country':
-        'Mij verbergen voor mensen uit mijn land',
+    'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
         'Bepaal in de instellingen of mensen uit jouw land je Discover-foto kunnen zien',
     'my_subscription_section': 'Mijn abonnement',
@@ -1685,17 +1739,21 @@ abstract final class AppStrings {
     'no_messages': 'Geen berichten — schrijf het eerste!',
     'tooltip_call': 'Bellen',
     'tip_photo_title': 'Verschijn in Discover ✨',
-    'tip_photo_body': 'Voeg een foto van jezelf toe om in Discover te verschijnen en volop contacten van over de hele wereld te krijgen 😉',
+    'tip_photo_body':
+        'Voeg een foto van jezelf toe om in Discover te verschijnen en volop contacten van over de hele wereld te krijgen 😉',
     'tip_photo_where_title': 'En waar doe je dat?',
-    'tip_photo_where_body': 'Je kunt je foto nu meteen toevoegen op je Profielpagina.',
+    'tip_photo_where_body':
+        'Je kunt je foto nu meteen toevoegen op je Profielpagina.',
     'tip_profile_here_title': 'Je foto komt hier 👇',
-    'tip_profile_here_body': 'Voeg een foto van jezelf toe en je verschijnt in Discover.',
+    'tip_profile_here_body':
+        'Voeg een foto van jezelf toe en je verschijnt in Discover.',
     'tip_next': 'Volgende',
     'tip_got_it': 'Begrepen',
     'live_search_failed': 'Kan het zoeken niet starten: {error}',
     'live_connect_failed': 'Verbinding mislukt: {error}',
     'live_unavailable_title': 'Live-oproep niet beschikbaar',
-    'live_unavailable_body': 'Willekeurige matchmaking heeft Supabase nodig. Stel het in om dit tabblad te activeren.',
+    'live_unavailable_body':
+        'Willekeurige matchmaking heeft Supabase nodig. Stel het in om dit tabblad te activeren.',
     'live_title': 'Willekeurige oproep',
     'live_subtitle': 'Ontmoet iemand willekeurig, live vertaald.',
     'live_searching_count': '{count} op zoek naar een live',
@@ -1704,7 +1762,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'Camera niet toegestaan',
     'live_camera_denied_body': 'Je kunt nog steeds een live-oproep starten.',
     'live_searching_title': 'Iemand zoeken…',
-    'live_searching_body': 'We verbinden je met iemand, ergens ter wereld 🌍 — live vertaald.',
+    'live_searching_body':
+        'We verbinden je met iemand, ergens ter wereld 🌍 — live vertaald.',
     'live_cancel': 'Annuleren',
     'online_now': 'Online',
     'discover_photo_cta_title': 'Voeg een foto van jezelf toe',
@@ -1712,8 +1771,10 @@ abstract final class AppStrings {
     'delete_message': 'Bericht verwijderen',
     'delete_message_body': 'Dit bericht wordt voor iedereen verwijderd.',
     'delete_conversation': 'Gesprek verwijderen',
-    'delete_conversation_body': 'Het gesprek verdwijnt uit je lijst. Het verschijnt weer als de persoon je een nieuw bericht stuurt.',
-    'call_perm_required': 'Toegang tot camera en microfoon is nodig om aan de oproep deel te nemen.',
+    'delete_conversation_body':
+        'Het gesprek verdwijnt uit je lijst. Het verschijnt weer als de persoon je een nieuw bericht stuurt.',
+    'call_perm_required':
+        'Toegang tot camera en microfoon is nodig om aan de oproep deel te nemen.',
     'call_could_not_join': 'Deelnemen mislukt',
     'call_go_back': 'Terug',
     'call_connecting': 'Verbinden met {room}…',
@@ -1741,8 +1802,10 @@ abstract final class AppStrings {
     'call_route_speaker': 'Luidspreker',
     'call_route_earpiece': 'Oortelefoon',
     'call_audio_output': 'Audio-uitvoer',
-    'call_route_external_hint': 'De uitvoer wordt door je apparaat geregeld zolang een koptelefoon of Bluetooth verbonden is.',
-    'call_route_internal_hint': 'Zet de luidspreker aan of schakel terug naar de oortelefoon.',
+    'call_route_external_hint':
+        'De uitvoer wordt door je apparaat geregeld zolang een koptelefoon of Bluetooth verbonden is.',
+    'call_route_internal_hint':
+        'Zet de luidspreker aan of schakel terug naar de oortelefoon.',
     'invite_friend': 'Nodig een vriend uit voor Swayco',
     'follow_back': 'Terug volgen',
     'profile_add': 'Toevoegen',
@@ -1805,7 +1868,8 @@ abstract final class AppStrings {
     'join_name_hint': 'Hoe anderen je zullen zien',
     'join_speak': 'Je spreekt {lang}',
     'join_no_lang': 'Geen taal gekozen',
-    'join_lang_subtitle': 'De taal van de andere persoon wordt automatisch gedetecteerd.',
+    'join_lang_subtitle':
+        'De taal van de andere persoon wordt automatisch gedetecteerd.',
     'join_edit_profile': 'Profiel bewerken',
     'join_error_room': 'Voer een kamernaam (3+ tekens) en je voornaam in.',
     'join_error_room_format':
@@ -1873,7 +1937,8 @@ abstract final class AppStrings {
     'no_messages': 'لا توجد رسائل — اكتب الأولى!',
     'tooltip_call': 'اتصل',
     'tip_photo_title': 'اظهر في Discover ✨',
-    'tip_photo_body': 'أضِف صورة لك لتظهر في Discover وتحصل على الكثير من الإضافات من جميع أنحاء العالم 😉',
+    'tip_photo_body':
+        'أضِف صورة لك لتظهر في Discover وتحصل على الكثير من الإضافات من جميع أنحاء العالم 😉',
     'tip_photo_where_title': 'وأين يتم ذلك؟',
     'tip_photo_where_body': 'يمكنك إضافة صورتك الآن من صفحة ملفك الشخصي.',
     'tip_profile_here_title': 'صورتك توضع هنا 👇',
@@ -1883,7 +1948,8 @@ abstract final class AppStrings {
     'live_search_failed': 'تعذّر بدء البحث: {error}',
     'live_connect_failed': 'فشل الاتصال: {error}',
     'live_unavailable_title': 'المكالمة المباشرة غير متاحة',
-    'live_unavailable_body': 'يحتاج التوفيق العشوائي إلى Supabase. قم بإعداده لتفعيل هذا التبويب.',
+    'live_unavailable_body':
+        'يحتاج التوفيق العشوائي إلى Supabase. قم بإعداده لتفعيل هذا التبويب.',
     'live_title': 'مكالمة عشوائية',
     'live_subtitle': 'قابِل شخصًا عشوائيًا، مترجَمًا مباشرةً.',
     'live_searching_count': '{count} يبحثون عن بث مباشر',
@@ -1892,7 +1958,8 @@ abstract final class AppStrings {
     'live_camera_denied': 'الكاميرا غير مسموح بها',
     'live_camera_denied_body': 'لا يزال بإمكانك بدء مكالمة مباشرة.',
     'live_searching_title': 'البحث عن شخص…',
-    'live_searching_body': 'نوصلك بشخص ما، في مكان ما من العالم 🌍 — مترجَمًا مباشرةً.',
+    'live_searching_body':
+        'نوصلك بشخص ما، في مكان ما من العالم 🌍 — مترجَمًا مباشرةً.',
     'live_cancel': 'إلغاء',
     'online_now': 'متصل الآن',
     'discover_photo_cta_title': 'أضف صورة لك',
@@ -1900,8 +1967,10 @@ abstract final class AppStrings {
     'delete_message': 'حذف الرسالة',
     'delete_message_body': 'سيتم حذف هذه الرسالة لدى الجميع.',
     'delete_conversation': 'حذف المحادثة',
-    'delete_conversation_body': 'ستختفي المحادثة من قائمتك. وستظهر مجددًا إذا أرسل لك الشخص رسالة جديدة.',
-    'call_perm_required': 'يلزم إذن الكاميرا والميكروفون للانضمام إلى المكالمة.',
+    'delete_conversation_body':
+        'ستختفي المحادثة من قائمتك. وستظهر مجددًا إذا أرسل لك الشخص رسالة جديدة.',
+    'call_perm_required':
+        'يلزم إذن الكاميرا والميكروفون للانضمام إلى المكالمة.',
     'call_could_not_join': 'تعذّر الانضمام',
     'call_go_back': 'رجوع',
     'call_connecting': 'جارٍ الاتصال بـ {room}…',
@@ -1929,7 +1998,8 @@ abstract final class AppStrings {
     'call_route_speaker': 'مكبر الصوت',
     'call_route_earpiece': 'سماعة الأذن',
     'call_audio_output': 'مخرج الصوت',
-    'call_route_external_hint': 'جهازك يتحكم في المخرج طالما أن سماعات الرأس أو البلوتوث متصلة.',
+    'call_route_external_hint':
+        'جهازك يتحكم في المخرج طالما أن سماعات الرأس أو البلوتوث متصلة.',
     'call_route_internal_hint': 'فعّل مكبر الصوت أو ارجع إلى سماعة الأذن.',
     'invite_friend': 'ادعُ صديقًا إلى Swayco',
     'follow_back': 'متابعة بالمثل',
@@ -2019,8 +2089,7 @@ abstract final class AppStrings {
         'Когда кто-то добавит вас из Discover или поиска, его запрос появится здесь.',
     'demandes_reacted_to_photo': '{name} отреагировал(а) {emoji} на ваше фото',
     'demandes_liked_your_photo': '{name} оценил(а) ваше фото',
-    'settings_hide_from_country':
-        'Скрыть меня от людей из моей страны',
+    'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
         'В настройках решите, могут ли люди из вашей страны видеть ваше фото в Discover',
     'my_subscription_section': 'Моя подписка',
@@ -2062,9 +2131,11 @@ abstract final class AppStrings {
     'no_messages': 'Нет сообщений — напиши первое!',
     'tooltip_call': 'Позвонить',
     'tip_photo_title': 'Появись в Discover ✨',
-    'tip_photo_body': 'Добавь своё фото, чтобы появиться в Discover и получать множество добавлений со всего мира 😉',
+    'tip_photo_body':
+        'Добавь своё фото, чтобы появиться в Discover и получать множество добавлений со всего мира 😉',
     'tip_photo_where_title': 'А где это сделать?',
-    'tip_photo_where_body': 'Ты можешь добавить фото прямо сейчас на странице профиля.',
+    'tip_photo_where_body':
+        'Ты можешь добавить фото прямо сейчас на странице профиля.',
     'tip_profile_here_title': 'Твоё фото — сюда 👇',
     'tip_profile_here_body': 'Добавь своё фото, и ты появишься в Discover.',
     'tip_next': 'Далее',
@@ -2072,16 +2143,19 @@ abstract final class AppStrings {
     'live_search_failed': 'Не удалось начать поиск: {error}',
     'live_connect_failed': 'Не удалось подключиться: {error}',
     'live_unavailable_title': 'Прямой звонок недоступен',
-    'live_unavailable_body': 'Для случайного подбора нужен Supabase. Настройте его, чтобы включить эту вкладку.',
+    'live_unavailable_body':
+        'Для случайного подбора нужен Supabase. Настройте его, чтобы включить эту вкладку.',
     'live_title': 'Случайный звонок',
-    'live_subtitle': 'Познакомьтесь со случайным человеком, с переводом в прямом эфире.',
+    'live_subtitle':
+        'Познакомьтесь со случайным человеком, с переводом в прямом эфире.',
     'live_searching_count': '{count} в поиске эфира',
     'live_be_first': 'Станьте первым, кто начнёт эфир',
     'live_trigger': 'Начать случайный звонок',
     'live_camera_denied': 'Камера не разрешена',
     'live_camera_denied_body': 'Вы всё равно можете начать прямой звонок.',
     'live_searching_title': 'Ищем кого-нибудь…',
-    'live_searching_body': 'Мы соединяем вас с кем-то, где-то в мире 🌍 — с переводом в прямом эфире.',
+    'live_searching_body':
+        'Мы соединяем вас с кем-то, где-то в мире 🌍 — с переводом в прямом эфире.',
     'live_cancel': 'Отмена',
     'online_now': 'В сети',
     'discover_photo_cta_title': 'Добавьте своё фото',
@@ -2089,8 +2163,10 @@ abstract final class AppStrings {
     'delete_message': 'Удалить сообщение',
     'delete_message_body': 'Это сообщение будет удалено у всех.',
     'delete_conversation': 'Удалить переписку',
-    'delete_conversation_body': 'Переписка исчезнет из вашего списка. Она появится снова, если человек напишет вам.',
-    'call_perm_required': 'Для подключения к звонку нужен доступ к камере и микрофону.',
+    'delete_conversation_body':
+        'Переписка исчезнет из вашего списка. Она появится снова, если человек напишет вам.',
+    'call_perm_required':
+        'Для подключения к звонку нужен доступ к камере и микрофону.',
     'call_could_not_join': 'Не удалось подключиться',
     'call_go_back': 'Назад',
     'call_connecting': 'Подключение к {room}…',
@@ -2118,8 +2194,10 @@ abstract final class AppStrings {
     'call_route_speaker': 'Динамик',
     'call_route_earpiece': 'Разговорный динамик',
     'call_audio_output': 'Вывод звука',
-    'call_route_external_hint': 'Вывод управляется устройством, пока подключены наушники или Bluetooth.',
-    'call_route_internal_hint': 'Включите динамик или вернитесь к разговорному динамику.',
+    'call_route_external_hint':
+        'Вывод управляется устройством, пока подключены наушники или Bluetooth.',
+    'call_route_internal_hint':
+        'Включите динамик или вернитесь к разговорному динамику.',
     'invite_friend': 'Пригласить друга в Swayco',
     'follow_back': 'Подписаться в ответ',
     'profile_add': 'Добавить',
@@ -2208,8 +2286,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
     'demandes_liked_your_photo': '{name} 赞了您的照片',
     'settings_hide_from_country': '对来自我国家的人隐藏',
-    'discover_visibility_hint':
-        '在设置中决定来自您国家的人是否能看到您的 Discover 照片',
+    'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片',
     'my_subscription_section': '我的订阅',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
@@ -2234,18 +2311,15 @@ abstract final class AppStrings {
     'friendship_pending_in': '待接受',
     'messages_title': '消息',
     'chat_no_friends_title': '还没有朋友',
-    'chat_no_friends_body':
-        '前往搜索标签页，按名字找到某人，然后发送好友请求来聊天。',
+    'chat_no_friends_body': '前往搜索标签页，按名字找到某人，然后发送好友请求来聊天。',
     'chat_no_name': '无名字',
     'chat_tap_to_chat': '点击聊天',
     'tooltip_more': '更多',
     'view_profile': '查看个人资料',
     'block_peer_q': '屏蔽 {name}？',
     'unblock_peer_q': '解除屏蔽 {name}？',
-    'block_peer_body':
-        '此人将无法再找到你、联系你或拨打你的电话。你可以从设置 → 已屏蔽中撤销。',
-    'unblock_peer_body':
-        '此人将能够再次找到你、联系你并查看你的消息。',
+    'block_peer_body': '此人将无法再找到你、联系你或拨打你的电话。你可以从设置 → 已屏蔽中撤销。',
+    'unblock_peer_body': '此人将能够再次找到你、联系你并查看你的消息。',
     'no_messages': '没有消息——写下第一条！',
     'tooltip_call': '通话',
     'tip_photo_title': '出现在 Discover 中 ✨',
@@ -2282,8 +2356,7 @@ abstract final class AppStrings {
     'call_go_back': '返回',
     'call_connecting': '正在连接 {room}…',
     'call_connecting_short': '正在连接通话…',
-    'call_connecting_caller_pays':
-        '一个订阅就能覆盖整个通话 — 仅向发起人扣费。',
+    'call_connecting_caller_pays': '一个订阅就能覆盖整个通话 — 仅向发起人扣费。',
     'call_waiting_title': '正在等待对方…',
     'call_waiting_body': '在另一台设备上使用相同的房间名。',
     'call_leave_q': '离开通话？',
@@ -2320,8 +2393,7 @@ abstract final class AppStrings {
     'composer_message_hint': '消息',
     'profile_default_title': '个人资料',
     'delete_photo_q': '删除照片？',
-    'delete_photo_body':
-        '你的 Discover 照片将被删除。你可以随时上传新的。',
+    'delete_photo_body': '你的 Discover 照片将被删除。你可以随时上传新的。',
     'bio_editor_title': '你的简介',
     'incoming_someone': '某人',
     'cant_join_call': '无法加入通话：{msg}',
@@ -2331,8 +2403,7 @@ abstract final class AppStrings {
     'call_declined': '通话被拒绝',
     'who_liked_me': '谁喜欢我',
     'no_one_liked_yet': '还没有人喜欢你',
-    'like_explainer':
-        '当有人点击你 Discover 卡片上的 ❤ 时，你会在这里看到。',
+    'like_explainer': '当有人点击你 Discover 卡片上的 ❤ 时，你会在这里看到。',
     'profile_speaks': '说{lang}',
     'profile_no_language': '没有语言',
     'profile_edit': '编辑',
@@ -2343,8 +2414,7 @@ abstract final class AppStrings {
     'onb_welcome_title': '欢迎',
     'onb_welcome_subtitle': '告诉我们在通话中如何称呼你。',
     'onb_language_title': '你的语言',
-    'onb_language_subtitle':
-        '选择你使用的语言。对方加入通话时，他们的语言会自动检测。',
+    'onb_language_subtitle': '选择你使用的语言。对方加入通话时，他们的语言会自动检测。',
     'onb_first_name_label': '名字',
     'onb_first_name_hint': '例如 Alex',
     'onb_next': '下一步',
@@ -2355,12 +2425,10 @@ abstract final class AppStrings {
     'onb_need_language': '请选择你使用的语言。',
     'onb_language_picker_label': '你使用的语言',
     'onb_profile_title': '你的个人资料',
-    'onb_translation_help':
-        '在通话中，我们将自动把对方的声音翻译成你的语言，把你的声音翻译成对方的语言。',
+    'onb_translation_help': '在通话中，我们将自动把对方的声音翻译成你的语言，把你的声音翻译成对方的语言。',
 
     'join_title': '加入房间',
-    'join_desc':
-        '选择一个房间名称并与他人分享。你们必须使用相同的名称才能进行 1 对 1 连接。',
+    'join_desc': '选择一个房间名称并与他人分享。你们必须使用相同的名称才能进行 1 对 1 连接。',
     'join_room_label': '房间名称',
     'join_room_hint': '例如 dinner-with-sam',
     'join_name_label': '你的名字',
@@ -2389,13 +2457,11 @@ abstract final class AppStrings {
     'nav_demandes': 'リクエスト',
     'demandes_title': 'リクエスト',
     'demandes_empty_title': 'リクエストはまだありません',
-    'demandes_empty_body':
-        '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
+    'demandes_empty_body': '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
     'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
     'demandes_liked_your_photo': '{name} があなたの写真にいいねしました',
     'settings_hide_from_country': '自分の国の人から非表示にする',
-    'discover_visibility_hint':
-        '設定で、同じ国の人に Discover の写真を見せるか決める',
+    'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める',
     'my_subscription_section': 'マイサブスクリプション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
@@ -2420,8 +2486,7 @@ abstract final class AppStrings {
     'friendship_pending_in': '承認待ち',
     'messages_title': 'メッセージ',
     'chat_no_friends_title': 'まだ友達がいません',
-    'chat_no_friends_body':
-        '検索タブで名前から相手を見つけ、友達リクエストを送ってチャットを始めましょう。',
+    'chat_no_friends_body': '検索タブで名前から相手を見つけ、友達リクエストを送ってチャットを始めましょう。',
     'chat_no_name': '名前なし',
     'chat_tap_to_chat': 'タップしてチャット',
     'tooltip_more': 'もっと見る',
@@ -2430,8 +2495,7 @@ abstract final class AppStrings {
     'unblock_peer_q': '{name} のブロックを解除しますか？',
     'block_peer_body':
         'この人はあなたを見つけたり、連絡したり、通話することができなくなります。設定 → ブロック済み から取り消せます。',
-    'unblock_peer_body':
-        'この人は再びあなたを見つけたり、連絡したり、メッセージを見ることができます。',
+    'unblock_peer_body': 'この人は再びあなたを見つけたり、連絡したり、メッセージを見ることができます。',
     'no_messages': 'メッセージなし — 最初の一通を書きましょう！',
     'tooltip_call': '通話',
     'tip_photo_title': 'Discover に表示されよう ✨',
@@ -2468,8 +2532,7 @@ abstract final class AppStrings {
     'call_go_back': '戻る',
     'call_connecting': '{room} に接続中…',
     'call_connecting_short': '通話に接続中…',
-    'call_connecting_caller_pays':
-        '通話は1つのサブスクリプションで十分です — 発信者だけが課金されます。',
+    'call_connecting_caller_pays': '通話は1つのサブスクリプションで十分です — 発信者だけが課金されます。',
     'call_waiting_title': '相手を待っています…',
     'call_waiting_body': '別の端末で同じルーム名を使ってください。',
     'call_leave_q': '通話から退出しますか？',
@@ -2506,8 +2569,7 @@ abstract final class AppStrings {
     'composer_message_hint': 'メッセージ',
     'profile_default_title': 'プロフィール',
     'delete_photo_q': '写真を削除しますか？',
-    'delete_photo_body':
-        'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
+    'delete_photo_body': 'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
     'bio_editor_title': '自己紹介',
     'incoming_someone': '誰か',
     'cant_join_call': '通話に参加できません: {msg}',
@@ -2517,8 +2579,7 @@ abstract final class AppStrings {
     'call_declined': '通話が拒否されました',
     'who_liked_me': 'いいねをくれた人',
     'no_one_liked_yet': 'まだ誰もあなたにいいねしていません',
-    'like_explainer':
-        '誰かがあなたの Discover カードの ❤ をタップすると、ここに表示されます。',
+    'like_explainer': '誰かがあなたの Discover カードの ❤ をタップすると、ここに表示されます。',
     'profile_speaks': '{lang}を話します',
     'profile_no_language': '言語なし',
     'profile_edit': '編集',
@@ -2529,8 +2590,7 @@ abstract final class AppStrings {
     'onb_welcome_title': 'ようこそ',
     'onb_welcome_subtitle': '通話で呼ばれる名前を教えてください。',
     'onb_language_title': 'あなたの言語',
-    'onb_language_subtitle':
-        '話す言語を選んでください。相手の言語は通話に参加したときに自動的に検出されます。',
+    'onb_language_subtitle': '話す言語を選んでください。相手の言語は通話に参加したときに自動的に検出されます。',
     'onb_first_name_label': '名前',
     'onb_first_name_hint': '例: Alex',
     'onb_next': '次へ',
@@ -2541,12 +2601,10 @@ abstract final class AppStrings {
     'onb_need_language': '話す言語を選んでください。',
     'onb_language_picker_label': '話す言語',
     'onb_profile_title': 'プロフィール',
-    'onb_translation_help':
-        '通話中、相手の声をあなたの言語に、あなたの声を相手の言語に自動翻訳します。',
+    'onb_translation_help': '通話中、相手の声をあなたの言語に、あなたの声を相手の言語に自動翻訳します。',
 
     'join_title': 'ルームに参加',
-    'join_desc':
-        'ルーム名を選んで、他の人と共有してください。1対1で接続するには、同じ名前を使う必要があります。',
+    'join_desc': 'ルーム名を選んで、他の人と共有してください。1対1で接続するには、同じ名前を使う必要があります。',
     'join_room_label': 'ルーム名',
     'join_room_hint': '例: dinner-with-sam',
     'join_name_label': 'あなたの名前',
@@ -2575,13 +2633,11 @@ abstract final class AppStrings {
     'nav_demandes': '요청',
     'demandes_title': '요청',
     'demandes_empty_title': '아직 요청이 없습니다',
-    'demandes_empty_body':
-        '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
+    'demandes_empty_body': '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
     'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
     'demandes_liked_your_photo': '{name}님이 회원님의 사진을 좋아합니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
-    'discover_visibility_hint':
-        '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택',
+    'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택',
     'my_subscription_section': '내 구독',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',
@@ -2606,8 +2662,7 @@ abstract final class AppStrings {
     'friendship_pending_in': '수락 대기',
     'messages_title': '메시지',
     'chat_no_friends_title': '아직 친구가 없습니다',
-    'chat_no_friends_body':
-        '검색 탭에서 이름으로 누군가를 찾고, 친구 요청을 보내서 대화를 시작하세요.',
+    'chat_no_friends_body': '검색 탭에서 이름으로 누군가를 찾고, 친구 요청을 보내서 대화를 시작하세요.',
     'chat_no_name': '이름 없음',
     'chat_tap_to_chat': '대화하려면 탭하세요',
     'tooltip_more': '더 보기',
@@ -2616,8 +2671,7 @@ abstract final class AppStrings {
     'unblock_peer_q': '{name} 차단을 해제하시겠습니까?',
     'block_peer_body':
         '이 사람은 더 이상 당신을 찾거나, 연락하거나, 전화할 수 없습니다. 설정 → 차단됨에서 취소할 수 있습니다.',
-    'unblock_peer_body':
-        '이 사람이 다시 당신을 찾고, 연락하고, 메시지를 볼 수 있게 됩니다.',
+    'unblock_peer_body': '이 사람이 다시 당신을 찾고, 연락하고, 메시지를 볼 수 있게 됩니다.',
     'no_messages': '메시지 없음 — 첫 메시지를 작성하세요!',
     'tooltip_call': '전화',
     'tip_photo_title': 'Discover에 등장하세요 ✨',
@@ -2654,8 +2708,7 @@ abstract final class AppStrings {
     'call_go_back': '뒤로',
     'call_connecting': '{room}에 연결 중…',
     'call_connecting_short': '통화에 연결 중…',
-    'call_connecting_caller_pays':
-        '구독 하나로 통화가 가능합니다 — 발신자만 차감됩니다.',
+    'call_connecting_caller_pays': '구독 하나로 통화가 가능합니다 — 발신자만 차감됩니다.',
     'call_waiting_title': '상대방을 기다리는 중…',
     'call_waiting_body': '다른 기기에서 같은 방 이름을 사용하세요.',
     'call_leave_q': '통화를 나갈까요?',
@@ -2692,8 +2745,7 @@ abstract final class AppStrings {
     'composer_message_hint': '메시지',
     'profile_default_title': '프로필',
     'delete_photo_q': '사진을 삭제하시겠습니까?',
-    'delete_photo_body':
-        'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',
+    'delete_photo_body': 'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',
     'bio_editor_title': '자기소개',
     'incoming_someone': '누군가',
     'cant_join_call': '통화에 참여할 수 없습니다: {msg}',
@@ -2703,8 +2755,7 @@ abstract final class AppStrings {
     'call_declined': '통화가 거절되었습니다',
     'who_liked_me': '나를 좋아한 사람',
     'no_one_liked_yet': '아직 아무도 좋아요를 누르지 않았습니다',
-    'like_explainer':
-        '누군가 당신의 Discover 카드의 ❤를 탭하면 여기에 표시됩니다.',
+    'like_explainer': '누군가 당신의 Discover 카드의 ❤를 탭하면 여기에 표시됩니다.',
     'profile_speaks': '{lang}를 사용합니다',
     'profile_no_language': '언어 없음',
     'profile_edit': '편집',
@@ -2715,8 +2766,7 @@ abstract final class AppStrings {
     'onb_welcome_title': '환영합니다',
     'onb_welcome_subtitle': '통화에서 어떻게 부를지 알려주세요.',
     'onb_language_title': '당신의 언어',
-    'onb_language_subtitle':
-        '사용하는 언어를 선택하세요. 상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
+    'onb_language_subtitle': '사용하는 언어를 선택하세요. 상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
     'onb_first_name_label': '이름',
     'onb_first_name_hint': '예: Alex',
     'onb_next': '다음',
@@ -2731,8 +2781,7 @@ abstract final class AppStrings {
         '통화 중에 상대방의 음성을 당신의 언어로, 당신의 음성을 상대방의 언어로 자동 번역합니다.',
 
     'join_title': '방 참여하기',
-    'join_desc':
-        '방 이름을 선택하고 다른 사람과 공유하세요. 1대1로 연결하려면 같은 이름을 사용해야 합니다.',
+    'join_desc': '방 이름을 선택하고 다른 사람과 공유하세요. 1대1로 연결하려면 같은 이름을 사용해야 합니다.',
     'join_room_label': '방 이름',
     'join_room_hint': '예: dinner-with-sam',
     'join_name_label': '당신의 이름',

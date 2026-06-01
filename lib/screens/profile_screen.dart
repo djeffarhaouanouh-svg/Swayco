@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/voice_message_api.dart';
@@ -552,35 +551,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _remote = _remote!.copyWith(emojis: saved));
   }
 
-  /// Opens the OS share sheet to invite a friend to Swayco. The native
-  /// sheet lists every app that can receive text — WhatsApp, Instagram,
-  /// SMS, Mail… — so there's no need for per-app buttons.
-  ///
-  /// The shared link carries the local user's `referral_code` as a
-  /// `?ref=…` query so a new sign-up coming through it can be
-  /// attributed back and the "3 amis = +30 min" bonus paid out by
-  /// `attribute_referral` on the server.
-  Future<void> _shareInvite() async {
-    final box = context.findRenderObject() as RenderBox?;
-    final code = _remote?.referralCode ?? '';
-    final link = code.isEmpty
-        ? 'https://www.swayco.fr'
-        : 'https://www.swayco.fr/?ref=$code';
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text', args: {'link': link}),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // User dismissed the sheet or sharing is unavailable — nothing to do.
-    }
-  }
-
   Future<void> _reportPeer() async {
     if (!_isViewingOther || _deviceId.isEmpty || _targetId.isEmpty) return;
     final peerName = _displayName.isEmpty
@@ -768,19 +738,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onMessagePeer: _openChatWithPeer,
                           ),
                           const SizedBox(height: 20),
-                          // "Invite a friend to Swayco" — own profile only, sits
-                          // between the identity block and the language card.
-                          if (!_isViewingOther) ...[
-                            _InviteFriendCard(onTap: _shareInvite),
-                            const SizedBox(height: 16),
-                          ],
                           _LanguageCard(
                             language: lang,
                             showCallWarning: !_isViewingOther,
                           ),
                           if (!_isViewingOther) ...[
-                            const SizedBox(height: 16),
-                            _CreditsCard(profile: _remote),
                             const SizedBox(height: 16),
                             // Voice-clone card. Shown to ALL tiers when viewing
                             // your own profile — Ultra users get the recording
@@ -869,8 +831,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 /// Ultra subscribers never see a number — only "Illimité", because
 /// the fair-use cap (2000 crédits) exists to bound runaway billing,
 /// not to be displayed as a quota.
-class _CreditsCard extends StatelessWidget {
-  const _CreditsCard({required this.profile});
+/// Translation-credits card ("X credits left this month" + lifetime total).
+/// Lives here but is rendered on the Settings screen now (moved off the
+/// profile), so it's public.
+class CreditsCard extends StatelessWidget {
+  const CreditsCard({super.key, required this.profile});
 
   final RemoteProfile? profile;
 
@@ -1758,64 +1723,6 @@ class _LanguageCard extends StatelessWidget {
   }
 }
 
-/// Accent-tinted call-to-action card that opens the OS share sheet to
-/// invite a friend to Swayco. Deliberately not a dark "bar" card so it
-/// reads as an action, not just another panel.
-class _InviteFriendCard extends StatelessWidget {
-  const _InviteFriendCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SC.accent.withValues(alpha: 0.45)),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SC.accent.withValues(alpha: 0.20),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_add_alt_1,
-                  color: SC.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  AppStrings.t('invite_friend'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Insta-style identity section: avatar with camera badge on the left,
 /// followers/following counts inline on the right; below, the display name,
 /// handle, bio (tap-to-edit) and a compact Discover photo preview, then a
@@ -2190,6 +2097,31 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // Likes received — tap the heart to see who liked you.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTapLikes,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.favorite,
+                    color: Color(0xFFFF3B5C),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$likesCount',
+                    style: const TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
             _GhostIconButton(
               icon: Icons.settings_outlined,
               onTap: onSettings,
@@ -2269,18 +2201,6 @@ class _IdentitySection extends StatelessWidget {
         // shows the user's initials when they have no photo yet.
         _pdpBubble(editable: false),
         const SizedBox(height: 16),
-        // Read-only photo gallery below it (hidden when there are no photos).
-        if (photos.isNotEmpty) ...[
-          _PhotoGallery(
-            photos: photos,
-            viewerMode: true,
-            onPick: () {},
-            onRemove: (_) {},
-            iLikePeer: iLikePeer,
-            onTogglePeerLike: preview ? null : onTogglePeerLike,
-          ),
-          const SizedBox(height: 20),
-        ],
         // Centred name + handle.
         Text(
           displayName,
@@ -2405,6 +2325,18 @@ class _IdentitySection extends StatelessWidget {
               onTap: onAddPeer ?? () {},
             ),
           ],
+        ],
+        // Read-only photo gallery — positioned below the action buttons.
+        if (photos.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _PhotoGallery(
+            photos: photos,
+            viewerMode: true,
+            onPick: () {},
+            onRemove: (_) {},
+            iLikePeer: iLikePeer,
+            onTogglePeerLike: preview ? null : onTogglePeerLike,
+          ),
         ],
         // Emojis (read-only) — only when the peer has some.
         if (emojis.isNotEmpty) ...[
@@ -3010,22 +2942,19 @@ class _GhostIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // White circle with a black glyph — monochrome, no blue tint.
     return Material(
-      color: SC.bubbleIn,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Tooltip(
           message: tooltip,
-          child: Container(
+          child: SizedBox(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF2A3942)),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Icon(icon, size: 17, color: SC.textMuted),
+            child: Icon(icon, size: 18, color: const Color(0xFF0E0E0E)),
           ),
         ),
       ),

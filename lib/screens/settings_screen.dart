@@ -20,6 +20,7 @@ import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
 import 'onboarding_screen.dart';
+import 'profile_screen.dart' show CreditsCard;
 
 /// Hosts every secondary account-level action that doesn't belong on the
 /// main profile view: account management, notification toggles, privacy,
@@ -49,6 +50,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _hideOnline = false;
   bool _hideFromCountry = false;
   String _audioOutput = 'speaker';
+  // My profile — used to render the translation-credits card (moved here
+  // from the profile screen).
+  RemoteProfile? _profile;
 
   String get _email => AuthService.currentEmail;
   // Real version + build, loaded from package_info_plus in initState.
@@ -90,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final uid = await DeviceId.getOrCreate();
         final remote = await ProfileApi.fetchById(uid);
         if (!mounted || remote == null) return;
+        setState(() => _profile = remote);
         if (remote.hideOnlineStatus != _hideOnline) {
           setState(() => _hideOnline = remote.hideOnlineStatus);
           await _saveBool(_kHideOnline, remote.hideOnlineStatus);
@@ -108,7 +113,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     AppSettings.hideOnlineLocal.value = value;
     final uid = await DeviceId.getOrCreate();
     final ok = await ProfileApi.updateHideOnlineStatus(
-      userId: uid, hide: value,
+      userId: uid,
+      hide: value,
     );
     if (!ok && mounted) {
       // Roll back the optimistic UI if the DB write failed.
@@ -123,9 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _hideFromCountry = value);
     await _saveBool(_kHideFromCountry, value);
     final uid = await DeviceId.getOrCreate();
-    final ok = await ProfileApi.updateHideFromCountry(
-      userId: uid, hide: value,
-    );
+    final ok = await ProfileApi.updateHideFromCountry(userId: uid, hide: value);
     if (!ok && mounted) {
       setState(() => _hideFromCountry = !value);
       await _saveBool(_kHideFromCountry, !value);
@@ -372,172 +376,186 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(
-          AppStrings.t('settings_title'),
-          style: SCText.h3,
-        ),
+        title: Text(AppStrings.t('settings_title'), style: SCText.h3),
       ),
       body: MeshBackground(
         child: SafeArea(
-        child: AbsorbPointer(
-          absorbing: _busy,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              _SectionHeader(label: AppStrings.t('settings_section_account')),
-              _SettingsCard(children: [
-                _SettingsRow(
-                  icon: Icons.alternate_email,
-                  label: AppStrings.t('settings_email'),
-                  trailing: _SubtleText(_email.isEmpty ? '—' : _email),
+          child: AbsorbPointer(
+            absorbing: _busy,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                // Translation credits (moved here from the profile screen).
+                _SectionHeader(label: AppStrings.t('settings_section_credits')),
+                CreditsCard(profile: _profile),
+                const SizedBox(height: 8),
+                _SectionHeader(label: AppStrings.t('settings_section_account')),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.alternate_email,
+                      label: AppStrings.t('settings_email'),
+                      trailing: _SubtleText(_email.isEmpty ? '—' : _email),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.lock_reset,
+                      label: AppStrings.t('settings_change_password'),
+                      onTap: _changePassword,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.logout,
+                      label: AppStrings.t('profile_signout'),
+                      color: const Color(0xFFE53935),
+                      onTap: _signOut,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.delete_forever,
+                      label: AppStrings.t('settings_delete_account'),
+                      color: const Color(0xFFE53935),
+                      onTap: _deleteAccount,
+                    ),
+                  ],
                 ),
-                _SettingsRow(
-                  icon: Icons.lock_reset,
-                  label: AppStrings.t('settings_change_password'),
-                  onTap: _changePassword,
-                ),
-                _SettingsRow(
-                  icon: Icons.logout,
-                  label: AppStrings.t('profile_signout'),
-                  color: const Color(0xFFE53935),
-                  onTap: _signOut,
-                ),
-                _SettingsRow(
-                  icon: Icons.delete_forever,
-                  label: AppStrings.t('settings_delete_account'),
-                  color: const Color(0xFFE53935),
-                  onTap: _deleteAccount,
-                ),
-              ]),
 
-              _SectionHeader(
-                  label: AppStrings.t('settings_section_notifications')),
-              _SettingsCard(children: [
-                _SettingsToggleRow(
-                  icon: Icons.notifications_active_outlined,
-                  label: AppStrings.t('settings_push'),
-                  value: _push,
-                  onChanged: (v) {
-                    setState(() => _push = v);
-                    _saveBool(_kPush, v);
-                    _applyPushPref(v);
-                  },
-                ),
-                _SettingsToggleRow(
-                  icon: Icons.volume_up_outlined,
-                  label: AppStrings.t('settings_sounds'),
-                  value: _sounds,
-                  onChanged: (v) {
-                    setState(() => _sounds = v);
-                    _saveBool(_kSounds, v);
-                  },
-                ),
-                _SettingsToggleRow(
-                  icon: Icons.music_note_outlined,
-                  label: AppStrings.t('settings_in_app_sounds'),
-                  value: _inAppSounds,
-                  onChanged: (v) {
-                    setState(() => _inAppSounds = v);
-                    _saveBool(_kInAppSounds, v);
-                    CallAlert.soundsEnabled = v;
-                  },
-                ),
-              ]),
-
-              _SectionHeader(label: AppStrings.t('settings_section_privacy')),
-              _SettingsCard(children: [
-                _SettingsRow(
-                  icon: Icons.block,
-                  label: AppStrings.t('settings_blocked'),
-                  onTap: _openBlockedUsers,
-                ),
-                _SettingsToggleRow(
-                  icon: Icons.visibility_off_outlined,
-                  label: AppStrings.t('settings_hide_online'),
-                  value: _hideOnline,
-                  onChanged: _setHideOnline,
-                ),
-                _SettingsToggleRow(
-                  icon: Icons.public_off_outlined,
-                  label: AppStrings.t('settings_hide_from_country'),
-                  value: _hideFromCountry,
-                  onChanged: _setHideFromCountry,
-                ),
-              ]),
-
-              _SectionHeader(label: AppStrings.t('settings_section_lang')),
-              _SettingsCard(children: [
-                _SettingsRow(
-                  icon: Icons.language,
-                  label: AppStrings.t('settings_lang_interface'),
-                  onTap: _openLanguageEditor,
-                ),
-                _SettingsRow(
-                  icon: Icons.speaker_outlined,
-                  label: AppStrings.t('settings_audio_output'),
-                  trailing: _SubtleText(
-                    _audioOutput == 'speaker'
-                        ? AppStrings.t('settings_audio_speaker')
-                        : AppStrings.t('settings_audio_earpiece'),
-                  ),
-                  onTap: _pickAudioOutput,
-                ),
-              ]),
-
-              // Subscriptions are handled by Stripe, which the app only
-              // drives on the web build — hide the section on native
-              // (store IAP isn't wired up).
-              if (kIsWeb) ...[
                 _SectionHeader(
-                    label: AppStrings.t('settings_section_subscription')),
-                _SettingsCard(children: [
-                  _SettingsRow(
-                    icon: Icons.workspace_premium_outlined,
-                    label: AppStrings.t('settings_manage_sub'),
-                    onTap: _manageSubscription,
+                  label: AppStrings.t('settings_section_notifications'),
+                ),
+                _SettingsCard(
+                  children: [
+                    _SettingsToggleRow(
+                      icon: Icons.notifications_active_outlined,
+                      label: AppStrings.t('settings_push'),
+                      value: _push,
+                      onChanged: (v) {
+                        setState(() => _push = v);
+                        _saveBool(_kPush, v);
+                        _applyPushPref(v);
+                      },
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.volume_up_outlined,
+                      label: AppStrings.t('settings_sounds'),
+                      value: _sounds,
+                      onChanged: (v) {
+                        setState(() => _sounds = v);
+                        _saveBool(_kSounds, v);
+                      },
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.music_note_outlined,
+                      label: AppStrings.t('settings_in_app_sounds'),
+                      value: _inAppSounds,
+                      onChanged: (v) {
+                        setState(() => _inAppSounds = v);
+                        _saveBool(_kInAppSounds, v);
+                        CallAlert.soundsEnabled = v;
+                      },
+                    ),
+                  ],
+                ),
+
+                _SectionHeader(label: AppStrings.t('settings_section_privacy')),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.block,
+                      label: AppStrings.t('settings_blocked'),
+                      onTap: _openBlockedUsers,
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.visibility_off_outlined,
+                      label: AppStrings.t('settings_hide_online'),
+                      value: _hideOnline,
+                      onChanged: _setHideOnline,
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.public_off_outlined,
+                      label: AppStrings.t('settings_hide_from_country'),
+                      value: _hideFromCountry,
+                      onChanged: _setHideFromCountry,
+                    ),
+                  ],
+                ),
+
+                _SectionHeader(label: AppStrings.t('settings_section_lang')),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.language,
+                      label: AppStrings.t('settings_lang_interface'),
+                      onTap: _openLanguageEditor,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.speaker_outlined,
+                      label: AppStrings.t('settings_audio_output'),
+                      trailing: _SubtleText(
+                        _audioOutput == 'speaker'
+                            ? AppStrings.t('settings_audio_speaker')
+                            : AppStrings.t('settings_audio_earpiece'),
+                      ),
+                      onTap: _pickAudioOutput,
+                    ),
+                  ],
+                ),
+
+                // Subscriptions are handled by Stripe, which the app only
+                // drives on the web build — hide the section on native
+                // (store IAP isn't wired up).
+                if (kIsWeb) ...[
+                  _SectionHeader(
+                    label: AppStrings.t('settings_section_subscription'),
                   ),
-                ]),
-              ],
+                  _SettingsCard(
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.workspace_premium_outlined,
+                        label: AppStrings.t('settings_manage_sub'),
+                        onTap: _manageSubscription,
+                      ),
+                    ],
+                  ),
+                ],
 
-              _SectionHeader(label: AppStrings.t('settings_section_help')),
-              _SettingsCard(children: [
-                _SettingsRow(
-                  icon: Icons.help_outline,
-                  label: AppStrings.t('settings_help_faq'),
-                  onTap: _openHelp,
+                _SectionHeader(label: AppStrings.t('settings_section_help')),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.help_outline,
+                      label: AppStrings.t('settings_help_faq'),
+                      onTap: _openHelp,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.mail_outline,
+                      label: AppStrings.t('settings_contact'),
+                      onTap: _contactSupport,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.gavel_outlined,
+                      label: AppStrings.t('settings_terms'),
+                      onTap: _openTerms,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.privacy_tip_outlined,
+                      label: AppStrings.t('settings_privacy'),
+                      onTap: _openPrivacy,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.info_outline,
+                      label: AppStrings.t('settings_version'),
+                      trailing: _SubtleText(_appVersion),
+                    ),
+                  ],
                 ),
-                _SettingsRow(
-                  icon: Icons.mail_outline,
-                  label: AppStrings.t('settings_contact'),
-                  onTap: _contactSupport,
-                ),
-                _SettingsRow(
-                  icon: Icons.gavel_outlined,
-                  label: AppStrings.t('settings_terms'),
-                  onTap: _openTerms,
-                ),
-                _SettingsRow(
-                  icon: Icons.privacy_tip_outlined,
-                  label: AppStrings.t('settings_privacy'),
-                  onTap: _openPrivacy,
-                ),
-                _SettingsRow(
-                  icon: Icons.info_outline,
-                  label: AppStrings.t('settings_version'),
-                  trailing: _SubtleText(_appVersion),
-                ),
-              ]),
 
-              if (_busy) ...[
-                const SizedBox(height: 20),
-                const Center(
-                  child: CircularProgressIndicator(
-                      color: SC.accent),
-                ),
+                if (_busy) ...[
+                  const SizedBox(height: 20),
+                  const Center(
+                    child: CircularProgressIndicator(color: SC.accent),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -577,12 +595,14 @@ class _SettingsCard extends StatelessWidget {
     for (var i = 0; i < children.length; i++) {
       divided.add(children[i]);
       if (i != children.length - 1) {
-        divided.add(Divider(
-          height: 1,
-          thickness: 1,
-          indent: 52,
-          color: Colors.white.withValues(alpha: 0.06),
-        ));
+        divided.add(
+          Divider(
+            height: 1,
+            thickness: 1,
+            indent: 52,
+            color: Colors.white.withValues(alpha: 0.06),
+          ),
+        );
       }
     }
     return Container(
@@ -633,16 +653,11 @@ class _SettingsRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (trailing != null) ...[
-              trailing!,
-              const SizedBox(width: 8),
-            ],
+            if (trailing != null) ...[trailing!, const SizedBox(width: 8)],
             if (onTap != null && trailing == null)
-              const Icon(Icons.chevron_right,
-                  color: SC.textMuted, size: 22)
+              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22)
             else if (onTap != null)
-              const Icon(Icons.chevron_right,
-                  color: SC.textMuted, size: 22),
+              const Icon(Icons.chevron_right, color: SC.textMuted, size: 22),
           ],
         ),
       ),
@@ -706,10 +721,7 @@ class _SubtleText extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: SC.textMuted,
-        fontSize: 13,
-      ),
+      style: const TextStyle(color: SC.textMuted, fontSize: 13),
     );
   }
 }
@@ -749,8 +761,7 @@ class _AudioOutputOption extends StatelessWidget {
                 ),
               ),
             ),
-            if (selected)
-              const Icon(Icons.check, color: SC.accent),
+            if (selected) const Icon(Icons.check, color: SC.accent),
           ],
         ),
       ),
@@ -793,8 +804,10 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
   Future<void> _unblock(RemoteProfile p) async {
     final ok = await showSwaycoConfirm(
       context: context,
-      title: AppStrings.t('blocked_unblock_title_q',
-          args: {'name': p.displayName}),
+      title: AppStrings.t(
+        'blocked_unblock_title_q',
+        args: {'name': p.displayName},
+      ),
       body: AppStrings.t('blocked_unblock_body'),
       confirmLabel: AppStrings.t('blocked_unblock_confirm'),
       destructive: false,
@@ -806,9 +819,11 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
       setState(() => _blocked = _blocked.where((b) => b.id != p.id).toList());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
+        ),
+      );
     }
   }
 
@@ -823,83 +838,76 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(
-          AppStrings.t('blocked_title'),
-          style: SCText.h3,
-        ),
+        title: Text(AppStrings.t('blocked_title'), style: SCText.h3),
       ),
       body: MeshBackground(
         child: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                  color: SC.accent),
-            )
-          : _blocked.isEmpty
-              ? const _BlockedEmptyState()
-              : RefreshIndicator(
-                  color: SC.accent,
-                  backgroundColor: SC.bubbleIn,
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    itemCount: _blocked.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) {
-                      final p = _blocked[i];
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: SC.glassStrong,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: SC.glassBorder),
-                        ),
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                        child: Row(
-                          children: [
-                            ProfileAvatar(
-                              displayName: p.displayName,
-                              avatarUrl: p.avatarUrl,
-                              avatarColorHex: p.avatarColor,
-                              size: 40,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+            ? const Center(child: CircularProgressIndicator(color: SC.accent))
+            : _blocked.isEmpty
+            ? const _BlockedEmptyState()
+            : RefreshIndicator(
+                color: SC.accent,
+                backgroundColor: SC.bubbleIn,
+                onRefresh: _load,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  itemCount: _blocked.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final p = _blocked[i];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: SC.glassStrong,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: SC.glassBorder),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Row(
+                        children: [
+                          ProfileAvatar(
+                            displayName: p.displayName,
+                            avatarUrl: p.avatarUrl,
+                            avatarColorHex: p.avatarColor,
+                            size: 40,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  p.displayName.isEmpty ? '—' : p.displayName,
+                                  style: const TextStyle(
+                                    color: SC.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (p.handle.isNotEmpty)
                                   Text(
-                                    p.displayName.isEmpty ? '—' : p.displayName,
+                                    '@${p.handle}',
                                     style: const TextStyle(
-                                      color: SC.textPrimary,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
+                                      color: SC.textMuted,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                  if (p.handle.isNotEmpty)
-                                    Text(
-                                      '@${p.handle}',
-                                      style: const TextStyle(
-                                        color: SC.textMuted,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () => _unblock(p),
-                              child: Text(
-                                AppStrings.t('unblock'),
-                                style: const TextStyle(
-                                    color: SC.accent),
-                              ),
+                          ),
+                          TextButton(
+                            onPressed: () => _unblock(p),
+                            child: Text(
+                              AppStrings.t('unblock'),
+                              style: const TextStyle(color: SC.accent),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
+              ),
       ),
     );
   }
@@ -916,8 +924,7 @@ class _BlockedEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.block,
-                size: 56, color: SC.textMuted),
+            const Icon(Icons.block, size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('blocked_empty_title'),
