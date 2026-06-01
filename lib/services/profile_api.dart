@@ -39,6 +39,7 @@ class RemoteProfile {
     required this.avatarColor,
     required this.avatarUrl,
     this.discoverPhotoUrl = '',
+    this.photos = const [],
     this.bio = '',
     this.emojis = const [],
     this.gender = '',
@@ -64,8 +65,14 @@ class RemoteProfile {
 
   /// Public URL of the larger photo shown when this profile appears in
   /// someone else's Discover card stack. Optional — empty falls back to
-  /// [avatarUrl] (or the placeholder beyond that).
+  /// [avatarUrl] (or the placeholder beyond that). Mirror of [photos]`[0]`.
   final String discoverPhotoUrl;
+
+  /// Ordered photo gallery shown in the "Tes photos" section. Each element is
+  /// a public URL; `photos[0]` is the PDP (avatar) used everywhere in the app
+  /// and the Discover-card photo. Kept in sync with [avatarUrl] /
+  /// [discoverPhotoUrl] by [ProfileApi.addProfilePhoto] / [removeProfilePhoto].
+  final List<String> photos;
 
   /// Free-form short tagline shown on the user's own profile and on their
   /// Discover card. Capped at [profileBioMaxLength] characters.
@@ -186,6 +193,16 @@ class RemoteProfile {
         avatarColor: m['avatar_color']?.toString() ?? '',
         avatarUrl: m['avatar_url']?.toString() ?? '',
         discoverPhotoUrl: m['discover_photo_url']?.toString() ?? '',
+        photos: () {
+          final raw = m['photos'];
+          if (raw is List) {
+            return raw
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList(growable: false);
+          }
+          return const <String>[];
+        }(),
         bio: m['bio']?.toString() ?? '',
         emojis: () {
           final raw = m['emojis'];
@@ -233,6 +250,7 @@ class RemoteProfile {
     String? avatarColor,
     String? avatarUrl,
     String? discoverPhotoUrl,
+    List<String>? photos,
     String? bio,
     List<String>? emojis,
     String? gender,
@@ -256,6 +274,7 @@ class RemoteProfile {
         avatarColor: avatarColor ?? this.avatarColor,
         avatarUrl: avatarUrl ?? this.avatarUrl,
         discoverPhotoUrl: discoverPhotoUrl ?? this.discoverPhotoUrl,
+        photos: photos ?? this.photos,
         bio: bio ?? this.bio,
         emojis: emojis ?? this.emojis,
         gender: gender ?? this.gender,
@@ -280,6 +299,9 @@ const int profileBioMaxLength = 80;
 /// Maximum number of emojis a user can pin to their profile. Kept small so
 /// the "Emojis" section stays a single tidy row across phone widths.
 const int profileEmojisMax = 5;
+
+/// Maximum number of photos in a user's gallery ("Tes photos" section).
+const int profilePhotosMax = 6;
 
 /// Supabase `profiles` table. Mirror of the local UserPrefs profile so that
 /// other users can discover each other by display name.
@@ -458,15 +480,19 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
-  /// Upload [bytes] as the user's single profile photo. By product decision
-  /// there is exactly ONE photo per user and it doubles as the avatar (PDP)
-  /// shown everywhere in the app AND the Discover-card photo — so the same
-  /// public URL is written into both `avatar_url` and `discover_photo_url`.
-  /// Stored under the `discover/` prefix at the larger Discover size. Returns
-  /// the cache-busted public URL.
-  static Future<String> uploadProfilePhoto({
+  /// Append [bytes] as a new photo in the user's gallery ("Tes photos").
+  /// Each upload gets a unique storage path so the gallery can hold several
+  /// distinct files. The FIRST photo in the gallery doubles as the PDP
+  /// (avatar) shown everywhere in the app AND the Discover-card photo, so
+  /// `photos[0]` is mirrored into both `avatar_url` and `discover_photo_url`.
+  ///
+  /// [current] is the gallery as the client currently knows it; the new URL
+  /// is appended (capped at [profilePhotosMax]) and the full new list is
+  /// persisted and returned for an optimistic update.
+  static Future<List<String>> addProfilePhoto({
     required String deviceId,
     required Uint8List bytes,
+    required List<String> current,
     String contentType = 'image/jpeg',
   }) async {
     if (!isSupabaseReady) {
@@ -474,9 +500,15 @@ abstract final class ProfileApi {
     }
     if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
     if (bytes.isEmpty) throw ArgumentError('image vide');
+    if (current.length >= profilePhotosMax) {
+      throw StateError('Galerie pleine ($profilePhotosMax photos max)');
+    }
 
     final ext = contentType.endsWith('png') ? 'png' : 'jpg';
-    final path = 'discover/$deviceId.$ext';
+    // Unique path per photo (timestamp) under a per-user folder so several
+    // photos coexist instead of overwriting a single fixed key.
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'discover/$deviceId/$stamp.$ext';
     await _c.storage.from('avatars').uploadBinary(
           path,
           bytes,
@@ -486,15 +518,62 @@ abstract final class ProfileApi {
             cacheControl: '3600',
           ),
         );
-    final baseUrl = _c.storage.from('avatars').getPublicUrl(path);
-    final urlWithBuster =
-        '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    final url = _c.storage.from('avatars').getPublicUrl(path);
+    final next = [...current, url].take(profilePhotosMax).toList();
     await _c.from('profiles').update({
-      'discover_photo_url': urlWithBuster,
-      'avatar_url': urlWithBuster,
+      'photos': next,
+      // photos[0] is the PDP — keep avatar + discover columns in sync.
+      'avatar_url': next.first,
+      'discover_photo_url': next.first,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', deviceId);
-    return urlWithBuster;
+    return next;
+  }
+
+  /// Remove [url] from the user's gallery. Re-syncs `avatar_url` /
+  /// `discover_photo_url` to the new `photos[0]` (or empties them when the
+  /// gallery becomes empty), best-effort deletes the underlying storage
+  /// object, and — when the gallery is now empty — drops received likes
+  /// (they were earned on a Discover card that no longer has a photo).
+  /// Returns the new gallery list.
+  static Future<List<String>> removeProfilePhoto({
+    required String deviceId,
+    required String url,
+    required List<String> current,
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
+    final next = current.where((p) => p != url).toList(growable: false);
+    final pdp = next.isEmpty ? '' : next.first;
+    await _c.from('profiles').update({
+      'photos': next,
+      'avatar_url': pdp,
+      'discover_photo_url': pdp,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', deviceId);
+    // Best-effort storage cleanup: the public URL is
+    // ".../object/public/avatars/<path>" — strip the prefix to recover the
+    // storage key. A failure here is at worst a few KB of orphaned bytes.
+    try {
+      final marker = '/avatars/';
+      final i = url.indexOf(marker);
+      if (i != -1) {
+        final key = url.substring(i + marker.length).split('?').first;
+        await _c.storage.from('avatars').remove([key]);
+      }
+    } catch (e) {
+      debugPrint('ProfileApi.removeProfilePhoto: storage cleanup failed: $e');
+    }
+    if (next.isEmpty) {
+      try {
+        await _c.from('likes').delete().eq('liked', deviceId);
+      } catch (e) {
+        debugPrint('ProfileApi.removeProfilePhoto: likes cleanup failed: $e');
+      }
+    }
+    return next;
   }
 
   /// Case-insensitive substring search across display name AND handle.

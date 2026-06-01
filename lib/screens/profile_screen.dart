@@ -47,11 +47,17 @@ import 'settings_screen.dart';
 ///     warning are dropped (private to me), and the action row becomes
 ///     Bloquer / Débloquer instead of Edit / Paramètres.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.userId});
+  const ProfileScreen({super.key, this.userId, this.preview = false});
 
   /// When non-null, render the profile of the given Supabase auth user id
   /// in read-only "viewer" mode rather than my own profile.
   final String? userId;
+
+  /// "Aperçu" mode: render MY OWN profile ([userId] set to my device id) in
+  /// the read-only viewer layout so I can preview how others see me. Hides
+  /// the report/block menu and the follow/message actions that would
+  /// otherwise target myself.
+  final bool preview;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -80,6 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   Timer? _pollTimer;
 
   bool get _isViewingOther => widget.userId != null;
+  /// True when previewing my own profile (read-only, but it's still "me").
+  bool get _isPreview => widget.preview;
   String get _targetId => widget.userId ?? _deviceId;
 
   @override
@@ -374,11 +382,21 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     return DateTime.now().difference(ls) < const Duration(minutes: 2);
   }
 
-  Future<void> _pickAndUploadDiscoverPhoto() async {
+  /// "Tes photos" — pick an image and append it to the gallery. The first
+  /// photo doubles as the PDP (avatar) + Discover photo; [ProfileApi.
+  /// addProfilePhoto] keeps those columns in sync.
+  Future<void> _pickAndAddPhoto() async {
     if (_deviceId.isEmpty) return;
     if (!isSupabaseReady) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Supabase non configuré.')),
+      );
+      return;
+    }
+    final current = _remote?.photos ?? const <String>[];
+    if (current.length >= profilePhotosMax) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('photos_full'))),
       );
       return;
     }
@@ -396,11 +414,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     if (!mounted) return;
     final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
     try {
-      // Single photo doubles as the PDP (avatar) and the Discover photo —
-      // uploadProfilePhoto writes both columns from one upload.
-      await ProfileApi.uploadProfilePhoto(
+      await ProfileApi.addProfilePhoto(
         deviceId: _deviceId,
         bytes: bytes,
+        current: current,
         contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
       );
       if (!mounted) return;
@@ -416,7 +433,10 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
-  Future<void> _deleteDiscoverPhoto() async {
+  /// Remove a single gallery photo. Re-syncs the PDP server-side; cascades a
+  /// like wipe only when the gallery becomes empty (see [ProfileApi.
+  /// removeProfilePhoto]).
+  Future<void> _removePhoto(String url) async {
     if (_deviceId.isEmpty) return;
     final ok = await showSwaycoConfirm(
       context: context,
@@ -426,15 +446,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
     if (ok != true) return;
     try {
-      await ProfileApi.deleteMyDiscoverPhoto(_deviceId);
-      // Cascade: likes received are tied to the (now-deleted) photo, so
-      // drop them too — otherwise the ❤ badge keeps showing on an empty
-      // cell. Best-effort; a failure here shouldn't block the deletion.
-      try {
-        await LikeApi.deleteAllLikersOf(_deviceId);
-      } catch (e) {
-        debugPrint('cascade like delete failed: $e');
-      }
+      await ProfileApi.removeProfilePhoto(
+        deviceId: _deviceId,
+        url: url,
+        current: _remote?.photos ?? const <String>[],
+      );
       if (!mounted) return;
       await _reload();
     } catch (e) {
@@ -443,6 +459,18 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         SnackBar(content: Text('Suppression échouée : $e')),
       );
     }
+  }
+
+  /// "Aperçu" — open my own profile in read-only preview mode so I can see
+  /// it the way other users do (no edit affordances, no follow/message
+  /// actions). Pushes the same screen pointed at my own id with [preview].
+  Future<void> _openPreview() async {
+    if (_deviceId.isEmpty) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileScreen(userId: _deviceId, preview: true),
+      ),
+    );
   }
 
   Future<void> _saveBio(String bio) async {
@@ -542,12 +570,16 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               scrolledUnderElevation: 0,
               surfaceTintColor: Colors.transparent,
               title: Text(
-                _displayName.isEmpty
-                    ? AppStrings.t('profile_default_title')
-                    : _displayName,
+                _isPreview
+                    ? AppStrings.t('profile_preview')
+                    : (_displayName.isEmpty
+                        ? AppStrings.t('profile_default_title')
+                        : _displayName),
                 style: SCText.h3,
               ),
               actions: [
+                // No report / block menu when previewing my own profile.
+                if (!_isPreview)
                 PopupMenuButton<String>(
                   tooltip: AppStrings.t('tooltip_more'),
                   icon: const Icon(Icons.more_vert),
@@ -651,10 +683,11 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     online: _peerOnline,
                     bio: _remote?.bio ?? '',
                     emojis: _remote?.emojis ?? const [],
+                    photos: _remote?.photos ?? const [],
                     counts: _counts,
                     likesCount: _likesCount,
-                    discoverPhotoUrl: _remote?.discoverPhotoUrl ?? '',
                     viewerMode: _isViewingOther,
+                    preview: _isPreview,
                     peerFollowsMe: _peerFollowsMe,
                     iFollowPeer: _iFollowPeer,
                     iRequestedPeer: _iRequestedPeer,
@@ -664,8 +697,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     onTapFollowers: () => _openFriendsList(FriendDirection.followers),
                     onTapFollowing: () => _openFriendsList(FriendDirection.following),
                     onTapLikes: _openLikesReceived,
-                    onPickDiscoverPhoto: _pickAndUploadDiscoverPhoto,
-                    onDeleteDiscoverPhoto: _deleteDiscoverPhoto,
+                    onPickPhoto: _pickAndAddPhoto,
+                    onRemovePhoto: _removePhoto,
+                    onPreview: _openPreview,
                     onEdit: _openEditor,
                     onSettings: _openSettings,
                     onFollowBack: _followBack,
@@ -1739,19 +1773,21 @@ class _IdentitySection extends StatelessWidget {
     this.online = false,
     required this.bio,
     required this.emojis,
+    required this.photos,
     required this.counts,
     required this.likesCount,
-    required this.discoverPhotoUrl,
     required this.onEditBio,
     this.onEditEmojis,
     required this.onTapFollowers,
     required this.onTapFollowing,
     required this.onTapLikes,
-    required this.onPickDiscoverPhoto,
-    required this.onDeleteDiscoverPhoto,
+    required this.onPickPhoto,
+    required this.onRemovePhoto,
+    required this.onPreview,
     required this.onEdit,
     required this.onSettings,
     this.viewerMode = false,
+    this.preview = false,
     this.peerFollowsMe = false,
     this.iFollowPeer = false,
     this.iRequestedPeer = false,
@@ -1771,24 +1807,33 @@ class _IdentitySection extends StatelessWidget {
   /// Emojis the user pinned to their profile. Rendered in the "Emojis"
   /// section; editable on my own profile (tap a tile), read-only otherwise.
   final List<String> emojis;
+  /// Photo gallery ("Tes photos"). `photos[0]` is the PDP. Editable (add /
+  /// remove) on my own profile, read-only otherwise.
+  final List<String> photos;
   final FriendshipCounts counts;
   /// Number of users who liked me. Only shown on my own profile (private).
   final int likesCount;
-  final String discoverPhotoUrl;
   final Future<void> Function(String) onEditBio;
   /// Persist the edited emoji list. Null in viewer mode (read-only).
   final Future<void> Function(List<String>)? onEditEmojis;
   final VoidCallback onTapFollowers;
   final VoidCallback onTapFollowing;
   final VoidCallback onTapLikes;
-  final VoidCallback onPickDiscoverPhoto;
-  final VoidCallback onDeleteDiscoverPhoto;
+  /// Own profile: append a photo to the gallery.
+  final VoidCallback onPickPhoto;
+  /// Own profile: remove the given gallery photo by URL.
+  final void Function(String url) onRemovePhoto;
+  /// Own profile: open the read-only "Aperçu" of how others see me.
+  final VoidCallback onPreview;
   final VoidCallback onEdit;
   final VoidCallback onSettings;
-  /// True when this section is rendering someone else's profile read-only.
-  /// Hides the camera badge, the bio edit affordance, the discover-photo
-  /// upload affordance, and swaps Edit/Paramètres for Message / Follow-back.
+  /// True when this section is rendering someone else's profile read-only
+  /// (or my own in "Aperçu" mode). Hides editing affordances and swaps
+  /// Edit/Paramètres for Message / Follow-back.
   final bool viewerMode;
+  /// True when [viewerMode] is actually a preview of MY OWN profile — hide
+  /// the follow/message actions (they'd target myself) and show a banner.
+  final bool preview;
   /// Viewer-mode only: does the displayed peer follow me? Gates the
   /// "Follow back" button.
   final bool peerFollowsMe;
@@ -1959,45 +2004,127 @@ class _IdentitySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return viewerMode ? _buildViewer(context) : _buildOwn(context);
+  }
+
+  /// My own profile — capture-1 layout: a "Ton profil" header with an
+  /// Aperçu (preview) pill + settings gear, then the "Tes photos" gallery,
+  /// the "Emojis" section and the "Bio" section. No avatar circle, name,
+  /// handle or follower stats here (that's what Aperçu / the viewer layout
+  /// is for) — this surface is purely "edit how my profile looks".
+  Widget _buildOwn(BuildContext context) {
     final emptyBio = bio.trim().isEmpty;
-    // Posts count for now = 1 if a Discover photo is set, else 0. Wired to
-    // a real `posts` table once multi-post support ships (see SQL in commit).
-    final postsCount = discoverPhotoUrl.isNotEmpty ? 1 : 0;
+    final photosTitle = photos.isEmpty
+        ? AppStrings.t('profile_photos_section')
+        : '${AppStrings.t('profile_photos_section')} (${photos.length})';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── "Ta photo" section (capture-1 style big tile). The single
-        //    photo doubles as the PDP (avatar) shown everywhere in the app
-        //    and as the Discover-card photo.
-        if (!viewerMode) ...[
-          _ProfileSectionHeader(AppStrings.t('profile_photo_section')),
-          const SizedBox(height: 12),
-        ],
-        _ProfilePhoto(
-          discoverPhotoUrl: discoverPhotoUrl,
-          viewerMode: viewerMode,
-          onPick: onPickDiscoverPhoto,
-          onDelete: onDeleteDiscoverPhoto,
-          // Likes badge only on my own profile (private). Tap → "Qui m'a liké".
-          likesCount: viewerMode ? 0 : likesCount,
-          onTapLikes: onTapLikes,
-          // Viewer mode: heart overlay so I can like the peer's photo.
-          iLikePeer: iLikePeer,
-          onTogglePeerLike: onTogglePeerLike,
+        // Header — "Ton profil" + Aperçu pill + settings gear.
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                AppStrings.t('onb_profile_title'),
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            _PreviewPill(onTap: onPreview),
+            const SizedBox(width: 8),
+            _GhostIconButton(
+              icon: Icons.settings_outlined,
+              onTap: onSettings,
+              tooltip: AppStrings.t('settings_title'),
+            ),
+          ],
         ),
-        // Tiny ⓘ hint under the photo — only on my own profile. Taps jump
-        // to Settings where the "Me cacher de mon pays" toggle lives.
-        if (!viewerMode) ...[
-          const SizedBox(height: 10),
-          _DiscoverVisibilityHint(
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
+        const SizedBox(height: 22),
+        // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
+        _ProfileSectionHeader(photosTitle),
+        const SizedBox(height: 12),
+        _PhotoGallery(
+          photos: photos,
+          viewerMode: false,
+          onPick: onPickPhoto,
+          onRemove: onRemovePhoto,
+          likesCount: likesCount,
+          onTapLikes: onTapLikes,
+        ),
+        const SizedBox(height: 10),
+        // ⓘ hint — taps jump to Settings where "Me cacher de mon pays" lives.
+        _DiscoverVisibilityHint(
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+          ),
+        ),
+        // Emojis.
+        const SizedBox(height: 24),
+        _ProfileSectionHeader(AppStrings.t('profile_emojis_section')),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final e in emojis)
+              _EmojiTile(emoji: e, onTap: () => _openEmojiEditor(context)),
+            if (emojis.length < profileEmojisMax)
+              _EmojiAddTile(onTap: () => _openEmojiEditor(context)),
+          ],
+        ),
+        // Bio.
+        const SizedBox(height: 24),
+        _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
+        const SizedBox(height: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _openBioEditor(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              emptyBio ? _bioPlaceholder : bio,
+              style: TextStyle(
+                color: emptyBio ? SC.textMuted : SC.textPrimary,
+                fontSize: 15,
+                height: 1.45,
+                fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  /// Someone else's profile (read-only), or my own profile in "Aperçu"
+  /// preview mode. Photo gallery + name/handle + stats + (unless preview)
+  /// the Message / Follow-back / Add action stack, then the peer's emojis
+  /// and bio when present.
+  Widget _buildViewer(BuildContext context) {
+    final emptyBio = bio.trim().isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Preview banner — only when looking at my own profile via Aperçu.
+        if (preview) ...[
+          const _PreviewBanner(),
+          const SizedBox(height: 16),
         ],
-        const SizedBox(height: 20),
+        // Read-only photo gallery (hidden when the peer has none).
+        if (photos.isNotEmpty) ...[
+          _PhotoGallery(
+            photos: photos,
+            viewerMode: true,
+            onPick: () {},
+            onRemove: (_) {},
+            iLikePeer: iLikePeer,
+            onTogglePeerLike: preview ? null : onTogglePeerLike,
+          ),
+          const SizedBox(height: 20),
+        ],
         // Centred name + handle.
         Text(
           displayName,
@@ -2016,12 +2143,8 @@ class _IdentitySection extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: SC.textMuted, fontSize: 13,
-          ),
+          style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // Online indicator — viewer mode, peer active in the last 2 min
-        // and not hiding their status.
         if (online) ...[
           const SizedBox(height: 6),
           Row(
@@ -2048,17 +2171,11 @@ class _IdentitySection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
-        // Stats row, TikTok-style. On my own profile we add a private
-        // posts | followers | following. Likes count moved to a badge on
-        // the Discover photo cell below (private to me, not shown in
-        // viewer mode).
+        // Stats — posts (= gallery size) | followers | following.
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _InlineStat(
-              value: postsCount,
-              label: 'posts',
-            ),
+            _InlineStat(value: photos.length, label: 'posts'),
             const _StatDivider(),
             _InlineStat(
               value: counts.followers,
@@ -2073,122 +2190,64 @@ class _IdentitySection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        // Big primary action button — gradient like TikTok's Follow.
-        Row(
-          children: [
-            if (!viewerMode) ...[
-              Expanded(
-                child: _GradientActionButton(
-                  label: AppStrings.t('profile_edit'),
-                  icon: Icons.edit_outlined,
-                  onTap: onEdit,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _GhostIconButton(
-                icon: Icons.settings_outlined,
-                onTap: onSettings,
-                tooltip: AppStrings.t('settings_title'),
-              ),
-            ] else ...[
-              Expanded(
-                child: Column(
-                  children: [
-                    _GradientActionButton(
-                      label: AppStrings.t('profile_message'),
-                      icon: Icons.chat_bubble_outline,
-                      onTap: onMessagePeer ?? () {},
-                    ),
-                    // Second action depends on the follow relation:
-                    //  • I already follow them → "Unfollow" (removes them
-                    //    from my friends)
-                    //  • peer follows me, I don't → "S'abonner en retour":
-                    //    INSTANT follow, no approval (FriendshipApi.follow).
-                    //  • stranger, request already sent → "Demande envoyée".
-                    //  • stranger → "Ajouter": SENDS A REQUEST they must
-                    //    accept (FriendshipApi.sendRequest).
-                    if (iFollowPeer) ...[
-                      const SizedBox(height: 10),
-                      _GradientActionButton(
-                        label: AppStrings.t('follow_unfollow'),
-                        icon: Icons.person_remove_alt_1,
-                        onTap: onUnfollow ?? () {},
-                        subdued: true,
-                      ),
-                    ] else if (peerFollowsMe) ...[
-                      const SizedBox(height: 10),
-                      _GradientActionButton(
-                        label: AppStrings.t('follow_back'),
-                        icon: Icons.person_add_alt_1,
-                        onTap: onFollowBack ?? () {},
-                      ),
-                    ] else if (iRequestedPeer) ...[
-                      const SizedBox(height: 10),
-                      _GradientActionButton(
-                        label: AppStrings.t('friendship_sent'),
-                        icon: Icons.schedule,
-                        onTap: () {},
-                        subdued: true,
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 10),
-                      _GradientActionButton(
-                        label: AppStrings.t('profile_add'),
-                        icon: Icons.person_add_alt_1,
-                        onTap: onAddPeer ?? () {},
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+        // Action stack — hidden in preview (the buttons would target myself).
+        if (!preview) ...[
+          const SizedBox(height: 16),
+          _GradientActionButton(
+            label: AppStrings.t('profile_message'),
+            icon: Icons.chat_bubble_outline,
+            onTap: onMessagePeer ?? () {},
+          ),
+          // Second action depends on the follow relation:
+          //  • I already follow them → "Unfollow".
+          //  • peer follows me, I don't → "S'abonner en retour" (instant).
+          //  • stranger, request already sent → "Demande envoyée".
+          //  • stranger → "Ajouter" (sends a request they must accept).
+          if (iFollowPeer) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('follow_unfollow'),
+              icon: Icons.person_remove_alt_1,
+              onTap: onUnfollow ?? () {},
+              subdued: true,
+            ),
+          ] else if (peerFollowsMe) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('follow_back'),
+              icon: Icons.person_add_alt_1,
+              onTap: onFollowBack ?? () {},
+            ),
+          ] else if (iRequestedPeer) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('friendship_sent'),
+              icon: Icons.schedule,
+              onTap: () {},
+              subdued: true,
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('profile_add'),
+              icon: Icons.person_add_alt_1,
+              onTap: onAddPeer ?? () {},
+            ),
           ],
-        ),
-        // ── Emojis section. Editable on my own profile (tap any tile or
-        //    the + tile); read-only when viewing someone else, and hidden
-        //    entirely when the peer has none.
-        if (!viewerMode || emojis.isNotEmpty) ...[
+        ],
+        // Emojis (read-only) — only when the peer has some.
+        if (emojis.isNotEmpty) ...[
           const SizedBox(height: 24),
           _ProfileSectionHeader(AppStrings.t('profile_emojis_section')),
           const SizedBox(height: 12),
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: [
-              for (final e in emojis)
-                _EmojiTile(
-                  emoji: e,
-                  onTap: viewerMode ? null : () => _openEmojiEditor(context),
-                ),
-              if (!viewerMode && emojis.length < profileEmojisMax)
-                _EmojiAddTile(onTap: () => _openEmojiEditor(context)),
-            ],
+            children: [for (final e in emojis) _EmojiTile(emoji: e)],
           ),
         ],
-        // ── Bio section. Tap-to-edit on my own profile, flat text on
-        //    someone else's (skipped if empty in viewer mode).
-        if (!viewerMode) ...[
-          const SizedBox(height: 24),
-          _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
-          const SizedBox(height: 8),
-          InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => _openBioEditor(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(
-                emptyBio ? _bioPlaceholder : bio,
-                style: TextStyle(
-                  color: emptyBio ? SC.textMuted : SC.textPrimary,
-                  fontSize: 15,
-                  height: 1.45,
-                  fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-          ),
-        ] else if (!emptyBio) ...[
+        // Bio (read-only) — only when non-empty.
+        if (!emptyBio) ...[
           const SizedBox(height: 24),
           _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
           const SizedBox(height: 8),
@@ -2227,55 +2286,140 @@ class _ProfileSectionHeader extends StatelessWidget {
   }
 }
 
-/// The single profile photo, rendered as a large centred portrait tile
-/// (capture-1 style). Reuses [_PhotoCell] for the photo and its badges
-/// (likes / like / delete) and [_AddDiscoverPhotoCta] for the empty
-/// own-profile state. Hidden entirely in viewer mode when the peer has
-/// no photo. By product decision there is exactly one photo and it
-/// doubles as the PDP everywhere in the app.
-class _ProfilePhoto extends StatelessWidget {
-  const _ProfilePhoto({
-    required this.discoverPhotoUrl,
+/// "Tes photos" — a horizontal gallery of portrait photo tiles (capture-1
+/// style). On my own profile the first tile is the yellow/accent "+" add
+/// CTA, followed by each photo with a delete badge; the PDP (index 0) also
+/// carries the private likes badge. In viewer mode the gallery is read-only
+/// (the PDP carries the like-this-peer heart). Reuses [_PhotoCell] for the
+/// photo + its badges and [_AddDiscoverPhotoCta] for the add tile.
+class _PhotoGallery extends StatelessWidget {
+  const _PhotoGallery({
+    required this.photos,
     required this.viewerMode,
     required this.onPick,
-    this.onDelete,
+    required this.onRemove,
     this.likesCount = 0,
     this.onTapLikes,
     this.iLikePeer = false,
     this.onTogglePeerLike,
   });
 
-  final String discoverPhotoUrl;
+  final List<String> photos;
   final bool viewerMode;
   final VoidCallback onPick;
-  final VoidCallback? onDelete;
+  final void Function(String url) onRemove;
   final int likesCount;
   final VoidCallback? onTapLikes;
   final bool iLikePeer;
   final VoidCallback? onTogglePeerLike;
 
+  static const double _height = 188;
+  static const double _width = 140;
+
   @override
   Widget build(BuildContext context) {
-    final hasPhoto = discoverPhotoUrl.isNotEmpty;
-    if (viewerMode && !hasPhoto) return const SizedBox.shrink();
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 240),
-        child: AspectRatio(
-          aspectRatio: 3 / 4,
-          child: hasPhoto
-              ? _PhotoCell(
-                  photoUrl: discoverPhotoUrl,
-                  viewerMode: viewerMode,
-                  onTap: onPick,
-                  onDelete: onDelete,
-                  likesCount: likesCount,
-                  onTapLikes: onTapLikes,
-                  iLikePeer: iLikePeer,
-                  onTogglePeerLike: onTogglePeerLike,
-                )
-              : _AddDiscoverPhotoCta(onTap: onPick),
+    if (viewerMode && photos.isEmpty) return const SizedBox.shrink();
+    final canAdd = !viewerMode && photos.length < profilePhotosMax;
+    final items = <Widget>[
+      if (canAdd)
+        SizedBox(width: _width, child: _AddDiscoverPhotoCta(onTap: onPick)),
+      for (var i = 0; i < photos.length; i++)
+        SizedBox(
+          width: _width,
+          child: _PhotoCell(
+            photoUrl: photos[i],
+            viewerMode: viewerMode,
+            onTap: () {},
+            // Delete badge on every photo on my own profile.
+            onDelete: viewerMode ? null : () => onRemove(photos[i]),
+            // Likes badge only on the PDP (index 0) of my own profile.
+            likesCount: (!viewerMode && i == 0) ? likesCount : 0,
+            onTapLikes: (!viewerMode && i == 0) ? onTapLikes : null,
+            // Like-this-peer heart only on the PDP in viewer mode.
+            iLikePeer: iLikePeer,
+            onTogglePeerLike:
+                (viewerMode && i == 0) ? onTogglePeerLike : null,
+          ),
         ),
+    ];
+    return SizedBox(
+      height: _height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, i) => items[i],
+      ),
+    );
+  }
+}
+
+/// The yellow "Aperçu" pill in the profile header (capture-1 style, tinted to
+/// the app's cyan DA). Opens a read-only preview of how others see me.
+class _PreviewPill extends StatelessWidget {
+  const _PreviewPill({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.accent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.visibility_outlined,
+                  size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                AppStrings.t('profile_preview'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Banner shown at the top of the Aperçu preview so the user understands
+/// they're looking at the public view of their own profile.
+class _PreviewBanner extends StatelessWidget {
+  const _PreviewBanner();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: SC.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SC.accent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.visibility_outlined, size: 18, color: SC.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              AppStrings.t('profile_preview_banner'),
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2382,11 +2526,10 @@ class _DiscoverVisibilityHint extends StatelessWidget {
   }
 }
 
-/// Shown on the user's own profile when they have no Discover photo
-/// yet — a yellow square with a black "+" badge that sits in the same
-/// 1/3-width slot the eventual photo will occupy. Single photo only
-/// by design (economic reasons), so there's no "Tes photos (n)"
-/// header or "Tout voir" affordance — just this one tile.
+/// The "+" add tile that opens the gallery picker, shown as the first tile
+/// of the "Tes photos" gallery on my own profile (and as the empty-state
+/// when no photo has been added yet). Accent-tinted square with a centred
+/// "+" badge, filling its portrait slot in the horizontal gallery.
 class _AddDiscoverPhotoCta extends StatelessWidget {
   const _AddDiscoverPhotoCta({required this.onTap});
 
