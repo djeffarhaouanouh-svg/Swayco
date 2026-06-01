@@ -2090,17 +2090,20 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — title left-aligned in the shared h1 style (same as the
-        // Discover / Messages screens), with the Aperçu pill + settings gear
-        // on a right-aligned row just below so they never crowd the title.
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(AppStrings.t('onb_profile_title'), style: SCText.h1),
-        ),
-        const SizedBox(height: 16),
+        // Header — title (shared h1 style) on the left with the Aperçu pill +
+        // settings gear on the same top row, right-aligned. The title flexes
+        // and ellipsises so the buttons never get pushed off a narrow phone.
         Row(
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            Expanded(
+              child: Text(
+                AppStrings.t('onb_profile_title'),
+                style: SCText.h1,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 10),
             _PreviewPill(onTap: onPreview),
             const SizedBox(width: 10),
             _GhostIconButton(

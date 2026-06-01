@@ -27,26 +27,29 @@ abstract final class ReceivedActivityUnread {
   static DateTime _seenAt = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   static Timer? _poll;
 
-  /// Start tracking for [meId]. Safe to call repeatedly. On the very first
-  /// run (no stored timestamp) everything already received is treated as
-  /// seen, so the badge only ever lights up for activity arriving from now on.
+  /// Start tracking for [meId]. Safe to call repeatedly. Until the user has
+  /// opened the Demandes tab at least once (no stored timestamp), the seen
+  /// pointer is the epoch — so the badge surfaces the whole backlog of
+  /// already-received likes / reactions, and clears once they look.
   static Future<void> start(String meId) async {
     if (meId.isEmpty || !isSupabaseReady) return;
     _meId = meId;
 
     final prefs = await SharedPreferences.getInstance();
     final iso = prefs.getString(_seenKey);
-    if (iso != null) {
-      _seenAt = DateTime.tryParse(iso)?.toUtc() ?? DateTime.now().toUtc();
-    } else {
-      _seenAt = DateTime.now().toUtc();
-      await prefs.setString(_seenKey, _seenAt.toIso8601String());
-    }
+    _seenAt = iso != null
+        ? (DateTime.tryParse(iso)?.toUtc() ?? _epoch)
+        : _epoch;
 
     await refresh();
     _poll?.cancel();
     _poll = Timer.periodic(_pollInterval, (_) => refresh());
   }
+
+  static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(
+    0,
+    isUtc: true,
+  );
 
   /// Re-count likes + reactions received since [_seenAt].
   static Future<void> refresh() async {
