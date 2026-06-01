@@ -1307,7 +1307,7 @@ class _ProfileCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Right rail: 4 random reaction emojis (ghosted until tapped)
+                  // Right rail: reaction emojis (ghosted until tapped)
                   // stacked above the heart. Skipped together with the heart
                   // for background-deck instances where interaction is off.
                   if (onToggleLike != null) ...[
@@ -1417,7 +1417,7 @@ class _ReactionRail extends StatelessWidget {
   final Set<String> reactedEmojis;
 
   // Fixed across all cards so users learn the rail by muscle memory.
-  static const _emojis = <String>['🔥', '✨', '💯', '😍'];
+  static const _emojis = <String>['🔥', '✨', '😍'];
 
   @override
   Widget build(BuildContext context) {
