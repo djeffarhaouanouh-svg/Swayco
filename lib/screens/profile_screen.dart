@@ -2113,7 +2113,9 @@ class _IdentitySection extends StatelessWidget {
           const _PreviewBanner(),
           const SizedBox(height: 16),
         ],
-        // Read-only photo gallery (hidden when the peer has none).
+        // Read-only photo gallery (hidden when the peer has none). In my own
+        // Aperçu with no photo yet, show an empty PDP bubble placeholder so
+        // the preview makes clear where the profile picture will appear.
         if (photos.isNotEmpty) ...[
           _PhotoGallery(
             photos: photos,
@@ -2123,6 +2125,9 @@ class _IdentitySection extends StatelessWidget {
             iLikePeer: iLikePeer,
             onTogglePeerLike: preview ? null : onTogglePeerLike,
           ),
+          const SizedBox(height: 20),
+        ] else if (preview) ...[
+          const _EmptyPdpBubble(),
           const SizedBox(height: 20),
         ],
         // Centred name + handle.
@@ -2145,7 +2150,8 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        if (online) ...[
+        // Online indicator — hidden in my own Aperçu (it's always "me").
+        if (online && !preview) ...[
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2386,6 +2392,32 @@ class _PreviewPill extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Empty circular PDP placeholder shown in the Aperçu preview when the user
+/// hasn't added a photo yet — makes clear where their profile picture will
+/// appear once uploaded.
+class _EmptyPdpBubble extends StatelessWidget {
+  const _EmptyPdpBubble();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: SC.bubbleIn,
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF2A3942)),
+        ),
+        child: const Icon(
+          Icons.person_outline,
+          size: 48,
+          color: SC.textMuted,
         ),
       ),
     );
