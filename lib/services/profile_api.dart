@@ -40,6 +40,7 @@ class RemoteProfile {
     required this.avatarUrl,
     this.discoverPhotoUrl = '',
     this.bio = '',
+    this.emojis = const [],
     this.gender = '',
     this.hideOnlineStatus = false,
     this.hideFromCountry = false,
@@ -69,6 +70,11 @@ class RemoteProfile {
   /// Free-form short tagline shown on the user's own profile and on their
   /// Discover card. Capped at [profileBioMaxLength] characters.
   final String bio;
+
+  /// A short, expressive list of emojis the user picks to decorate their
+  /// profile (rendered as tiles in the "Emojis" section). Each element is
+  /// one grapheme/emoji; capped at [profileEmojisMax] client-side.
+  final List<String> emojis;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -181,6 +187,16 @@ class RemoteProfile {
         avatarUrl: m['avatar_url']?.toString() ?? '',
         discoverPhotoUrl: m['discover_photo_url']?.toString() ?? '',
         bio: m['bio']?.toString() ?? '',
+        emojis: () {
+          final raw = m['emojis'];
+          if (raw is List) {
+            return raw
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList(growable: false);
+          }
+          return const <String>[];
+        }(),
         gender: () {
           final g = m['gender']?.toString().trim() ?? '';
           return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -205,11 +221,65 @@ class RemoteProfile {
         lastSeen: _parseDate(m['last_seen']),
         referralCode: m['referral_code']?.toString() ?? '',
       );
+
+  /// Returns a copy with the given fields overridden. Used by the few call
+  /// sites that mutate a single attribute (bio / emojis save, credit refill)
+  /// and need a fresh immutable instance without re-listing every field —
+  /// which previously dropped attributes like `subscriptionTier` on rebuild.
+  RemoteProfile copyWith({
+    String? handle,
+    String? displayName,
+    String? language,
+    String? avatarColor,
+    String? avatarUrl,
+    String? discoverPhotoUrl,
+    String? bio,
+    List<String>? emojis,
+    String? gender,
+    bool? hideOnlineStatus,
+    bool? hideFromCountry,
+    bool? isPro,
+    String? subscriptionTier,
+    String? elevenlabsVoiceId,
+    int? creditsSeconds,
+    DateTime? creditsResetAt,
+    int? lifetimeCallSeconds,
+    DateTime? proExpiresAt,
+    DateTime? lastSeen,
+    String? referralCode,
+  }) =>
+      RemoteProfile(
+        id: id,
+        handle: handle ?? this.handle,
+        displayName: displayName ?? this.displayName,
+        language: language ?? this.language,
+        avatarColor: avatarColor ?? this.avatarColor,
+        avatarUrl: avatarUrl ?? this.avatarUrl,
+        discoverPhotoUrl: discoverPhotoUrl ?? this.discoverPhotoUrl,
+        bio: bio ?? this.bio,
+        emojis: emojis ?? this.emojis,
+        gender: gender ?? this.gender,
+        hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
+        hideFromCountry: hideFromCountry ?? this.hideFromCountry,
+        isPro: isPro ?? this.isPro,
+        subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+        elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
+        creditsSeconds: creditsSeconds ?? this.creditsSeconds,
+        creditsResetAt: creditsResetAt ?? this.creditsResetAt,
+        lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
+        proExpiresAt: proExpiresAt ?? this.proExpiresAt,
+        lastSeen: lastSeen ?? this.lastSeen,
+        referralCode: referralCode ?? this.referralCode,
+      );
 }
 
 /// Maximum number of characters allowed in a profile bio. Enforced on the
 /// client; the DB column should also have a `length(bio) <= 80` check.
 const int profileBioMaxLength = 80;
+
+/// Maximum number of emojis a user can pin to their profile. Kept small so
+/// the "Emojis" section stays a single tidy row across phone widths.
+const int profileEmojisMax = 5;
 
 /// Supabase `profiles` table. Mirror of the local UserPrefs profile so that
 /// other users can discover each other by display name.
@@ -388,6 +458,45 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
+  /// Upload [bytes] as the user's single profile photo. By product decision
+  /// there is exactly ONE photo per user and it doubles as the avatar (PDP)
+  /// shown everywhere in the app AND the Discover-card photo — so the same
+  /// public URL is written into both `avatar_url` and `discover_photo_url`.
+  /// Stored under the `discover/` prefix at the larger Discover size. Returns
+  /// the cache-busted public URL.
+  static Future<String> uploadProfilePhoto({
+    required String deviceId,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
+    if (bytes.isEmpty) throw ArgumentError('image vide');
+
+    final ext = contentType.endsWith('png') ? 'png' : 'jpg';
+    final path = 'discover/$deviceId.$ext';
+    await _c.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: contentType,
+            cacheControl: '3600',
+          ),
+        );
+    final baseUrl = _c.storage.from('avatars').getPublicUrl(path);
+    final urlWithBuster =
+        '$baseUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    await _c.from('profiles').update({
+      'discover_photo_url': urlWithBuster,
+      'avatar_url': urlWithBuster,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', deviceId);
+    return urlWithBuster;
+  }
+
   /// Case-insensitive substring search across display name AND handle.
   /// Excludes my own profile.
   ///
@@ -470,22 +579,9 @@ abstract final class ProfileApi {
       debugPrint('ProfileApi._maybeRefillCredits failed: $e');
       return null;
     }
-    return RemoteProfile(
-      id: p.id,
-      handle: p.handle,
-      displayName: p.displayName,
-      language: p.language,
-      avatarColor: p.avatarColor,
-      avatarUrl: p.avatarUrl,
-      discoverPhotoUrl: p.discoverPhotoUrl,
-      bio: p.bio,
-      hideOnlineStatus: p.hideOnlineStatus,
-      isPro: p.isPro,
+    return p.copyWith(
       creditsSeconds: allotment,
       creditsResetAt: nextReset.toLocal(),
-      lifetimeCallSeconds: p.lifetimeCallSeconds,
-      proExpiresAt: p.proExpiresAt,
-      referralCode: p.referralCode,
     );
   }
 
@@ -587,6 +683,32 @@ abstract final class ProfileApi {
     }
   }
 
+  /// Persist the user's chosen profile emojis. Trims blanks and caps at
+  /// [profileEmojisMax] so a client without the right limit can't push an
+  /// oversize list. Returns the saved list (for optimistic updates), or null
+  /// on failure.
+  static Future<List<String>?> updateMyEmojis({
+    required String userId,
+    required List<String> emojis,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return null;
+    final cleaned = emojis
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(profileEmojisMax)
+        .toList(growable: false);
+    try {
+      await _c.from('profiles').update({
+        'emojis': cleaned,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      return cleaned;
+    } catch (e) {
+      debugPrint('ProfileApi.updateMyEmojis failed: $e');
+      return null;
+    }
+  }
+
   /// Toggle the privacy bit that hides this user's online presence from
   /// other clients. Returns true on success so the caller can keep the
   /// optimistic UI in sync if the request failed.
@@ -653,8 +775,12 @@ abstract final class ProfileApi {
   static Future<void> deleteMyDiscoverPhoto(String userId) async {
     if (!isSupabaseReady || userId.isEmpty) return;
     try {
+      // The single photo doubles as the avatar (PDP), so clearing it must
+      // wipe both columns — otherwise the deleted photo would linger as the
+      // user's avatar everywhere else in the app.
       await _c.from('profiles').update({
         'discover_photo_url': '',
+        'avatar_url': '',
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', userId);
     } catch (e) {

@@ -30,7 +30,6 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'chat_thread_screen.dart';
@@ -334,44 +333,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     await _reload();
   }
 
-  Future<void> _pickAndUploadAvatar() async {
-    if (_deviceId.isEmpty) return;
-    if (!isSupabaseReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Supabase non configuré.')),
-      );
-      return;
-    }
-    final picker = ImagePicker();
-    final XFile? file = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
-    try {
-      await ProfileApi.uploadAvatar(
-        deviceId: _deviceId,
-        bytes: bytes,
-        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
-      );
-      if (!mounted) return;
-      await _reload();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Upload échoué : $e'),
-          duration: const Duration(seconds: 8),
-        ),
-      );
-    }
-  }
-
   Future<void> _openEditor() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -435,7 +396,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     if (!mounted) return;
     final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
     try {
-      await ProfileApi.uploadDiscoverPhoto(
+      // Single photo doubles as the PDP (avatar) and the Discover photo —
+      // uploadProfilePhoto writes both columns from one upload.
+      await ProfileApi.uploadProfilePhoto(
         deviceId: _deviceId,
         bytes: bytes,
         contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
@@ -493,24 +456,22 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       return;
     }
     if (!mounted || _remote == null) return;
-    setState(() {
-      _remote = RemoteProfile(
-        id: _remote!.id,
-        handle: _remote!.handle,
-        displayName: _remote!.displayName,
-        language: _remote!.language,
-        avatarColor: _remote!.avatarColor,
-        avatarUrl: _remote!.avatarUrl,
-        discoverPhotoUrl: _remote!.discoverPhotoUrl,
-        bio: saved,
-        isPro: _remote!.isPro,
-        creditsSeconds: _remote!.creditsSeconds,
-        creditsResetAt: _remote!.creditsResetAt,
-        lifetimeCallSeconds: _remote!.lifetimeCallSeconds,
-        proExpiresAt: _remote!.proExpiresAt,
-        referralCode: _remote!.referralCode,
+    setState(() => _remote = _remote!.copyWith(bio: saved));
+  }
+
+  Future<void> _saveEmojis(List<String> emojis) async {
+    if (_deviceId.isEmpty) return;
+    final saved =
+        await ProfileApi.updateMyEmojis(userId: _deviceId, emojis: emojis);
+    if (saved == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sauvegarde échouée.')),
       );
-    });
+      return;
+    }
+    if (!mounted || _remote == null) return;
+    setState(() => _remote = _remote!.copyWith(emojis: saved));
   }
 
   /// Opens the OS share sheet to invite a friend to Swayco. The native
@@ -688,9 +649,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         : _displayName,
                     handle: _handle,
                     online: _peerOnline,
-                    avatarColorHex: _remote?.avatarColor,
-                    avatarUrl: _remote?.avatarUrl,
                     bio: _remote?.bio ?? '',
+                    emojis: _remote?.emojis ?? const [],
                     counts: _counts,
                     likesCount: _likesCount,
                     discoverPhotoUrl: _remote?.discoverPhotoUrl ?? '',
@@ -699,8 +659,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     iFollowPeer: _iFollowPeer,
                     iRequestedPeer: _iRequestedPeer,
                     iLikePeer: _iLikePeer,
-                    onTapAvatar: _pickAndUploadAvatar,
                     onEditBio: _saveBio,
+                    onEditEmojis: _saveEmojis,
                     onTapFollowers: () => _openFriendsList(FriendDirection.followers),
                     onTapFollowing: () => _openFriendsList(FriendDirection.following),
                     onTapLikes: _openLikesReceived,
@@ -1777,14 +1737,13 @@ class _IdentitySection extends StatelessWidget {
     required this.displayName,
     required this.handle,
     this.online = false,
-    required this.avatarColorHex,
-    required this.avatarUrl,
     required this.bio,
+    required this.emojis,
     required this.counts,
     required this.likesCount,
     required this.discoverPhotoUrl,
-    required this.onTapAvatar,
     required this.onEditBio,
+    this.onEditEmojis,
     required this.onTapFollowers,
     required this.onTapFollowing,
     required this.onTapLikes,
@@ -1808,15 +1767,17 @@ class _IdentitySection extends StatelessWidget {
   final String handle;
   /// Viewer-mode only: show a green "online" line under the handle.
   final bool online;
-  final String? avatarColorHex;
-  final String? avatarUrl;
   final String bio;
+  /// Emojis the user pinned to their profile. Rendered in the "Emojis"
+  /// section; editable on my own profile (tap a tile), read-only otherwise.
+  final List<String> emojis;
   final FriendshipCounts counts;
   /// Number of users who liked me. Only shown on my own profile (private).
   final int likesCount;
   final String discoverPhotoUrl;
-  final VoidCallback onTapAvatar;
   final Future<void> Function(String) onEditBio;
+  /// Persist the edited emoji list. Null in viewer mode (read-only).
+  final Future<void> Function(List<String>)? onEditEmojis;
   final VoidCallback onTapFollowers;
   final VoidCallback onTapFollowing;
   final VoidCallback onTapLikes;
@@ -1918,6 +1879,84 @@ class _IdentitySection extends StatelessWidget {
     }
   }
 
+  /// Splits free-typed text into individual emoji/grapheme tiles, dropping
+  /// blanks and capping at [profileEmojisMax].
+  static List<String> _parseEmojis(String raw) => raw.characters
+      .where((c) => c.trim().isNotEmpty)
+      .take(profileEmojisMax)
+      .toList(growable: false);
+
+  Future<void> _openEmojiEditor(BuildContext context) async {
+    final save = onEditEmojis;
+    if (save == null) return;
+    final ctrl = TextEditingController(text: emojis.join(' '));
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SC.bubbleIn,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20, 16, 20, 16 + MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppStrings.t('emojis_editor_title'),
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.t('emojis_editor_hint'),
+              style: const TextStyle(color: SC.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLines: 1,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: SC.textPrimary, fontSize: 22),
+              decoration: InputDecoration(
+                hintText: '🐯 🖤 🎧 💀',
+                hintStyle: const TextStyle(color: SC.textMuted, fontSize: 22),
+                filled: true,
+                fillColor: SC.bg,
+                border: const OutlineInputBorder(
+                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(_parseEmojis(ctrl.text)),
+              style: FilledButton.styleFrom(
+                backgroundColor: SC.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(AppStrings.t('save')),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (result != null) {
+      await save(result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final emptyBio = bio.trim().isEmpty;
@@ -1925,37 +1964,40 @@ class _IdentitySection extends StatelessWidget {
     // a real `posts` table once multi-post support ships (see SQL in commit).
     final postsCount = discoverPhotoUrl.isNotEmpty ? 1 : 0;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Centred avatar (TikTok-style) with the camera badge bottom-right
-        // when editing my own profile.
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            ProfileAvatar(
-              displayName: displayName,
-              avatarUrl: avatarUrl,
-              avatarColorHex: avatarColorHex,
-              size: 128,
-              fontSize: 54,
-              onTap: viewerMode ? null : onTapAvatar,
-            ),
-            if (!viewerMode)
-              Container(
-                width: 28, height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SC.accent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: SC.bg, width: 2),
-                ),
-                child: const Icon(Icons.camera_alt,
-                    size: 14, color: Colors.white),
-              ),
-          ],
+        // ── "Ta photo" section (capture-1 style big tile). The single
+        //    photo doubles as the PDP (avatar) shown everywhere in the app
+        //    and as the Discover-card photo.
+        if (!viewerMode) ...[
+          _ProfileSectionHeader(AppStrings.t('profile_photo_section')),
+          const SizedBox(height: 12),
+        ],
+        _ProfilePhoto(
+          discoverPhotoUrl: discoverPhotoUrl,
+          viewerMode: viewerMode,
+          onPick: onPickDiscoverPhoto,
+          onDelete: onDeleteDiscoverPhoto,
+          // Likes badge only on my own profile (private). Tap → "Qui m'a liké".
+          likesCount: viewerMode ? 0 : likesCount,
+          onTapLikes: onTapLikes,
+          // Viewer mode: heart overlay so I can like the peer's photo.
+          iLikePeer: iLikePeer,
+          onTogglePeerLike: onTogglePeerLike,
         ),
-        const SizedBox(height: 14),
+        // Tiny ⓘ hint under the photo — only on my own profile. Taps jump
+        // to Settings where the "Me cacher de mon pays" toggle lives.
+        if (!viewerMode) ...[
+          const SizedBox(height: 10),
+          _DiscoverVisibilityHint(
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
         // Centred name + handle.
         Text(
           displayName,
@@ -2031,45 +2073,6 @@ class _IdentitySection extends StatelessWidget {
             ),
           ],
         ),
-        // Bio centred, TikTok-style. Tap-to-edit on my own profile, flat
-        // text on someone else's (skipped if empty in viewer mode).
-        if (!viewerMode) ...[
-          const SizedBox(height: 14),
-          InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => _openBioEditor(context),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              child: Text(
-                emptyBio ? _bioPlaceholder : bio,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: emptyBio
-                      ? SC.textMuted
-                      : SC.textPrimary,
-                  fontSize: 14,
-                  height: 1.4,
-                  fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ),
-          ),
-        ] else if (!emptyBio) ...[
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              bio,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
         const SizedBox(height: 16),
         // Big primary action button — gradient like TikTok's Follow.
         Row(
@@ -2142,38 +2145,194 @@ class _IdentitySection extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: 22),
-        // Instagram-style 3-column grid. Slot 0 is the Discover photo
-        // (the only real one for now). Slots 1-2 tease where future
-        // photos will live — tappable on my own profile (opens the
-        // gallery picker), inert when viewing someone else.
-        _PhotosGrid(
-          discoverPhotoUrl: discoverPhotoUrl,
-          viewerMode: viewerMode,
-          onPick: onPickDiscoverPhoto,
-          onDelete: onDeleteDiscoverPhoto,
-          // Likes badge only on my own profile (private). Tap it → opens
-          // the "Qui m'a liké" screen.
-          likesCount: viewerMode ? 0 : likesCount,
-          onTapLikes: onTapLikes,
-          // Viewer mode: heart overlay so I can like the peer's photo.
-          iLikePeer: iLikePeer,
-          onTogglePeerLike: onTogglePeerLike,
-        ),
-        // Tiny ⓘ hint under the photo tile — only on my own profile.
-        // Taps jump to Settings where the "Me cacher de mon pays"
-        // toggle lives.
+        // ── Emojis section. Editable on my own profile (tap any tile or
+        //    the + tile); read-only when viewing someone else, and hidden
+        //    entirely when the peer has none.
+        if (!viewerMode || emojis.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _ProfileSectionHeader(AppStrings.t('profile_emojis_section')),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final e in emojis)
+                _EmojiTile(
+                  emoji: e,
+                  onTap: viewerMode ? null : () => _openEmojiEditor(context),
+                ),
+              if (!viewerMode && emojis.length < profileEmojisMax)
+                _EmojiAddTile(onTap: () => _openEmojiEditor(context)),
+            ],
+          ),
+        ],
+        // ── Bio section. Tap-to-edit on my own profile, flat text on
+        //    someone else's (skipped if empty in viewer mode).
         if (!viewerMode) ...[
-          const SizedBox(height: 10),
-          _DiscoverVisibilityHint(
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
+          const SizedBox(height: 24),
+          _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
+          const SizedBox(height: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _openBioEditor(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                emptyBio ? _bioPlaceholder : bio,
+                style: TextStyle(
+                  color: emptyBio ? SC.textMuted : SC.textPrimary,
+                  fontSize: 15,
+                  height: 1.45,
+                  fontStyle: emptyBio ? FontStyle.italic : FontStyle.normal,
+                ),
               ),
+            ),
+          ),
+        ] else if (!emptyBio) ...[
+          const SizedBox(height: 24),
+          _ProfileSectionHeader(AppStrings.t('profile_bio_section')),
+          const SizedBox(height: 8),
+          Text(
+            bio,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 15,
+              height: 1.45,
             ),
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Section header used across the redesigned profile (capture-1 style):
+/// a bold left-aligned title.
+class _ProfileSectionHeader extends StatelessWidget {
+  const _ProfileSectionHeader(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: SC.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// The single profile photo, rendered as a large centred portrait tile
+/// (capture-1 style). Reuses [_PhotoCell] for the photo and its badges
+/// (likes / like / delete) and [_AddDiscoverPhotoCta] for the empty
+/// own-profile state. Hidden entirely in viewer mode when the peer has
+/// no photo. By product decision there is exactly one photo and it
+/// doubles as the PDP everywhere in the app.
+class _ProfilePhoto extends StatelessWidget {
+  const _ProfilePhoto({
+    required this.discoverPhotoUrl,
+    required this.viewerMode,
+    required this.onPick,
+    this.onDelete,
+    this.likesCount = 0,
+    this.onTapLikes,
+    this.iLikePeer = false,
+    this.onTogglePeerLike,
+  });
+
+  final String discoverPhotoUrl;
+  final bool viewerMode;
+  final VoidCallback onPick;
+  final VoidCallback? onDelete;
+  final int likesCount;
+  final VoidCallback? onTapLikes;
+  final bool iLikePeer;
+  final VoidCallback? onTogglePeerLike;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = discoverPhotoUrl.isNotEmpty;
+    if (viewerMode && !hasPhoto) return const SizedBox.shrink();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 240),
+        child: AspectRatio(
+          aspectRatio: 3 / 4,
+          child: hasPhoto
+              ? _PhotoCell(
+                  photoUrl: discoverPhotoUrl,
+                  viewerMode: viewerMode,
+                  onTap: onPick,
+                  onDelete: onDelete,
+                  likesCount: likesCount,
+                  onTapLikes: onTapLikes,
+                  iLikePeer: iLikePeer,
+                  onTogglePeerLike: onTogglePeerLike,
+                )
+              : _AddDiscoverPhotoCta(onTap: onPick),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single emoji tile in the "Emojis" section. Tappable on my own
+/// profile (opens the emoji editor), inert when read-only.
+class _EmojiTile extends StatelessWidget {
+  const _EmojiTile({required this.emoji, this.onTap});
+  final String emoji;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.bubbleIn,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          width: 54,
+          height: 54,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF2A3942)),
+          ),
+          child: Text(emoji, style: const TextStyle(fontSize: 26)),
+        ),
+      ),
+    );
+  }
+}
+
+/// The "+" tile that opens the emoji editor on my own profile.
+class _EmojiAddTile extends StatelessWidget {
+  const _EmojiAddTile({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.accent.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          width: 54,
+          height: 54,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: SC.accent.withValues(alpha: 0.4)),
+          ),
+          child: const Icon(Icons.add_rounded, color: SC.accent, size: 24),
+        ),
+      ),
     );
   }
 }
@@ -2218,67 +2377,6 @@ class _DiscoverVisibilityHint extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PhotosGrid extends StatelessWidget {
-  const _PhotosGrid({
-    required this.discoverPhotoUrl,
-    required this.viewerMode,
-    required this.onPick,
-    this.onDelete,
-    this.likesCount = 0,
-    this.onTapLikes,
-    this.iLikePeer = false,
-    this.onTogglePeerLike,
-  });
-
-  final String discoverPhotoUrl;
-  final bool viewerMode;
-  final VoidCallback onPick;
-  final VoidCallback? onDelete;
-  final int likesCount;
-  final VoidCallback? onTapLikes;
-  final bool iLikePeer;
-  final VoidCallback? onTogglePeerLike;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasPhoto = discoverPhotoUrl.isNotEmpty;
-    if (viewerMode && !hasPhoto) return const SizedBox.shrink();
-    return Align(
-      alignment: Alignment.centerLeft,
-      // Phone: 1/3 of the available column width (original behaviour).
-      // Desktop / wide: same 1/3 formula but clamped to 280 px so the
-      // tile doesn't balloon to a third of a 1200-px viewport. The
-      // clamp only kicks in on wide layouts — phones stay unchanged.
-      child: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final w = (constraints.maxWidth / 3).clamp(0.0, 280.0);
-          return SizedBox(
-            width: w,
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: hasPhoto
-                  ? _PhotoCell(
-                      photoUrl: discoverPhotoUrl,
-                      viewerMode: viewerMode,
-                      onTap: onPick,
-                      onDelete: onDelete,
-                      likesCount: likesCount,
-                      onTapLikes: onTapLikes,
-                      iLikePeer: iLikePeer,
-                      onTogglePeerLike: onTogglePeerLike,
-                    )
-                  // Own profile, no photo yet — a yellow "+" tile that
-                  // sits in the same slot the photo would occupy once
-                  // uploaded. Single photo only by design (economic).
-                  : _AddDiscoverPhotoCta(onTap: onPick),
-            ),
-          );
-        },
       ),
     );
   }
