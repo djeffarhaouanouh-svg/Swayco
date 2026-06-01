@@ -2020,27 +2020,39 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — "Ton profil" + Aperçu pill + settings gear.
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                AppStrings.t('onb_profile_title'),
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
+        // Header — centred "Ton profil" title with the Aperçu pill +
+        // settings gear pinned to the right.
+        SizedBox(
+          height: 44,
+          child: Stack(
+            children: [
+              Center(
+                child: Text(
+                  AppStrings.t('onb_profile_title'),
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-            ),
-            _PreviewPill(onTap: onPreview),
-            const SizedBox(width: 8),
-            _GhostIconButton(
-              icon: Icons.settings_outlined,
-              onTap: onSettings,
-              tooltip: AppStrings.t('settings_title'),
-            ),
-          ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PreviewPill(onTap: onPreview),
+                    const SizedBox(width: 8),
+                    _GhostIconButton(
+                      icon: Icons.settings_outlined,
+                      onTap: onSettings,
+                      tooltip: AppStrings.t('settings_title'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 22),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
