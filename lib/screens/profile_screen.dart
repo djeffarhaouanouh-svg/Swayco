@@ -2097,31 +2097,6 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Likes received — tap the heart to see who liked you.
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTapLikes,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.favorite,
-                    color: Color(0xFFFF3B5C),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$likesCount',
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
             _GhostIconButton(
               icon: Icons.settings_outlined,
               onTap: onSettings,
@@ -2942,19 +2917,20 @@ class _GhostIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // White circle with a black glyph — monochrome, no blue tint.
+    // Dark frosted-glass circle (same surface as the cards) with a white
+    // glyph — no blue tint.
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(999),
+      color: SC.glassStrong,
+      shape: const CircleBorder(side: BorderSide(color: SC.glassBorder)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        customBorder: const CircleBorder(),
         onTap: onTap,
         child: Tooltip(
           message: tooltip,
           child: SizedBox(
             width: 38,
             height: 38,
-            child: Icon(icon, size: 18, color: const Color(0xFF0E0E0E)),
+            child: Icon(icon, size: 18, color: Colors.white),
           ),
         ),
       ),
