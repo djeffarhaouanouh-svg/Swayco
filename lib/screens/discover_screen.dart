@@ -74,6 +74,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // renders pre-filled when I revisit.
   Map<String, Set<String>> _myReactionsByPeer = const {};
 
+  // Peers I've already sent a direct intro message to (Discover text area).
+  // Hydrated on bootstrap so the "one message per person" rule survives
+  // restarts; the in-card field collapses to a sent state for these.
+  Set<String> _directMessagedIds = <String>{};
+
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
   final PageController _pageController = PageController();
@@ -140,11 +145,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(_myId);
       final liked = await LikeApi.fetchMyLikedIds(_myId);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
+      final messaged = await ChatApi.fetchMyTextRecipients(_myId);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
+        _directMessagedIds = messaged;
       });
     } catch (_) {
       // Polling errors are non-fatal — next tick will retry.
@@ -163,12 +170,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(id);
       final liked = await LikeApi.fetchMyLikedIds(id);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
+      final messaged = await ChatApi.fetchMyTextRecipients(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
+        _directMessagedIds = messaged;
         _profiles = feed;
         _rebuildCards();
         _feedLoading = false;
@@ -493,6 +502,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
+  /// Send a one-off intro message to [peer] from the Discover card text area.
+  /// One per person: optimistically marks the peer as messaged (the in-card
+  /// field collapses to a sent state) and persists via the real chat message
+  /// — [ChatApi.sendMessage] also fires the push notification to the peer.
+  Future<void> _sendDirectMessage(RemoteProfile peer, String text) async {
+    final body = text.trim();
+    if (body.isEmpty || _myId.isEmpty || peer.id.isEmpty) return;
+    if (_directMessagedIds.contains(peer.id)) return;
+    setState(() => _directMessagedIds = {..._directMessagedIds, peer.id});
+    await _sendQuickMessage(
+      peer,
+      body: body,
+      snack: 'Message envoyé à ${peer.displayName}',
+    );
+  }
+
   /// Floating glass snackbar lifted above the floating GlassNavBar so
   /// the message isn't hidden by it. Same Swayco Midnight palette as
   /// the cards.
@@ -719,6 +744,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
                   reactedEmojis:
                       _myReactionsByPeer[profile.id] ?? const <String>{},
+                  alreadyMessaged: _directMessagedIds.contains(profile.id),
+                  onSendMessage: (text) => _sendDirectMessage(profile, text),
                 ),
               ),
             ),
@@ -1130,6 +1157,8 @@ class _ProfileCard extends StatelessWidget {
     this.onToggleLike,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
+    this.alreadyMessaged = false,
+    this.onSendMessage,
   });
 
   final RemoteProfile profile;
@@ -1157,6 +1186,14 @@ class _ProfileCard extends StatelessWidget {
   /// Emojis I've already sent to [profile] — each matching button on
   /// the rail renders pre-filled.
   final Set<String> reactedEmojis;
+
+  /// True when I've already sent [profile] a direct intro message — the
+  /// in-card text field is replaced by a "message sent" state (one per peer).
+  final bool alreadyMessaged;
+
+  /// Send a one-off intro message to [profile] from the in-card text area.
+  /// Null on non-interactive (background-deck) cards.
+  final Future<void> Function(String)? onSendMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -1306,6 +1343,17 @@ class _ProfileCard extends StatelessWidget {
                         ],
                         const SizedBox(height: 14),
                         _AddButton(onTap: onAdd, sent: pendingOutgoing),
+                        // Direct intro message — one per person. Hidden on
+                        // background-deck cards (onSendMessage null).
+                        if (onSendMessage != null) ...[
+                          const SizedBox(height: 10),
+                          if (alreadyMessaged)
+                            const _MessageSentPill()
+                          else
+                            _DirectMessageField(
+                              onSend: onSendMessage!,
+                            ),
+                        ],
                       ],
                     ),
                   ),
@@ -1500,6 +1548,111 @@ class _ReactionEmojiButton extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// In-card direct-message field on the Discover card — type a one-off intro
+/// message and send it. One per person: after sending, the parent flips the
+/// card to [_MessageSentPill]. Translucent dark pill with white text so it
+/// reads over the photo.
+class _DirectMessageField extends StatefulWidget {
+  const _DirectMessageField({required this.onSend});
+  final Future<void> Function(String) onSend;
+  @override
+  State<_DirectMessageField> createState() => _DirectMessageFieldState();
+}
+
+class _DirectMessageFieldState extends State<_DirectMessageField> {
+  final TextEditingController _ctrl = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    await widget.onSend(text);
+    // The parent rebuilds this card into _MessageSentPill once the peer is
+    // marked messaged; guard mounted in case it already swapped out.
+    if (mounted) setState(() => _sending = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 2, 6, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              enabled: !_sending,
+              minLines: 1,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: AppStrings.t('discover_message_hint'),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onSubmitted: (_) => _send(),
+            ),
+          ),
+          IconButton(
+            onPressed: _sending ? null : _send,
+            icon: const Icon(Icons.send_rounded, color: SC.accent, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown in place of [_DirectMessageField] once the intro message was sent.
+class _MessageSentPill extends StatelessWidget {
+  const _MessageSentPill();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            AppStrings.t('discover_message_sent'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -140,6 +140,27 @@ abstract final class ChatApi {
     return out;
   }
 
+  /// Peers [meId] has already sent a real text message to (not an emoji
+  /// reaction). Used by Discover to enforce "one intro message per person":
+  /// once present, the in-card message field collapses to a sent state.
+  /// Heuristic: a body longer than 2 graphemes is a message, not a single
+  /// reaction emoji.
+  static Future<Set<String>> fetchMyTextRecipients(String meId) async {
+    if (meId.isEmpty) return <String>{};
+    final rows = await _client
+        .from('messages')
+        .select('recipient, body')
+        .eq('sender', meId);
+    final out = <String>{};
+    for (final r in rows as List) {
+      final map = Map<String, dynamic>.from(r as Map);
+      final rec = map['recipient']?.toString() ?? '';
+      final body = map['body']?.toString() ?? '';
+      if (rec.isNotEmpty && body.runes.length > 2) out.add(rec);
+    }
+    return out;
+  }
+
   /// Most recent photo reactions (Discover-rail emoji taps) addressed
   /// to [meId]. One entry per sender — the latest emoji a given peer
   /// reacted with. Ordered by most recent first.
