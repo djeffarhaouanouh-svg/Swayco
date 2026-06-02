@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -37,6 +36,7 @@ import 'chat_thread_screen.dart';
 import 'friends_list_screen.dart';
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
+import 'paywall_screen.dart';
 import 'settings_screen.dart';
 
 /// Profile view. Two modes:
@@ -1021,24 +1021,21 @@ class CreditsCard extends StatelessWidget {
 /// the [_PlansSection] in / out via an AnimatedSize. Hidden entirely
 /// when the user is on the top tier (Ultra Plus) — no upgrades to
 /// surface.
-class _MySubscriptionSection extends StatefulWidget {
+class _MySubscriptionSection extends StatelessWidget {
   const _MySubscriptionSection({required this.currentTier});
 
   final String currentTier;
 
-  @override
-  State<_MySubscriptionSection> createState() => _MySubscriptionSectionState();
-}
-
-class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
-  bool _expanded = false;
+  /// Tier ladder, used only to decide whether the user has any upgrade
+  /// above their current tier. Ultra users have none, so the whole
+  /// "Mon abonnement" row disappears.
+  static const List<String> _ladder = ['free', 'plus', 'ultra_plus'];
 
   @override
   Widget build(BuildContext context) {
-    // Same gate as _PlansSection: Ultra users see no upgrades, so the
-    // whole "Mon abonnement" affordance collapses to nothing.
-    final myRank = _PlansSection._rank(widget.currentTier);
-    final hasUpgrades = _PlansSection._ladder.skip(myRank + 1).isNotEmpty;
+    final i = _ladder.indexOf(currentTier);
+    final rank = i < 0 ? 0 : i;
+    final hasUpgrades = _ladder.skip(rank + 1).isNotEmpty;
     if (!hasUpgrades) return const SizedBox.shrink();
 
     return Container(
@@ -1048,498 +1045,52 @@ class _MySubscriptionSectionState extends State<_MySubscriptionSection> {
         border: Border.all(color: SC.glassBorder),
       ),
       padding: const EdgeInsets.all(4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => setState(() => _expanded = !_expanded),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 14,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.workspace_premium_outlined,
-                      color: SC.accent,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        AppStrings.t('my_subscription_section'),
-                        style: const TextStyle(
-                          color: SC.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    AnimatedRotation(
-                      duration: const Duration(milliseconds: 180),
-                      turns: _expanded ? 0.5 : 0.0,
-                      child: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: SC.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          // Tapping the row deploys the full-screen paywall instead of
+          // expanding the pricing cards inline.
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(builder: (_) => const PaywallScreen()),
           ),
-          ClipRect(
-            child: AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
-              child: _expanded
-                  ? Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                      child: _PlansSection(currentTier: widget.currentTier),
-                    )
-                  : const SizedBox(width: double.infinity),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Plans section rendered below the credits card on the user's own
-/// profile. Two presentations depending on the build target:
-///   - Web: in-app pricing cards (Pro 29€ / Ultra 59€) since the web
-///     subscription flow is fully ours.
-///   - Native (iOS / Android): a single "manage your subscription on
-///     our website" card with a copyable URL. Stores enforce in-app
-///     purchases for any subscription that unlocks app features, so
-///     we deliberately don't surface pricing in the app shell — users
-///     bounce to swayco.fr to subscribe.
-class _PlansSection extends StatefulWidget {
-  const _PlansSection({required this.currentTier});
-
-  /// Caller's current subscription tier. Drives which upgrade cards we
-  /// render — only tiers *strictly above* this one show up, so a Plus
-  /// subscriber sees Pro + Ultra, a Pro sees Ultra, and an Ultra sees
-  /// nothing (we hide the whole section).
-  final String currentTier;
-
-  static const String _manageUrl = 'swayco.fr';
-
-  /// Ordered tier ladder. The index of [tier] in this list is used to
-  /// decide which cards are "above" the user's current tier — anything
-  /// at a strictly greater index is a valid upgrade target.
-  static const List<String> _ladder = ['free', 'plus', 'ultra_plus'];
-
-  static int _rank(String tier) {
-    final i = _ladder.indexOf(tier);
-    return i < 0 ? 0 : i;
-  }
-
-  @override
-  State<_PlansSection> createState() => _PlansSectionState();
-}
-
-class _PlansSectionState extends State<_PlansSection> {
-  /// Which tier currently shows the accent (green) border. Initially
-  /// the first upgrade above the user's tier so the section opens with
-  /// a sensible default highlight.
-  String? _selected;
-
-  // Per-tier marketing copy, kept inline so the build below is just a
-  // filter over this map — adding a tier later means editing this one
-  // place and the ladder in _PlansSection.
-  static final Map<String, _PlanCopy> _copy = {
-    'plus': _PlanCopy(
-      price: '7,97€/mois',
-      audience:
-          'Pour écouter la traduction des messages vocaux et débloquer plus de traductions live.',
-      features: [
-        '180 crédits de traduction (≈ 3 h / mois)',
-        'doublage audio des messages vocaux',
-      ],
-    ),
-    'ultra_plus': _PlanCopy(
-      price: '15,97€/mois',
-      audience:
-          'Pour couples internationaux, créateurs, gamers — appels quotidiens.',
-      features: [
-        '360 crédits de traduction (≈ 6 h / mois)',
-        'doublage avec TA voix clonée',
-      ],
-    ),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb) {
-      // Native — direct users to the web flow.
-      return _ManageOnWebCard(url: _PlansSection._manageUrl);
-    }
-    // Tiers strictly above the user's current one. Ultra users see no
-    // upgrade cards at all → the whole section vanishes.
-    final myRank = _PlansSection._rank(widget.currentTier);
-    final upgrades = _PlansSection._ladder
-        .skip(myRank + 1)
-        .where(_copy.containsKey)
-        .toList(growable: false);
-    if (upgrades.isEmpty) return const SizedBox.shrink();
-
-    // Default the highlighted card to the *top* upgrade in the visible
-    // set — i.e. Ultra Plus for a Free or Plus user. Anchoring the
-    // accent on the most premium option nudges conversion upward; the
-    // user can still tap Plus to claim the border. Falls back to the
-    // first upgrade if for some reason the top one isn't in the list.
-    final defaultSelected = upgrades.last;
-    final effectiveSelected =
-        (_selected != null && upgrades.contains(_selected!))
-        ? _selected!
-        : defaultSelected;
-
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        final cards = [
-          for (var i = 0; i < upgrades.length; i++)
-            _PlanCard(
-              tier: upgrades[i],
-              name: _displayName(upgrades[i]),
-              price: _copy[upgrades[i]]!.price,
-              audience: _copy[upgrades[i]]!.audience,
-              features: _copy[upgrades[i]]!.features,
-              featured: effectiveSelected == upgrades[i],
-              // "Populaire" sits on the closest upgrade (highest
-              // conversion target for the user's current tier).
-              popularBadge: i == 0,
-              onTap: () => setState(() => _selected = upgrades[i]),
-            ),
-        ];
-        // Wide layout: lay the upgrade tiers side-by-side so the user
-        // can compare them at a glance. Below ~720 px the cards would
-        // get crushed (the bullet list wraps awkwardly past 5+ items)
-        // so we fall back to the vertical stack at narrower widths
-        // and on mobile.
-        const wideBreakpoint = 720.0;
-        if (constraints.maxWidth >= wideBreakpoint && cards.length >= 2) {
-          // IntrinsicHeight + crossAxisAlignment.stretch pads every
-          // card up to the tallest one so the cards align flush along
-          // both edges. Without this the shorter "Plus" card floats
-          // above the bottom of the taller "Ultra Plus" card and the
-          // row looks lopsided.
-          return IntrinsicHeight(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var i = 0; i < cards.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 16),
-                  Expanded(child: cards[i]),
-                ],
-              ],
-            ),
-          );
-        }
-        return Column(
-          children: [
-            for (var i = 0; i < cards.length; i++) ...[
-              if (i > 0) const SizedBox(height: 12),
-              cards[i],
-            ],
-          ],
-        );
-      },
-    );
-  }
-
-  /// Marketing-style display name for a tier key. Special-cased so the
-  /// composite key `ultra_plus` renders as "Ultra Plus" instead of the
-  /// generic capitalise-first-letter behaviour.
-  static String _displayName(String tier) {
-    if (tier == 'ultra_plus') return 'Ultra Plus';
-    if (tier.isEmpty) return tier;
-    return '${tier[0].toUpperCase()}${tier.substring(1)}';
-  }
-}
-
-/// Marketing copy for a single tier — small POD so the [build] method
-/// can iterate over the visible-upgrades list without giant inline
-/// blocks per tier.
-class _PlanCopy {
-  const _PlanCopy({
-    required this.price,
-    required this.audience,
-    required this.features,
-  });
-  final String price;
-  final String audience;
-  final List<String> features;
-}
-
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({
-    required this.tier,
-    required this.name,
-    required this.price,
-    required this.audience,
-    required this.features,
-    required this.featured,
-    required this.popularBadge,
-    this.onTap,
-  });
-
-  /// Raw tier key (e.g. `ultra_plus`) — what we send to the backend
-  /// when starting checkout. Distinct from the display [name] so we
-  /// don't accidentally `name.toLowerCase()` a string like
-  /// "Ultra Plus" and end up posting `tier: "ultra plus"` (space).
-  final String tier;
-  final String name;
-  final String price;
-  final String audience;
-  final List<String> features;
-
-  /// Visually flagged tier — accent-coloured border + accent price /
-  /// bullets / CTA to draw the eye toward this option.
-  final bool featured;
-
-  /// Render a "Populaire" badge in the top-right corner. Independent
-  /// of [featured] in the API so a tier can be visually featured
-  /// without claiming popularity (or vice versa).
-  final bool popularBadge;
-
-  /// Tap anywhere on the card body to claim the accent border. The
-  /// Souscrire button keeps its own onPressed, so taps that land on
-  /// the button still go straight to checkout instead of just
-  /// re-selecting the card.
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor = featured ? SC.accent : const Color(0xFF2A3942);
-    // GestureDetector around the whole body so users can claim the
-    // accent border by tapping anywhere on the card. The Souscrire
-    // FilledButton has its own gesture arena and still wins on its
-    // own bounds, so this doesn't steal checkout taps.
-    Widget wrap(Widget child) => MouseRegion(
-      cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: child,
-      ),
-    );
-    final card = Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: featured ? 1.5 : 1),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                const Icon(
+                  Icons.workspace_premium_outlined,
+                  color: SC.accent,
+                  size: 22,
                 ),
-              ),
-              const Spacer(),
-              Text(
-                price,
-                style: TextStyle(
-                  color: featured ? SC.accent : SC.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            audience,
-            style: const TextStyle(
-              color: SC.textMuted,
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
-          for (final f in features)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: featured ? SC.accent : SC.textMuted,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    AppStrings.t('my_subscription_section'),
+                    style: const TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      f,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // Push the Souscrire button to the bottom of the card so two
-          // cards laid side-by-side on desktop (IntrinsicHeight Row)
-          // align their CTAs along a single baseline regardless of how
-          // many feature bullets each tier has.
-          const Spacer(),
-          const SizedBox(height: 8),
-          _SubscribeButton(tier: tier, label: 'Souscrire $name'),
-        ],
-      ),
-    );
-
-    if (!popularBadge) return wrap(card);
-
-    // Overlay a "Populaire" badge in the top-right corner. The card
-    // gets a little extra top padding so the title row never collides
-    // with the badge ribbon.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        wrap(card),
-        Positioned(
-          top: -12,
-          right: 14,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              // Warm amber pops against the cyan / navy palette of the
-              // card body, so the badge reads at a glance instead of
-              // blending into the price column above the divider.
-              color: const Color(0xFFFFC247),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.45),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFFC247).withValues(alpha: 0.55),
-                  blurRadius: 14,
-                  offset: const Offset(0, 3),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: SC.textMuted,
                 ),
               ],
             ),
-            child: const Text(
-              'Populaire',
-              style: TextStyle(
-                color: Color(0xFF1A1300),
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-              ),
-            ),
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// Tiny card shown on native builds: tells the user the subscription
-/// is managed on the web and provides a one-tap copy of the URL.
-/// Avoids embedding pricing in the app, which keeps the build
-/// store-compatible (Apple §3.1.1: no in-app pointers to external
-/// purchase mechanisms with full pricing).
-/// Stateful subscribe button so we can show a spinner while the
-/// `/api/stripe/checkout` round-trip is in flight. Once we have the
-/// URL we redirect the browser to Stripe Checkout (web-only).
-class _SubscribeButton extends StatefulWidget {
-  const _SubscribeButton({required this.tier, required this.label});
-
-  final String tier;
-  final String label;
-
-  @override
-  State<_SubscribeButton> createState() => _SubscribeButtonState();
-}
-
-class _SubscribeButtonState extends State<_SubscribeButton> {
-  bool _busy = false;
-
-  Future<void> _onTap() async {
-    setState(() => _busy = true);
-    final url = await StripeApi.startCheckout(widget.tier);
-    if (!mounted) return;
-    if (url == null || url.isEmpty) {
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Impossible d'ouvrir la page de paiement. Réessaye dans un instant.",
-          ),
-        ),
-      );
-      return;
-    }
-    // Redirect in the same tab on web (Stripe expects an external
-    // page), open the system browser on native (won't normally fire
-    // since the plans are web-only, but kept defensive).
-    await launchUrl(
-      Uri.parse(url),
-      webOnlyWindowName: '_self',
-      mode: LaunchMode.externalApplication,
-    );
-    if (mounted) setState(() => _busy = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: _busy ? null : _onTap,
-      style: FilledButton.styleFrom(
-        // Softer than SC.accent — the brighter cyan was too loud once
-        // both pricing cards stacked vertically. accentDeep keeps the
-        // Swayco identity while letting the badge / price text breathe.
-        backgroundColor: SC.accentDeep,
-        foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(44),
       ),
-      child: _busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : Text(
-              widget.label,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
     );
   }
 }
 
 /// Opens the Stripe Customer Portal. Shown on the credits card when
 /// the user is already Pro / Ultra so they can cancel / change card /
-/// upgrade / downgrade. Web-only — native builds keep the existing
-/// [_ManageOnWebCard] pointer.
+/// upgrade / downgrade. Web-only.
 class _ManageSubscriptionButton extends StatefulWidget {
   const _ManageSubscriptionButton();
 
@@ -1584,81 +1135,6 @@ class _ManageSubscriptionButtonState extends State<_ManageSubscriptionButton> {
             )
           : const Icon(Icons.settings_outlined, size: 18),
       label: const Text('Gérer mon abonnement'),
-    );
-  }
-}
-
-class _ManageOnWebCard extends StatelessWidget {
-  const _ManageOnWebCard({required this.url});
-
-  final String url;
-
-  Future<void> _copy(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: url));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Lien copié : $url'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.glassStrong,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _copy(context),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SC.glassBorder),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Gère ton abonnement sur notre site web :',
-                      style: TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      url,
-                      style: const TextStyle(
-                        color: SC.accent,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Copier',
-                icon: const Icon(
-                  Icons.copy_rounded,
-                  color: SC.textMuted,
-                  size: 20,
-                ),
-                onPressed: () => _copy(context),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
