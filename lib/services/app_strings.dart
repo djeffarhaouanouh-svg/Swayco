@@ -434,7 +434,7 @@ abstract final class AppStrings {
     'onb_gift_headline': 'Bienvenue{hi} 🎉',
     'onb_gift_body':
         'On t\'offre 15 minutes d\'appel traduit pour démarrer. Aucune carte requise.',
-    'onb_gift_cta': "C'est parti",
+    'onb_gift_cta': "C'est parti 📞",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
@@ -859,7 +859,7 @@ abstract final class AppStrings {
     'onb_gift_headline': 'Welcome{hi} 🎉',
     'onb_gift_body':
         "We're giving you 15 minutes of translated calling to get started. No card required.",
-    'onb_gift_cta': "Let's go",
+    'onb_gift_cta': "Let's go 📞",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
