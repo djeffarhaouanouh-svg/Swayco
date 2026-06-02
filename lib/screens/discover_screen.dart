@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
@@ -1344,18 +1343,18 @@ class _ProfileCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 14),
-                        _AddButton(onTap: onAdd, sent: pendingOutgoing),
-                        // Direct intro message — one per person. Hidden on
+                        // Friend request now lives in the rail (person-add
+                        // button), so the old "Add" pill is gone — the card
+                        // shows the direct message field here instead.
+                        // Direct intro message — one per photo. Hidden on
                         // background-deck cards (onSendMessage null).
-                        if (onSendMessage != null) ...[
-                          const SizedBox(height: 10),
+                        if (onSendMessage != null)
                           if (alreadyMessaged)
                             const _MessageSentPill()
                           else
                             _DirectMessageField(
                               onSend: onSendMessage!,
                             ),
-                        ],
                       ],
                     ),
                   ),
@@ -1623,83 +1622,69 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   Widget build(BuildContext context) {
     final hasText = _ctrl.text.trim().isNotEmpty;
-    // Frosted-glass pill — blurred translucent fill + soft gradient + white
-    // hairline, with a leading chat glyph and a filled cyan send button that
-    // only appears once there's text.
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 270),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.22),
-                  Colors.white.withValues(alpha: 0.08),
-                ],
+    // Clean neutral-dark pill (no blur, no blue) with white text, a leading
+    // chat glyph and a filled cyan send button that appears only while typing.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 270),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+        ),
+        padding: EdgeInsets.fromLTRB(14, 3, hasText ? 5 : 16, 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 16,
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: TextField(
+                controller: _ctrl,
+                enabled: !_sending,
+                minLines: 1,
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                cursorColor: SC.accent,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: AppStrings.t('discover_message_hint'),
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onSubmitted: (_) => _send(),
               ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
             ),
-            padding: EdgeInsets.fromLTRB(14, 3, hasText ? 5 : 16, 3),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.75),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: TextField(
-                    controller: _ctrl,
-                    enabled: !_sending,
-                    minLines: 1,
-                    maxLines: 2,
-                    textCapitalization: TextCapitalization.sentences,
-                    cursorColor: SC.accent,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: AppStrings.t('discover_message_hint'),
-                      hintStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 14,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    onSubmitted: (_) => _send(),
+            if (hasText) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: _sending ? null : _send,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    color: SC.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_upward_rounded,
+                    color: Colors.white,
+                    size: 18,
                   ),
                 ),
-                if (hasText) ...[
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: _sending ? null : _send,
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: const BoxDecoration(
-                        color: SC.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_upward_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1732,57 +1717,6 @@ class _MessageSentPill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// "Ajouter" pill — sends a friend-request-style action on tap, then
-/// flips its label to "Envoyé" and stops being tappable. Light haptic
-/// on the first press; the label transition cross-fades smoothly.
-/// "Ajouter" pill on the Discover deck. Drives a friend-request
-/// toggle: first tap sends, a tap when already pending cancels.
-/// State is owned by the parent card so the pill survives card
-/// rebuilds (e.g. swiping back) and reflects the live friendship
-/// table on every refresh.
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.onTap, required this.sent});
-  final VoidCallback onTap;
-
-  /// True when I have a pending outgoing friend request to this peer
-  /// — flips the label to "Envoyé" and still fires [onTap] on press
-  /// so the parent can cancel the demande.
-  final bool sent;
-
-  void _handleTap() {
-    HapticFeedback.mediumImpact();
-    onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: _handleTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Text(
-              sent ? AppStrings.t('sent_label') : AppStrings.t('profile_add'),
-              key: ValueKey(sent),
-              style: const TextStyle(
-                color: SC.bg,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
