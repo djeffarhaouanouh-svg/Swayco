@@ -1579,7 +1579,7 @@ class _AddButton extends StatelessWidget {
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: Text(
-              sent ? 'Envoyé' : 'Ajouter',
+              sent ? AppStrings.t('sent_label') : AppStrings.t('profile_add'),
               key: ValueKey(sent),
               style: const TextStyle(
                 color: SC.bg,

@@ -1674,13 +1674,18 @@ class _LanguageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final flag = language?.flag ?? '🌐';
+    // Language name localised to the UI language (e.g. "French" in EN,
+    // "Français" in FR) — not the native label, so it never reads
+    // "Speaks Français".
+    final langName =
+        language != null ? AppStrings.t('lang_name_${language!.code}') : '';
     final label = language != null
-        ? AppStrings.t('profile_speaks', args: {'lang': language!.label})
+        ? AppStrings.t('profile_speaks', args: {'lang': langName})
         : AppStrings.t('profile_no_language');
     final warning = (showCallWarning && language != null)
         ? AppStrings.t(
             'profile_call_language_warning',
-            args: {'lang': language!.label},
+            args: {'lang': langName},
           )
         : null;
     return Container(
