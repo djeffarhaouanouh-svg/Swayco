@@ -2592,7 +2592,7 @@ class _InterestPickerSheetState extends State<_InterestPickerSheet> {
       expand: false,
       builder: (ctx, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: SC.bubbleIn,
+          color: Color(0xFF0E0E0E),
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: Column(
