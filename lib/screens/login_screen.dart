@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
@@ -166,6 +169,63 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
       _info = null;
     });
+  }
+
+  /// Apple sign-in is native only on Apple platforms. Hide the button
+  /// elsewhere so Android users don't see a dead control.
+  bool get _showApple => !kIsWeb && Platform.isIOS;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _info = null;
+      _showResendConfirmation = false;
+    });
+    try {
+      final res = await AuthService.signInWithGoogle();
+      // Null = user cancelled the sheet; just drop the spinner.
+      if (res == null && mounted) setState(() => _busy = false);
+      // On success the parent's auth listener routes us away — leave _busy on
+      // so the form stays disabled during the transition.
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _info = null;
+      _showResendConfirmation = false;
+    });
+    try {
+      final res = await AuthService.signInWithApple();
+      if (res == null && mounted) setState(() => _busy = false);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _busy = false;
+      });
+    }
   }
 
   @override
@@ -341,10 +401,78 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: SC.glassBorder)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          AppStrings.t('login_or'),
+                          style: const TextStyle(
+                            color: SC.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: SC.glassBorder)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _SocialButton(
+                    icon: Icons.g_mobiledata_rounded,
+                    label: AppStrings.t('login_continue_google'),
+                    onPressed: _busy ? null : _signInWithGoogle,
+                  ),
+                  if (_showApple) ...[
+                    const SizedBox(height: 12),
+                    _SocialButton(
+                      icon: Icons.apple,
+                      label: AppStrings.t('login_continue_apple'),
+                      onPressed: _busy ? null : _signInWithApple,
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A neutral, full-width "Continue with …" pill matching the Swayco glass DA.
+/// Kept provider-agnostic (icon + label) so Google and Apple share one widget.
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, color: SC.textPrimary, size: 24),
+      label: Text(
+        label,
+        style: const TextStyle(
+          color: SC.textPrimary,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(50),
+        side: const BorderSide(color: SC.glassBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
     );

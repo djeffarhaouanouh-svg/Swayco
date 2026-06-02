@@ -35,3 +35,19 @@ String resolvedSupabaseUrl() => _envOrDefine(
 String resolvedSupabasePublishableKey() => _envOrDefine(
     'SUPABASE_PUBLISHABLE_KEY',
     const String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'));
+
+/// Google OAuth **Web** client ID (`xxxx.apps.googleusercontent.com`). Used as
+/// `serverClientId` for the native sign-in flow and verified by Supabase. This
+/// is the client whose ID + secret you paste into Supabase → Auth → Providers →
+/// Google. Empty when unset → the Google button shows a "not configured" error.
+String resolvedGoogleWebClientId() => _envOrDefine(
+    'GOOGLE_WEB_CLIENT_ID',
+    const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'));
+
+/// Google OAuth **iOS** client ID (`xxxx.apps.googleusercontent.com`). Used as
+/// `clientId` on iOS so the native Google SDK can open the consent sheet and
+/// return through the reversed-client-id URL scheme declared in Info.plist.
+/// Leave empty on Android (the SHA-1-registered Android client is implicit).
+String resolvedGoogleIosClientId() => _envOrDefine(
+    'GOOGLE_IOS_CLIENT_ID',
+    const String.fromEnvironment('GOOGLE_IOS_CLIENT_ID'));

@@ -14,6 +14,12 @@ $ErrorActionPreference = "Stop"
 $SUPABASE_URL = "https://rhxenzcdnfvpgjjefztx.supabase.co"
 $SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5NZJowDX1ba6cGwuzFN08Q_j9GxFMXi"
 $TOKEN_API_BASE = "https://www.swayco.fr"
+# Google OAuth client IDs. The WEB client is the serverClientId Supabase
+# validates against; the iOS client backs the native sheet + URL scheme.
+#  - WEB : client_secret_...vjspl0l68...json  (à coller aussi dans Supabase)
+#  - iOS : client_...7864a6b9...plist (reversed ID = scheme dans Info.plist)
+$GOOGLE_WEB_CLIENT_ID = "361554699132-vjspl0l68h93fg9vateiinb1ndboj4ge.apps.googleusercontent.com"
+$GOOGLE_IOS_CLIENT_ID = "361554699132-7864a6b9g008r6do0gekdh4ddftcul48.apps.googleusercontent.com"
 
 Write-Host "==> flutter clean" -ForegroundColor Cyan
 flutter clean
@@ -25,7 +31,9 @@ Write-Host "==> Build Android App Bundle (Play Store)" -ForegroundColor Cyan
 flutter build appbundle --release `
   --dart-define=SUPABASE_URL=$SUPABASE_URL `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY `
-  --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE
+  --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE `
+  --dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID `
+  --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
 
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Build Android echoue." -ForegroundColor Red
@@ -42,7 +50,9 @@ if ($IsMacOS) {
   flutter build ipa --release `
     --dart-define=SUPABASE_URL=$SUPABASE_URL `
     --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY `
-    --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE
+    --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE `
+    --dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID `
+    --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
 
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Build iOS echoue." -ForegroundColor Red

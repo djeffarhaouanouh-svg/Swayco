@@ -49,6 +49,12 @@ backend/node_modules/
 *.p8
 **/*.p8
 
+# Google OAuth client downloads. The *_secret_*.json holds the Web client
+# secret (pasted into Supabase only); the client_*.plist is the iOS client
+# config. Neither is needed by the app — IDs are passed via --dart-define.
+client_secret_*.json
+client_*.apps.googleusercontent.com.plist
+
 # Android release signing — the keystore + its password file must
 # never be committed. Losing them means losing the ability to update
 # the app on Play Store, leaking them means anyone can ship malware

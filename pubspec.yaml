@@ -70,6 +70,9 @@ dependencies:
   # Swayco Midnight design — Bricolage Grotesque (titles) + DM Sans (body).
   google_fonts: ^6.2.1
   flutter_local_notifications: ^18.0.1
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.1.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

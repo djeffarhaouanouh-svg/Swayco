@@ -105,5 +105,22 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Google Sign-In callback. The scheme is the *reversed* iOS OAuth
+		     client ID: "com.googleusercontent.apps.<iOS-client-id-prefix>".
+		     ⚠️ This MUST be the reversed form of the **iOS** client (not the
+		     Web client). If your iOS client ID differs from the value below,
+		     update both this scheme and GOOGLE_IOS_CLIENT_ID in the build
+		     scripts. -->
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.361554699132-7864a6b9g008r6do0gekdh4ddftcul48</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>
