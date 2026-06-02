@@ -609,7 +609,6 @@ class _FriendChatRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        onLongPress: () => _showRowMenu(context),
         borderRadius: BorderRadius.circular(18),
         child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -711,11 +710,15 @@ class _FriendChatRow extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 8),
-            // Quick audio-call shortcut, then the 3-dots menu (Appeler /
-            // Vidéo / profil / signaler…) on the far right.
+            // Quick audio-call shortcut, then the 3-dots popup (red-only:
+            // report / block / delete) on the far right.
             _RowCallButton(onTap: onCall),
             const SizedBox(width: 6),
-            _RowMoreButton(onTap: () => _showRowMenu(context)),
+            _RowMoreMenu(
+              onReport: onReport,
+              onBlock: onBlock,
+              onDeleteConversation: onDeleteConversation,
+            ),
           ],
         ),
         ),
@@ -723,37 +726,6 @@ class _FriendChatRow extends StatelessWidget {
     );
   }
 
-  /// Long-press surface for the secondary actions that used to live as a
-  /// trailing phone icon + 3-dot popup. Matches the minimalist Midnight
-  /// row layout (avatar | name + preview | time) without dropping the
-  /// call / view profile / report / block / delete affordances.
-  Future<void> _showRowMenu(BuildContext context) async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _RowActionsSheet(name: profile.displayName),
-    );
-    switch (picked) {
-      case 'call':
-        onCall();
-        break;
-      case 'video':
-        onCallVideo();
-        break;
-      case 'profile':
-        onViewProfile();
-        break;
-      case 'report':
-        onReport();
-        break;
-      case 'block':
-        onBlock();
-        break;
-      case 'delete':
-        onDeleteConversation();
-        break;
-    }
-  }
 }
 
 /// Small round audio-call shortcut at the far-right of every chat-list row.
@@ -780,129 +752,74 @@ class _RowCallButton extends StatelessWidget {
 }
 
 /// Small round "more" (⋮) button at the far-right of every chat-list row.
-/// Opens the actions sheet (Appeler / Vidéo / view profile / report…).
-class _RowMoreButton extends StatelessWidget {
-  const _RowMoreButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.glassStrong,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.all(9),
-          child: Icon(
-            Icons.more_vert,
-            color: SC.textPrimary,
-            size: 18,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RowActionsSheet extends StatelessWidget {
-  const _RowActionsSheet({required this.name});
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: SC.bubbleIn,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: SC.glassBorderStrong),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (name.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-                  child: Text(name, style: SCText.h3),
-                ),
-              _RowAction(
-                icon: Icons.phone_rounded,
-                label: AppStrings.t('tooltip_call'),
-                onTap: () => Navigator.of(context).pop('call'),
-              ),
-              _RowAction(
-                icon: Icons.videocam_rounded,
-                label: AppStrings.t('call_video'),
-                onTap: () => Navigator.of(context).pop('video'),
-              ),
-              _RowAction(
-                icon: Icons.person_outline_rounded,
-                label: AppStrings.t('view_profile'),
-                onTap: () => Navigator.of(context).pop('profile'),
-              ),
-              _RowAction(
-                icon: Icons.flag_outlined,
-                label: AppStrings.t('report'),
-                destructive: true,
-                onTap: () => Navigator.of(context).pop('report'),
-              ),
-              _RowAction(
-                icon: Icons.block,
-                label: AppStrings.t('block'),
-                destructive: true,
-                onTap: () => Navigator.of(context).pop('block'),
-              ),
-              _RowAction(
-                icon: Icons.delete_outline,
-                label: AppStrings.t('delete_conversation'),
-                destructive: true,
-                onTap: () => Navigator.of(context).pop('delete'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RowAction extends StatelessWidget {
-  const _RowAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.destructive = false,
+/// Opens a compact dropdown popup with the destructive (red) actions only:
+/// Report / Block / Delete conversation. Call lives on the phone shortcut.
+class _RowMoreMenu extends StatelessWidget {
+  const _RowMoreMenu({
+    required this.onReport,
+    required this.onBlock,
+    required this.onDeleteConversation,
   });
 
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool destructive;
+  final VoidCallback onReport;
+  final VoidCallback onBlock;
+  final VoidCallback onDeleteConversation;
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? const Color(0xFFE53935) : SC.textPrimary;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: SCText.body.copyWith(color: color, fontSize: 15),
-            ),
-          ],
+    return PopupMenuButton<String>(
+      tooltip: '',
+      color: SC.bubbleIn,
+      elevation: 12,
+      shadowColor: Colors.black.withValues(alpha: 0.5),
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: SC.glassBorderStrong),
+      ),
+      onSelected: (v) {
+        switch (v) {
+          case 'report':
+            onReport();
+            break;
+          case 'block':
+            onBlock();
+            break;
+          case 'delete':
+            onDeleteConversation();
+            break;
+        }
+      },
+      itemBuilder: (ctx) => [
+        _redItem('report', Icons.flag_outlined, 'report'),
+        _redItem('block', Icons.block, 'block'),
+        _redItem('delete', Icons.delete_outline, 'delete_conversation'),
+      ],
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: const BoxDecoration(
+          color: SC.glassStrong,
+          shape: BoxShape.circle,
         ),
+        child: const Icon(Icons.more_vert, color: SC.textPrimary, size: 18),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _redItem(String value, IconData icon, String key) {
+    const red = Color(0xFFE53935);
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: red, size: 20),
+          const SizedBox(width: 14),
+          Text(
+            AppStrings.t(key),
+            style: SCText.body.copyWith(color: red, fontSize: 15),
+          ),
+        ],
       ),
     );
   }
