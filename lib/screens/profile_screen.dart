@@ -1871,20 +1871,6 @@ class _IdentitySection extends StatelessWidget {
 
   /// Opens the "Centres d'intérêt" picker (a styled bottom sheet of coloured
   /// category groups) and persists the new selection.
-  Future<void> _openInterestPicker(BuildContext context) async {
-    final save = onEditInterests;
-    if (save == null) return;
-    final result = await showModalBottomSheet<List<String>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _InterestPickerSheet(initial: interests),
-    );
-    if (result != null) {
-      await save(result);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return viewerMode ? _buildViewer(context) : _buildOwn(context);
@@ -2074,24 +2060,13 @@ class _IdentitySection extends StatelessWidget {
             MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
         ),
-        // Centres d'intérêt — coloured chips of the picked tags + an "add"
-        // chip; tapping any of them opens the styled category picker.
+        // Centres d'intérêt — picked chips + an "add" chip; tapping either
+        // unfolds the category picker inline, right under the chips (no
+        // overlay), then folds back when you're done.
         const SizedBox(height: 24),
-        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final tag in interests)
-              _InterestChip(
-                label: tag,
-                color: interestColor(tag),
-                onTap: () => _openInterestPicker(context),
-              ),
-            if (interests.length < profileInterestsMax)
-              _InterestAddChip(onTap: () => _openInterestPicker(context)),
-          ],
+        _InterestsSection(
+          interests: interests,
+          onSave: onEditInterests,
         ),
       ],
     );
@@ -2580,18 +2555,36 @@ class _InterestAddChip extends StatelessWidget {
   }
 }
 
-/// The "Centres d'intérêt" picker: a tall, styled bottom sheet listing every
-/// category (coloured emoji-led header) with its options as toggle chips.
-/// Enforces the [profileInterestsMax] cap and returns the picked list.
-class _InterestPickerSheet extends StatefulWidget {
-  const _InterestPickerSheet({required this.initial});
-  final List<String> initial;
+/// The "Centres d'intérêt" section on my own profile: the picked chips plus
+/// an "add" chip. Tapping either UNFOLDS the category picker inline, right
+/// under the chips (no overlay / bottom sheet) — pick the tags, then tap
+/// "Enregistrer" to fold it back and persist. Enforces [profileInterestsMax].
+class _InterestsSection extends StatefulWidget {
+  const _InterestsSection({required this.interests, required this.onSave});
+
+  final List<String> interests;
+  final Future<void> Function(List<String>)? onSave;
+
   @override
-  State<_InterestPickerSheet> createState() => _InterestPickerSheetState();
+  State<_InterestsSection> createState() => _InterestsSectionState();
 }
 
-class _InterestPickerSheetState extends State<_InterestPickerSheet> {
-  late final Set<String> _sel = {...widget.initial};
+class _InterestsSectionState extends State<_InterestsSection> {
+  late Set<String> _sel = {...widget.interests};
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(covariant _InterestsSection old) {
+    super.didUpdateWidget(old);
+    // Resync with the parent's saved list while folded (e.g. after a save
+    // round-trip). While unfolded we keep the user's in-progress selection.
+    if (!_expanded && !_sameSet(_sel, widget.interests)) {
+      _sel = {...widget.interests};
+    }
+  }
+
+  bool _sameSet(Set<String> a, List<String> b) =>
+      a.length == b.length && a.containsAll(b);
 
   void _toggle(String tag) {
     setState(() {
@@ -2603,127 +2596,150 @@ class _InterestPickerSheetState extends State<_InterestPickerSheet> {
     });
   }
 
+  Future<void> _close() async {
+    setState(() => _expanded = false);
+    final save = widget.onSave;
+    if (save != null) await save(_sel.toList());
+  }
+
   @override
   Widget build(BuildContext context) {
-    final full = _sel.length >= profileInterestsMax;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.8,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (ctx, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0E0E0E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
+        const SizedBox(height: 12),
+        // The picked chips + the add/toggle chip. Tapping any of them folds
+        // or unfolds the inline picker below.
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            // Grab handle.
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 4),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: SC.textMuted.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(999),
+            for (final tag in _sel)
+              _InterestChip(
+                label: tag,
+                color: interestColor(tag),
+                onTap: () => setState(() => _expanded = !_expanded),
               ),
-            ),
-            // Title + live counter.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppStrings.t('profile_interests_section'),
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${_sel.length}/$profileInterestsMax',
-                    style: TextStyle(
-                      color: full ? SC.accent : SC.textMuted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+            if (_sel.length < profileInterestsMax)
+              _InterestAddChip(
+                onTap: () => setState(() => _expanded = !_expanded),
               ),
-            ),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                children: [
-                  for (final cat in kInterestCategories) ...[
-                    Row(
-                      children: [
-                        Text(cat.emoji,
-                            style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 8),
-                        Text(
-                          cat.label,
-                          style: TextStyle(
-                            color: cat.color,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final opt in cat.options)
-                          _InterestChip(
-                            label: opt,
-                            color: interestColor(opt),
-                            selected: _sel.contains(opt),
-                            showCheck: _sel.contains(opt),
-                            // When the cap is hit, leave only the already
-                            // picked chips tappable (to deselect).
-                            onTap: (!_sel.contains(opt) && full)
-                                ? null
-                                : () => _toggle(opt),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-                  ],
-                ],
-              ),
-            ),
-            // Done button.
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                4,
-                20,
-                12 + MediaQuery.paddingOf(context).bottom,
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () =>
-                      Navigator.of(context).pop(_sel.toList()),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text(AppStrings.t('save')),
-                ),
-              ),
-            ),
           ],
         ),
+        // The category picker, unfolding right here (no overlay).
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: _InlineInterestPicker(
+            sel: _sel,
+            onToggle: _toggle,
+            onDone: _close,
+          ),
+          crossFadeState: _expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 240),
+          sizeCurve: Curves.easeOutCubic,
+          firstCurve: Curves.easeOut,
+          secondCurve: Curves.easeIn,
+        ),
+      ],
+    );
+  }
+}
+
+/// The inline body of the interest picker: a black rounded panel with every
+/// category (coloured emoji-led header) and its options as toggle chips, plus
+/// a live counter and an "Enregistrer" button. Rendered inside the profile —
+/// not in a sheet — by [_InterestsSection].
+class _InlineInterestPicker extends StatelessWidget {
+  const _InlineInterestPicker({
+    required this.sel,
+    required this.onToggle,
+    required this.onDone,
+  });
+
+  final Set<String> sel;
+  final void Function(String tag) onToggle;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final full = sel.length >= profileInterestsMax;
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E0E0E),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SC.glassBorderStrong),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Live counter row.
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '${sel.length}/$profileInterestsMax',
+              style: TextStyle(
+                color: full ? SC.accent : SC.textMuted,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final cat in kInterestCategories) ...[
+            Row(
+              children: [
+                Text(cat.emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Text(
+                  cat.label,
+                  style: TextStyle(
+                    color: cat.color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final opt in cat.options)
+                  _InterestChip(
+                    label: opt,
+                    color: interestColor(opt),
+                    selected: sel.contains(opt),
+                    showCheck: sel.contains(opt),
+                    // When the cap is hit, leave only the already-picked chips
+                    // tappable (to deselect).
+                    onTap: (!sel.contains(opt) && full)
+                        ? null
+                        : () => onToggle(opt),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onDone,
+              style: FilledButton.styleFrom(
+                backgroundColor: SC.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(AppStrings.t('save')),
+            ),
+          ),
+        ],
       ),
     );
   }
