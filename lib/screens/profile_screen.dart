@@ -2554,7 +2554,7 @@ class _InterestAddChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
@@ -2562,13 +2562,13 @@ class _InterestAddChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.add_rounded, color: SC.accent, size: 20),
-              const SizedBox(width: 5),
+              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
+              const SizedBox(width: 4),
               Text(
                 AppStrings.t('interests_add'),
                 style: const TextStyle(
                   color: SC.accent,
-                  fontSize: 16,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
