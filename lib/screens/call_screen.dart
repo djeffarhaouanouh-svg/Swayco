@@ -22,7 +22,6 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
-import '../widgets/translation_feedback_ribbon.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -702,6 +701,18 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  void _openAudioSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SC.bubbleIn,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _AudioSettingsSheet(controller: _audio),
+    );
+  }
+
   void _openLanguageSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -1024,23 +1035,6 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
-                if (widget.translation.translationListenable != null)
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    // Sits below the "swayco.ai" watermark at the top centre.
-                    top: MediaQuery.paddingOf(context).top + 44,
-                    child: ListenableBuilder(
-                      listenable: widget.translation.translationListenable!,
-                      builder: (context, _) {
-                        return TranslationFeedbackRibbon(
-                          phase: widget.translation.translationFeedbackPhase,
-                          remoteHot: widget.translation.translationRemoteVoiceHot,
-                          remoteParticipantCount: remoteCount,
-                        );
-                      },
-                    ),
-                  ),
                 // PiP: shows whichever feed is NOT the main one. Tap to
                 // swap. Always rendered when the corresponding party
                 // exists, even if their camera is off â€” falls back to a
@@ -1148,6 +1142,12 @@ class _CallScreenState extends State<CallScreen> {
                             background: SC.accent,
                             onTap: _toggleCam,
                           ),
+                        _RoundCallButton(
+                          icon: Icons.tune_rounded,
+                          label: AppStrings.t('call_audio'),
+                          background: SC.accent,
+                          onTap: _openAudioSheet,
+                        ),
                         _RoundCallButton(
                           icon: Icons.translate,
                           label: AppStrings.t('call_language'),
@@ -1355,6 +1355,137 @@ class _LanguageRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// In-call audio panel — just the sliders: mic level, translation volume and
+/// original-voice volume. (The ducking toggle + speaker/earpiece route were
+/// dropped on request.)
+class _AudioSettingsSheet extends StatelessWidget {
+  const _AudioSettingsSheet({required this.controller});
+
+  final AudioController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Text(
+                  AppStrings.t('call_audio'),
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _MicLevelStrip(level: controller.micLevel),
+                const SizedBox(height: 18),
+                _SheetLabel(
+                  icon: Icons.record_voice_over_rounded,
+                  text: AppStrings.t('call_translation_volume'),
+                ),
+                Slider(
+                  value: controller.translatedVolume,
+                  onChanged: (v) => controller.setTranslatedVolume(v),
+                  activeColor: SC.accent,
+                  inactiveColor: Colors.white24,
+                ),
+                const SizedBox(height: 6),
+                _SheetLabel(
+                  icon: Icons.person_outline_rounded,
+                  text: AppStrings.t('call_original_volume'),
+                ),
+                Slider(
+                  value: controller.originalVolume,
+                  onChanged: (v) => controller.setOriginalVolume(v),
+                  activeColor: SC.accent,
+                  inactiveColor: Colors.white24,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetLabel extends StatelessWidget {
+  const _SheetLabel({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: SC.textMuted),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+                color: SC.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MicLevelStrip extends StatelessWidget {
+  const _MicLevelStrip({required this.level});
+  final double level;
+
+  @override
+  Widget build(BuildContext context) {
+    final clamped = level.clamp(0.0, 1.0).toDouble();
+    return Row(
+      children: [
+        const Icon(Icons.mic_rounded, size: 16, color: SC.textMuted),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: clamped,
+              minHeight: 6,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                clamped > 0.85 ? const Color(0xFFE53935) : SC.accent,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
