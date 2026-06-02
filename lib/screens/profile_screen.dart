@@ -737,7 +737,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             showCallWarning: !_isViewingOther,
                           ),
                           if (!_isViewingOther) ...[
-                            const SizedBox(height: 16),
                             // Voice-clone card. Shown to ALL tiers when viewing
                             // your own profile — Ultra users get the recording
                             // flow, everyone else gets a locked state that
@@ -763,9 +762,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                             //   ),
                             //   const SizedBox(height: 16),
                             // ],
-                            _MySubscriptionSection(
-                              currentTier: _remote?.subscriptionTier ?? 'free',
-                            ),
+                            // Subscriptions route the user to external Stripe
+                            // checkout / pricing, which Apple & Google forbid
+                            // in native apps — so the whole "Mon abonnement"
+                            // affordance is web-only.
+                            if (kIsWeb) ...[
+                              const SizedBox(height: 16),
+                              _MySubscriptionSection(
+                                currentTier: _remote?.subscriptionTier ?? 'free',
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -974,7 +980,9 @@ class CreditsCard extends StatelessWidget {
           if (lowCredits) ...[
             const SizedBox(height: 6),
             Text(
-              AppStrings.t('credits_low_hint'),
+              AppStrings.t(
+                kIsWeb ? 'credits_low_hint' : 'credits_low_hint_native',
+              ),
               style: const TextStyle(
                 color: Color(0xFFFFA726),
                 fontSize: 12,

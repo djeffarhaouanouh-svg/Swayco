@@ -355,6 +355,10 @@ abstract final class AppStrings {
     'credits_unlimited': 'Traduction illimitée',
     'credits_low_hint':
         'Bientôt à court de crédits. Renouvellement le mois prochain — passe à un palier supérieur pour ne pas attendre.',
+    // Native (App Store / Play Store) variant — no upgrade upsell, since
+    // external subscription prompts aren't allowed in the store builds.
+    'credits_low_hint_native':
+        'Bientôt à court de crédits. Renouvellement le mois prochain.',
     'credits_used_total_inline': '{time} traduit au total',
     'credits_exhausted_banner':
         'Crédits épuisés — la traduction est désactivée, l\'appel continue.',
@@ -781,6 +785,9 @@ abstract final class AppStrings {
     'credits_unlimited': 'Unlimited translation',
     'credits_low_hint':
         'Running low. Refills next month — upgrade if you don\'t want to wait.',
+    // Native (App Store / Play Store) variant — no upgrade upsell, since
+    // external subscription prompts aren't allowed in the store builds.
+    'credits_low_hint_native': 'Running low. Refills next month.',
     'credits_used_total_inline': '{time} translated in total',
     'credits_exhausted_banner':
         'Out of credits — translation is off, the call continues.',
