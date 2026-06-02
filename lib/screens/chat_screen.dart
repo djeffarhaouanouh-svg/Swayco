@@ -769,7 +769,7 @@ class _RowMoreMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       tooltip: '',
-      color: SC.bubbleIn,
+      color: const Color(0xFF0E0E0E),
       elevation: 12,
       shadowColor: Colors.black.withValues(alpha: 0.5),
       position: PopupMenuPosition.under,
