@@ -303,6 +303,9 @@ abstract final class ChatApi {
       'recipient': recipientId,
       'sender_name': senderName,
       'body': '',
+      // `language` is NOT NULL with no default — an image carries no language,
+      // so stamp it empty (omitting it threw a 23502 not-null violation).
+      'language': '',
       'image_url': url,
     });
     unawaited(
