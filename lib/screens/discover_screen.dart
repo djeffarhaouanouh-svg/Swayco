@@ -1367,6 +1367,8 @@ class _ProfileCard extends StatelessWidget {
                     _ReactionRail(
                       onSendEmoji: onSendEmoji,
                       reactedEmojis: reactedEmojis,
+                      onAddFriend: onAdd,
+                      pendingOutgoing: pendingOutgoing,
                     ),
                   ],
                 ],
@@ -1385,6 +1387,8 @@ class _ReactionRail extends StatelessWidget {
   const _ReactionRail({
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
+    this.onAddFriend,
+    this.pendingOutgoing = false,
   });
 
   /// Fires with the tapped emoji string — handed to each
@@ -1395,6 +1399,14 @@ class _ReactionRail extends StatelessWidget {
   /// Emojis the local user has already sent to this peer — each
   /// matching button renders pre-filled so the rail survives refreshes.
   final Set<String> reactedEmojis;
+
+  /// Send / cancel a friend request — wired to the person-add button at the
+  /// bottom of the rail. Null on non-interactive cards.
+  final VoidCallback? onAddFriend;
+
+  /// True when a friend request to this peer is already pending — the
+  /// person-add button shows its "sent" (accent) state.
+  final bool pendingOutgoing;
 
   // Fixed across all cards so users learn the rail by muscle memory.
   static const _emojis = <String>['🔥', '✨', '😍'];
@@ -1413,7 +1425,52 @@ class _ReactionRail extends StatelessWidget {
                 onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
           ),
         ],
+        // Friend-request button at the bottom of the rail.
+        if (onAddFriend != null) ...[
+          const SizedBox(height: 10),
+          _RailAddFriendButton(
+            pending: pendingOutgoing,
+            onTap: onAddFriend!,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Person-add button at the bottom of the reaction rail — sends a friend
+/// request (or cancels a pending one). Matches the 48 px emoji buttons; turns
+/// accent + check when a request is already pending.
+class _RailAddFriendButton extends StatelessWidget {
+  const _RailAddFriendButton({required this.pending, required this.onTap});
+  final bool pending;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: pending
+              ? SC.accent.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.35),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: pending ? SC.accent : Colors.white.withValues(alpha: 0.20),
+            width: pending ? 2 : 1,
+          ),
+        ),
+        child: Icon(
+          pending ? Icons.check_rounded : Icons.person_add_alt_1,
+          size: pending ? 24 : 22,
+          color: pending ? SC.accent : Colors.white,
+        ),
+      ),
     );
   }
 }
@@ -1566,53 +1623,83 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   Widget build(BuildContext context) {
     final hasText = _ctrl.text.trim().isNotEmpty;
-    return ConstrainedBox(
-      // Smaller, doesn't span the whole card width.
-      constraints: const BoxConstraints(maxWidth: 250),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-        ),
-        padding: EdgeInsets.fromLTRB(14, 0, hasText ? 4 : 14, 0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: TextField(
-                controller: _ctrl,
-                enabled: !_sending,
-                minLines: 1,
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                cursorColor: SC.accent,
-                style: const TextStyle(color: Colors.white, fontSize: 13.5),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: AppStrings.t('discover_message_hint'),
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 13.5,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
-                ),
-                onSubmitted: (_) => _send(),
+    // Frosted-glass pill — blurred translucent fill + soft gradient + white
+    // hairline, with a leading chat glyph and a filled cyan send button that
+    // only appears once there's text.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 270),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.22),
+                  Colors.white.withValues(alpha: 0.08),
+                ],
               ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
             ),
-            // Send arrow only appears once there's something to send.
-            if (hasText)
-              GestureDetector(
-                onTap: _sending ? null : _send,
-                behavior: HitTestBehavior.opaque,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child:
-                      Icon(Icons.send_rounded, color: SC.accent, size: 20),
+            padding: EdgeInsets.fromLTRB(14, 3, hasText ? 5 : 16, 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.75),
                 ),
-              ),
-          ],
+                const SizedBox(width: 8),
+                Flexible(
+                  child: TextField(
+                    controller: _ctrl,
+                    enabled: !_sending,
+                    minLines: 1,
+                    maxLines: 2,
+                    textCapitalization: TextCapitalization.sentences,
+                    cursorColor: SC.accent,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: AppStrings.t('discover_message_hint'),
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+                if (hasText) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: _sending ? null : _send,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        color: SC.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
