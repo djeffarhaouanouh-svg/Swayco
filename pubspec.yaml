@@ -137,6 +137,8 @@ flutter:
     - assets/mesh_midnight_bg.png
     # Illustration shown in the "add your photo" profile tip dialog.
     - assets/add-picture.png
+    # Transparent logo mark — shown on the "call ended" summary card.
+    - assets/icon-fg-transparent.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

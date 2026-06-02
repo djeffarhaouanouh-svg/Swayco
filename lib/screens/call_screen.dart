@@ -856,6 +856,7 @@ class _CallScreenState extends State<CallScreen> {
     final name = (profile?.displayName.trim().isNotEmpty ?? false)
         ? profile!.displayName.trim()
         : AppStrings.t('profile_anonymous');
+    final firstName = name.split(RegExp(r'\s+')).first;
     final lang = profile?.language.trim() ?? '';
     final appLang = lang.isEmpty ? null : findLanguageByCode(lang);
     final dur = _finalDuration ?? Duration.zero;
@@ -873,7 +874,8 @@ class _CallScreenState extends State<CallScreen> {
                   color: const Color(0xFF0E0E0E),
                   child: Stack(
                     children: [
-                      // Peer PDP + name + flag, a touch above centre.
+                      // Peer PDP, then the first name aligned on the same row
+                      // as the flag, a touch above centre.
                       Align(
                         alignment: const Alignment(0, -0.18),
                         child: Column(
@@ -886,33 +888,31 @@ class _CallScreenState extends State<CallScreen> {
                               size: 132,
                             ),
                             const SizedBox(height: 20),
-                            Text(
-                              name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (appLang != null) ...[
-                              const SizedBox(height: 10),
-                              Row(
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(appLang.flag,
-                                      style: const TextStyle(fontSize: 26)),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    appLang.label,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.6),
-                                      fontSize: 15,
+                                  if (appLang != null) ...[
+                                    Text(appLang.flag,
+                                        style: const TextStyle(fontSize: 30)),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      firstName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
@@ -937,20 +937,16 @@ class _CallScreenState extends State<CallScreen> {
                           ],
                         ),
                       ),
-                      // Brand logo — dead bottom-centre.
-                      const Positioned(
+                      // Brand icon — dead bottom-centre.
+                      Positioned(
                         left: 0,
                         right: 0,
                         bottom: 22,
                         child: Center(
-                          child: Text(
-                            'swayco.ai',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
+                          child: Image.asset(
+                            'assets/icon-fg-transparent.png',
+                            height: 52,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
