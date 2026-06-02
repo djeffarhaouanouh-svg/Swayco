@@ -66,29 +66,13 @@ const List<InterestCategory> kInterestCategories = [
   ),
 ];
 
-/// Vivid chip palette (Tailwind-500) used by the "bord blanc" interest chips:
-/// each chip is a solid colour with a white border + white text. Colours are
-/// assigned per tag (stable hash) so the list stays lively and multi-colour
-/// like the reference design, not one colour per category.
-const List<Color> kInterestChipPalette = [
-  Color(0xFF22C55E), // green
-  Color(0xFFF97316), // orange
-  Color(0xFFD946EF), // fuchsia
-  Color(0xFF3B82F6), // blue
-  Color(0xFFEAB308), // yellow
-  Color(0xFFEC4899), // pink
-  Color(0xFF8B5CF6), // violet
-  Color(0xFF0EA5E9), // sky
-  Color(0xFFEF4444), // red
-  Color(0xFF14B8A6), // teal
-];
-
-/// Stable vivid colour for a chip [label] — hashes the label into
-/// [kInterestChipPalette] so a given tag always gets the same colour.
+/// Colour for a chip [label] = its CATEGORY colour (Musique → violet,
+/// Sport → green, Films → pink, Gaming → blue, Lifestyle → orange). So every
+/// chip of a category shares one vivid colour. Falls back to a neutral slate
+/// for a tag no longer in the taxonomy.
 Color interestColor(String label) {
-  var hash = 0;
-  for (final c in label.codeUnits) {
-    hash = (hash * 31 + c) & 0x7fffffff;
+  for (final c in kInterestCategories) {
+    if (c.options.contains(label)) return c.color;
   }
-  return kInterestChipPalette[hash % kInterestChipPalette.length];
+  return const Color(0xFF64748B);
 }

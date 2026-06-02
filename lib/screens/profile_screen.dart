@@ -2479,17 +2479,13 @@ class _InterestChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // "Bord blanc" style: EVERY chip shows its own vivid colour. Selected
-    // chips are full colour + bold white border + check + shadow; unpicked
-    // ones (picker) keep the same colour, just dimmed with a faint border so
-    // the palette stays visible.
-    final bg = selected ? color : color.withValues(alpha: 0.45);
-    final borderColor =
-        selected ? Colors.white : Colors.white.withValues(alpha: 0.25);
-    final fg = Colors.white.withValues(alpha: selected ? 1 : 0.9);
+    // "Bord blanc" style: EVERY chip is its category's solid vivid colour with
+    // white text, so all colours are always visible. Selected chips get a bold
+    // white border + check + shadow; unpicked ones a thin faint white border.
+    final fg = Colors.white;
     return Material(
-      color: bg,
-      elevation: selected ? 3 : 0,
+      color: color,
+      elevation: selected ? 3 : 1,
       shadowColor: color.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
@@ -2500,8 +2496,10 @@ class _InterestChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: borderColor,
-              width: selected ? 1.8 : 1,
+              color: selected
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.35),
+              width: selected ? 2 : 1,
             ),
           ),
           child: Row(
