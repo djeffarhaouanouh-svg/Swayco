@@ -16,6 +16,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -585,11 +586,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final deckTop = safeTop + _DiscoverHeader.height;
     final deckBottom = GlassNavBar.height + safeBottom;
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       // Cards extend behind the floating nav bar (rendered by RootShell).
       extendBody: true,
-      body: ColoredBox(
-        color: const Color(0xFF0E0E0E),
+      body: MeshBackground(
         child: Stack(
           children: [
             // The card deck, inset to the gap between the two bar bodies.
@@ -1204,11 +1204,9 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         boxShadow: [
           BoxShadow(
-            // Neutral black drop shadow — the old cyan glow read as an ugly
-            // blue halo behind the card / message field.
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 40,
-            offset: const Offset(0, 20),
+            color: SC.meshCyan.withValues(alpha: 0.30),
+            blurRadius: 60,
+            offset: const Offset(0, 30),
           ),
         ],
       ),
@@ -1217,7 +1215,7 @@ class _ProfileCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const ColoredBox(color: Color(0xFF0E0E0E)),
+            const ColoredBox(color: SC.bubbleIn),
             if (photoUrl.isNotEmpty)
               Image.network(
                 photoUrl,
@@ -1225,8 +1223,7 @@ class _ProfileCard extends StatelessWidget {
                 // Centre crop — keeps the subject roughly in the middle of
                 // the card whatever the source aspect ratio.
                 alignment: Alignment.center,
-                errorBuilder: (_, _, _) =>
-                    const ColoredBox(color: Color(0xFF0E0E0E)),
+                errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
               ),
             Positioned.fill(
               child: DecoratedBox(
@@ -1624,9 +1621,8 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
       constraints: const BoxConstraints(maxWidth: 270),
       child: Container(
         decoration: BoxDecoration(
-          // Solid neutral dark — opaque so no navy photo/background shows
-          // through (the translucent fill read as blue).
-          color: const Color(0xFF1C1C1E),
+          // Neutral translucent dark over the photo.
+          color: Colors.black.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
         ),
@@ -1651,6 +1647,9 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   isDense: true,
+                  // The app theme fills inputs with navy (bubbleIn) — turn it
+                  // OFF here, that navy was the "fond bleu" behind the text.
+                  filled: false,
                   hintText: AppStrings.t('discover_message_hint'),
                   hintStyle: TextStyle(
                     color: Colors.white.withValues(alpha: 0.65),
