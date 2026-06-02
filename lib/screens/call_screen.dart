@@ -1,8 +1,10 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -22,6 +24,7 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
+import '../widgets/profile_avatar.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -36,6 +39,7 @@ class CallScreen extends StatefulWidget {
     this.isCaller = false,
     this.outgoingCallId,
     this.startWithCamera = false,
+    this.peerId,
   });
 
   final String wsUrl;
@@ -71,6 +75,11 @@ class CallScreen extends StatefulWidget {
   /// requested until the user taps the in-call camera toggle.
   final bool startWithCamera;
 
+  /// Device id of the person on the other end (caller for the callee, callee
+  /// for the caller). Used purely to fetch their profile for the "call ended"
+  /// summary card (PDP + flag). Null for guest/live calls with no known peer.
+  final String? peerId;
+
   @override
   State<CallScreen> createState() => _CallScreenState();
 }
@@ -85,6 +94,17 @@ class _CallScreenState extends State<CallScreen> {
   /// before the caller could read it. Flips true after the timer below.
   bool _minSplashDone = false;
   Timer? _splashTimer;
+
+  /// Once a connected call ends, we swap to a black "call ended" summary card
+  /// (peer PDP + flag + duration) instead of popping straight back. These hold
+  /// the data that card needs.
+  bool _ended = false;
+  RemoteProfile? _peerProfile;
+  Duration? _finalDuration;
+
+  /// Wraps the shareable part of the summary card so it can be captured to a
+  /// PNG and shared ("partager la page").
+  final GlobalKey _shareCardKey = GlobalKey();
   bool _micOn = true;
   late bool _camOn = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
@@ -256,6 +276,7 @@ class _CallScreenState extends State<CallScreen> {
     _splashTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => _minSplashDone = true);
     });
+    unawaited(_loadPeerProfile());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
@@ -266,6 +287,20 @@ class _CallScreenState extends State<CallScreen> {
         callId: callId,
         onDeclined: _onDeclinedByCallee,
       );
+    }
+  }
+
+  /// Best-effort fetch of the peer's profile (PDP + language) for the
+  /// "call ended" summary card. Silent on any failure — the card just falls
+  /// back to an initial-letter avatar and no flag.
+  Future<void> _loadPeerProfile() async {
+    final id = widget.peerId;
+    if (id == null || id.isEmpty) return;
+    try {
+      final p = await ProfileApi.fetchById(id);
+      if (mounted && p != null) setState(() => _peerProfile = p);
+    } catch (_) {
+      // Offline / not found — summary degrades gracefully.
     }
   }
 
@@ -767,7 +802,197 @@ class _CallScreenState extends State<CallScreen> {
       await r.disconnect();
       await r.dispose();
     }
+    // If the call actually connected, show the black "call ended" summary
+    // (PDP + flag + minutes + share) instead of popping straight back. A call
+    // that never connected (declined / unanswered) just closes.
+    final startedAt = _connectedAt;
+    if (startedAt != null && mounted) {
+      _finalDuration = DateTime.now().difference(startedAt);
+      unawaited(UsageTracker.stop());
+      setState(() => _ended = true);
+      return;
+    }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  String _formatCallDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    if (m <= 0) return '$s s';
+    return '$m min ${s.toString().padLeft(2, '0')} s';
+  }
+
+  /// Capture the summary card to a PNG and hand it to the OS share sheet —
+  /// "partager la page". Best-effort: a capture / share failure is swallowed.
+  Future<void> _shareSummary() async {
+    try {
+      final obj = _shareCardKey.currentContext?.findRenderObject();
+      if (obj is! RenderRepaintBoundary) return;
+      final image = await obj.toImage(pixelRatio: 3);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) return;
+      final data = bytes.buffer.asUint8List();
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(data, name: 'swayco-call.png', mimeType: 'image/png'),
+          ],
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
+        ),
+      );
+    } catch (_) {
+      // Sheet dismissed / capture unavailable — nothing to do.
+    }
+  }
+
+  /// Black "call ended" card: the peer's PDP + flag, the minutes spent, a
+  /// share button bottom-right and the swayco logo dead-centre at the bottom.
+  Widget _buildEndedSummary(BuildContext context) {
+    final profile = _peerProfile;
+    final name = (profile?.displayName.trim().isNotEmpty ?? false)
+        ? profile!.displayName.trim()
+        : AppStrings.t('profile_anonymous');
+    final lang = profile?.language.trim() ?? '';
+    final appLang = lang.isEmpty ? null : findLanguageByCode(lang);
+    final dur = _finalDuration ?? Duration.zero;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0E0E0E),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // The shareable card (everything captured into the PNG).
+            Positioned.fill(
+              child: RepaintBoundary(
+                key: _shareCardKey,
+                child: Container(
+                  color: const Color(0xFF0E0E0E),
+                  child: Stack(
+                    children: [
+                      // Peer PDP + name + flag, a touch above centre.
+                      Align(
+                        alignment: const Alignment(0, -0.18),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ProfileAvatar(
+                              displayName: name,
+                              avatarUrl: profile?.avatarUrl,
+                              avatarColorHex: profile?.avatarColor,
+                              size: 132,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (appLang != null) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(appLang.flag,
+                                      style: const TextStyle(fontSize: 26)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    appLang.label,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Minutes spent — just above the logo.
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 78,
+                        child: Column(
+                          children: [
+                            const Icon(Icons.schedule_rounded,
+                                color: SC.accent, size: 22),
+                            const SizedBox(height: 6),
+                            Text(
+                              _formatCallDuration(dur),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Brand logo — dead bottom-centre.
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 22,
+                        child: Center(
+                          child: Text(
+                            'swayco.ai',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Close — kept OUT of the captured card.
+            Positioned(
+              top: 4,
+              left: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 26),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            // Share the card — bottom-right, also out of the capture.
+            Positioned(
+              right: 20,
+              bottom: 66,
+              child: Material(
+                color: SC.accent,
+                shape: const CircleBorder(),
+                elevation: 3,
+                shadowColor: Colors.black54,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _shareSummary,
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Icon(Icons.ios_share_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmLeave() async {
@@ -805,6 +1030,10 @@ class _CallScreenState extends State<CallScreen> {
     // back) â€” so the call is counted exactly once with its duration.
     final startedAt = _connectedAt;
     if (startedAt != null) {
+      // Prefer the duration captured when the call ended — otherwise time
+      // spent reading the summary card would inflate the analytics figure.
+      final durMs = (_finalDuration ?? DateTime.now().difference(startedAt))
+          .inMilliseconds;
       Analytics.track(
         'call_ended',
         roomName: widget.roomName,
@@ -812,7 +1041,7 @@ class _CallScreenState extends State<CallScreen> {
         langTo: _attachedRemoteLang,
         props: {
           'kind': _callKind,
-          'duration_ms': DateTime.now().difference(startedAt).inMilliseconds,
+          'duration_ms': durMs,
           // Real translation-live time â€” drives the OpenAI Realtime cost
           // estimate in the admin dashboard.
           'translation_ms': _translationLive.elapsed.inMilliseconds,
@@ -848,6 +1077,8 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_ended) return _buildEndedSummary(context);
+
     if (_connectError != null) {
       return Scaffold(
         backgroundColor: SC.bg,

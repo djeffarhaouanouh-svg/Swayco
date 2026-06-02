@@ -186,6 +186,8 @@ class _RootShellState extends State<RootShell> {
             displayName: myProfile?.displayName ?? '',
             mySourceLang: myProfile?.language ?? '',
             translation: widget.translation,
+            // For the "call ended" summary card (peer PDP + flag).
+            peerId: call.callerId,
           ),
         ),
       );

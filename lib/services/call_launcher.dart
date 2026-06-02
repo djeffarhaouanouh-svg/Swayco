@@ -120,6 +120,8 @@ abstract final class CallLauncher {
             // Lets the waiting screen close itself the moment the callee
             // declines, instead of ringing into an empty room.
             outgoingCallId: ringId,
+            // For the "call ended" summary card (peer PDP + flag).
+            peerId: peerDeviceId,
           ),
         ),
       );
