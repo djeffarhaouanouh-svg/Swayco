@@ -136,8 +136,10 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
         ? AppStrings.t('profile_followers')
         : AppStrings.t('profile_following');
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0E0E0E),
+        surfaceTintColor: Colors.transparent,
         title: Text(title),
         actions: [
           IconButton(
@@ -231,7 +233,7 @@ class _FriendRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
-        color: SC.bubbleIn,
+        color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -339,7 +341,7 @@ class _MutedPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: const Color(0xFF262626),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
