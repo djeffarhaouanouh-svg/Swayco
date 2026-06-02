@@ -1050,11 +1050,9 @@ class _MySubscriptionSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          // Tapping the row deploys the full-screen paywall instead of
-          // expanding the pricing cards inline.
-          onTap: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const PaywallScreen()),
-          ),
+          // Tapping the row slides the paywall up from the bottom as a
+          // modal sheet instead of expanding the pricing cards inline.
+          onTap: () => showPaywallSheet(context),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             child: Row(

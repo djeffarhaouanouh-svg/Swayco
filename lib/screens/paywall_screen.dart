@@ -4,26 +4,40 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
-import '../widgets/mesh_background.dart';
 
-/// Full-screen subscription paywall — Swayco "Midnight" reskin of the
-/// classic store layout: a social-proof pill, a bold headline + trial
-/// promise, the logo as hero art, a stack of radio-selectable plan
-/// cards (price pulled from the profile section's source of truth), a
-/// single bottom CTA acting on the selected plan, and the legal /
-/// restore footer.
-///
-/// Dark navy background, hairline grey card borders, cyan accent on the
-/// selected card + CTA — matching [SC] everywhere instead of the pink
-/// reference it was adapted from.
-class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
-
-  @override
-  State<PaywallScreen> createState() => _PaywallScreenState();
+/// Opens the subscription paywall as a modal sheet that slides up from
+/// the bottom (rounded top corners, grab handle, dismiss by swipe / tap
+/// outside). Call this from anywhere — e.g. the profile's "Mon
+/// abonnement" row.
+Future<void> showPaywallSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.62),
+    builder: (_) => const _PaywallSheet(),
+  );
 }
 
-class _PaywallScreenState extends State<PaywallScreen> {
+/// Subscription paywall — Swayco "Midnight" reskin of the classic store
+/// layout, presented as a bottom sheet: grab handle + close, a
+/// social-proof pill, a bold headline + trial promise, the logo as hero
+/// art, a stack of radio-selectable plan cards (prices mirror the
+/// profile tiers), a single CTA acting on the selected plan, and the
+/// legal / restore footer.
+///
+/// Dark navy surface, hairline grey card borders, cyan accent on the
+/// selected card + CTA — matching [SC] everywhere instead of the pink
+/// reference it was adapted from.
+class _PaywallSheet extends StatefulWidget {
+  const _PaywallSheet();
+
+  @override
+  State<_PaywallSheet> createState() => _PaywallSheetState();
+}
+
+class _PaywallSheetState extends State<_PaywallSheet> {
   /// Currently highlighted plan (cyan border + filled radio + cyan
   /// price). Defaults to the entry paid tier — the "start your trial"
   /// CTA converts best anchored on the cheaper recurring plan, with the
@@ -33,7 +47,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool _busy = false;
 
   // Plan copy. Prices are the single source of truth shared with the
-  // profile's _PlansSection — keep the two in sync (9,99 / 15,99).
+  // profile tier ladder — keep them in sync (9,99 / 15,99).
   static const List<_Plan> _plans = [
     _Plan(
       tier: 'plus',
@@ -111,127 +125,148 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              // ── Top bar: social-proof pill centred, close button left.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const _SocialProofPill(),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: GlassIconButton(
-                        icon: Icons.close,
-                        iconSize: 18,
-                        size: 36,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Scrollable hero + plans (keeps the CTA pinned below).
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      Text(
-                        'Activez votre abonnement\net profitez de 3 jours offerts',
-                        textAlign: TextAlign.center,
-                        style: SCText.h1.copyWith(fontSize: 27, height: 1.12),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Parlez toutes les langues, sans barrière. '
-                        'Traduction vocale et messages, en temps réel.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: SC.textMuted,
-                          fontSize: 14.5,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      const _HeroLogo(),
-                      const SizedBox(height: 32),
-                      for (var i = 0; i < _plans.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 14),
-                        _PlanTile(
-                          plan: _plans[i],
-                          selected: _selected == _plans[i].tier,
-                          onTap: () =>
-                              setState(() => _selected = _plans[i].tier),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Pinned CTA + footer.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _startTrial,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: SC.accent,
-                      foregroundColor: SC.bgDeep,
-                      minimumSize: const Size.fromHeight(54),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _busy
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: SC.bgDeep,
-                            ),
-                          )
-                        : const Text(
-                            'Commencer mon essai gratuit',
-                            style: TextStyle(
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8, top: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _FooterLink('Restaurer les achats', _restore),
-                    const _FooterDot(),
-                    _FooterLink(
-                      'Conditions',
-                      () => _openExternal('https://swayco.fr/terms'),
-                    ),
-                    const _FooterDot(),
-                    _FooterLink(
-                      'Confidentialité',
-                      () => _openExternal('https://swayco.fr/privacy'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    // Cap the sheet height so a tall screen doesn't stretch it edge to
+    // edge — it should read as a window that slid up, not a full page.
+    final maxH = MediaQuery.of(context).size.height * 0.9;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxH),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: SC.bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border(
+            top: BorderSide(color: SC.glassBorderStrong),
           ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Grab handle.
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SC.glassBorderStrong,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+
+            // Top row: social-proof pill centred, close button left.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const _SocialProofPill(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GlassIconButton(
+                      icon: Icons.close,
+                      iconSize: 18,
+                      size: 36,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Scrollable hero + plans (shrinks to content when short,
+            // scrolls once it would overflow the capped height).
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      'Activez votre abonnement\net profitez de 3 jours offerts',
+                      textAlign: TextAlign.center,
+                      style: SCText.h1.copyWith(fontSize: 25, height: 1.12),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Parlez toutes les langues, sans barrière. '
+                      'Traduction vocale et messages, en temps réel.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: SC.textMuted,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    const _HeroLogo(),
+                    const SizedBox(height: 26),
+                    for (var i = 0; i < _plans.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 14),
+                      _PlanTile(
+                        plan: _plans[i],
+                        selected: _selected == _plans[i].tier,
+                        onTap: () =>
+                            setState(() => _selected = _plans[i].tier),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Pinned CTA + footer.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _busy ? null : _startTrial,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: SC.bgDeep,
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: SC.bgDeep,
+                          ),
+                        )
+                      : const Text(
+                          'Commencer mon essai gratuit',
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _FooterLink('Restaurer les achats', _restore),
+                  const _FooterDot(),
+                  _FooterLink(
+                    'Conditions',
+                    () => _openExternal('https://swayco.fr/terms'),
+                  ),
+                  const _FooterDot(),
+                  _FooterLink(
+                    'Confidentialité',
+                    () => _openExternal('https://swayco.fr/privacy'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -257,7 +292,7 @@ class _Plan {
   final bool popular;
 }
 
-/// Social-proof chip at the very top — glass pill, cyan verified badge.
+/// Social-proof chip at the top — glass pill, cyan verified badge.
 class _SocialProofPill extends StatelessWidget {
   const _SocialProofPill();
 
@@ -295,8 +330,8 @@ class _HeroLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 150,
-      height: 150,
+      width: 132,
+      height: 132,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
@@ -309,11 +344,11 @@ class _HeroLogo extends StatelessWidget {
       alignment: Alignment.center,
       child: Image.asset(
         'assets/icon-fg-transparent.png',
-        width: 112,
-        height: 112,
+        width: 100,
+        height: 100,
         fit: BoxFit.contain,
         errorBuilder: (_, _, _) =>
-            const Icon(Icons.translate_rounded, size: 96, color: SC.accent),
+            const Icon(Icons.translate_rounded, size: 84, color: SC.accent),
       ),
     );
   }
