@@ -1957,7 +1957,7 @@ class _IdentitySection extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(width: 64),
+            const SizedBox(width: 68),
             Expanded(
               child: _InlineEditable(
                 value: displayName,
@@ -1980,20 +1980,20 @@ class _IdentitySection extends StatelessWidget {
                 child: Tooltip(
                   message: AppStrings.t('profile_edit'),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border:
                           Border.all(color: SC.accent.withValues(alpha: 0.6)),
                     ),
                     child: const Icon(Icons.edit_outlined,
-                        size: 18, color: SC.accent),
+                        size: 16, color: SC.accent),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 32),
           ],
         ),
         const SizedBox(height: 2),
