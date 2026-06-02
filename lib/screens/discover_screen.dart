@@ -16,7 +16,6 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -102,10 +101,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   List<Friendship> _myFriendships = const [];
 
   // Idle swipe-hint: after [_swipeHintDelay] of inactivity, the deck peeks
-  // the next card up and an up-arrow rides along (same controller, so they
-  // move in sync). Any swipe / touch resets it.
+  // the next card up (driven by [_hintCtrl], no rebuild). Any swipe / touch
+  // resets it.
   Timer? _swipeHintTimer;
-  bool _showSwipeHint = false;
   static const _swipeHintDelay = Duration(seconds: 7);
   // Drives both the card peek (via PageController.jumpTo) and the arrow's
   // translation, so the two animate together.
@@ -240,17 +238,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _swipeHintTimer?.cancel();
     _nudging = false;
     _hintCtrl.stop();
-    if (_showSwipeHint && mounted) setState(() => _showSwipeHint = false);
     _swipeHintTimer = Timer(_swipeHintDelay, _fireSwipeHint);
   }
 
-  /// Idle nudge: show the up-arrow and peek the next card up (both driven by
-  /// [_hintCtrl] so they move together). Re-arms so the nudge repeats every
-  /// few seconds until the user moves.
+  /// Idle nudge: peek the next card up (driven by [_hintCtrl] via
+  /// [_onHintTick] — no setState, so the deck/images never rebuild or blink).
+  /// Re-arms so the nudge repeats every few seconds until the user moves.
   void _fireSwipeHint() {
     if (!mounted) return;
-    setState(() => _showSwipeHint = true);
-    _startNudge();
+    if (_cards.length > 1 && !_searchExpanded) _startNudge();
     _swipeHintTimer = Timer(const Duration(seconds: 4), _fireSwipeHint);
   }
 
@@ -589,10 +585,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final deckTop = safeTop + _DiscoverHeader.height;
     final deckBottom = GlassNavBar.height + safeBottom;
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       // Cards extend behind the floating nav bar (rendered by RootShell).
       extendBody: true,
-      body: MeshBackground(
+      body: ColoredBox(
+        color: const Color(0xFF0E0E0E),
         child: Stack(
           children: [
             // The card deck, inset to the gap between the two bar bodies.
@@ -651,10 +648,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onOpen: _openSearchResult,
                 ),
               ),
-            // Swipe-up arrow hint removed on request. The subtle card "peek"
-            // nudge (driven by [_hintCtrl]) still rides on [_showSwipeHint].
-            if (_showSwipeHint && _cards.length > 1 && !_searchExpanded)
-              const SizedBox.shrink(),
           ],
         ),
       ),
@@ -1211,9 +1204,11 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         boxShadow: [
           BoxShadow(
-            color: SC.meshCyan.withValues(alpha: 0.30),
-            blurRadius: 60,
-            offset: const Offset(0, 30),
+            // Neutral black drop shadow — the old cyan glow read as an ugly
+            // blue halo behind the card / message field.
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 40,
+            offset: const Offset(0, 20),
           ),
         ],
       ),
@@ -1222,7 +1217,7 @@ class _ProfileCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const ColoredBox(color: SC.bubbleIn),
+            const ColoredBox(color: Color(0xFF0E0E0E)),
             if (photoUrl.isNotEmpty)
               Image.network(
                 photoUrl,
@@ -1230,7 +1225,8 @@ class _ProfileCard extends StatelessWidget {
                 // Centre crop — keeps the subject roughly in the middle of
                 // the card whatever the source aspect ratio.
                 alignment: Alignment.center,
-                errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+                errorBuilder: (_, _, _) =>
+                    const ColoredBox(color: Color(0xFF0E0E0E)),
               ),
             Positioned.fill(
               child: DecoratedBox(
@@ -1628,7 +1624,9 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
       constraints: const BoxConstraints(maxWidth: 270),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
+          // Solid neutral dark — opaque so no navy photo/background shows
+          // through (the translucent fill read as blue).
+          color: const Color(0xFF1C1C1E),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
         ),
