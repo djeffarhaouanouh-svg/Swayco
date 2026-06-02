@@ -74,10 +74,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // renders pre-filled when I revisit.
   Map<String, Set<String>> _myReactionsByPeer = const {};
 
-  // Peers I've already sent a direct intro message to (Discover text area).
-  // Hydrated on bootstrap so the "one message per person" rule survives
-  // restarts; the in-card field collapses to a sent state for these.
-  Set<String> _directMessagedIds = <String>{};
+  // Discover PHOTOS I've already sent a direct intro message from (text area).
+  // One message per photo (each photo is its own card), hydrated on bootstrap
+  // so it survives restarts; the in-card field collapses to a sent state when
+  // the card's photo is here.
+  Set<String> _directMessagedPhotos = <String>{};
 
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
@@ -145,13 +146,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(_myId);
       final liked = await LikeApi.fetchMyLikedIds(_myId);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
-      final messaged = await ChatApi.fetchMyTextRecipients(_myId);
+      final messaged = await ChatApi.fetchMyMessagedPhotos(_myId);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
-        _directMessagedIds = messaged;
+        _directMessagedPhotos = messaged;
       });
     } catch (_) {
       // Polling errors are non-fatal — next tick will retry.
@@ -170,14 +171,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(id);
       final liked = await LikeApi.fetchMyLikedIds(id);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
-      final messaged = await ChatApi.fetchMyTextRecipients(id);
+      final messaged = await ChatApi.fetchMyMessagedPhotos(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
-        _directMessagedIds = messaged;
+        _directMessagedPhotos = messaged;
         _profiles = feed;
         _rebuildCards();
         _feedLoading = false;
@@ -471,6 +472,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     RemoteProfile peer, {
     required String body,
     required String snack,
+    String discoverPhoto = '',
   }) async {
     if (_myId.isEmpty || peer.id.isEmpty) return;
     try {
@@ -493,6 +495,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         recipientId: peer.id,
         body: body,
         language: myLang,
+        discoverPhoto: discoverPhoto,
       );
       if (!mounted) return;
       _showAddedSnack(snack);
@@ -502,19 +505,25 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Send a one-off intro message to [peer] from the Discover card text area.
-  /// One per person: optimistically marks the peer as messaged (the in-card
-  /// field collapses to a sent state) and persists via the real chat message
-  /// — [ChatApi.sendMessage] also fires the push notification to the peer.
-  Future<void> _sendDirectMessage(RemoteProfile peer, String text) async {
+  /// Send a one-off intro message to [peer] from the Discover card text area,
+  /// stamped with the card's [photoUrl]. One per photo: optimistically marks
+  /// the photo as messaged (the in-card field collapses to a sent state) and
+  /// persists via the real chat message — [ChatApi.sendMessage] also fires the
+  /// push notification to the peer.
+  Future<void> _sendDirectMessage(
+    RemoteProfile peer,
+    String photoUrl,
+    String text,
+  ) async {
     final body = text.trim();
     if (body.isEmpty || _myId.isEmpty || peer.id.isEmpty) return;
-    if (_directMessagedIds.contains(peer.id)) return;
-    setState(() => _directMessagedIds = {..._directMessagedIds, peer.id});
+    if (_directMessagedPhotos.contains(photoUrl)) return;
+    setState(() => _directMessagedPhotos = {..._directMessagedPhotos, photoUrl});
     await _sendQuickMessage(
       peer,
       body: body,
       snack: 'Message envoyé à ${peer.displayName}',
+      discoverPhoto: photoUrl,
     );
   }
 
@@ -634,28 +643,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onOpen: _openSearchResult,
                 ),
               ),
-            // Idle nudge: an up-arrow near the bottom that rides up in sync
-            // with the card peek (both driven by [_hintCtrl]) to show the
-            // user they can swipe up to the next card.
+            // Swipe-up arrow hint removed on request. The subtle card "peek"
+            // nudge (driven by [_hintCtrl]) still rides on [_showSwipeHint].
             if (_showSwipeHint && _cards.length > 1 && !_searchExpanded)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: deckBottom + 20,
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _hintCtrl,
-                    builder: (_, child) {
-                      final t = Curves.easeOut.transform(_hintCtrl.value);
-                      return Transform.translate(
-                        offset: Offset(0, -t * 14),
-                        child: child,
-                      );
-                    },
-                    child: const _SwipeHint(),
-                  ),
-                ),
-              ),
+              const SizedBox.shrink(),
           ],
         ),
       ),
@@ -744,8 +735,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
                   reactedEmojis:
                       _myReactionsByPeer[profile.id] ?? const <String>{},
-                  alreadyMessaged: _directMessagedIds.contains(profile.id),
-                  onSendMessage: (text) => _sendDirectMessage(profile, text),
+                  alreadyMessaged: _directMessagedPhotos.contains(card.photo),
+                  onSendMessage: (text) =>
+                      _sendDirectMessage(profile, card.photo, text),
                 ),
               ),
             ),
@@ -1377,38 +1369,6 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-/// Idle nudge pill with an up-arrow, pointing the way of the swipe. Its
-/// vertical motion is driven by the parent (the same controller that peeks
-/// the card), so the arrow and the card move as one. Fades in on mount.
-class _SwipeHint extends StatelessWidget {
-  const _SwipeHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOut,
-        builder: (_, fade, child) => Opacity(opacity: fade, child: child),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.42),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-          ),
-          child: const Icon(
-            Icons.keyboard_arrow_up_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Vertical reaction rail rendered on the right side of a profile card —
 /// ghosted "send-a-vibe" emojis, each dim by default and filled when tapped.
 class _ReactionRail extends StatelessWidget {
@@ -1568,7 +1528,17 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   bool _sending = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Rebuild on text changes so the send arrow only shows while typing.
+    _ctrl.addListener(_onChanged);
+  }
+
+  void _onChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _ctrl.removeListener(_onChanged);
     _ctrl.dispose();
     super.dispose();
   }
@@ -1578,49 +1548,62 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     await widget.onSend(text);
-    // The parent rebuilds this card into _MessageSentPill once the peer is
+    // The parent rebuilds this card into _MessageSentPill once the photo is
     // marked messaged; guard mounted in case it already swapped out.
     if (mounted) setState(() => _sending = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 2, 6, 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _ctrl,
-              enabled: !_sending,
-              minLines: 1,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: AppStrings.t('discover_message_hint'),
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
+    final hasText = _ctrl.text.trim().isNotEmpty;
+    return ConstrainedBox(
+      // Smaller, doesn't span the whole card width.
+      constraints: const BoxConstraints(maxWidth: 250),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        padding: EdgeInsets.fromLTRB(14, 0, hasText ? 4 : 14, 0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: TextField(
+                controller: _ctrl,
+                enabled: !_sending,
+                minLines: 1,
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                cursorColor: SC.accent,
+                style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: AppStrings.t('discover_message_hint'),
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 13.5,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                onSubmitted: (_) => _send(),
               ),
-              onSubmitted: (_) => _send(),
             ),
-          ),
-          IconButton(
-            onPressed: _sending ? null : _send,
-            icon: const Icon(Icons.send_rounded, color: SC.accent, size: 20),
-          ),
-        ],
+            // Send arrow only appears once there's something to send.
+            if (hasText)
+              GestureDetector(
+                onTap: _sending ? null : _send,
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child:
+                      Icon(Icons.send_rounded, color: SC.accent, size: 20),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

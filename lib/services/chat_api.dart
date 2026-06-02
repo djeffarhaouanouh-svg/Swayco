@@ -140,23 +140,24 @@ abstract final class ChatApi {
     return out;
   }
 
-  /// Peers [meId] has already sent a real text message to (not an emoji
-  /// reaction). Used by Discover to enforce "one intro message per person":
-  /// once present, the in-card message field collapses to a sent state.
-  /// Heuristic: a body longer than 2 graphemes is a message, not a single
-  /// reaction emoji.
-  static Future<Set<String>> fetchMyTextRecipients(String meId) async {
+  /// Discover photos [meId] has already sent an intro message from. Used by
+  /// Discover to enforce "one intro message per photo": once a card's photo is
+  /// in this set, that card's message field collapses to its sent state. Each
+  /// of a person's photos is a separate card, so they can each be messaged
+  /// once. Persisted across restarts via the `discover_photo` column.
+  static Future<Set<String>> fetchMyMessagedPhotos(String meId) async {
     if (meId.isEmpty) return <String>{};
     final rows = await _client
         .from('messages')
-        .select('recipient, body')
-        .eq('sender', meId);
+        .select('discover_photo')
+        .eq('sender', meId)
+        .neq('discover_photo', '');
     final out = <String>{};
     for (final r in rows as List) {
-      final map = Map<String, dynamic>.from(r as Map);
-      final rec = map['recipient']?.toString() ?? '';
-      final body = map['body']?.toString() ?? '';
-      if (rec.isNotEmpty && body.runes.length > 2) out.add(rec);
+      final photo =
+          Map<String, dynamic>.from(r as Map)['discover_photo']?.toString() ??
+              '';
+      if (photo.isNotEmpty) out.add(photo);
     }
     return out;
   }
@@ -234,6 +235,7 @@ abstract final class ChatApi {
     required String recipientId,
     required String body,
     required String language,
+    String discoverPhoto = '',
   }) async {
     await _client.from('messages').insert({
       'conversation_id': conversationId,
@@ -242,6 +244,9 @@ abstract final class ChatApi {
       'sender_name': senderName,
       'body': body,
       'language': language,
+      // Stamp the Discover photo this intro was sent from (empty otherwise),
+      // so the "one message per photo" rule survives restarts.
+      if (discoverPhoto.isNotEmpty) 'discover_photo': discoverPhoto,
     });
     // Fire-and-forget push to the recipient. Best-effort; never block
     // or fail the send because of a notification hiccup.
