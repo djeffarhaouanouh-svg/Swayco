@@ -2769,7 +2769,7 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SC.bubbleIn,
+      color: SC.accent.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -2777,7 +2777,7 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
+            border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
           ),
           child: Center(
             child: Container(
