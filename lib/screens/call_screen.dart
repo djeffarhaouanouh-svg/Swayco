@@ -79,6 +79,12 @@ class _CallScreenState extends State<CallScreen> {
   Room? _room;
   String? _connectError;
   bool _connecting = true;
+
+  /// Keep the connecting splash on screen for at least this long — LiveKit
+  /// often connects in well under a second, so the splash used to flash by
+  /// before the caller could read it. Flips true after the timer below.
+  bool _minSplashDone = false;
+  Timer? _splashTimer;
   bool _micOn = true;
   late bool _camOn = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
@@ -245,6 +251,11 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _start();
+    // Hold the connecting splash for a minimum of 5s so it is actually
+    // readable even when the room connects almost instantly.
+    _splashTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _minSplashDone = true);
+    });
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
@@ -788,6 +799,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    _splashTimer?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
     // runs on every exit path (hang-up, peer-left auto-hangup, system
     // back) â€” so the call is counted exactly once with its duration.
@@ -873,22 +885,26 @@ class _CallScreenState extends State<CallScreen> {
       );
     }
 
-    if (_connecting || _room == null) {
+    if (_connecting || _room == null || !_minSplashDone) {
       // Splash-style connecting state. Showing the room name + a bare
       // spinner during LiveKit's handshake felt clinical and gave the
       // caller no signal about the credit deduction â€” switch to the
       // app's splash image with a single one-liner hint clarifying
       // that only the caller's monthly credits are debited (the peer
       // listens free). Keeps the spinner so the user still has motion
-      // feedback that something is happening.
+      // feedback that something is happening. Held for >= 5s (see
+      // _minSplashDone) and on the app's black, to match the logo.
       return Scaffold(
-        backgroundColor: SC.bg,
+        backgroundColor: const Color(0xFF0E0E0E),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
             child: Column(
               children: [
+                // Bigger top flex than the bottom spacer below lifts the
+                // spinner + text block up off the bottom edge.
                 Expanded(
+                  flex: 6,
                   child: Center(
                     child: Image.asset(
                       'assets/test-splashscreen.png',
@@ -925,6 +941,7 @@ class _CallScreenState extends State<CallScreen> {
                     height: 1.4,
                   ),
                 ),
+                const Expanded(flex: 2, child: SizedBox()),
               ],
             ),
           ),
