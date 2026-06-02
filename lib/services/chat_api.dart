@@ -172,6 +172,26 @@ abstract final class ChatApi {
     return out;
   }
 
+  /// Peers [meId] has already sent a Discover intro message to. The Discover
+  /// feed is now one card per PERSON (their photos shown in a carousel), so
+  /// the "one intro per person" rule keys on the recipient, not the photo.
+  /// A non-empty `discover_photo` stamp marks a message as a Discover intro.
+  static Future<Set<String>> fetchMyDiscoverMessagedPeers(String meId) async {
+    if (meId.isEmpty) return <String>{};
+    final rows = await _client
+        .from('messages')
+        .select('recipient')
+        .eq('sender', meId)
+        .neq('discover_photo', '');
+    final out = <String>{};
+    for (final r in rows as List) {
+      final rcpt =
+          Map<String, dynamic>.from(r as Map)['recipient']?.toString() ?? '';
+      if (rcpt.isNotEmpty) out.add(rcpt);
+    }
+    return out;
+  }
+
   /// Most recent photo reactions (Discover-rail emoji taps) addressed
   /// to [meId]. One entry per sender — the latest emoji a given peer
   /// reacted with. Ordered by most recent first.

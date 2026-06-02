@@ -36,28 +36,29 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
 
-  // The feed is now one card per PHOTO, not per profile: every profile is
-  // flattened into its photos (newest first), so a friend's new photos each
-  // get their own swipeable card. Rebuilt whenever [_profiles] changes.
-  final List<({RemoteProfile profile, String photo})> _cards = [];
+  // The feed is one card per PERSON: each profile's photos (newest first,
+  // capped at 6) are shown as a horizontal carousel inside their single card.
+  // Rebuilt whenever [_profiles] changes.
+  static const int _maxCardPhotos = 6;
+  final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
   void _rebuildCards() {
     _cards.clear();
     for (final p in _profiles) {
       final photos = p.photos.where((u) => u.isNotEmpty).toList();
+      List<String> shown;
       if (photos.isEmpty) {
         // Legacy rows with no gallery: fall back to the single photo.
         final single = p.discoverPhotoUrl.isNotEmpty
             ? p.discoverPhotoUrl
             : p.avatarUrl;
-        if (single.isNotEmpty) _cards.add((profile: p, photo: single));
+        shown = single.isNotEmpty ? <String>[single] : const <String>[];
       } else {
         // Newest photos sit at the end of the array (append-on-upload), so
-        // reverse to show the most recent first.
-        for (final url in photos.reversed) {
-          _cards.add((profile: p, photo: url));
-        }
+        // reverse to show the most recent first; cap the carousel at 6.
+        shown = photos.reversed.take(_maxCardPhotos).toList();
       }
+      if (shown.isNotEmpty) _cards.add((profile: p, photos: shown));
     }
   }
 
@@ -73,11 +74,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // renders pre-filled when I revisit.
   Map<String, Set<String>> _myReactionsByPeer = const {};
 
-  // Discover PHOTOS I've already sent a direct intro message from (text area).
-  // One message per photo (each photo is its own card), hydrated on bootstrap
-  // so it survives restarts; the in-card field collapses to a sent state when
-  // the card's photo is here.
-  Set<String> _directMessagedPhotos = <String>{};
+  // Peers I've already sent a direct intro message to (text area). One message
+  // per PERSON (each card is one person now), hydrated on bootstrap so it
+  // survives restarts; the in-card field collapses to a sent state once the
+  // peer is here.
+  Set<String> _directMessagedPeers = <String>{};
 
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
@@ -144,13 +145,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(_myId);
       final liked = await LikeApi.fetchMyLikedIds(_myId);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
-      final messaged = await ChatApi.fetchMyMessagedPhotos(_myId);
+      final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(_myId);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
-        _directMessagedPhotos = messaged;
+        _directMessagedPeers = messaged;
       });
     } catch (_) {
       // Polling errors are non-fatal — next tick will retry.
@@ -169,14 +170,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final mine = await FriendshipApi.fetchMine(id);
       final liked = await LikeApi.fetchMyLikedIds(id);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
-      final messaged = await ChatApi.fetchMyMessagedPhotos(id);
+      final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
         _likedIds = liked;
         _myReactionsByPeer = reactions;
-        _directMessagedPhotos = messaged;
+        _directMessagedPeers = messaged;
         _profiles = feed;
         _rebuildCards();
         _feedLoading = false;
@@ -436,11 +437,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     current.add(emoji);
     next[peer.id] = current;
     setState(() => _myReactionsByPeer = next);
+    // No discover_photo stamp on reactions — that flag marks intro MESSAGES
+    // only (so reacting doesn't collapse the card's message field). [photo]
+    // is kept for signature symmetry with the message path.
     await _sendQuickMessage(
       peer,
       body: emoji,
       snack: '$emoji envoyé à ${peer.displayName}',
-      discoverPhoto: photo,
     );
   }
 
@@ -510,11 +513,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Send a one-off intro message to [peer] from the Discover card text area,
-  /// stamped with the card's [photoUrl]. One per photo: optimistically marks
-  /// the photo as messaged (the in-card field collapses to a sent state) and
-  /// persists via the real chat message — [ChatApi.sendMessage] also fires the
-  /// push notification to the peer.
+  /// Send a one-off intro message to [peer] from the Discover card text area.
+  /// One per PERSON: optimistically marks the peer as messaged (the in-card
+  /// field collapses to a sent state) and persists via the real chat message —
+  /// [ChatApi.sendMessage] also fires the push notification to the peer. The
+  /// [photoUrl] is stamped on the message purely to flag it as a Discover
+  /// intro (so it counts towards the per-person hydration).
   Future<void> _sendDirectMessage(
     RemoteProfile peer,
     String photoUrl,
@@ -522,13 +526,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   ) async {
     final body = text.trim();
     if (body.isEmpty || _myId.isEmpty || peer.id.isEmpty) return;
-    if (_directMessagedPhotos.contains(photoUrl)) return;
-    setState(() => _directMessagedPhotos = {..._directMessagedPhotos, photoUrl});
+    if (_directMessagedPeers.contains(peer.id)) return;
+    setState(() => _directMessagedPeers = {..._directMessagedPeers, peer.id});
     await _sendQuickMessage(
       peer,
       body: body,
       snack: 'Message envoyé à ${peer.displayName}',
-      discoverPhoto: photoUrl,
+      discoverPhoto: photoUrl.isEmpty ? peer.id : photoUrl,
     );
   }
 
@@ -715,9 +719,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           }
           // Dart's `%` returns a non-negative result for a positive
           // divisor, so this also wraps cleanly when the user swipes
-          // backward past the first card. One card == one photo.
+          // backward past the first card. One card == one person.
           final card = _cards[i % _cards.length];
           final profile = card.profile;
+          final firstPhoto = card.photos.isNotEmpty ? card.photos.first : '';
           // The deck is already inset between the two bars (see build), so
           // the card just fills its page — that keeps consecutive cards
           // contiguous, sliding in flush with no gap between them.
@@ -727,19 +732,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               child: SizedBox.expand(
                 child: _ProfileCard(
                   profile: profile,
-                  photoUrl: card.photo,
+                  photos: card.photos,
                   onAdd: () => _toggleFriendRequest(profile),
                   pendingOutgoing:
                       _statusFor(profile) == FriendshipStatus.pendingOutgoing,
                   liked: _likedIds.contains(profile.id),
                   onToggleLike: () => _toggleLikeOnProfile(profile.id),
                   onSendEmoji: (emoji) =>
-                      _toggleEmojiReaction(profile, card.photo, emoji),
+                      _toggleEmojiReaction(profile, firstPhoto, emoji),
                   reactedEmojis:
                       _myReactionsByPeer[profile.id] ?? const <String>{},
-                  alreadyMessaged: _directMessagedPhotos.contains(card.photo),
+                  alreadyMessaged: _directMessagedPeers.contains(profile.id),
                   onSendMessage: (text) =>
-                      _sendDirectMessage(profile, card.photo, text),
+                      _sendDirectMessage(profile, firstPhoto, text),
                 ),
               ),
             ),
@@ -1144,7 +1149,7 @@ class _StatusPill extends StatelessWidget {
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
-    required this.photoUrl,
+    required this.photos,
     required this.onAdd,
     this.pendingOutgoing = false,
     this.liked = false,
@@ -1157,9 +1162,9 @@ class _ProfileCard extends StatelessWidget {
 
   final RemoteProfile profile;
 
-  /// The single photo this card shows. The Discover feed is one card per
-  /// photo, so each of a profile's gallery photos gets its own card.
-  final String photoUrl;
+  /// This person's photos (newest first, max 6) shown as a horizontal
+  /// carousel inside the card. The Discover feed is one card per person.
+  final List<String> photos;
 
   final VoidCallback onAdd;
 
@@ -1216,15 +1221,7 @@ class _ProfileCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: SC.bubbleIn),
-            if (photoUrl.isNotEmpty)
-              Image.network(
-                photoUrl,
-                fit: BoxFit.cover,
-                // Centre crop — keeps the subject roughly in the middle of
-                // the card whatever the source aspect ratio.
-                alignment: Alignment.center,
-                errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-              ),
+            if (photos.isNotEmpty) _CardPhotoCarousel(photos: photos),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -1369,6 +1366,82 @@ class _ProfileCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Horizontal photo carousel filling a Discover card. Swipe left/right to move
+/// between this person's photos (the deck itself pages vertically, so the two
+/// axes don't fight). Page dots sit at the TOP-CENTRE in a discreet greyed
+/// white. Single-photo cards render just the image, no dots.
+class _CardPhotoCarousel extends StatefulWidget {
+  const _CardPhotoCarousel({required this.photos});
+
+  final List<String> photos;
+
+  @override
+  State<_CardPhotoCarousel> createState() => _CardPhotoCarouselState();
+}
+
+class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
+  final PageController _ctrl = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = widget.photos;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _ctrl,
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _index = i),
+          itemBuilder: (_, i) => Image.network(
+            photos[i],
+            fit: BoxFit.cover,
+            // Centre crop — keeps the subject roughly in the middle of the
+            // card whatever the source aspect ratio.
+            alignment: Alignment.center,
+            errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+          ),
+        ),
+        if (photos.length > 1)
+          Positioned(
+            top: 14,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < photos.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: i == _index ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        // Discreet — greyed white, the active dot a touch
+                        // brighter and wider.
+                        color: i == _index
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : Colors.white.withValues(alpha: 0.30),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
