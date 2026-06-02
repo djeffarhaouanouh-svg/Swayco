@@ -1309,13 +1309,12 @@ class _ProfileCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Right rail: reaction emojis (ghosted until tapped)
-                  // stacked above the heart. Skipped together with the heart
-                  // for background-deck instances where interaction is off.
-                  if (onToggleLike != null) ...[
+                  // Right rail: reaction emojis (ghosted until tapped).
+                  // Skipped for background-deck instances where interaction
+                  // is off.
+                  if (onSendEmoji != null) ...[
                     const SizedBox(width: 12),
                     _ReactionRail(
-                      heart: _LikeHeart(liked: liked, onTap: onToggleLike!),
                       onSendEmoji: onSendEmoji,
                       reactedEmojis: reactedEmojis,
                     ),
@@ -1362,52 +1361,13 @@ class _SwipeHint extends StatelessWidget {
   }
 }
 
-class _LikeHeart extends StatelessWidget {
-  const _LikeHeart({required this.liked, required this.onTap});
-  final bool liked;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const red = Color(0xFFFF3B5C);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: liked
-              ? red.withValues(alpha: 0.18)
-              : Colors.black.withValues(alpha: 0.35),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: liked ? red : Colors.white.withValues(alpha: 0.20),
-            width: liked ? 2 : 1,
-          ),
-        ),
-        child: Icon(
-          liked ? Icons.favorite : Icons.favorite_border,
-          size: liked ? 26 : 22,
-          color: liked ? red : Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-/// Vertical reaction rail rendered on the right side of a profile card.
-/// The same 4 ghosted "send-a-vibe" emojis are shown above [heart] on
-/// every card; each is dim by default and fills in when tapped.
+/// Vertical reaction rail rendered on the right side of a profile card —
+/// ghosted "send-a-vibe" emojis, each dim by default and filled when tapped.
 class _ReactionRail extends StatelessWidget {
   const _ReactionRail({
-    required this.heart,
     this.onSendEmoji,
     this.reactedEmojis = const <String>{},
   });
-
-  final Widget heart;
 
   /// Fires with the tapped emoji string — handed to each
   /// [_ReactionEmojiButton]. Wired by the parent card to drop the emoji
@@ -1426,15 +1386,15 @@ class _ReactionRail extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final emoji in _emojis) ...[
+        for (var i = 0; i < _emojis.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
           _ReactionEmojiButton(
-            emoji: emoji,
-            reacted: reactedEmojis.contains(emoji),
-            onSend: onSendEmoji == null ? null : () => onSendEmoji!(emoji),
+            emoji: _emojis[i],
+            reacted: reactedEmojis.contains(_emojis[i]),
+            onSend:
+                onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
           ),
-          const SizedBox(height: 10),
         ],
-        heart,
       ],
     );
   }
