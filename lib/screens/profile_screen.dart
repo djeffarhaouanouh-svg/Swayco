@@ -2508,7 +2508,7 @@ class _InterestChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
@@ -2522,14 +2522,14 @@ class _InterestChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (showCheck) ...[
-                Icon(Icons.check_rounded, size: 15, color: fg),
-                const SizedBox(width: 5),
+                Icon(Icons.check_rounded, size: 18, color: fg),
+                const SizedBox(width: 6),
               ],
               Text(
                 label,
                 style: TextStyle(
                   color: fg,
-                  fontSize: 13.5,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -2554,7 +2554,7 @@ class _InterestAddChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
@@ -2562,13 +2562,13 @@ class _InterestAddChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
-              const SizedBox(width: 4),
+              const Icon(Icons.add_rounded, color: SC.accent, size: 20),
+              const SizedBox(width: 5),
               Text(
                 AppStrings.t('interests_add'),
                 style: const TextStyle(
                   color: SC.accent,
-                  fontSize: 13.5,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
