@@ -2586,6 +2586,9 @@ class _InterestsSectionState extends State<_InterestsSection> {
   bool _sameSet(Set<String> a, List<String> b) =>
       a.length == b.length && a.containsAll(b);
 
+  // Auto-persist on every tap — the picker has no mandatory "Save" step, so
+  // whatever the user toggles is saved immediately. _close() flushes the final
+  // state once more when folding, which also wins any rapid-tap race.
   void _toggle(String tag) {
     setState(() {
       if (_sel.contains(tag)) {
@@ -2594,6 +2597,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
         _sel.add(tag);
       }
     });
+    widget.onSave?.call(_sel.toList());
   }
 
   Future<void> _close() async {
@@ -2648,11 +2652,13 @@ class _InterestsSectionState extends State<_InterestsSection> {
   }
 }
 
-/// The inline body of the interest picker: a black rounded panel with every
-/// category (coloured emoji-led header) and its options as toggle chips, plus
-/// a live counter and an "Enregistrer" button. Rendered inside the profile —
-/// not in a sheet — by [_InterestsSection].
-class _InlineInterestPicker extends StatelessWidget {
+/// The inline body of the interest picker: a black rounded panel where each
+/// category is its OWN collapsible dropdown (coloured emoji-led header + a
+/// chevron). Tapping a header unfolds that category's option chips. A live
+/// counter sits on top and an "Enregistrer" fold button at the bottom — but
+/// every chip tap is auto-saved by [_InterestsSection], so the button is just
+/// a tidy way to fold back. Rendered inside the profile (no sheet).
+class _InlineInterestPicker extends StatefulWidget {
   const _InlineInterestPicker({
     required this.sel,
     required this.onToggle,
@@ -2664,11 +2670,23 @@ class _InlineInterestPicker extends StatelessWidget {
   final VoidCallback onDone;
 
   @override
+  State<_InlineInterestPicker> createState() => _InlineInterestPickerState();
+}
+
+class _InlineInterestPickerState extends State<_InlineInterestPicker> {
+  // Which category dropdowns are open. Default: open the ones that already
+  // hold a picked tag, collapse the empty ones.
+  late final Set<String> _open = {
+    for (final cat in kInterestCategories)
+      if (cat.options.any(widget.sel.contains)) cat.label,
+  };
+
+  @override
   Widget build(BuildContext context) {
-    final full = sel.length >= profileInterestsMax;
+    final full = widget.sel.length >= profileInterestsMax;
     return Container(
       margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: const Color(0xFF0E0E0E),
         borderRadius: BorderRadius.circular(18),
@@ -2681,7 +2699,7 @@ class _InlineInterestPicker extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              '${sel.length}/$profileInterestsMax',
+              '${widget.sel.length}/$profileInterestsMax',
               style: TextStyle(
                 color: full ? SC.accent : SC.textMuted,
                 fontSize: 14,
@@ -2689,9 +2707,69 @@ class _InlineInterestPicker extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          for (final cat in kInterestCategories) ...[
-            Row(
+          const SizedBox(height: 2),
+          for (final cat in kInterestCategories)
+            _CategoryDropdown(
+              cat: cat,
+              open: _open.contains(cat.label),
+              onToggleOpen: () => setState(() {
+                if (!_open.remove(cat.label)) _open.add(cat.label);
+              }),
+              sel: widget.sel,
+              full: full,
+              onToggle: widget.onToggle,
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: widget.onDone,
+              style: FilledButton.styleFrom(
+                backgroundColor: SC.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(AppStrings.t('save')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One collapsible category inside [_InlineInterestPicker]: a tappable header
+/// (emoji + coloured label + a "picked" count badge + rotating chevron) and,
+/// when open, the category's option chips. A faint divider closes each row.
+class _CategoryDropdown extends StatelessWidget {
+  const _CategoryDropdown({
+    required this.cat,
+    required this.open,
+    required this.onToggleOpen,
+    required this.sel,
+    required this.full,
+    required this.onToggle,
+  });
+
+  final InterestCategory cat;
+  final bool open;
+  final VoidCallback onToggleOpen;
+  final Set<String> sel;
+  final bool full;
+  final void Function(String tag) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = cat.options.where(sel.contains).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onToggleOpen,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
               children: [
                 Text(cat.emoji, style: const TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
@@ -2699,15 +2777,49 @@ class _InlineInterestPicker extends StatelessWidget {
                   cat.label,
                   style: TextStyle(
                     color: cat.color,
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
                   ),
                 ),
+                if (picked > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: cat.color.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$picked',
+                      style: TextStyle(
+                        color: cat.color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                AnimatedRotation(
+                  turns: open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: SC.textMuted,
+                    size: 22,
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 12),
+            child: Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
@@ -2725,22 +2837,14 @@ class _InlineInterestPicker extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 18),
-          ],
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onDone,
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(AppStrings.t('save')),
-            ),
           ),
-        ],
-      ),
+          crossFadeState:
+              open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+          sizeCurve: Curves.easeOutCubic,
+        ),
+        Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+      ],
     );
   }
 }
