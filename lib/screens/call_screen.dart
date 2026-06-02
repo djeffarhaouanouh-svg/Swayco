@@ -702,18 +702,6 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  void _openAudioSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: SC.bubbleIn,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) => _AudioSettingsSheet(controller: _audio),
-    );
-  }
-
   void _openLanguageSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -1040,7 +1028,8 @@ class _CallScreenState extends State<CallScreen> {
                   Positioned(
                     left: 10,
                     right: 10,
-                    top: MediaQuery.paddingOf(context).top + 12,
+                    // Sits below the "swayco.ai" watermark at the top centre.
+                    top: MediaQuery.paddingOf(context).top + 44,
                     child: ListenableBuilder(
                       listenable: widget.translation.translationListenable!,
                       builder: (context, _) {
@@ -1144,7 +1133,7 @@ class _CallScreenState extends State<CallScreen> {
                           label: _micOn
                               ? AppStrings.t('call_mute')
                               : AppStrings.t('call_unmute'),
-                          background: SC.bubbleIn,
+                          background: SC.accent,
                           onTap: _toggleMic,
                         ),
                         // Live broadcasts keep the camera on â€” no toggle.
@@ -1156,19 +1145,13 @@ class _CallScreenState extends State<CallScreen> {
                             label: _camOn
                                 ? AppStrings.t('call_video')
                                 : AppStrings.t('call_video_off'),
-                            background: SC.bubbleIn,
+                            background: SC.accent,
                             onTap: _toggleCam,
                           ),
                         _RoundCallButton(
-                          icon: Icons.tune_rounded,
-                          label: AppStrings.t('call_audio'),
-                          background: SC.bubbleIn,
-                          onTap: _openAudioSheet,
-                        ),
-                        _RoundCallButton(
                           icon: Icons.translate,
                           label: AppStrings.t('call_language'),
-                          background: SC.bubbleIn,
+                          background: SC.accent,
                           onTap: _openLanguageSheet,
                         ),
                         _RoundCallButton(
@@ -1192,8 +1175,8 @@ class _CallScreenState extends State<CallScreen> {
                         'swayco.ai',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                           shadows: [
                             Shadow(
@@ -1254,100 +1237,6 @@ class _RoundCallButton extends StatelessWidget {
           style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11),
         ),
       ],
-    );
-  }
-}
-
-class _AudioSettingsSheet extends StatelessWidget {
-  const _AudioSettingsSheet({required this.controller});
-
-  final AudioController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Text(
-                  AppStrings.t('call_audio'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _MicLevelStrip(level: controller.micLevel),
-                const SizedBox(height: 18),
-                _SheetLabel(
-                  icon: Icons.record_voice_over_rounded,
-                  text: AppStrings.t('call_translation_volume'),
-                ),
-                Slider(
-                  value: controller.translatedVolume,
-                  onChanged: (v) => controller.setTranslatedVolume(v),
-                  activeColor: SC.accent,
-                  inactiveColor: Colors.white24,
-                ),
-                const SizedBox(height: 6),
-                _SheetLabel(
-                  icon: Icons.person_outline_rounded,
-                  text: AppStrings.t('call_original_volume'),
-                ),
-                Slider(
-                  value: controller.originalVolume,
-                  onChanged: (v) => controller.setOriginalVolume(v),
-                  activeColor: SC.accent,
-                  inactiveColor: Colors.white24,
-                ),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: controller.duckingEnabled,
-                  onChanged: controller.setDuckingEnabled,
-                  activeTrackColor: SC.accent,
-                  title: Text(
-                    AppStrings.t('call_ducking_title'),
-                    style: const TextStyle(
-                        color: SC.textPrimary, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    controller.isDucking
-                        ? AppStrings.t('call_ducking_on')
-                        : AppStrings.t('call_ducking_off'),
-                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                _RouteRow(controller: controller),
-              ],
-            );
-          },
-        ),
-      ),
     );
   }
 }
@@ -1466,115 +1355,6 @@ class _LanguageRow extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SheetLabel extends StatelessWidget {
-  const _SheetLabel({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: SC.textMuted),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(color: SC.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MicLevelStrip extends StatelessWidget {
-  const _MicLevelStrip({required this.level});
-  final double level;
-
-  @override
-  Widget build(BuildContext context) {
-    final clamped = level.clamp(0.0, 1.0).toDouble();
-    return Row(
-      children: [
-        const Icon(Icons.mic_rounded, size: 16, color: SC.textMuted),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: clamped,
-              minHeight: 6,
-              backgroundColor: Colors.white12,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                clamped > 0.85 ? const Color(0xFFE53935) : SC.accent,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RouteRow extends StatelessWidget {
-  const _RouteRow({required this.controller});
-  final AudioController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final route = controller.route;
-    final external = route == AudioRoute.wiredHeadset || route == AudioRoute.bluetooth;
-    final routeLabel = switch (route) {
-      AudioRoute.bluetooth => 'Bluetooth',
-      AudioRoute.wiredHeadset => AppStrings.t('call_route_headset'),
-      AudioRoute.speaker => AppStrings.t('call_route_speaker'),
-      AudioRoute.earpiece => AppStrings.t('call_route_earpiece'),
-    };
-    final routeIcon = switch (route) {
-      AudioRoute.bluetooth => Icons.bluetooth_audio_rounded,
-      AudioRoute.wiredHeadset => Icons.headphones_rounded,
-      AudioRoute.speaker => Icons.volume_up_rounded,
-      AudioRoute.earpiece => Icons.phone_in_talk_rounded,
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SheetLabel(
-            icon: Icons.speaker_phone_rounded,
-            text: AppStrings.t('call_audio_output')),
-        Row(
-          children: [
-            Icon(routeIcon, color: SC.textPrimary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                routeLabel,
-                style: const TextStyle(color: SC.textPrimary, fontSize: 14),
-              ),
-            ),
-            Switch.adaptive(
-              value: controller.speakerOn,
-              onChanged: external ? null : controller.setSpeakerOn,
-              activeTrackColor: SC.accent,
-            ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            external
-                ? AppStrings.t('call_route_external_hint')
-                : AppStrings.t('call_route_internal_hint'),
-            style: const TextStyle(color: SC.textMuted, fontSize: 12),
-          ),
-        ),
-      ],
     );
   }
 }
