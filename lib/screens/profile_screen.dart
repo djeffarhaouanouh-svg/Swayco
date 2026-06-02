@@ -2817,25 +2817,32 @@ class _CategoryDropdown extends StatelessWidget {
         ),
         AnimatedCrossFade(
           firstChild: const SizedBox(width: double.infinity, height: 0),
+          // The category's options as a single-row horizontal carousel —
+          // scroll sideways through the chips instead of wrapping to a grid.
           secondChild: Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 12),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final opt in cat.options)
-                  _InterestChip(
-                    label: opt,
-                    color: interestColor(opt),
-                    selected: sel.contains(opt),
-                    showCheck: sel.contains(opt),
-                    // When the cap is hit, leave only the already-picked chips
-                    // tappable (to deselect).
-                    onTap: (!sel.contains(opt) && full)
-                        ? null
-                        : () => onToggle(opt),
-                  ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  for (final opt in cat.options) ...[
+                    _InterestChip(
+                      label: opt,
+                      color: interestColor(opt),
+                      selected: sel.contains(opt),
+                      showCheck: sel.contains(opt),
+                      // When the cap is hit, leave only the already-picked
+                      // chips tappable (to deselect).
+                      onTap: (!sel.contains(opt) && full)
+                          ? null
+                          : () => onToggle(opt),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
             ),
           ),
           crossFadeState:
