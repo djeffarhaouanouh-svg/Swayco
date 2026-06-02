@@ -1181,6 +1181,31 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   ),
                 ),
+                // Brand watermark — top-centre, always on top of whatever
+                // call layout is showing (full-screen, PiP, split…).
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'swayco.ai',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
