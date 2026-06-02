@@ -1175,7 +1175,7 @@ class _CallScreenState extends State<CallScreen> {
                         'swayco.ai',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 32,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                           shadows: [
