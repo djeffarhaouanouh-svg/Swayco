@@ -1946,13 +1946,14 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name centred directly under the PDP, with a round edit bubble on
-        // the right. The left spacer matches the bubble (36) so the name
-        // stays perfectly centred under the photo.
+        // Name centred under the PDP. The edit button uses the SAME bubble
+        // style as the settings gear (_GhostIconButton) and sits towards the
+        // right but pulled in from the edge (right margin 20). The left
+        // spacer (64 = button 44 + margin 20) keeps the name centred.
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(width: 36),
+            const SizedBox(width: 64),
             Expanded(
               child: _InlineEditable(
                 value: displayName,
@@ -1966,22 +1967,12 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
-            Material(
-              color: SC.bubbleIn,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onEdit,
-                child: const Padding(
-                  padding: EdgeInsets.all(9),
-                  child: Icon(
-                    Icons.edit_outlined,
-                    size: 18,
-                    color: SC.textMuted,
-                  ),
-                ),
-              ),
+            _GhostIconButton(
+              icon: Icons.edit_outlined,
+              onTap: onEdit,
+              tooltip: AppStrings.t('profile_edit'),
             ),
+            const SizedBox(width: 20),
           ],
         ),
         const SizedBox(height: 2),
