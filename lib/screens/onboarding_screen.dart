@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
+import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
@@ -48,11 +49,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// Set in [_prefill] from [UserPrefs.isGenderSet]. When true the gender
   /// page is omitted from the flow ("Une fois choisi, plus s'afficher").
   bool _genderAlreadySet = false;
+  /// Centres d'intérêt picked on the interests step. Plain labels matching
+  /// [kInterestCategories]; persisted via [ProfileApi.updateMyInterests].
+  /// Capped at [profileInterestsMax].
+  final Set<String> _selectedInterests = {};
   int _page = 0;
 
-  /// Total pages shown in this run. Welcome (0) + Language (1) + optionally
-  /// Gender (2), so 3 on first-ever onboarding and 2 once gender is known.
-  int get _pageCount => 2 + (_genderAlreadySet ? 0 : 1);
+  /// Total pages shown in the first-run wizard:
+  ///   Welcome(0) · Language(1) · [Gender(2)] · City · Interests · Welcome-gift
+  /// Gender is omitted once already known, so the count flexes by one.
+  int get _pageCount => 4 + (_genderAlreadySet ? 0 : 1);
 
   @override
   void initState() {
@@ -70,6 +76,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (snap != null) {
       setState(() {
         _nameCtrl.text = snap.firstName;
+      });
+    }
+    // Brand-new social sign-in: no local profile yet, but Google/Apple handed
+    // us a name. Prefill it so the user just confirms instead of retyping.
+    // Never clobbers a value the user already has (only fills when blank).
+    if (_nameCtrl.text.trim().isEmpty) {
+      final suggested = AuthService.suggestedFirstName;
+      if (suggested.isNotEmpty) {
+        setState(() => _nameCtrl.text = suggested);
+      }
+    }
+    if (snap != null) {
+      setState(() {
         final stored = snap.sourceLang.trim();
         if (stored.isNotEmpty && findLanguageByCode(stored) != null) {
           _selectedLang = findLanguageByCode(stored)!.code;
@@ -102,6 +121,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
         if (remote.city.isNotEmpty) {
           _cityCtrl.text = remote.city;
+        }
+        if (remote.interests.isNotEmpty) {
+          _selectedInterests
+            ..clear()
+            ..addAll(remote.interests.take(profileInterestsMax));
         }
         if (remote.language.trim().isNotEmpty &&
             findLanguageByCode(remote.language) != null) {
@@ -193,6 +217,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         language: _selectedLang!,
         gender: genderToSave,
       );
+      // Location + interests are collected in BOTH flows now (the first-run
+      // wizard gained City and Interests steps), so persist them whenever
+      // they hold a value — independently of editing mode. upsertMyProfile
+      // doesn't carry these columns, so they go through their own calls.
+      if (_countryCtrl.text.trim().isNotEmpty ||
+          _cityCtrl.text.trim().isNotEmpty) {
+        await ProfileApi.updateMyLocation(
+          userId: deviceId,
+          country: _countryCtrl.text.trim(),
+          city: _cityCtrl.text.trim(),
+        );
+      }
+      if (_selectedInterests.isNotEmpty) {
+        await ProfileApi.updateMyInterests(
+          userId: deviceId,
+          interests: _selectedInterests.toList(),
+        );
+      }
       // Bio is only edited via this screen in editing mode (the first-run
       // welcome flow keeps the form to name + language). Persist it
       // separately because upsertMyProfile doesn't carry the bio column.
@@ -200,11 +242,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await ProfileApi.updateMyBio(
           userId: deviceId,
           bio: _bioCtrl.text.trim(),
-        );
-        await ProfileApi.updateMyLocation(
-          userId: deviceId,
-          country: _countryCtrl.text.trim(),
-          city: _cityCtrl.text.trim(),
         );
       }
     }
@@ -338,8 +375,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
 
     final showGenderStep = !_genderAlreadySet;
-    final nextOrFinishFromLanguage =
-        showGenderStep ? _goToGenderStep : _finish;
 
     return Scaffold(
       backgroundColor: SC.bg,
@@ -348,7 +383,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _OnboardingHeader(page: _page, pageCount: _pageCount),
+            _OnboardingHeader(
+              page: _page,
+              pageCount: _pageCount,
+              showGenderStep: showGenderStep,
+            ),
             Expanded(
               child: PageView(
                 controller: _pageController,
@@ -364,33 +403,42 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         );
                         return;
                       }
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                      );
+                      _next();
                     },
                   ),
                   _StepLanguage(
                     selected: _selectedLang,
                     onSelect: _onLanguageSelected,
-                    onBack: () => _pageController.previousPage(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                    ),
-                    onFinish: nextOrFinishFromLanguage,
-                    finishLabelKey:
-                        showGenderStep ? 'onb_next' : 'onb_finish',
+                    onBack: _back,
+                    onFinish: _goFromLanguage,
+                    finishLabelKey: 'onb_next',
                   ),
                   if (showGenderStep)
                     _StepGender(
                       selected: _selectedGender,
                       onSelect: (g) => setState(() => _selectedGender = g),
-                      onBack: () => _pageController.previousPage(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                      ),
-                      onFinish: _finish,
+                      onBack: _back,
+                      onFinish: _next,
+                      finishLabelKey: 'onb_next',
                     ),
+                  _StepCity(
+                    location: [_cityCtrl.text.trim(), _countryCtrl.text.trim()]
+                        .where((s) => s.isNotEmpty)
+                        .join(', '),
+                    onOpenPicker: _openLocationPicker,
+                    onBack: _back,
+                    onNext: _next,
+                  ),
+                  _StepInterests(
+                    selected: _selectedInterests,
+                    onToggle: _toggleInterest,
+                    onBack: _back,
+                    onNext: _next,
+                  ),
+                  _StepGift(
+                    firstName: _nameCtrl.text.trim(),
+                    onFinish: _finish,
+                  ),
                 ],
               ),
             ),
@@ -401,47 +449,84 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _goToGenderStep() {
+  /// Advance one page with the shared transition.
+  void _next() => _pageController.nextPage(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+
+  /// Go back one page with the shared transition.
+  void _back() => _pageController.previousPage(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+
+  /// Language → next, but guard the required language pick first.
+  void _goFromLanguage() {
     if (_selectedLang == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppStrings.t('onb_need_language'))),
       );
       return;
     }
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
+    _next();
+  }
+
+  /// Add / remove an interest, capping at [profileInterestsMax] and nudging
+  /// the user when the cap is hit instead of silently ignoring the tap.
+  void _toggleInterest(String label) {
+    setState(() {
+      if (_selectedInterests.contains(label)) {
+        _selectedInterests.remove(label);
+      } else {
+        if (_selectedInterests.length >= profileInterestsMax) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppStrings.t('onb_interests_max', args: {
+                  'n': '$profileInterestsMax',
+                }),
+              ),
+            ),
+          );
+          return;
+        }
+        _selectedInterests.add(label);
+      }
+    });
   }
 }
 
 class _OnboardingHeader extends StatelessWidget {
-  const _OnboardingHeader({required this.page, required this.pageCount});
+  const _OnboardingHeader({
+    required this.page,
+    required this.pageCount,
+    required this.showGenderStep,
+  });
 
   final int page;
   final int pageCount;
+  final bool showGenderStep;
 
-  String get _titleKey {
-    switch (page) {
-      case 0:
-        return 'onb_welcome_title';
-      case 1:
-        return 'onb_language_title';
-      default:
-        return 'onb_gender_title';
+  /// Maps the current PageView index to a title/subtitle key pair. The gender
+  /// step shifts every page after Language by one when present, so we resolve
+  /// against an offset rather than hard-coded indices.
+  (String, String) get _keys {
+    final genderOffset = showGenderStep ? 1 : 0;
+    if (page == 0) return ('onb_welcome_title', 'onb_welcome_subtitle');
+    if (page == 1) return ('onb_language_title', 'onb_language_subtitle');
+    if (showGenderStep && page == 2) {
+      return ('onb_gender_title', 'onb_gender_subtitle');
     }
+    if (page == 2 + genderOffset) return ('onb_city_title', 'onb_city_subtitle');
+    if (page == 3 + genderOffset) {
+      return ('onb_interests_title', 'onb_interests_subtitle');
+    }
+    return ('onb_gift_title', 'onb_gift_subtitle');
   }
 
-  String get _subtitleKey {
-    switch (page) {
-      case 0:
-        return 'onb_welcome_subtitle';
-      case 1:
-        return 'onb_language_subtitle';
-      default:
-        return 'onb_gender_subtitle';
-    }
-  }
+  String get _titleKey => _keys.$1;
+  String get _subtitleKey => _keys.$2;
 
   @override
   Widget build(BuildContext context) {
@@ -627,6 +712,7 @@ class _StepGender extends StatelessWidget {
     required this.onSelect,
     required this.onBack,
     required this.onFinish,
+    this.finishLabelKey = 'onb_finish',
   });
 
   /// `m` / `f` / `x` or null (nothing picked yet).
@@ -634,6 +720,7 @@ class _StepGender extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onBack;
   final VoidCallback onFinish;
+  final String finishLabelKey;
 
   @override
   Widget build(BuildContext context) {
@@ -686,7 +773,7 @@ class _StepGender extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    AppStrings.t('onb_finish'),
+                    AppStrings.t(finishLabelKey),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -699,6 +786,340 @@ class _StepGender extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// City step — a single glass "tap to choose" field reusing the cascading
+/// country → city picker sheet. Optional: a "Passer" (skip) link advances
+/// without a pick.
+class _StepCity extends StatelessWidget {
+  const _StepCity({
+    required this.location,
+    required this.onOpenPicker,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  /// Pretty "City, Country" string (empty when nothing picked yet).
+  final String location;
+  final VoidCallback onOpenPicker;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _GlassSelectField(
+            icon: Icons.public,
+            label: AppStrings.t('onb_location_label'),
+            hint: AppStrings.t('onb_location_hint'),
+            value: location,
+            onTap: onOpenPicker,
+          ),
+          const SizedBox(height: 28),
+          _StepNav(
+            onBack: onBack,
+            onNext: onNext,
+            // City is optional → the primary CTA always advances, and the
+            // label reads "Skip" until a city is chosen, then "Next".
+            nextLabelKey: location.isEmpty ? 'onb_skip' : 'onb_next',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Interests step — a swipeable carousel, one page per [InterestCategory].
+/// Tags tint to their category colour when picked; cyan dots under the
+/// carousel track the active category. Optional: a "Passer" CTA when nothing
+/// is selected.
+class _StepInterests extends StatefulWidget {
+  const _StepInterests({
+    required this.selected,
+    required this.onToggle,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  State<_StepInterests> createState() => _StepInterestsState();
+}
+
+class _StepInterestsState extends State<_StepInterests> {
+  final _carousel = PageController();
+  int _category = 0;
+
+  @override
+  void dispose() {
+    _carousel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final anySelected = widget.selected.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Selection counter so the user knows the cap (e.g. "2 / 6").
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+          child: Text(
+            AppStrings.t('onb_interests_count', args: {
+              'n': '${widget.selected.length}',
+              'max': '$profileInterestsMax',
+            }),
+            style: const TextStyle(color: SC.textMuted, fontSize: 13),
+          ),
+        ),
+        Expanded(
+          child: PageView.builder(
+            controller: _carousel,
+            itemCount: kInterestCategories.length,
+            onPageChanged: (i) => setState(() => _category = i),
+            itemBuilder: (context, i) {
+              final cat = kInterestCategories[i];
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(cat.emoji, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 10),
+                        Text(cat.label, style: SCText.h3),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final opt in cat.options)
+                          _InterestChip(
+                            label: opt,
+                            color: cat.color,
+                            selected: widget.selected.contains(opt),
+                            onTap: () => widget.onToggle(opt),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        // Cyan carousel dots — one per category, active one widened.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < kInterestCategories.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              _Dot(active: i == _category),
+            ],
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: _StepNav(
+            onBack: widget.onBack,
+            onNext: widget.onNext,
+            nextLabelKey: anySelected ? 'onb_next' : 'onb_skip',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A selectable interest tag. Neutral grey when unpicked; fills with its
+/// category [color] (translucent) + a check when picked.
+class _InterestChip extends StatelessWidget {
+  const _InterestChip({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? color.withValues(alpha: 0.18) : SC.bubbleIn;
+    final border = selected ? color : SC.glassBorder;
+    final fg = selected ? color : SC.textPrimary;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border, width: selected ? 1.5 : 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check, size: 16, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Final celebratory step: announces the 15 free welcome minutes and the
+/// single CTA that actually completes onboarding.
+class _StepGift extends StatelessWidget {
+  const _StepGift({required this.firstName, required this.onFinish});
+
+  final String firstName;
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context) {
+    final hi = firstName.isEmpty ? '' : ', $firstName';
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: SC.accent.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+                border: Border.all(color: SC.accent, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.card_giftcard_rounded,
+                color: SC.accent,
+                size: 46,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            AppStrings.t('onb_gift_headline', args: {'hi': hi}),
+            textAlign: TextAlign.center,
+            style: SCText.h2.copyWith(fontSize: 24),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            AppStrings.t('onb_gift_body'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.textSecondary,
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 32),
+          FilledButton(
+            onPressed: onFinish,
+            style: FilledButton.styleFrom(
+              backgroundColor: SC.accent,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              AppStrings.t('onb_gift_cta'),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared Back + primary-CTA row used by the City and Interests steps so
+/// their navigation stays visually identical to Language / Gender.
+class _StepNav extends StatelessWidget {
+  const _StepNav({
+    required this.onBack,
+    required this.onNext,
+    required this.nextLabelKey,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+  final String nextLabelKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        TextButton(
+          onPressed: onBack,
+          style: TextButton.styleFrom(foregroundColor: SC.textMuted),
+          child: Text(AppStrings.t('onb_back')),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: FilledButton(
+            onPressed: onNext,
+            style: FilledButton.styleFrom(
+              backgroundColor: SC.accent,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              AppStrings.t(nextLabelKey),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -27,6 +27,23 @@ abstract final class AuthService {
 
   static bool get isAuthenticated => currentUser != null;
 
+  /// Best-effort first name pulled from the OAuth identity metadata, used to
+  /// prefill the onboarding name field on a brand-new social sign-in. Google
+  /// populates `full_name` / `name` / `given_name`; Apple only hands the name
+  /// over once, which [signInWithApple] mirrors into `given_name` / `full_name`.
+  /// Returns the given name when available, otherwise the first token of the
+  /// full name. Empty when nothing usable is present.
+  static String get suggestedFirstName {
+    final meta = currentUser?.userMetadata;
+    if (meta == null) return '';
+    String pick(String key) => (meta[key]?.toString() ?? '').trim();
+    final given = pick('given_name');
+    if (given.isNotEmpty) return given;
+    final full = pick('full_name').isNotEmpty ? pick('full_name') : pick('name');
+    if (full.isEmpty) return '';
+    return full.split(RegExp(r'\s+')).first;
+  }
+
   /// Broadcast stream — useful for routing the app between Login / Onboarding
   /// / Home in reaction to sign-in or sign-out.
   static Stream<AuthState> get onAuthStateChange => _auth.onAuthStateChange;

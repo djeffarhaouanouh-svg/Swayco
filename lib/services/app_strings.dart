@@ -420,6 +420,21 @@ abstract final class AppStrings {
     'onb_gender_female': 'Féminin',
     'onb_gender_neutral': 'Neutre',
     'onb_need_gender': 'Choisis une option pour continuer.',
+    'onb_skip': 'Passer',
+    'onb_city_title': 'Ta ville',
+    'onb_city_subtitle':
+        "D'où tu appelles ? Ça aide à te proposer des gens près de toi. (facultatif)",
+    'onb_interests_title': 'Tes centres d\'intérêt',
+    'onb_interests_subtitle':
+        'Swipe entre les catégories et choisis ce qui te ressemble. (facultatif)',
+    'onb_interests_count': '{n} / {max} sélectionnés',
+    'onb_interests_max': 'Maximum {n} centres d\'intérêt.',
+    'onb_gift_title': 'Cadeau de bienvenue',
+    'onb_gift_subtitle': "C'est cadeau, profites-en pour ton premier appel.",
+    'onb_gift_headline': 'Bienvenue{hi} 🎉',
+    'onb_gift_body':
+        'On t\'offre 15 minutes d\'appel traduit pour démarrer. Aucune carte requise.',
+    'onb_gift_cta': "C'est parti",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
@@ -830,6 +845,21 @@ abstract final class AppStrings {
     'onb_gender_female': 'Female',
     'onb_gender_neutral': 'Neutral',
     'onb_need_gender': 'Pick an option to continue.',
+    'onb_skip': 'Skip',
+    'onb_city_title': 'Your city',
+    'onb_city_subtitle':
+        'Where are you calling from? Helps us suggest people near you. (optional)',
+    'onb_interests_title': 'Your interests',
+    'onb_interests_subtitle':
+        'Swipe through the categories and pick what fits you. (optional)',
+    'onb_interests_count': '{n} / {max} selected',
+    'onb_interests_max': 'Up to {n} interests.',
+    'onb_gift_title': 'Welcome gift',
+    'onb_gift_subtitle': "It's on us — enjoy it on your first call.",
+    'onb_gift_headline': 'Welcome{hi} 🎉',
+    'onb_gift_body':
+        "We're giving you 15 minutes of translated calling to get started. No card required.",
+    'onb_gift_cta': "Let's go",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
