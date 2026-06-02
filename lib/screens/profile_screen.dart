@@ -2631,13 +2631,19 @@ class _InterestsSectionState extends State<_InterestsSection> {
               ),
           ],
         ),
-        // The category picker, unfolding right here (no overlay).
+        // The category picker, unfolding right here (no overlay). A tap
+        // anywhere outside the panel folds it back (auto-saved already).
         AnimatedCrossFade(
           firstChild: const SizedBox(width: double.infinity, height: 0),
-          secondChild: _InlineInterestPicker(
-            sel: _sel,
-            onToggle: _toggle,
-            onDone: _close,
+          secondChild: TapRegion(
+            onTapOutside: (_) {
+              if (_expanded) _close();
+            },
+            child: _InlineInterestPicker(
+              sel: _sel,
+              onToggle: _toggle,
+              onDone: _close,
+            ),
           ),
           crossFadeState: _expanded
               ? CrossFadeState.showSecond
