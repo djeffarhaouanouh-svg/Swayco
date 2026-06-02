@@ -410,12 +410,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   /// already, delete every matching reaction message I sent otherwise.
   /// Optimistic local update on both branches so the rail button
   /// flips immediately; rolls back to the cached set on failure.
-  Future<void> _toggleEmojiReaction(RemoteProfile peer, String emoji) async {
+  Future<void> _toggleEmojiReaction(
+    RemoteProfile peer,
+    String photo,
+    String emoji,
+  ) async {
     final wasReacted = _myReactionsByPeer[peer.id]?.contains(emoji) ?? false;
     if (wasReacted) {
       await _unsendEmojiReaction(peer, emoji);
     } else {
-      await _sendEmojiReaction(peer, emoji);
+      await _sendEmojiReaction(peer, photo, emoji);
     }
   }
 
@@ -424,7 +428,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   /// that opens the thread on their side. Tracks the emoji locally so
   /// the rail button stays filled when the card is revisited; the
   /// hydration on bootstrap reads the same set from past messages.
-  Future<void> _sendEmojiReaction(RemoteProfile peer, String emoji) async {
+  Future<void> _sendEmojiReaction(
+    RemoteProfile peer,
+    String photo,
+    String emoji,
+  ) async {
     // Optimistic local update so the button stays filled immediately
     // without waiting for the round-trip.
     final next = Map<String, Set<String>>.from(_myReactionsByPeer);
@@ -436,6 +444,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       peer,
       body: emoji,
       snack: '$emoji envoyé à ${peer.displayName}',
+      discoverPhoto: photo,
     );
   }
 
@@ -732,7 +741,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       _statusFor(profile) == FriendshipStatus.pendingOutgoing,
                   liked: _likedIds.contains(profile.id),
                   onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                  onSendEmoji: (emoji) => _toggleEmojiReaction(profile, emoji),
+                  onSendEmoji: (emoji) =>
+                      _toggleEmojiReaction(profile, card.photo, emoji),
                   reactedEmojis:
                       _myReactionsByPeer[profile.id] ?? const <String>{},
                   alreadyMessaged: _directMessagedPhotos.contains(card.photo),

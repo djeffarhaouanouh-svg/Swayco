@@ -826,6 +826,37 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+              // Discover reaction / intro: a small Snapchat-style thumbnail
+              // of the photo it was about, with the message stuck below it.
+              if (message.hasDiscoverPhoto)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: GestureDetector(
+                    onTap: () =>
+                        _openFullImage(context, message.discoverPhoto),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxHeight: 150,
+                          maxWidth: 120,
+                        ),
+                        child: Image.network(
+                          message.discoverPhoto,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox(
+                            height: 100,
+                            width: 100,
+                            child: Center(
+                              child: Icon(Icons.broken_image_outlined,
+                                  color: SC.textMuted),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               // Image messages: show the photo (tap to view full-screen).
               if (message.isImage)
                 Padding(

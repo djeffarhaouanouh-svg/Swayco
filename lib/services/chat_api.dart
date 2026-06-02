@@ -18,6 +18,7 @@ class ChatMessage {
     this.audioUrl = '',
     this.audioDurationMs = 0,
     this.imageUrl = '',
+    this.discoverPhoto = '',
   });
 
   final String id;
@@ -52,11 +53,19 @@ class ChatMessage {
   /// Public URL of an image sent in the thread. Empty for text / voice.
   final String imageUrl;
 
+  /// When this message was sent from a Discover card (intro message or emoji
+  /// reaction), the URL of the photo it was about — shown as a Snapchat-style
+  /// thumbnail above the message. Empty otherwise.
+  final String discoverPhoto;
+
   /// True when this message was recorded as audio (has a playable URL).
   bool get isVoice => audioUrl.isNotEmpty;
 
   /// True when this message carries an image.
   bool get isImage => imageUrl.isNotEmpty;
+
+  /// True when this message references a Discover photo (reaction / intro).
+  bool get hasDiscoverPhoto => discoverPhoto.isNotEmpty;
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) {
     final created = m['created_at'];
@@ -77,6 +86,7 @@ class ChatMessage {
       language: m['language']?.toString().trim() ?? '',
       audioUrl: m['audio_url']?.toString() ?? '',
       imageUrl: m['image_url']?.toString() ?? '',
+      discoverPhoto: m['discover_photo']?.toString() ?? '',
       audioDurationMs: dur is int
           ? dur
           : (dur is num
