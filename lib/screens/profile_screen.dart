@@ -2479,15 +2479,17 @@ class _InterestChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // "Bord blanc" style: a solid vivid colour with a white border + white
-    // text when selected; a faint dark outline when unpicked (picker only).
-    final bg = selected ? color : Colors.white.withValues(alpha: 0.06);
+    // "Bord blanc" style: EVERY chip shows its own vivid colour. Selected
+    // chips are full colour + bold white border + check + shadow; unpicked
+    // ones (picker) keep the same colour, just dimmed with a faint border so
+    // the palette stays visible.
+    final bg = selected ? color : color.withValues(alpha: 0.45);
     final borderColor =
-        selected ? Colors.white : Colors.white.withValues(alpha: 0.22);
-    final fg = selected ? Colors.white : Colors.white.withValues(alpha: 0.7);
+        selected ? Colors.white : Colors.white.withValues(alpha: 0.25);
+    final fg = Colors.white.withValues(alpha: selected ? 1 : 0.9);
     return Material(
       color: bg,
-      elevation: selected ? 2 : 0,
+      elevation: selected ? 3 : 0,
       shadowColor: color.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
@@ -2499,7 +2501,7 @@ class _InterestChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: borderColor,
-              width: selected ? 1.6 : 1,
+              width: selected ? 1.8 : 1,
             ),
           ),
           child: Row(
@@ -2531,8 +2533,9 @@ class _InterestAddChip extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
+    final grey = Colors.white.withValues(alpha: 0.7);
     return Material(
-      color: SC.accent.withValues(alpha: 0.12),
+      color: Colors.white.withValues(alpha: 0.06),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -2541,17 +2544,17 @@ class _InterestAddChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: SC.accent.withValues(alpha: 0.4)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
+              Icon(Icons.add_rounded, color: grey, size: 17),
               const SizedBox(width: 4),
               Text(
                 AppStrings.t('interests_add'),
-                style: const TextStyle(
-                  color: SC.accent,
+                style: TextStyle(
+                  color: grey,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2778,13 +2781,13 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
           ),
           child: Center(
             child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: SC.accent.withValues(alpha: 0.18),
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                color: SC.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, color: SC.accent, size: 26),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
             ),
           ),
         ),
