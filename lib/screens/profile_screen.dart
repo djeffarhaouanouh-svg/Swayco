@@ -2479,11 +2479,16 @@ class _InterestChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = color.withValues(alpha: selected ? 0.20 : 0.06);
-    final border = color.withValues(alpha: selected ? 0.85 : 0.28);
-    final fg = selected ? color : color.withValues(alpha: 0.75);
+    // "Bord blanc" style: a solid vivid colour with a white border + white
+    // text when selected; a faint dark outline when unpicked (picker only).
+    final bg = selected ? color : Colors.white.withValues(alpha: 0.06);
+    final borderColor =
+        selected ? Colors.white : Colors.white.withValues(alpha: 0.22);
+    final fg = selected ? Colors.white : Colors.white.withValues(alpha: 0.7);
     return Material(
       color: bg,
+      elevation: selected ? 2 : 0,
+      shadowColor: color.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -2493,8 +2498,8 @@ class _InterestChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: border,
-              width: selected ? 1.4 : 1,
+              color: borderColor,
+              width: selected ? 1.6 : 1,
             ),
           ),
           child: Row(
@@ -2509,7 +2514,7 @@ class _InterestChip extends StatelessWidget {
                 style: TextStyle(
                   color: fg,
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -2663,7 +2668,7 @@ class _InterestPickerSheetState extends State<_InterestPickerSheet> {
                         for (final opt in cat.options)
                           _InterestChip(
                             label: opt,
-                            color: cat.color,
+                            color: interestColor(opt),
                             selected: _sel.contains(opt),
                             showCheck: _sel.contains(opt),
                             // When the cap is hit, leave only the already
