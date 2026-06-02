@@ -1951,10 +1951,9 @@ class _IdentitySection extends StatelessWidget {
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
-        // Name centred under the PDP. The edit button uses the SAME bubble
-        // style as the settings gear (_GhostIconButton) and sits towards the
-        // right but pulled in from the edge (right margin 20). The left
-        // spacer (64 = button 44 + margin 20) keeps the name centred.
+        // Name centred under the PDP, with a cyan edit bubble towards the
+        // right (pulled in 20px from the edge). The left spacer (64 = bubble
+        // 44 + margin 20) keeps the name centred.
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -1972,10 +1971,27 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
-            _GhostIconButton(
-              icon: Icons.edit_outlined,
-              onTap: onEdit,
-              tooltip: AppStrings.t('profile_edit'),
+            Material(
+              color: SC.accent.withValues(alpha: 0.15),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onEdit,
+                child: Tooltip(
+                  message: AppStrings.t('profile_edit'),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: SC.accent.withValues(alpha: 0.6)),
+                    ),
+                    child: const Icon(Icons.edit_outlined,
+                        size: 18, color: SC.accent),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 20),
           ],
@@ -2531,9 +2547,8 @@ class _InterestAddChip extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    final grey = Colors.white.withValues(alpha: 0.7);
     return Material(
-      color: Colors.white.withValues(alpha: 0.06),
+      color: SC.accent.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -2542,17 +2557,17 @@ class _InterestAddChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_rounded, color: grey, size: 17),
+              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
               const SizedBox(width: 4),
               Text(
                 AppStrings.t('interests_add'),
-                style: TextStyle(
-                  color: grey,
+                style: const TextStyle(
+                  color: SC.accent,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
