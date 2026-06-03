@@ -627,6 +627,24 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       body: MeshBackground(
         child: Stack(
           children: [
+            // Cyan-blue ambient wash over the mesh: turns the fond behind the
+            // card from flat navy into a cyan-blue glow — brightest right
+            // behind the card, fading to a cyan-navy cast at the edges.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 1.2,
+                    colors: [
+                      SC.meshCyan.withValues(alpha: 0.50),
+                      SC.meshBlue.withValues(alpha: 0.30),
+                      SC.meshNavy.withValues(alpha: 0.22),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
             // The card deck, inset to the gap between the two bar bodies.
             // Each page is exactly the gap height, so cards slide in flush.
             // When the user lingers, _fireSwipeHint peeks the next card up
@@ -1253,9 +1271,17 @@ class _ProfileCard extends StatelessWidget {
         // exactly into the concave notches of the top bar / nav.
         borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         boxShadow: [
+          // Bright cyan halo hugging the card on every side — the "effet
+          // lumineux" radiating out from behind it (no offset = even glow).
           BoxShadow(
-            color: SC.meshCyan.withValues(alpha: 0.30),
-            blurRadius: 60,
+            color: SC.accent.withValues(alpha: 0.55),
+            blurRadius: 48,
+            spreadRadius: 2,
+          ),
+          // Softer, wider cyan bloom dropping below for depth.
+          BoxShadow(
+            color: SC.meshCyan.withValues(alpha: 0.35),
+            blurRadius: 90,
             offset: const Offset(0, 30),
           ),
         ],
