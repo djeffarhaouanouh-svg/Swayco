@@ -354,7 +354,13 @@ abstract final class ChatApi {
   /// order rows by recent activity.
   static Future<Map<String, ChatMessage>> fetchLatestPerConversation(
     String meId, {
-    int limit = 200,
+    // Pulls the N most recent messages across ALL my conversations, then
+    // keeps the newest per conversation. So a conversation only drops off
+    // the chat list once its last message falls outside this window — i.e.
+    // once I've exchanged more than [limit] total messages AND the older
+    // thread's friendship has also ended. Bumped 200 → 1000 to push that
+    // edge far out of reach for normal usage.
+    int limit = 1000,
   }) async {
     if (meId.isEmpty) return const {};
     final rows = await _client
