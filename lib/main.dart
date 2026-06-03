@@ -15,6 +15,7 @@ import 'screens/root_shell.dart';
 import 'services/analytics.dart';
 import 'services/app_settings.dart';
 import 'services/app_strings.dart';
+import 'services/app_boot.dart';
 import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
@@ -276,6 +277,12 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           _needsOnboarding = needsOnboarding;
           _loading = false;
         });
+        // Only the authed RootShell waits on heavy landing content (the
+        // Discover feed reports readiness itself via AppBoot). Guest join,
+        // login and onboarding have nothing to load → ready immediately.
+        final showsRootShell =
+            _guestInvite == null && authed && !needsOnboarding;
+        if (!showsRootShell) AppBoot.markHomeReady();
       }
     }
   }
@@ -442,19 +449,44 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           title: 'Swayco',
           debugShowCheckedModeBanner: false,
           theme: SC.material(),
-          home: _buildHome(),
+          home: ValueListenableBuilder<bool>(
+            valueListenable: AppBoot.homeReady,
+            builder: (context, homeReady, _) {
+              // Keep the boot splash up until the landing screen is FULLY
+              // ready: past bootstrap, past the 3s minimum, AND its content
+              // loaded (e.g. the Discover feed reports via AppBoot) — so the
+              // app appears complete, never as a spinner behind the splash.
+              final showSplash =
+                  _loading || !_minSplashElapsed || !homeReady;
+              return Stack(
+                children: [
+                  // The real screen is built as soon as bootstrap resolves so
+                  // it can load its data *behind* the splash; pure black until
+                  // then.
+                  Positioned.fill(
+                    child: _loading
+                        ? const ColoredBox(color: Color(0xFF000000))
+                        : _buildHome(),
+                  ),
+                  // Splash overlay — cross-fades out once everything is ready.
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 450),
+                      child: showSplash
+                          ? const SplashScreenAnimation()
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
   }
 
   Widget _buildHome() {
-    if (_loading || !_minSplashElapsed) {
-      // Black splash: the Traduction.json Lottie. Held for at least 3s (see the
-      // Timer in initState) so the animation plays through, then until the
-      // first real screen is ready.
-      return const SplashScreenAnimation();
-    }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {
       return GuestJoinScreen(

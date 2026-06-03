@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../services/app_boot.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
@@ -171,6 +172,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     setState(() => _myId = id);
     if (!isSupabaseReady || id.isEmpty) {
       setState(() => _feedLoading = false);
+      AppBoot.markHomeReady();
       return;
     }
     try {
@@ -198,8 +200,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _restoreCursor(results[5] as String);
         _feedLoading = false;
       });
+      AppBoot.markHomeReady();
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
+      AppBoot.markHomeReady();
     }
   }
 
