@@ -911,6 +911,7 @@ class _StepInterestsState extends State<_StepInterests> {
                           _InterestChip(
                             label: opt,
                             color: cat.color,
+                            shape: cat.shape,
                             selected: widget.selected.contains(opt),
                             onTap: () => widget.onToggle(opt),
                           ),
@@ -951,12 +952,14 @@ class _InterestChip extends StatelessWidget {
   const _InterestChip({
     required this.label,
     required this.color,
+    required this.shape,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
   final Color color;
+  final InterestShape shape;
   final bool selected;
   final VoidCallback onTap;
 
@@ -965,18 +968,20 @@ class _InterestChip extends StatelessWidget {
     final bg = selected ? color.withValues(alpha: 0.18) : SC.bubbleIn;
     final border = selected ? color : SC.glassBorder;
     final fg = selected ? color : SC.textPrimary;
+    final outer = interestShapeBorder(shape);
+    final bordered = interestShapeBorder(
+      shape,
+      side: BorderSide(color: border, width: selected ? 1.5 : 1),
+    );
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(14),
+      shape: outer,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        customBorder: outer,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border, width: selected ? 1.5 : 1),
-          ),
+          decoration: ShapeDecoration(shape: bordered),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

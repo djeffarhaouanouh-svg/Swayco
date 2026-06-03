@@ -1934,6 +1934,7 @@ class _InterestChip extends StatelessWidget {
   const _InterestChip({
     required this.label,
     required this.color,
+    this.shape,
     this.selected = true,
     this.showCheck = false,
     this.onTap,
@@ -1941,6 +1942,10 @@ class _InterestChip extends StatelessWidget {
 
   final String label;
   final Color color;
+
+  /// Per-category silhouette. Null → derived from the label's category
+  /// (used by the read-only display chips, which only know the stored label).
+  final InterestShape? shape;
 
   /// Filled (true) vs faint outline (false). Display chips are always filled;
   /// the picker uses false for the unpicked options.
@@ -1956,25 +1961,26 @@ class _InterestChip extends StatelessWidget {
     // white text, so all colours are always visible. Selected chips get a bold
     // white border + check + shadow; unpicked ones a thin faint white border.
     final fg = Colors.white;
+    final s = shape ?? interestShape(label);
+    final outer = interestShapeBorder(s);
+    final bordered = interestShapeBorder(
+      s,
+      side: BorderSide(
+        color: selected ? Colors.white : Colors.white.withValues(alpha: 0.35),
+        width: selected ? 2 : 1,
+      ),
+    );
     return Material(
       color: color,
       elevation: selected ? 3 : 1,
       shadowColor: color.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(999),
+      shape: outer,
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        customBorder: outer,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.35),
-              width: selected ? 2 : 1,
-            ),
-          ),
+          decoration: ShapeDecoration(shape: bordered),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2335,6 +2341,7 @@ class _CategoryPage extends StatelessWidget {
                     _InterestChip(
                       label: opt,
                       color: interestColor(opt),
+                      shape: cat.shape,
                       selected: sel.contains(opt),
                       showCheck: sel.contains(opt),
                       // When the cap is hit, leave only the already-picked
