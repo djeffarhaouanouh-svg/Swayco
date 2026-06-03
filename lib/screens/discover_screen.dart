@@ -82,7 +82,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   // TikTok-style vertical pager. Swipe up = next profile, swipe down =
   // previous. Snapping + the slide animation are handled by PageView.
-  final PageController _pageController = PageController();
+  // Not final: at bootstrap we swap it for one with the right initialPage so
+  // the deck resumes on the card we left off (see _restoreCursor).
+  PageController _pageController = PageController();
+
+  // Raw PageView index of the card currently on top. Persisted (as that
+  // person's profile id, via _persistCursor) on every page change so a
+  // restart resumes here instead of snapping back to the first card.
+  int _topIndex = 0;
 
   // Desktop mouse wheel / trackpad scrolls bypass PageView's snap and
   // can blow through several pages in one gesture. We debounce wheel
@@ -172,6 +179,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
       final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(id);
       final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
+      final cursor = await UserPrefs.loadDiscoverCursor();
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
@@ -180,11 +188,34 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _directMessagedPeers = messaged;
         _profiles = feed;
         _rebuildCards();
+        _restoreCursor(cursor);
         _feedLoading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
     }
+  }
+
+  /// Resume the deck on the card we were parked on last session. Called from
+  /// the bootstrap setState, while we're still _feedLoading — so the PageView
+  /// isn't built yet and the controller has no clients. Swapping it for one
+  /// with the right initialPage lands us on that person with no visible jump
+  /// to the first card. We match by profile id (not the saved index) so it
+  /// holds up even if the feed comes back reordered.
+  void _restoreCursor(String cursorId) {
+    if (cursorId.isEmpty || _cards.isEmpty) return;
+    final idx = _cards.indexWhere((c) => c.profile.id == cursorId);
+    if (idx <= 0) return; // not found, or already the first card
+    _pageController.dispose();
+    _pageController = PageController(initialPage: idx);
+    _topIndex = idx;
+  }
+
+  /// Remember which person is on top so a restart resumes here. Fire-and-forget
+  /// write on every page change; we store the profile id, not the raw index.
+  void _persistCursor() {
+    if (_cards.isEmpty) return;
+    UserPrefs.saveDiscoverCursor(_cards[_topIndex % _cards.length].profile.id);
   }
 
   /// Toggle a like on [profileId]. Optimistic local flip + DB write
@@ -708,8 +739,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         // last one. On desktop the parent Listener also rate-limits
         // wheel scrolling above this physics.
         physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
-        // Reset the idle swipe-hint timer every time a new profile lands.
-        onPageChanged: (_) => _scheduleSwipeHint(),
+        // Remember the new top card (so a restart resumes here) and reset
+        // the idle swipe-hint timer every time a new profile lands.
+        onPageChanged: (i) {
+          _topIndex = i;
+          _persistCursor();
+          _scheduleSwipeHint();
+        },
         // Unbounded itemCount + modulo on the index = the feed loops
         // forever: after the last profile the user lands back on the
         // first one (1 → 2 → 3 → 1 → 2 → 3 …).

@@ -25,6 +25,28 @@ abstract final class UserPrefs {
   /// Cleared after a successful attribution.
   static const String keyPendingReferralCode = 'pending_referral_code';
 
+  /// Discover feed cursor: the profile id of the card the user was last
+  /// parked on. Written on every page change so closing + reopening the app
+  /// resumes on that person instead of snapping back to the top of the feed.
+  /// We store the id (not a numeric index) so it stays correct even when the
+  /// feed comes back in a different order next launch. Empty = start at the top.
+  static const String keyDiscoverCursor = 'discover_cursor_profile_id';
+
+  static Future<String> loadDiscoverCursor() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(keyDiscoverCursor) ?? '';
+  }
+
+  static Future<void> saveDiscoverCursor(String profileId) async {
+    final p = await SharedPreferences.getInstance();
+    final id = profileId.trim();
+    if (id.isEmpty) {
+      await p.remove(keyDiscoverCursor);
+    } else {
+      await p.setString(keyDiscoverCursor, id);
+    }
+  }
+
   static Future<String> readPendingReferralCode() async {
     final p = await SharedPreferences.getInstance();
     return p.getString(keyPendingReferralCode) ?? '';
