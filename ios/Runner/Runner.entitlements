@@ -2,13 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- APNs environment for push notifications. "development" targets the
-	     APNs sandbox, used by debug builds run from Xcode. For TestFlight
-	     and App Store builds this must read "production"; with automatic
-	     signing Xcode promotes it when archiving with a distribution
-	     profile. -->
+	<!-- APNs environment. Hardcoded to "production" because we ship via
+	     `flutter build ipa` (CLI), which — unlike an Xcode Archive — does
+	     NOT auto-promote "development" to "production" for a distribution
+	     build. Leaving it on "development" produced a SANDBOX VoIP token,
+	     which the production APNs endpoint rejected with
+	     BadEnvironmentKeyInToken (and sandbox with BadDeviceToken). All our
+	     builds are TestFlight/App Store, so production is correct; a debug
+	     run from Xcode would need this flipped back to development. -->
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 	<!-- Sign in with Apple. Required for the native Apple auth flow and for
 	     App Store review when any third-party login (Google) is offered. -->
 	<key>com.apple.developer.applesignin</key>
