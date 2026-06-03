@@ -147,7 +147,8 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                 builder: (context, _) {
                   final breath =
                       0.5 - 0.5 * math.cos(_pulse.value * 2 * math.pi);
-                  final intensity = (0.22 + 0.12 * breath) *
+                  // Kept low so the background reads as a deep, pure black.
+                  final intensity = (0.09 + 0.05 * breath) *
                       _intro.value.clamp(0.0, 1.0);
                   return DecoratedBox(
                     decoration: BoxDecoration(
@@ -228,7 +229,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    accent.withValues(alpha: 0.45),
+                                    accent.withValues(alpha: 0.26),
                                     accent.withValues(alpha: 0.0),
                                   ],
                                 ),
@@ -383,7 +384,7 @@ class _WavePainter extends CustomPainter {
       final s = 1.0 + 0.95 * ease; // 1.0 → ~1.95 outward
       final fadeIn = (t / 0.10).clamp(0.0, 1.0); // born softly at the logo
       final fadeOut = math.pow(1 - t, 1.3).toDouble(); // dim as it travels
-      final alpha = 0.40 * fadeIn * fadeOut * form;
+      final alpha = 0.36 * fadeIn * fadeOut * form;
       if (alpha <= 0.004) continue;
 
       final path = _squircle(center, _rxHug * s, _ryHug * s);
@@ -393,8 +394,8 @@ class _WavePainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3.0
-          ..color = accent.withValues(alpha: alpha * 0.55)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          ..color = accent.withValues(alpha: alpha * 0.35)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
       );
       // Crisp contour.
       canvas.drawPath(
@@ -413,7 +414,7 @@ class _WavePainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 6
-        ..color = accent.withValues(alpha: 0.26 * form * (0.8 + 0.2 * breath))
+        ..color = accent.withValues(alpha: 0.18 * form * (0.8 + 0.2 * breath))
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
     );
     canvas.drawPath(
