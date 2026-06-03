@@ -129,6 +129,14 @@
       // Stay deep black behind Flutter (no white flash on first frame).
       document.body.style.background = "#000000";
     }
+    // Flutter fires "flutter-first-frame" once its first frame is painted —
+    // that's our cue to pull the HTML boot splash so the (identical) in-app
+    // Lottie shows through. WITHOUT this, the #splash overlay (z-index max)
+    // covers the running app forever (flutter_native_splash, which used to
+    // call removeSplashFromWeb, was retired). The timeout is a backstop in
+    // case the event never fires.
+    window.addEventListener("flutter-first-frame", removeSplashFromWeb);
+    window.setTimeout(removeSplashFromWeb, 15000);
   </script>
 </head>
 <body>
