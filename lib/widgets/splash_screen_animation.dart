@@ -3,18 +3,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Premium, Spotify-style boot splash for Swayco — a real-time voice
-/// translation app. Pure Flutter (no Lottie, no extra packages): a white
-/// "S" mark on pure black, wrapped by a luminous cyan ring that forms,
-/// rotates and carries a travelling packet of light around it — the visual
-/// metaphor for a message being transmitted and translated in real time,
-/// as if the logo were plugged into a worldwide network.
+/// translation app. Pure Flutter (no Lottie, no extra packages): a large
+/// white "S" mark on pure black, wrapped by cyan contour "waves" that
+/// ripple outward from the logo — the visual metaphor for a message being
+/// transmitted and translated in real time, radiating out to a worldwide
+/// network.
 ///
 /// Timeline
 ///  • Phase 1 (0.0 – 0.5s) — the logo fades in and zooms 0.9 → 1.0.
-///  • Phase 2 (0.5 – 2.0s) — a cyan wisp swirls in and closes into a glowing
-///    ring around the logo; the ring slowly rotates with a soft glow.
-///  • Phase 3 (loop)       — a light wave travels around the ring while the
-///    logo pulses 1.00 → 1.03 → 1.00 and the bottom halo gently breathes.
+///  • Phase 2 (0.5 – 2.0s) — cyan contour rings form, hugging the logo, and
+///    start rippling outward with a soft glow.
+///  • Phase 3 (loop)       — waves continuously emanate from the logo while
+///    it pulses 1.00 → 1.03 → 1.00 and the bottom halo gently breathes.
 ///
 /// Faithful to assets/loader-spofitylike.png: a status line that advances
 /// ("Connexion…" → "Prêt à traduire"), a thin cyan progress bar and a cyan
@@ -43,7 +43,7 @@ class SplashScreenAnimation extends StatefulWidget {
   /// Pure black by design — the premium look depends on it.
   final Color background;
 
-  /// Single cyan accent used for the ring, wave, glow, text and bar.
+  /// Single cyan accent used for the waves, glow, text and bar.
   final Color accent;
 
   /// Status line, advanced over the intro: [intro, connecting, ready].
@@ -58,21 +58,20 @@ class SplashScreenAnimation extends StatefulWidget {
 
 class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     with TickerProviderStateMixin {
-  // One-shot intro: logo in, ring forms, progress fills, status advances.
+  // One-shot intro: logo in, waves form, progress fills, status advances.
   late final AnimationController _intro;
-  // Continuous orbit: ring rotation + travelling wave (the "message").
-  late final AnimationController _orbit;
-  // Continuous slow breath: logo pulse + halo intensity.
+  // Continuous emanation: contour waves rippling outward from the logo.
+  late final AnimationController _wave;
+  // Continuous slow breath: logo pulse + halo / glow intensity.
   late final AnimationController _pulse;
 
   late final Animation<double> _logoOpacity;
   late final Animation<double> _logoIntroScale;
-  late final Animation<double> _ringForm;
+  late final Animation<double> _waveForm;
   late final Animation<double> _progress;
 
-  // Logo box and the (larger) ring paint box around it.
-  static const double _core = 112.0;
-  static const double _ring = 190.0;
+  // Logo box — large and centred.
+  static const double _core = 168.0;
 
   @override
   void initState() {
@@ -82,9 +81,9 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     );
-    _orbit = AnimationController(
+    _wave = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5200),
+      duration: const Duration(milliseconds: 4800),
     )..repeat();
     _pulse = AnimationController(
       vsync: this,
@@ -102,8 +101,8 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
         curve: const Interval(0.0, 0.34, curve: Curves.easeOutCubic),
       ),
     );
-    // Phase 2 — the ring forms from ~0.5s to 2.0s.
-    _ringForm = CurvedAnimation(
+    // Phase 2 — the contour waves fade in from ~0.5s to 2.0s.
+    _waveForm = CurvedAnimation(
       parent: _intro,
       curve: const Interval(0.22, 1.0, curve: Curves.easeOutCubic),
     );
@@ -119,7 +118,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
   @override
   void dispose() {
     _intro.dispose();
-    _orbit.dispose();
+    _wave.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -167,60 +166,85 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
             ),
           ),
 
-          // Logo + orbiting ring, dead centre.
+          // Contour waves rippling outward from the logo (centre of screen).
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_intro, _wave, _pulse]),
+                builder: (context, _) {
+                  final breath =
+                      0.5 - 0.5 * math.cos(_pulse.value * 2 * math.pi);
+                  return CustomPaint(
+                    painter: _WavePainter(
+                      accent: accent,
+                      form: _waveForm.value,
+                      wave: _wave.value,
+                      breath: breath,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // Logo, dead centre, over the waves.
           Center(
             child: SizedBox(
-              width: _ring,
-              height: _ring,
+              width: _core,
+              height: _core,
               child: AnimatedBuilder(
-                animation: Listenable.merge([_intro, _orbit, _pulse]),
+                animation: Listenable.merge([_intro, _pulse]),
                 builder: (context, _) {
                   // Pulse 1.00 → 1.03 → 1.00.
                   final pulseScale =
                       1.0 + 0.015 * (1 - math.cos(_pulse.value * 2 * math.pi));
-                  final breath =
-                      0.5 - 0.5 * math.cos(_pulse.value * 2 * math.pi);
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Ring / wisp / travelling wave.
-                      CustomPaint(
-                        size: const Size(_ring, _ring),
-                        painter: _OrbitPainter(
-                          accent: accent,
-                          ringForm: _ringForm.value,
-                          orbit: _orbit.value,
-                          breath: breath,
-                        ),
-                      ),
-                      // Soft white bloom behind the mark for depth.
-                      Opacity(
-                        opacity: _logoOpacity.value * 0.5,
-                        child: Container(
-                          width: _core * 0.95,
-                          height: _core * 0.95,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [Color(0x1FFFFFFF), Color(0x00FFFFFF)],
+                  return Opacity(
+                    opacity: _logoOpacity.value,
+                    child: Transform.scale(
+                      scale: _logoIntroScale.value * pulseScale,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Soft white bloom for depth.
+                          Container(
+                            width: _core * 0.86,
+                            height: _core * 0.86,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [Color(0x24FFFFFF), Color(0x00FFFFFF)],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      // The white "S".
-                      Opacity(
-                        opacity: _logoOpacity.value,
-                        child: Transform.scale(
-                          scale: _logoIntroScale.value * pulseScale,
-                          child: Image.asset(
+                          // Cyan rim light, upper-right (matches reference).
+                          Positioned(
+                            top: _core * 0.08,
+                            right: _core * 0.10,
+                            child: Container(
+                              width: _core * 0.46,
+                              height: _core * 0.46,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    accent.withValues(alpha: 0.45),
+                                    accent.withValues(alpha: 0.0),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // The white "S".
+                          Image.asset(
                             widget.logoAsset,
                             width: _core,
                             height: _core,
                             filterQuality: FilterQuality.high,
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   );
                 },
               ),
@@ -316,132 +340,116 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-/// Paints the luminous cyan ring, its rotating highlight and the travelling
-/// "message" packet (a comet that spirals in while the ring forms, then
-/// rides the settled ring).
-class _OrbitPainter extends CustomPainter {
-  _OrbitPainter({
+/// Paints cyan, squircle-shaped contour "waves" that hug the logo and
+/// ripple continuously outward — born tight around the mark, expanding and
+/// fading as they travel out, like sound/translation radiating to a network.
+class _WavePainter extends CustomPainter {
+  _WavePainter({
     required this.accent,
-    required this.ringForm,
-    required this.orbit,
+    required this.form,
+    required this.wave,
     required this.breath,
   });
 
-  /// 0 → 1: how far the ring has formed (drives opacity + radius snap).
-  final double ringForm;
+  /// 0 → 1: intro formation (fades the whole wave system in).
+  final double form;
 
-  /// 0 → 1: continuous rotation phase (rotation + wave position).
-  final double orbit;
+  /// 0 → 1: looping emanation phase.
+  final double wave;
 
-  /// 0 → 1: slow breath used to modulate the glow.
+  /// 0 → 1: slow breath used to modulate the bright inner outline.
   final double breath;
 
   final Color accent;
 
+  // How many rings are alive at once.
+  static const int _count = 7;
+  // Tight outline that hugs the logo (a touch larger than the "S").
+  static const double _rxHug = 86;
+  static const double _ryHug = 108;
+  // Squircle exponent — rounded-rectangle feel, like the reference.
+  static const double _n = 3.4;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final form = ringForm.clamp(0.0, 1.0);
     if (form <= 0) return;
-
     final center = size.center(Offset.zero);
-    final baseR = size.width * 0.5 - 14;
-    // Brightest highlights / comet head lean toward white.
-    final hot = Color.lerp(accent, Colors.white, 0.65)!;
+    final hot = Color.lerp(accent, Colors.white, 0.5)!;
 
-    // Radius eases from a touch wide to its resting value so the ring looks
-    // like it snaps closed around the logo as it forms.
-    final ringR = baseR * (1.06 - 0.06 * form);
+    // ---- Emanating contour waves ----
+    for (int i = 0; i < _count; i++) {
+      final t = (wave + i / _count) % 1.0;
+      final ease = Curves.easeOut.transform(t);
+      final s = 1.0 + 0.95 * ease; // 1.0 → ~1.95 outward
+      final fadeIn = (t / 0.10).clamp(0.0, 1.0); // born softly at the logo
+      final fadeOut = math.pow(1 - t, 1.3).toDouble(); // dim as it travels
+      final alpha = 0.40 * fadeIn * fadeOut * form;
+      if (alpha <= 0.004) continue;
 
-    // ---- 1. Soft outer glow halo ----
-    canvas.drawCircle(
-      center,
-      ringR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7
-        ..color = accent.withValues(alpha: 0.22 * form * (0.82 + 0.18 * breath))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
-    );
-
-    // ---- 2. Crisp thin track ----
-    canvas.drawCircle(
-      center,
-      ringR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = accent.withValues(alpha: 0.16 * form),
-    );
-
-    // ---- 3. Rotating bright arc (the ring "turns") ----
-    canvas.drawCircle(
-      center,
-      ringR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..strokeCap = StrokeCap.round
-        ..shader = SweepGradient(
-          transform: GradientRotation(orbit * 2 * math.pi),
-          colors: [
-            accent.withValues(alpha: 0.0),
-            accent.withValues(alpha: 0.0),
-            accent.withValues(alpha: 0.55 * form),
-            hot.withValues(alpha: 0.0),
-          ],
-          stops: const [0.0, 0.55, 0.92, 1.0],
-        ).createShader(Rect.fromCircle(center: center, radius: ringR)),
-    );
-
-    // ---- 4. Travelling wave: a luminous packet circling the ring ----
-    // It spirals in from slightly outside while the ring is still forming
-    // (the wisp that wraps the logo in the reference), then rides the
-    // settled ring once formed.
-    final waveR = ringR * (1.0 + 0.10 * (1 - form));
-    final headA = -math.pi / 2 + orbit * 2 * math.pi;
-
-    // Comet tail — a string of fading dots behind the head.
-    const tailCount = 16;
-    for (int i = tailCount; i >= 1; i--) {
-      final f = i / tailCount; // ~1 at far tail .. ~0 near head
-      final a = headA - f * 1.5; // tail spans ~1.5 rad
-      final p = Offset(
-        center.dx + waveR * math.cos(a),
-        center.dy + waveR * math.sin(a),
-      );
-      final fade = math.pow(1 - f, 1.6).toDouble();
-      canvas.drawCircle(
-        p,
-        1.6 + 1.8 * fade,
+      final path = _squircle(center, _rxHug * s, _ryHug * s);
+      // Soft glow underlay.
+      canvas.drawPath(
+        path,
         Paint()
-          ..color = accent.withValues(alpha: 0.5 * fade * form)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0
+          ..color = accent.withValues(alpha: alpha * 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      // Crisp contour.
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = (1.6 - 0.8 * t).clamp(0.7, 1.6)
+          ..color = accent.withValues(alpha: alpha),
       );
     }
 
-    // Comet head — bright near-white core + glow.
-    final head = Offset(
-      center.dx + waveR * math.cos(headA),
-      center.dy + waveR * math.sin(headA),
-    );
-    canvas.drawCircle(
-      head,
-      6,
+    // ---- Bright outline hugging the logo (anchors the waves) ----
+    final hug = _squircle(center, _rxHug, _ryHug);
+    canvas.drawPath(
+      hug,
       Paint()
-        ..color = accent.withValues(alpha: 0.55 * form)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6
+        ..color = accent.withValues(alpha: 0.26 * form * (0.8 + 0.2 * breath))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
     );
-    canvas.drawCircle(
-      head,
-      2.6,
-      Paint()..color = hot.withValues(alpha: 0.95 * form),
+    canvas.drawPath(
+      hug,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..color = hot.withValues(alpha: 0.5 * form),
     );
   }
 
+  /// Closed squircle (super-ellipse) path centred on [c].
+  Path _squircle(Offset c, double rx, double ry) {
+    const steps = 96;
+    final path = Path();
+    for (int i = 0; i <= steps; i++) {
+      final th = (i / steps) * 2 * math.pi;
+      final x = c.dx + rx * _sgnPow(math.cos(th), 2 / _n);
+      final y = c.dy + ry * _sgnPow(math.sin(th), 2 / _n);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    return path;
+  }
+
+  double _sgnPow(double v, double p) =>
+      (v < 0 ? -1.0 : 1.0) * math.pow(v.abs(), p).toDouble();
+
   @override
-  bool shouldRepaint(_OrbitPainter old) =>
-      old.ringForm != ringForm ||
-      old.orbit != orbit ||
+  bool shouldRepaint(_WavePainter old) =>
+      old.form != form ||
+      old.wave != wave ||
       old.breath != breath ||
       old.accent != accent;
 }
