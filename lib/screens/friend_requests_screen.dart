@@ -44,9 +44,17 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   List<_PhotoReaction> _reactions = const [];
   // Profiles who liked one of my photos, newest first.
   List<RemoteProfile> _likers = const [];
+  // People who follow me but I don't follow back yet — surfaced here with a
+  // "S'abonner en retour" button so the relation can be made mutual.
+  List<RemoteProfile> _newFollowers = const [];
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
+  // Likes + photo-reactions have no realtime subscription (only friendships
+  // do), so while the user sits on this tab we poll to pull fresh ones in.
+  // Runs only while Demandes is the active tab and the app is foregrounded.
+  Timer? _livePoll;
+  static const _livePollInterval = Duration(seconds: 15);
 
   @override
   void initState() {
@@ -60,15 +68,34 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   }
 
   void _onNavTabChanged() {
-    if (NavTab.index.value == NavTab.demandes && mounted) {
+    if (!mounted) return;
+    if (NavTab.index.value == NavTab.demandes) {
       _reload(silent: true);
+      _startLivePoll();
+    } else {
+      _stopLivePoll();
     }
+  }
+
+  /// Keep likes / reactions fresh while the user lingers on this tab — they
+  /// have no realtime channel, so without this a new one wouldn't show until
+  /// the tab is re-opened. Idempotent.
+  void _startLivePoll() {
+    _livePoll ??= Timer.periodic(_livePollInterval, (_) {
+      if (mounted) _reload(silent: true);
+    });
+  }
+
+  void _stopLivePoll() {
+    _livePoll?.cancel();
+    _livePoll = null;
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     NavTab.index.removeListener(_onNavTabChanged);
+    _stopLivePoll();
     final ch = _channel;
     if (ch != null) {
       Supabase.instance.client.removeChannel(ch);
@@ -78,7 +105,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _reload(silent: true);
+    if (state == AppLifecycleState.resumed) {
+      _reload(silent: true);
+      // Resume polling only if Demandes is the tab we came back to.
+      if (NavTab.index.value == NavTab.demandes) _startLivePoll();
+    } else if (state == AppLifecycleState.paused) {
+      // No point polling in the background — the OS push handles waking us.
+      _stopLivePoll();
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -86,6 +120,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     if (!mounted) return;
     setState(() => _myId = id);
     await _reload();
+    // If the user launched straight onto Demandes, start the live poll now
+    // (the NavTab listener only fires on a *change* of tab).
+    if (NavTab.index.value == NavTab.demandes) _startLivePoll();
     if (!isSupabaseReady || id.isEmpty) return;
     _channel = FriendshipApi.subscribeMine(
       userId: id,
@@ -101,6 +138,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _requests = const [];
         _reactions = const [];
         _likers = const [];
+        _newFollowers = const [];
       });
       return;
     }
@@ -137,11 +175,16 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         for (final m in reactionMessages)
           _PhotoReaction(message: m, author: byId[m.senderId]),
       ];
+      // People who follow me (accepted, I'm the addressee) but I haven't
+      // followed back yet (no accepted row where I'm the requester). These
+      // get a "S'abonner en retour" button below.
+      final newFollowers = await _fetchFollowBackCandidates();
       if (!mounted) return;
       setState(() {
         _requests = friendships;
         _likers = likers;
         _reactions = reactions;
+        _newFollowers = newFollowers;
         _loading = false;
       });
       FriendRequestUnread.setCount(friendships.length);
@@ -151,6 +194,43 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _error = '$e';
         _loading = false;
       });
+    }
+  }
+
+  /// Resolve the people who follow me but I don't follow back. Reads all my
+  /// friendship edges once and diffs the two accepted directions. Returns an
+  /// empty list (never throws) so a hiccup here can't blank the whole page.
+  Future<List<RemoteProfile>> _fetchFollowBackCandidates() async {
+    try {
+      final mine = await FriendshipApi.fetchMine(_myId);
+      final iFollow = <String>{}; // accepted edges where I'm the requester
+      final followMe = <String>{}; // accepted edges where I'm the addressee
+      for (final f in mine) {
+        if (f.status != 'accepted') continue;
+        if (f.requester == _myId) iFollow.add(f.addressee);
+        if (f.addressee == _myId) followMe.add(f.requester);
+      }
+      final ids = followMe
+          .where((id) => id.isNotEmpty && id != _myId && !iFollow.contains(id))
+          .toList(growable: false);
+      if (ids.isEmpty) return const [];
+      return await ProfileApi.fetchByIds(ids);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// "S'abonner en retour": follow back instantly (accepted edge, no approval).
+  /// Optimistically drops the row; restores it on failure.
+  Future<void> _followBack(RemoteProfile peer) async {
+    final next = _newFollowers.where((p) => p.id != peer.id).toList();
+    setState(() => _newFollowers = next);
+    try {
+      await FriendshipApi.follow(meId: _myId, peerId: peer.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _newFollowers = [..._newFollowers, peer]);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -234,8 +314,74 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       );
     }
-    final hasContent =
-        _requests.isNotEmpty || _likers.isNotEmpty || _reactions.isNotEmpty;
+    // One glass card per non-empty category, in priority order: pending
+    // requests (need a decision) → new followers (follow back) → likes →
+    // reactions. Built as a list so the 18px gaps fall only between cards.
+    final sections = <Widget>[
+      if (_requests.isNotEmpty)
+        GlassContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            children: [
+              for (final req in _requests)
+                _RequestRow(
+                  request: req,
+                  onTap: () {
+                    final p = req.requester;
+                    if (p != null) _openProfile(p);
+                  },
+                  onAccept: () => _accept(req),
+                  onReject: () => _reject(req),
+                ),
+            ],
+          ),
+        ),
+      if (_newFollowers.isNotEmpty)
+        GlassContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            children: [
+              for (final p in _newFollowers)
+                _FollowBackRow(
+                  follower: p,
+                  onTap: () => _openProfile(p),
+                  onFollowBack: () => _followBack(p),
+                ),
+            ],
+          ),
+        ),
+      // Likes received on my photos.
+      if (_likers.isNotEmpty)
+        GlassContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            children: [
+              for (final p in _likers)
+                _LikeRow(liker: p, onTap: () => _openProfile(p)),
+            ],
+          ),
+        ),
+      if (_reactions.isNotEmpty)
+        GlassContainer(
+          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            children: [
+              for (final r in _reactions)
+                _ReactionRow(
+                  reaction: r,
+                  onTap: () {
+                    final a = r.author;
+                    if (a != null) _openProfile(a);
+                  },
+                ),
+            ],
+          ),
+        ),
+    ];
     return RefreshIndicator(
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
@@ -254,7 +400,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           // feels like a void — same surface the populated list uses
           // (with the stronger glass shade so it doesn't read as a
           // dark void on the mesh) and the centered copy inside.
-          if (!hasContent)
+          if (sections.isEmpty)
             GlassContainer(
               borderRadius: BorderRadius.circular(24),
               color: SC.glassStrong,
@@ -262,59 +408,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
               child: const _NoRequestsEmpty(),
             ),
-          if (_requests.isNotEmpty)
-            GlassContainer(
-              borderRadius: BorderRadius.circular(24),
-              padding: const EdgeInsets.all(6),
-              child: Column(
-                children: [
-                  for (final req in _requests)
-                    _RequestRow(
-                      request: req,
-                      onTap: () {
-                        final p = req.requester;
-                        if (p != null) _openProfile(p);
-                      },
-                      onAccept: () => _accept(req),
-                      onReject: () => _reject(req),
-                    ),
-                ],
-              ),
-            ),
-          if (_requests.isNotEmpty &&
-              (_likers.isNotEmpty || _reactions.isNotEmpty))
-            const SizedBox(height: 18),
-          // Likes received on my photos.
-          if (_likers.isNotEmpty)
-            GlassContainer(
-              borderRadius: BorderRadius.circular(24),
-              padding: const EdgeInsets.all(6),
-              child: Column(
-                children: [
-                  for (final p in _likers)
-                    _LikeRow(liker: p, onTap: () => _openProfile(p)),
-                ],
-              ),
-            ),
-          if (_likers.isNotEmpty && _reactions.isNotEmpty)
-            const SizedBox(height: 18),
-          if (_reactions.isNotEmpty)
-            GlassContainer(
-              borderRadius: BorderRadius.circular(24),
-              padding: const EdgeInsets.all(6),
-              child: Column(
-                children: [
-                  for (final r in _reactions)
-                    _ReactionRow(
-                      reaction: r,
-                      onTap: () {
-                        final a = r.author;
-                        if (a != null) _openProfile(a);
-                      },
-                    ),
-                ],
-              ),
-            ),
+          for (var i = 0; i < sections.length; i++) ...[
+            if (i > 0) const SizedBox(height: 18),
+            sections[i],
+          ],
         ],
       ),
     );
@@ -390,6 +487,70 @@ class _RequestRow extends StatelessWidget {
               _AcceptButton(onTap: onAccept),
               const SizedBox(width: 6),
               _RejectButton(onTap: onReject),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "X s'est abonné·e à toi" row — the peer follows me and I don't follow
+/// back yet. One "S'abonner en retour" button makes the relation mutual;
+/// tapping the rest of the row opens their profile.
+class _FollowBackRow extends StatelessWidget {
+  const _FollowBackRow({
+    required this.follower,
+    required this.onTap,
+    required this.onFollowBack,
+  });
+
+  final RemoteProfile follower;
+  final VoidCallback onTap;
+  final VoidCallback onFollowBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = follower.displayName.isNotEmpty
+        ? follower.displayName
+        : (follower.handle.isNotEmpty
+              ? '@${follower.handle}'
+              : AppStrings.t('chat_no_name'));
+    final subtitle = AppStrings.t(
+      'demandes_started_following',
+      args: {'name': name},
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                displayName: follower.displayName,
+                avatarUrl: follower.avatarUrl,
+                avatarColorHex: follower.avatarColor,
+                size: 46,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: SCText.body.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _FollowBackButton(onTap: onFollowBack),
             ],
           ),
         ),
@@ -532,6 +693,36 @@ class _AcceptButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text(
             AppStrings.t('accept'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Accent pill that follows the peer back. Same shape as [_AcceptButton]
+/// but carries the "S'abonner en retour" label.
+class _FollowBackButton extends StatelessWidget {
+  const _FollowBackButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SC.accent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text(
+            AppStrings.t('follow_back'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,

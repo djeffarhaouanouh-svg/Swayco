@@ -64,6 +64,7 @@ abstract final class AppStrings {
         "Quand quelqu'un t'ajoutera depuis Discover ou la recherche, sa demande apparaîtra ici.",
     'demandes_reacted_to_photo': '{name} a réagi {emoji} à votre photo',
     'demandes_liked_your_photo': '{name} a liké ta photo',
+    'demandes_started_following': "{name} s'est abonné·e à toi",
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
     'discover_visibility_hint':
         'Décide dans les paramètres si les personnes de ton pays peuvent voir ta photo Discover',
@@ -504,6 +505,7 @@ abstract final class AppStrings {
         'When someone adds you from Discover or Search, their request will appear here.',
     'demandes_reacted_to_photo': '{name} reacted {emoji} to your photo',
     'demandes_liked_your_photo': '{name} liked your photo',
+    'demandes_started_following': '{name} started following you',
     'settings_hide_from_country': 'Hide me from people in my country',
     'discover_visibility_hint':
         'In settings, choose whether people in your country can see your Discover photo',
@@ -934,6 +936,7 @@ abstract final class AppStrings {
         'Cuando alguien te añada desde Discover o la búsqueda, su solicitud aparecerá aquí.',
     'demandes_reacted_to_photo': '{name} reaccionó {emoji} a tu foto',
     'demandes_liked_your_photo': 'A {name} le gustó tu foto',
+    'demandes_started_following': '{name} empezó a seguirte',
     'settings_hide_from_country': 'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
         'En los ajustes, decide si las personas de tu país pueden ver tu foto de Discover',
@@ -1227,6 +1230,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo':
         '{name} hat mit {emoji} auf dein Foto reagiert',
     'demandes_liked_your_photo': '{name} gefällt dein Foto',
+    'demandes_started_following': '{name} folgt dir jetzt',
     'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
         'Lege in den Einstellungen fest, ob Leute aus deinem Land dein Discover-Foto sehen',
@@ -1426,6 +1430,7 @@ abstract final class AppStrings {
         'Quando qualcuno ti aggiungerà da Discover o dalla ricerca, la sua richiesta apparirà qui.',
     'demandes_reacted_to_photo': '{name} ha reagito {emoji} alla tua foto',
     'demandes_liked_your_photo': 'A {name} è piaciuta la tua foto',
+    'demandes_started_following': '{name} ha iniziato a seguirti',
     'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
         'Nelle impostazioni, decidi se le persone del tuo paese possono vedere la tua foto Discover',
@@ -1624,6 +1629,7 @@ abstract final class AppStrings {
         'Quando alguém te adicionar do Discover ou da pesquisa, o pedido aparecerá aqui.',
     'demandes_reacted_to_photo': '{name} reagiu {emoji} à tua foto',
     'demandes_liked_your_photo': '{name} curtiu a tua foto',
+    'demandes_started_following': '{name} começou a seguir-te',
     'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
         'Nas definições, decide se as pessoas do teu país podem ver a tua foto Discover',
@@ -1821,6 +1827,7 @@ abstract final class AppStrings {
         'Wanneer iemand je toevoegt via Discover of de zoekbalk, verschijnt het verzoek hier.',
     'demandes_reacted_to_photo': '{name} reageerde {emoji} op je foto',
     'demandes_liked_your_photo': '{name} vindt je foto leuk',
+    'demandes_started_following': '{name} volgt je nu',
     'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
         'Bepaal in de instellingen of mensen uit jouw land je Discover-foto kunnen zien',
@@ -2019,6 +2026,7 @@ abstract final class AppStrings {
         'عندما يضيفك شخص من ديسكفر أو البحث، سيظهر طلبه هنا.',
     'demandes_reacted_to_photo': '{name} تفاعل {emoji} مع صورتك',
     'demandes_liked_your_photo': '{name} أعجب بصورتك',
+    'demandes_started_following': '{name} بدأ بمتابعتك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
     'discover_visibility_hint':
         'في الإعدادات، قرّر إن كان بإمكان الأشخاص من بلدك رؤية صورتك في ديسكفر',
@@ -2213,6 +2221,7 @@ abstract final class AppStrings {
         'Когда кто-то добавит вас из Discover или поиска, его запрос появится здесь.',
     'demandes_reacted_to_photo': '{name} отреагировал(а) {emoji} на ваше фото',
     'demandes_liked_your_photo': '{name} оценил(а) ваше фото',
+    'demandes_started_following': '{name} подписался(ась) на вас',
     'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
         'В настройках решите, могут ли люди из вашей страны видеть ваше фото в Discover',
@@ -2409,6 +2418,7 @@ abstract final class AppStrings {
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
     'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
     'demandes_liked_your_photo': '{name} 赞了您的照片',
+    'demandes_started_following': '{name} 开始关注您了',
     'settings_hide_from_country': '对来自我国家的人隐藏',
     'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片',
     'my_subscription_section': '我的订阅',
@@ -2584,6 +2594,7 @@ abstract final class AppStrings {
     'demandes_empty_body': '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
     'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
     'demandes_liked_your_photo': '{name} があなたの写真にいいねしました',
+    'demandes_started_following': '{name} があなたをフォローしました',
     'settings_hide_from_country': '自分の国の人から非表示にする',
     'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める',
     'my_subscription_section': 'マイサブスクリプション',
@@ -2760,6 +2771,7 @@ abstract final class AppStrings {
     'demandes_empty_body': '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
     'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
     'demandes_liked_your_photo': '{name}님이 회원님의 사진을 좋아합니다',
+    'demandes_started_following': '{name}님이 회원님을 팔로우하기 시작했습니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
     'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택',
     'my_subscription_section': '내 구독',
