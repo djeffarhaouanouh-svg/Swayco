@@ -148,10 +148,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _loading = true;
   bool _needsOnboarding = false;
   bool _authed = false;
-  /// Holds the boot splash for a minimum of 3s so the Traduction.json Lottie
-  /// is actually seen, even when [_bootstrap] returns in a few hundred ms.
-  /// Flipped by a [Timer] in [initState]; the splash also waits on [_loading].
-  bool _minSplashElapsed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
@@ -168,11 +164,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void initState() {
     super.initState();
     _bootstrap();
-    // Keep the boot splash up for at least 3s so the Lottie plays through,
-    // even when bootstrap finishes almost instantly.
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _minSplashElapsed = true);
-    });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
@@ -453,11 +444,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
             valueListenable: AppBoot.homeReady,
             builder: (context, homeReady, _) {
               // Keep the boot splash up until the landing screen is FULLY
-              // ready: past bootstrap, past the 3s minimum, AND its content
-              // loaded (e.g. the Discover feed reports via AppBoot) — so the
-              // app appears complete, never as a spinner behind the splash.
-              final showSplash =
-                  _loading || !_minSplashElapsed || !homeReady;
+              // ready: past bootstrap AND its content loaded (e.g. the Discover
+              // feed reports via AppBoot) — so the app appears complete, never
+              // as a spinner behind the splash. No artificial minimum.
+              final showSplash = _loading || !homeReady;
               return Stack(
                 children: [
                   // The real screen is built as soon as bootstrap resolves so
