@@ -174,21 +174,28 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       return;
     }
     try {
-      final mine = await FriendshipApi.fetchMine(id);
-      final liked = await LikeApi.fetchMyLikedIds(id);
-      final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(id);
-      final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(id);
-      final feed = await ProfileApi.fetchDiscoverFeed(myId: id);
-      final cursor = await UserPrefs.loadDiscoverCursor();
+      // These six queries are independent — fire them concurrently (was
+      // sequential: six round-trips back-to-back, the main reason the deck
+      // sat on its spinner for seconds). Bounded so a slow / wedged call
+      // can't trap the spinner forever; on timeout we drop into the catch
+      // and show the deck rather than spin indefinitely.
+      final results = await Future.wait(<Future<Object>>[
+        FriendshipApi.fetchMine(id),
+        LikeApi.fetchMyLikedIds(id),
+        ChatApi.fetchMyOutgoingPhotoReactions(id),
+        ChatApi.fetchMyDiscoverMessagedPeers(id),
+        ProfileApi.fetchDiscoverFeed(myId: id),
+        UserPrefs.loadDiscoverCursor(),
+      ]).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
-        _myFriendships = mine;
-        _likedIds = liked;
-        _myReactionsByPeer = reactions;
-        _directMessagedPeers = messaged;
-        _profiles = feed;
+        _myFriendships = results[0] as List<Friendship>;
+        _likedIds = results[1] as Set<String>;
+        _myReactionsByPeer = results[2] as Map<String, Set<String>>;
+        _directMessagedPeers = results[3] as Set<String>;
+        _profiles = results[4] as List<RemoteProfile>;
         _rebuildCards();
-        _restoreCursor(cursor);
+        _restoreCursor(results[5] as String);
         _feedLoading = false;
       });
     } catch (_) {

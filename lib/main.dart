@@ -147,11 +147,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _loading = true;
   bool _needsOnboarding = false;
   bool _authed = false;
-  /// Lets the boot splash play its Lottie through ONCE before the first real
-  /// screen takes over, even when [_bootstrap] finishes in a few hundred ms.
-  /// Flipped by the splash's onComplete callback, with a safety [Timer] in
-  /// [initState] in case the animation never loads.
-  bool _minSplashElapsed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
@@ -168,15 +163,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void initState() {
     super.initState();
     _bootstrap();
-    // Safety net: the splash normally dismisses when its Lottie finishes one
-    // play (see _buildHome → onComplete). If the animation never loads (asset
-    // error), force the boot splash off after a bounded wait so the app can
-    // never get stuck on it.
-    Timer(const Duration(milliseconds: 4500), () {
-      if (mounted && !_minSplashElapsed) {
-        setState(() => _minSplashElapsed = true);
-      }
-    });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
@@ -454,17 +440,12 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   Widget _buildHome() {
-    if (_loading || !_minSplashElapsed) {
-      // Black splash: the Traduction.json Lottie, played through once. When it
-      // finishes (or the safety Timer fires), _minSplashElapsed flips and the
-      // first real screen takes over.
-      return SplashScreenAnimation(
-        onComplete: () {
-          if (mounted && !_minSplashElapsed) {
-            setState(() => _minSplashElapsed = true);
-          }
-        },
-      );
+    if (_loading) {
+      // Black splash: the Traduction.json Lottie. Shown only while bootstrap
+      // runs (no artificial min-hold) — the web boot page already played the
+      // same Lottie during engine load, so this just covers the brief gap
+      // until the first real screen is ready.
+      return const SplashScreenAnimation();
     }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {
