@@ -213,10 +213,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     var authed = false;
     var needsOnboarding = false;
     try {
+      debugPrint('bootstrap: start');
       // A guest-invite deep link (`/c/<room>` on web) bypasses login
       // entirely: the visitor joins the call with no account. Detected
       // before anything else so an auth check never gates them.
-      final invite = await GuestInviteApi.resolveFromCurrentUrl();
+      // Bounded: a never-returning resolver must not trap the boot splash.
+      final invite = await GuestInviteApi.resolveFromCurrentUrl()
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
       if (invite != null) {
         if (!mounted) return;
         setState(() {
@@ -243,7 +246,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       // renders in whatever the user picked last time on this device
       // (no-op for a fresh install — falls back to the default).
       try {
-        final localProfile = await UserPrefs.loadProfile();
+        final localProfile = await UserPrefs.loadProfile()
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (localProfile != null && localProfile.sourceLang.isNotEmpty) {
           AppStrings.setFromCode(localProfile.sourceLang);
         }
@@ -251,15 +255,26 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         debugPrint('loadProfile failed: $e');
       }
       authed = AuthService.isAuthenticated;
+      debugPrint('bootstrap: authed=$authed');
       if (authed) {
-        needsOnboarding = await _resolveNeedsOnboarding();
-        if (!needsOnboarding) {
-          await _hydrateAuthedSession();
-        }
+        // Bound the whole authed-state load: any Supabase call inside that
+        // never returns (a true hang, which try/catch can't catch) would
+        // otherwise leave _loading true forever → user stuck on the splash.
+        await (() async {
+          needsOnboarding = await _resolveNeedsOnboarding();
+          debugPrint('bootstrap: needsOnboarding=$needsOnboarding');
+          if (!needsOnboarding) {
+            await _hydrateAuthedSession();
+          }
+        })().timeout(const Duration(seconds: 8), onTimeout: () {
+          debugPrint('bootstrap: authed-state load timed out — entering app');
+        });
       }
+      debugPrint('bootstrap: done');
     } catch (e, s) {
       debugPrint('bootstrap failed: $e\n$s');
     } finally {
+      debugPrint('bootstrap: finally → _loading=false');
       if (mounted) {
         setState(() {
           _authed = authed;
@@ -276,9 +291,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// main shell.
   Future<void> _onSignedIn() async {
     setState(() => _loading = true);
-    final needsOnboarding = await _resolveNeedsOnboarding();
-    if (!needsOnboarding) {
-      await _hydrateAuthedSession();
+    var needsOnboarding = false;
+    try {
+      await (() async {
+        needsOnboarding = await _resolveNeedsOnboarding();
+        if (!needsOnboarding) {
+          await _hydrateAuthedSession();
+        }
+      })().timeout(const Duration(seconds: 8), onTimeout: () {
+        debugPrint('_onSignedIn: authed-state load timed out');
+      });
+    } catch (e, s) {
+      debugPrint('_onSignedIn failed: $e\n$s');
     }
     if (!mounted) return;
     setState(() {
