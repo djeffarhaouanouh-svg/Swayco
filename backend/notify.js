@@ -233,6 +233,14 @@ async function notifyUser(recipientUid, payload) {
     }),
   );
 
+  // Per-target outcome in the Railway logs so a missing push can be
+  // diagnosed at a glance: e.g. `sent: ios_voip`, `error: BadDeviceToken`,
+  // `skipped: apns-not-configured`.
+  console.log(
+    `[notify] uid=${recipientUid} type=${payload.type} ` +
+      `ok=${out.ok} failed=${out.failed} ${JSON.stringify(out.results)}`,
+  );
+
   return out;
 }
 
