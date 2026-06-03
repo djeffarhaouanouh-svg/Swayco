@@ -640,7 +640,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ? const Center(
                       child: CircularProgressIndicator(color: SC.accent),
                     )
-                  : _buildStack(),
+                  // Tap anywhere on the deck that isn't the message field or a
+                  // button dismisses the keyboard. translucent so taps on the
+                  // empty photo area still register here; the TextField / the
+                  // action buttons win the gesture arena first, and onTap never
+                  // claims the vertical drag the PageView uses to swipe cards.
+                  : GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: _buildStack(),
+                    ),
             ),
             // Full-width frosted-glass top bar — mirrors the bottom nav so
             // the full-bleed photo runs behind both with no empty strip at
