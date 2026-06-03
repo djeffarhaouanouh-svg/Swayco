@@ -907,11 +907,13 @@ class _MessageBubble extends StatelessWidget {
                     durationMs: message.audioDurationMs,
                   ),
                 ),
-              // For voice messages we still surface the transcription /
-              // translation as text. When [displayBody] is empty (raw
-              // STT returned nothing), drop the Text node entirely so
-              // the bubble doesn't show a phantom blank line.
-              if (displayBody.isNotEmpty)
+              // For voice messages the transcription / translation is only
+              // for the recipient — the sender already knows what they said,
+              // so we hide the text under their own voice bubble (the player
+              // alone is enough). Non-voice messages always show their body.
+              // When [displayBody] is empty (raw STT returned nothing), drop
+              // the Text node entirely so the bubble shows no phantom line.
+              if (displayBody.isNotEmpty && !(message.isVoice && mine))
                 Text(
                   displayBody,
                   style: TextStyle(
