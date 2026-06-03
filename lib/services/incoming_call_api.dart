@@ -179,6 +179,25 @@ abstract final class IncomingCallApi {
     }
   }
 
+  /// Fetch one call row by id. Used on the iOS CallKit "accept" path: the
+  /// accept event only carries the call id, so we read the row back to get
+  /// the room name to join. RLS lets the callee (and caller) read it.
+  static Future<IncomingCall?> fetchById(String callId) async {
+    if (!isSupabaseReady || callId.isEmpty) return null;
+    try {
+      final row = await _c
+          .from('incoming_calls')
+          .select()
+          .eq('id', callId)
+          .maybeSingle();
+      if (row == null) return null;
+      return IncomingCall.fromMap(Map<String, dynamic>.from(row));
+    } catch (e) {
+      debugPrint('IncomingCallApi.fetchById failed: $e');
+      return null;
+    }
+  }
+
   /// Marks a ringing row as ended via the `end_incoming_call` RPC, which
   /// stamps `ended_at = now()` and records the elapsed duration in
   /// `duration_seconds`. Replaces the old hard-DELETE so the row

@@ -1,8 +1,10 @@
 import Flutter
 import UIKit
+import PushKit
+import flutter_callkit_incoming
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -17,6 +19,68 @@ import UIKit
     //   .LegacyUserDefaultsApi.getAll", null, null)
     // and the same on firebase_core_platform_interface. Moving the
     // register call to the scene fixes those channel errors.
+    //
+    // We DO still set up PushKit here: it registers no Flutter plugin, it
+    // only forwards VoIP events to SwiftFlutterCallkitIncomingPlugin's
+    // app-wide singleton (which the scene sets up when it registers the
+    // plugins). This is what lets CallKit ring on an incoming call even
+    // when the app is backgrounded or killed.
+    let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
+    voipRegistry.delegate = self
+    voipRegistry.desiredPushTypes = [.voIP]
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // MARK: - PKPushRegistryDelegate (VoIP / CallKit)
+
+  /// APNs (re)issued the device's VoIP push token. Hand it to the plugin so
+  /// Dart can upload it to our backend (NotificationApi.registerVoip).
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didUpdate pushCredentials: PKPushCredentials,
+    for type: PKPushType
+  ) {
+    let deviceToken = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+    SwiftFlutterCallkitIncomingPlugin.sharedInstance?.setDevicePushTokenVoIP(deviceToken)
+  }
+
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didInvalidatePushTokenFor type: PKPushType
+  ) {
+    SwiftFlutterCallkitIncomingPlugin.sharedInstance?.setDevicePushTokenVoIP("")
+  }
+
+  /// A VoIP push arrived. iOS 13+ REQUIRES reporting an incoming call to
+  /// CallKit synchronously from this method (or the app is killed). The
+  /// plugin does the CallKit reporting; we just translate the payload into
+  /// its Data model. These keys must match what backend/notify.js puts in
+  /// the VoIP payload.
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didReceiveIncomingPushWith payload: PKPushPayload,
+    for type: PKPushType,
+    completion: @escaping () -> Void
+  ) {
+    let dict = payload.dictionaryPayload
+    let callId = (dict["callId"] as? String) ?? UUID().uuidString
+    let callerName = (dict["callerName"] as? String) ?? "Appel entrant"
+    let handle = (dict["callerId"] as? String) ?? ""
+    let roomName = (dict["roomName"] as? String) ?? ""
+
+    let data = flutter_callkit_incoming.Data(
+      id: callId,
+      nameCaller: callerName,
+      handle: handle,
+      type: 0
+    )
+    data.extra = [
+      "callId": callId,
+      "roomName": roomName,
+      "callerId": handle,
+    ] as NSDictionary
+
+    SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(data, fromPushKit: true)
+    completion()
   }
 }

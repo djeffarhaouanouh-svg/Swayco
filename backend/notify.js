@@ -19,6 +19,8 @@
 //  - Firebase missing → fcm tokens skipped
 //  - Supabase missing → endpoint returns 503
 
+const { sendVoipPush, apnsConfigured } = require('./apns_voip');
+
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY?.trim();
@@ -183,6 +185,38 @@ async function notifyUser(recipientUid, payload) {
           await fcm.send(msg);
           out.ok += 1;
           out.results.push({ id: t.id, sent: t.platform });
+        } else if (t.platform === 'ios_voip') {
+          // iOS CallKit rides a VoIP push sent straight to APNs (FCM can't
+          // send VoIP). Only calls use this transport — anything else would
+          // just wake the device for nothing.
+          if (payload.type !== 'incoming_call') {
+            out.results.push({ id: t.id, skipped: 'voip-non-call' });
+            return;
+          }
+          if (!apnsConfigured()) {
+            out.results.push({ id: t.id, skipped: 'apns-not-configured' });
+            return;
+          }
+          const d = payload.data || {};
+          const res = await sendVoipPush(t.fcm_token, {
+            type: 'incoming_call',
+            callId: String(d.callId || ''),
+            roomName: String(d.roomName || ''),
+            callerId: String(d.callerId || ''),
+            callerName: String(payload.title || ''),
+          });
+          if (res.ok) {
+            out.ok += 1;
+            out.results.push({ id: t.id, sent: 'ios_voip' });
+          } else {
+            out.failed += 1;
+            out.results.push({ id: t.id, error: res.reason });
+            if (res.status === 410 ||
+                res.reason === 'BadDeviceToken' ||
+                res.reason === 'Unregistered') {
+              await sb.from('notification_targets').delete().eq('id', t.id);
+            }
+          }
         } else {
           out.results.push({ id: t.id, skipped: 'unknown-platform' });
         }

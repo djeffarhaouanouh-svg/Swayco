@@ -80,6 +80,32 @@ abstract final class NotificationApi {
     }
   }
 
+  /// Upsert an iOS PushKit VoIP token (platform `ios_voip`). This is a
+  /// separate target from the regular FCM token and is what the backend
+  /// pushes to so CallKit can ring full-screen for an incoming call.
+  static Future<bool> registerVoip({
+    required String userId,
+    required String voipToken,
+  }) async {
+    if (!isSupabaseReady) return false;
+    if (userId.isEmpty || voipToken.isEmpty) return false;
+    try {
+      await _c.from('notification_targets').upsert(
+        {
+          'user_id': userId,
+          'platform': 'ios_voip',
+          'fcm_token': voipToken,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        onConflict: 'user_id,fcm_token',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('NotificationApi.registerVoip failed: $e');
+      return false;
+    }
+  }
+
   /// Drop a single transport target — used on sign-out or when the
   /// browser/native subscription expires and we replace it.
   static Future<void> deleteByEndpoint({

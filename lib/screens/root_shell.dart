@@ -9,6 +9,7 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/incoming_call_api.dart';
+import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
@@ -96,6 +97,14 @@ class _RootShellState extends State<RootShell> {
     final myId = await DeviceId.getOrCreate();
     if (!mounted || myId.isEmpty) return;
     _myCalleeId = myId;
+    // iOS only: wire CallKit so an incoming call rings full-screen via a
+    // VoIP push even when the app is killed. Accept → join the room;
+    // decline → tell the caller (same path as the in-app dialog).
+    unawaited(IosCallKit.start(
+      userId: myId,
+      onAccept: _onCallKitAccept,
+      onDecline: _onCallKitDecline,
+    ));
     // Kick the pending-requests watcher so the Demandes nav badge stays
     // live without waiting for the user to open the tab.
     unawaited(FriendRequestUnread.start(myId));
@@ -199,6 +208,32 @@ class _RootShellState extends State<RootShell> {
         ),
       );
     }
+  }
+
+  /// iOS CallKit "Accept": the user answered from the native full-screen
+  /// call UI (possibly straight from a killed app). The accept event only
+  /// carries the call id, so we read the row back for the room name, join
+  /// it, and dismiss the CallKit entry so it doesn't linger behind our own
+  /// in-call screen.
+  Future<void> _onCallKitAccept(String callId) async {
+    if (callId.isEmpty) return;
+    // Don't let the realtime poll re-open the in-app dialog for the same
+    // call we're already answering.
+    _handledCallIds.add(callId);
+    final call = await IncomingCallApi.fetchById(callId);
+    unawaited(IosCallKit.endCall(callId));
+    if (!mounted || call == null || call.roomName.isEmpty) return;
+    await _joinCallRoom(call);
+  }
+
+  /// iOS CallKit "Decline" (or the ring timing out): close the row and tell
+  /// the caller so their waiting screen stops ringing.
+  Future<void> _onCallKitDecline(String callId) async {
+    if (callId.isEmpty) return;
+    _handledCallIds.add(callId);
+    await IncomingCallApi.broadcastDecline(callId: callId);
+    await IncomingCallApi.cancel(callId: callId);
+    unawaited(IosCallKit.endCall(callId));
   }
 
   @override
