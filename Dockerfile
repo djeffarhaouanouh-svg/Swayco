@@ -46,6 +46,7 @@ RUN npm ci --omit=dev
 
 COPY backend/server.js ./server.js
 COPY backend/notify.js ./notify.js
+COPY backend/apns_voip.js ./apns_voip.js
 COPY backend/stripe.js ./stripe.js
 COPY backend/analytics.js ./analytics.js
 COPY backend/tiers.js ./tiers.js
