@@ -27,6 +27,7 @@ import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
 import 'translation/openai_realtime_translation.dart';
+import 'widgets/splash_screen_animation.dart';
 
 /// Runs in a dedicated background isolate when a data push lands while the
 /// app is backgrounded or killed. For an incoming call it rings a
@@ -146,6 +147,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _loading = true;
   bool _needsOnboarding = false;
   bool _authed = false;
+  /// Lets the premium boot splash play its intro (logo in → ring forms →
+  /// "Prêt à traduire") in full before the first real screen takes over,
+  /// even when [_bootstrap] finishes in a few hundred ms. Tune the timer
+  /// in [initState] (or drop both to swap the instant boot completes).
+  bool _minSplashElapsed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
@@ -162,6 +168,12 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void initState() {
     super.initState();
     _bootstrap();
+    // Hold the boot splash for at least one full intro (~2.2s of animation
+    // + a beat) so the premium logo→ring→"Prêt à traduire" sequence is
+    // actually seen even when bootstrap returns almost instantly.
+    Timer(const Duration(milliseconds: 2600), () {
+      if (mounted) setState(() => _minSplashElapsed = true);
+    });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
@@ -415,13 +427,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   Widget _buildHome() {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: SC.bg,
-        body: Center(
-          child: CircularProgressIndicator(color: SC.accent),
-        ),
-      );
+    if (_loading || !_minSplashElapsed) {
+      // Premium black splash: white "S" + forming cyan ring + travelling
+      // wave. Replaces the old navy (#0A1024) loading scaffold.
+      return const SplashScreenAnimation();
     }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {

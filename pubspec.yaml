@@ -143,6 +143,8 @@ flutter:
     - assets/add-picture.png
     # Transparent logo mark — shown on the "call ended" summary card.
     - assets/icon-fg-transparent.png
+    # White "S" mark — centre of the premium boot splash (SplashScreenAnimation).
+    - assets/notif-android.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
