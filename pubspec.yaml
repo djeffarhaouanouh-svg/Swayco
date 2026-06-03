@@ -74,6 +74,8 @@ dependencies:
   sign_in_with_apple: ^8.1.0
   crypto: ^3.0.7
   flutter_callkit_incoming: ^3.1.1
+  # Renders the Traduction.json boot/splash animation (SplashScreenAnimation).
+  lottie: ^3.1.0
 
 dev_dependencies:
   flutter_test:
@@ -145,6 +147,8 @@ flutter:
     - assets/icon-fg-transparent.png
     # White "S" mark — centre of the premium boot splash (SplashScreenAnimation).
     - assets/notif-android.png
+    # Lottie boot/splash animation (cyan + white line-art on black).
+    - assets/Traduction.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:

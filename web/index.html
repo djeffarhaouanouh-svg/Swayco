@@ -98,9 +98,32 @@
         background-color: #000000;
           }
     }
+
+    /* Boot splash: the Traduction.json Lottie, centred on pure black.
+       Shown immediately while the Flutter engine downloads + boots, then
+       removed by removeSplashFromWeb() once the first Flutter frame renders
+       (the in-app SplashScreenAnimation plays the SAME Lottie, so the hand-off
+       is invisible). */
+    #splash {
+      position: fixed;
+      inset: 0;
+      margin: 0;
+      background-color: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2147483647;
+    }
+    #splash-lottie {
+      width: min(72vmin, 460px);
+      height: min(72vmin, 460px);
+    }
   </style>
+  <!-- Lottie player (vendored, offline-safe) for the boot splash above. -->
+  <script src="lottie.min.js"></script>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
+      try { window.__splashAnim?.destroy(); } catch (e) {}
       document.getElementById("splash")?.remove();
       document.getElementById("splash-branding")?.remove();
       // Stay deep black behind Flutter (no white flash on first frame).
@@ -109,8 +132,30 @@
   </script>
 </head>
 <body>
-  <!-- Boot splash image removed: the page stays a deep, pure black until the
-       Flutter engine renders SplashScreenAnimation (logo fades in from black). -->
+  <!-- Boot splash: the Traduction.json Lottie animation on deep black. This is
+       the very first image on web; removeSplashFromWeb() removes it once the
+       Flutter first frame is up. -->
+  <div id="splash">
+    <div id="splash-lottie"></div>
+  </div>
+  <script>
+    (function () {
+      try {
+        if (window.lottie) {
+          window.__splashAnim = lottie.loadAnimation({
+            container: document.getElementById("splash-lottie"),
+            renderer: "svg",
+            loop: true,
+            autoplay: true,
+            path: "Traduction.json",
+          });
+        }
+      } catch (e) {
+        // If Lottie fails to load, the deep-black #splash background remains,
+        // which is exactly the previous boot look — no white flash.
+      }
+    })();
+  </script>
 
   <!--
     You can customize the "flutter_bootstrap.js" script.
