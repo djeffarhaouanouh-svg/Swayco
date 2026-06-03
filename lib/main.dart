@@ -147,6 +147,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _loading = true;
   bool _needsOnboarding = false;
   bool _authed = false;
+  /// Holds the boot splash for a minimum of 3s so the Traduction.json Lottie
+  /// is actually seen, even when [_bootstrap] returns in a few hundred ms.
+  /// Flipped by a [Timer] in [initState]; the splash also waits on [_loading].
+  bool _minSplashElapsed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
@@ -163,6 +167,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void initState() {
     super.initState();
     _bootstrap();
+    // Keep the boot splash up for at least 3s so the Lottie plays through,
+    // even when bootstrap finishes almost instantly.
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _minSplashElapsed = true);
+    });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
@@ -440,11 +449,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   Widget _buildHome() {
-    if (_loading) {
-      // Black splash: the Traduction.json Lottie. Shown only while bootstrap
-      // runs (no artificial min-hold) — the web boot page already played the
-      // same Lottie during engine load, so this just covers the brief gap
-      // until the first real screen is ready.
+    if (_loading || !_minSplashElapsed) {
+      // Black splash: the Traduction.json Lottie. Held for at least 3s (see the
+      // Timer in initState) so the animation plays through, then until the
+      // first real screen is ready.
       return const SplashScreenAnimation();
     }
     // Guest-invite link → straight to the join screen, no login.
