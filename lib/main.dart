@@ -147,10 +147,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _loading = true;
   bool _needsOnboarding = false;
   bool _authed = false;
-  /// Lets the premium boot splash play its intro (logo in → ring forms →
-  /// "Prêt à traduire") in full before the first real screen takes over,
-  /// even when [_bootstrap] finishes in a few hundred ms. Tune the timer
-  /// in [initState] (or drop both to swap the instant boot completes).
+  /// Lets the boot splash play its Lottie through ONCE before the first real
+  /// screen takes over, even when [_bootstrap] finishes in a few hundred ms.
+  /// Flipped by the splash's onComplete callback, with a safety [Timer] in
+  /// [initState] in case the animation never loads.
   bool _minSplashElapsed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
@@ -168,11 +168,14 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void initState() {
     super.initState();
     _bootstrap();
-    // Hold the boot splash for at least one full intro (~2.2s of animation
-    // + a beat) so the premium logo→ring→"Prêt à traduire" sequence is
-    // actually seen even when bootstrap returns almost instantly.
-    Timer(const Duration(milliseconds: 2600), () {
-      if (mounted) setState(() => _minSplashElapsed = true);
+    // Safety net: the splash normally dismisses when its Lottie finishes one
+    // play (see _buildHome → onComplete). If the animation never loads (asset
+    // error), force the boot splash off after a bounded wait so the app can
+    // never get stuck on it.
+    Timer(const Duration(milliseconds: 4500), () {
+      if (mounted && !_minSplashElapsed) {
+        setState(() => _minSplashElapsed = true);
+      }
     });
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
@@ -428,9 +431,16 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
   Widget _buildHome() {
     if (_loading || !_minSplashElapsed) {
-      // Premium black splash: white "S" + forming cyan ring + travelling
-      // wave. Replaces the old navy (#0A1024) loading scaffold.
-      return const SplashScreenAnimation();
+      // Black splash: the Traduction.json Lottie, played through once. When it
+      // finishes (or the safety Timer fires), _minSplashElapsed flips and the
+      // first real screen takes over.
+      return SplashScreenAnimation(
+        onComplete: () {
+          if (mounted && !_minSplashElapsed) {
+            setState(() => _minSplashElapsed = true);
+          }
+        },
+      );
     }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {
