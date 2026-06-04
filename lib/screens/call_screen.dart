@@ -320,7 +320,7 @@ class _CallScreenState extends State<CallScreen> {
       );
       // Safety net for the lost-broadcast / powered-off-callee cases above:
       // leave the waiting room after the ring window if nobody joined.
-      _ringTimeout = Timer(const Duration(seconds: 20), _onRingTimeout);
+      _ringTimeout = Timer(const Duration(seconds: 25), _onRingTimeout);
     }
   }
 
