@@ -1323,17 +1323,24 @@ class _ComposerState extends State<_Composer> {
   Timer? _tick;
   Duration _elapsed = Duration.zero;
 
+  /// Typewriter reveal of the placeholder when the chat opens — the hint
+  /// fills in one character at a time ("W", "Wr", "Wri"…).
+  String _typedHint = '';
+  Timer? _hintTimer;
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTextChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
+    _animateHint();
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onTextChanged);
     _tick?.cancel();
+    _hintTimer?.cancel();
     // Best-effort: drop any in-flight recording when the chat is closed.
     unawaited(() async {
       try {
@@ -1347,6 +1354,32 @@ class _ComposerState extends State<_Composer> {
   void _onTextChanged() {
     final has = widget.controller.text.trim().isNotEmpty;
     if (has != _hasText) setState(() => _hasText = has);
+  }
+
+  @override
+  void didUpdateWidget(_Composer old) {
+    super.didUpdateWidget(old);
+    // The spoken language loads a beat after the screen opens; retype the
+    // placeholder once it resolves ("Message" → "Write in English").
+    if (old.myLang != widget.myLang) _animateHint();
+  }
+
+  /// Reveal [_composerHint] one character at a time. Cheap setState loop on a
+  /// ~45 ms tick — quick enough to feel snappy, slow enough to read.
+  void _animateHint() {
+    _hintTimer?.cancel();
+    final full = _composerHint;
+    if (!mounted) return;
+    setState(() => _typedHint = '');
+    var shown = 0;
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 45), (t) {
+      if (!mounted || shown >= full.length) {
+        t.cancel();
+        return;
+      }
+      shown++;
+      setState(() => _typedHint = full.substring(0, shown));
+    });
   }
 
   /// Resolved path passed to `record.start`. Native gets a real file in
@@ -1506,7 +1539,7 @@ class _ComposerState extends State<_Composer> {
                           cursorColor: SC.accent,
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
-                            hintText: _composerHint,
+                            hintText: _typedHint,
                             hintStyle: const TextStyle(color: SC.textMuted),
                             filled: false,
                             contentPadding:
