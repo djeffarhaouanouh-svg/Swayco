@@ -977,10 +977,15 @@ class _CallScreenState extends State<CallScreen> {
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: _shareSummary,
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Icon(Icons.ios_share_rounded,
-                        color: Colors.white, size: 22),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    // Curved "forward/share" arrow: a horizontally mirrored
+                    // reply glyph so it points up to the right.
+                    child: Transform.flip(
+                      flipX: true,
+                      child: const Icon(Icons.reply_rounded,
+                          color: Colors.white, size: 24),
+                    ),
                   ),
                 ),
               ),
