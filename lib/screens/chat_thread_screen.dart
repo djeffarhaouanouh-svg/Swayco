@@ -1437,76 +1437,85 @@ class _ComposerState extends State<_Composer> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-        child: GlassContainer(
-          borderRadius: BorderRadius.circular(26),
-          padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 140),
-                  child: TextField(
-                    controller: widget.controller,
-                    enabled: !widget.sending,
-                    minLines: 1,
-                    maxLines: 6,
-                    textCapitalization: TextCapitalization.sentences,
-                    cursorColor: SC.accent,
-                    style: const TextStyle(color: SC.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: AppStrings.t('composer_message_hint'),
-                      hintStyle: const TextStyle(color: SC.textMuted),
-                      filled: false,
-                      contentPadding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
-                      // Only the translate toggle on the left now — the photo
-                      // button moved to the right of the bar.
-                      prefixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(width: 8),
-                          _ComposerTranslateToggle(
-                            active: widget.autoTranslate,
-                            onTap: widget.onToggleTranslate,
+        padding: const EdgeInsets.fromLTRB(12, 4, 8, 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: GlassContainer(
+                borderRadius: BorderRadius.circular(26),
+                padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 140),
+                        child: TextField(
+                          controller: widget.controller,
+                          enabled: !widget.sending,
+                          minLines: 1,
+                          maxLines: 6,
+                          textCapitalization: TextCapitalization.sentences,
+                          cursorColor: SC.accent,
+                          style: const TextStyle(color: SC.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: AppStrings.t('composer_message_hint'),
+                            hintStyle: const TextStyle(color: SC.textMuted),
+                            filled: false,
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(4, 8, 12, 8),
+                            // Only the translate toggle on the left — the photo
+                            // button now sits OUTSIDE the bar (right).
+                            prefixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(width: 8),
+                                _ComposerTranslateToggle(
+                                  active: widget.autoTranslate,
+                                  onTap: widget.onToggleTranslate,
+                                ),
+                              ],
+                            ),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 0,
+                              minHeight: 38,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
                           ),
-                        ],
+                          onSubmitted: (_) => widget.onSend(),
+                        ),
                       ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 0,
-                        minHeight: 38,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
                     ),
-                    onSubmitted: (_) => widget.onSend(),
-                  ),
+                    const SizedBox(width: 6),
+                    _CircleActionButton(
+                      icon: _hasText ? Icons.send : Icons.mic,
+                      busy: widget.sending,
+                      onTap: widget.sending
+                          ? null
+                          : (_hasText ? widget.onSend : _startRecording),
+                    ),
+                  ],
                 ),
               ),
-              // Photo button — now on the right, next to send / mic.
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: widget.sending ? null : widget.onSendImage,
-                child: const Padding(
-                  padding: EdgeInsets.all(7),
-                  child: Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: 22,
-                    color: SC.textMuted,
-                  ),
+            ),
+            const SizedBox(width: 4),
+            // Photo (add image) button — OUTSIDE the glass bar, on the right.
+            InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: widget.sending ? null : widget.onSendImage,
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(
+                  Icons.add_photo_alternate_outlined,
+                  size: 24,
+                  color: SC.textMuted,
                 ),
               ),
-              const SizedBox(width: 2),
-              _CircleActionButton(
-                icon: _hasText ? Icons.send : Icons.mic,
-                busy: widget.sending,
-                onTap: widget.sending
-                    ? null
-                    : (_hasText ? widget.onSend : _startRecording),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
