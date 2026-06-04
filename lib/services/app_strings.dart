@@ -300,6 +300,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Change la langue dans laquelle tu entends l’autre personne. Ça ne change rien pour elle.',
     'composer_message_hint': 'Message',
+    'composer_message_hint_lang': 'Écrivez en {lang}',
     // Profile
     'profile_default_title': 'Profil',
     'delete_photo_q': 'Supprimer la photo ?',
@@ -735,6 +736,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         "Changes the language you hear the other person in. It doesn't change anything for them.",
     'composer_message_hint': 'Message',
+    'composer_message_hint_lang': 'Write in {lang}',
     'profile_default_title': 'Profile',
     'delete_photo_q': 'Delete photo?',
     'delete_photo_body':
@@ -1131,6 +1133,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Cambia el idioma en el que escuchas a la otra persona. No cambia nada para ella.',
     'composer_message_hint': 'Mensaje',
+    'composer_message_hint_lang': 'Escribe en {lang}',
     'profile_default_title': 'Perfil',
     'delete_photo_q': '¿Eliminar la foto?',
     'delete_photo_body':
@@ -1358,6 +1361,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Ändert die Sprache, in der du die andere Person hörst. Für sie ändert sich nichts.',
     'composer_message_hint': 'Nachricht',
+    'composer_message_hint_lang': 'Schreib auf {lang}',
     'profile_default_title': 'Profil',
     'delete_photo_q': 'Foto löschen?',
     'delete_photo_body':
@@ -1559,6 +1563,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Cambia la lingua in cui senti l’altra persona. Per lei non cambia nulla.',
     'composer_message_hint': 'Messaggio',
+    'composer_message_hint_lang': 'Scrivi in {lang}',
     'profile_default_title': 'Profilo',
     'delete_photo_q': 'Eliminare la foto?',
     'delete_photo_body':
@@ -1760,6 +1765,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Muda o idioma em que ouves a outra pessoa. Não muda nada para ela.',
     'composer_message_hint': 'Mensagem',
+    'composer_message_hint_lang': 'Escreve em {lang}',
     'profile_default_title': 'Perfil',
     'delete_photo_q': 'Excluir a foto?',
     'delete_photo_body':
@@ -1961,6 +1967,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Verandert de taal waarin je de ander hoort. Voor de ander verandert er niets.',
     'composer_message_hint': 'Bericht',
+    'composer_message_hint_lang': 'Schrijf in het {lang}',
     'profile_default_title': 'Profiel',
     'delete_photo_q': 'Foto verwijderen?',
     'delete_photo_body':
@@ -2159,6 +2166,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'يغيّر اللغة التي تسمع بها الشخص الآخر. لا يتغيّر شيء بالنسبة له.',
     'composer_message_hint': 'رسالة',
+    'composer_message_hint_lang': 'اكتب بـ {lang}',
     'profile_default_title': 'الملف الشخصي',
     'delete_photo_q': 'حذف الصورة؟',
     'delete_photo_body':
@@ -2359,6 +2367,7 @@ abstract final class AppStrings {
     'call_output_language_hint':
         'Меняет язык, на котором вы слышите собеседника. Для него ничего не меняется.',
     'composer_message_hint': 'Сообщение',
+    'composer_message_hint_lang': 'Пишите на {lang}',
     'profile_default_title': 'Профиль',
     'delete_photo_q': 'Удалить фото?',
     'delete_photo_body':
@@ -2542,6 +2551,7 @@ abstract final class AppStrings {
     'call_output_language_title': '我听到的语言',
     'call_output_language_hint': '更改你听到对方时所用的语言。对方不受影响。',
     'composer_message_hint': '消息',
+    'composer_message_hint_lang': '用{lang}输入',
     'profile_default_title': '个人资料',
     'delete_photo_q': '删除照片？',
     'delete_photo_body': '你的 Discover 照片将被删除。你可以随时上传新的。',
@@ -2721,6 +2731,7 @@ abstract final class AppStrings {
     'call_output_language_title': '自分が聞く言語',
     'call_output_language_hint': '相手の声が聞こえる言語を変更します。相手側には影響しません。',
     'composer_message_hint': 'メッセージ',
+    'composer_message_hint_lang': '{lang}で入力',
     'profile_default_title': 'プロフィール',
     'delete_photo_q': '写真を削除しますか？',
     'delete_photo_body': 'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
@@ -2900,6 +2911,7 @@ abstract final class AppStrings {
     'call_output_language_title': '내가 듣는 언어',
     'call_output_language_hint': '상대방의 말이 들리는 언어를 바꿉니다. 상대방에게는 영향이 없습니다.',
     'composer_message_hint': '메시지',
+    'composer_message_hint_lang': '{lang}로 입력',
     'profile_default_title': '프로필',
     'delete_photo_q': '사진을 삭제하시겠습니까?',
     'delete_photo_body': 'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',

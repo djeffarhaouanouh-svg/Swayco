@@ -17,6 +17,7 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
@@ -525,6 +526,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     onSendImage: _sendImage,
                     autoTranslate: _autoTranslate,
                     onToggleTranslate: _toggleAutoTranslate,
+                    myLang: _myLang,
                   ),
                 ],
               ),
@@ -1248,11 +1250,16 @@ class _Composer extends StatefulWidget {
     required this.onSendImage,
     required this.autoTranslate,
     required this.onToggleTranslate,
+    required this.myLang,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+
+  /// The local user's spoken-language code (e.g. `fr`). Drives the composer
+  /// placeholder — "Écrivez en Français" instead of a generic "Message".
+  final String myLang;
 
   /// Hand the parent the raw recording so it can run the backend upload.
   final Future<void> Function({
@@ -1433,6 +1440,15 @@ class _ComposerState extends State<_Composer> {
     return _buildIdleBar();
   }
 
+  /// Placeholder shown in the empty input. Adapts to the user's spoken
+  /// language — "Écrivez en Français" for a French user — falling back to the
+  /// plain "Message" when their language is unknown.
+  String get _composerHint {
+    final lang = findLanguageByCode(widget.myLang);
+    if (lang == null) return AppStrings.t('composer_message_hint');
+    return AppStrings.t('composer_message_hint_lang', args: {'lang': lang.label});
+  }
+
   Widget _buildIdleBar() {
     return SafeArea(
       top: false,
@@ -1460,7 +1476,7 @@ class _ComposerState extends State<_Composer> {
                           cursorColor: SC.accent,
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
-                            hintText: AppStrings.t('composer_message_hint'),
+                            hintText: _composerHint,
                             hintStyle: const TextStyle(color: SC.textMuted),
                             filled: false,
                             contentPadding:
