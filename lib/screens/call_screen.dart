@@ -1350,7 +1350,7 @@ class _CallScreenState extends State<CallScreen> {
       // feedback that something is happening. Held for >= 5s (see
       // _minSplashDone) and on the app's black, to match the logo.
       return Scaffold(
-        backgroundColor: const Color(0xFF0E0E0E),
+        backgroundColor: const Color(0xFF000000),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
@@ -1362,7 +1362,7 @@ class _CallScreenState extends State<CallScreen> {
                   flex: 6,
                   child: Center(
                     child: Image.asset(
-                      'assets/test-splashscreen.png',
+                      'assets/notif-android.png',
                       width: 220,
                       height: 220,
                       fit: BoxFit.contain,
@@ -1378,15 +1378,6 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text(
-                  AppStrings.t('call_connecting_short'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Text(
                   AppStrings.t('call_connecting_caller_pays'),
                   textAlign: TextAlign.center,
