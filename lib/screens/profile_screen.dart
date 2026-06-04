@@ -20,6 +20,7 @@ import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/interests.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/like_api.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
@@ -596,6 +597,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(_languageCode);
+    // Flag shown right of the name: the COUNTRY flag once a location is set
+    // (the spoken language doesn't always match — a Brazilian speaks
+    // Portuguese), else the language flag. This is NOT the language card's
+    // flag, which stays the spoken language on purpose.
+    final nameFlag = ((_remote?.city.trim().isNotEmpty ?? false)
+            ? countryFlagFor(_remote?.country ?? '')
+            : null) ??
+        lang?.flag ??
+        '';
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
       // No header bar. When viewing someone else, the back button + ⋮ menu
@@ -656,6 +666,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             // "anonymous" fallback itself in viewer mode and
                             // an editable field on my own profile.
                             displayName: _displayName,
+                            flag: nameFlag,
                             handle: _handle,
                             online: _peerOnline,
                             bio: _remote?.bio ?? '',
@@ -1283,6 +1294,7 @@ class _LanguageCard extends StatelessWidget {
 class _IdentitySection extends StatelessWidget {
   const _IdentitySection({
     required this.displayName,
+    this.flag = '',
     required this.handle,
     this.online = false,
     required this.bio,
@@ -1317,6 +1329,9 @@ class _IdentitySection extends StatelessWidget {
   });
 
   final String displayName;
+
+  /// Country flag emoji shown right of the name ('' to hide).
+  final String flag;
   final String handle;
 
   /// Viewer-mode only: show a green "online" line under the handle.
@@ -1499,16 +1514,27 @@ class _IdentitySection extends StatelessWidget {
           children: [
             const SizedBox(width: 68),
             Expanded(
-              child: _InlineEditable(
-                value: displayName,
-                placeholder: AppStrings.t('profile_anonymous'),
-                onSave: onEditName,
-                maxLength: profileNameMaxLength,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: _InlineEditable(
+                      value: displayName,
+                      placeholder: AppStrings.t('profile_anonymous'),
+                      onSave: onEditName,
+                      maxLength: profileNameMaxLength,
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (flag.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Text(flag, style: const TextStyle(fontSize: 18)),
+                  ],
+                ],
               ),
             ),
             Material(
@@ -1624,20 +1650,31 @@ class _IdentitySection extends StatelessWidget {
         // shows the user's initials when they have no photo yet.
         _pdpBubble(editable: false),
         const SizedBox(height: 16),
-        // Centred name + handle. Falls back to the anonymous label when the
-        // peer has no display name set.
-        Text(
-          displayName.trim().isEmpty
-              ? AppStrings.t('profile_anonymous')
-              : displayName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+        // Centred name + flag + handle. Falls back to the anonymous label
+        // when the peer has no display name set.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                displayName.trim().isEmpty
+                    ? AppStrings.t('profile_anonymous')
+                    : displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (flag.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(flag, style: const TextStyle(fontSize: 18)),
+            ],
+          ],
         ),
         const SizedBox(height: 2),
         Text(

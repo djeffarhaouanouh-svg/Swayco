@@ -10,6 +10,7 @@ import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
@@ -1192,8 +1193,15 @@ class _ProfileCardState extends State<_ProfileCard> {
     final onSendEmoji = sendEmoji == null
         ? null
         : (String emoji) => sendEmoji(currentPhoto, emoji);
-    final lang = findLanguageByCode(profile.language);
-    final flag = lang?.flag ?? '';
+    // Show the person's COUNTRY flag once they've set a location (the spoken
+    // language doesn't always match the country — a Brazilian speaks
+    // Portuguese but flies 🇧🇷). Falls back to the language flag when there's
+    // no city, as before.
+    final flag = (profile.city.trim().isNotEmpty
+            ? countryFlagFor(profile.country)
+            : null) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
     // "Ville, Pays" shown small under the name (either part may be empty).
     final locationLabel = [profile.city.trim(), profile.country.trim()]
         .where((s) => s.isNotEmpty)

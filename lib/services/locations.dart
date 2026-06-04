@@ -114,3 +114,15 @@ const List<Country> kCountries = [
   ]),
   Country(name: 'Luxembourg', flag: '🇱🇺', cities: ['Luxembourg', 'Esch-sur-Alzette']),
 ];
+
+/// The flag emoji for a stored [country] name (verbatim match against
+/// [kCountries]), or null when the name is empty / unknown. Used to show a
+/// person's COUNTRY flag (which the spoken language doesn't always match).
+String? countryFlagFor(String country) {
+  final name = country.trim();
+  if (name.isEmpty) return null;
+  for (final c in kCountries) {
+    if (c.name == name) return c.flag;
+  }
+  return null;
+}

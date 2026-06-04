@@ -22,6 +22,7 @@ import '../services/call_alert.dart';
 import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../services/translation_api.dart';
 import '../services/usage_tracker.dart';
@@ -1050,7 +1051,13 @@ class _CallScreenState extends State<CallScreen> {
         : AppStrings.t('profile_anonymous');
     final firstName = name.split(RegExp(r'\s+')).first;
     final lang = profile?.language.trim() ?? '';
-    final appLang = lang.isEmpty ? null : findLanguageByCode(lang);
+    // Country flag once the peer has set a location (the spoken language
+    // doesn't always match the country); language flag otherwise.
+    final flagEmoji = ((profile?.city.trim().isNotEmpty ?? false)
+            ? countryFlagFor(profile?.country ?? '')
+            : null) ??
+        (lang.isEmpty ? null : findLanguageByCode(lang)?.flag) ??
+        '';
     final dur = _finalDuration ?? Duration.zero;
 
     return Scaffold(
@@ -1105,8 +1112,8 @@ class _CallScreenState extends State<CallScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (appLang != null) ...[
-                                    Text(appLang.flag,
+                                  if (flagEmoji.isNotEmpty) ...[
+                                    Text(flagEmoji,
                                         style: const TextStyle(fontSize: 30)),
                                     const SizedBox(width: 12),
                                   ],
