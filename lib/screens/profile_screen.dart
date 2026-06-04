@@ -2148,6 +2148,10 @@ class _InterestsSection extends StatefulWidget {
 class _InterestsSectionState extends State<_InterestsSection> {
   late Set<String> _sel = {...widget.interests};
   bool _expanded = false;
+  // Shared so a tap on the chips above isn't treated as "outside" the picker:
+  // otherwise tapping the open "Add" chip would fire the picker's
+  // onTapOutside (close) AND the chip's onTap (reopen) → it never closes.
+  final Object _pickerGroup = Object();
 
   @override
   void didUpdateWidget(covariant _InterestsSection old) {
@@ -2206,26 +2210,31 @@ class _InterestsSectionState extends State<_InterestsSection> {
         _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
         const SizedBox(height: 12),
         // The picked chips + the add/toggle chip. Tapping any of them folds
-        // or unfolds the inline picker below.
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final tag in _sel)
-              _InterestChip(
-                label: tag,
-                color: interestColor(tag),
-                onTap: _toggleExpanded,
-              ),
-            if (_sel.length < profileInterestsMax)
-              _InterestAddChip(onTap: _toggleExpanded),
-          ],
+        // or unfolds the inline picker below. In the same TapRegion group as
+        // the picker so tapping a chip while open doesn't count as "outside".
+        TapRegion(
+          groupId: _pickerGroup,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final tag in _sel)
+                _InterestChip(
+                  label: tag,
+                  color: interestColor(tag),
+                  onTap: _toggleExpanded,
+                ),
+              if (_sel.length < profileInterestsMax)
+                _InterestAddChip(onTap: _toggleExpanded),
+            ],
+          ),
         ),
         // The category picker, unfolding right here (no overlay). A tap
         // anywhere outside the panel folds it back (auto-saved already).
         AnimatedCrossFade(
           firstChild: const SizedBox(width: double.infinity, height: 0),
           secondChild: TapRegion(
+            groupId: _pickerGroup,
             onTapOutside: (_) {
               if (_expanded) _close();
             },
