@@ -1475,6 +1475,33 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
     super.dispose();
   }
 
+  void _go(int i) {
+    final target = i.clamp(0, widget.photos.length - 1);
+    _ctrl.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Tappable chevron — the reliable way to change photo with a mouse on
+  /// web. Renders nothing at the ends (null [onTap]).
+  Widget _arrow(IconData icon, VoidCallback? onTap) {
+    if (onTap == null) return const SizedBox.shrink();
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, color: Colors.white, size: 26),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final photos = widget.photos;
@@ -1508,6 +1535,32 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
             ),
           ),
         ),
+        // Clickable chevrons over the photo, vertically centred (above the
+        // name / message / emoji rail, which live in the card's bottom row).
+        if (photos.length > 1) ...[
+          Positioned(
+            left: 6,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _arrow(
+                Icons.chevron_left_rounded,
+                _index > 0 ? () => _go(_index - 1) : null,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 6,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _arrow(
+                Icons.chevron_right_rounded,
+                _index < photos.length - 1 ? () => _go(_index + 1) : null,
+              ),
+            ),
+          ),
+        ],
         if (photos.length > 1)
           Positioned(
             top: 14,
