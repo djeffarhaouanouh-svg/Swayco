@@ -56,7 +56,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
   @override
   Widget build(BuildContext context) {
     final shortest = MediaQuery.sizeOf(context).shortestSide;
-    final size = math.min(shortest * 0.72, 460.0);
+    final size = math.min(shortest * 0.80, 500.0);
 
     return Scaffold(
       backgroundColor: widget.background,
