@@ -1446,6 +1446,9 @@ class _CardPhoto extends StatelessWidget {
       // Centre crop — keeps the subject roughly in the middle of the card
       // whatever the source aspect ratio.
       alignment: Alignment.center,
+      // Keep the already-decoded frame on screen while the widget rebuilds
+      // (e.g. during a tab swipe) instead of flashing to a blank/black frame.
+      gaplessPlayback: true,
       errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
     );
   }
