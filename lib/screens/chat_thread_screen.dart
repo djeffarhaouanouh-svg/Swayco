@@ -754,8 +754,8 @@ class _ThreadHeader extends StatelessWidget {
               child: Text.rich(
                 TextSpan(
                   children: [
-                    TextSpan(text: 'swayco '),
-                    TextSpan(text: 'ai', style: TextStyle(color: SC.accent)),
+                    TextSpan(text: 'swayco'),
+                    TextSpan(text: '.ai', style: TextStyle(color: SC.accent)),
                   ],
                 ),
                 maxLines: 1,
