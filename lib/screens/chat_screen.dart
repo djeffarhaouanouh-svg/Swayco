@@ -396,21 +396,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
+          // No header bar — the discussions list fills the whole page (it
+          // scrolls behind the floating nav bar). A small top inset keeps the
+          // first row off the status area. The "Invite to a call" row is the
+          // last item of the list — see _buildBody.
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    AppStrings.t('messages_title'),
-                    style: SCText.h1,
-                  ),
-                ),
-              ),
-              // The list fills the full height (scrolling behind the
-              // floating nav bar). The "Invite to a call" row is the last
-              // item of the list — see _buildBody.
+              const SizedBox(height: 8),
               Expanded(child: _buildBody()),
             ],
           ),
