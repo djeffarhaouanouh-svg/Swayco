@@ -1785,12 +1785,6 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 16,
-              color: Colors.white.withValues(alpha: 0.75),
-            ),
-            const SizedBox(width: 8),
             Flexible(
               child: TextField(
                 controller: _ctrl,
