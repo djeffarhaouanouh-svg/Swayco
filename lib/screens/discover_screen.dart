@@ -787,9 +787,6 @@ class _DiscoverHeader extends StatelessWidget {
                 children: [
                   Text(AppStrings.t('discover_title'), style: SCText.h1),
                   const Spacer(),
-                  // Notification glyph.
-                  Image.asset('assets/notif-android.png', height: 30),
-                  const SizedBox(width: 12),
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width.
                   AnimatedContainer(
