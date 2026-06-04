@@ -2182,6 +2182,22 @@ class _InterestsSectionState extends State<_InterestsSection> {
     if (save != null) await save(_sel.toList());
   }
 
+  void _toggleExpanded() {
+    setState(() => _expanded = !_expanded);
+    if (!_expanded) return;
+    // Once the picker unfolds, scroll it up to the top of the viewport so the
+    // pins are fully in view (it would otherwise open below the fold).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -2199,12 +2215,10 @@ class _InterestsSectionState extends State<_InterestsSection> {
               _InterestChip(
                 label: tag,
                 color: interestColor(tag),
-                onTap: () => setState(() => _expanded = !_expanded),
+                onTap: _toggleExpanded,
               ),
             if (_sel.length < profileInterestsMax)
-              _InterestAddChip(
-                onTap: () => setState(() => _expanded = !_expanded),
-              ),
+              _InterestAddChip(onTap: _toggleExpanded),
           ],
         ),
         // The category picker, unfolding right here (no overlay). A tap
@@ -2428,7 +2442,11 @@ class _CategoryPage extends StatelessWidget {
                   for (final opt in cat.options)
                     _InterestChip(
                       label: opt,
-                      color: interestColor(opt),
+                      // Use THIS category's colour — interestColor() takes the
+                      // first matching category, so a label shared by two
+                      // categories (e.g. K-pop / J-pop) would otherwise show
+                      // the other category's colour inside this page.
+                      color: cat.color,
                       shape: cat.shape,
                       selected: sel.contains(opt),
                       showCheck: sel.contains(opt),
