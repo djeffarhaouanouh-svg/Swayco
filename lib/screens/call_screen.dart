@@ -169,8 +169,16 @@ class _CallScreenState extends State<CallScreen> {
   /// our ring so the waiting screen can close. Null for the callee and
   /// for calls with no ring row. Removed on teardown.
   RealtimeChannel? _declineChannel;
-  /// Guards [_onDeclinedByCallee] so we pop / snackbar at most once.
+  /// Guards [_onDeclinedByCallee] / [_onRingTimeout] so we pop / snackbar at
+  /// most once.
   bool _declinedHandled = false;
+
+  /// Caller-only ring timeout. The decline signal is a best-effort realtime
+  /// broadcast — the web build frequently misses it, and a powered-off callee
+  /// can't send it at all — so without this the caller could ring into an
+  /// empty room forever. Armed only for direct friend rings (an
+  /// [outgoingCallId]); guest-invite waits have no timeout.
+  Timer? _ringTimeout;
 
   /// When the LiveKit room finished connecting â€” null until then. Used
   /// to emit the analytics `call_ended` duration from [dispose] (which
@@ -310,7 +318,23 @@ class _CallScreenState extends State<CallScreen> {
         callId: callId,
         onDeclined: _onDeclinedByCallee,
       );
+      // Safety net for the lost-broadcast / powered-off-callee cases above:
+      // leave the waiting room after the ring window if nobody joined.
+      _ringTimeout = Timer(const Duration(seconds: 35), _onRingTimeout);
     }
+  }
+
+  /// Ring window elapsed with no one joining — the callee declined (and the
+  /// broadcast was lost), their phone was off, or they simply didn't answer.
+  /// Same teardown as a decline, with a "no answer" message.
+  void _onRingTimeout() {
+    if (_declinedHandled || _hadRemote || !mounted) return;
+    _declinedHandled = true;
+    CallAlert.stop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.t('call_no_answer'))),
+    );
+    unawaited(_hangUp());
   }
 
   /// Best-effort fetch of the peer's profile (PDP + language) for the
@@ -1245,6 +1269,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     _splashTimer?.cancel();
+    _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
     // runs on every exit path (hang-up, peer-left auto-hangup, system
     // back) â€” so the call is counted exactly once with its duration.
