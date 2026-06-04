@@ -60,6 +60,18 @@ abstract final class LocalNotifications {
     if (android_ != null) {
       await android_.createNotificationChannel(_callsChannel);
       await android_.createNotificationChannel(_messagesChannel);
+      // Android 13+ : POST_NOTIFICATIONS runtime grant (FCM also asks, but
+      // this covers the case where push is off yet calls still need to ring).
+      try {
+        await android_.requestNotificationsPermission();
+      } catch (_) {/* older Android: granted at install */}
+      // Android 14+ (API 34): a full-screen-intent notification is downgraded
+      // to a heads-up banner unless this special permission is granted. This
+      // is what makes the incoming call actually take over the screen
+      // (WhatsApp-style) instead of a small banner.
+      try {
+        await android_.requestFullScreenIntentPermission();
+      } catch (_) {/* older Android: not required */}
     }
     _ready = true;
   }
