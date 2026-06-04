@@ -661,7 +661,7 @@ class _ThreadHeader extends StatelessWidget {
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 8),
-            Expanded(
+            Flexible(
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: onViewProfile,
@@ -676,7 +676,7 @@ class _ThreadHeader extends StatelessWidget {
                         size: 32,
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
+                      Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -724,6 +724,24 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ),
             ),
+            // Brand wordmark — centred in the gap between the name and the
+            // call buttons (same "swayco.ai" mark as the call screen).
+            Expanded(
+              child: Center(
+                child: Text(
+                  'swayco.ai',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Audio call (phone) + video call (camera).
             GlassIconButton(
               icon: Icons.phone_rounded,
