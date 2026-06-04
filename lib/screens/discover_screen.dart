@@ -1771,13 +1771,16 @@ class _DirectMessageField extends StatefulWidget {
 
 class _DirectMessageFieldState extends State<_DirectMessageField> {
   final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _focus = FocusNode();
   bool _sending = false;
 
   @override
   void initState() {
     super.initState();
-    // Rebuild on text changes so the send arrow only shows while typing.
+    // Rebuild on text changes AND on focus so the bar expands + reveals the
+    // send arrow when tapped, and shrinks back when idle/empty.
     _ctrl.addListener(_onChanged);
+    _focus.addListener(_onChanged);
   }
 
   void _onChanged() => setState(() {});
@@ -1785,6 +1788,8 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   void dispose() {
     _ctrl.removeListener(_onChanged);
+    _focus.removeListener(_onChanged);
+    _focus.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -1802,76 +1807,78 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   Widget build(BuildContext context) {
     final hasText = _ctrl.text.trim().isNotEmpty;
+    // Expanded once the field is tapped (focused) or has text: full width +
+    // send arrow. Idle & empty: a slightly narrower compact pill, no arrow.
+    final expanded = _focus.hasFocus || hasText;
     // First name only — weave it into the hint ("Écris à Sarah…"); fall back
     // to the generic hint when the peer has no name.
     final firstName = widget.peerName.trim().split(RegExp(r'\s+')).first;
     final hintText = firstName.isEmpty
         ? AppStrings.t('discover_message_hint')
         : AppStrings.t('discover_message_hint_name', args: {'name': firstName});
-    // Clean neutral-dark pill (no blur, no blue) with white text, a leading
-    // chat glyph and a filled cyan send button that appears only while typing.
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 270),
-      child: Container(
-        decoration: BoxDecoration(
-          // Neutral translucent dark over the photo.
-          color: Colors.black.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-        ),
-        padding: EdgeInsets.fromLTRB(14, 3, hasText ? 5 : 16, 3),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: TextField(
-                controller: _ctrl,
-                enabled: !_sending,
-                minLines: 1,
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                cursorColor: SC.accent,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  isDense: true,
-                  // The app theme fills inputs with navy (bubbleIn) — turn it
-                  // OFF here, that navy was the "fond bleu" behind the text.
-                  filled: false,
-                  hintText: hintText,
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      // Slightly narrower at rest; grows back to the full width on tap.
+      width: expanded ? 270 : 232,
+      decoration: BoxDecoration(
+        // Neutral translucent dark over the photo.
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+      ),
+      padding: EdgeInsets.fromLTRB(14, 3, expanded ? 5 : 16, 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              focusNode: _focus,
+              enabled: !_sending,
+              minLines: 1,
+              maxLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                // The app theme fills inputs with navy (bubbleIn) — turn it
+                // OFF here, that navy was the "fond bleu" behind the text.
+                filled: false,
+                hintText: hintText,
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 14,
                 ),
-                onSubmitted: (_) => _send(),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onSubmitted: (_) => _send(),
+            ),
+          ),
+          // Send arrow (➤) inside the bar — appears once the field is tapped
+          // or has text.
+          if (expanded) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: (hasText && !_sending) ? _send : null,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: SC.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
             ),
-            // Send arrow (➤) inside the bar — shown only while typing so the
-            // empty field stays compact.
-            if (hasText) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: _sending ? null : _send,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: SC.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
