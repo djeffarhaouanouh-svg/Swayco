@@ -204,8 +204,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final seen = <String>{};
     for (var off = -1; off <= 5; off++) {
       final card = _cards[(index + off) % n];
-      final raw = card.photos.isNotEmpty ? card.photos.first : '';
-      final url = supabaseThumbUrl(raw);
+      final url = card.photos.isNotEmpty ? card.photos.first : '';
       if (url.isNotEmpty && seen.add(url)) {
         precacheImage(NetworkImage(url), context).ignore();
       }
@@ -1386,11 +1385,8 @@ class _CardPhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Serve a lighter, transformed thumbnail; fall back to the full image if
-    // the Supabase render endpoint isn't available (feature off).
-    final thumb = supabaseThumbUrl(photoUrl);
     return Image.network(
-      thumb,
+      photoUrl,
       fit: BoxFit.cover,
       // Centre crop — keeps the subject roughly in the middle of the card
       // whatever the source aspect ratio.
@@ -1398,34 +1394,9 @@ class _CardPhoto extends StatelessWidget {
       // Keep the already-decoded frame on screen while the widget rebuilds
       // (e.g. during a tab swipe) instead of flashing to a blank/black frame.
       gaplessPlayback: true,
-      errorBuilder: (_, _, _) {
-        if (thumb == photoUrl) {
-          return const ColoredBox(color: SC.bubbleIn);
-        }
-        return Image.network(
-          photoUrl,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-        );
-      },
+      errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
     );
   }
-}
-
-/// Supabase Storage image transformation: rewrite a public object URL to the
-/// `render/image` endpoint with a width + quality cap so the Discover card
-/// photo downloads far lighter. Returns the URL unchanged when it isn't a
-/// Supabase public object URL, so non-Supabase / already-rendered URLs pass
-/// through untouched (and the caller can fall back to it on error).
-String supabaseThumbUrl(String url, {int width = 720, int quality = 70}) {
-  const marker = '/storage/v1/object/public/';
-  if (!url.contains(marker)) return url;
-  final rendered =
-      url.replaceFirst(marker, '/storage/v1/render/image/public/');
-  final sep = rendered.contains('?') ? '&' : '?';
-  return '$rendered${sep}width=$width&quality=$quality&resize=cover';
 }
 
 /// Vertical reaction rail rendered on the right side of a profile card —
