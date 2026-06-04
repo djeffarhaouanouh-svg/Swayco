@@ -1475,6 +1475,16 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
     super.dispose();
   }
 
+  void _go(int i) {
+    final target = i.clamp(0, widget.photos.length - 1);
+    if (target == _index) return;
+    _ctrl.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final photos = widget.photos;
@@ -1494,6 +1504,37 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
             errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
           ),
         ),
+        // Tap to change photo (left half = previous, right half = next),
+        // Tinder/Stories style. A horizontal *drag* here would fight the
+        // vertical profile deck and lose, so tapping is the reliable gesture
+        // (vertical swipe still changes profile, taps don't claim drags).
+        // Confined to the upper area so the name / message / emoji rail at
+        // the bottom of the card stay tappable.
+        if (photos.length > 1)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 150,
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _index > 0 ? () => _go(_index - 1) : null,
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _index < photos.length - 1
+                        ? () => _go(_index + 1)
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (photos.length > 1)
           Positioned(
             top: 14,
