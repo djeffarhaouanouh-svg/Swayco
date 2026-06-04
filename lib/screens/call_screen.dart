@@ -1352,15 +1352,16 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Controls as a vertical rail on the RIGHT (like the Discover
-                // emoji rail), vertically centred. The camera self-view above
-                // is a separate widget and stays untouched.
+                // Controls as a vertical rail anchored to the BOTTOM-RIGHT, so
+                // they grow upward from the bottom and never reach the PiP
+                // self-view in the top-right corner.
                 Positioned(
-                  top: 0,
-                  bottom: 0,
                   right: 12,
+                  bottom: 0,
                   child: SafeArea(
-                    child: Center(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1374,7 +1375,7 @@ class _CallScreenState extends State<CallScreen> {
                             background: SC.accent,
                             onTap: _toggleMic,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           // Live broadcasts keep the camera on — no toggle.
                           if (_callKind != 'live') ...[
                             _RoundCallButton(
@@ -1387,7 +1388,7 @@ class _CallScreenState extends State<CallScreen> {
                               background: SC.accent,
                               onTap: _toggleCam,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                           ],
                           _RoundCallButton(
                             icon: Icons.tune_rounded,
@@ -1395,14 +1396,14 @@ class _CallScreenState extends State<CallScreen> {
                             background: SC.accent,
                             onTap: _openAudioSheet,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           _RoundCallButton(
                             icon: Icons.translate,
                             label: AppStrings.t('call_language'),
                             background: SC.accent,
                             onTap: _openLanguageSheet,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           _RoundCallButton(
                             icon: Icons.call_end_rounded,
                             label: AppStrings.t('call_end'),
