@@ -1328,12 +1328,17 @@ class _ComposerState extends State<_Composer> {
   String _typedHint = '';
   Timer? _hintTimer;
 
+  /// Gate: only type the placeholder once the page-open transition has
+  /// finished, so the animation plays on a settled (visible) screen instead
+  /// of during the slide-in + initial message load (where it isn't seen).
+  bool _hintReady = false;
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTextChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
-    _animateHint();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startHintWhenSettled());
   }
 
   @override
@@ -1360,8 +1365,30 @@ class _ComposerState extends State<_Composer> {
   void didUpdateWidget(_Composer old) {
     super.didUpdateWidget(old);
     // The spoken language loads a beat after the screen opens; retype the
-    // placeholder once it resolves ("Message" → "Write in English").
-    if (old.myLang != widget.myLang) _animateHint();
+    // placeholder once it resolves ("Message" → "Write in English") — but
+    // only after the open transition, so the retype stays visible.
+    if (_hintReady && old.myLang != widget.myLang) _animateHint();
+  }
+
+  /// Wait for the route's open transition to finish, then start typing.
+  /// Runs immediately when there's no transition still in flight.
+  void _startHintWhenSettled() {
+    if (!mounted) return;
+    final anim = ModalRoute.of(context)?.animation;
+    if (anim != null && anim.status != AnimationStatus.completed) {
+      void onStatus(AnimationStatus s) {
+        if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
+          anim.removeStatusListener(onStatus);
+          if (!mounted) return;
+          _hintReady = true;
+          _animateHint();
+        }
+      }
+      anim.addStatusListener(onStatus);
+    } else {
+      _hintReady = true;
+      _animateHint();
+    }
   }
 
   /// Reveal [_composerHint] one character at a time. Cheap setState loop on a
