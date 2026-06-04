@@ -1481,17 +1481,31 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        PageView.builder(
-          controller: _ctrl,
-          itemCount: photos.length,
-          onPageChanged: (i) => setState(() => _index = i),
-          itemBuilder: (_, i) => Image.network(
-            photos[i],
-            fit: BoxFit.cover,
-            // Centre crop — keeps the subject roughly in the middle of the
-            // card whatever the source aspect ratio.
-            alignment: Alignment.center,
-            errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+        // Flutter blocks mouse drags on scrollables by default, so on the web
+        // build the photo carousel couldn't be slid with a mouse. Opt the
+        // mouse + trackpad in here so left/right drag pages the photos
+        // everywhere (the vertical profile deck still pages via the wheel).
+        ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+              PointerDeviceKind.stylus,
+            },
+          ),
+          child: PageView.builder(
+            controller: _ctrl,
+            itemCount: photos.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (_, i) => Image.network(
+              photos[i],
+              fit: BoxFit.cover,
+              // Centre crop — keeps the subject roughly in the middle of the
+              // card whatever the source aspect ratio.
+              alignment: Alignment.center,
+              errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
+            ),
           ),
         ),
         if (photos.length > 1)
