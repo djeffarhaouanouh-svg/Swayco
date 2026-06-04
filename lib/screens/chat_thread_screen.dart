@@ -1439,14 +1439,14 @@ class _ComposerState extends State<_Composer> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 4, 8, 6),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: GlassContainer(
                 borderRadius: BorderRadius.circular(26),
                 padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: ConstrainedBox(
