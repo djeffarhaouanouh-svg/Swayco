@@ -396,17 +396,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
-          // No fixed top bar: the "Messages" title is the first item of the
-          // scroll view (see _buildBody), so it scrolls away with the list
-          // instead of being a fixed band the conversations tuck under.
-          child: _buildBody(),
+          // Fixed "Messages" band at the top; the conversation list scrolls
+          // underneath it (the band stays pinned, it doesn't scroll away).
+          child: Column(
+            children: [
+              _titleBar,
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// The big "Messages" title — now a normal (scrolling) item, not a fixed
-  /// header bar.
+  /// The fixed "Messages" band pinned at the top of the page.
   Widget get _titleBar => Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
         child: Align(
@@ -421,39 +424,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // instead of swapping a centred spinner for a populated list
       // (the old behaviour made rows pop in one by one as each
       // request resolved).
-      return Column(
-        children: [
-          _titleBar,
-          Expanded(
-            child: _ChatListSkeleton(
-              bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
-            ),
-          ),
-        ],
+      return _ChatListSkeleton(
+        bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
       );
     }
     if (_error != null) {
-      return Column(
-        children: [
-          _titleBar,
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              _error!,
-              style: const TextStyle(
-                color: Color(0xFFFFAB91),
-                height: 1.35,
-                fontSize: 13,
-              ),
-            ),
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          _error!,
+          style: const TextStyle(
+            color: Color(0xFFFFAB91),
+            height: 1.35,
+            fontSize: 13,
           ),
-        ],
+        ),
       );
     }
     if (_friends.isEmpty) {
-      return Column(
-        children: [_titleBar, const Expanded(child: _NoFriendsEmpty())],
-      );
+      return const _NoFriendsEmpty();
     }
     return RefreshIndicator(
       color: SC.accent,
@@ -463,11 +452,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         // Clear the floating nav bar so the invite row stays scrollable.
         padding: EdgeInsets.fromLTRB(
-          16, 0, 16,
+          16, 4, 16,
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          _titleBar,
           // Conversation rows as a flat list (no boxed card) — just a thin
           // hairline divider between them (inset past the avatar).
           Column(
