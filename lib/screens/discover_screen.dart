@@ -36,29 +36,23 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
 
-  // The feed is one card per PERSON: each profile's photos (newest first,
-  // capped at 6) are shown as a horizontal carousel inside their single card.
+  // The feed is one card per PERSON, showing a SINGLE photo (the discover
+  // photo). The rest of the gallery only lives on the profile page.
   // Rebuilt whenever [_profiles] changes.
-  static const int _maxCardPhotos = 6;
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
   void _rebuildCards() {
     _cards.clear();
     for (final p in _profiles) {
       final photos = p.photos.where((u) => u.isNotEmpty).toList();
-      List<String> shown;
-      if (photos.isEmpty) {
-        // Legacy rows with no gallery: fall back to the single photo.
-        final single = p.discoverPhotoUrl.isNotEmpty
-            ? p.discoverPhotoUrl
-            : p.avatarUrl;
-        shown = single.isNotEmpty ? <String>[single] : const <String>[];
-      } else {
-        // Newest photos sit at the end of the array (append-on-upload), so
-        // reverse to show the most recent first; cap the carousel at 6.
-        shown = photos.reversed.take(_maxCardPhotos).toList();
+      // One photo only: the designated discover photo, falling back to the
+      // first gallery photo, then the avatar.
+      final single = p.discoverPhotoUrl.isNotEmpty
+          ? p.discoverPhotoUrl
+          : (photos.isNotEmpty ? photos.first : p.avatarUrl);
+      if (single.isNotEmpty) {
+        _cards.add((profile: p, photos: <String>[single]));
       }
-      if (shown.isNotEmpty) _cards.add((profile: p, photos: shown));
     }
   }
 
@@ -1235,9 +1229,6 @@ class _ProfileCard extends StatefulWidget {
 }
 
 class _ProfileCardState extends State<_ProfileCard> {
-  // Which carousel photo is on screen — drives the reaction rail's target.
-  int _photoIdx = 0;
-
   @override
   Widget build(BuildContext context) {
     // Alias widget fields to locals so the (long) build body below reads
@@ -1248,10 +1239,8 @@ class _ProfileCardState extends State<_ProfileCard> {
     final pendingOutgoing = widget.pendingOutgoing;
     final alreadyMessaged = widget.alreadyMessaged;
     final onSendMessage = widget.onSendMessage;
-    final idx = photos.isEmpty
-        ? 0
-        : _photoIdx.clamp(0, photos.length - 1);
-    final currentPhoto = photos.isEmpty ? '' : photos[idx];
+    // One photo per Discover card now — reactions target it.
+    final currentPhoto = photos.isEmpty ? '' : photos.first;
     final reactedEmojis =
         widget.reactionsByPhoto[currentPhoto] ?? const <String>{};
     final sendEmoji = widget.onSendEmoji;
@@ -1291,11 +1280,7 @@ class _ProfileCardState extends State<_ProfileCard> {
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: SC.bubbleIn),
-            if (photos.isNotEmpty)
-              _CardPhotoCarousel(
-                photos: photos,
-                onIndexChanged: (i) => setState(() => _photoIdx = i),
-              ),
+            if (currentPhoto.isNotEmpty) _CardPhoto(photoUrl: currentPhoto),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -1445,113 +1430,23 @@ class _ProfileCardState extends State<_ProfileCard> {
   }
 }
 
-/// Horizontal photo carousel filling a Discover card. Swipe left/right to move
-/// between this person's photos (the deck itself pages vertically, so the two
-/// axes don't fight). Page dots sit at the TOP-CENTRE in a discreet greyed
-/// white. Single-photo cards render just the image, no dots.
-class _CardPhotoCarousel extends StatefulWidget {
-  const _CardPhotoCarousel({required this.photos, this.onIndexChanged});
+/// The single Discover photo filling a card. The feed now shows one photo
+/// per person (the rest of the gallery lives on the profile page), so this
+/// is just a centre-cropped image — no carousel.
+class _CardPhoto extends StatelessWidget {
+  const _CardPhoto({required this.photoUrl});
 
-  final List<String> photos;
-
-  /// Fires with the new photo index whenever the visible photo changes
-  /// (swipe or tap). Lets the parent card target reactions at this photo.
-  final ValueChanged<int>? onIndexChanged;
-
-  @override
-  State<_CardPhotoCarousel> createState() => _CardPhotoCarouselState();
-}
-
-class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
-  int _index = 0;
-  double _dragDx = 0;
-
-  void _set(int i) {
-    final n = widget.photos.length;
-    if (n <= 1) return;
-    final t = i.clamp(0, n - 1);
-    if (t == _index) return;
-    setState(() => _index = t);
-    widget.onIndexChanged?.call(t);
-  }
+  final String photoUrl;
 
   @override
   Widget build(BuildContext context) {
-    final photos = widget.photos;
-    final i = photos.isEmpty ? 0 : _index.clamp(0, photos.length - 1);
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Manual swipe + tap navigation — NO inner PageView, so there's no
-        // gesture-arena fight with the vertical profile deck: a horizontal
-        // drag is claimed here (the deck only wants vertical), a vertical
-        // drag falls through to the deck, and a tap flips by which side was
-        // touched. This is what actually makes browsing photos work on mobile.
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: photos.length > 1 ? (_) => _dragDx = 0 : null,
-          onHorizontalDragUpdate:
-              photos.length > 1 ? (d) => _dragDx += d.delta.dx : null,
-          onHorizontalDragEnd: photos.length > 1
-              ? (d) {
-                  final v = d.primaryVelocity ?? 0;
-                  if (v.abs() > 100) {
-                    _set(v < 0 ? _index + 1 : _index - 1); // fling
-                  } else if (_dragDx.abs() > 40) {
-                    _set(_dragDx < 0 ? _index + 1 : _index - 1); // drag
-                  }
-                }
-              : null,
-          onTapUp: photos.length > 1
-              ? (d) {
-                  final w = context.size?.width ?? 0;
-                  if (w <= 0) return;
-                  _set(d.localPosition.dx > w / 2 ? _index + 1 : _index - 1);
-                }
-              : null,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Image.network(
-              photos.isEmpty ? '' : photos[i],
-              key: ValueKey(i),
-              fit: BoxFit.cover,
-              // Centre crop — keeps the subject roughly in the middle of the
-              // card whatever the source aspect ratio.
-              alignment: Alignment.center,
-              errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-            ),
-          ),
-        ),
-        if (photos.length > 1)
-          Positioned(
-            top: 14,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var j = 0; j < photos.length; j++) ...[
-                    if (j > 0) const SizedBox(width: 6),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: j == i ? 18 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        // Discreet — greyed white, the active dot a touch
-                        // brighter and wider.
-                        color: j == i
-                            ? Colors.white.withValues(alpha: 0.75)
-                            : Colors.white.withValues(alpha: 0.30),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-      ],
+    return Image.network(
+      photoUrl,
+      fit: BoxFit.cover,
+      // Centre crop — keeps the subject roughly in the middle of the card
+      // whatever the source aspect ratio.
+      alignment: Alignment.center,
+      errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
     );
   }
 }

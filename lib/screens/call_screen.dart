@@ -1361,7 +1361,7 @@ class _CallScreenState extends State<CallScreen> {
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 28),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
