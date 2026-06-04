@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -20,6 +21,7 @@ import '../services/call_alert.dart';
 import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
+import '../services/translation_api.dart';
 import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -111,6 +113,18 @@ class _CallScreenState extends State<CallScreen> {
   /// lives in the small PiP. Tap either to swap back.
   bool _selfMain = false;
   EventsListener<RoomEvent>? _roomEvents;
+
+  // ── In-call text chat (typed). What I type is translated into the peer's
+  // language and sent over the LiveKit data channel; on their side it shows
+  // as a caption AND is read aloud (OpenAI TTS via the backend). Ephemeral —
+  // nothing is persisted.
+  static const String _captionTopic = 'swayco-chat';
+  final List<({String orig, String trans, bool mine})> _captions = [];
+  final TextEditingController _chatCtrl = TextEditingController();
+  final FocusNode _chatFocus = FocusNode();
+  final AudioPlayer _ttsPlayer = AudioPlayer();
+  bool _chatTranslate = true;
+  bool _chatSending = false;
 
   /// The remote BCP-47 we have attached the translation pipeline with, so we
   /// only re-attach when it actually changes.
@@ -574,6 +588,8 @@ class _CallScreenState extends State<CallScreen> {
         ..on<TrackUnmutedEvent>((_) {
           if (mounted) setState(() {});
         })
+        // In-call typed-chat messages from the peer.
+        ..on<DataReceivedEvent>(_onCaptionData)
         ..on<ParticipantConnectedEvent>((_) {
           // First remote joining = call answered â†’ silence the caller's
           // dial tone (no-op on native via the stub).
@@ -703,6 +719,146 @@ class _CallScreenState extends State<CallScreen> {
     final next = !_micOn;
     await room.localParticipant?.setMicrophoneEnabled(next);
     if (mounted) setState(() => _micOn = next);
+  }
+
+  // ── In-call typed chat ────────────────────────────────────────────────
+
+  /// Type → translate into the peer's language → show my bubble → publish
+  /// to the peer over the data channel (they see the translation and hear it).
+  Future<void> _sendCaption() async {
+    final room = _room;
+    final text = _chatCtrl.text.trim();
+    if (room == null || text.isEmpty || _chatSending) return;
+    setState(() => _chatSending = true);
+    final to = _discoverRemoteLang(room); // peer's spoken language ('' if unknown)
+    var trans = text;
+    if (_chatTranslate && to.isNotEmpty) {
+      trans = await fetchTextTranslation(
+        text: text,
+        to: to,
+        from: widget.mySourceLang,
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _captions.add((orig: text, trans: trans, mine: true));
+      _chatCtrl.clear();
+      _chatSending = false;
+    });
+    try {
+      final payload = jsonEncode({'orig': text, 'trans': trans, 'lang': to});
+      await room.localParticipant?.publishData(
+        Uint8List.fromList(utf8.encode(payload)),
+        reliable: true,
+        topic: _captionTopic,
+      );
+    } catch (_) {
+      // Best-effort — the message still shows on my side.
+    }
+  }
+
+  /// A typed message arrived from the peer: show it (original + translation
+  /// in my language) and read the translation aloud via OpenAI TTS.
+  void _onCaptionData(DataReceivedEvent e) {
+    if (e.topic != _captionTopic) return;
+    try {
+      final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
+      final orig = m['orig']?.toString() ?? '';
+      final trans = m['trans']?.toString() ?? '';
+      final lang = m['lang']?.toString() ?? '';
+      if (orig.isEmpty && trans.isEmpty) return;
+      if (mounted) {
+        setState(() => _captions.add((orig: orig, trans: trans, mine: false)));
+      }
+      if (trans.isNotEmpty) unawaited(_speak(trans, lang));
+    } catch (_) {
+      // Ignore malformed packets / other topics.
+    }
+  }
+
+  /// OpenAI TTS (gpt-4o-mini-tts via the backend) for an incoming message.
+  Future<void> _speak(String text, String lang) async {
+    try {
+      final bytes = await fetchSpeech(text: text, lang: lang);
+      if (bytes == null || !mounted) return;
+      await _ttsPlayer.stop();
+      await _ttsPlayer.play(BytesSource(bytes));
+    } catch (_) {
+      // TTS is best-effort — silence on failure (e.g. backend /tts missing).
+    }
+  }
+
+  /// The in-call chat composer: translate toggle + text field + send.
+  Widget _buildChatComposer() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      child: Row(
+        children: [
+          // Translate on/off — when on, the message is translated into the
+          // peer's language before it's sent.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _chatTranslate = !_chatTranslate),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Icon(
+                Icons.translate,
+                size: 20,
+                color: _chatTranslate
+                    ? SC.accent
+                    : Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _chatCtrl,
+              focusNode: _chatFocus,
+              minLines: 1,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                hintText: AppStrings.t('composer_message_hint'),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onSubmitted: (_) => _sendCaption(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _chatSending ? null : _sendCaption,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: SC.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_upward_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _toggleCam() async {
@@ -1051,6 +1207,9 @@ class _CallScreenState extends State<CallScreen> {
     }
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
+    _chatCtrl.dispose();
+    _chatFocus.dispose();
+    unawaited(_ttsPlayer.dispose());
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -1352,6 +1511,35 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // In-call typed chat: recent caption bubbles + the composer,
+                // bottom-left so they clear the control rail on the right.
+                // Lifts with the keyboard.
+                Positioned(
+                  left: 12,
+                  right: 84,
+                  bottom: MediaQuery.viewInsetsOf(context).bottom +
+                      MediaQuery.paddingOf(context).bottom +
+                      12,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final c in _captions.length > 4
+                          ? _captions.sublist(_captions.length - 4)
+                          : _captions)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _CaptionBubble(
+                            orig: c.orig,
+                            trans: c.trans,
+                            mine: c.mine,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      _buildChatComposer(),
+                    ],
+                  ),
+                ),
                 // Controls as a vertical rail anchored to the BOTTOM-RIGHT, so
                 // they grow upward from the bottom and never reach the PiP
                 // self-view in the top-right corner.
@@ -1488,6 +1676,61 @@ class _RoundCallButton extends StatelessWidget {
           style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11),
         ),
       ],
+    );
+  }
+}
+
+/// One in-call typed-chat bubble: the original line (bold) with its
+/// translation underneath (italic, muted). Mine aligns right, theirs left.
+class _CaptionBubble extends StatelessWidget {
+  const _CaptionBubble({
+    required this.orig,
+    required this.trans,
+    required this.mine,
+  });
+
+  final String orig;
+  final String trans;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              orig,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (trans.isNotEmpty && trans != orig) ...[
+              const SizedBox(height: 2),
+              Text(
+                trans,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

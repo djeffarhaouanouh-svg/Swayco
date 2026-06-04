@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
@@ -69,6 +70,25 @@ Uri _translationTextUri() {
   }
   final b = resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '');
   return Uri.parse('$b/translation/text');
+}
+
+Uri _translationTtsUri() {
+  const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
+  if (fromEnv.isNotEmpty) {
+    final b = fromEnv.replaceAll(RegExp(r'/$'), '');
+    return Uri.parse('$b/translation/tts');
+  }
+  if (kIsWeb) {
+    final o = Uri.base.removeFragment();
+    return Uri(
+      scheme: o.scheme,
+      host: o.host,
+      port: o.hasPort ? o.port : null,
+      path: '/translation/tts',
+    );
+  }
+  final b = resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '');
+  return Uri.parse('$b/translation/tts');
 }
 
 Map<String, dynamic> _decodeObjectMap(String body) {
@@ -255,5 +275,34 @@ Future<String> fetchTextTranslation({
     return t is String && t.isNotEmpty ? t : text;
   } catch (_) {
     return text;
+  }
+}
+
+/// Text-to-speech via the backend (`/translation/tts` → OpenAI
+/// gpt-4o-mini-tts). POSTs the text (+ optional BCP-47 [lang] and [voice])
+/// and returns the spoken audio bytes (mp3), or null on any error so the
+/// caller can silently skip playback. The backend is expected to return the
+/// raw audio body (Content-Type audio/mpeg).
+Future<Uint8List?> fetchSpeech({
+  required String text,
+  String? lang,
+  String voice = 'alloy',
+}) async {
+  if (text.trim().isEmpty) return null;
+  final uri = _translationTtsUri();
+  try {
+    final res = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'text': text,
+        if (lang != null && lang.isNotEmpty) 'lang': lang,
+        'voice': voice,
+      }),
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) return null;
+    return res.bodyBytes.isEmpty ? null : res.bodyBytes;
+  } catch (_) {
+    return null;
   }
 }
