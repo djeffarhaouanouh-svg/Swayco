@@ -211,14 +211,12 @@ async function notifyUser(recipientUid, payload) {
           } else {
             out.failed += 1;
             out.results.push({ id: t.id, error: res.reason });
-            // Purge permanently-dead VoIP tokens: gone (410/Unregistered),
-            // malformed/wrong-env (BadDeviceToken), or a stale sandbox token
-            // hitting the production endpoint (BadEnvironmentKeyInToken).
-            // Stops old tokens from piling up and erroring forever.
-            if (res.status === 410 ||
-                res.reason === 'BadDeviceToken' ||
-                res.reason === 'Unregistered' ||
-                res.reason === 'BadEnvironmentKeyInToken') {
+            // Only purge tokens APNs says are truly GONE. We deliberately do
+            // NOT purge on BadDeviceToken / BadEnvironmentKeyInToken anymore:
+            // those can indicate a config issue (wrong key/topic/environment)
+            // rather than a dead token, and purging them every failed call was
+            // making the row vanish before it could be inspected.
+            if (res.status === 410 || res.reason === 'Unregistered') {
               await sb.from('notification_targets').delete().eq('id', t.id);
             }
           }

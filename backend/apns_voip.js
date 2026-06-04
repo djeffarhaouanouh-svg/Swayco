@@ -144,9 +144,17 @@ async function sendVoipPush(deviceToken, payload) {
   const firstHost = sandboxFirst ? SANDBOX_HOST : PROD_HOST;
   const secondHost = sandboxFirst ? PROD_HOST : SANDBOX_HOST;
 
+  // Verbose diagnosis: show the topic, token prefix, and what EACH APNs
+  // environment replies, so a key/topic/environment problem is unambiguous.
+  console.log(
+    `[voip] topic=${BUNDLE_ID}.voip token=${deviceToken.slice(0, 12)}… ` +
+      `key=${KEY_ID} team=${TEAM_ID}`,
+  );
   let res = await _post(firstHost, deviceToken, payload);
+  console.log(`[voip] ${firstHost} -> ${res.ok ? 'OK' : res.reason} (status ${res.status})`);
   if (!res.ok && ENV_MISMATCH_REASONS.has(res.reason)) {
     res = await _post(secondHost, deviceToken, payload);
+    console.log(`[voip] ${secondHost} -> ${res.ok ? 'OK' : res.reason} (status ${res.status})`);
   }
   return res;
 }
