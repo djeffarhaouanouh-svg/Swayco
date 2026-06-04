@@ -1365,14 +1365,14 @@ class _ComposerState extends State<_Composer> {
   }
 
   /// Reveal [_composerHint] one character at a time. Cheap setState loop on a
-  /// ~45 ms tick — quick enough to feel snappy, slow enough to read.
+  /// ~70 ms tick — quick enough to feel snappy, slow enough to read.
   void _animateHint() {
     _hintTimer?.cancel();
     final full = _composerHint;
     if (!mounted) return;
     setState(() => _typedHint = '');
     var shown = 0;
-    _hintTimer = Timer.periodic(const Duration(milliseconds: 45), (t) {
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 70), (t) {
       if (!mounted || shown >= full.length) {
         t.cancel();
         return;
