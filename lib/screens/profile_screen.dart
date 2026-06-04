@@ -1591,7 +1591,7 @@ class _IdentitySection extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
-        _ProfileSectionHeader(photosTitle),
+        _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
         const SizedBox(height: 12),
         _PhotoGallery(
           photos: photos,
@@ -1794,13 +1794,37 @@ class _IdentitySection extends StatelessWidget {
 /// Section header used across the redesigned profile (capture-1 style):
 /// a bold left-aligned title.
 class _ProfileSectionHeader extends StatelessWidget {
-  const _ProfileSectionHeader(this.title);
+  const _ProfileSectionHeader(this.title, {this.trailing});
   final String title;
+
+  /// Optional widget pinned to the right of the title (e.g. a cyan "+20"
+  /// reward hint on the photos / interests sections).
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(title, style: SCText.h2),
+    return Row(
+      children: [
+        Expanded(child: Text(title, style: SCText.h2)),
+        ?trailing,
+      ],
+    );
+  }
+}
+
+/// Small cyan "+20" reward hint shown on the right of a section header to
+/// nudge the user to complete it.
+class _RewardHint extends StatelessWidget {
+  const _RewardHint();
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      '+20',
+      style: TextStyle(
+        color: SC.accent,
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+      ),
     );
   }
 }
@@ -2207,7 +2231,10 @@ class _InterestsSectionState extends State<_InterestsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
+        _ProfileSectionHeader(
+          AppStrings.t('profile_interests_section'),
+          trailing: const _RewardHint(),
+        ),
         const SizedBox(height: 12),
         // The picked chips + the add/toggle chip. Tapping any of them folds
         // or unfolds the inline picker below. In the same TapRegion group as
