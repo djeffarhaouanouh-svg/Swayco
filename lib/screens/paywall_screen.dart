@@ -22,7 +22,7 @@ Future<void> showPaywallSheet(BuildContext context) {
 
 /// Subscription paywall — Swayco "Midnight" reskin of the classic store
 /// layout, presented as a bottom sheet: grab handle + close, a
-/// social-proof pill, a bold headline + trial promise, the logo as hero
+/// social-proof pill, a bold headline + value prop, the logo as hero
 /// art, a stack of radio-selectable plan cards (prices mirror the
 /// profile tiers), a single CTA acting on the selected plan, and the
 /// legal / restore footer.
@@ -39,8 +39,8 @@ class _PaywallSheet extends StatefulWidget {
 
 class _PaywallSheetState extends State<_PaywallSheet> {
   /// Currently highlighted plan (cyan border + filled radio + cyan
-  /// price). Defaults to the entry paid tier — the "start your trial"
-  /// CTA converts best anchored on the cheaper recurring plan, with the
+  /// price). Defaults to the entry paid tier — the subscribe CTA
+  /// converts best anchored on the cheaper recurring plan, with the
   /// pricier tier sitting just above as an upsell.
   String _selected = 'plus';
 
@@ -57,7 +57,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       // Highlighted (cyan) fragments are wrapped in *asterisks* and
       // split out at render time, mirroring the green words in the
       // reference paywall.
-      sublabel: 'Essai *gratuit* de *3 jours*',
+      sublabel: 'Heures d\'appel *incluses*',
       popular: true,
     ),
     _Plan(
@@ -65,12 +65,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       name: 'Ultra Plus',
       price: '15,99 €',
       period: '/mois',
-      sublabel: 'Essai *gratuit* de *3 jours* · voix clonée',
+      sublabel: 'Heures d\'appel *illimitées*',
       popular: false,
     ),
   ];
 
-  Future<void> _startTrial() async {
+  Future<void> _subscribe() async {
     if (_busy) return;
     setState(() => _busy = true);
     final url = await StripeApi.startCheckout(_selected);
@@ -181,7 +181,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                   children: [
                     const SizedBox(height: 4),
                     Text(
-                      'Activez votre abonnement\net profitez de 3 jours offerts',
+                      'Activez votre abonnement\net parlez sans limite',
                       textAlign: TextAlign.center,
                       style: SCText.h1.copyWith(fontSize: 25, height: 1.12),
                     ),
@@ -219,7 +219,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _busy ? null : _startTrial,
+                  onPressed: _busy ? null : _subscribe,
                   style: FilledButton.styleFrom(
                     backgroundColor: SC.accent,
                     foregroundColor: SC.bgDeep,
@@ -238,7 +238,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                           ),
                         )
                       : const Text(
-                          'Commencer mon essai gratuit',
+                          'S\'abonner',
                           style: TextStyle(
                             fontSize: 16.5,
                             fontWeight: FontWeight.w800,
@@ -354,7 +354,7 @@ class _HeroLogo extends StatelessWidget {
   }
 }
 
-/// One selectable plan card: radio on the left, name + trial sub-label
+/// One selectable plan card: radio on the left, name + sub-label
 /// in the middle, price on the right. Selected → cyan border, faint cyan
 /// fill, filled radio, cyan price.
 class _PlanTile extends StatelessWidget {
