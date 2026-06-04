@@ -821,7 +821,7 @@ class _MessageBubble extends StatelessWidget {
                   child: Text(
                     message.senderName,
                     style: const TextStyle(
-                      color: SC.outBubbleEnd,
+                      color: SC.accent,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
@@ -1099,20 +1099,20 @@ class _DubButtonState extends State<_DubButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: SC.accentDeep,
+                    color: SC.accent,
                   ),
                 )
               else
                 const Icon(
                   Icons.volume_up_outlined,
                   size: 16,
-                  color: SC.accentDeep,
+                  color: SC.accent,
                 ),
               const SizedBox(width: 6),
               Text(
                 _error ?? AppStrings.t('voice_dub_listen'),
                 style: const TextStyle(
-                  color: SC.accentDeep,
+                  color: SC.accent,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1215,8 +1215,8 @@ class _VoicePlayerState extends State<_VoicePlayer> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 4,
-              backgroundColor: Colors.black.withValues(alpha: 0.12),
-              valueColor: const AlwaysStoppedAnimation<Color>(SC.accentDeep),
+              backgroundColor: SC.textPrimary.withValues(alpha: 0.18),
+              valueColor: const AlwaysStoppedAnimation<Color>(SC.accent),
             ),
           ),
         ),

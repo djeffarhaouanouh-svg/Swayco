@@ -44,15 +44,15 @@ abstract final class SC {
   static const outBubbleStart = Color(0xFF0891B2);
   static const outBubbleEnd   = Color(0xFF0E7490);
 
-  // Chat message bubbles — light "card" style on the black message area
-  // (iMessage-like). Incoming (received): neutral light grey, near-black
-  // text. Outgoing (sent): pale cyan with a cyan border, dark-teal text.
-  static const msgInBg       = Color(0xFFEAEAEC);
-  static const msgInText     = Color(0xFF1C1C1E);
-  static const msgInBorder   = Color(0x12000000);
-  static const msgOutBg      = Color(0xFFE3F6FB);
+  // Chat message bubbles — "card" style on the black message area.
+  // Incoming (received): dark slate grey. Outgoing (sent): dark cyan with a
+  // bright cyan border. Both keep light text so they read on the black area.
+  static const msgInBg       = Color(0xFF2F333B);
+  static const msgInText     = Color(0xFFF5F7FF);
+  static const msgInBorder   = Color(0x1FFFFFFF);
+  static const msgOutBg      = Color(0xFF0F505F);
   static const msgOutBorder  = accent;
-  static const msgOutText    = Color(0xFF0B4C5A);
+  static const msgOutText    = Color(0xFFEAFBFF);
 
   /// Global Material 3 theme used by [MaterialApp.theme]. Mirrors the
   /// Midnight palette so any widget that opts into the inherited
