@@ -56,15 +56,22 @@ abstract final class IosCallKit {
     await _registerToken(userId);
   }
 
-  static Future<void> _registerToken(String userId) async {
+  static Future<void> _registerToken(String userId, {int attempts = 8}) async {
     if (!_isIos || userId.isEmpty) return;
-    try {
-      final token = await FlutterCallkitIncoming.getDevicePushTokenVoIP();
-      if (token != null && token.isNotEmpty) {
-        await NotificationApi.registerVoip(userId: userId, voipToken: token);
+    // The VoIP token may not be ready the instant we start — PushKit delivers
+    // it slightly after launch. Poll a few times until it's available instead
+    // of giving up on the first empty read.
+    for (var i = 0; i < attempts; i++) {
+      try {
+        final token = await FlutterCallkitIncoming.getDevicePushTokenVoIP();
+        if (token != null && token.isNotEmpty) {
+          await NotificationApi.registerVoip(userId: userId, voipToken: token);
+          return;
+        }
+      } catch (e) {
+        debugPrint('IosCallKit._registerToken failed: $e');
       }
-    } catch (e) {
-      debugPrint('IosCallKit._registerToken failed: $e');
+      await Future<void>.delayed(const Duration(seconds: 2));
     }
   }
 

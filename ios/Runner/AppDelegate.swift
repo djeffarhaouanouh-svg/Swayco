@@ -41,6 +41,15 @@ import flutter_callkit_incoming
     for type: PKPushType
   ) {
     let deviceToken = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+    // Persist DIRECTLY to the key the plugin reads in getDevicePushTokenVoIP
+    // ("DevicePushTokenVoIP"). The plugin's own setDevicePushTokenVoIP is the
+    // only thing that normally writes it, but it runs through
+    // sharedInstance — which is nil here because our SceneDelegate registers
+    // plugins late. That dropped the token entirely (getDevicePushTokenVoIP
+    // returned "", so Dart never registered it). Writing UserDefaults
+    // ourselves guarantees the token survives the race; the sharedInstance
+    // call below is best-effort to also fire the Dart "token updated" event.
+    UserDefaults.standard.set(deviceToken, forKey: "DevicePushTokenVoIP")
     SwiftFlutterCallkitIncomingPlugin.sharedInstance?.setDevicePushTokenVoIP(deviceToken)
   }
 
