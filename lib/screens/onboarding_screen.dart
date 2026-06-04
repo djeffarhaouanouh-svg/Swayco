@@ -1195,67 +1195,51 @@ class _LanguageGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final lang in supportedLanguages)
-          _LanguageChip(
-            language: lang,
-            selected: lang.code == selected,
-            onTap: () => onSelect(lang.code),
-          ),
-      ],
-    );
-  }
-}
-
-class _LanguageChip extends StatelessWidget {
-  const _LanguageChip({
-    required this.language,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final AppLanguage language;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.bubbleIn;
-    final borderColor = selected ? SC.accent : SC.glassBorder;
-    final fg = selected ? SC.accent : SC.textPrimary;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
+    final value =
+        (selected != null && supportedLanguages.any((l) => l.code == selected))
+            ? selected
+            : null;
+    return Container(
+      decoration: BoxDecoration(
+        color: SC.bubbleIn,
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: borderColor,
-              width: selected ? 1.5 : 1,
-            ),
+        border: Border.all(color: SC.glassBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: value,
+          dropdownColor: SC.bubbleIn,
+          borderRadius: BorderRadius.circular(14),
+          iconEnabledColor: SC.textPrimary,
+          hint: Text(
+            AppStrings.t('onb_language_picker_label'),
+            style: const TextStyle(color: SC.textMuted, fontSize: 15),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(language.flag, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 10),
-              Text(
-                language.label,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          items: [
+            for (final lang in supportedLanguages)
+              DropdownMenuItem<String>(
+                value: lang.code,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(lang.flag, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    Text(
+                      lang.label,
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+          ],
+          onChanged: (code) {
+            if (code != null) onSelect(code);
+          },
         ),
       ),
     );
