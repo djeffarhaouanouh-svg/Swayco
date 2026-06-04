@@ -647,16 +647,18 @@ class _ThreadHeader extends StatelessWidget {
     return Padding(
       // No frosted block behind the header any more — only the round glass
       // buttons keep their glass. The row sits transparently over the chat.
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Row(
           children: [
             GlassIconButton(
               icon: Icons.arrow_back_rounded,
+              size: 36,
+              iconSize: 18,
               onTap: () => Navigator.of(context).maybePop(),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
@@ -669,7 +671,7 @@ class _ThreadHeader extends StatelessWidget {
                         displayName: title,
                         avatarUrl: peer?.avatarUrl,
                         avatarColorHex: peer?.avatarColor,
-                        size: 38,
+                        size: 32,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -721,9 +723,19 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             // Audio call (phone) + video call (camera).
-            GlassIconButton(icon: Icons.phone_rounded, onTap: onCall),
+            GlassIconButton(
+              icon: Icons.phone_rounded,
+              size: 36,
+              iconSize: 18,
+              onTap: onCall,
+            ),
             const SizedBox(width: 6),
-            GlassIconButton(icon: Icons.videocam_rounded, onTap: onCallVideo),
+            GlassIconButton(
+              icon: Icons.videocam_rounded,
+              size: 36,
+              iconSize: 18,
+              onTap: onCallVideo,
+            ),
           ],
         ),
       ),
@@ -1425,10 +1437,10 @@ class _ComposerState extends State<_Composer> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
         child: GlassContainer(
-          borderRadius: BorderRadius.circular(28),
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          borderRadius: BorderRadius.circular(26),
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1447,27 +1459,13 @@ class _ComposerState extends State<_Composer> {
                       hintText: AppStrings.t('composer_message_hint'),
                       hintStyle: const TextStyle(color: SC.textMuted),
                       filled: false,
-                      contentPadding: const EdgeInsets.fromLTRB(4, 12, 14, 12),
-                      // Image button + translate toggle grouped together in
-                      // the prefix so they share one baseline and stay aligned.
+                      contentPadding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+                      // Only the translate toggle on the left now — the photo
+                      // button moved to the right of the bar.
                       prefixIcon: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const SizedBox(width: 4),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap:
-                                widget.sending ? null : widget.onSendImage,
-                            child: const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.add_photo_alternate_outlined,
-                                size: 22,
-                                color: SC.textMuted,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 8),
                           _ComposerTranslateToggle(
                             active: widget.autoTranslate,
                             onTap: widget.onToggleTranslate,
@@ -1476,7 +1474,7 @@ class _ComposerState extends State<_Composer> {
                       ),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 0,
-                        minHeight: 44,
+                        minHeight: 38,
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -1486,7 +1484,20 @@ class _ComposerState extends State<_Composer> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              // Photo button — now on the right, next to send / mic.
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: widget.sending ? null : widget.onSendImage,
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: Icon(
+                    Icons.add_photo_alternate_outlined,
+                    size: 22,
+                    color: SC.textMuted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
               _CircleActionButton(
                 icon: _hasText ? Icons.send : Icons.mic,
                 busy: widget.sending,
