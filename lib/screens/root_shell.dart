@@ -89,6 +89,12 @@ class _RootShellState extends State<RootShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onNotificationIntent();
       _maybeShowOnboardingTips();
+      // Warm the call "connecting" logo into the image cache at app start so
+      // it shows instantly when a call begins (it was decoding on first
+      // display, leaving a visible blank beat on the connecting screen).
+      if (mounted) {
+        precacheImage(const AssetImage('assets/notif-android.png'), context);
+      }
     });
   }
 
