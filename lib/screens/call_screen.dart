@@ -1352,64 +1352,65 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // Controls as a vertical rail on the RIGHT (like the Discover
+                // emoji rail), vertically centred. The camera self-view above
+                // is a separate widget and stays untouched.
                 Positioned(
-                  left: 0,
-                  right: 0,
+                  top: 0,
                   bottom: 0,
-                  child: Container(
-                    padding: EdgeInsets.fromLTRB(16, 28, 16, 16 + MediaQuery.paddingOf(context).bottom),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.82),
-                          Colors.black.withValues(alpha: 0),
+                  right: 12,
+                  child: SafeArea(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _RoundCallButton(
+                            icon: _micOn
+                                ? Icons.mic_rounded
+                                : Icons.mic_off_rounded,
+                            label: _micOn
+                                ? AppStrings.t('call_mute')
+                                : AppStrings.t('call_unmute'),
+                            background: SC.accent,
+                            onTap: _toggleMic,
+                          ),
+                          const SizedBox(height: 16),
+                          // Live broadcasts keep the camera on — no toggle.
+                          if (_callKind != 'live') ...[
+                            _RoundCallButton(
+                              icon: _camOn
+                                  ? Icons.videocam_rounded
+                                  : Icons.videocam_off_rounded,
+                              label: _camOn
+                                  ? AppStrings.t('call_video')
+                                  : AppStrings.t('call_video_off'),
+                              background: SC.accent,
+                              onTap: _toggleCam,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          _RoundCallButton(
+                            icon: Icons.tune_rounded,
+                            label: AppStrings.t('call_audio'),
+                            background: SC.accent,
+                            onTap: _openAudioSheet,
+                          ),
+                          const SizedBox(height: 16),
+                          _RoundCallButton(
+                            icon: Icons.translate,
+                            label: AppStrings.t('call_language'),
+                            background: SC.accent,
+                            onTap: _openLanguageSheet,
+                          ),
+                          const SizedBox(height: 16),
+                          _RoundCallButton(
+                            icon: Icons.call_end_rounded,
+                            label: AppStrings.t('call_end'),
+                            background: const Color(0xFFE53935),
+                            onTap: _hangUp,
+                          ),
                         ],
                       ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _RoundCallButton(
-                          icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-                          label: _micOn
-                              ? AppStrings.t('call_mute')
-                              : AppStrings.t('call_unmute'),
-                          background: SC.accent,
-                          onTap: _toggleMic,
-                        ),
-                        // Live broadcasts keep the camera on â€” no toggle.
-                        if (_callKind != 'live')
-                          _RoundCallButton(
-                            icon: _camOn
-                                ? Icons.videocam_rounded
-                                : Icons.videocam_off_rounded,
-                            label: _camOn
-                                ? AppStrings.t('call_video')
-                                : AppStrings.t('call_video_off'),
-                            background: SC.accent,
-                            onTap: _toggleCam,
-                          ),
-                        _RoundCallButton(
-                          icon: Icons.tune_rounded,
-                          label: AppStrings.t('call_audio'),
-                          background: SC.accent,
-                          onTap: _openAudioSheet,
-                        ),
-                        _RoundCallButton(
-                          icon: Icons.translate,
-                          label: AppStrings.t('call_language'),
-                          background: SC.accent,
-                          onTap: _openLanguageSheet,
-                        ),
-                        _RoundCallButton(
-                          icon: Icons.call_end_rounded,
-                          label: AppStrings.t('call_end'),
-                          background: const Color(0xFFE53935),
-                          onTap: _hangUp,
-                        ),
-                      ],
                     ),
                   ),
                 ),
