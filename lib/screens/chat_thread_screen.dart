@@ -652,8 +652,12 @@ class _ThreadHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
+        child: Stack(
+          alignment: Alignment.center,
           children: [
+            // Leading (back + name) cluster and trailing (call buttons).
+            Row(
+              children: [
             GlassIconButton(
               icon: Icons.arrow_back_rounded,
               size: 36,
@@ -724,24 +728,7 @@ class _ThreadHeader extends StatelessWidget {
                 ),
               ),
             ),
-            // Brand wordmark — centred in the gap between the name and the
-            // call buttons (same "swayco.ai" mark as the call screen).
-            Expanded(
-              child: Center(
-                child: Text(
-                  'swayco.ai',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
+            const Spacer(),
             // Audio call (phone) + video call (camera).
             GlassIconButton(
               icon: Icons.phone_rounded,
@@ -755,6 +742,24 @@ class _ThreadHeader extends StatelessWidget {
               size: 36,
               iconSize: 18,
               onTap: onCallVideo,
+            ),
+              ],
+            ),
+            // Brand wordmark — dead-centre of the header, balanced between
+            // the name and the call buttons. Tap-through (IgnorePointer) so
+            // it never blocks the name / buttons underneath.
+            const IgnorePointer(
+              child: Text(
+                'swayco ai',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
             ),
           ],
         ),
