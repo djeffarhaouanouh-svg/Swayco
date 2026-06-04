@@ -7,6 +7,7 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
@@ -126,6 +127,9 @@ class _CallScreenState extends State<CallScreen> {
   final TextEditingController _chatCtrl = TextEditingController();
   final FocusNode _chatFocus = FocusNode();
   final AudioPlayer _ttsPlayer = AudioPlayer();
+  // On-device TTS — the fallback voice when the backend OpenAI /translation/tts
+  // endpoint isn't available (it currently isn't, so this is what speaks).
+  final FlutterTts _deviceTts = FlutterTts();
   bool _chatTranslate = true;
   bool _chatSending = false;
 
@@ -790,15 +794,33 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// OpenAI TTS (gpt-4o-mini-tts via the backend) for an incoming message.
+  /// Read an incoming message aloud. Prefer OpenAI TTS (gpt-4o-mini-tts via
+  /// the backend); fall back to the device's built-in voice when the backend
+  /// /translation/tts endpoint isn't available.
   Future<void> _speak(String text, String lang) async {
     try {
       final bytes = await fetchSpeech(text: text, lang: lang);
-      if (bytes == null || !mounted) return;
-      await _ttsPlayer.stop();
-      await _ttsPlayer.play(BytesSource(bytes));
+      if (bytes != null && bytes.isNotEmpty && mounted) {
+        await _ttsPlayer.stop();
+        await _ttsPlayer.play(BytesSource(bytes));
+        return;
+      }
     } catch (_) {
-      // TTS is best-effort — silence on failure (e.g. backend /tts missing).
+      // Fall through to the device voice.
+    }
+    if (!mounted) return;
+    try {
+      // BCP-47 primary subtag (e.g. "fr") — best-effort; if the engine
+      // rejects it, speak() still runs in the default voice.
+      if (lang.isNotEmpty) {
+        try {
+          await _deviceTts.setLanguage(lang);
+        } catch (_) {}
+      }
+      await _deviceTts.stop();
+      await _deviceTts.speak(text);
+    } catch (_) {
+      // TTS is best-effort — silent on failure.
     }
   }
 
@@ -1244,6 +1266,7 @@ class _CallScreenState extends State<CallScreen> {
     _chatCtrl.dispose();
     _chatFocus.dispose();
     unawaited(_ttsPlayer.dispose());
+    unawaited(_deviceTts.stop());
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;

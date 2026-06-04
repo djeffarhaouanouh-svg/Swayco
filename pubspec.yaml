@@ -66,6 +66,9 @@ dependencies:
   # min Dart SDK to 3.12, which we can't take yet.
   record: ^6.2.1
   audioplayers: ^6.1.0
+  # On-device text-to-speech for the in-call chat captions (fallback when the
+  # backend OpenAI /translation/tts endpoint isn't available).
+  flutter_tts: ^4.2.0
   path_provider: ^2.1.4
   # Swayco Midnight design — Bricolage Grotesque (titles) + DM Sans (body).
   google_fonts: ^6.2.1
