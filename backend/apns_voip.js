@@ -22,10 +22,16 @@ const KEY_ID = process.env.APNS_KEY_ID?.trim();
 const TEAM_ID = process.env.APNS_TEAM_ID?.trim();
 const BUNDLE_ID =
   process.env.APNS_BUNDLE_ID?.trim() || 'com.translate.livekit.livekitTranslate';
-const HOST =
-  process.env.APNS_USE_SANDBOX === '1'
-    ? 'https://api.sandbox.push.apple.com'
-    : 'https://api.push.apple.com';
+const PROD_HOST = 'https://api.push.apple.com';
+const SANDBOX_HOST = 'https://api.sandbox.push.apple.com';
+// APNs rejection reasons that mean "right token, wrong environment" — we
+// retry the same token on the other host instead of giving up. Lets one
+// backend serve both production (TestFlight/App Store) and sandbox (debug
+// from Xcode) builds without knowing how the app was signed.
+const ENV_MISMATCH_REASONS = new Set([
+  'BadEnvironmentKeyInToken',
+  'BadDeviceToken',
+]);
 
 function apnsConfigured() {
   return Boolean(AUTH_KEY && KEY_ID && TEAM_ID && BUNDLE_ID);
@@ -50,17 +56,8 @@ function providerToken() {
   return _cachedToken;
 }
 
-/**
- * Send a VoIP push to a single device token.
- * @param {string} deviceToken hex VoIP token from PushKit.
- * @param {object} payload flat keys the iOS PushKit handler reads
- *   (callId, roomName, callerId, callerName, type).
- * @returns {Promise<{ok:boolean,status?:number,reason?:string}>}
- */
-function sendVoipPush(deviceToken, payload) {
-  if (!apnsConfigured()) return Promise.resolve({ ok: false, reason: 'apns-not-configured' });
-  if (!deviceToken) return Promise.resolve({ ok: false, reason: 'no-token' });
-
+// Low-level: POST the VoIP push to ONE specific APNs host.
+function _post(host, deviceToken, payload) {
   return new Promise((resolve) => {
     let settled = false;
     const done = (r) => {
@@ -71,7 +68,7 @@ function sendVoipPush(deviceToken, payload) {
 
     let client;
     try {
-      client = http2.connect(HOST);
+      client = http2.connect(host);
     } catch (e) {
       return done({ ok: false, reason: e.message });
     }
@@ -125,6 +122,33 @@ function sendVoipPush(deviceToken, payload) {
     });
     req.end(body);
   });
+}
+
+/**
+ * Send a VoIP push to a single device token. Tries one APNs environment,
+ * and if the token is rejected for being in the wrong environment, retries
+ * on the other host — so the same backend works for both TestFlight/App
+ * Store (production) and Xcode-debug (sandbox) builds without us having to
+ * know how the app was signed. `APNS_USE_SANDBOX=1` just flips which host
+ * is tried first.
+ * @param {string} deviceToken hex VoIP token from PushKit.
+ * @param {object} payload flat keys the iOS PushKit handler reads
+ *   (callId, roomName, callerId, callerName, type).
+ * @returns {Promise<{ok:boolean,status?:number,reason?:string}>}
+ */
+async function sendVoipPush(deviceToken, payload) {
+  if (!apnsConfigured()) return { ok: false, reason: 'apns-not-configured' };
+  if (!deviceToken) return { ok: false, reason: 'no-token' };
+
+  const sandboxFirst = process.env.APNS_USE_SANDBOX === '1';
+  const firstHost = sandboxFirst ? SANDBOX_HOST : PROD_HOST;
+  const secondHost = sandboxFirst ? PROD_HOST : SANDBOX_HOST;
+
+  let res = await _post(firstHost, deviceToken, payload);
+  if (!res.ok && ENV_MISMATCH_REASONS.has(res.reason)) {
+    res = await _post(secondHost, deviceToken, payload);
+  }
+  return res;
 }
 
 module.exports = { sendVoipPush, apnsConfigured };
