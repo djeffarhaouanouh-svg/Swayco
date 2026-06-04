@@ -602,7 +602,7 @@ abstract final class AppStrings {
     'report_reason_other': 'Other',
     'discover_title': 'Discover',
     'discover_message_hint': 'Write a message…',
-    'discover_message_hint_name': 'Message {name}…',
+    'discover_message_hint_name': 'Write to {name}…',
     'discover_message_sent': 'Message sent',
     'search_chercher': 'Search',
     'search_friend_hint': 'Name or @handle',
