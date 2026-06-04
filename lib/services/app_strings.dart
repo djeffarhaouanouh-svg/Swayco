@@ -315,6 +315,7 @@ abstract final class AppStrings {
     'accept': 'Accepter',
     'call_declined': 'Appel refusé',
     'call_no_answer': 'Pas de réponse',
+    'call_speak_lang_hint': 'Parle en {lang} pour que la traduction fonctionne',
     // Likes received
     'who_liked_me': "Qui m'a liké",
     'no_one_liked_yet': "Personne ne t'a encore liké",
@@ -750,6 +751,7 @@ abstract final class AppStrings {
     'accept': 'Accept',
     'call_declined': 'Call declined',
     'call_no_answer': 'No answer',
+    'call_speak_lang_hint': 'Speak in {lang} so the translation works',
     'who_liked_me': 'Who liked me',
     'no_one_liked_yet': 'No one has liked you yet',
     'like_explainer':
@@ -1148,6 +1150,7 @@ abstract final class AppStrings {
     'accept': 'Aceptar',
     'call_declined': 'Llamada rechazada',
     'call_no_answer': 'Sin respuesta',
+    'call_speak_lang_hint': 'Habla en {lang} para que la traducción funcione',
     'who_liked_me': 'Quién me dio like',
     'no_one_liked_yet': 'Nadie te ha dado like todavía',
     'like_explainer':
@@ -1377,6 +1380,7 @@ abstract final class AppStrings {
     'accept': 'Annehmen',
     'call_declined': 'Anruf abgelehnt',
     'call_no_answer': 'Keine Antwort',
+    'call_speak_lang_hint': 'Sprich auf {lang}, damit die Übersetzung funktioniert',
     'who_liked_me': 'Wer mich gelikt hat',
     'no_one_liked_yet': 'Noch niemand hat dich gelikt',
     'like_explainer':
@@ -1580,6 +1584,7 @@ abstract final class AppStrings {
     'accept': 'Accetta',
     'call_declined': 'Chiamata rifiutata',
     'call_no_answer': 'Nessuna risposta',
+    'call_speak_lang_hint': 'Parla in {lang} così la traduzione funziona',
     'who_liked_me': 'Chi mi ha messo mi piace',
     'no_one_liked_yet': 'Nessuno ti ha ancora messo mi piace',
     'like_explainer':
@@ -1783,6 +1788,7 @@ abstract final class AppStrings {
     'accept': 'Aceitar',
     'call_declined': 'Chamada recusada',
     'call_no_answer': 'Sem resposta',
+    'call_speak_lang_hint': 'Fala em {lang} para a tradução funcionar',
     'who_liked_me': 'Quem me curtiu',
     'no_one_liked_yet': 'Ninguém te curtiu ainda',
     'like_explainer':
@@ -1986,6 +1992,7 @@ abstract final class AppStrings {
     'accept': 'Accepteren',
     'call_declined': 'Oproep geweigerd',
     'call_no_answer': 'Geen antwoord',
+    'call_speak_lang_hint': 'Spreek in het {lang} zodat de vertaling werkt',
     'who_liked_me': 'Wie heeft mij geliket',
     'no_one_liked_yet': 'Niemand heeft je nog geliket',
     'like_explainer':
@@ -2186,6 +2193,7 @@ abstract final class AppStrings {
     'accept': 'قبول',
     'call_declined': 'تم رفض المكالمة',
     'call_no_answer': 'لا يوجد رد',
+    'call_speak_lang_hint': 'تحدّث بـ {lang} حتى تعمل الترجمة',
     'who_liked_me': 'من أعجب بي',
     'no_one_liked_yet': 'لم يعجب بك أحد بعد',
     'like_explainer':
@@ -2388,6 +2396,7 @@ abstract final class AppStrings {
     'accept': 'Принять',
     'call_declined': 'Звонок отклонён',
     'call_no_answer': 'Нет ответа',
+    'call_speak_lang_hint': 'Говорите на {lang}, чтобы перевод работал',
     'who_liked_me': 'Кто мне поставил лайк',
     'no_one_liked_yet': 'Тебя ещё никто не лайкнул',
     'like_explainer':
@@ -2572,6 +2581,7 @@ abstract final class AppStrings {
     'accept': '接受',
     'call_declined': '通话被拒绝',
     'call_no_answer': '无人接听',
+    'call_speak_lang_hint': '请用{lang}说话，翻译才能正常工作',
     'who_liked_me': '谁喜欢我',
     'no_one_liked_yet': '还没有人喜欢你',
     'like_explainer': '当有人点击你 Discover 卡片上的 ❤ 时，你会在这里看到。',
@@ -2753,6 +2763,7 @@ abstract final class AppStrings {
     'accept': '応答',
     'call_declined': '通話が拒否されました',
     'call_no_answer': '応答なし',
+    'call_speak_lang_hint': '翻訳が機能するように{lang}で話してください',
     'who_liked_me': 'いいねをくれた人',
     'no_one_liked_yet': 'まだ誰もあなたにいいねしていません',
     'like_explainer': '誰かがあなたの Discover カードの ❤ をタップすると、ここに表示されます。',
@@ -2934,6 +2945,7 @@ abstract final class AppStrings {
     'accept': '수락',
     'call_declined': '통화가 거절되었습니다',
     'call_no_answer': '응답 없음',
+    'call_speak_lang_hint': '번역이 작동하도록 {lang}로 말하세요',
     'who_liked_me': '나를 좋아한 사람',
     'no_one_liked_yet': '아직 아무도 좋아요를 누르지 않았습니다',
     'like_explainer': '누군가 당신의 Discover 카드의 ❤를 탭하면 여기에 표시됩니다.',

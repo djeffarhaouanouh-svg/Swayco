@@ -29,6 +29,7 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
+import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 
 class CallScreen extends StatefulWidget {
@@ -850,13 +851,25 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// The in-call chat composer: translate toggle + text field + send.
+  /// The local user's spoken-language label (e.g. "Français"), or null when
+  /// unknown — drives the "speak in X" hint and the composer placeholder.
+  String? get _myLangLabel => findLanguageByCode(widget.mySourceLang)?.label;
+
+  /// In-call composer placeholder — names the user's language, mirroring the
+  /// messages composer ("Écrivez en Français").
+  String get _chatHint {
+    final label = _myLangLabel;
+    return label == null
+        ? AppStrings.t('composer_message_hint')
+        : AppStrings.t('composer_message_hint_lang', args: {'lang': label});
+  }
+
   Widget _buildChatComposer() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
+    // Same frosted-glass bar as the messages composer.
+    return GlassContainer(
+      borderRadius: BorderRadius.circular(26),
+      color: Colors.black.withValues(alpha: 0.35),
+      border: Colors.white.withValues(alpha: 0.18),
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
       child: Row(
         children: [
@@ -888,7 +901,7 @@ class _CallScreenState extends State<CallScreen> {
               decoration: InputDecoration(
                 isDense: true,
                 filled: false,
-                hintText: AppStrings.t('composer_message_hint'),
+                hintText: _chatHint,
                 hintStyle: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
@@ -1626,6 +1639,42 @@ class _CallScreenState extends State<CallScreen> {
                             avatarColor: c.mine
                                 ? (_myProfile?.avatarColor ?? '')
                                 : (_peerProfile?.avatarColor ?? ''),
+                          ),
+                        ),
+                      // "Speak in <your language>" reminder, shown at the
+                      // start of the call (until the first caption appears).
+                      if (_captions.isEmpty && _myLangLabel != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.12)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.graphic_eq_rounded,
+                                    size: 15, color: SC.accent),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    AppStrings.t('call_speak_lang_hint',
+                                        args: {'lang': _myLangLabel!}),
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.85),
+                                      fontSize: 12.5,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       const SizedBox(height: 4),
