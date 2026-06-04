@@ -1421,12 +1421,25 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — just the "Ton profil" title.
-        Text(
-          AppStrings.t('onb_profile_title'),
-          style: SCText.h1,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        // Header — "Ton profil" title with the settings gear pinned to the
+        // top-right corner of the page.
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                AppStrings.t('onb_profile_title'),
+                style: SCText.h1,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _GhostIconButton(
+              icon: Icons.settings_outlined,
+              onTap: onSettings,
+              tooltip: AppStrings.t('settings_title'),
+            ),
+          ],
         ),
         const SizedBox(height: 26),
         // Round PDP bubble (the independent avatar) — tap to set a new PDP.
@@ -1502,37 +1515,23 @@ class _IdentitySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // Stats — posts | followers | following — kept centred on the full
-        // width by balancing the right-side gear (38 + 8 gap) with an equal
-        // invisible spacer on the left. The gear sits at the stats level.
+        // Stats — posts | followers | following — centred across the full
+        // width (the settings gear now lives in the top-right header).
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            const SizedBox(width: 46),
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _InlineStat(value: photos.length, label: 'posts'),
-                  const _StatDivider(),
-                  _InlineStat(
-                    value: counts.followers,
-                    label: AppStrings.t('profile_followers').toLowerCase(),
-                    onTap: onTapFollowers,
-                  ),
-                  const _StatDivider(),
-                  _InlineStat(
-                    value: counts.following,
-                    label: AppStrings.t('profile_following').toLowerCase(),
-                    onTap: onTapFollowing,
-                  ),
-                ],
-              ),
+            _InlineStat(value: photos.length, label: 'posts'),
+            const _StatDivider(),
+            _InlineStat(
+              value: counts.followers,
+              label: AppStrings.t('profile_followers').toLowerCase(),
+              onTap: onTapFollowers,
             ),
-            const SizedBox(width: 8),
-            _GhostIconButton(
-              icon: Icons.settings_outlined,
-              onTap: onSettings,
-              tooltip: AppStrings.t('settings_title'),
+            const _StatDivider(),
+            _InlineStat(
+              value: counts.following,
+              label: AppStrings.t('profile_following').toLowerCase(),
+              onTap: onTapFollowing,
             ),
           ],
         ),
