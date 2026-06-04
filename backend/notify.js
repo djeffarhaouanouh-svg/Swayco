@@ -211,9 +211,14 @@ async function notifyUser(recipientUid, payload) {
           } else {
             out.failed += 1;
             out.results.push({ id: t.id, error: res.reason });
+            // Purge permanently-dead VoIP tokens: gone (410/Unregistered),
+            // malformed/wrong-env (BadDeviceToken), or a stale sandbox token
+            // hitting the production endpoint (BadEnvironmentKeyInToken).
+            // Stops old tokens from piling up and erroring forever.
             if (res.status === 410 ||
                 res.reason === 'BadDeviceToken' ||
-                res.reason === 'Unregistered') {
+                res.reason === 'Unregistered' ||
+                res.reason === 'BadEnvironmentKeyInToken') {
               await sb.from('notification_targets').delete().eq('id', t.id);
             }
           }
