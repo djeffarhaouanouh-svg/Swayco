@@ -1676,7 +1676,6 @@ class _IdentitySection extends StatelessWidget {
             label: AppStrings.t('unblock'),
             icon: Icons.lock_open,
             onTap: onToggleBlock ?? () {},
-            subdued: true,
           ),
         ] else ...[
           _GradientActionButton(
@@ -1691,7 +1690,6 @@ class _IdentitySection extends StatelessWidget {
               label: AppStrings.t('follow_unfollow'),
               icon: Icons.person_remove_alt_1,
               onTap: onUnfollow ?? () {},
-              subdued: true,
             ),
           ] else if (peerFollowsMe) ...[
             const SizedBox(height: 10),
