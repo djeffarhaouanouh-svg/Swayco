@@ -396,28 +396,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    AppStrings.t('messages_title'),
-                    style: SCText.h1,
-                  ),
-                ),
-              ),
-              // The list fills the full height (scrolling behind the
-              // floating nav bar). The "Invite to a call" row is the last
-              // item of the list — see _buildBody.
-              Expanded(child: _buildBody()),
-            ],
-          ),
+          // No fixed top bar: the "Messages" title is the first item of the
+          // scroll view (see _buildBody), so it scrolls away with the list
+          // instead of being a fixed band the conversations tuck under.
+          child: _buildBody(),
         ),
       ),
     );
   }
+
+  /// The big "Messages" title — now a normal (scrolling) item, not a fixed
+  /// header bar.
+  Widget get _titleBar => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(AppStrings.t('messages_title'), style: SCText.h1),
+        ),
+      );
 
   Widget _buildBody() {
     if (_loading) {
@@ -425,21 +421,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // instead of swapping a centred spinner for a populated list
       // (the old behaviour made rows pop in one by one as each
       // request resolved).
-      return _ChatListSkeleton(
-        bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
+      return Column(
+        children: [
+          _titleBar,
+          Expanded(
+            child: _ChatListSkeleton(
+              bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
+            ),
+          ),
+        ],
       );
     }
     if (_error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          _error!,
-          style: const TextStyle(color: Color(0xFFFFAB91), height: 1.35, fontSize: 13),
-        ),
+      return Column(
+        children: [
+          _titleBar,
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              _error!,
+              style: const TextStyle(
+                color: Color(0xFFFFAB91),
+                height: 1.35,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       );
     }
     if (_friends.isEmpty) {
-      return const _NoFriendsEmpty();
+      return Column(
+        children: [_titleBar, const Expanded(child: _NoFriendsEmpty())],
+      );
     }
     return RefreshIndicator(
       color: SC.accent,
@@ -453,6 +467,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
+          _titleBar,
           // Conversation rows as a flat list (no boxed card) — just a thin
           // hairline divider between them (inset past the avatar).
           Column(
