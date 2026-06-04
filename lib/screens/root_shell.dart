@@ -250,9 +250,14 @@ class _RootShellState extends State<RootShell> {
         callerId = call.callerId;
       }
     }
-    // Dismiss the native CallKit entry so our own call screen can show.
-    unawaited(IosCallKit.endCall(callId));
-    if (roomName.isEmpty) return;
+    if (roomName.isEmpty) {
+      unawaited(IosCallKit.endCall(callId));
+      return;
+    }
+    // Mark the CallKit call connected (do NOT end it yet) so iOS keeps the
+    // audio session alive for LiveKit — otherwise there's no sound. Our own
+    // call screen shows under CallKit's banner.
+    await IosCallKit.setConnected(callId);
     await _joinCallRoom(IncomingCall(
       id: callId,
       callerId: callerId,
@@ -260,6 +265,8 @@ class _RootShellState extends State<RootShell> {
       roomName: roomName,
       createdAt: DateTime.now(),
     ));
+    // The call screen has been closed (hung up) — now tear down CallKit.
+    unawaited(IosCallKit.endCall(callId));
   }
 
   /// iOS CallKit "Decline" (or the ring timing out): close the row and tell

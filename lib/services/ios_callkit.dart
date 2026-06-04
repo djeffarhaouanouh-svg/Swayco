@@ -94,6 +94,19 @@ abstract final class IosCallKit {
     return const {};
   }
 
+  /// Tell CallKit the call is connected. Keeps the CallKit call (and its
+  /// AVAudioSession) ALIVE so LiveKit/WebRTC audio actually flows. Ending
+  /// the call immediately on accept tore the audio session down — video
+  /// kept working (it doesn't use it) but there was no sound.
+  static Future<void> setConnected(String callId) async {
+    if (!_isIos || callId.isEmpty) return;
+    try {
+      await FlutterCallkitIncoming.setCallConnected(callId);
+    } catch (e) {
+      debugPrint('IosCallKit.setConnected failed: $e');
+    }
+  }
+
   /// Dismiss the native CallKit UI for [callId] once we've taken over
   /// (joined the room) or the call is gone.
   static Future<void> endCall(String callId) async {
