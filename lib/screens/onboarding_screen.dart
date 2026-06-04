@@ -308,6 +308,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           hint: AppStrings.t('profile_bio_placeholder'),
                           icon: Icons.short_text,
                           alignLabelWithHint: true,
+                          // Show the prompt directly (not only on focus).
+                          alwaysFloatLabel: true,
                         ),
                         const SizedBox(height: 14),
                         // Single field: tap to pick country → then city.
@@ -1261,6 +1263,7 @@ class _GlassTextField extends StatelessWidget {
     this.minLines,
     this.maxLines = 1,
     this.alignLabelWithHint = false,
+    this.alwaysFloatLabel = false,
   });
 
   final TextEditingController controller;
@@ -1272,6 +1275,10 @@ class _GlassTextField extends StatelessWidget {
   final int? minLines;
   final int? maxLines;
   final bool alignLabelWithHint;
+
+  /// Keep the label floated up so the [hint] is shown even when empty /
+  /// unfocused (instead of only appearing on focus).
+  final bool alwaysFloatLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1293,6 +1300,9 @@ class _GlassTextField extends StatelessWidget {
           labelText: label,
           labelStyle: const TextStyle(color: SC.textMuted),
           floatingLabelStyle: const TextStyle(color: SC.accent),
+          floatingLabelBehavior: alwaysFloatLabel
+              ? FloatingLabelBehavior.always
+              : FloatingLabelBehavior.auto,
           hintText: hint,
           hintStyle: const TextStyle(color: SC.textMuted),
           prefixIcon: Icon(icon, color: SC.textMuted),
