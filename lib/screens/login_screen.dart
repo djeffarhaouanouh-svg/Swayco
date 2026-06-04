@@ -232,7 +232,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isSignUp = _mode == _Mode.signUp;
     return Scaffold(
-      backgroundColor: SC.bg,
+      // Solid black login backdrop (no navy / mesh) — on request.
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
