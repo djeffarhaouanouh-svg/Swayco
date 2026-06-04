@@ -711,6 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             peerFollowsMe: _peerFollowsMe,
                             iFollowPeer: _iFollowPeer,
                             iRequestedPeer: _iRequestedPeer,
+                            peerBlocked: _peerBlocked,
                             iLikePeer: _iLikePeer,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
@@ -728,6 +729,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onFollowBack: _followBack,
                             onAddPeer: _addPeer,
                             onUnfollow: _unfollowPeer,
+                            onToggleBlock: _toggleBlock,
                             onTogglePeerLike: _togglePeerLike,
                             onMessagePeer: _openChatWithPeer,
                           ),
@@ -1260,9 +1262,11 @@ class _IdentitySection extends StatelessWidget {
     this.peerFollowsMe = false,
     this.iFollowPeer = false,
     this.iRequestedPeer = false,
+    this.peerBlocked = false,
     this.onFollowBack,
     this.onAddPeer,
     this.onUnfollow,
+    this.onToggleBlock,
     this.iLikePeer = false,
     this.onTogglePeerLike,
     this.onMessagePeer,
@@ -1330,6 +1334,11 @@ class _IdentitySection extends StatelessWidget {
   /// Viewer-mode only: I sent a still-pending request via "Ajouter".
   final bool iRequestedPeer;
 
+  /// Viewer-mode only: have I blocked the displayed peer? When true the
+  /// action stack collapses to a single "Débloquer" button — the follow
+  /// relation and Message CTA are meaningless on a profile I've cut off.
+  final bool peerBlocked;
+
   /// Viewer-mode only: follow the peer back (instant abonnement).
   final VoidCallback? onFollowBack;
 
@@ -1338,6 +1347,10 @@ class _IdentitySection extends StatelessWidget {
 
   /// Viewer-mode only: unfollow the peer (removes them from my friends).
   final VoidCallback? onUnfollow;
+
+  /// Viewer-mode only: block / unblock the displayed peer. Drives the
+  /// "Débloquer" action button shown while [peerBlocked] is true.
+  final VoidCallback? onToggleBlock;
 
   /// Viewer-mode only: have I liked this peer? Drives the heart overlay
   /// on their photo cell.
@@ -1648,48 +1661,61 @@ class _IdentitySection extends StatelessWidget {
             ),
           ],
         ),
-        // Action stack: Message + (Unfollow / Follow-back / Add) by relation:
+        // Action stack. When I've blocked this peer the whole stack
+        // collapses to a single "Débloquer" CTA — the follow relation and
+        // Message button would otherwise read as wrong ("Se désabonner" /
+        // "Message") on a profile I've deliberately cut off.
+        // Otherwise: Message + (Unfollow / Follow-back / Add) by relation:
         //  • I already follow them → "Unfollow".
         //  • peer follows me, I don't → "S'abonner en retour" (instant).
         //  • stranger, request already sent → "Demande envoyée".
         //  • stranger → "Ajouter" (sends a request they must accept).
         const SizedBox(height: 16),
-        _GradientActionButton(
-          label: AppStrings.t('profile_message'),
-          icon: Icons.chat_bubble_outline,
-          onTap: onMessagePeer ?? () {},
-          glass: true,
-        ),
-        if (iFollowPeer) ...[
-          const SizedBox(height: 10),
+        if (peerBlocked) ...[
           _GradientActionButton(
-            label: AppStrings.t('follow_unfollow'),
-            icon: Icons.person_remove_alt_1,
-            onTap: onUnfollow ?? () {},
-            subdued: true,
-          ),
-        ] else if (peerFollowsMe) ...[
-          const SizedBox(height: 10),
-          _GradientActionButton(
-            label: AppStrings.t('follow_back'),
-            icon: Icons.person_add_alt_1,
-            onTap: onFollowBack ?? () {},
-          ),
-        ] else if (iRequestedPeer) ...[
-          const SizedBox(height: 10),
-          _GradientActionButton(
-            label: AppStrings.t('friendship_sent'),
-            icon: Icons.schedule,
-            onTap: () {},
+            label: AppStrings.t('unblock'),
+            icon: Icons.lock_open,
+            onTap: onToggleBlock ?? () {},
             subdued: true,
           ),
         ] else ...[
-          const SizedBox(height: 10),
           _GradientActionButton(
-            label: AppStrings.t('profile_add'),
-            icon: Icons.person_add_alt_1,
-            onTap: onAddPeer ?? () {},
+            label: AppStrings.t('profile_message'),
+            icon: Icons.chat_bubble_outline,
+            onTap: onMessagePeer ?? () {},
+            glass: true,
           ),
+          if (iFollowPeer) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('follow_unfollow'),
+              icon: Icons.person_remove_alt_1,
+              onTap: onUnfollow ?? () {},
+              subdued: true,
+            ),
+          ] else if (peerFollowsMe) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('follow_back'),
+              icon: Icons.person_add_alt_1,
+              onTap: onFollowBack ?? () {},
+            ),
+          ] else if (iRequestedPeer) ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('friendship_sent'),
+              icon: Icons.schedule,
+              onTap: () {},
+              subdued: true,
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            _GradientActionButton(
+              label: AppStrings.t('profile_add'),
+              icon: Icons.person_add_alt_1,
+              onTap: onAddPeer ?? () {},
+            ),
+          ],
         ],
         // Centres d'intérêt (read-only) — just above the photos.
         if (interests.isNotEmpty) ...[
