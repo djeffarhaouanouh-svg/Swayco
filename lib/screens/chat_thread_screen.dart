@@ -689,7 +689,9 @@ class _ThreadHeader extends StatelessWidget {
                               title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: SCText.h3,
+                              style: SCText.h3.copyWith(
+                                color: SC.textPrimary.withValues(alpha: 0.6),
+                              ),
                             ),
                             if (_peerOnline) ...[
                               const SizedBox(height: 2),
@@ -749,8 +751,13 @@ class _ThreadHeader extends StatelessWidget {
             // the name and the call buttons. Tap-through (IgnorePointer) so
             // it never blocks the name / buttons underneath.
             const IgnorePointer(
-              child: Text(
-                'swayco ai',
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'swayco '),
+                    TextSpan(text: 'ai', style: TextStyle(color: SC.accent)),
+                  ],
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
