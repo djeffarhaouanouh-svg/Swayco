@@ -453,15 +453,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          // Single glass card holding every conversation row — the rows
-          // are stacked without dividers so they read as one continuous
-          // surface, matching the Midnight visual reference.
+          // Single glass card holding every conversation row, with a thin
+          // hairline divider between them (inset past the avatar) so each
+          // conversation reads as a distinct entry.
           GlassContainer(
             borderRadius: BorderRadius.circular(24),
             padding: const EdgeInsets.all(6),
             child: Column(
               children: [
-                for (final p in _friends)
+                for (final (i, p) in _friends.indexed) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 70,
+                      endIndent: 12,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
                   _FriendChatRow(
                     profile: p,
                     lastMessage: _latestByConv[_conversationIdFor(p.id)],
@@ -486,6 +494,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       startWithCamera: true,
                     ),
                   ),
+                ],
               ],
             ),
           ),
