@@ -438,6 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         bytes: bytes,
         current: current,
         contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+        currentDiscover: _remote?.discoverPhotoUrl ?? '',
       );
       if (!mounted) return;
       await _reload();
@@ -512,6 +513,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         deviceId: _deviceId,
         url: url,
         current: _remote?.photos ?? const <String>[],
+        currentDiscover: _remote?.discoverPhotoUrl ?? '',
       );
       if (!mounted) return;
       await _reload();
@@ -520,6 +522,24 @@ class _ProfileScreenState extends State<ProfileScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Suppression échouée : $e')));
+    }
+  }
+
+  /// Choose which gallery photo shows in Discover. Optimistically moves the
+  /// cyan selection ring, then persists the pointer (no gallery reorder).
+  Future<void> _setDiscoverPhoto(String url) async {
+    if (_deviceId.isEmpty || url.isEmpty) return;
+    final prev = _remote;
+    if (prev == null || prev.discoverPhotoUrl == url) return;
+    setState(() => _remote = prev.copyWith(discoverPhotoUrl: url));
+    try {
+      await ProfileApi.setDiscoverPhoto(deviceId: _deviceId, url: url);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _remote = prev); // revert on failure
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Échec : $e')));
     }
   }
 
@@ -673,6 +693,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             interests: _remote?.interests ?? const [],
                             photos: _remote?.photos ?? const [],
                             avatarUrl: _remote?.avatarUrl ?? '',
+                            discoverPhotoUrl: _remote?.discoverPhotoUrl ?? '',
+                            onSelectDiscover: _setDiscoverPhoto,
                             counts: _counts,
                             likesByPhoto: _likesByPhoto,
                             viewerMode: _isViewingOther,
@@ -1301,6 +1323,8 @@ class _IdentitySection extends StatelessWidget {
     required this.interests,
     required this.photos,
     required this.avatarUrl,
+    this.discoverPhotoUrl = '',
+    this.onSelectDiscover,
     required this.counts,
     required this.likesByPhoto,
     required this.onEditName,
@@ -1350,6 +1374,12 @@ class _IdentitySection extends StatelessWidget {
   /// The profile picture (PDP) shown in the round bubble — an independent
   /// image, no longer tied to `photos[0]`. Empty falls back to initials.
   final String avatarUrl;
+
+  /// Which gallery photo currently shows in Discover — gets the cyan ring.
+  final String discoverPhotoUrl;
+
+  /// Own profile: pick which gallery photo is the Discover photo (by URL).
+  final void Function(String url)? onSelectDiscover;
   final FriendshipCounts counts;
 
   /// Likes received per photo URL. Only shown on my own profile (private).
@@ -1626,6 +1656,8 @@ class _IdentitySection extends StatelessWidget {
           onRemove: onRemovePhoto,
           likesByPhoto: likesByPhoto,
           onTapLikes: onTapLikes,
+          discoverPhotoUrl: discoverPhotoUrl,
+          onSelectDiscover: onSelectDiscover,
         ),
         const SizedBox(height: 10),
         // ⓘ hint — taps jump to Settings where "Me cacher de mon pays" lives.
@@ -1882,12 +1914,17 @@ class _PhotoGallery extends StatelessWidget {
     this.onTapLikes,
     this.likedPhotoUrls = const {},
     this.onTogglePhotoLike,
+    this.discoverPhotoUrl = '',
+    this.onSelectDiscover,
   });
 
   final List<String> photos;
   final bool viewerMode;
   final VoidCallback onPick;
   final void Function(String url) onRemove;
+  // Own profile: URL of the Discover photo (cyan ring) + select-by-tap.
+  final String discoverPhotoUrl;
+  final void Function(String url)? onSelectDiscover;
   // Own profile: likes received per photo URL.
   final Map<String, int> likesByPhoto;
   final VoidCallback? onTapLikes;
@@ -1932,7 +1969,15 @@ class _PhotoGallery extends StatelessWidget {
               child: _PhotoCell(
                 photoUrl: photos[i],
                 viewerMode: viewerMode,
-                onTap: () {},
+                // Cyan ring on the photo currently shown in Discover.
+                isDiscover: !viewerMode &&
+                    discoverPhotoUrl.isNotEmpty &&
+                    photos[i].split('?').first ==
+                        discoverPhotoUrl.split('?').first,
+                // Tapping a photo picks it as the Discover photo.
+                onTap: onSelectDiscover == null
+                    ? () {}
+                    : () => onSelectDiscover!(photos[i]),
                 // Delete badge on every photo on my own profile.
                 onDelete: viewerMode ? null : () => onRemove(photos[i]),
                 // Per-photo likes badge on each of my own photos.
@@ -2629,11 +2674,16 @@ class _PhotoCell extends StatelessWidget {
     this.onTapLikes,
     this.iLikePeer = false,
     this.onTogglePeerLike,
+    this.isDiscover = false,
   });
 
   final String? photoUrl;
   final bool viewerMode;
   final VoidCallback onTap;
+
+  /// True for the gallery photo currently shown in Discover — draws a thin
+  /// cyan ring around the tile.
+  final bool isDiscover;
 
   /// When non-null and a photo is set on my own profile, a small trash
   /// button appears top-right to delete the photo.
@@ -2779,6 +2829,18 @@ class _PhotoCell extends StatelessWidget {
                       size: iLikePeer ? 16 : 14,
                       color: iLikePeer ? const Color(0xFFFF3B5C) : Colors.white,
                     ),
+                  ),
+                ),
+              ),
+            ),
+          // Thin cyan ring marking the photo currently shown in Discover.
+          if (isDiscover)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: SC.accent, width: 2),
                   ),
                 ),
               ),

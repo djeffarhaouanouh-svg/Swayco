@@ -536,6 +536,29 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
+  /// Point the Discover card at a SPECIFIC gallery photo [url] (the user
+  /// chooses which of their photos appears in Discover). Unlike
+  /// [addProfilePhoto] this does NOT reorder the gallery — it only moves the
+  /// `discover_photo_url` pointer. [url] must already be one of the user's
+  /// `photos`.
+  static Future<void> setDiscoverPhoto({
+    required String deviceId,
+    required String url,
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
+    if (url.isEmpty) throw ArgumentError('url vide');
+    await _c
+        .from('profiles')
+        .update({
+          'discover_photo_url': url,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
+  }
+
   /// Append [bytes] as a new photo in the user's gallery ("Tes photos").
   /// Each upload gets a unique storage path so the gallery can hold several
   /// distinct files. `photos[0]` still drives the Discover-card photo
@@ -550,6 +573,7 @@ abstract final class ProfileApi {
     required Uint8List bytes,
     required List<String> current,
     String contentType = 'image/jpeg',
+    String currentDiscover = '',
   }) async {
     if (!isSupabaseReady) {
       throw StateError('Supabase non configuré');
@@ -578,14 +602,20 @@ abstract final class ProfileApi {
         );
     final url = _c.storage.from('avatars').getPublicUrl(path);
     final next = [...current, url].take(profilePhotosMax).toList();
+    // Preserve the user's CHOSEN Discover photo if it's still in the gallery;
+    // otherwise the first photo drives the card (e.g. the first-ever upload).
+    // The PDP / avatar is an independent picture (via [uploadAvatar]), so this
+    // never touches `avatar_url`.
+    final stripped = currentDiscover.split('?').first;
+    final discover = (currentDiscover.isNotEmpty &&
+            next.any((p) => p.split('?').first == stripped))
+        ? next.firstWhere((p) => p.split('?').first == stripped)
+        : next.first;
     await _c
         .from('profiles')
         .update({
           'photos': next,
-          // The gallery drives the Discover card (photos[0]), but the PDP /
-          // avatar is now an independent picture set via [uploadAvatar] — so we
-          // no longer touch `avatar_url` here.
-          'discover_photo_url': next.first,
+          'discover_photo_url': discover,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', deviceId);
@@ -602,15 +632,24 @@ abstract final class ProfileApi {
     required String deviceId,
     required String url,
     required List<String> current,
+    String currentDiscover = '',
   }) async {
     if (!isSupabaseReady) {
       throw StateError('Supabase non configuré');
     }
     if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
     final next = current.where((p) => p != url).toList(growable: false);
-    // Keep the Discover card in sync with the gallery's first photo; the PDP
-    // (avatar_url) is independent now and left untouched.
-    final discover = next.isEmpty ? '' : next.first;
+    // Keep the user's CHOSEN Discover photo if it survived the delete;
+    // otherwise fall back to the first remaining photo (or empty). The PDP
+    // (avatar_url) is independent and left untouched.
+    final stripped = currentDiscover.split('?').first;
+    final String discover;
+    if (currentDiscover.isNotEmpty &&
+        next.any((p) => p.split('?').first == stripped)) {
+      discover = next.firstWhere((p) => p.split('?').first == stripped);
+    } else {
+      discover = next.isEmpty ? '' : next.first;
+    }
     await _c
         .from('profiles')
         .update({
