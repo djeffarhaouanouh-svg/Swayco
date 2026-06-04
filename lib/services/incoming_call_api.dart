@@ -165,11 +165,19 @@ abstract final class IncomingCallApi {
   static Future<List<IncomingCall>> fetchPending(String calleeId) async {
     if (!isSupabaseReady || calleeId.isEmpty) return const [];
     try {
+      // Only fresh rings: a row older than the caller's ring window is a
+      // missed/abandoned call (the caller may have closed the tab without
+      // stamping ended_at), so it must not re-pop the answer UI on app open.
+      final cutoff = DateTime.now()
+          .toUtc()
+          .subtract(const Duration(seconds: 45))
+          .toIso8601String();
       final rows = await _c
           .from('incoming_calls')
           .select()
           .eq('callee', calleeId)
-          .filter('ended_at', 'is', null);
+          .filter('ended_at', 'is', null)
+          .gte('created_at', cutoff);
       return (rows as List)
           .map((r) => IncomingCall.fromMap(Map<String, dynamic>.from(r as Map)))
           .toList(growable: false);

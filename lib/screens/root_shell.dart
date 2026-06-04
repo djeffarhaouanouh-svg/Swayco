@@ -158,6 +158,14 @@ class _RootShellState extends State<RootShell> {
     if (!mounted || _ringingDialogOpen) return;
     if (_handledCallIds.contains(call.id)) return;
     _handledCallIds.add(call.id);
+    // Ignore a stale ring. If the row is older than the caller's ring window
+    // it's a missed/abandoned call (e.g. a web caller closed the tab without
+    // stamping ended_at) — don't pop the answer UI for it when the callee
+    // opens / foregrounds the app long after.
+    if (DateTime.now().difference(call.createdAt) >
+        const Duration(seconds: 45)) {
+      return;
+    }
     // The app is now in the foreground handling the call via the in-app
     // dialog — silence the full-screen background ringer if it fired.
     unawaited(LocalNotifications.cancelIncomingCall());
