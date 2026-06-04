@@ -778,6 +778,9 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
+    // Dark text on the light bubbles (dark-teal on sent, near-black on
+    // received).
+    final bubbleText = mine ? SC.msgOutText : SC.msgInText;
     final radius = BorderRadius.only(
       topLeft: Radius.circular(mine ? 18 : 8),
       topRight: Radius.circular(mine ? 8 : 18),
@@ -800,27 +803,13 @@ class _MessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
           decoration: BoxDecoration(
-            color: mine ? null : SC.bubbleIn,
-            gradient: mine
-                ? const LinearGradient(
-                    colors: [SC.outBubbleStart, SC.outBubbleEnd],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
+            // Light "card" bubbles on the black message area: received =
+            // neutral grey, sent = pale cyan with a cyan border.
+            color: mine ? SC.msgOutBg : SC.msgInBg,
             borderRadius: radius,
             border: Border.all(
-              color: mine
-                  ? SC.accent.withValues(alpha: 0.4)
-                  : SC.bubbleInBorder,
+              color: mine ? SC.msgOutBorder : SC.msgInBorder,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -832,7 +821,7 @@ class _MessageBubble extends StatelessWidget {
                   child: Text(
                     message.senderName,
                     style: const TextStyle(
-                      color: SC.accent,
+                      color: SC.outBubbleEnd,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
@@ -930,8 +919,8 @@ class _MessageBubble extends StatelessWidget {
                   displayBody,
                   style: TextStyle(
                     color: translating
-                        ? SC.textPrimary.withValues(alpha: 0.55)
-                        : SC.textPrimary,
+                        ? bubbleText.withValues(alpha: 0.55)
+                        : bubbleText,
                     fontSize: 15,
                     height: 1.3,
                     fontStyle: translating
@@ -961,7 +950,7 @@ class _MessageBubble extends StatelessWidget {
                 child: Text(
                   time,
                   style: TextStyle(
-                    color: SC.textPrimary.withValues(alpha: 0.55),
+                    color: bubbleText.withValues(alpha: 0.5),
                     fontSize: 10,
                   ),
                 ),
@@ -1110,20 +1099,20 @@ class _DubButtonState extends State<_DubButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: SC.accent,
+                    color: SC.accentDeep,
                   ),
                 )
               else
                 const Icon(
                   Icons.volume_up_outlined,
                   size: 16,
-                  color: SC.accent,
+                  color: SC.accentDeep,
                 ),
               const SizedBox(width: 6),
               Text(
                 _error ?? AppStrings.t('voice_dub_listen'),
                 style: const TextStyle(
-                  color: SC.accent,
+                  color: SC.accentDeep,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1226,8 +1215,8 @@ class _VoicePlayerState extends State<_VoicePlayer> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 4,
-              backgroundColor: SC.textPrimary.withValues(alpha: 0.18),
-              valueColor: const AlwaysStoppedAnimation<Color>(SC.accent),
+              backgroundColor: Colors.black.withValues(alpha: 0.12),
+              valueColor: const AlwaysStoppedAnimation<Color>(SC.accentDeep),
             ),
           ),
         ),
@@ -1235,7 +1224,7 @@ class _VoicePlayerState extends State<_VoicePlayer> {
         Text(
           label,
           style: TextStyle(
-            color: SC.textPrimary.withValues(alpha: 0.75),
+            color: SC.msgInText.withValues(alpha: 0.75),
             fontSize: 12,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
