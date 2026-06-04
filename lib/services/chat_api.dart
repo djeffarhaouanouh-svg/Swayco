@@ -116,36 +116,42 @@ abstract final class ChatApi {
     required String meId,
     required String peerId,
     required String emoji,
+    required String photoUrl,
   }) async {
     if (meId.isEmpty || peerId.isEmpty || emoji.isEmpty) return;
-    await _client
+    var q = _client
         .from('messages')
         .delete()
         .eq('sender', meId)
         .eq('recipient', peerId)
         .eq('body', emoji);
+    // A reaction belongs to a specific photo, stamped in `discover_photo`.
+    if (photoUrl.isNotEmpty) q = q.eq('discover_photo', photoUrl);
+    await q;
   }
 
-  /// Every photo reaction the local user (`meId`) has ever sent, keyed
-  /// by the recipient's id and pointing to the set of emojis sent to
-  /// them. Lets the Discover rail render the buttons pre-filled when
-  /// the user has already reacted to that peer's card.
+  /// Every photo reaction the local user (`meId`) has ever sent, keyed by the
+  /// PHOTO URL it was about (`discover_photo`) and pointing to the set of
+  /// emojis sent on that photo. Lets the Discover rail render the buttons
+  /// pre-filled only for the exact photo the user reacted to. Legacy
+  /// reactions with no photo stamp are ignored (they reset to unreacted).
   static Future<Map<String, Set<String>>> fetchMyOutgoingPhotoReactions(
     String meId,
   ) async {
     if (meId.isEmpty) return const {};
     final rows = await _client
         .from('messages')
-        .select('recipient, body')
+        .select('discover_photo, body')
         .eq('sender', meId)
-        .inFilter('body', photoReactionEmojis);
+        .inFilter('body', photoReactionEmojis)
+        .neq('discover_photo', '');
     final out = <String, Set<String>>{};
     for (final r in rows as List) {
       final map = Map<String, dynamic>.from(r as Map);
-      final peer = map['recipient']?.toString() ?? '';
+      final photo = map['discover_photo']?.toString() ?? '';
       final emoji = map['body']?.toString() ?? '';
-      if (peer.isEmpty || emoji.isEmpty) continue;
-      out.putIfAbsent(peer, () => <String>{}).add(emoji);
+      if (photo.isEmpty || emoji.isEmpty) continue;
+      out.putIfAbsent(photo, () => <String>{}).add(emoji);
     }
     return out;
   }
@@ -159,15 +165,17 @@ abstract final class ChatApi {
     if (meId.isEmpty) return <String>{};
     final rows = await _client
         .from('messages')
-        .select('discover_photo')
+        .select('discover_photo, body')
         .eq('sender', meId)
         .neq('discover_photo', '');
     final out = <String>{};
     for (final r in rows as List) {
-      final photo =
-          Map<String, dynamic>.from(r as Map)['discover_photo']?.toString() ??
-              '';
-      if (photo.isNotEmpty) out.add(photo);
+      final map = Map<String, dynamic>.from(r as Map);
+      final photo = map['discover_photo']?.toString() ?? '';
+      final body = map['body']?.toString() ?? '';
+      // Reactions also stamp discover_photo now — they are NOT intro messages.
+      if (photo.isEmpty || photoReactionEmojis.contains(body)) continue;
+      out.add(photo);
     }
     return out;
   }
@@ -180,14 +188,18 @@ abstract final class ChatApi {
     if (meId.isEmpty) return <String>{};
     final rows = await _client
         .from('messages')
-        .select('recipient')
+        .select('recipient, body')
         .eq('sender', meId)
         .neq('discover_photo', '');
     final out = <String>{};
     for (final r in rows as List) {
-      final rcpt =
-          Map<String, dynamic>.from(r as Map)['recipient']?.toString() ?? '';
-      if (rcpt.isNotEmpty) out.add(rcpt);
+      final map = Map<String, dynamic>.from(r as Map);
+      final rcpt = map['recipient']?.toString() ?? '';
+      final body = map['body']?.toString() ?? '';
+      // Reactions now also carry a discover_photo stamp — exclude them so a
+      // mere reaction doesn't collapse the card's intro-message field.
+      if (rcpt.isEmpty || photoReactionEmojis.contains(body)) continue;
+      out.add(rcpt);
     }
     return out;
   }

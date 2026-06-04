@@ -64,13 +64,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   RemoteProfile? _remote;
   ProfileSnapshot? _local;
   FriendshipCounts _counts = const FriendshipCounts(followers: 0, following: 0);
-  int _likesCount = 0;
+  // Own profile: likes received per photo URL — drives each gallery photo's
+  // heart badge. Likes belong to a specific photo now.
+  Map<String, int> _likesByPhoto = const {};
   bool _loading = true;
   // Viewer-mode only: am I currently blocking the displayed user?
   bool _peerBlocked = false;
-  // Viewer-mode only: have I liked the displayed user? Drives the heart
-  // overlay on the peer's Discover photo.
-  bool _iLikePeer = false;
+  // Viewer-mode only: which of the peer's photo URLs I've liked. Drives the
+  // filled heart on each of the peer's gallery photos.
+  Set<String> _likedPhotoUrls = const {};
   // Viewer-mode only: directional follow state with the displayed user.
   // `_peerFollowsMe` → they added me; `_iFollowPeer` → I added them.
   bool _peerFollowsMe = false;
@@ -129,20 +131,19 @@ class _ProfileScreenState extends State<ProfileScreen>
         ? await FriendshipApi.countsFor(targetId)
         : const FriendshipCounts(followers: 0, following: 0);
     // Likes received are only meaningful (and visible) on my own profile.
-    // The peer's count would leak who liked them.
-    final likes = !_isViewingOther && isSupabaseReady
-        ? await LikeApi.countLikersOf(targetId)
-        : 0;
+    // The peer's count would leak who liked them. Now keyed per photo URL.
+    final likesByPhoto = !_isViewingOther && isSupabaseReady
+        ? await LikeApi.countLikesPerPhoto(targetId)
+        : const <String, int>{};
     final blocked = _isViewingOther && isSupabaseReady && deviceId.isNotEmpty
         ? await BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
         : false;
-    // In viewer mode we also need the "do I like this peer?" bit so the
-    // heart overlay renders in the right state on first paint.
-    bool iLike = false;
+    // In viewer mode we also need the set of the peer's photos I've liked so
+    // each photo's heart renders in the right state on first paint.
+    Set<String> likedPhotoUrls = const {};
     if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
       try {
-        final myLikes = await LikeApi.fetchMyLikedIds(deviceId);
-        iLike = myLikes.contains(targetId);
+        likedPhotoUrls = await LikeApi.fetchMyLikedPhotos(deviceId);
       } catch (_) {}
     }
     // Directional follow state — drives the "Follow back" button.
@@ -164,9 +165,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       _local = local;
       _remote = remote;
       _counts = counts;
-      _likesCount = likes;
+      _likesByPhoto = likesByPhoto;
       _peerBlocked = blocked;
-      _iLikePeer = iLike;
+      _likedPhotoUrls = likedPhotoUrls;
       _peerFollowsMe = peerFollowsMe;
       _iFollowPeer = iFollowPeer;
       _iRequestedPeer = iRequestedPeer;
@@ -174,21 +175,42 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
-  /// Optimistic like/unlike of the displayed peer (viewer mode). Roll back
-  /// the local flag if the DB write fails.
-  Future<void> _togglePeerLike() async {
-    if (!_isViewingOther || _deviceId.isEmpty || _targetId.isEmpty) return;
-    final wasLiked = _iLikePeer;
-    setState(() => _iLikePeer = !wasLiked);
+  /// Optimistic like/unlike of one of the peer's photos (viewer mode). Roll
+  /// back the local set if the DB write fails.
+  Future<void> _togglePhotoLike(String photoUrl) async {
+    if (!_isViewingOther ||
+        _deviceId.isEmpty ||
+        _targetId.isEmpty ||
+        photoUrl.isEmpty) {
+      return;
+    }
+    final wasLiked = _likedPhotoUrls.contains(photoUrl);
+    setState(() {
+      _likedPhotoUrls = wasLiked
+          ? ({..._likedPhotoUrls}..remove(photoUrl))
+          : {..._likedPhotoUrls, photoUrl};
+    });
     try {
       if (wasLiked) {
-        await LikeApi.unlike(likerId: _deviceId, likedId: _targetId);
+        await LikeApi.unlike(
+          likerId: _deviceId,
+          likedId: _targetId,
+          photoUrl: photoUrl,
+        );
       } else {
-        await LikeApi.like(likerId: _deviceId, likedId: _targetId);
+        await LikeApi.like(
+          likerId: _deviceId,
+          likedId: _targetId,
+          photoUrl: photoUrl,
+        );
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _iLikePeer = wasLiked);
+      setState(() {
+        _likedPhotoUrls = wasLiked
+            ? {..._likedPhotoUrls, photoUrl}
+            : ({..._likedPhotoUrls}..remove(photoUrl));
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Impossible d\'enregistrer le like.')),
       );
@@ -641,13 +663,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                             photos: _remote?.photos ?? const [],
                             avatarUrl: _remote?.avatarUrl ?? '',
                             counts: _counts,
-                            likesCount: _likesCount,
+                            likesByPhoto: _likesByPhoto,
                             viewerMode: _isViewingOther,
                             peerFollowsMe: _peerFollowsMe,
                             iFollowPeer: _iFollowPeer,
                             iRequestedPeer: _iRequestedPeer,
                             peerBlocked: _peerBlocked,
-                            iLikePeer: _iLikePeer,
+                            likedPhotoUrls: _likedPhotoUrls,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
                             onEditInterests: _saveInterests,
@@ -665,7 +687,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onAddPeer: _addPeer,
                             onUnfollow: _unfollowPeer,
                             onToggleBlock: _toggleBlock,
-                            onTogglePeerLike: _togglePeerLike,
+                            onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                           ),
                           const SizedBox(height: 20),
@@ -1268,7 +1290,7 @@ class _IdentitySection extends StatelessWidget {
     required this.photos,
     required this.avatarUrl,
     required this.counts,
-    required this.likesCount,
+    required this.likesByPhoto,
     required this.onEditName,
     required this.onEditBio,
     this.onPickAvatar,
@@ -1289,8 +1311,8 @@ class _IdentitySection extends StatelessWidget {
     this.onAddPeer,
     this.onUnfollow,
     this.onToggleBlock,
-    this.iLikePeer = false,
-    this.onTogglePeerLike,
+    this.likedPhotoUrls = const {},
+    this.onTogglePhotoLike,
     this.onMessagePeer,
   });
 
@@ -1315,8 +1337,8 @@ class _IdentitySection extends StatelessWidget {
   final String avatarUrl;
   final FriendshipCounts counts;
 
-  /// Number of users who liked me. Only shown on my own profile (private).
-  final int likesCount;
+  /// Likes received per photo URL. Only shown on my own profile (private).
+  final Map<String, int> likesByPhoto;
 
   /// Persist the edited display name (own profile, inline).
   final Future<void> Function(String) onEditName;
@@ -1374,10 +1396,12 @@ class _IdentitySection extends StatelessWidget {
   /// "Débloquer" action button shown while [peerBlocked] is true.
   final VoidCallback? onToggleBlock;
 
-  /// Viewer-mode only: have I liked this peer? Drives the heart overlay
-  /// on their photo cell.
-  final bool iLikePeer;
-  final VoidCallback? onTogglePeerLike;
+  /// Viewer-mode only: the peer's photo URLs I've liked. Drives the filled
+  /// heart on each of their gallery photos.
+  final Set<String> likedPhotoUrls;
+
+  /// Viewer-mode only: like/unlike one of the peer's photos by URL.
+  final void Function(String photoUrl)? onTogglePhotoLike;
 
   /// Viewer-mode only: opens the DM thread with this peer.
   final VoidCallback? onMessagePeer;
@@ -1574,7 +1598,7 @@ class _IdentitySection extends StatelessWidget {
           viewerMode: false,
           onPick: onPickPhoto,
           onRemove: onRemovePhoto,
-          likesCount: likesCount,
+          likesByPhoto: likesByPhoto,
           onTapLikes: onTapLikes,
         ),
         const SizedBox(height: 10),
@@ -1758,8 +1782,8 @@ class _IdentitySection extends StatelessWidget {
             viewerMode: true,
             onPick: () {},
             onRemove: (_) {},
-            iLikePeer: iLikePeer,
-            onTogglePeerLike: onTogglePeerLike,
+            likedPhotoUrls: likedPhotoUrls,
+            onTogglePhotoLike: onTogglePhotoLike,
           ),
         ],
       ],
@@ -1793,20 +1817,23 @@ class _PhotoGallery extends StatelessWidget {
     required this.viewerMode,
     required this.onPick,
     required this.onRemove,
-    this.likesCount = 0,
+    this.likesByPhoto = const {},
     this.onTapLikes,
-    this.iLikePeer = false,
-    this.onTogglePeerLike,
+    this.likedPhotoUrls = const {},
+    this.onTogglePhotoLike,
   });
 
   final List<String> photos;
   final bool viewerMode;
   final VoidCallback onPick;
   final void Function(String url) onRemove;
-  final int likesCount;
+  // Own profile: likes received per photo URL.
+  final Map<String, int> likesByPhoto;
   final VoidCallback? onTapLikes;
-  final bool iLikePeer;
-  final VoidCallback? onTogglePeerLike;
+  // Viewer mode: the peer's photo URLs I've liked.
+  final Set<String> likedPhotoUrls;
+  // Viewer mode: like/unlike one of the peer's photos by URL.
+  final void Function(String photoUrl)? onTogglePhotoLike;
 
   // Portrait tiles (3:4) laid out three-per-row, Instagram-style.
   static const double _aspect = 216 / 162; // height / width
@@ -1847,13 +1874,14 @@ class _PhotoGallery extends StatelessWidget {
                 onTap: () {},
                 // Delete badge on every photo on my own profile.
                 onDelete: viewerMode ? null : () => onRemove(photos[i]),
-                // Likes badge only on the PDP (index 0) of my own profile.
-                likesCount: (!viewerMode && i == 0) ? likesCount : 0,
-                onTapLikes: (!viewerMode && i == 0) ? onTapLikes : null,
-                // Like-this-peer heart only on the PDP in viewer mode.
-                iLikePeer: iLikePeer,
-                onTogglePeerLike:
-                    (viewerMode && i == 0) ? onTogglePeerLike : null,
+                // Per-photo likes badge on each of my own photos.
+                likesCount: viewerMode ? 0 : (likesByPhoto[photos[i]] ?? 0),
+                onTapLikes: viewerMode ? null : onTapLikes,
+                // Per-photo like heart on each of the peer's photos (viewer).
+                iLikePeer: likedPhotoUrls.contains(photos[i]),
+                onTogglePeerLike: viewerMode && onTogglePhotoLike != null
+                    ? () => onTogglePhotoLike!(photos[i])
+                    : null,
               ),
             ),
         ];

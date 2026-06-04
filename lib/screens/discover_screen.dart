@@ -10,7 +10,6 @@ import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
-import '../services/like_api.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
@@ -63,17 +62,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  // Profile ids I've already liked — heart renders filled for these.
-  // Hydrated from Supabase on bootstrap so the state survives restarts /
-  // multi-device; mutated optimistically on every tap, written through
-  // LikeApi.like / LikeApi.unlike.
-  Set<String> _likedIds = <String>{};
-
-  // peer id → set of photo-reaction emojis I've already sent them.
-  // Same persistence story as [_likedIds]: hydrated from the messages
-  // table on bootstrap so each reaction button on a Discover card
-  // renders pre-filled when I revisit.
-  Map<String, Set<String>> _myReactionsByPeer = const {};
+  // photo URL → set of photo-reaction emojis I've already sent on that photo.
+  // Reactions belong to a specific photo now, so the rail renders pre-filled
+  // only for the exact carousel photo I reacted to. Hydrated from the
+  // messages table on bootstrap so it survives restarts / multi-device.
+  Map<String, Set<String>> _myReactionsByPhoto = const {};
 
   // Peers I've already sent a direct intro message to (text area). One message
   // per PERSON (each card is one person now), hydrated on bootstrap so it
@@ -151,14 +144,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (_myId.isEmpty || !isSupabaseReady) return;
     try {
       final mine = await FriendshipApi.fetchMine(_myId);
-      final liked = await LikeApi.fetchMyLikedIds(_myId);
       final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
       final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(_myId);
       if (!mounted) return;
       setState(() {
         _myFriendships = mine;
-        _likedIds = liked;
-        _myReactionsByPeer = reactions;
+        _myReactionsByPhoto = reactions;
         _directMessagedPeers = messaged;
       });
     } catch (_) {
@@ -183,7 +174,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       // and show the deck rather than spin indefinitely.
       final results = await Future.wait(<Future<Object>>[
         FriendshipApi.fetchMine(id),
-        LikeApi.fetchMyLikedIds(id),
         ChatApi.fetchMyOutgoingPhotoReactions(id),
         ChatApi.fetchMyDiscoverMessagedPeers(id),
         ProfileApi.fetchDiscoverFeed(myId: id),
@@ -192,12 +182,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       if (!mounted) return;
       setState(() {
         _myFriendships = results[0] as List<Friendship>;
-        _likedIds = results[1] as Set<String>;
-        _myReactionsByPeer = results[2] as Map<String, Set<String>>;
-        _directMessagedPeers = results[3] as Set<String>;
-        _profiles = results[4] as List<RemoteProfile>;
+        _myReactionsByPhoto = results[1] as Map<String, Set<String>>;
+        _directMessagedPeers = results[2] as Set<String>;
+        _profiles = results[3] as List<RemoteProfile>;
         _rebuildCards();
-        _restoreCursor(results[5] as String);
+        _restoreCursor(results[4] as String);
         _feedLoading = false;
       });
       AppBoot.markHomeReady();
@@ -231,36 +220,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   /// Toggle a like on [profileId]. Optimistic local flip + DB write
   /// through LikeApi; on error roll back so the heart matches the truth.
-  Future<void> _toggleLikeOnProfile(String profileId) async {
-    if (_myId.isEmpty || profileId.isEmpty) return;
-    final wasLiked = _likedIds.contains(profileId);
-    setState(() {
-      if (wasLiked) {
-        _likedIds = {..._likedIds}..remove(profileId);
-      } else {
-        _likedIds = {..._likedIds, profileId};
-      }
-    });
-    try {
-      if (wasLiked) {
-        await LikeApi.unlike(likerId: _myId, likedId: profileId);
-      } else {
-        await LikeApi.like(likerId: _myId, likedId: profileId);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (wasLiked) {
-          _likedIds = {..._likedIds, profileId};
-        } else {
-          _likedIds = {..._likedIds}..remove(profileId);
-        }
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppStrings.t('like_save_failed'))));
-    }
-  }
 
   @override
   void dispose() {
@@ -454,9 +413,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     String photo,
     String emoji,
   ) async {
-    final wasReacted = _myReactionsByPeer[peer.id]?.contains(emoji) ?? false;
+    if (photo.isEmpty) return;
+    final wasReacted = _myReactionsByPhoto[photo]?.contains(emoji) ?? false;
     if (wasReacted) {
-      await _unsendEmojiReaction(peer, emoji);
+      await _unsendEmojiReaction(peer, photo, emoji);
     } else {
       await _sendEmojiReaction(peer, photo, emoji);
     }
@@ -472,46 +432,52 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     String photo,
     String emoji,
   ) async {
-    // Optimistic local update so the button stays filled immediately
-    // without waiting for the round-trip.
-    final next = Map<String, Set<String>>.from(_myReactionsByPeer);
-    final current = Set<String>.from(next[peer.id] ?? const <String>{});
+    // Optimistic local update (keyed by the photo) so the button stays
+    // filled immediately without waiting for the round-trip.
+    final next = Map<String, Set<String>>.from(_myReactionsByPhoto);
+    final current = Set<String>.from(next[photo] ?? const <String>{});
     current.add(emoji);
-    next[peer.id] = current;
-    setState(() => _myReactionsByPeer = next);
-    // No discover_photo stamp on reactions — that flag marks intro MESSAGES
-    // only (so reacting doesn't collapse the card's message field). [photo]
-    // is kept for signature symmetry with the message path.
+    next[photo] = current;
+    setState(() => _myReactionsByPhoto = next);
+    // Stamp the photo URL into discover_photo so the reaction belongs to THIS
+    // photo (intro messages are told apart by their non-emoji body, so this
+    // doesn't collapse the card's message field).
     await _sendQuickMessage(
       peer,
       body: emoji,
       snack: '$emoji envoyé à ${peer.displayName}',
+      discoverPhoto: photo,
     );
   }
 
   /// Undo a previously-sent reaction. Pulls the emoji out of the local
   /// set, then deletes every matching message I sent so the peer's
   /// thread / Demandes feed loses the entry too.
-  Future<void> _unsendEmojiReaction(RemoteProfile peer, String emoji) async {
-    final previous = _myReactionsByPeer;
+  Future<void> _unsendEmojiReaction(
+    RemoteProfile peer,
+    String photo,
+    String emoji,
+  ) async {
+    final previous = _myReactionsByPhoto;
     final next = Map<String, Set<String>>.from(previous);
-    final current = Set<String>.from(next[peer.id] ?? const <String>{});
+    final current = Set<String>.from(next[photo] ?? const <String>{});
     current.remove(emoji);
     if (current.isEmpty) {
-      next.remove(peer.id);
+      next.remove(photo);
     } else {
-      next[peer.id] = current;
+      next[photo] = current;
     }
-    setState(() => _myReactionsByPeer = next);
+    setState(() => _myReactionsByPhoto = next);
     try {
       await ChatApi.deleteMyReaction(
         meId: _myId,
         peerId: peer.id,
         emoji: emoji,
+        photoUrl: photo,
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => _myReactionsByPeer = previous);
+      setState(() => _myReactionsByPhoto = previous);
     }
   }
 
@@ -804,18 +770,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
               child: SizedBox.expand(
+                // Keyed by person so each card keeps its own carousel index
+                // as the deck recycles pages.
                 child: _ProfileCard(
+                  key: ValueKey(profile.id),
                   profile: profile,
                   photos: card.photos,
                   onAdd: () => _toggleFriendRequest(profile),
                   pendingOutgoing:
                       _statusFor(profile) == FriendshipStatus.pendingOutgoing,
-                  liked: _likedIds.contains(profile.id),
-                  onToggleLike: () => _toggleLikeOnProfile(profile.id),
-                  onSendEmoji: (emoji) =>
-                      _toggleEmojiReaction(profile, firstPhoto, emoji),
-                  reactedEmojis:
-                      _myReactionsByPeer[profile.id] ?? const <String>{},
+                  // Reactions belong to the photo currently shown in the
+                  // carousel — the card resolves it and calls back with it.
+                  reactionsByPhoto: _myReactionsByPhoto,
+                  onSendEmoji: (photo, emoji) =>
+                      _toggleEmojiReaction(profile, photo, emoji),
                   alreadyMessaged: _directMessagedPeers.contains(profile.id),
                   onSendMessage: (text) =>
                       _sendDirectMessage(profile, firstPhoto, text),
@@ -1220,16 +1188,15 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends StatefulWidget {
   const _ProfileCard({
+    super.key,
     required this.profile,
     required this.photos,
     required this.onAdd,
     this.pendingOutgoing = false,
-    this.liked = false,
-    this.onToggleLike,
     this.onSendEmoji,
-    this.reactedEmojis = const <String>{},
+    this.reactionsByPhoto = const {},
     this.alreadyMessaged = false,
     this.onSendMessage,
   });
@@ -1246,19 +1213,14 @@ class _ProfileCard extends StatelessWidget {
   /// [profile]. Drives the "Ajouter" pill into its "Envoyé" state;
   /// re-tapping then cancels the request via [onAdd].
   final bool pendingOutgoing;
-  final bool liked;
 
-  /// When non-null, a heart button is rendered to the right of "Envoyer 👋".
-  /// Tap toggles liked state.
-  final VoidCallback? onToggleLike;
+  /// Fires with the photo URL currently shown + the tapped emoji — the
+  /// reaction belongs to that specific photo.
+  final void Function(String photo, String emoji)? onSendEmoji;
 
-  /// Fires with the emoji string when one of the reaction-rail buttons
-  /// is tapped — sends that emoji as a chat message to [profile].
-  final ValueChanged<String>? onSendEmoji;
-
-  /// Emojis I've already sent to [profile] — each matching button on
-  /// the rail renders pre-filled.
-  final Set<String> reactedEmojis;
+  /// Photo URL → emojis I've already sent on it. The rail renders a button
+  /// filled only for the carousel photo currently in view.
+  final Map<String, Set<String>> reactionsByPhoto;
 
   /// True when I've already sent [profile] a direct intro message — the
   /// in-card text field is replaced by a "message sent" state (one per peer).
@@ -1269,7 +1231,33 @@ class _ProfileCard extends StatelessWidget {
   final Future<void> Function(String)? onSendMessage;
 
   @override
+  State<_ProfileCard> createState() => _ProfileCardState();
+}
+
+class _ProfileCardState extends State<_ProfileCard> {
+  // Which carousel photo is on screen — drives the reaction rail's target.
+  int _photoIdx = 0;
+
+  @override
   Widget build(BuildContext context) {
+    // Alias widget fields to locals so the (long) build body below reads
+    // unchanged.
+    final profile = widget.profile;
+    final photos = widget.photos;
+    final onAdd = widget.onAdd;
+    final pendingOutgoing = widget.pendingOutgoing;
+    final alreadyMessaged = widget.alreadyMessaged;
+    final onSendMessage = widget.onSendMessage;
+    final idx = photos.isEmpty
+        ? 0
+        : _photoIdx.clamp(0, photos.length - 1);
+    final currentPhoto = photos.isEmpty ? '' : photos[idx];
+    final reactedEmojis =
+        widget.reactionsByPhoto[currentPhoto] ?? const <String>{};
+    final sendEmoji = widget.onSendEmoji;
+    final onSendEmoji = sendEmoji == null
+        ? null
+        : (String emoji) => sendEmoji(currentPhoto, emoji);
     final lang = findLanguageByCode(profile.language);
     final flag = lang?.flag ?? '';
     // "Ville, Pays" shown small under the name (either part may be empty).
@@ -1303,7 +1291,11 @@ class _ProfileCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: SC.bubbleIn),
-            if (photos.isNotEmpty) _CardPhotoCarousel(photos: photos),
+            if (photos.isNotEmpty)
+              _CardPhotoCarousel(
+                photos: photos,
+                onIndexChanged: (i) => setState(() => _photoIdx = i),
+              ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -1425,7 +1417,7 @@ class _ProfileCard extends StatelessWidget {
                             const _MessageSentPill()
                           else
                             _DirectMessageField(
-                              onSend: onSendMessage!,
+                              onSend: onSendMessage,
                             ),
                       ],
                     ),
@@ -1457,9 +1449,13 @@ class _ProfileCard extends StatelessWidget {
 /// axes don't fight). Page dots sit at the TOP-CENTRE in a discreet greyed
 /// white. Single-photo cards render just the image, no dots.
 class _CardPhotoCarousel extends StatefulWidget {
-  const _CardPhotoCarousel({required this.photos});
+  const _CardPhotoCarousel({required this.photos, this.onIndexChanged});
 
   final List<String> photos;
+
+  /// Fires with the new photo index whenever the visible photo changes
+  /// (swipe or tap). Lets the parent card target reactions at this photo.
+  final ValueChanged<int>? onIndexChanged;
 
   @override
   State<_CardPhotoCarousel> createState() => _CardPhotoCarouselState();
@@ -1494,7 +1490,10 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
         PageView.builder(
           controller: _ctrl,
           itemCount: photos.length,
-          onPageChanged: (i) => setState(() => _index = i),
+          onPageChanged: (i) {
+            setState(() => _index = i);
+            widget.onIndexChanged?.call(i);
+          },
           itemBuilder: (_, i) => Image.network(
             photos[i],
             fit: BoxFit.cover,

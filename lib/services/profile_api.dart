@@ -632,9 +632,22 @@ abstract final class ProfileApi {
     } catch (e) {
       debugPrint('ProfileApi.removeProfilePhoto: storage cleanup failed: $e');
     }
+    // Likes belong to a specific photo now — drop the ones earned on the
+    // photo just removed so they vanish with it (a reposted photo gets a new
+    // URL, hence a fresh start). Goes through the SECURITY DEFINER RPC because
+    // table RLS only lets the *liker* delete a row.
+    try {
+      await _c.rpc(
+        'delete_my_received_likes_for_photo',
+        params: {'p_photo': url},
+      );
+    } catch (e) {
+      debugPrint('ProfileApi.removeProfilePhoto: photo likes cleanup failed: $e');
+    }
+    // Belt-and-braces: when the gallery is now empty, wipe any stragglers.
     if (next.isEmpty) {
       try {
-        await _c.from('likes').delete().eq('liked', deviceId);
+        await _c.rpc('delete_my_received_likes');
       } catch (e) {
         debugPrint('ProfileApi.removeProfilePhoto: likes cleanup failed: $e');
       }

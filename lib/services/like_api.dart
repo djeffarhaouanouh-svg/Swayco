@@ -32,19 +32,24 @@ import 'supabase_service.dart';
 abstract final class LikeApi {
   static SupabaseClient get _c => Supabase.instance.client;
 
-  /// Idempotent — re-liking the same person is a no-op via the composite PK.
+  /// Idempotent — re-liking the same photo is a no-op via the composite PK
+  /// `(liker, liked, photo_url)`. A like belongs to a specific PHOTO, so a
+  /// person can like several of someone's photos independently.
   static Future<void> like({
     required String likerId,
     required String likedId,
+    required String photoUrl,
   }) async {
     if (!isSupabaseReady) return;
     if (likerId.isEmpty || likedId.isEmpty || likerId == likedId) return;
+    if (photoUrl.isEmpty) return;
     try {
       await _c.from('likes').upsert({
         'liker': likerId,
         'liked': likedId,
+        'photo_url': photoUrl,
         'created_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'liker,liked');
+      }, onConflict: 'liker,liked,photo_url');
       unawaited(_notifyLike(likerId, likedId));
     } catch (e) {
       debugPrint('LikeApi.like failed: $e');
@@ -68,35 +73,46 @@ abstract final class LikeApi {
     }
   }
 
-  /// Remove the like row. Safe to call when no row exists.
+  /// Remove the like row for a single photo. Safe to call when no row exists.
   static Future<void> unlike({
     required String likerId,
     required String likedId,
+    required String photoUrl,
   }) async {
     if (!isSupabaseReady || likerId.isEmpty || likedId.isEmpty) return;
+    if (photoUrl.isEmpty) return;
     try {
-      await _c.from('likes').delete().eq('liker', likerId).eq('liked', likedId);
+      await _c
+          .from('likes')
+          .delete()
+          .eq('liker', likerId)
+          .eq('liked', likedId)
+          .eq('photo_url', photoUrl);
     } catch (e) {
       debugPrint('LikeApi.unlike failed: $e');
       rethrow;
     }
   }
 
-  /// Set of profile ids I've liked — used by Discover to render the
-  /// heart in its filled state for profiles I previously liked.
-  static Future<Set<String>> fetchMyLikedIds(String likerId) async {
+  /// Set of photo URLs I've liked — used to render a photo's heart in its
+  /// filled state when I previously liked that specific photo.
+  static Future<Set<String>> fetchMyLikedPhotos(String likerId) async {
     if (!isSupabaseReady || likerId.isEmpty) return const <String>{};
     try {
-      final rows = await _c.from('likes').select('liked').eq('liker', likerId);
+      final rows = await _c
+          .from('likes')
+          .select('photo_url')
+          .eq('liker', likerId);
       return (rows as List)
           .map(
             (r) =>
-                Map<String, dynamic>.from(r as Map)['liked']?.toString() ?? '',
+                Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ??
+                '',
           )
-          .where((id) => id.isNotEmpty)
+          .where((u) => u.isNotEmpty)
           .toSet();
     } catch (e) {
-      debugPrint('LikeApi.fetchMyLikedIds failed: $e');
+      debugPrint('LikeApi.fetchMyLikedPhotos failed: $e');
       return const <String>{};
     }
   }
@@ -111,15 +127,15 @@ abstract final class LikeApi {
           .select('liker, created_at')
           .eq('liked', userId)
           .order('created_at', ascending: false);
-      final ids = (rows as List)
-          .map(
-            (r) =>
-                Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '',
-          )
-          .where((id) => id.isNotEmpty)
-          .toList(growable: false);
+      // A liker can now appear once per liked photo — dedupe to distinct
+      // people, keeping newest-first order.
+      final ids = <String>{};
+      for (final r in rows as List) {
+        final id = Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '';
+        if (id.isNotEmpty) ids.add(id);
+      }
       if (ids.isEmpty) return const [];
-      return ProfileApi.fetchByIds(ids);
+      return ProfileApi.fetchByIds(ids.toList(growable: false));
     } catch (e) {
       debugPrint('LikeApi.fetchLikersOf failed: $e');
       return const [];
@@ -141,15 +157,13 @@ abstract final class LikeApi {
           .eq('liked', userId)
           .gt('created_at', since.toUtc().toIso8601String())
           .order('created_at', ascending: false);
-      final ids = (rows as List)
-          .map(
-            (r) =>
-                Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '',
-          )
-          .where((id) => id.isNotEmpty)
-          .toList(growable: false);
+      final ids = <String>{};
+      for (final r in rows as List) {
+        final id = Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '';
+        if (id.isNotEmpty) ids.add(id);
+      }
       if (ids.isEmpty) return const [];
-      return ProfileApi.fetchByIds(ids);
+      return ProfileApi.fetchByIds(ids.toList(growable: false));
     } catch (e) {
       debugPrint('LikeApi.fetchLikersSince failed: $e');
       return const [];
@@ -175,6 +189,23 @@ abstract final class LikeApi {
       await _c.rpc('delete_my_received_likes');
     } catch (e) {
       debugPrint('LikeApi.deleteAllLikersOf failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Wipe the received likes on a single one of my photos — called when the
+  /// owner deletes that photo, so its likes vanish with it. Goes through the
+  /// `delete_my_received_likes_for_photo` SECURITY DEFINER RPC (migration
+  /// 0036) for the same RLS reason as [deleteAllLikersOf].
+  static Future<void> deleteReceivedLikesForPhoto(String photoUrl) async {
+    if (!isSupabaseReady || photoUrl.isEmpty) return;
+    try {
+      await _c.rpc(
+        'delete_my_received_likes_for_photo',
+        params: {'p_photo': photoUrl},
+      );
+    } catch (e) {
+      debugPrint('LikeApi.deleteReceivedLikesForPhoto failed: $e');
       rethrow;
     }
   }
@@ -209,15 +240,27 @@ abstract final class LikeApi {
     }
   }
 
-  /// Quick count for the badge on the profile screen.
-  static Future<int> countLikersOf(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) return 0;
+  /// Likes received per photo, keyed by photo URL — drives the per-photo
+  /// heart badge on my own profile gallery. Only readable for my own rows
+  /// (RLS lets the liked party read their received likes).
+  static Future<Map<String, int>> countLikesPerPhoto(String userId) async {
+    if (!isSupabaseReady || userId.isEmpty) return const {};
     try {
-      final rows = await _c.from('likes').select('liker').eq('liked', userId);
-      return (rows as List).length;
+      final rows = await _c
+          .from('likes')
+          .select('photo_url')
+          .eq('liked', userId);
+      final out = <String, int>{};
+      for (final r in rows as List) {
+        final url =
+            Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ?? '';
+        if (url.isEmpty) continue;
+        out[url] = (out[url] ?? 0) + 1;
+      }
+      return out;
     } catch (e) {
-      debugPrint('LikeApi.countLikersOf failed: $e');
-      return 0;
+      debugPrint('LikeApi.countLikesPerPhoto failed: $e');
+      return const {};
     }
   }
 
@@ -234,7 +277,13 @@ abstract final class LikeApi {
           .select('liker')
           .eq('liked', userId)
           .gt('created_at', since.toUtc().toIso8601String());
-      return (rows as List).length;
+      // Distinct people (a liker may have liked several of my photos).
+      final likers = <String>{};
+      for (final r in rows as List) {
+        final id = Map<String, dynamic>.from(r as Map)['liker']?.toString() ?? '';
+        if (id.isNotEmpty) likers.add(id);
+      }
+      return likers.length;
     } catch (e) {
       debugPrint('LikeApi.countReceivedLikesSince failed: $e');
       return 0;
