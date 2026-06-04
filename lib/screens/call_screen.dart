@@ -1423,6 +1423,10 @@ class _CallScreenState extends State<CallScreen> {
         ),
         child: Scaffold(
           backgroundColor: Colors.black,
+          // Don't shrink the video when the keyboard opens — keep it full
+          // screen; only the chat composer lifts above the keyboard (it adds
+          // viewInsets.bottom itself).
+          resizeToAvoidBottomInset: false,
           body: SafeArea(
             child: Stack(
               fit: StackFit.expand,
@@ -1574,9 +1578,9 @@ class _CallScreenState extends State<CallScreen> {
                 Positioned(
                   left: 8,
                   right: 84,
-                  bottom: MediaQuery.viewInsetsOf(context).bottom +
-                      MediaQuery.paddingOf(context).bottom +
-                      12,
+                  // Lift above the keyboard. The SafeArea already accounts for
+                  // the bottom inset, so only add the keyboard height here.
+                  bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
