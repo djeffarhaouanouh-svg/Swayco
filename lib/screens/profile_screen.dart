@@ -687,9 +687,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                         padding: EdgeInsets.fromLTRB(
                           28,
                           // Own profile: title sits at the very top like the
-                          // other tabs (Discover / Messages). Viewer: leave
-                          // room for the transparent AppBar drawn behind it.
-                          _isViewingOther ? 56 : 12,
+                          // other tabs (Discover / Messages). Viewer: just
+                          // clear the transparent AppBar drawn behind it, kept
+                          // tight so the whole profile sits higher on screen.
+                          _isViewingOther ? 36 : 12,
                           28,
                           32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
@@ -1786,46 +1787,55 @@ class _PhotoGallery extends StatelessWidget {
   final bool iLikePeer;
   final VoidCallback? onTogglePeerLike;
 
-  static const double _height = 216;
-  static const double _width = 162;
+  // Portrait tiles (3:4) laid out three-per-row, Instagram-style.
+  static const double _aspect = 216 / 162; // height / width
+  static const double _spacing = 8;
+  static const int _columns = 3;
 
   @override
   Widget build(BuildContext context) {
     if (viewerMode && photos.isEmpty) return const SizedBox.shrink();
     final canAdd = !viewerMode && photos.length < profilePhotosMax;
-    final items = <Widget>[
-      if (canAdd)
-        SizedBox(
-          width: _width,
-          child: _AddDiscoverPhotoCta(onTap: onPick),
-        ),
-      for (var i = 0; i < photos.length; i++)
-        SizedBox(
-          width: _width,
-          child: _PhotoCell(
-            photoUrl: photos[i],
-            viewerMode: viewerMode,
-            onTap: () {},
-            // Delete badge on every photo on my own profile.
-            onDelete: viewerMode ? null : () => onRemove(photos[i]),
-            // Likes badge only on the PDP (index 0) of my own profile.
-            likesCount: (!viewerMode && i == 0) ? likesCount : 0,
-            onTapLikes: (!viewerMode && i == 0) ? onTapLikes : null,
-            // Like-this-peer heart only on the PDP in viewer mode.
-            iLikePeer: iLikePeer,
-            onTogglePeerLike: (viewerMode && i == 0) ? onTogglePeerLike : null,
-          ),
-        ),
-    ];
-    return SizedBox(
-      height: _height,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => items[i],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Exactly three tiles per row on phone; the tile width follows the
+        // available content width so the grid always fills edge-to-edge.
+        final tileWidth =
+            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
+        final tileHeight = tileWidth * _aspect;
+        final cells = <Widget>[
+          if (canAdd)
+            SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: _AddDiscoverPhotoCta(onTap: onPick),
+            ),
+          for (var i = 0; i < photos.length; i++)
+            SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: _PhotoCell(
+                photoUrl: photos[i],
+                viewerMode: viewerMode,
+                onTap: () {},
+                // Delete badge on every photo on my own profile.
+                onDelete: viewerMode ? null : () => onRemove(photos[i]),
+                // Likes badge only on the PDP (index 0) of my own profile.
+                likesCount: (!viewerMode && i == 0) ? likesCount : 0,
+                onTapLikes: (!viewerMode && i == 0) ? onTapLikes : null,
+                // Like-this-peer heart only on the PDP in viewer mode.
+                iLikePeer: iLikePeer,
+                onTogglePeerLike:
+                    (viewerMode && i == 0) ? onTogglePeerLike : null,
+              ),
+            ),
+        ];
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: cells,
+        );
+      },
     );
   }
 }
