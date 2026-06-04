@@ -459,16 +459,27 @@ class _RootShellState extends State<RootShell> {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      child: GlassNavBar(
-                        selected: index,
-                        unreadChat: unread,
-                        // Demandes badge = pending friend requests + unseen
-                        // likes / photo-reactions.
-                        unreadRequests: pending + activity,
-                        // Only the Discover tab has a card resting on the nav
-                        // that the concave notches should hug.
-                        hugTopCorners: index == NavTab.discover,
-                        onSelect: _selectTab,
+                      // Rebuild on every pager tick so the highlight pill
+                      // glides with the swipe instead of snapping at the end.
+                      child: AnimatedBuilder(
+                        animation: _pageController,
+                        builder: (context, _) {
+                          final frac = _pageController.hasClients
+                              ? (_pageController.page ?? index.toDouble())
+                              : index.toDouble();
+                          return GlassNavBar(
+                            selected: index,
+                            selectedFraction: frac,
+                            unreadChat: unread,
+                            // Demandes badge = pending friend requests +
+                            // unseen likes / photo-reactions.
+                            unreadRequests: pending + activity,
+                            // Only the Discover tab has a card resting on the
+                            // nav that the concave notches should hug.
+                            hugTopCorners: index == NavTab.discover,
+                            onSelect: _selectTab,
+                          );
+                        },
                       ),
                     ),
                   ],

@@ -17,9 +17,17 @@ class GlassNavBar extends StatelessWidget {
     required this.unreadRequests,
     required this.onSelect,
     this.hugTopCorners = false,
+    this.selectedFraction,
   });
 
   final int selected;
+
+  /// Continuous tab position (e.g. 1.4 mid-swipe between tabs 1 and 2). When
+  /// provided, the highlight pill tracks it in real time so it glides with
+  /// the page swipe instead of snapping. Null → the pill just animates
+  /// between integer [selected] slots (used by pushed-route nav bars that
+  /// have no pager).
+  final double? selectedFraction;
   final int unreadChat;
 
   /// Count of pending friend requests addressed to the local user —
@@ -107,31 +115,46 @@ class GlassNavBar extends StatelessWidget {
               // Each tab gets an equal slice of the full width; the pill
               // and the icons share the same slot geometry so they line up.
               final slot = constraints.maxWidth / items.length;
+              // Continuous pill position when a fraction is supplied (glides
+              // with the swipe); otherwise the integer slot.
+              final pillLeft = slot * (selectedFraction ?? selected.toDouble());
+              final pill = Center(
+                child: Container(
+                  width: slot - 24,
+                  height: height - 16,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.28),
+                    ),
+                  ),
+                ),
+              );
               return Stack(
                 alignment: Alignment.centerLeft,
                 children: [
-                  // Sliding highlight pill — animates between item slots.
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    left: slot * selected,
-                    top: 0,
-                    bottom: 0,
-                    width: slot,
-                    child: Center(
-                      child: Container(
-                        width: slot - 24,
-                        height: height - 16,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.28),
-                          ),
-                        ),
-                      ),
+                  // Sliding highlight pill. With a fraction it tracks the
+                  // swipe live (plain Positioned); without one it animates
+                  // between integer slots on tap.
+                  if (selectedFraction != null)
+                    Positioned(
+                      left: pillLeft,
+                      top: 0,
+                      bottom: 0,
+                      width: slot,
+                      child: pill,
+                    )
+                  else
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                      left: pillLeft,
+                      top: 0,
+                      bottom: 0,
+                      width: slot,
+                      child: pill,
                     ),
-                  ),
                   // Items — one equal-width slot each.
                   Row(
                     children: [
