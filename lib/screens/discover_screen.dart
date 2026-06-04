@@ -16,6 +16,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -541,15 +542,30 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final deckTop = safeTop + _DiscoverHeader.height;
     final deckBottom = GlassNavBar.height + safeBottom;
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       // Cards extend behind the floating nav bar (rendered by RootShell).
       extendBody: true,
-      // Plain black background (the site's black) — the cyan glow hugging the
-      // card comes from the card's own shadow, not from the background.
-      body: ColoredBox(
-        color: const Color(0xFF0E0E0E),
+      body: MeshBackground(
         child: Stack(
           children: [
+            // Cyan-blue ambient wash over the mesh: turns the fond behind the
+            // card from flat navy into a cyan-blue glow — brightest right
+            // behind the card, fading to a cyan-navy cast at the edges.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 1.2,
+                    colors: [
+                      SC.meshCyan.withValues(alpha: 0.50),
+                      SC.meshBlue.withValues(alpha: 0.30),
+                      SC.meshNavy.withValues(alpha: 0.22),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
             // The card deck, inset to the gap between the two bar bodies.
             // Each page is exactly the gap height, so cards slide in flush.
             Positioned(
