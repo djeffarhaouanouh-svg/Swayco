@@ -1812,6 +1812,10 @@ class _PhotoGallery extends StatelessWidget {
   static const double _aspect = 216 / 162; // height / width
   static const double _spacing = 8;
   static const int _columns = 3;
+  // Cap the tile size so wide (desktop / web) layouts show small thumbnails
+  // that wrap across the row, instead of three giant images. Phones stay
+  // below this cap, so they keep exactly three per row.
+  static const double _maxTile = 150;
 
   @override
   Widget build(BuildContext context) {
@@ -1819,10 +1823,12 @@ class _PhotoGallery extends StatelessWidget {
     final canAdd = !viewerMode && photos.length < profilePhotosMax;
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Exactly three tiles per row on phone; the tile width follows the
-        // available content width so the grid always fills edge-to-edge.
-        final tileWidth =
+        // Phone: three per row (width / 3). Desktop: the three-up width blows
+        // past [_maxTile], so clamp to it and let the Wrap flow more, smaller
+        // tiles across the width.
+        final threeUp =
             (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
+        final tileWidth = threeUp > _maxTile ? _maxTile : threeUp;
         final tileHeight = tileWidth * _aspect;
         final cells = <Widget>[
           if (canAdd)
