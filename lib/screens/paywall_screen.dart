@@ -57,7 +57,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       // Highlighted (cyan) fragments are wrapped in *asterisks* and
       // split out at render time, mirroring the green words in the
       // reference paywall.
-      sublabel: 'Heures d\'appel *incluses*',
+      sublabel: 'Jusqu\'à *10h* d\'appels traduits par mois',
       popular: true,
     ),
     _Plan(
