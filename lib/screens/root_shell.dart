@@ -61,6 +61,20 @@ class _RootShellState extends State<RootShell> {
   /// Guards the one-shot coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
 
+  /// Drives the horizontal swipe between tabs (Snapchat-style). Kept in sync
+  /// with [NavTab.index]: nav-bar taps / routing animate it, swipes update
+  /// [NavTab.index] via [PageView.onPageChanged].
+  late final PageController _pageController =
+      PageController(initialPage: NavTab.index.value);
+
+  /// Select a tab: update the shared index and clear the matching badges.
+  /// Shared by nav-bar taps and swipe (onPageChanged).
+  void _selectTab(int i) {
+    NavTab.select(i);
+    if (i == NavTab.chat) ChatUnread.markAllSeen();
+    if (i == NavTab.demandes) ReceivedActivityUnread.markSeen();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -282,6 +296,7 @@ class _RootShellState extends State<RootShell> {
   @override
   void dispose() {
     _callPollTimer?.cancel();
+    _pageController.dispose();
     NotificationRouter.pending.removeListener(_onNotificationIntent);
     NavTab.index.removeListener(_onNavTabChanged);
     final ch = _callsChannel;
@@ -292,7 +307,19 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _onNavTabChanged() {
-    if (NavTab.index.value == NavTab.profile) _maybeShowProfileTip();
+    final i = NavTab.index.value;
+    // Keep the swipeable pager in sync with programmatic tab changes
+    // (nav-bar taps, notification routing, pop-to-tab). Guarded so the
+    // round-trip from a swipe (onPageChanged → NavTab.select → here) doesn't
+    // re-animate to the page we're already on.
+    if (_pageController.hasClients && _pageController.page?.round() != i) {
+      _pageController.animateToPage(
+        i,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (i == NavTab.profile) _maybeShowProfileTip();
   }
 
   /// Whether the signed-in user already uploaded a Discover photo — when
@@ -417,7 +444,17 @@ class _RootShellState extends State<RootShell> {
                 ];
                 return Stack(
                   children: [
-                    IndexedStack(index: index, children: pages),
+                    // Swipe horizontally between tabs (Snapchat-style). Each
+                    // page is kept alive so its state (scroll position, the
+                    // Discover deck, subscriptions) survives a swipe away,
+                    // exactly like the old IndexedStack.
+                    PageView(
+                      controller: _pageController,
+                      onPageChanged: _selectTab,
+                      children: [
+                        for (final p in pages) _KeepAlivePage(child: p),
+                      ],
+                    ),
                     Positioned(
                       left: 0,
                       right: 0,
@@ -431,13 +468,7 @@ class _RootShellState extends State<RootShell> {
                         // Only the Discover tab has a card resting on the nav
                         // that the concave notches should hug.
                         hugTopCorners: index == NavTab.discover,
-                        onSelect: (i) {
-                          NavTab.select(i);
-                          if (i == NavTab.chat) ChatUnread.markAllSeen();
-                          if (i == NavTab.demandes) {
-                            ReceivedActivityUnread.markSeen();
-                          }
-                        },
+                        onSelect: _selectTab,
                       ),
                     ),
                   ],
@@ -448,6 +479,28 @@ class _RootShellState extends State<RootShell> {
         ),
       ),
     );
+  }
+}
+
+/// Keeps a tab page alive while it's swiped off-screen in the [PageView],
+/// so its state (scroll, subscriptions, the Discover deck position) is
+/// preserved — matching the old IndexedStack behaviour.
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({required this.child});
+  final Widget child;
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
