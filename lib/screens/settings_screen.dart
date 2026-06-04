@@ -832,7 +832,17 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                 backgroundColor: SC.bubbleIn,
                 onRefresh: _load,
                 child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  // extendBodyBehindAppBar puts the body (and this list) at
+                  // y=0, behind the status bar + transparent AppBar. Without
+                  // this inset the first row renders under the clock and the
+                  // "Débloquer" button lands in the status-bar/notch area —
+                  // so the tap never reaches it.
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    MediaQuery.paddingOf(context).top + kToolbarHeight + 12,
+                    16,
+                    24,
+                  ),
                   itemCount: _blocked.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
