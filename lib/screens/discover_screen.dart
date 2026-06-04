@@ -1504,9 +1504,10 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
           ),
         ),
         // Tap to change photo (left half = previous, right half = next),
-        // Tinder/Stories style. A horizontal *drag* here would fight the
-        // vertical profile deck and lose, so tapping is the reliable gesture
-        // (vertical swipe still changes profile, taps don't claim drags).
+        // Tinder/Stories style — handy and works with a mouse on web too.
+        // TRANSLUCENT (not opaque) so a horizontal drag still falls through
+        // to the PageView below: swiping between photos keeps working, taps
+        // don't claim drags, and a vertical drag still changes profile.
         // Confined to the upper area so the name / message / emoji rail at
         // the bottom of the card stay tappable.
         if (photos.length > 1)
@@ -1519,13 +1520,13 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
               children: [
                 Expanded(
                   child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
+                    behavior: HitTestBehavior.translucent,
                     onTap: _index > 0 ? () => _go(_index - 1) : null,
                   ),
                 ),
                 Expanded(
                   child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
+                    behavior: HitTestBehavior.translucent,
                     onTap: _index < photos.length - 1
                         ? () => _go(_index + 1)
                         : null,
