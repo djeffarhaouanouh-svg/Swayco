@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
@@ -421,7 +422,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   _SocialButton(
-                    icon: Icons.g_mobiledata_rounded,
+                    leading: SvgPicture.asset(
+                      'assets/google-logo-search-new-svgrepo-com.svg',
+                      width: 22,
+                      height: 22,
+                    ),
                     label: AppStrings.t('login_continue_google'),
                     onPressed: _busy ? null : _signInWithGoogle,
                   ),
@@ -447,12 +452,18 @@ class _LoginScreenState extends State<LoginScreen> {
 /// Kept provider-agnostic (icon + label) so Google and Apple share one widget.
 class _SocialButton extends StatelessWidget {
   const _SocialButton({
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.label,
     required this.onPressed,
-  });
+  }) : assert(icon != null || leading != null);
 
-  final IconData icon;
+  /// Monochrome icon (e.g. Apple). Ignored when [leading] is provided.
+  final IconData? icon;
+
+  /// Custom leading widget — used for the multicolour Google logo, which a
+  /// font [IconData] can't render.
+  final Widget? leading;
   final String label;
   final VoidCallback? onPressed;
 
@@ -460,7 +471,7 @@ class _SocialButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, color: SC.textPrimary, size: 24),
+      icon: leading ?? Icon(icon, color: SC.textPrimary, size: 24),
       label: Text(
         label,
         style: const TextStyle(

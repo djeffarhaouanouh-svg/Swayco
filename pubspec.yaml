@@ -79,6 +79,9 @@ dependencies:
   flutter_callkit_incoming: ^3.1.1
   # Renders the Traduction.json boot/splash animation (SplashScreenAnimation).
   lottie: ^3.1.0
+  # Renders the official multicolour Google "G" on the login social button
+  # (a font IconData can't carry Google's 4 brand colours).
+  flutter_svg: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -152,6 +155,8 @@ flutter:
     - assets/notif-android.png
     # Lottie boot/splash animation (cyan + white line-art on black).
     - assets/Traduction.json
+    # Official multicolour Google "G" — login "Continue with Google" button.
+    - assets/google-logo-search-new-svgrepo-com.svg
 
   # To add assets to your application, add an assets section, like this:
   # assets:
