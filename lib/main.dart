@@ -19,6 +19,7 @@ import 'services/app_boot.dart';
 import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
+import 'services/app_navigator.dart';
 import 'services/guest_invite_api.dart';
 import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
@@ -438,6 +439,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       builder: (context, _, _) {
         return MaterialApp(
           title: 'Swayco',
+          navigatorKey: rootNavigatorKey,
           debugShowCheckedModeBanner: false,
           theme: SC.material(),
           home: ValueListenableBuilder<bool>(

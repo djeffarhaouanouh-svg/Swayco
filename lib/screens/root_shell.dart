@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,6 +10,7 @@ import '../services/call_alert.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
+import '../services/app_navigator.dart';
 import '../services/incoming_call_api.dart';
 import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
@@ -132,6 +135,12 @@ class _RootShellState extends State<RootShell> {
   }
 
   Future<void> _handleIncomingCall(IncomingCall call) async {
+    // On iOS the incoming call is owned by CallKit (native full-screen via
+    // VoIP push). Running the in-app dialog in parallel races it: when the
+    // user answers in CallKit, this dialog's auto-decline timer fires and
+    // broadcasts a spurious "declined", which makes the caller leave and the
+    // just-joined call drop. So skip the dialog entirely on iOS.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) return;
     if (!mounted || _ringingDialogOpen) return;
     if (_handledCallIds.contains(call.id)) return;
     _handledCallIds.add(call.id);
@@ -185,8 +194,14 @@ class _RootShellState extends State<RootShell> {
         displayName: myProfile?.displayName ?? '',
         sourceLang: myProfile?.language ?? '',
       );
-      if (!mounted) return;
-      await Navigator.of(context).push<void>(
+      // Navigate via the global navigator key, not `context`: on an iOS
+      // CallKit accept this runs from a native event while the app may still
+      // be backgrounded, so the local BuildContext isn't a reliable place to
+      // push from. The route is added to the stack and becomes visible the
+      // moment CallKit dismisses and the app comes forward.
+      final nav = rootNavigatorKey.currentState;
+      if (nav == null) return;
+      await nav.push<void>(
         MaterialPageRoute<void>(
           builder: (_) => CallScreen(
             wsUrl: token.url,
@@ -201,8 +216,11 @@ class _RootShellState extends State<RootShell> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx == null) return;
+      // ctx is fetched fresh here (not captured across the await), so it's safe.
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
           content: Text(AppStrings.t('cant_join_call', args: {'msg': '$e'})),
         ),
@@ -220,10 +238,28 @@ class _RootShellState extends State<RootShell> {
     // Don't let the realtime poll re-open the in-app dialog for the same
     // call we're already answering.
     _handledCallIds.add(callId);
-    final call = await IncomingCallApi.fetchById(callId);
+    // Prefer the room straight from the CallKit payload (no DB / auth
+    // dependency); fall back to the incoming_calls row only if it's missing.
+    final extra = await IosCallKit.extraFor(callId);
+    var roomName = (extra['roomName'] ?? '').toString();
+    var callerId = (extra['callerId'] ?? '').toString();
+    if (roomName.isEmpty) {
+      final call = await IncomingCallApi.fetchById(callId);
+      if (call != null) {
+        roomName = call.roomName;
+        callerId = call.callerId;
+      }
+    }
+    // Dismiss the native CallKit entry so our own call screen can show.
     unawaited(IosCallKit.endCall(callId));
-    if (!mounted || call == null || call.roomName.isEmpty) return;
-    await _joinCallRoom(call);
+    if (roomName.isEmpty) return;
+    await _joinCallRoom(IncomingCall(
+      id: callId,
+      callerId: callerId,
+      calleeId: _myCalleeId,
+      roomName: roomName,
+      createdAt: DateTime.now(),
+    ));
   }
 
   /// iOS CallKit "Decline" (or the ring timing out): close the row and tell

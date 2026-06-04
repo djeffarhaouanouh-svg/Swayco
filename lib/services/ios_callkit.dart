@@ -75,6 +75,25 @@ abstract final class IosCallKit {
     }
   }
 
+  /// Read the `extra` payload (callId, roomName, callerId) the VoIP push
+  /// carried for [callId], straight from CallKit's active-calls list. Lets
+  /// the accept handler get the room without a Supabase round-trip (which
+  /// may not be ready the instant the call is answered).
+  static Future<Map<String, dynamic>> extraFor(String callId) async {
+    if (!_isIos || callId.isEmpty) return const {};
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      for (final c in calls) {
+        if (c.id == callId) {
+          return Map<String, dynamic>.from(c.extra ?? const <String, dynamic>{});
+        }
+      }
+    } catch (e) {
+      debugPrint('IosCallKit.extraFor failed: $e');
+    }
+    return const {};
+  }
+
   /// Dismiss the native CallKit UI for [callId] once we've taken over
   /// (joined the room) or the call is gone.
   static Future<void> endCall(String callId) async {
