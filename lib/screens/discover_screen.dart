@@ -1822,7 +1822,7 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
         ),
-        padding: EdgeInsets.fromLTRB(14, 3, hasText ? 5 : 16, 3),
+        padding: const EdgeInsets.fromLTRB(14, 3, 5, 3),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1851,26 +1851,30 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
                 onSubmitted: (_) => _send(),
               ),
             ),
-            if (hasText) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: _sending ? null : _send,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: SC.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_upward_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+            const SizedBox(width: 6),
+            // Send arrow always inside the bar, on the right (➤). Cyan and
+            // tappable while there's text, dimmed when the field is empty.
+            GestureDetector(
+              onTap: (hasText && !_sending) ? _send : null,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: hasText
+                      ? SC.accent
+                      : Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: hasText
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.55),
+                  size: 18,
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
