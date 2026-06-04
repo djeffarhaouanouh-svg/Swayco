@@ -25,6 +25,7 @@ import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
+import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
@@ -113,6 +114,13 @@ Future<void> main() async {
       } catch (e) {
         debugPrint('Firebase init slow/failed: $e');
       }
+    }
+    // RevenueCat (in-app subscriptions on iOS/Android). No-op on web, which
+    // keeps the Stripe checkout. Best-effort — a store hiccup mustn't gate boot.
+    try {
+      await RevenueCat.init().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('RevenueCat init slow/failed: $e');
     }
     // Seed the hide-online cache so presence renders are correct on
     // the first frame. 2s cap — SharedPreferences must never block.
@@ -311,6 +319,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       _authed = false;
       _needsOnboarding = false;
     });
+    // Detach from RevenueCat so the next user starts on a clean store id.
+    unawaited(RevenueCat.logOut());
   }
 
   /// Consume the pending `?ref=<code>` captured at boot (if any) and
@@ -368,6 +378,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   Future<void> _hydrateAuthedSession() async {
     final uid = AuthService.currentUserId;
     if (uid.isEmpty) return;
+    // Tie store purchases to this account (no-op on web / unconfigured).
+    unawaited(RevenueCat.identify(uid));
     final profile = await UserPrefs.loadProfile();
     if (profile != null && profile.firstName.isNotEmpty) {
       await ProfileApi.upsertMyProfile(

@@ -82,6 +82,10 @@ dependencies:
   # Renders the official multicolour Google "G" on the login social button
   # (a font IconData can't carry Google's 4 brand colours).
   flutter_svg: ^2.0.0
+  # RevenueCat — in-app subscriptions on iOS / Android (the web build keeps
+  # using the Stripe checkout via StripeApi; RevenueCat's native SDK has no
+  # web support).
+  purchases_flutter: ^10.2.2
 
 dev_dependencies:
   flutter_test:
