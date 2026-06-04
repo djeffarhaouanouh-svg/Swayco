@@ -1537,6 +1537,14 @@ class _IdentitySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
+        // Centres d'intérêt — picked chips + an "add" chip; tapping either
+        // unfolds the category picker inline, right under the chips (no
+        // overlay), then folds back when you're done. Shown ABOVE the photos.
+        _InterestsSection(
+          interests: interests,
+          onSave: onEditInterests,
+        ),
+        const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle),
         const SizedBox(height: 12),
@@ -1554,14 +1562,6 @@ class _IdentitySection extends StatelessWidget {
           onTap: () => Navigator.of(context).push<void>(
             MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
-        ),
-        // Centres d'intérêt — picked chips + an "add" chip; tapping either
-        // unfolds the category picker inline, right under the chips (no
-        // overlay), then folds back when you're done.
-        const SizedBox(height: 24),
-        _InterestsSection(
-          interests: interests,
-          onSave: onEditInterests,
         ),
       ],
     );
