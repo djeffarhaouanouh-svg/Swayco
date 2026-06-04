@@ -1,10 +1,12 @@
 import Flutter
 import UIKit
 import PushKit
+import CallKit
 import flutter_callkit_incoming
+import WebRTC
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate {
+@objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CallkitIncomingAppDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -92,4 +94,43 @@ import flutter_callkit_incoming
     SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(data, fromPushKit: true)
     completion()
   }
+
+  // MARK: - CallkitIncomingAppDelegate (WebRTC audio session handoff)
+  //
+  // The plugin calls these on us *because* we conform to the protocol. The
+  // crucial pair is didActivate/didDeactivateAudioSession: we hand CallKit's
+  // audio session to WebRTC so the microphone is actually captured. Without
+  // it, output worked (received audio played) but our mic published silence.
+  //
+  // IMPORTANT: once we conform, the plugin delegates CXAction fulfillment to
+  // us (it only fulfills itself when there's no CallkitIncomingAppDelegate).
+  // So onAccept/onDecline/onEnd MUST call action.fulfill() or CallKit hangs.
+
+  public func onAccept(_ call: Call, _ action: CXAnswerCallAction) {
+    action.fulfill()
+  }
+
+  public func onDecline(_ call: Call, _ action: CXEndCallAction) {
+    action.fulfill()
+  }
+
+  public func onEnd(_ call: Call, _ action: CXEndCallAction) {
+    action.fulfill()
+  }
+
+  public func onTimeOut(_ call: Call) {}
+
+  public func didActivateAudioSession(_ audioSession: AVAudioSession) {
+    let rtcSession = RTCAudioSession.sharedInstance()
+    rtcSession.audioSessionDidActivate(audioSession)
+    rtcSession.isAudioEnabled = true
+  }
+
+  public func didDeactivateAudioSession(_ audioSession: AVAudioSession) {
+    let rtcSession = RTCAudioSession.sharedInstance()
+    rtcSession.audioSessionDidDeactivate(audioSession)
+    rtcSession.isAudioEnabled = false
+  }
+
+  public func providerDidReset() {}
 }
