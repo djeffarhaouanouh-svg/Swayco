@@ -18,6 +18,7 @@ import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_alert.dart';
+import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
@@ -102,6 +103,8 @@ class _CallScreenState extends State<CallScreen> {
   /// the data that card needs.
   bool _ended = false;
   RemoteProfile? _peerProfile;
+  // My own profile (PDP) — used for the avatars on my in-call chat captions.
+  RemoteProfile? _myProfile;
   Duration? _finalDuration;
 
   /// Wraps the shareable part of the summary card so it can be captured to a
@@ -291,6 +294,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    unawaited(_loadMyProfile());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
@@ -316,6 +320,16 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {
       // Offline / not found — summary degrades gracefully.
     }
+  }
+
+  /// Best-effort fetch of my own profile (PDP) for the avatar on my in-call
+  /// chat captions. Silent on failure — falls back to an initial-letter tile.
+  Future<void> _loadMyProfile() async {
+    try {
+      final id = await DeviceId.getOrCreate();
+      final p = await ProfileApi.fetchById(id);
+      if (mounted && p != null) setState(() => _myProfile = p);
+    } catch (_) {}
   }
 
   /// The callee declined our ring. As long as they haven't actually
@@ -1515,7 +1529,7 @@ class _CallScreenState extends State<CallScreen> {
                 // bottom-left so they clear the control rail on the right.
                 // Lifts with the keyboard.
                 Positioned(
-                  left: 12,
+                  left: 8,
                   right: 84,
                   bottom: MediaQuery.viewInsetsOf(context).bottom +
                       MediaQuery.paddingOf(context).bottom +
@@ -1528,11 +1542,20 @@ class _CallScreenState extends State<CallScreen> {
                           ? _captions.sublist(_captions.length - 4)
                           : _captions)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: _CaptionBubble(
                             orig: c.orig,
                             trans: c.trans,
-                            mine: c.mine,
+                            // My PDP for my lines, the peer's for theirs.
+                            name: c.mine
+                                ? (_myProfile?.displayName ?? widget.displayName)
+                                : (_peerProfile?.displayName ?? ''),
+                            avatarUrl: c.mine
+                                ? (_myProfile?.avatarUrl ?? '')
+                                : (_peerProfile?.avatarUrl ?? ''),
+                            avatarColor: c.mine
+                                ? (_myProfile?.avatarColor ?? '')
+                                : (_peerProfile?.avatarColor ?? ''),
                           ),
                         ),
                       const SizedBox(height: 4),
@@ -1680,57 +1703,77 @@ class _RoundCallButton extends StatelessWidget {
   }
 }
 
-/// One in-call typed-chat bubble: the original line (bold) with its
-/// translation underneath (italic, muted). Mine aligns right, theirs left.
+/// One in-call typed-chat caption: the sender's PDP, then a translucent
+/// bubble with the original line (bold) and its translation underneath
+/// (italic). Always avatar-left, like the design reference.
 class _CaptionBubble extends StatelessWidget {
   const _CaptionBubble({
     required this.orig,
     required this.trans,
-    required this.mine,
+    required this.name,
+    required this.avatarUrl,
+    required this.avatarColor,
   });
 
   final String orig;
   final String trans;
-  final bool mine;
+  final String name;
+  final String avatarUrl;
+  final String avatarColor;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 280),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+    // Soft shadow so white text stays readable on the (now transparent)
+    // bubble over the video.
+    const shadows = [Shadow(color: Colors.black, blurRadius: 6)];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ProfileAvatar(
+          displayName: name,
+          avatarUrl: avatarUrl,
+          avatarColorHex: avatarColor,
+          size: 30,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              orig,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              // Transparent — just enough to lift the text off the video.
+              color: Colors.black.withValues(alpha: 0.30),
+              borderRadius: BorderRadius.circular(18),
             ),
-            if (trans.isNotEmpty && trans != orig) ...[
-              const SizedBox(height: 2),
-              Text(
-                trans,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  orig,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    shadows: shadows,
+                  ),
                 ),
-              ),
-            ],
-          ],
+                if (trans.isNotEmpty && trans != orig) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    trans,
+                    style: const TextStyle(
+                      color: Color(0xCCFFFFFF),
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                      shadows: shadows,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
