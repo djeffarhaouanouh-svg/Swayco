@@ -163,6 +163,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _feedLoading = false;
       });
       AppBoot.markHomeReady();
+      // Warm the first cards' photos once the deck is laid out.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _precacheAround(_topIndex);
+      });
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
       AppBoot.markHomeReady();
@@ -189,6 +193,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _persistCursor() {
     if (_cards.isEmpty) return;
     UserPrefs.saveDiscoverCursor(_cards[_topIndex % _cards.length].profile.id);
+  }
+
+  /// Warm the image cache for the cards around [index] (the previous one and
+  /// the next five) so a swipe shows the photo instantly instead of waiting
+  /// on the Supabase download. De-duped so a short feed isn't fetched twice.
+  void _precacheAround(int index) {
+    if (!mounted || _cards.isEmpty) return;
+    final n = _cards.length;
+    final seen = <String>{};
+    for (var off = -1; off <= 5; off++) {
+      final card = _cards[(index + off) % n];
+      final url = card.photos.isNotEmpty ? card.photos.first : '';
+      if (url.isNotEmpty && seen.add(url)) {
+        precacheImage(NetworkImage(url), context).ignore();
+      }
+    }
   }
 
   /// Toggle a like on [profileId]. Optimistic local flip + DB write
@@ -662,10 +682,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         // last one. On desktop the parent Listener also rate-limits
         // wheel scrolling above this physics.
         physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
-        // Remember the new top card so a restart resumes here.
+        // Remember the new top card so a restart resumes here, and warm the
+        // upcoming cards' photos so the next swipes are instant.
         onPageChanged: (i) {
           _topIndex = i;
           _persistCursor();
+          _precacheAround(i);
         },
         // Unbounded itemCount + modulo on the index = the feed loops
         // forever: after the last profile the user lands back on the
