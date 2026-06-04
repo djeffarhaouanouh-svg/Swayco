@@ -466,8 +466,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     Divider(
                       height: 1,
                       thickness: 1,
+                      // Inset past the avatar on the left and stopping before
+                      // the time + call/menu cluster on the right, so it sits
+                      // only under the text.
                       indent: 70,
-                      endIndent: 12,
+                      endIndent: 150,
                       color: Colors.white.withValues(alpha: 0.08),
                     ),
                   _FriendChatRow(
