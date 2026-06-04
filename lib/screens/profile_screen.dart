@@ -576,76 +576,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     final lang = findLanguageByCode(_languageCode);
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
-      // AppBar only when pushed as a route to view someone else — gives a
-      // back button. The "my profile" tab is mounted in IndexedStack, no
-      // back navigation, so no AppBar needed.
-      extendBodyBehindAppBar: true,
-      appBar: _isViewingOther
-          ? AppBar(
-              backgroundColor: Colors.transparent,
-              foregroundColor: SC.textPrimary,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              surfaceTintColor: Colors.transparent,
-              title: Text(
-                _displayName.isEmpty
-                    ? AppStrings.t('profile_default_title')
-                    : _displayName,
-                style: SCText.h3,
-              ),
-              actions: [
-                  PopupMenuButton<String>(
-                    tooltip: AppStrings.t('tooltip_more'),
-                    icon: const Icon(Icons.more_vert),
-                    color: SC.bubbleIn,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: const BorderSide(color: SC.glassBorder),
-                    ),
-                    onSelected: (v) {
-                      if (v == 'report') _reportPeer();
-                      if (v == 'block') _toggleBlock();
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem<String>(
-                        value: 'report',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.flag_outlined,
-                              size: 18,
-                              color: Color(0xFFE53935),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              AppStrings.t('report'),
-                              style: const TextStyle(color: Color(0xFFE53935)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'block',
-                        child: Row(
-                          children: [
-                            Icon(
-                              _peerBlocked ? Icons.lock_open : Icons.block,
-                              size: 18,
-                              color: const Color(0xFFE53935),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              AppStrings.t(_peerBlocked ? 'unblock' : 'block'),
-                              style: const TextStyle(color: Color(0xFFE53935)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            )
-          : null,
+      // No header bar. When viewing someone else, the back button + ⋮ menu
+      // float directly over the content (added to the Stack below) so the
+      // whole profile reads as one continuous page. The "my profile" tab is
+      // mounted in IndexedStack, so it never needed a back affordance.
       body: ColoredBox(
         color: const Color(0xFF0E0E0E),
         child: Stack(
@@ -780,6 +714,93 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
               ),
             ),
+            // Floating controls over the content — no header bar. Back on the
+            // left, the report/block ⋮ menu on the right; both sit
+            // transparently on top of the scrolling profile.
+            if (_isViewingOther)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: SC.textPrimary,
+                          ),
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        ),
+                        const Spacer(),
+                        PopupMenuButton<String>(
+                          tooltip: AppStrings.t('tooltip_more'),
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: SC.textPrimary,
+                          ),
+                          color: SC.bubbleIn,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: SC.glassBorder),
+                          ),
+                          onSelected: (v) {
+                            if (v == 'report') _reportPeer();
+                            if (v == 'block') _toggleBlock();
+                          },
+                          itemBuilder: (ctx) => [
+                            PopupMenuItem<String>(
+                              value: 'report',
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.flag_outlined,
+                                    size: 18,
+                                    color: Color(0xFFE53935),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    AppStrings.t('report'),
+                                    style: const TextStyle(
+                                      color: Color(0xFFE53935),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _peerBlocked
+                                        ? Icons.lock_open
+                                        : Icons.block,
+                                    size: 18,
+                                    color: const Color(0xFFE53935),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    AppStrings.t(
+                                      _peerBlocked ? 'unblock' : 'block',
+                                    ),
+                                    style: const TextStyle(
+                                      color: Color(0xFFE53935),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             // When viewing someone else's profile this screen is a route
             // pushed on top of [RootShell], so the shell's floating nav bar
             // is hidden. Re-render it here and route taps back to the shell.

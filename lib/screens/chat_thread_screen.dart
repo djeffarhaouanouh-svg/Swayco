@@ -478,30 +478,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               bottom: false,
               child: Column(
                 children: [
-                  _ThreadHeader(
-                    title: widget.title,
-                    peer: _peer,
-                    onCall: () => CallLauncher.startCall(
-                      context,
-                      peerDeviceId: widget.peerDeviceId,
-                      translation: widget.translation,
-                    ),
-                    onCallVideo: () => CallLauncher.startCall(
-                      context,
-                      peerDeviceId: widget.peerDeviceId,
-                      translation: widget.translation,
-                      startWithCamera: true,
-                    ),
-                    onViewProfile: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            ProfileScreen(userId: widget.peerDeviceId),
-                      ),
-                    ),
-                    peerBlocked: _peerBlocked,
-                    onToggleBlock: _toggleBlockPeer,
-                    onReport: _reportPeer,
-                  ),
                   if (_error != null) _ErrorBanner(message: _error!),
                   // Pure-black background ONLY behind the messages zone — the
                   // header and composer keep the lighter 0E0E0E surface.
@@ -533,6 +509,41 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           Positioned.fill(
             child: IgnorePointer(
               child: _ActivationWaveOverlay(animation: _activationWave),
+            ),
+          ),
+          // Floating header over the conversation — no separate header bar, so
+          // the message list fills the page and the back / call buttons sit
+          // transparently on top (the list clears them via its top padding).
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: _ThreadHeader(
+                title: widget.title,
+                peer: _peer,
+                onCall: () => CallLauncher.startCall(
+                  context,
+                  peerDeviceId: widget.peerDeviceId,
+                  translation: widget.translation,
+                ),
+                onCallVideo: () => CallLauncher.startCall(
+                  context,
+                  peerDeviceId: widget.peerDeviceId,
+                  translation: widget.translation,
+                  startWithCamera: true,
+                ),
+                onViewProfile: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        ProfileScreen(userId: widget.peerDeviceId),
+                  ),
+                ),
+                peerBlocked: _peerBlocked,
+                onToggleBlock: _toggleBlockPeer,
+                onReport: _reportPeer,
+              ),
             ),
           ),
         ],
@@ -581,7 +592,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final canDub = _myTier == 'plus' || _myTier == 'pro' || _myTier == 'ultra';
     return ListView.builder(
       controller: _scrollCtrl,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      // Extra top inset so the oldest message clears the floating header.
+      padding: const EdgeInsets.fromLTRB(12, 72, 12, 12),
       itemCount: _messages.length,
       itemBuilder: (ctx, i) {
         final m = _messages[i];
