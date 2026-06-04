@@ -1463,79 +1463,65 @@ class _CardPhotoCarousel extends StatefulWidget {
 }
 
 class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
-  final PageController _ctrl = PageController();
   int _index = 0;
+  double _dragDx = 0;
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _go(int i) {
-    final target = i.clamp(0, widget.photos.length - 1);
-    if (target == _index) return;
-    _ctrl.animateToPage(
-      target,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+  void _set(int i) {
+    final n = widget.photos.length;
+    if (n <= 1) return;
+    final t = i.clamp(0, n - 1);
+    if (t == _index) return;
+    setState(() => _index = t);
+    widget.onIndexChanged?.call(t);
   }
 
   @override
   Widget build(BuildContext context) {
     final photos = widget.photos;
+    final i = photos.isEmpty ? 0 : _index.clamp(0, photos.length - 1);
     return Stack(
       fit: StackFit.expand,
       children: [
-        PageView.builder(
-          controller: _ctrl,
-          itemCount: photos.length,
-          onPageChanged: (i) {
-            setState(() => _index = i);
-            widget.onIndexChanged?.call(i);
-          },
-          itemBuilder: (_, i) => Image.network(
-            photos[i],
-            fit: BoxFit.cover,
-            // Centre crop — keeps the subject roughly in the middle of the
-            // card whatever the source aspect ratio.
-            alignment: Alignment.center,
-            errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-          ),
-        ),
-        // Tap to change photo (left half = previous, right half = next),
-        // Tinder/Stories style — handy and works with a mouse on web too.
-        // TRANSLUCENT (not opaque) so a horizontal drag still falls through
-        // to the PageView below: swiping between photos keeps working, taps
-        // don't claim drags, and a vertical drag still changes profile.
-        // Confined to the upper area so the name / message / emoji rail at
-        // the bottom of the card stay tappable.
-        if (photos.length > 1)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 150,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _index > 0 ? () => _go(_index - 1) : null,
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _index < photos.length - 1
-                        ? () => _go(_index + 1)
-                        : null,
-                  ),
-                ),
-              ],
+        // Manual swipe + tap navigation — NO inner PageView, so there's no
+        // gesture-arena fight with the vertical profile deck: a horizontal
+        // drag is claimed here (the deck only wants vertical), a vertical
+        // drag falls through to the deck, and a tap flips by which side was
+        // touched. This is what actually makes browsing photos work on mobile.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: photos.length > 1 ? (_) => _dragDx = 0 : null,
+          onHorizontalDragUpdate:
+              photos.length > 1 ? (d) => _dragDx += d.delta.dx : null,
+          onHorizontalDragEnd: photos.length > 1
+              ? (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (v.abs() > 100) {
+                    _set(v < 0 ? _index + 1 : _index - 1); // fling
+                  } else if (_dragDx.abs() > 40) {
+                    _set(_dragDx < 0 ? _index + 1 : _index - 1); // drag
+                  }
+                }
+              : null,
+          onTapUp: photos.length > 1
+              ? (d) {
+                  final w = context.size?.width ?? 0;
+                  if (w <= 0) return;
+                  _set(d.localPosition.dx > w / 2 ? _index + 1 : _index - 1);
+                }
+              : null,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Image.network(
+              photos.isEmpty ? '' : photos[i],
+              key: ValueKey(i),
+              fit: BoxFit.cover,
+              // Centre crop — keeps the subject roughly in the middle of the
+              // card whatever the source aspect ratio.
+              alignment: Alignment.center,
+              errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
             ),
           ),
+        ),
         if (photos.length > 1)
           Positioned(
             top: 14,
@@ -1545,16 +1531,16 @@ class _CardPhotoCarouselState extends State<_CardPhotoCarousel> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (var i = 0; i < photos.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
+                  for (var j = 0; j < photos.length; j++) ...[
+                    if (j > 0) const SizedBox(width: 6),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: i == _index ? 18 : 6,
+                      width: j == i ? 18 : 6,
                       height: 6,
                       decoration: BoxDecoration(
                         // Discreet — greyed white, the active dot a touch
                         // brighter and wider.
-                        color: i == _index
+                        color: j == i
                             ? Colors.white.withValues(alpha: 0.75)
                             : Colors.white.withValues(alpha: 0.30),
                         borderRadius: BorderRadius.circular(999),
