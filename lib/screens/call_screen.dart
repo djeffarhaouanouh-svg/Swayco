@@ -1044,6 +1044,26 @@ class _CallScreenState extends State<CallScreen> {
                   color: const Color(0xFF0E0E0E),
                   child: Stack(
                     children: [
+                      // Brand wordmark — top-centre, like the in-call screen.
+                      const Positioned(
+                        top: 12,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Text(
+                            'swayco.ai',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       // Peer PDP, then the first name aligned on the same row
                       // as the flag, a touch above centre.
                       Align(
@@ -1086,11 +1106,11 @@ class _CallScreenState extends State<CallScreen> {
                           ],
                         ),
                       ),
-                      // Minutes spent — just above the logo.
+                      // Minutes spent — raised well above the logo.
                       Positioned(
                         left: 0,
                         right: 0,
-                        bottom: 78,
+                        bottom: 170,
                         child: Column(
                           children: [
                             const Icon(Icons.schedule_rounded,
@@ -1138,7 +1158,7 @@ class _CallScreenState extends State<CallScreen> {
             // Share the card — bottom-right, also out of the capture.
             Positioned(
               right: 20,
-              bottom: 66,
+              bottom: 24,
               child: Material(
                 color: SC.accent,
                 shape: const CircleBorder(),
