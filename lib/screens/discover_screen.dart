@@ -1418,6 +1418,7 @@ class _ProfileCardState extends State<_ProfileCard> {
                           else
                             _DirectMessageField(
                               onSend: onSendMessage,
+                              peerName: profile.displayName,
                             ),
                       ],
                     ),
@@ -1772,8 +1773,12 @@ class _ReactionEmojiButton extends StatelessWidget {
 /// card to [_MessageSentPill]. Translucent dark pill with white text so it
 /// reads over the photo.
 class _DirectMessageField extends StatefulWidget {
-  const _DirectMessageField({required this.onSend});
+  const _DirectMessageField({required this.onSend, this.peerName = ''});
   final Future<void> Function(String) onSend;
+
+  /// The recipient's display name — its first word is woven into the hint
+  /// ("Écris à Sarah…"). Falls back to the generic hint when empty.
+  final String peerName;
   @override
   State<_DirectMessageField> createState() => _DirectMessageFieldState();
 }
@@ -1811,6 +1816,12 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   Widget build(BuildContext context) {
     final hasText = _ctrl.text.trim().isNotEmpty;
+    // First name only — weave it into the hint ("Écris à Sarah…"); fall back
+    // to the generic hint when the peer has no name.
+    final firstName = widget.peerName.trim().split(RegExp(r'\s+')).first;
+    final hintText = firstName.isEmpty
+        ? AppStrings.t('discover_message_hint')
+        : AppStrings.t('discover_message_hint_name', args: {'name': firstName});
     // Clean neutral-dark pill (no blur, no blue) with white text, a leading
     // chat glyph and a filled cyan send button that appears only while typing.
     return ConstrainedBox(
@@ -1840,7 +1851,7 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
                   // The app theme fills inputs with navy (bubbleIn) — turn it
                   // OFF here, that navy was the "fond bleu" behind the text.
                   filled: false,
-                  hintText: AppStrings.t('discover_message_hint'),
+                  hintText: hintText,
                   hintStyle: TextStyle(
                     color: Colors.white.withValues(alpha: 0.65),
                     fontSize: 14,

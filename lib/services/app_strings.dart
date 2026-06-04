@@ -165,6 +165,7 @@ abstract final class AppStrings {
     // Discover
     'discover_title': 'Discover',
     'discover_message_hint': 'Écris un message…',
+    'discover_message_hint_name': 'Écris à {name}…',
     'discover_message_sent': 'Message envoyé',
     'search_chercher': 'Chercher',
     'search_friend_hint': 'Nom ou @handle',
@@ -601,6 +602,7 @@ abstract final class AppStrings {
     'report_reason_other': 'Other',
     'discover_title': 'Discover',
     'discover_message_hint': 'Write a message…',
+    'discover_message_hint_name': 'Message {name}…',
     'discover_message_sent': 'Message sent',
     'search_chercher': 'Search',
     'search_friend_hint': 'Name or @handle',
@@ -1019,6 +1021,7 @@ abstract final class AppStrings {
     'restart': 'Reiniciar',
     'discover_title': 'Discover',
     'discover_message_hint': 'Escribe un mensaje…',
+    'discover_message_hint_name': 'Escribe a {name}…',
     'discover_message_sent': 'Mensaje enviado',
     'search_chercher': 'Buscar',
     'search_friend_hint': 'Nombre del amigo',
