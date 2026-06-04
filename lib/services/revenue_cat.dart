@@ -1,5 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:purchases_flutter/purchases_flutter.dart';
+
+/// Outcome of a store purchase attempt — plain enum so callers (the paywall)
+/// never need to import `purchases_flutter` types directly.
+enum PurchaseOutcome { success, cancelled, unavailable, error }
 
 /// RevenueCat wrapper for in-app subscriptions on **iOS / Android**.
 ///
@@ -105,6 +110,40 @@ abstract final class RevenueCat {
     }
   }
 
+  /// High-level purchase: find the package whose store product is [productId]
+  /// in the current offering, buy it, and report whether [entitlementId] is
+  /// active afterwards. Keeps `purchases_flutter` types out of the UI.
+  static Future<PurchaseOutcome> purchaseProduct({
+    required String productId,
+    required String entitlementId,
+  }) async {
+    if (!_configured) return PurchaseOutcome.unavailable;
+    Package? pkg;
+    for (final p in await fetchPackages()) {
+      if (p.storeProduct.identifier == productId) {
+        pkg = p;
+        break;
+      }
+    }
+    if (pkg == null) return PurchaseOutcome.unavailable;
+    try {
+      final result = await Purchases.purchase(PurchaseParams.package(pkg));
+      return result.customerInfo.entitlements.active.containsKey(entitlementId)
+          ? PurchaseOutcome.success
+          : PurchaseOutcome.error;
+    } on PlatformException catch (e) {
+      if (PurchasesErrorHelper.getErrorCode(e) ==
+          PurchasesErrorCode.purchaseCancelledError) {
+        return PurchaseOutcome.cancelled;
+      }
+      debugPrint('RevenueCat purchase error: ${e.message}');
+      return PurchaseOutcome.error;
+    } catch (e) {
+      debugPrint('RevenueCat purchase error: $e');
+      return PurchaseOutcome.error;
+    }
+  }
+
   /// Re-attach existing purchases on a reinstall / new device.
   static Future<CustomerInfo?> restore() async {
     if (!_configured) return null;
@@ -113,6 +152,19 @@ abstract final class RevenueCat {
     } catch (e) {
       debugPrint('RevenueCat restore failed: $e');
       return null;
+    }
+  }
+
+  /// Restore purchases and return the set of entitlement ids active after —
+  /// e.g. `{'pro'}` or `{'ultra'}`. Empty when nothing to restore.
+  static Future<Set<String>> restoreEntitlements() async {
+    if (!_configured) return const {};
+    try {
+      final info = await Purchases.restorePurchases();
+      return info.entitlements.active.keys.toSet();
+    } catch (e) {
+      debugPrint('RevenueCat restore failed: $e');
+      return const {};
     }
   }
 

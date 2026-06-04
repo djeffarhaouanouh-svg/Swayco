@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
@@ -70,13 +71,58 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     ),
   ];
 
+  /// Maps a paywall plan tier to its RevenueCat product + entitlement id.
+  /// Plus (9,99 €) = the "pro" product; Ultra Plus (15,99 €) = "ultra".
+  ({String productId, String entitlement}) _rcFor(String tier) =>
+      tier == 'ultra_plus'
+          ? (productId: 'ultra_monthly', entitlement: 'ultra')
+          : (productId: 'pro_monthly', entitlement: 'pro');
+
   Future<void> _subscribe() async {
     if (_busy) return;
     setState(() => _busy = true);
+    try {
+      // Mobile (iOS/Android) → RevenueCat / native store. Web → Stripe.
+      if (RevenueCat.isConfigured) {
+        await _subscribeViaStore();
+      } else {
+        await _subscribeViaStripe();
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _subscribeViaStore() async {
+    final rc = _rcFor(_selected);
+    final outcome = await RevenueCat.purchaseProduct(
+      productId: rc.productId,
+      entitlementId: rc.entitlement,
+    );
+    if (!mounted) return;
+    if (outcome == PurchaseOutcome.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Abonnement activé 🎉')),
+      );
+      Navigator.of(context).maybePop();
+    } else if (outcome == PurchaseOutcome.unavailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Offre indisponible pour le moment.')),
+      );
+    } else if (outcome == PurchaseOutcome.error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("L'achat n'a pas pu être finalisé. Réessaie."),
+        ),
+      );
+    }
+    // PurchaseOutcome.cancelled → the user backed out; say nothing.
+  }
+
+  Future<void> _subscribeViaStripe() async {
     final url = await StripeApi.startCheckout(_selected);
     if (!mounted) return;
     if (url == null || url.isEmpty) {
-      setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -91,7 +137,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       webOnlyWindowName: '_self',
       mode: LaunchMode.externalApplication,
     );
-    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _openExternal(String url) async {
@@ -110,6 +155,24 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// existing subscription is re-attached / managed). Falls back to a
   /// toast on native where the portal is unavailable.
   Future<void> _restore() async {
+    // Mobile → RevenueCat restore. Web → the Stripe customer portal.
+    if (RevenueCat.isConfigured) {
+      setState(() => _busy = true);
+      final active = await RevenueCat.restoreEntitlements();
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (active.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Achats restaurés ✅')),
+        );
+        Navigator.of(context).maybePop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucun abonnement à restaurer.')),
+        );
+      }
+      return;
+    }
     final url = await StripeApi.openPortal();
     if (!mounted) return;
     if (url != null && url.isNotEmpty) {
