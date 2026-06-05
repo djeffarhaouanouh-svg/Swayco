@@ -444,6 +444,34 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     notifyListeners();
   }
 
+  /// Tear down a CAPTURED (old) pipeline during a make-before-break rotation,
+  /// without touching the live fields. Same safe order as [_stopMedia]: close
+  /// the PC + dispose the stream/renderer, and NEVER stop the cloned remote
+  /// track (stopping a clone can kill the source the remote is still using).
+  Future<void> _disposePipeline(
+    RTCPeerConnection? pc,
+    RTCVideoRenderer? renderer,
+    MediaStream? stream,
+  ) async {
+    if (pc != null) {
+      try {
+        pc.onConnectionState = null;
+        await pc.close();
+      } catch (_) {}
+    }
+    if (stream != null) {
+      try {
+        await stream.dispose();
+      } catch (_) {}
+    }
+    if (renderer != null) {
+      try {
+        renderer.srcObject = null;
+        await renderer.dispose();
+      } catch (_) {}
+    }
+  }
+
   /// Opens WebRTC to OpenAI; caller must set [_busy] if needed.
   Future<void> _openPipelineCore(
     RemoteAudioTrack remote,
@@ -643,11 +671,28 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
     _busy = true;
     try {
-      debugPrint('[xlate] refresh START — opening new pipeline');
-      await _stopMedia();
-      if (!identical(_room, roomRef)) return;
+      debugPrint('[xlate] refresh START — make-before-break rotation');
+      // Capture the CURRENT (old) pipeline but DON'T tear it down yet: it keeps
+      // playing translated audio while the replacement comes up, so rotating
+      // the OpenAI session at its ~10-min expiry leaves NO silent gap.
+      final oldPc = _pc;
+      final oldRenderer = _renderer;
+      final oldStream = _localStream;
+      // Open + connect the NEW pipeline. On success it swaps itself into
+      // _pc/_renderer/_localStream (the old refs now live only in the locals
+      // above). If it THROWS, the fields are untouched — the OLD pipeline is
+      // still live — and the catch retries: still no break.
       await _openPipelineCore(remote, sid, roomRef);
-      debugPrint('[xlate] refresh OK — new pipeline opened');
+      if (!identical(_room, roomRef)) {
+        await _disposePipeline(oldPc, oldRenderer, oldStream);
+        return;
+      }
+      // New pipeline is now the live _pc. Give its translated audio ~1.5s to
+      // start flowing, then retire the OLD one — a brief overlap of the same
+      // translated speech, never a gap.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      await _disposePipeline(oldPc, oldRenderer, oldStream);
+      debugPrint('[xlate] refresh OK — rotated with no gap');
     } catch (e, st) {
       debugPrint('[xlate] refresh FAILED: $e\n$st');
       Analytics.track(
@@ -656,7 +701,8 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         langTo: _route?.sourceBcp47,
         props: {'phase': 'refresh', 'message': e.toString()},
       );
-      await _stopMedia();
+      // The replacement failed to come up; the OLD pipeline is still live in
+      // the fields — leave it running and just retry the rotation soon.
       _scheduleNextRefreshRaw(const Duration(seconds: 6));
     } finally {
       _busy = false;
