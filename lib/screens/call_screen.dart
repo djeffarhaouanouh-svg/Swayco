@@ -138,7 +138,9 @@ class _CallScreenState extends State<CallScreen> {
   // On-device TTS — the fallback voice when the backend OpenAI /translation/tts
   // endpoint isn't available (it currently isn't, so this is what speaks).
   final FlutterTts _deviceTts = FlutterTts();
-  bool _chatTranslate = true;
+  // Always translate typed messages into the peer's language. The in-call
+  // toggle was removed; this stays true for the life of the call.
+  final bool _chatTranslate = true;
   bool _chatSending = false;
 
   /// The remote BCP-47 we have attached the translation pipeline with, so we
@@ -955,22 +957,9 @@ class _CallScreenState extends State<CallScreen> {
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
       child: Row(
         children: [
-          // Translate on/off — when on, the message is translated into the
-          // peer's language before it's sent.
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _chatTranslate = !_chatTranslate),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(
-                Icons.translate,
-                size: 20,
-                color: _chatTranslate
-                    ? SC.accent
-                    : Colors.white.withValues(alpha: 0.5),
-              ),
-            ),
-          ),
+          // Translation stays always on (_chatTranslate defaults to true); the
+          // toggle icon was removed so the text field can start hard left and
+          // use the reclaimed space.
           Expanded(
             child: TextField(
               controller: _chatCtrl,
@@ -989,7 +978,7 @@ class _CallScreenState extends State<CallScreen> {
                   fontSize: 14,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                contentPadding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
               ),
               onSubmitted: (_) => _sendCaption(),
             ),
@@ -1846,29 +1835,26 @@ class _RoundCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: background,
-          shape: const CircleBorder(),
-          elevation: 3,
-          shadowColor: Colors.black54,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Icon(icon, color: Colors.white, size: 21),
-            ),
+    // The label is no longer shown under the button (the icons speak for
+    // themselves), but it is kept on Semantics so screen readers still
+    // announce each control.
+    return Semantics(
+      label: label,
+      button: true,
+      child: Material(
+        color: background,
+        shape: const CircleBorder(),
+        elevation: 3,
+        shadowColor: Colors.black54,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(icon, color: Colors.white, size: 21),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11),
-        ),
-      ],
+      ),
     );
   }
 }
