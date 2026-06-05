@@ -32,11 +32,13 @@ import '../translation/translation_route.dart';
 import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 
-/// TEMPORARY: show the on-screen audio-pipeline diagnostic during a call.
-/// The user builds on a remote Mac with no device-log access, so this is the
-/// only way to see, on each phone, why a voice isn't coming through. Set to
-/// false once the audio bug is fixed.
-const bool _kShowAudioDebug = true;
+/// On-screen audio-pipeline diagnostic during a call. Kept (flag-gated, off by
+/// default) because the user builds on a remote Mac with no device-log access:
+/// flip to true to surface the OpenAI connection state, the translation route,
+/// open attempts and the last error directly on the phone. It revealed the
+/// native clone() bug; leaving it here makes any future audio regression
+/// diagnosable without another instrumentation round-trip.
+const bool _kShowAudioDebug = false;
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
