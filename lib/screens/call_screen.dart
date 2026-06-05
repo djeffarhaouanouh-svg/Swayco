@@ -32,14 +32,6 @@ import '../translation/translation_route.dart';
 import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 
-/// On-screen audio-pipeline diagnostic during a call. Kept (flag-gated, off by
-/// default) because the user builds on a remote Mac with no device-log access:
-/// flip to true to surface the OpenAI connection state, the translation route,
-/// open attempts and the last error directly on the phone. It revealed the
-/// native clone() bug; leaving it here makes any future audio regression
-/// diagnosable without another instrumentation round-trip.
-const bool _kShowAudioDebug = false;
-
 class CallScreen extends StatefulWidget {
   const CallScreen({
     super.key,
@@ -1702,48 +1694,6 @@ class _CallScreenState extends State<CallScreen> {
                       final overlay = widget.translation.buildTranslationAudioOverlay();
                       return overlay ?? const SizedBox.shrink();
                     },
-                  ),
-                // TEMPORARY on-screen audio diagnostic. The user builds on a
-                // remote Mac and has no way to read device logs, so the phone
-                // must show its own audio-pipeline state during a call. Flip
-                // [_kShowAudioDebug] to false to remove it.
-                if (_kShowAudioDebug &&
-                    widget.translation.translationListenable != null)
-                  Positioned(
-                    left: 8,
-                    right: 8,
-                    top: MediaQuery.paddingOf(context).top + 6,
-                    child: IgnorePointer(
-                      child: ListenableBuilder(
-                        listenable: Listenable.merge(
-                          [widget.translation.translationListenable, _audio],
-                        ),
-                        builder: (context, _) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'AUDIO DEBUG\n'
-                              '${widget.translation.translationDiagnostics}\n'
-                              'duck: ${_audio.isDucking ? "ON (orig coupe)" : "off"} • '
-                              'vol orig: ${_audio.originalVolume.toStringAsFixed(2)} • '
-                              'HP: ${_audio.speakerOn ? "oui" : "non"}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                height: 1.35,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                   ),
                 // In-call typed chat: recent caption bubbles + the composer,
                 // bottom-left so they clear the control rail on the right.
