@@ -32,6 +32,12 @@ import '../translation/translation_route.dart';
 import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 
+/// TEMPORARY: show the on-screen audio-pipeline diagnostic during a call.
+/// The user builds on a remote Mac with no device-log access, so this is the
+/// only way to see, on each phone, why a voice isn't coming through. Set to
+/// false once the audio bug is fixed.
+const bool _kShowAudioDebug = true;
+
 class CallScreen extends StatefulWidget {
   const CallScreen({
     super.key,
@@ -1694,6 +1700,48 @@ class _CallScreenState extends State<CallScreen> {
                       final overlay = widget.translation.buildTranslationAudioOverlay();
                       return overlay ?? const SizedBox.shrink();
                     },
+                  ),
+                // TEMPORARY on-screen audio diagnostic. The user builds on a
+                // remote Mac and has no way to read device logs, so the phone
+                // must show its own audio-pipeline state during a call. Flip
+                // [_kShowAudioDebug] to false to remove it.
+                if (_kShowAudioDebug &&
+                    widget.translation.translationListenable != null)
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    top: MediaQuery.paddingOf(context).top + 6,
+                    child: IgnorePointer(
+                      child: ListenableBuilder(
+                        listenable: Listenable.merge(
+                          [widget.translation.translationListenable, _audio],
+                        ),
+                        builder: (context, _) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'AUDIO DEBUG\n'
+                              '${widget.translation.translationDiagnostics}\n'
+                              'duck: ${_audio.isDucking ? "ON (orig coupe)" : "off"} • '
+                              'vol orig: ${_audio.originalVolume.toStringAsFixed(2)} • '
+                              'HP: ${_audio.speakerOn ? "oui" : "non"}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                height: 1.35,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 // In-call typed chat: recent caption bubbles + the composer,
                 // bottom-left so they clear the control rail on the right.

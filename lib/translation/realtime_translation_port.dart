@@ -49,6 +49,12 @@ abstract class RealtimeTranslationPort {
   /// Set the playback volume of the translated audio in [0, 1]. No-op when
   /// the implementation has no translated audio stream of its own.
   Future<void> setTranslatedAudioVolume(double volume) async {}
+
+  /// Short, human-readable status of the translation audio pipeline, surfaced
+  /// in an on-screen debug panel. The user builds on a remote Mac and has no
+  /// way to read device logs, so the phone itself must show whether the
+  /// OpenAI connection is up and whether the translated track is playing.
+  String get translationDiagnostics => '';
 }
 
 /// Default: no processing; keeps call path simple until you add an adapter.
@@ -80,4 +86,7 @@ class NoOpRealtimeTranslation implements RealtimeTranslationPort {
 
   @override
   Future<void> setTranslatedAudioVolume(double volume) async {}
+
+  @override
+  String get translationDiagnostics => '';
 }

@@ -102,6 +102,49 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   bool get translationSpeaking => _translationSpeaking;
 
   @override
+  String get translationDiagnostics {
+    final pc = _pc;
+    final cs = pc?.connectionState;
+    String pcLabel;
+    switch (cs) {
+      case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
+        pcLabel = 'connectée';
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateConnecting:
+        pcLabel = 'connexion…';
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+        pcLabel = 'ECHEC';
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
+        pcLabel = 'coupee';
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
+        pcLabel = 'fermee';
+        break;
+      case null:
+        pcLabel = _busy ? 'ouverture…' : 'absente';
+        break;
+      default:
+        pcLabel = cs.toString().split('.').last;
+    }
+    final room = _room;
+    var origTracks = 0;
+    if (room != null) {
+      for (final p in room.remoteParticipants.values) {
+        for (final pub in p.audioTrackPublications) {
+          if (pub.track is RemoteAudioTrack) origTracks++;
+        }
+      }
+    }
+    final trk = _translatedAudioTrack != null ? 'OUI' : 'NON';
+    final speaking = _translationSpeaking ? 'oui' : 'non';
+    final extra = _pausedForSilence ? ' • pause(silence)' : '';
+    return 'OpenAI: $pcLabel • trad recue: $trk • parle: $speaking • '
+        'orig: $origTracks piste(s) • vol trad: ${_translatedVolume.toStringAsFixed(2)}$extra';
+  }
+
+  @override
   Future<void> setTranslatedAudioVolume(double volume) async {
     final clamped = volume.clamp(0.0, 1.0);
     _translatedVolume = clamped;

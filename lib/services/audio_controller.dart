@@ -197,15 +197,14 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // Duck the original remote audio to 25% (native) while the translation plays
-  // so BOTH the real voice and the translation are audible at once. The
-  // AppDelegate now sets WebRTC's iOS audio session to mixWithOthers, so the OS
-  // MIXES the two WebRTC flows (LiveKit original + OpenAI translation) instead
-  // of silencing one (the old FR↔AR arbitration bug, 41f699e) — the same thing
-  // the browser already does on web. Web stays 0.0 (it already plays both; its
-  // remote audio is driven through the DOM). The original returns to full level
-  // [_duckReleaseDelay] after the translation stops.
-  static double get _duckedLevel => kIsWeb ? 0.0 : 0.25;
+  // Mute the original remote voice WHILE the translation is actually speaking,
+  // restoring it [_duckReleaseDelay] after. This is the EXACT behaviour the web
+  // build uses — and the user confirmed the web build sounds perfect. There is
+  // a single shared WebRTC engine on iOS (livekit_client is built on
+  // flutter_webrtc), so both the original and the translated remote tracks play
+  // automatically through the same audio session; nothing arbitrates them away.
+  // Native therefore behaves identically to web with the same 0.0 duck level.
+  static const double _duckedLevel = 0.0;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
