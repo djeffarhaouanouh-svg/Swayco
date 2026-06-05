@@ -888,7 +888,36 @@ class _CallScreenState extends State<CallScreen> {
         : AppStrings.t('composer_message_hint_lang', args: {'lang': label});
   }
 
+  /// Typewriter reveal of the placeholder — same effect as the messages
+  /// composer: the hint types itself in once the in-call composer appears.
+  String _typedChatHint = '';
+  Timer? _chatHintTimer;
+  bool _chatHintStarted = false;
+
+  void _animateChatHint() {
+    _chatHintTimer?.cancel();
+    final full = _chatHint;
+    if (!mounted) return;
+    setState(() => _typedChatHint = '');
+    var shown = 0;
+    _chatHintTimer = Timer.periodic(const Duration(milliseconds: 75), (t) {
+      if (!mounted || shown >= full.length) {
+        t.cancel();
+        return;
+      }
+      shown++;
+      setState(() => _typedChatHint = full.substring(0, shown));
+    });
+  }
+
   Widget _buildChatComposer() {
+    // Type the placeholder in the first time the composer appears.
+    if (!_chatHintStarted) {
+      _chatHintStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _animateChatHint();
+      });
+    }
     // Same frosted-glass bar as the messages composer.
     return GlassContainer(
       borderRadius: BorderRadius.circular(26),
@@ -925,7 +954,7 @@ class _CallScreenState extends State<CallScreen> {
               decoration: InputDecoration(
                 isDense: true,
                 filled: false,
-                hintText: _chatHint,
+                hintText: _typedChatHint,
                 hintStyle: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
@@ -1332,6 +1361,7 @@ class _CallScreenState extends State<CallScreen> {
     }
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
+    _chatHintTimer?.cancel();
     _chatCtrl.dispose();
     _chatFocus.dispose();
     unawaited(_ttsPlayer.dispose());
@@ -1637,7 +1667,9 @@ class _CallScreenState extends State<CallScreen> {
                 // Lifts with the keyboard.
                 Positioned(
                   left: 8,
-                  right: 84,
+                  // Extra right margin so the bar clears the round control rail
+                  // on the right (it was touching the buttons on phones).
+                  right: 100,
                   // Lift above the keyboard. The SafeArea already accounts for
                   // the bottom inset, so only add the keyboard height here.
                   bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
@@ -1663,42 +1695,6 @@ class _CallScreenState extends State<CallScreen> {
                             avatarColor: c.mine
                                 ? (_myProfile?.avatarColor ?? '')
                                 : (_peerProfile?.avatarColor ?? ''),
-                          ),
-                        ),
-                      // "Speak in <your language>" reminder, shown at the
-                      // start of the call (until the first caption appears).
-                      if (_captions.isEmpty && _myLangLabel != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.12)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.graphic_eq_rounded,
-                                    size: 15, color: SC.accent),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    AppStrings.t('call_speak_lang_hint',
-                                        args: {'lang': _myLangLabel!}),
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.85),
-                                      fontSize: 12.5,
-                                      height: 1.3,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       const SizedBox(height: 4),
