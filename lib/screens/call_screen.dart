@@ -1149,11 +1149,6 @@ class _CallScreenState extends State<CallScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (flagEmoji.isNotEmpty) ...[
-                                    Text(flagEmoji,
-                                        style: const TextStyle(fontSize: 30)),
-                                    const SizedBox(width: 12),
-                                  ],
                                   Flexible(
                                     child: Text(
                                       firstName,
@@ -1166,6 +1161,11 @@ class _CallScreenState extends State<CallScreen> {
                                       ),
                                     ),
                                   ),
+                                  if (flagEmoji.isNotEmpty) ...[
+                                    const SizedBox(width: 12),
+                                    Text(flagEmoji,
+                                        style: const TextStyle(fontSize: 30)),
+                                  ],
                                 ],
                               ),
                             ),
