@@ -456,9 +456,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          // Conversation rows as a flat list (no boxed card) — just a thin
-          // hairline divider between them (inset past the avatar).
-          Column(
+          // Single glass card holding every conversation row, with a thin
+          // hairline divider between them (inset past the avatar) so each
+          // conversation reads as a distinct entry.
+          GlassContainer(
+            borderRadius: BorderRadius.circular(24),
+            padding: const EdgeInsets.all(6),
+            child: Column(
               children: [
                 for (final (i, p) in _friends.indexed) ...[
                   if (i > 0)
@@ -499,6 +503,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ],
               ],
             ),
+          ),
           const SizedBox(height: 18),
           _InviteToCallBar(
             onInviteToCall: _creatingInvite ? null : _shareCallInvite,
