@@ -298,6 +298,23 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// Poll-rebind translation until the remote's spoken language is known.
+  /// Covers the second-joiner case: a peer already in the room when we connect
+  /// emits no ParticipantConnectedEvent, and their JWT metadata (which carries
+  /// their language) can hydrate a beat after connect — so the first bind ran
+  /// blind (remote lang unknown) and nothing retried. That's the "only one
+  /// side hears the translation" bug.
+  Future<void> _rebindUntilRemoteLangKnown(Room room) async {
+    for (var i = 0; i < 12; i++) {
+      if (!mounted) return;
+      if (_discoverRemoteLang(room).isNotEmpty) {
+        await _refreshTranslationBinding(room);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -616,6 +633,10 @@ class _CallScreenState extends State<CallScreen> {
       room.addListener(_onRoomChanged);
       _roomEvents = room.createListener()
         ..on<TrackSubscribedEvent>((_) {
+          // The peer's audio (and the participant metadata carrying their
+          // language) is now here — (re)bind translation in case the remote
+          // language wasn't known at connect time.
+          unawaited(_refreshTranslationBinding(room));
           if (mounted) setState(() {});
         })
         ..on<TrackUnsubscribedEvent>((_) {
@@ -666,6 +687,9 @@ class _CallScreenState extends State<CallScreen> {
       // are sent back to the live screen when either one ends the call.
       if (room.remoteParticipants.isNotEmpty) {
         _hadRemote = true;
+        // Peer was already here when we joined → no ParticipantConnectedEvent
+        // fires for us, so keep re-binding until their language is known.
+        unawaited(_rebindUntilRemoteLangKnown(room));
       }
       await _audio.bind(room);
       // Call audio plays through the loudspeaker (AudioController's default);

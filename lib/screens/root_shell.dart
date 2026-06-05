@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
 import '../services/call_alert.dart';
+import '../services/call_launcher.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
@@ -212,15 +213,16 @@ class _RootShellState extends State<RootShell> {
 
   Future<void> _joinCallRoom(IncomingCall call) async {
     try {
-      final myId = await DeviceId.getOrCreate();
-      final myProfile = isSupabaseReady
-          ? await ProfileApi.fetchById(myId)
-          : null;
+      // Resolve my name + spoken language the SAME robust way the caller does
+      // (local prefs → Supabase fallback). The old raw profile fetch could
+      // mint a token with an empty sourceLang, leaving the OTHER side unable
+      // to translate me — half of the "translation only reaches one person".
+      final me = await CallLauncher.resolveMyIdentity();
       final token = await fetchLiveKitToken(
         roomName: call.roomName,
         identity: 'u${DateTime.now().millisecondsSinceEpoch}',
-        displayName: myProfile?.displayName ?? '',
-        sourceLang: myProfile?.language ?? '',
+        displayName: me.name,
+        sourceLang: me.sourceLang,
       );
       // Navigate via the global navigator key, not `context`: on an iOS
       // CallKit accept this runs from a native event while the app may still
@@ -242,8 +244,8 @@ class _RootShellState extends State<RootShell> {
             wsUrl: token.url,
             jwt: token.token,
             roomName: token.roomName,
-            displayName: myProfile?.displayName ?? '',
-            mySourceLang: myProfile?.language ?? '',
+            displayName: me.name,
+            mySourceLang: me.sourceLang,
             translation: widget.translation,
             // For the "call ended" summary card (peer PDP + flag).
             peerId: call.callerId,
