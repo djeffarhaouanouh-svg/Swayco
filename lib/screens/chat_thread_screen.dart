@@ -651,112 +651,119 @@ class _ThreadHeader extends StatelessWidget {
       // buttons keep their glass. The row sits transparently over the chat.
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Stack(
-          alignment: Alignment.center,
+        // Slightly taller header (vertical 4 → 8); the round buttons + avatar
+        // grow with it, but the name text and wordmark keep their size.
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Row(
           children: [
-            // Leading (back + name) cluster and trailing (call buttons).
-            Row(
-              children: [
             GlassIconButton(
               icon: Icons.arrow_back_rounded,
-              size: 36,
-              iconSize: 18,
+              size: 40,
+              iconSize: 20,
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 8),
-            Flexible(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: onViewProfile,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      // Online presence is shown as a green dot ON the avatar
-                      // (the old "En ligne" text line was removed so the header
-                      // stays a single compact line).
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ProfileAvatar(
-                            displayName: title,
-                            avatarUrl: peer?.avatarUrl,
-                            avatarColorHex: peer?.avatarColor,
-                            size: 32,
-                          ),
-                          if (_peerOnline)
-                            Positioned(
-                              right: -1,
-                              bottom: -1,
-                              child: Container(
-                                width: 11,
-                                height: 11,
-                                decoration: BoxDecoration(
-                                  color: SC.online,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: SC.bgDeep, width: 2),
-                                ),
+            // Name cluster (avatar + online dot + name). Non-flex with a capped
+            // name width, so the single Expanded below absorbs all slack and
+            // keeps the call buttons pinned hard right.
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onViewProfile,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Online presence is a green dot ON the avatar.
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ProfileAvatar(
+                          displayName: title,
+                          avatarUrl: peer?.avatarUrl,
+                          avatarColorHex: peer?.avatarColor,
+                          size: 36,
+                        ),
+                        if (_peerOnline)
+                          Positioned(
+                            right: -1,
+                            bottom: -1,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: SC.online,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: SC.bgDeep, width: 2),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SCText.h3.copyWith(
-                            color: SC.textPrimary.withValues(alpha: 0.6),
                           ),
+                      ],
+                    ),
+                    const SizedBox(width: 10),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width * 0.42,
+                      ),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SCText.h3.copyWith(
+                          color: SC.textPrimary.withValues(alpha: 0.6),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const Spacer(),
+            // Brand wordmark — centred in the gap between the name and the call
+            // buttons (dynamic: the gap grows/shrinks with the name length).
+            // Scales down if the gap is tight; hidden for very long names so it
+            // never becomes a microscopic logo. The Expanded still absorbs the
+            // slack either way, keeping the buttons pinned right.
+            Expanded(
+              child: Center(
+                child: title.length <= 14
+                    ? const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: 'swayco'),
+                              TextSpan(
+                                text: '.ai',
+                                style: TextStyle(color: SC.accent),
+                              ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
             // Audio call (phone) + video call (camera).
             GlassIconButton(
               icon: Icons.phone_rounded,
-              size: 36,
-              iconSize: 18,
+              size: 40,
+              iconSize: 20,
               onTap: onCall,
             ),
             const SizedBox(width: 6),
             GlassIconButton(
               icon: Icons.videocam_rounded,
-              size: 36,
-              iconSize: 18,
+              size: 40,
+              iconSize: 20,
               onTap: onCallVideo,
             ),
-              ],
-            ),
-            // Brand wordmark — dead-centre of the header. Hidden when the
-            // peer's name is long so the two never collide (names render wider
-            // on the native build than on web). Tap-through (IgnorePointer) so
-            // it never blocks the name / buttons underneath.
-            if (title.length <= 10)
-              const IgnorePointer(
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: 'swayco'),
-                      TextSpan(text: '.ai', style: TextStyle(color: SC.accent)),
-                    ],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
