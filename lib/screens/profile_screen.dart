@@ -3017,22 +3017,28 @@ class _GradientActionButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+          // Scale the icon+label down to fit when a translation is long
+          // (German / Russian / katakana run wider) instead of overflowing.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
