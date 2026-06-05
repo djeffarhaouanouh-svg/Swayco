@@ -65,18 +65,25 @@ abstract final class CallLauncher {
   /// Returns true if the call was launched, false otherwise (missing profile,
   /// network error, etc.). Shows a snackbar on failure when [context] is
   /// still mounted.
+  /// Lock so a double-tap on a call button (or two call entry points firing
+  /// at once) can't start two calls / create two ring rows. Held until the
+  /// call screen pops, then reset in the finally below.
+  static bool _starting = false;
+
   static Future<bool> startCall(
     BuildContext context, {
     required String peerDeviceId,
     required RealtimeTranslationPort translation,
     bool startWithCamera = false,
   }) async {
-    final myId = await DeviceId.getOrCreate();
-    final me = await resolveMyIdentity();
-    final myName = me.name;
-    final mySourceLang = me.sourceLang;
-
+    if (_starting) return false;
+    _starting = true;
     try {
+      final myId = await DeviceId.getOrCreate();
+      final me = await resolveMyIdentity();
+      final myName = me.name;
+      final mySourceLang = me.sourceLang;
+
       final room = roomNameFor(myId, peerDeviceId);
       final token = await fetchLiveKitToken(
         roomName: room,
@@ -141,6 +148,8 @@ abstract final class CallLauncher {
         );
       }
       return false;
+    } finally {
+      _starting = false;
     }
   }
 }
