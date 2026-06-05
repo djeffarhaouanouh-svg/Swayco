@@ -12,6 +12,7 @@ import '../services/block_api.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
+import '../services/push_dispatcher.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
@@ -143,6 +144,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       await NotificationClient.unregister(uid);
     }
+  }
+
+  /// Send a push to THIS device (same id the FCM/VoIP token is registered
+  /// under) so the whole pipeline — token → backend /api/notify → APNs/FCM →
+  /// device banner — can be verified on a real build. iOS won't show a banner
+  /// while the app is foregrounded, so the toast tells the user to background
+  /// it; the round-trip takes a couple of seconds, by which time it shows.
+  Future<void> _sendTestNotification() async {
+    final uid = await DeviceId.getOrCreate();
+    if (uid.isEmpty) return;
+    await PushDispatcher.notify(
+      recipientUid: uid,
+      title: 'Swayco',
+      body: AppStrings.t('settings_test_push_body'),
+      type: 'test',
+    );
+    if (!mounted) return;
+    _toast(AppStrings.t('settings_test_push_sent'));
   }
 
   // ───── Actions ─────────────────────────────────────────────────────────
@@ -419,6 +438,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
                       },
+                    ),
+                    _SettingsRow(
+                      icon: Icons.notification_add_outlined,
+                      label: AppStrings.t('settings_test_push'),
+                      onTap: _sendTestNotification,
                     ),
                   ],
                 ),

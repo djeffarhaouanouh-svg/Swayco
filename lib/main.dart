@@ -225,9 +225,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         return;
       }
       // Referral pickup: when the app is opened from
-      // `https://swayco.fr/?ref=<code>`, stash the code in prefs so we
+      // `https://www.swayco.fr/?ref=<code>`, stash the code in prefs so we
       // can credit the referrer once this visitor has finished sign-up
-      // + onboarding. Cleared by `_maybeAttributePendingReferral`.
+      // + onboarding. Cleared by `_maybeAttributePendingReferral`. (Host-
+      // agnostic — reads the `ref` query param whatever the host.)
       if (kIsWeb) {
         final ref = Uri.base.queryParameters['ref']?.trim() ?? '';
         if (ref.isNotEmpty) {
