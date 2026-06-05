@@ -197,14 +197,14 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // Mute the original remote voice WHILE the translation is actually speaking,
-  // restoring it [_duckReleaseDelay] after. This is the EXACT behaviour the web
-  // build uses — and the user confirmed the web build sounds perfect. There is
-  // a single shared WebRTC engine on iOS (livekit_client is built on
-  // flutter_webrtc), so both the original and the translated remote tracks play
-  // automatically through the same audio session; nothing arbitrates them away.
-  // Native therefore behaves identically to web with the same 0.0 duck level.
-  static const double _duckedLevel = 0.0;
+  // While the translation is actually speaking, duck the original remote voice
+  // to 25% (instead of fully muting it) and restore it [_duckReleaseDelay]
+  // after. The listener hears the real voice first, then it drops UNDER the
+  // translation so the two don't clash — but a hint of the original stays
+  // audible. Same on web and native: livekit_client shares one flutter_webrtc
+  // engine, so both remote tracks play through one audio session and the duck
+  // is driven by Helper.setVolume on the original track.
+  static const double _duckedLevel = 0.25;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
