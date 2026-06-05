@@ -1501,6 +1501,22 @@ class _IdentitySection extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
+          // Viewer mode: a green presence dot on the lower-right of the PDP
+          // when the peer is online (replaces the old "en ligne" text line).
+          if (!editable && online)
+            Positioned(
+              right: 10,
+              bottom: 10,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: SC.online,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: SC.bg, width: 3),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1722,32 +1738,7 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // Online indicator — peer active in the last 2 min, not hidden.
-        if (online) ...[
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: SC.online,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                AppStrings.t('online_now'),
-                style: const TextStyle(
-                  color: SC.online,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
+        // (Online presence is now a green dot on the PDP — see _pdpBubble.)
         // Bio (read-only) — between the PDP/name block and the stats, centred.
         if (!emptyBio) ...[
           const SizedBox(height: 14),
@@ -1849,9 +1840,11 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Read-only photo gallery — below the interests.
+        // Read-only photo gallery — below the interests, under its own header.
         if (photos.isNotEmpty) ...[
           const SizedBox(height: 24),
+          _ProfileSectionHeader(AppStrings.t('profile_photos_peer')),
+          const SizedBox(height: 12),
           _PhotoGallery(
             photos: photos,
             viewerMode: true,
