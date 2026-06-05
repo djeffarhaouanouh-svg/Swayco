@@ -52,6 +52,15 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   bool _translationSpeaking = false;
   bool _wasPcConnected = false;
 
+  /// Diagnostics for the on-screen AUDIO DEBUG panel (the user builds on a
+  /// remote Mac and cannot read device logs). [_openAttempts] counts how many
+  /// times we tried to open the OpenAI pipeline; [_lastOpenError] is the most
+  /// recent failure reason (null once a connection succeeds). These reveal,
+  /// on the phone itself, whether the pipeline never tries (route problem) or
+  /// tries and throws (and exactly why).
+  int _openAttempts = 0;
+  String? _lastOpenError;
+
   /// Wall-clock moment the current pipeline open began (set at the top
   /// of [_openPipelineCore]). The gap to the first "pc connected" is
   /// reported as `translation_connected` setup latency for the
@@ -140,8 +149,27 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     final trk = _translatedAudioTrack != null ? 'OUI' : 'NON';
     final speaking = _translationSpeaking ? 'oui' : 'non';
     final extra = _pausedForSilence ? ' • pause(silence)' : '';
-    return 'OpenAI: $pcLabel • trad recue: $trk • parle: $speaking • '
-        'orig: $origTracks piste(s) • vol trad: ${_translatedVolume.toStringAsFixed(2)}$extra';
+    final route = _route;
+    final String routeLabel;
+    if (route == null) {
+      routeLabel = 'NULL';
+    } else if (!route.isConfigured) {
+      routeLabel = 'NON-CONFIG';
+    } else {
+      routeLabel = '${route.targetBcp47}/${route.sourceBcp47}';
+    }
+    final err = _lastOpenError;
+    final base = 'OpenAI: $pcLabel • trad recue: $trk • parle: $speaking • '
+        'orig: $origTracks piste(s) • route: $routeLabel • essais: $_openAttempts$extra';
+    return err == null ? base : '$base\nERR: $err';
+  }
+
+  /// Compact, single-line error label for the on-screen panel (full message
+  /// still goes to Analytics). Trimmed so it fits the debug overlay.
+  static String _shortError(String phase, Object e) {
+    var s = e.toString().replaceAll('\n', ' ');
+    if (s.length > 90) s = '${s.substring(0, 90)}…';
+    return '$phase: $s';
   }
 
   @override
@@ -351,6 +379,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   void _onPcConnectionState(RTCPeerConnectionState state) {
     debugPrint('[xlate] pc state → $state');
     final nowConnected = state == RTCPeerConnectionState.RTCPeerConnectionStateConnected;
+    if (nowConnected) _lastOpenError = null;
     if (nowConnected && !_wasPcConnected) {
       if (!kIsWeb) HapticFeedback.lightImpact();
       // Translation pipeline is live — report setup latency.
@@ -744,6 +773,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       debugPrint('[xlate] refresh OK — rotated with no gap');
     } catch (e, st) {
       debugPrint('[xlate] refresh FAILED: $e\n$st');
+      _lastOpenError = _shortError('refresh', e);
       Analytics.track(
         'translation_error',
         langFrom: _route?.targetBcp47,
@@ -830,9 +860,12 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         await _stopMedia();
       }
       if (!identical(_room, roomRef)) return;
+      _openAttempts++;
       await _openPipelineCore(remote, publicationSid, roomRef);
+      _lastOpenError = null;
     } catch (e, st) {
       debugPrint('OpenAi translation failed: $e\n$st');
+      _lastOpenError = _shortError('bind', e);
       Analytics.track(
         'translation_error',
         langFrom: _route?.targetBcp47,
