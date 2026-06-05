@@ -673,56 +673,43 @@ class _ThreadHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      ProfileAvatar(
-                        displayName: title,
-                        avatarUrl: peer?.avatarUrl,
-                        avatarColorHex: peer?.avatarColor,
-                        size: 32,
+                      // Online presence is shown as a green dot ON the avatar
+                      // (the old "En ligne" text line was removed so the header
+                      // stays a single compact line).
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ProfileAvatar(
+                            displayName: title,
+                            avatarUrl: peer?.avatarUrl,
+                            avatarColorHex: peer?.avatarColor,
+                            size: 32,
+                          ),
+                          if (_peerOnline)
+                            Positioned(
+                              right: -1,
+                              bottom: -1,
+                              child: Container(
+                                width: 11,
+                                height: 11,
+                                decoration: BoxDecoration(
+                                  color: SC.online,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: SC.bgDeep, width: 2),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(width: 10),
                       Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SCText.h3.copyWith(
-                                color: SC.textPrimary.withValues(alpha: 0.6),
-                              ),
-                            ),
-                            if (_peerOnline) ...[
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: SC.online,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: SC.online,
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    AppStrings.t('online_now'),
-                                    style: SCText.accent.copyWith(
-                                      fontSize: 11,
-                                      color: SC.online,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SCText.h3.copyWith(
+                            color: SC.textPrimary.withValues(alpha: 0.6),
+                          ),
                         ),
                       ),
                     ],
@@ -747,27 +734,29 @@ class _ThreadHeader extends StatelessWidget {
             ),
               ],
             ),
-            // Brand wordmark — dead-centre of the header, balanced between
-            // the name and the call buttons. Tap-through (IgnorePointer) so
+            // Brand wordmark — dead-centre of the header. Hidden when the
+            // peer's name is long so the two never collide (names render wider
+            // on the native build than on web). Tap-through (IgnorePointer) so
             // it never blocks the name / buttons underneath.
-            const IgnorePointer(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(text: 'swayco'),
-                    TextSpan(text: '.ai', style: TextStyle(color: SC.accent)),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
+            if (title.length <= 10)
+              const IgnorePointer(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: 'swayco'),
+                      TextSpan(text: '.ai', style: TextStyle(color: SC.accent)),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1568,6 +1557,10 @@ class _ComposerState extends State<_Composer> {
                           decoration: InputDecoration(
                             hintText: _typedHint,
                             hintStyle: const TextStyle(color: SC.textMuted),
+                            // Keep the placeholder on ONE line — on the native
+                            // build the wider font wrapped "Écrivez en Français"
+                            // onto a second line and made the whole bar tall.
+                            hintMaxLines: 1,
                             filled: false,
                             contentPadding:
                                 const EdgeInsets.fromLTRB(4, 8, 12, 8),
