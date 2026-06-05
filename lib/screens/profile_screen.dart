@@ -672,13 +672,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // Horizontal gutter matches the chat / discover headers so
                         // the avatar and bio don't run into the screen edge.
                         padding: EdgeInsets.fromLTRB(
-                          28,
+                          // Tight 8px gutter so the titles sit hard left and the
+                          // photos run almost edge to edge (profile redesign).
+                          8,
                           // Own profile: title sits at the very top like the
                           // other tabs (Discover / Messages). Viewer: just
                           // clear the transparent AppBar drawn behind it, kept
                           // tight so the whole profile sits higher on screen.
                           _isViewingOther ? 36 : 12,
-                          28,
+                          8,
                           32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
                         children: [
@@ -1950,6 +1952,53 @@ class _PhotoGallery extends StatelessWidget {
   Widget build(BuildContext context) {
     if (viewerMode && photos.isEmpty) return const SizedBox.shrink();
     final canAdd = !viewerMode && photos.length < profilePhotosMax;
+
+    // Own profile: a single horizontal, scrollable row of LARGER tiles (the
+    // add-tile first) — your photos stack on one line you swipe through,
+    // instead of the small 3-up grid used on someone else's profile.
+    if (!viewerMode) {
+      const double tileWidth = 160;
+      final double tileHeight = tileWidth * _aspect;
+      final count = (canAdd ? 1 : 0) + photos.length;
+      return SizedBox(
+        height: tileHeight,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          itemCount: count,
+          separatorBuilder: (_, _) => const SizedBox(width: _spacing),
+          itemBuilder: (context, index) {
+            if (canAdd && index == 0) {
+              return SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _AddDiscoverPhotoCta(onTap: onPick),
+              );
+            }
+            final url = photos[canAdd ? index - 1 : index];
+            return SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: _PhotoCell(
+                photoUrl: url,
+                viewerMode: false,
+                isDiscover: discoverPhotoUrl.isNotEmpty &&
+                    url.split('?').first == discoverPhotoUrl.split('?').first,
+                onTap: onSelectDiscover == null
+                    ? () {}
+                    : () => onSelectDiscover!(url),
+                onDelete: () => onRemove(url),
+                likesCount: likesByPhoto[url] ?? 0,
+                onTapLikes: onTapLikes,
+                iLikePeer: false,
+                onTogglePeerLike: null,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // Phone: three per row (width / 3). Desktop: the three-up width blows
