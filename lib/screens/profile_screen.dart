@@ -1840,11 +1840,12 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Read-only photo gallery — below the interests, under its own header.
-        if (photos.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _ProfileSectionHeader(AppStrings.t('profile_photos_peer')),
-          const SizedBox(height: 12),
+        // Read-only photos — always shown under their own header: the gallery
+        // when the peer has photos, else an "Aucune photo" placeholder.
+        const SizedBox(height: 24),
+        _ProfileSectionHeader(AppStrings.t('profile_photos_peer')),
+        const SizedBox(height: 12),
+        if (photos.isNotEmpty)
           _PhotoGallery(
             photos: photos,
             viewerMode: true,
@@ -1852,8 +1853,9 @@ class _IdentitySection extends StatelessWidget {
             onRemove: (_) {},
             likedPhotoUrls: likedPhotoUrls,
             onTogglePhotoLike: onTogglePhotoLike,
-          ),
-        ],
+          )
+        else
+          const _EmptyPhotosPlaceholder(),
       ],
     );
   }
@@ -1876,6 +1878,36 @@ class _ProfileSectionHeader extends StatelessWidget {
         Expanded(child: Text(title, style: SCText.h2)),
         ?trailing,
       ],
+    );
+  }
+}
+
+/// Empty-state on a peer's profile when they have no photos: a faint bordered
+/// box with a camera icon and "Aucune photo", shown under the Photos header.
+class _EmptyPhotosPlaceholder extends StatelessWidget {
+  const _EmptyPhotosPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SC.glassBorder),
+        color: Colors.white.withValues(alpha: 0.02),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.photo_camera_outlined, size: 34, color: SC.textMuted),
+          const SizedBox(height: 10),
+          Text(
+            AppStrings.t('profile_no_photos'),
+            style: const TextStyle(color: SC.textMuted, fontSize: 14),
+          ),
+        ],
+      ),
     );
   }
 }
