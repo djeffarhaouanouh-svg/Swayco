@@ -320,10 +320,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _openHelp() => _openExternal('https://swayco.fr/help');
+  void _openHelp() => _openExternal('https://www.swayco.fr/help');
   void _contactSupport() => _openExternal('mailto:support@swayco.fr');
-  void _openTerms() => _openExternal('https://swayco.fr/terms');
-  void _openPrivacy() => _openExternal('https://swayco.fr/privacy');
+  void _openTerms() => _openExternal('https://www.swayco.fr/terms');
+  void _openPrivacy() => _openExternal('https://www.swayco.fr/privacy');
 
   /// Try to open [url] in the device browser (or mail client for
   /// `mailto:` URLs). Falls back to a toast if the device can't handle

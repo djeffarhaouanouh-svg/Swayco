@@ -334,12 +334,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     const _FooterDot(),
                     _FooterLink(
                       'Conditions',
-                      () => _openExternal('https://swayco.fr/terms'),
+                      () => _openExternal('https://www.swayco.fr/terms'),
                     ),
                     const _FooterDot(),
                     _FooterLink(
                       'Confidentialité',
-                      () => _openExternal('https://swayco.fr/privacy'),
+                      () => _openExternal('https://www.swayco.fr/privacy'),
                     ),
                   ],
                 ),
