@@ -172,16 +172,18 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // While the translation plays, duck the original remote audio to 25% so
-  // each side still clearly hears the other's REAL voice underneath the
-  // translation. EXCEPTION — web (iOS Safari): two simultaneous WebRTC
-  // PeerConnections (LiveKit original + OpenAI translation) make the OS
-  // arbitrate; with ANY audible original it routinely wins, leaving the
-  // TRANSLATED track silent (the FR↔AR two-iPhone bug, fixed in 41f699e). So
-  // on web we still cut the original to absolute zero; native ducks to 25%.
-  // The original is restored to the user's full level [_duckReleaseDelay]
-  // after the translation stops.
-  static double get _duckedLevel => kIsWeb ? 0.0 : 0.25;
+  // Cut the original remote audio ENTIRELY (0.0) while the translation plays —
+  // do NOT dampen it to a low-but-audible level. Two simultaneous WebRTC
+  // PeerConnections (the LiveKit original + the OpenAI translation) make the OS
+  // arbitrate the audio session and silence ONE of them; with ANY audible
+  // original it routinely wins, leaving the TRANSLATED track silent — so the
+  // listener gets EITHER the real voice OR the translation, never both. This
+  // happens on NATIVE iOS too, not just Safari (the 10%/25% experiment in
+  // 83a5b88/6eafeb5 re-broke it; original fix in 41f699e). Cutting to absolute
+  // zero leaves a single active flow and avoids the arbitration. The original
+  // is restored to the user's full level [_duckReleaseDelay] after the
+  // translation stops.
+  static const double _duckedLevel = 0.0;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
