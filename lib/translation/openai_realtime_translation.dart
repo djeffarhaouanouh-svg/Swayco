@@ -131,13 +131,19 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   Widget? buildTranslationAudioOverlay() {
     final r = _renderer;
     if (r == null) return null;
+    // KEEP THIS IN THE VIEWPORT (1x1 at 0,0), not off-screen. The hidden
+    // RTCVideoView is what plays OpenAI's translated audio; iOS (WebKit on web,
+    // and the native platform view) CULLS a fully off-screen view, so its
+    // audio never plays — that's the asymmetric "one side hears the
+    // translation, the other only the original" bug. Re-applies dc942e7, which
+    // was reverted by d882d09 by mistake. Invisible to the eye, but mounted.
     return Positioned(
-      left: -20,
-      bottom: -20,
-      width: 4,
-      height: 4,
+      left: 0,
+      bottom: 0,
+      width: 1,
+      height: 1,
       child: Opacity(
-        opacity: 0.02,
+        opacity: 0.001,
         child: RTCVideoView(
           r,
           mirror: false,
