@@ -616,10 +616,21 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         _handleOaiEvent(t);
       };
 
-      final cloned = await remote.mediaStreamTrack.clone();
+      // MediaStreamTrack.clone() is implemented on web but throws
+      // UnimplementedError on native flutter_webrtc — this is the exact reason
+      // the translation pipeline NEVER started on the iOS build: it failed here
+      // on every attempt, retried every 6s, and the panel stayed "absente".
+      // On native, feed the ORIGINAL remote track straight into the OpenAI PC.
+      // Teardown (_stopMedia) only disposes this local stream + closes the PC
+      // and never calls track.stop(), so the LiveKit source that the original
+      // remote audio also uses is left untouched (no risk of cutting the real
+      // voice). Web keeps cloning, where stopping a clone could propagate to
+      // the source.
+      final MediaStreamTrack srcTrack =
+          kIsWeb ? await remote.mediaStreamTrack.clone() : remote.mediaStreamTrack;
       ms = await createLocalMediaStream('openai_translation_src');
-      await ms.addTrack(cloned);
-      await pc.addTrack(cloned, ms);
+      await ms.addTrack(srcTrack);
+      await pc.addTrack(srcTrack, ms);
 
       renderer = RTCVideoRenderer();
       await renderer.initialize();
