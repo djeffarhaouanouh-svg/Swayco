@@ -455,6 +455,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           navigatorKey: rootNavigatorKey,
           debugShowCheckedModeBanner: false,
           theme: SC.material(),
+          // Honour the device's "Larger Text" setting (good for readability)
+          // but cap it at 1.3× so an extreme accessibility font size can never
+          // overflow buttons / headers / labels and break the layout.
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           home: ValueListenableBuilder<bool>(
             valueListenable: AppBoot.homeReady,
             builder: (context, homeReady, _) {

@@ -719,15 +719,14 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             // Brand wordmark — centred in the gap between the name and the call
-            // buttons (dynamic: the gap grows/shrinks with the name length).
-            // Scales down if the gap is tight; hidden for very long names so it
-            // never becomes a microscopic logo. The Expanded still absorbs the
-            // slack either way, keeping the buttons pinned right.
+            // buttons. Measured dynamically: shown at FULL size only when the
+            // remaining gap is wide enough; for a long name the gap is too
+            // small and the logo is dropped entirely (never squashed). The
+            // Expanded still absorbs the slack, keeping the buttons pinned right.
             Expanded(
-              child: Center(
-                child: title.length <= 14
-                    ? const FittedBox(
-                        fit: BoxFit.scaleDown,
+              child: LayoutBuilder(
+                builder: (context, c) => c.maxWidth >= 80
+                    ? const Center(
                         child: Text.rich(
                           TextSpan(
                             children: [
