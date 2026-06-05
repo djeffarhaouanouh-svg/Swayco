@@ -221,7 +221,17 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const _SocialProofPill(),
+                  // Reserve room on each side for the close button so the pill
+                  // stays centred, and scale it down if a wider native font /
+                  // larger system text size would otherwise clip the label
+                  // (it fits natively on web, not always on a device).
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 44),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _SocialProofPill(),
+                    ),
+                  ),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: GlassIconButton(
@@ -312,21 +322,27 @@ class _PaywallSheetState extends State<_PaywallSheet> {
             ),
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _FooterLink('Restaurer les achats', _restore),
-                  const _FooterDot(),
-                  _FooterLink(
-                    'Conditions',
-                    () => _openExternal('https://swayco.fr/terms'),
-                  ),
-                  const _FooterDot(),
-                  _FooterLink(
-                    'Confidentialité',
-                    () => _openExternal('https://swayco.fr/privacy'),
-                  ),
-                ],
+              // Keep the three links on one centred line, scaling down on
+              // narrower devices / larger system fonts instead of clipping
+              // "Confidentialité" off the right edge.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _FooterLink('Restaurer les achats', _restore),
+                    const _FooterDot(),
+                    _FooterLink(
+                      'Conditions',
+                      () => _openExternal('https://swayco.fr/terms'),
+                    ),
+                    const _FooterDot(),
+                    _FooterLink(
+                      'Confidentialité',
+                      () => _openExternal('https://swayco.fr/privacy'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
