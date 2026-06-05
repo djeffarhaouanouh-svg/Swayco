@@ -125,7 +125,13 @@ class _CallScreenState extends State<CallScreen> {
   // as a caption AND is read aloud (OpenAI TTS via the backend). Ephemeral —
   // nothing is persisted.
   static const String _captionTopic = 'swayco-chat';
-  final List<({String orig, String trans, bool mine})> _captions = [];
+  // In-call captions: never more than [_maxCaptions] on screen, each removed
+  // after [_captionTtl]. The `id` lets a per-caption timer drop the right one.
+  static const int _maxCaptions = 10;
+  static const Duration _captionTtl = Duration(seconds: 10);
+  final List<({int id, String orig, String trans, bool mine})> _captions = [];
+  int _captionSeq = 0;
+  final Map<int, Timer> _captionTimers = {};
   final TextEditingController _chatCtrl = TextEditingController();
   final FocusNode _chatFocus = FocusNode();
   final AudioPlayer _ttsPlayer = AudioPlayer();
@@ -791,6 +797,31 @@ class _CallScreenState extends State<CallScreen> {
 
   // ── In-call typed chat ────────────────────────────────────────────────
 
+  /// Add an in-call caption: cap the on-screen list at [_maxCaptions] (drop
+  /// the oldest) and auto-remove this one after [_captionTtl] (10 s).
+  void _pushCaption({
+    required String orig,
+    required String trans,
+    required bool mine,
+  }) {
+    if (!mounted) return;
+    final id = _captionSeq++;
+    setState(() {
+      _captions.add((id: id, orig: orig, trans: trans, mine: mine));
+      while (_captions.length > _maxCaptions) {
+        final removed = _captions.removeAt(0);
+        _captionTimers.remove(removed.id)?.cancel();
+      }
+    });
+    _captionTimers[id] = Timer(_captionTtl, () => _removeCaption(id));
+  }
+
+  void _removeCaption(int id) {
+    _captionTimers.remove(id)?.cancel();
+    if (!mounted) return;
+    setState(() => _captions.removeWhere((c) => c.id == id));
+  }
+
   /// Type → translate into the peer's language → show my bubble → publish
   /// to the peer over the data channel (they see the translation and hear it).
   Future<void> _sendCaption() async {
@@ -809,10 +840,10 @@ class _CallScreenState extends State<CallScreen> {
     }
     if (!mounted) return;
     setState(() {
-      _captions.add((orig: text, trans: trans, mine: true));
       _chatCtrl.clear();
       _chatSending = false;
     });
+    _pushCaption(orig: text, trans: trans, mine: true);
     try {
       final payload = jsonEncode({'orig': text, 'trans': trans, 'lang': to});
       await room.localParticipant?.publishData(
@@ -835,9 +866,7 @@ class _CallScreenState extends State<CallScreen> {
       final trans = m['trans']?.toString() ?? '';
       final lang = m['lang']?.toString() ?? '';
       if (orig.isEmpty && trans.isEmpty) return;
-      if (mounted) {
-        setState(() => _captions.add((orig: orig, trans: trans, mine: false)));
-      }
+      _pushCaption(orig: orig, trans: trans, mine: false);
       if (trans.isNotEmpty) unawaited(_speak(trans, lang));
     } catch (_) {
       // Ignore malformed packets / other topics.
@@ -1362,6 +1391,10 @@ class _CallScreenState extends State<CallScreen> {
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
     _chatHintTimer?.cancel();
+    for (final t in _captionTimers.values) {
+      t.cancel();
+    }
+    _captionTimers.clear();
     _chatCtrl.dispose();
     _chatFocus.dispose();
     unawaited(_ttsPlayer.dispose());
@@ -1677,9 +1710,7 @@ class _CallScreenState extends State<CallScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final c in _captions.length > 4
-                          ? _captions.sublist(_captions.length - 4)
-                          : _captions)
+                      for (final c in _captions)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _CaptionBubble(
@@ -1827,8 +1858,8 @@ class _RoundCallButton extends StatelessWidget {
             customBorder: const CircleBorder(),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Icon(icon, color: Colors.white, size: 22),
+              padding: const EdgeInsets.all(12),
+              child: Icon(icon, color: Colors.white, size: 21),
             ),
           ),
         ),
