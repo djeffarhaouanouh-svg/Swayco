@@ -22,6 +22,7 @@ import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/like_api.dart';
+import '../services/revenue_cat.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
@@ -754,11 +755,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                             //   ),
                             //   const SizedBox(height: 16),
                             // ],
-                            // Subscriptions route the user to external Stripe
-                            // checkout / pricing, which Apple & Google forbid
-                            // in native apps — so the whole "Mon abonnement"
-                            // affordance is web-only.
-                            if (kIsWeb) ...[
+                            // Show "Mon abonnement" on web (Stripe checkout —
+                            // allowed on web) AND on any native platform where
+                            // RevenueCat is configured (iOS now; Android once
+                            // its goog_ key is set), where the purchase goes
+                            // through the compliant native store. Stays hidden
+                            // on a native platform WITHOUT RevenueCat, which
+                            // would otherwise fall back to forbidden Stripe.
+                            if (kIsWeb || RevenueCat.isConfigured) ...[
                               const SizedBox(height: 16),
                               _MySubscriptionSection(
                                 currentTier: _remote?.subscriptionTier ?? 'free',
