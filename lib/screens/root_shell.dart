@@ -224,10 +224,17 @@ class _RootShellState extends State<RootShell> {
       );
       // Navigate via the global navigator key, not `context`: on an iOS
       // CallKit accept this runs from a native event while the app may still
-      // be backgrounded, so the local BuildContext isn't a reliable place to
-      // push from. The route is added to the stack and becomes visible the
-      // moment CallKit dismisses and the app comes forward.
-      final nav = rootNavigatorKey.currentState;
+      // be backgrounded — or cold-launching from a killed state, where the
+      // widget tree (and the navigator) isn't built yet. Previously we dropped
+      // the push when the navigator wasn't ready, which is exactly the
+      // "answered but never landed on the call screen" bug — so wait up to
+      // ~6s for it to appear instead of giving up.
+      NavigatorState? nav;
+      for (var i = 0; i < 40; i++) {
+        nav = rootNavigatorKey.currentState;
+        if (nav != null) break;
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      }
       if (nav == null) return;
       await nav.push<void>(
         MaterialPageRoute<void>(
