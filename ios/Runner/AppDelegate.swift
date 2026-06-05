@@ -30,6 +30,21 @@ import WebRTC
     let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
     voipRegistry.delegate = self
     voipRegistry.desiredPushTypes = [.voIP]
+
+    // Make the two live WebRTC audio flows on a call (the LiveKit original
+    // voice + the OpenAI translation) PLAY TOGETHER instead of iOS silencing
+    // one of them — the way the browser already mixes them on web. Setting
+    // mixWithOthers on WebRTC's shared audio-session config makes WebRTC apply
+    // it every time it (re)configures the session, on both incoming and
+    // outgoing calls.
+    let rtcConfig = RTCAudioSessionConfiguration.webRTC()
+    rtcConfig.category = AVAudioSession.Category.playAndRecord.rawValue
+    rtcConfig.categoryOptions = [
+      .mixWithOthers, .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP,
+    ]
+    rtcConfig.mode = AVAudioSession.Mode.videoChat.rawValue
+    RTCAudioSessionConfiguration.setWebRTC(rtcConfig)
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

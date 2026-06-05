@@ -172,16 +172,15 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // Cut the original remote audio entirely (0.0) while the translation is
-  // playing — do NOT dampen it to a low-but-audible level. On iOS Safari,
-  // two simultaneous WebRTC PeerConnections (LiveKit original + OpenAI
-  // translation) make the OS arbitrate and "duck" one of them; with any
-  // audible original it routinely wins, leaving the translated track silent
-  // for the listener (the FR↔AR two-iPhone bug, fixed in 41f699e). Cutting
-  // to absolute zero leaves a single active flow and avoids the arbitration.
-  // The original is restored to the user's full level [_duckReleaseDelay]
-  // after the translation stops.
-  static const double _duckedLevel = 0.0;
+  // Duck the original remote audio to 25% (native) while the translation plays
+  // so BOTH the real voice and the translation are audible at once. The
+  // AppDelegate now sets WebRTC's iOS audio session to mixWithOthers, so the OS
+  // MIXES the two WebRTC flows (LiveKit original + OpenAI translation) instead
+  // of silencing one (the old FR↔AR arbitration bug, 41f699e) — the same thing
+  // the browser already does on web. Web stays 0.0 (it already plays both; its
+  // remote audio is driven through the DOM). The original returns to full level
+  // [_duckReleaseDelay] after the translation stops.
+  static double get _duckedLevel => kIsWeb ? 0.0 : 0.25;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
