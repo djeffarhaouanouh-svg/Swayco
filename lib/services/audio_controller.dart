@@ -4,14 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
-// LiveKit doesn't re-export these from its barrel, but we need
-// onConfigureNativeAudio + mixWithOthers to stop iOS from arbitrating between
-// our two live WebRTC audio flows (the LiveKit original + the OpenAI
-// translation) — otherwise the OS silences one of them.
-// ignore: implementation_imports
-import 'package:livekit_client/src/support/native_audio.dart';
-// ignore: implementation_imports
-import 'package:livekit_client/src/track/audio_management.dart';
 
 import '../translation/realtime_translation_port.dart';
 import 'livekit_web_audio.dart';
@@ -81,25 +73,6 @@ class AudioController extends ChangeNotifier {
   /// drive ducking + VU-meter + route detection.
   Future<void> bind(Room room) async {
     _room = room;
-    // Tell iOS to MIX our audio sessions instead of arbitrating: with two live
-    // WebRTC stacks (the LiveKit original + the OpenAI translation), the OS
-    // otherwise silences one — you'd hear EITHER the real voice OR the
-    // translation. LiveKit's default call config omits mixWithOthers, so add it
-    // (no-op on web — there's no AVAudioSession to configure there).
-    if (!kIsWeb) {
-      onConfigureNativeAudio = (AudioTrackState state) async {
-        final base = await defaultNativeAudioConfigurationFunc(state);
-        if (base.appleAudioCategory == AppleAudioCategory.soloAmbient) {
-          return base; // mixWithOthers is invalid for soloAmbient
-        }
-        return base.copyWith(
-          appleAudioCategoryOptions: {
-            ...?base.appleAudioCategoryOptions,
-            AppleAudioCategoryOption.mixWithOthers,
-          },
-        );
-      };
-    }
     _prefs = await UserPrefs.loadAudio();
 
     await _applySpeaker(_prefs.speakerOn);
@@ -199,13 +172,16 @@ class AudioController extends ChangeNotifier {
     }
   }
 
-  // Duck the original remote audio to 25% (native) while the translation plays
-  // so BOTH the real voice and the translation are audible at once. This works
-  // only because [bind] sets the iOS audio session to mixWithOthers — without
-  // it the OS arbitrates and silences one of the two WebRTC flows (the FR↔AR
-  // bug, 41f699e). Web keeps 0.0 (no AVAudioSession to mix there). The original
-  // is restored to full level [_duckReleaseDelay] after the translation stops.
-  static double get _duckedLevel => kIsWeb ? 0.0 : 0.25;
+  // Cut the original remote audio entirely (0.0) while the translation is
+  // playing — do NOT dampen it to a low-but-audible level. On iOS Safari,
+  // two simultaneous WebRTC PeerConnections (LiveKit original + OpenAI
+  // translation) make the OS arbitrate and "duck" one of them; with any
+  // audible original it routinely wins, leaving the translated track silent
+  // for the listener (the FR↔AR two-iPhone bug, fixed in 41f699e). Cutting
+  // to absolute zero leaves a single active flow and avoids the arbitration.
+  // The original is restored to the user's full level [_duckReleaseDelay]
+  // after the translation stops.
+  static const double _duckedLevel = 0.0;
   static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
 
   Future<void> _applyTranslatedVolume(double v) async {
