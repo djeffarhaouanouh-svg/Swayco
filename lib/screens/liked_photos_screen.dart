@@ -6,6 +6,7 @@ import '../services/device_id.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -126,12 +127,16 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
               backgroundColor: SC.bubbleIn,
               onRefresh: _load,
               child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 itemCount: _items.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (context, i) => _LikedRow(
-                  item: _items[i],
-                  onTap: () => _open(_items[i]),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, i) => GlassContainer(
+                  borderRadius: BorderRadius.circular(24),
+                  padding: const EdgeInsets.all(6),
+                  child: _LikedRow(
+                    item: _items[i],
+                    onTap: () => _open(_items[i]),
+                  ),
                 ),
               ),
             ),

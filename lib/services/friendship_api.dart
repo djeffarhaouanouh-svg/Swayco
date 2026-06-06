@@ -332,18 +332,6 @@ abstract final class FriendshipApi {
     required String peerId,
   }) async {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty) return;
-    // SECURITY DEFINER RPC so the edge is removed even when the peer blocked
-    // me (a restrictive deployed RLS could reject the direct delete). Falls
-    // back to a direct delete when the RPC isn't deployed yet.
-    try {
-      await _c.rpc(
-        'friendship_unfollow',
-        params: {'p_me': meId, 'p_peer': peerId},
-      );
-      return;
-    } catch (e) {
-      debugPrint('friendship_unfollow RPC unavailable, falling back: $e');
-    }
     await _c
         .from('friendships')
         .delete()
@@ -366,46 +354,11 @@ abstract final class FriendshipApi {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty || meId == peerId) {
       return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
     }
-    // SECURITY DEFINER RPC: resolves our edge even when the peer has blocked
-    // me (a restrictive deployed RLS would otherwise hide it from fetchMine,
-    // making the Unfollow button vanish). Falls back to the table scan below
-    // when the RPC isn't deployed yet.
-    try {
-      final rows = await _c.rpc(
-        'friendship_directional',
-        params: {'p_me': meId, 'p_peer': peerId},
-      );
-      if (rows is List && rows.isNotEmpty) {
-        final m = Map<String, dynamic>.from(rows.first as Map);
-        return (
-          peerFollowsMe: m['peer_follows_me'] == true,
-          iFollowPeer: m['i_follow_peer'] == true,
-          iRequestedPeer: m['i_requested_peer'] == true,
-        );
-      }
-    } catch (e) {
-      debugPrint('friendship_directional RPC unavailable, falling back: $e');
-    }
-    // Migration-free fallback that STILL bypasses RLS: the already-deployed
-    // accepted-peers RPC (migration 0005) resolves the accepted edges even
-    // when the peer has blocked me. This is what brings the "Se désabonner"
-    // button back without applying 0040. Pending requests aren't covered by
-    // that RPC, so they're read from the table below (best-effort).
-    var peerFollowsMe = false;
-    var iFollowPeer = false;
-    var iRequestedPeer = false;
-    try {
-      final following =
-          await fetchAcceptedPeers(meId: meId, direction: FriendDirection.following);
-      iFollowPeer = following.any((p) => p.id == peerId);
-      final followers =
-          await fetchAcceptedPeers(meId: meId, direction: FriendDirection.followers);
-      peerFollowsMe = followers.any((p) => p.id == peerId);
-    } catch (e) {
-      debugPrint('directionalWith accepted-peers fallback failed: $e');
-    }
     try {
       final mine = await fetchMine(meId);
+      var peerFollowsMe = false;
+      var iFollowPeer = false;
+      var iRequestedPeer = false;
       for (final f in mine) {
         final iSentToPeer = f.requester == meId && f.addressee == peerId;
         final peerSentToMe = f.requester == peerId && f.addressee == meId;
@@ -416,17 +369,15 @@ abstract final class FriendshipApi {
           iRequestedPeer = true;
         }
       }
+      return (
+        peerFollowsMe: peerFollowsMe,
+        iFollowPeer: iFollowPeer,
+        iRequestedPeer: iRequestedPeer,
+      );
     } catch (e) {
       debugPrint('FriendshipApi.directionalWith failed: $e');
+      return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
     }
-    // Return whatever the (RLS-bypassing) accepted-peers pass resolved, even
-    // if the direct table read above failed — so a peer who blocked me still
-    // shows as followed and the Unfollow button stays.
-    return (
-      peerFollowsMe: peerFollowsMe,
-      iFollowPeer: iFollowPeer,
-      iRequestedPeer: iRequestedPeer,
-    );
   }
 
   /// Derive how I (`meId`) currently stand with [peerId] given a list of my
