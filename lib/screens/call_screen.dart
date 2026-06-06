@@ -1435,19 +1435,16 @@ class _CallScreenState extends State<CallScreen> {
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
             child: Column(
               children: [
-                // Bigger top flex than the bottom spacer below lifts the
-                // spinner + text block up off the bottom edge.
-                Expanded(
-                  flex: 6,
-                  child: Center(
-                    child: Image.asset(
-                      'assets/notif-android.png',
-                      width: 220,
-                      height: 220,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                // Logo, then the spinner + hint kept close just beneath it
+                // (centred together as a tight group, not spread apart).
+                const Spacer(flex: 5),
+                Image.asset(
+                  'assets/notif-android.png',
+                  width: 210,
+                  height: 210,
+                  fit: BoxFit.contain,
                 ),
+                const SizedBox(height: 22),
                 const SizedBox(
                   height: 28,
                   width: 28,
@@ -1466,7 +1463,7 @@ class _CallScreenState extends State<CallScreen> {
                     height: 1.4,
                   ),
                 ),
-                const Expanded(flex: 2, child: SizedBox()),
+                const Spacer(flex: 6),
               ],
             ),
           ),

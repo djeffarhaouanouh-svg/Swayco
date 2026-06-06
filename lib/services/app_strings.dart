@@ -296,8 +296,7 @@ abstract final class AppStrings {
     'call_go_back': 'Retour',
     'call_connecting': 'Connexion à {room}…',
     'call_connecting_short': 'Connexion à l\'appel…',
-    'call_connecting_caller_pays':
-        'Un seul abonnement suffit pour l\'appel — c\'est l\'appelant qui est débité.',
+    'call_connecting_caller_pays': 'Un seul abonnement suffit pour traduire la conversation.',
     'call_waiting_title': 'En attente de l’autre personne…',
     'call_waiting_body': 'Partage le même nom de salle sur un autre appareil.',
     'call_leave_q': 'Quitter l’appel ?',
@@ -765,8 +764,7 @@ abstract final class AppStrings {
     'call_go_back': 'Go back',
     'call_connecting': 'Connecting to {room}…',
     'call_connecting_short': 'Connecting to call…',
-    'call_connecting_caller_pays':
-        'One subscription covers the call — only the caller is billed.',
+    'call_connecting_caller_pays': 'A single subscription is enough to translate the conversation.',
     'call_waiting_title': 'Waiting for the other person…',
     'call_waiting_body': 'Share the same room name on another device.',
     'call_leave_q': 'Leave call?',
@@ -1187,8 +1185,7 @@ abstract final class AppStrings {
     'call_go_back': 'Volver',
     'call_connecting': 'Conectando a {room}…',
     'call_connecting_short': 'Conectando a la llamada…',
-    'call_connecting_caller_pays':
-        'Una sola suscripción basta para la llamada — solo se cobra a quien llama.',
+    'call_connecting_caller_pays': 'Una sola suscripción basta para traducir la conversación.',
     'call_waiting_title': 'Esperando a la otra persona…',
     'call_waiting_body':
         'Comparte el mismo nombre de sala en otro dispositivo.',
@@ -1550,8 +1547,7 @@ abstract final class AppStrings {
     'call_go_back': 'Zurück',
     'call_connecting': 'Verbinde mit {room}…',
     'call_connecting_short': 'Anruf wird verbunden…',
-    'call_connecting_caller_pays':
-        'Ein Abo reicht für den Anruf — nur der Anrufer wird belastet.',
+    'call_connecting_caller_pays': 'Ein einziges Abo genügt, um das Gespräch zu übersetzen.',
     'call_waiting_title': 'Warten auf die andere Person…',
     'call_waiting_body': 'Teile denselben Raumnamen auf einem anderen Gerät.',
     'call_leave_q': 'Anruf verlassen?',
@@ -1979,8 +1975,7 @@ abstract final class AppStrings {
     'call_go_back': 'Indietro',
     'call_connecting': 'Connessione a {room}…',
     'call_connecting_short': 'Connessione alla chiamata…',
-    'call_connecting_caller_pays':
-        'Un solo abbonamento basta per la chiamata — viene addebitato solo chi chiama.',
+    'call_connecting_caller_pays': 'Un solo abbonamento basta per tradurre la conversazione.',
     'call_waiting_title': 'In attesa dell’altra persona…',
     'call_waiting_body':
         'Condividi lo stesso nome stanza su un altro dispositivo.',
@@ -2409,8 +2404,7 @@ abstract final class AppStrings {
     'call_go_back': 'Voltar',
     'call_connecting': 'A ligar a {room}…',
     'call_connecting_short': 'A ligar para a chamada…',
-    'call_connecting_caller_pays':
-        'Uma única subscrição chega para a chamada — só quem liga é debitado.',
+    'call_connecting_caller_pays': 'Uma só assinatura basta para traduzir a conversa.',
     'call_waiting_title': 'À espera da outra pessoa…',
     'call_waiting_body': 'Partilha o mesmo nome de sala noutro dispositivo.',
     'call_leave_q': 'Sair da chamada?',
@@ -2837,8 +2831,7 @@ abstract final class AppStrings {
     'call_go_back': 'Terug',
     'call_connecting': 'Verbinden met {room}…',
     'call_connecting_short': 'Verbinden met gesprek…',
-    'call_connecting_caller_pays':
-        'Eén abonnement is genoeg voor het gesprek — alleen de beller wordt belast.',
+    'call_connecting_caller_pays': 'Eén abonnement is genoeg om het gesprek te vertalen.',
     'call_waiting_title': 'Wachten op de andere persoon…',
     'call_waiting_body': 'Deel dezelfde kamernaam op een ander apparaat.',
     'call_leave_q': 'Oproep verlaten?',
@@ -3264,8 +3257,7 @@ abstract final class AppStrings {
     'call_go_back': 'رجوع',
     'call_connecting': 'جارٍ الاتصال بـ {room}…',
     'call_connecting_short': 'جارٍ الاتصال بالمكالمة…',
-    'call_connecting_caller_pays':
-        'اشتراك واحد يكفي للمكالمة — يُخصم من المتصل فقط.',
+    'call_connecting_caller_pays': 'اشتراك واحد يكفي لترجمة المحادثة.',
     'call_waiting_title': 'في انتظار الشخص الآخر…',
     'call_waiting_body': 'شارك اسم الغرفة نفسه على جهاز آخر.',
     'call_leave_q': 'مغادرة المكالمة؟',
@@ -3691,8 +3683,7 @@ abstract final class AppStrings {
     'call_go_back': 'Назад',
     'call_connecting': 'Подключение к {room}…',
     'call_connecting_short': 'Подключение к звонку…',
-    'call_connecting_caller_pays':
-        'Одной подписки достаточно на звонок — списывается только со звонящего.',
+    'call_connecting_caller_pays': 'Одной подписки достаточно, чтобы переводить разговор.',
     'call_waiting_title': 'Ожидание другого участника…',
     'call_waiting_body': 'Откройте то же имя комнаты на другом устройстве.',
     'call_leave_q': 'Покинуть звонок?',
@@ -4107,7 +4098,7 @@ abstract final class AppStrings {
     'call_go_back': '返回',
     'call_connecting': '正在连接 {room}…',
     'call_connecting_short': '正在连接通话…',
-    'call_connecting_caller_pays': '一个订阅就能覆盖整个通话 — 仅向发起人扣费。',
+    'call_connecting_caller_pays': '一个订阅即可翻译对话。',
     'call_waiting_title': '正在等待对方…',
     'call_waiting_body': '在另一台设备上使用相同的房间名。',
     'call_leave_q': '离开通话？',
@@ -4514,7 +4505,7 @@ abstract final class AppStrings {
     'call_go_back': '戻る',
     'call_connecting': '{room} に接続中…',
     'call_connecting_short': '通話に接続中…',
-    'call_connecting_caller_pays': '通話は1つのサブスクリプションで十分です — 発信者だけが課金されます。',
+    'call_connecting_caller_pays': '一つの登録で会話を翻訳できます。',
     'call_waiting_title': '相手を待っています…',
     'call_waiting_body': '別の端末で同じルーム名を使ってください。',
     'call_leave_q': '通話から退出しますか？',
@@ -4923,7 +4914,7 @@ abstract final class AppStrings {
     'call_go_back': '뒤로',
     'call_connecting': '{room}에 연결 중…',
     'call_connecting_short': '통화에 연결 중…',
-    'call_connecting_caller_pays': '구독 하나로 통화가 가능합니다 — 발신자만 차감됩니다.',
+    'call_connecting_caller_pays': '구독 하나면 대화를 번역할 수 있어요.',
     'call_waiting_title': '상대방을 기다리는 중…',
     'call_waiting_body': '다른 기기에서 같은 방 이름을 사용하세요.',
     'call_leave_q': '통화를 나갈까요?',
