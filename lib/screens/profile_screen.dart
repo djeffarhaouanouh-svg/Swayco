@@ -88,6 +88,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   // state on the "Ajouter" button.
   bool _iRequestedPeer = false;
   Timer? _pollTimer;
+  // Lets the mission celebration scroll the missions card into view.
+  final GlobalKey _missionsKey = GlobalKey();
 
   bool get _isViewingOther => widget.userId != null;
   String get _targetId => widget.userId ?? _deviceId;
@@ -104,13 +106,30 @@ class _ProfileScreenState extends State<ProfileScreen>
       const Duration(seconds: 12),
       () => _reload(silent: true),
     );
+    MissionsService.instance.justCompleted.addListener(_onMissionFlash);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    MissionsService.instance.justCompleted.removeListener(_onMissionFlash);
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  /// When a mission completes, bring the missions card into view (own profile
+  /// only) so the celebration star is visible flying into its ring.
+  void _onMissionFlash() {
+    if (!mounted || _isViewingOther) return;
+    if (MissionsService.instance.justCompleted.value == null) return;
+    final ctx = _missionsKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 340),
+      curve: Curves.easeOutCubic,
+      alignment: 0.4,
+    );
   }
 
   @override
@@ -742,7 +761,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             // Missions ring — earn call minutes by completing
                             // onboarding quests. Sits above the referral block.
                             const SizedBox(height: 20),
-                            const MissionsCard(),
+                            MissionsCard(key: _missionsKey),
                             // Referral section — sits between the language card
                             // (above) and "Mon abonnement" (below): invite 3
                             // friends, earn 15 min of translated calls.

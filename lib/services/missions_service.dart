@@ -85,21 +85,27 @@ class MissionsService {
       final res = await Future.wait<dynamic>([
         FriendshipApi.fetchMine(userId),
         LikeApi.fetchMyLikedPhotos(userId),
-        ChatApi.fetchMyDiscoverMessagedPeers(userId),
+        ChatApi.fetchMyOutgoingPhotoReactions(userId),
+        ChatApi.hasSentAnyMessage(userId),
         ProfileApi.fetchById(userId),
       ]);
       final friendships = res[0] as List<Friendship>;
       final liked = res[1] as Set<String>;
-      final messaged = res[2] as Set<String>;
-      final profile = res[3] as RemoteProfile?;
+      final reactions = res[2] as Map<String, Set<String>>;
+      final sentMessage = res[3] as bool;
+      final profile = res[4] as RemoteProfile?;
 
       final done = <String>{};
       if (friendships.any((f) => f.requester == userId)) {
         done.add('friend_request');
       }
       if (profile?.photos.isNotEmpty ?? false) done.add('post_photo');
-      if (liked.isNotEmpty) done.add('like_someone');
-      if (messaged.isNotEmpty) done.add('first_message');
+      // "Like" = a heart (LikeApi) OR a Discover rail reaction — both are ways
+      // to like someone, from different screens.
+      if (liked.isNotEmpty || reactions.isNotEmpty) done.add('like_someone');
+      // "First message" must catch a message from ANY screen (chat thread,
+      // Discover intro, image, voice), not just Discover-card intros.
+      if (sentMessage) done.add('first_message');
       if (profile?.bio.trim().isNotEmpty ?? false) done.add('fill_bio');
       if ((profile?.interests.length ?? 0) >= 3) done.add('add_interests');
 

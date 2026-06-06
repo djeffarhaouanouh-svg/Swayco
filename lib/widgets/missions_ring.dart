@@ -523,6 +523,7 @@ class MissionsRingCompact extends StatelessWidget {
         stroke: 4.5,
         dotRadius: 2.6,
         showCount: false,
+        flyTarget: true,
       ),
     );
   }
@@ -611,9 +612,11 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
   void _onEvent() {
     if (!mounted || _svc.justCompleted.value == null) return;
     final key = _svc.justCompleted.value!;
-    // Resolve render boxes AFTER the frame so sources/rings are laid out.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+    // Brief beat so the screen can scroll the ring into view (the profile
+    // ensures its missions card is visible) before we resolve positions and
+    // fly — otherwise the target jalon could still be off-screen.
+    Future.delayed(const Duration(milliseconds: 380), () {
+      if (!mounted || _svc.justCompleted.value != key) return;
       final from = _globalCenter(MissionFx.sources[key]);
       final ref = from ?? MediaQuery.sizeOf(context).center(Offset.zero);
       final near = _nearestJalon(ref);
@@ -622,16 +625,23 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
       _targetKey = near?.$1;
       _c.forward(from: 0);
     });
-    // Make sure the post-frame callback actually runs even if the app was idle.
-    WidgetsBinding.instance.scheduleFrame();
   }
 
   (GlobalKey, Offset)? _nearestJalon(Offset ref) {
+    final size = MediaQuery.sizeOf(context);
     GlobalKey? bestKey;
     Offset? best;
     var bestD = double.infinity;
     MissionFx.rings.forEach((k, jalons) {
       for (final j in jalons()) {
+        // Ignore rings that aren't actually on-screen (e.g. the Discover ring
+        // while the user is on another tab — it's kept alive off-screen).
+        if (j.dx < -24 ||
+            j.dy < -24 ||
+            j.dx > size.width + 24 ||
+            j.dy > size.height + 24) {
+          continue;
+        }
         final d = (j - ref).distanceSquared;
         if (d < bestD) {
           bestD = d;
