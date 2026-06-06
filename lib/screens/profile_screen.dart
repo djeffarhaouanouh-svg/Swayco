@@ -674,15 +674,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // Horizontal gutter matches the chat / discover headers so
                         // the avatar and bio don't run into the screen edge.
                         padding: EdgeInsets.fromLTRB(
-                          // Tight 8px gutter so the titles sit hard left and the
-                          // photos run almost edge to edge (profile redesign).
-                          8,
+                          28,
                           // Own profile: title sits at the very top like the
                           // other tabs (Discover / Messages). Viewer: just
                           // clear the transparent AppBar drawn behind it, kept
                           // tight so the whole profile sits higher on screen.
                           _isViewingOther ? 36 : 12,
-                          8,
+                          28,
                           32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
                         children: [
