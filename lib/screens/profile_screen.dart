@@ -1794,17 +1794,25 @@ class _IdentitySection extends StatelessWidget {
         // the text → it turns into a field), no bottom-sheet popup. Shows
         // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        _InlineEditable(
-          value: bio,
-          placeholder: _bioPlaceholder,
-          onSave: onEditBio,
-          maxLength: profileBioMaxLength,
-          maxLines: 2,
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 16.5,
-            height: 1.4,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _InlineEditable(
+                value: bio,
+                placeholder: _bioPlaceholder,
+                onSave: onEditBio,
+                maxLength: profileBioMaxLength,
+                maxLines: 2,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 16.5,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const _RewardHint(),
+          ],
         ),
         const SizedBox(height: 16),
         // Stats — posts | followers | following — centred across the full

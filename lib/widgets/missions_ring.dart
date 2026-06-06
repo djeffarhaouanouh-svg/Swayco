@@ -504,30 +504,38 @@ class MissionsRingCompact extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => showMissionsSheet(context),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MissionsRing(
-            width: 40,
-            height: 30,
-            stroke: 4.5,
-            dotRadius: 2.6,
-            showCount: false,
-            flyTarget: true,
+      child: const MissionsRing(
+        width: 40,
+        height: 30,
+        stroke: 4.5,
+        dotRadius: 2.6,
+        showCount: false,
+        flyTarget: true,
+      ),
+    );
+  }
+}
+
+/// The "X/6" missions score, shown on the LEFT of the Discover header.
+/// Tapping it opens the missions sheet (same as the ring on the right).
+class MissionsScoreLabel extends StatelessWidget {
+  const MissionsScoreLabel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showMissionsSheet(context),
+      child: ValueListenableBuilder<MissionsState>(
+        valueListenable: MissionsService.instance.state,
+        builder: (context, st, _) => Text(
+          '${st.completed}/$missionCount',
+          style: SCText.meta.copyWith(
+            color: SC.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(width: 6),
-          ValueListenableBuilder<MissionsState>(
-            valueListenable: MissionsService.instance.state,
-            builder: (context, st, _) => Text(
-              '${st.completed}/$missionCount',
-              style: SCText.meta.copyWith(
-                color: SC.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

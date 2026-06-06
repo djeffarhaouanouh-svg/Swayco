@@ -865,10 +865,12 @@ class _DiscoverHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const MissionsRingCompact(),
-                  const SizedBox(width: 12),
+                  const MissionsScoreLabel(),
+                  const SizedBox(width: 10),
                   Text(AppStrings.t('discover_title'), style: SCText.h1),
                   const Spacer(),
+                  const MissionsRingCompact(),
+                  const SizedBox(width: 10),
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width.
                   AnimatedContainer(
