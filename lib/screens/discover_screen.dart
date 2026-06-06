@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -1618,12 +1616,6 @@ class _ReactionEmojiButton extends StatefulWidget {
 
 class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     with TickerProviderStateMixin {
-  // Idle float — a gentle ±3px up/down loop, phase-shifted per index so the
-  // rail ripples instead of bobbing in unison.
-  late final AnimationController _float = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  );
   // Tap pop — a punch up to 1.35 then an elastic settle back to 1.0.
   late final AnimationController _pop = AnimationController(
     vsync: this,
@@ -1643,16 +1635,7 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
   ]).animate(_pop);
 
   @override
-  void initState() {
-    super.initState();
-    // Linear 0→1 loop; the per-index phase is applied in the builder via sin,
-    // so setting .value here (which would STOP the repeat) is avoided.
-    _float.repeat();
-  }
-
-  @override
   void dispose() {
-    _float.dispose();
     _pop.dispose();
     super.dispose();
   }
@@ -1681,17 +1664,9 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           behavior: HitTestBehavior.opaque,
           onTap: widget.onSend == null ? null : () => _handleTap(ctx),
           child: AnimatedBuilder(
-            animation: Listenable.merge([_float, _pop]),
-            builder: (context, child) {
-              // Smooth ±3px sine bob, phase-shifted per rail index.
-              final dy =
-                  math.sin((_float.value + widget.index * 0.27) * 2 * math.pi) *
-                      3;
-              return Transform.translate(
-                offset: Offset(0, dy),
-                child: Transform.scale(scale: _popScale.value, child: child),
-              );
-            },
+            animation: _pop,
+            builder: (context, child) =>
+                Transform.scale(scale: _popScale.value, child: child),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               width: 48,
