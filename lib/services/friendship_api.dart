@@ -332,6 +332,18 @@ abstract final class FriendshipApi {
     required String peerId,
   }) async {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty) return;
+    // SECURITY DEFINER RPC so the edge is removed even when the peer blocked
+    // me (a restrictive deployed RLS could reject the direct delete). Falls
+    // back to a direct delete when the RPC isn't deployed yet.
+    try {
+      await _c.rpc(
+        'friendship_unfollow',
+        params: {'p_me': meId, 'p_peer': peerId},
+      );
+      return;
+    } catch (e) {
+      debugPrint('friendship_unfollow RPC unavailable, falling back: $e');
+    }
     await _c
         .from('friendships')
         .delete()
@@ -353,6 +365,26 @@ abstract final class FriendshipApi {
   }) async {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty || meId == peerId) {
       return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
+    }
+    // SECURITY DEFINER RPC: resolves our edge even when the peer has blocked
+    // me (a restrictive deployed RLS would otherwise hide it from fetchMine,
+    // making the Unfollow button vanish). Falls back to the table scan below
+    // when the RPC isn't deployed yet.
+    try {
+      final rows = await _c.rpc(
+        'friendship_directional',
+        params: {'p_me': meId, 'p_peer': peerId},
+      );
+      if (rows is List && rows.isNotEmpty) {
+        final m = Map<String, dynamic>.from(rows.first as Map);
+        return (
+          peerFollowsMe: m['peer_follows_me'] == true,
+          iFollowPeer: m['i_follow_peer'] == true,
+          iRequestedPeer: m['i_requested_peer'] == true,
+        );
+      }
+    } catch (e) {
+      debugPrint('friendship_directional RPC unavailable, falling back: $e');
     }
     try {
       final mine = await fetchMine(meId);
