@@ -32,7 +32,8 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
+class _DiscoverScreenState extends State<DiscoverScreen>
+    with SingleTickerProviderStateMixin {
   // Real Supabase profiles, hydrated from ProfileApi.fetchDiscoverFeed at
   // bootstrap. Excludes me and anyone I've blocked / who's blocked me, but
   // intentionally KEEPS people I follow so their new photos show up here.
@@ -100,11 +101,29 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // existing status (pending / accepted) so we don't show "send" twice.
   List<Friendship> _myFriendships = const [];
 
+  // Idle swipe-hint: after [_swipeHintDelay] of inactivity, the deck peeks
+  // the next card up (driven by [_hintCtrl] via [_onHintTick] using
+  // PageController.jumpTo, no rebuild). Any swipe / touch resets it.
+  Timer? _swipeHintTimer;
+  static const _swipeHintDelay = Duration(seconds: 7);
+  late final AnimationController _hintCtrl;
+  // Page offset the nudge started from, restored when it finishes.
+  double _nudgeStart = 0;
+  // True while [_hintCtrl] is actively driving the page peek.
+  bool _nudging = false;
+  // How far the next card peeks up during the nudge.
+  static const double _peek = 34;
 
   @override
   void initState() {
     super.initState();
+    _hintCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      reverseDuration: const Duration(milliseconds: 380),
+    )..addListener(_onHintTick);
     _bootstrapSearch();
+    _scheduleSwipeHint();
     // Web: periodically refresh friendships + likes so a peer accepting
     // / blocking / liking gets reflected on the Discover cards within
     // ~10s. The feed itself is not re-fetched (it'd reset the swipe
@@ -220,13 +239,60 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    _hintCtrl.dispose();
     _pageController.dispose();
     _searchDebounce?.cancel();
     _pollTimer?.cancel();
+    _swipeHintTimer?.cancel();
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
+
+  /// (Re)arm the idle swipe-hint countdown — called on first load, on every
+  /// page change, and on any touch. Stops a running nudge, then fires a fresh
+  /// one only once the user has sat still for [_swipeHintDelay].
+  void _scheduleSwipeHint() {
+    _swipeHintTimer?.cancel();
+    _nudging = false;
+    _hintCtrl.stop();
+    _swipeHintTimer = Timer(_swipeHintDelay, _fireSwipeHint);
+  }
+
+  /// Idle nudge: peek the next card up (driven by [_hintCtrl] via
+  /// [_onHintTick] — no setState, so the deck/images never rebuild or blink).
+  /// Re-arms so the nudge repeats every few seconds until the user moves.
+  void _fireSwipeHint() {
+    if (!mounted) return;
+    if (_cards.length > 1 && !_searchExpanded) _startNudge();
+    _swipeHintTimer = Timer(const Duration(seconds: 4), _fireSwipeHint);
+  }
+
+  /// Run one peek: forward (card lifts, revealing a sliver of the next card)
+  /// then reverse (settles back). [_onHintTick] mirrors [_hintCtrl] onto the
+  /// PageController so no gap ever opens. Skipped while the user is dragging.
+  void _startNudge() {
+    if (!_pageController.hasClients) return;
+    final pos = _pageController.position;
+    if (pos.isScrollingNotifier.value) return;
+    _nudgeStart = pos.pixels;
+    _nudging = true;
+    _hintCtrl.forward(from: 0).then((_) {
+      if (mounted && _nudging) _hintCtrl.reverse();
+    });
+  }
+
+  /// Mirror [_hintCtrl] onto the page offset so the real next card peeks up
+  /// (no mesh gap).
+  void _onHintTick() {
+    if (!_nudging || !_pageController.hasClients) return;
+    final t = Curves.easeOut.transform(_hintCtrl.value);
+    _pageController.jumpTo(_nudgeStart + t * _peek);
+  }
+
+  /// Any direct touch counts as activity: stop a running nudge and restart
+  /// the idle countdown so the hint doesn't fight the user.
+  void _onUserActivity() => _scheduleSwipeHint();
 
   void _expandSearch() {
     setState(() => _searchExpanded = true);
@@ -650,6 +716,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // empty state, so the user can scroll into it the same way they
     // scroll between profiles.
     return Listener(
+      // Any touch on the deck is activity — stop a running hint nudge and
+      // restart the idle countdown so we never fight the user's gesture.
+      onPointerDown: (_) => _onUserActivity(),
       // On desktop a trackpad/mouse-wheel scroll can deliver enough
       // delta to skip several pages before the snap kicks in. We
       // intercept wheel ticks here and advance/rewind the PageView
@@ -692,6 +761,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           _topIndex = i;
           _persistCursor();
           _precacheAround(i);
+          _scheduleSwipeHint();
         },
         // Unbounded itemCount + modulo on the index = the feed loops
         // forever: after the last profile the user lands back on the
