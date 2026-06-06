@@ -20,6 +20,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
+import 'liked_photos_screen.dart';
 import 'profile_screen.dart' show CreditsCard;
 
 /// Hosts every secondary account-level action that doesn't belong on the
@@ -309,6 +310,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _openLikedPhotos() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const LikedPhotosScreen()),
+    );
+  }
+
   /// Opens the Stripe customer portal (cancel / change card / swap tier).
   /// Web-only — the subscription section is hidden on native builds.
   Future<void> _manageSubscription() async {
@@ -433,6 +440,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.block,
                       label: AppStrings.t('settings_blocked'),
                       onTap: _openBlockedUsers,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.favorite_border,
+                      label: AppStrings.t('settings_liked_photos'),
+                      onTap: _openLikedPhotos,
                     ),
                     _SettingsToggleRow(
                       icon: Icons.visibility_off_outlined,
