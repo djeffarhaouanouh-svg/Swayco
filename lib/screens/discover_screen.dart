@@ -1610,10 +1610,10 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           child: AnimatedBuilder(
             animation: Listenable.merge([_float, _pop]),
             builder: (context, child) {
-              // Smooth ±3px sine bob, phase-shifted per rail index.
+              // Smooth ±5px sine bob, phase-shifted per rail index.
               final dy =
                   math.sin((_float.value + widget.index * 0.27) * 2 * math.pi) *
-                      3;
+                      5;
               return Transform.translate(
                 offset: Offset(0, dy),
                 child: Transform.scale(scale: _popScale.value, child: child),
