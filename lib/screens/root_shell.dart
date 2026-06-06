@@ -339,7 +339,7 @@ class _RootShellState extends State<RootShell> {
     if (_pageController.hasClients && _pageController.page?.round() != i) {
       _pageController.animateToPage(
         i,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 190),
         curve: Curves.easeOutCubic,
       );
     }
@@ -475,6 +475,11 @@ class _RootShellState extends State<RootShell> {
                     PageView(
                       controller: _pageController,
                       onPageChanged: _selectTab,
+                      // Stiff snap spring so a left/right swipe settles on the
+                      // next tab fast, instead of the slow default glide.
+                      physics: const _SnappyTabPhysics(
+                        parent: ClampingScrollPhysics(),
+                      ),
                       children: [
                         for (final p in pages) _KeepAlivePage(child: p),
                       ],
@@ -517,6 +522,26 @@ class _RootShellState extends State<RootShell> {
       ),
     );
   }
+}
+
+/// Snappy page physics for the tab pager: a stiff, critically-damped snap
+/// spring so a left/right swipe lands on the next tab in roughly half the
+/// time of the default glide, with no overshoot.
+class _SnappyTabPhysics extends PageScrollPhysics {
+  const _SnappyTabPhysics({super.parent});
+
+  @override
+  _SnappyTabPhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnappyTabPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+    mass: 0.5,
+    stiffness: 220,
+    // 2 · √(0.5 · 220) ≈ 21 → critically damped, no bounce past the tab.
+    damping: 22,
+  );
 }
 
 /// Keeps a tab page alive while it's swiped off-screen in the [PageView],
