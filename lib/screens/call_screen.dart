@@ -1649,6 +1649,16 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // While the keyboard is open, a full-screen tap layer (below
+                // the composer + control rail, above the video) closes it —
+                // otherwise there's no way to dismiss the keyboard here.
+                if (MediaQuery.viewInsetsOf(context).bottom > 0)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => FocusScope.of(context).unfocus(),
+                    ),
+                  ),
                 // In-call typed chat: recent caption bubbles + the composer,
                 // bottom-left so they clear the control rail on the right.
                 // Lifts with the keyboard.
