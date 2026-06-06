@@ -44,6 +44,15 @@ abstract final class NotificationClient {
         return false;
       }
 
+      // Show the banner even while the app is in the FOREGROUND (iOS otherwise
+      // silently suppresses it) — so message/call pushes and the in-app test
+      // notification are actually visible without backgrounding the app.
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
       // On iOS we need APNs token to be available before FCM hands us
       // a token. getToken() blocks until it is, so this is fine.
       final token = await messaging.getToken();

@@ -152,14 +152,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// while the app is foregrounded, so the toast tells the user to background
   /// it; the round-trip takes a couple of seconds, by which time it shows.
   Future<void> _sendTestNotification() async {
-    final uid = await DeviceId.getOrCreate();
-    if (uid.isEmpty) return;
-    await PushDispatcher.notify(
-      recipientUid: uid,
-      title: 'Swayco',
-      body: AppStrings.t('settings_test_push_body'),
-      type: 'test',
-    );
+    // The FCM token may be registered under the device id (Settings toggle) or
+    // the auth uid (app-start). Fire to every distinct id so the test reaches
+    // this device's token regardless of which one it landed under.
+    final ids = <String>{
+      await DeviceId.getOrCreate(),
+      AuthService.currentUserId,
+    }..removeWhere((e) => e.isEmpty);
+    if (ids.isEmpty) return;
+    for (final id in ids) {
+      await PushDispatcher.notify(
+        recipientUid: id,
+        title: 'Swayco',
+        body: AppStrings.t('settings_test_push_body'),
+        type: 'test',
+      );
+    }
     if (!mounted) return;
     _toast(AppStrings.t('settings_test_push_sent'));
   }
