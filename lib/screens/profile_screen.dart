@@ -1809,7 +1809,7 @@ class _IdentitySection extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
             const _RewardHint(),
           ],
         ),
