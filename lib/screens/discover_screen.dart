@@ -973,14 +973,12 @@ class _DiscoverHeader extends StatelessWidget {
               padding: const EdgeInsets.only(left: 10, right: 20),
               child: Row(
                 children: [
-                  // 28px (a touch smaller than the global h1) so long
-                  // localized titles still fit. Hidden while the search is
-                  // open so the field has room and never overflows the bar.
+                  // Hidden while the search is open so the field has room and
+                  // never overflows the bar; full size otherwise (same as the
+                  // other page titles), since hiding it removes the need to
+                  // shrink it for long localized titles.
                   if (!expanded)
-                    Text(
-                      AppStrings.t('discover_title'),
-                      style: SCText.h1.copyWith(fontSize: 28),
-                    ),
+                    Text(AppStrings.t('discover_title'), style: SCText.h1),
                   const Spacer(),
                   const MissionsRingCompact(),
                   const SizedBox(width: 10),
