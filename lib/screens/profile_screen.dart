@@ -2865,7 +2865,7 @@ class _DiscoverVisibilityHint extends StatelessWidget {
                   style: const TextStyle(
                     color: SC.textMuted,
                     fontSize: 12,
-                    height: 1.3,
+                    height: 1.7,
                   ),
                 ),
               ),
