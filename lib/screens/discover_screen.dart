@@ -968,9 +968,9 @@ class _DiscoverHeader extends StatelessWidget {
           child: SizedBox(
             height: height,
             child: Padding(
-              // No left margin: the title sits flush left. Keep the right
-              // inset so the search pill stays off the screen edge.
-              padding: const EdgeInsets.only(right: 20),
+              // A mini left margin nudges the title off the screen edge; the
+              // right inset keeps the search pill off the edge too.
+              padding: const EdgeInsets.only(left: 10, right: 20),
               child: Row(
                 children: [
                   Text(AppStrings.t('discover_title'), style: SCText.h1),

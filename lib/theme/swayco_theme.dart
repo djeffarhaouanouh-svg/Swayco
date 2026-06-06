@@ -127,7 +127,7 @@ abstract final class SC {
 
 abstract final class SCText {
   static TextStyle h1 = GoogleFonts.bricolageGrotesque(
-    fontSize: 32, fontWeight: FontWeight.w800,
+    fontSize: 30, fontWeight: FontWeight.w800,
     letterSpacing: -1.0, color: SC.textPrimary, height: 1.05,
   );
   static TextStyle h2 = GoogleFonts.bricolageGrotesque(
