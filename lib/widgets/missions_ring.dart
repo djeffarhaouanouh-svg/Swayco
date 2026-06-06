@@ -6,7 +6,7 @@ import '../services/missions_service.dart';
 import '../theme/swayco_theme.dart';
 import 'glass.dart';
 
-/// UI metadata for each mission key (label + how-to + icon). The detection and
+/// UI metadata for each mission key (label + how-to + icon). Detection and
 /// reward live in [MissionsService]; this is purely presentation.
 class _MissionDef {
   const _MissionDef(this.key, this.title, this.howTo, this.icon);
@@ -55,11 +55,70 @@ const List<_MissionDef> _missions = [
   ),
 ];
 
-double _lerpDouble(double a, double b, double t) => a + (b - a) * t;
+/// Couples mission "sources" (where a reward originates — a photo grid, the bio
+/// field …) with the ring "targets" it flies into, for [MissionCelebrationOverlay].
+class MissionFx {
+  MissionFx._();
 
-/// The oval progress ring with 6 milestone dots. When a mission completes
-/// (signalled by [MissionsService.justCompleted]) a "shooting star" sweeps
-/// along the oval from the previous tip to the new one, growing the fill.
+  /// mission key → the on-screen widget the reward flies FROM.
+  static final Map<String, GlobalKey> sources = {};
+
+  /// full-ring key → closure returning its 6 milestone centres in GLOBAL
+  /// coordinates (empty when the ring isn't laid out / on-screen).
+  static final Map<GlobalKey, List<Offset> Function()> rings = {};
+
+  /// Pulsed with a ring key when the flying star reaches it → that ring pops.
+  static final ValueNotifier<GlobalKey?> arrived = ValueNotifier<GlobalKey?>(
+    null,
+  );
+}
+
+/// Wrap a section so the celebration star can fly FROM it when [missionKey]
+/// completes (e.g. the photos grid for `post_photo`).
+class MissionSource extends StatefulWidget {
+  const MissionSource({
+    super.key,
+    required this.missionKey,
+    required this.child,
+  });
+  final String missionKey;
+  final Widget child;
+
+  @override
+  State<MissionSource> createState() => _MissionSourceState();
+}
+
+class _MissionSourceState extends State<MissionSource> {
+  final GlobalKey _key = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    MissionFx.sources[widget.missionKey] = _key;
+  }
+
+  @override
+  void dispose() {
+    if (MissionFx.sources[widget.missionKey] == _key) {
+      MissionFx.sources.remove(widget.missionKey);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      KeyedSubtree(key: _key, child: widget.child);
+}
+
+Offset? _globalCenter(GlobalKey? key) {
+  final box = key?.currentContext?.findRenderObject() as RenderBox?;
+  if (box == null || !box.hasSize) return null;
+  return box.localToGlobal(box.size.center(Offset.zero));
+}
+
+/// The oval progress ring with 6 milestone dots. Arc + dots reflect
+/// [MissionsService.state]; when [flyTarget] it registers as a fly-in target
+/// and pops (grows) the moment a star reaches it.
 class MissionsRing extends StatefulWidget {
   const MissionsRing({
     super.key,
@@ -68,6 +127,7 @@ class MissionsRing extends StatefulWidget {
     this.stroke = 9,
     this.dotRadius = 5,
     this.showCount = true,
+    this.flyTarget = false,
   });
 
   final double width;
@@ -75,132 +135,134 @@ class MissionsRing extends StatefulWidget {
   final double stroke;
   final double dotRadius;
   final bool showCount;
+  final bool flyTarget;
 
   @override
   State<MissionsRing> createState() => _MissionsRingState();
 }
 
 class _MissionsRingState extends State<MissionsRing>
-    with TickerProviderStateMixin {
-  late final AnimationController _star = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1000),
-  )..addStatusListener((s) {
-    // When the sweeping star reaches the new jalon, pop the whole ring bigger.
-    if (s == AnimationStatus.completed) _pop.forward(from: 0);
-  });
-  late final CurvedAnimation _starCurve = CurvedAnimation(
-    parent: _star,
-    curve: Curves.easeInOutCubic,
-  );
+    with SingleTickerProviderStateMixin {
+  final GlobalKey _ringKey = GlobalKey();
+
   late final AnimationController _pop = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 440),
+    duration: const Duration(milliseconds: 460),
   );
   late final Animation<double> _popScale = TweenSequence<double>([
     TweenSequenceItem(
       tween: Tween(
         begin: 1.0,
-        end: 1.14,
+        end: 1.18,
       ).chain(CurveTween(curve: Curves.easeOut)),
-      weight: 38,
+      weight: 36,
     ),
     TweenSequenceItem(
       tween: Tween(
-        begin: 1.14,
+        begin: 1.18,
         end: 1.0,
       ).chain(CurveTween(curve: Curves.elasticOut)),
-      weight: 62,
+      weight: 64,
     ),
   ]).animate(_pop);
-
-  double _fromFrac = 0;
-  double _toFrac = 0;
-
-  MissionsService get _svc => MissionsService.instance;
 
   @override
   void initState() {
     super.initState();
-    final frac = _svc.state.value.completed / missionCount;
-    _fromFrac = frac;
-    _toFrac = frac;
-    _svc.justCompleted.addListener(_onCelebrate);
-  }
-
-  void _onCelebrate() {
-    if (!mounted) return;
-    final key = _svc.justCompleted.value;
-    if (key == null) return;
-    final completed = _svc.state.value.completed;
-    _fromFrac = (completed - 1).clamp(0, missionCount) / missionCount;
-    _toFrac = completed / missionCount;
-    _star.forward(from: 0);
-    // The global MissionCelebrationOverlay owns resetting justCompleted.
+    if (widget.flyTarget) {
+      MissionFx.rings[_ringKey] = _jalonsGlobal;
+      MissionFx.arrived.addListener(_onArrived);
+    }
   }
 
   @override
   void dispose() {
-    _svc.justCompleted.removeListener(_onCelebrate);
-    _starCurve.dispose();
-    _star.dispose();
+    if (widget.flyTarget) {
+      MissionFx.rings.remove(_ringKey);
+      MissionFx.arrived.removeListener(_onArrived);
+    }
     _pop.dispose();
     super.dispose();
+  }
+
+  void _onArrived() {
+    if (!mounted) return;
+    if (MissionFx.arrived.value == _ringKey) _pop.forward(from: 0);
+  }
+
+  /// The six milestone centres in global coordinates (or empty if off-screen).
+  List<Offset> _jalonsGlobal() {
+    final box = _ringKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return const [];
+    final pad = widget.stroke / 2 + widget.dotRadius + 4;
+    final rect = Rect.fromLTWH(
+      pad,
+      pad,
+      widget.width - pad * 2,
+      widget.height - pad * 2,
+    );
+    final a = rect.width / 2;
+    final b = rect.height / 2;
+    final c = rect.center;
+    final out = <Offset>[];
+    for (var i = 1; i <= missionCount; i++) {
+      final th = -math.pi / 2 + (i / missionCount) * 2 * math.pi;
+      out.add(
+        box.localToGlobal(
+          Offset(c.dx + a * math.cos(th), c.dy + b * math.sin(th)),
+        ),
+      );
+    }
+    return out;
   }
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
+      key: _ringKey,
       child: ValueListenableBuilder<MissionsState>(
-        valueListenable: _svc.state,
+        valueListenable: MissionsService.instance.state,
         builder: (context, st, _) {
-          final restFrac = st.completed / missionCount;
+          final frac = st.completed / missionCount;
           return AnimatedBuilder(
-            animation: Listenable.merge([_starCurve, _pop]),
-            builder: (context, _) {
-              final animating = _star.isAnimating;
-              final frac = animating
-                  ? _lerpDouble(_fromFrac, _toFrac, _starCurve.value)
-                  : restFrac;
-              return SizedBox(
-                width: widget.width,
-                height: widget.height,
-                child: Transform.scale(
-                  scale: _popScale.value,
-                  child: CustomPaint(
-                    painter: _RingPainter(
-                      fraction: frac,
-                      completed: st.completed,
-                      stroke: widget.stroke,
-                      dotRadius: widget.dotRadius,
-                      starFraction: animating ? frac : null,
-                    ),
-                    child: widget.showCount
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${st.completed}/$missionCount',
-                                  style: SCText.h3.copyWith(
-                                    color: SC.textPrimary,
-                                    fontSize: 19,
-                                  ),
-                                ),
-                                Text(
-                                  'missions',
-                                  style: SCText.meta.copyWith(
-                                    color: SC.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : null,
+            animation: _pop,
+            builder: (context, _) => SizedBox(
+              width: widget.width,
+              height: widget.height,
+              child: Transform.scale(
+                scale: _popScale.value,
+                child: CustomPaint(
+                  painter: _RingPainter(
+                    fraction: frac,
+                    completed: st.completed,
+                    stroke: widget.stroke,
+                    dotRadius: widget.dotRadius,
                   ),
+                  child: widget.showCount
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${st.completed}/$missionCount',
+                                style: SCText.h3.copyWith(
+                                  color: SC.textPrimary,
+                                  fontSize: 19,
+                                ),
+                              ),
+                              Text(
+                                'missions',
+                                style: SCText.meta.copyWith(
+                                  color: SC.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : null,
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),
@@ -214,14 +276,12 @@ class _RingPainter extends CustomPainter {
     required this.completed,
     required this.stroke,
     required this.dotRadius,
-    this.starFraction,
   });
 
   final double fraction;
   final int completed;
   final double stroke;
   final double dotRadius;
-  final double? starFraction;
 
   static const double _start = -math.pi / 2; // 12 o'clock
   static const double _tau = math.pi * 2;
@@ -245,7 +305,6 @@ class _RingPainter extends CustomPainter {
       return Offset(c.dx + a * math.cos(theta), c.dy + b * math.sin(theta));
     }
 
-    // Track — dim full oval.
     canvas.drawArc(
       rect,
       _start,
@@ -258,7 +317,6 @@ class _RingPainter extends CustomPainter {
         ..color = Colors.white.withValues(alpha: 0.10),
     );
 
-    // Filled arc — accent, deep → bright.
     final f = fraction.clamp(0.0, 1.0);
     if (f > 0) {
       canvas.drawArc(
@@ -278,7 +336,6 @@ class _RingPainter extends CustomPainter {
       );
     }
 
-    // Six milestone dots at i·60° from the top. Lit when i ≤ completed.
     for (var i = 1; i <= missionCount; i++) {
       final lit = i <= completed;
       final p = pt(i / missionCount);
@@ -302,34 +359,11 @@ class _RingPainter extends CustomPainter {
         );
       }
     }
-
-    // Shooting star at the arc tip while the sweep animates.
-    final sf = starFraction;
-    if (sf != null) {
-      final head = pt(sf);
-      canvas.drawCircle(
-        head,
-        dotRadius + 7,
-        Paint()
-          ..color = SC.accent.withValues(alpha: 0.55)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      );
-      canvas.drawCircle(head, dotRadius + 1.5, Paint()..color = Colors.white);
-      final spark = Paint()
-        ..color = Colors.white
-        ..strokeWidth = 1.6
-        ..strokeCap = StrokeCap.round;
-      final s = dotRadius + 6;
-      canvas.drawLine(head.translate(-s, 0), head.translate(s, 0), spark);
-      canvas.drawLine(head.translate(0, -s), head.translate(0, s), spark);
-    }
   }
 
   @override
   bool shouldRepaint(_RingPainter old) =>
-      old.fraction != fraction ||
-      old.completed != completed ||
-      old.starFraction != starFraction;
+      old.fraction != fraction || old.completed != completed;
 }
 
 /// Full missions card for the profile: ring + per-mission checklist with the
@@ -351,7 +385,12 @@ class MissionsCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const MissionsRing(width: 116, height: 96, stroke: 9),
+                  const MissionsRing(
+                    width: 116,
+                    height: 96,
+                    stroke: 9,
+                    flyTarget: true,
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -521,11 +560,11 @@ Future<void> showMissionsSheet(BuildContext context) {
   );
 }
 
-/// Game-style global celebration. When a mission completes, a shooting star
-/// streaks right → left across the top of the screen and a "+N min" banner
-/// pops — visible whatever screen / scroll position the user is on. Mounted
-/// once in RootShell, above everything. Owns resetting
-/// [MissionsService.justCompleted] when its animation finishes.
+/// Game-style global celebration. When a mission completes, a star flies FROM
+/// the section that earned it (e.g. the posted photo) TO the nearest ring
+/// milestone — and the ring pops as it lands. If the source or ring isn't
+/// on-screen it falls back to a streak across the top. A "+N min" banner pops
+/// in either way. Mounted once in RootShell, above everything.
 class MissionCelebrationOverlay extends StatefulWidget {
   const MissionCelebrationOverlay({super.key});
 
@@ -538,12 +577,21 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1900),
+    duration: const Duration(milliseconds: 1150),
   )..addStatusListener((s) {
     if (s == AnimationStatus.completed) {
+      if (_targetKey != null) {
+        // Pulse the ring (then reset so the next completion re-fires).
+        MissionFx.arrived.value = _targetKey;
+        MissionFx.arrived.value = null;
+      }
       MissionsService.instance.consumeJustCompleted();
     }
   });
+
+  Offset? _from; // reward source centre (null → streak)
+  Offset? _to; // nearest jalon
+  GlobalKey? _targetKey;
 
   MissionsService get _svc => MissionsService.instance;
 
@@ -553,12 +601,6 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
     _svc.justCompleted.addListener(_onEvent);
   }
 
-  void _onEvent() {
-    if (!mounted) return;
-    if (_svc.justCompleted.value == null) return;
-    _c.forward(from: 0);
-  }
-
   @override
   void dispose() {
     _svc.justCompleted.removeListener(_onEvent);
@@ -566,10 +608,67 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
     super.dispose();
   }
 
-  double _streakFade(double t) {
+  void _onEvent() {
+    if (!mounted || _svc.justCompleted.value == null) return;
+    final key = _svc.justCompleted.value!;
+    // Resolve render boxes AFTER the frame so sources/rings are laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final from = _globalCenter(MissionFx.sources[key]);
+      final ref = from ?? MediaQuery.sizeOf(context).center(Offset.zero);
+      final near = _nearestJalon(ref);
+      _from = from;
+      _to = near?.$2;
+      _targetKey = near?.$1;
+      _c.forward(from: 0);
+    });
+    // Make sure the post-frame callback actually runs even if the app was idle.
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  (GlobalKey, Offset)? _nearestJalon(Offset ref) {
+    GlobalKey? bestKey;
+    Offset? best;
+    var bestD = double.infinity;
+    MissionFx.rings.forEach((k, jalons) {
+      for (final j in jalons()) {
+        final d = (j - ref).distanceSquared;
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+          bestKey = k;
+        }
+      }
+    });
+    if (best == null) return null;
+    return (bestKey!, best!);
+  }
+
+  double _fade(double t) {
     if (t < 0.1) return t / 0.1;
-    if (t > 0.85) return (1 - t) / 0.15;
+    if (t > 0.9) return (1 - t) / 0.1;
     return 1.0;
+  }
+
+  Offset _quad(Offset p0, Offset p1, Offset p2, double t) {
+    final u = 1 - t;
+    return p0 * (u * u) + p1 * (2 * u * t) + p2 * (t * t);
+  }
+
+  Offset _starAt(double tt, Size size, double topInset) {
+    final from = _from;
+    final to = _to;
+    if (from != null && to != null) {
+      final e = Curves.easeInOutCubic.transform(tt.clamp(0.0, 1.0));
+      final mid = Offset.lerp(from, to, 0.5)! + const Offset(0, -70);
+      return _quad(from, mid, to, e);
+    }
+    final e = Curves.easeInOut.transform(tt.clamp(0.0, 1.0));
+    return Offset.lerp(
+      Offset(size.width + 60, topInset + 72),
+      Offset(-60, topInset + 132),
+      e,
+    )!;
   }
 
   @override
@@ -584,40 +683,37 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
             final topInset = MediaQuery.paddingOf(context).top;
             final t = _c.value;
 
-            // Shooting star: enters from the right, exits to the left, dipping
-            // slightly so it reads as "filante".
-            final starT = Curves.easeInOut.transform(t);
-            final star = Offset.lerp(
-              Offset(size.width + 60, topInset + 72),
-              Offset(-60, topInset + 132),
-              starT,
-            )!;
+            final star = _starAt(t, size, topInset);
+            final prev = _starAt((t - 0.05).clamp(0.0, 1.0), size, topInset);
+            final v = star - prev;
+            final dist = v.distance;
+            final dir = dist > 0.001 ? v / dist : const Offset(-1, 0.3);
+            final tailStart = star - dir * 92;
 
-            // Banner: pop in (0..0.18), hold, slide out (0.82..1).
             final inT = Curves.easeOutBack.transform(
-              (t / 0.18).clamp(0.0, 1.0),
+              (t / 0.16).clamp(0.0, 1.0),
             );
-            final outT = 1 - Curves.easeIn.transform(
-              ((t - 0.82) / 0.18).clamp(0.0, 1.0),
-            );
-            final bannerOpacity = inT.clamp(0.0, 1.0) * outT;
+            final outT =
+                1 -
+                Curves.easeIn.transform(((t - 0.84) / 0.16).clamp(0.0, 1.0));
 
             return SizedBox.expand(
               child: Stack(
                 children: [
                   CustomPaint(
                     size: size,
-                    painter: _StarStreakPainter(
+                    painter: _StarPainter(
                       star: star,
-                      fade: _streakFade(t),
+                      tailStart: tailStart,
+                      fade: _fade(t),
                     ),
                   ),
                   Positioned(
-                    top: topInset + 22 + (1 - inT) * -28,
+                    top: topInset + 22 + (1 - inT.clamp(0.0, 1.0)) * -28,
                     left: 0,
                     right: 0,
                     child: Opacity(
-                      opacity: bannerOpacity,
+                      opacity: inT.clamp(0.0, 1.0) * outT,
                       child: const Center(child: _CelebrationBanner()),
                     ),
                   ),
@@ -661,19 +757,21 @@ class _CelebrationBanner extends StatelessWidget {
   }
 }
 
-class _StarStreakPainter extends CustomPainter {
-  _StarStreakPainter({required this.star, required this.fade});
+class _StarPainter extends CustomPainter {
+  _StarPainter({
+    required this.star,
+    required this.tailStart,
+    required this.fade,
+  });
   final Offset star;
+  final Offset tailStart;
   final double fade;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (fade <= 0) return;
-    // Tail trails toward where the star came from (upper-right).
-    const dir = Offset(1, -0.42);
-    final tailEnd = star + dir * 95;
     canvas.drawLine(
-      tailEnd,
+      tailStart,
       star,
       Paint()
         ..strokeWidth = 4
@@ -683,7 +781,7 @@ class _StarStreakPainter extends CustomPainter {
             SC.accent.withValues(alpha: 0.0),
             SC.accent.withValues(alpha: 0.75 * fade),
           ],
-        ).createShader(Rect.fromPoints(tailEnd, star)),
+        ).createShader(Rect.fromPoints(tailStart, star)),
     );
     canvas.drawCircle(
       star,
@@ -706,6 +804,6 @@ class _StarStreakPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_StarStreakPainter old) =>
-      old.star != star || old.fade != fade;
+  bool shouldRepaint(_StarPainter old) =>
+      old.star != star || old.fade != fade || old.tailStart != tailStart;
 }

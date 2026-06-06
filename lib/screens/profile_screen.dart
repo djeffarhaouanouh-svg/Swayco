@@ -1775,16 +1775,19 @@ class _IdentitySection extends StatelessWidget {
         // the text → it turns into a field), no bottom-sheet popup. Shows
         // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        _InlineEditable(
-          value: bio,
-          placeholder: _bioPlaceholder,
-          onSave: onEditBio,
-          maxLength: profileBioMaxLength,
-          maxLines: 2,
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 16.5,
-            height: 1.4,
+        MissionSource(
+          missionKey: 'fill_bio',
+          child: _InlineEditable(
+            value: bio,
+            placeholder: _bioPlaceholder,
+            onSave: onEditBio,
+            maxLength: profileBioMaxLength,
+            maxLines: 2,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 16.5,
+              height: 1.4,
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -1815,23 +1818,29 @@ class _IdentitySection extends StatelessWidget {
         // Centres d'intérêt — picked chips + an "add" chip; tapping either
         // unfolds the category picker inline, right under the chips (no
         // overlay), then folds back when you're done. Shown ABOVE the photos.
-        _InterestsSection(
-          interests: interests,
-          onSave: onEditInterests,
+        MissionSource(
+          missionKey: 'add_interests',
+          child: _InterestsSection(
+            interests: interests,
+            onSave: onEditInterests,
+          ),
         ),
         const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
         const SizedBox(height: 12),
-        _PhotoGallery(
-          photos: photos,
-          viewerMode: false,
-          onPick: onPickPhoto,
-          onRemove: onRemovePhoto,
-          likesByPhoto: likesByPhoto,
-          onTapLikes: onTapLikes,
-          discoverPhotoUrl: discoverPhotoUrl,
-          onSelectDiscover: onSelectDiscover,
+        MissionSource(
+          missionKey: 'post_photo',
+          child: _PhotoGallery(
+            photos: photos,
+            viewerMode: false,
+            onPick: onPickPhoto,
+            onRemove: onRemovePhoto,
+            likesByPhoto: likesByPhoto,
+            onTapLikes: onTapLikes,
+            discoverPhotoUrl: discoverPhotoUrl,
+            onSelectDiscover: onSelectDiscover,
+          ),
         ),
         const SizedBox(height: 10),
         // ⓘ hint — taps jump to Settings where "Me cacher de mon pays" lives.
