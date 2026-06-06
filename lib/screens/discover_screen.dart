@@ -881,7 +881,8 @@ class _OnlineBadgeState extends State<_OnlineBadge> {
   @override
   Widget build(BuildContext context) {
     final count = _count;
-    if (count == null) return const SizedBox.shrink();
+    // No badge when nobody's online (or it's disabled remotely).
+    if (count == null || count <= 0) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
