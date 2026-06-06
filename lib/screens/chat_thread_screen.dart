@@ -696,55 +696,74 @@ class _ThreadHeader extends StatelessWidget {
             // left-aligned, nudged up. The logo is dropped for a long name so
             // the two never collide.
             Expanded(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onViewProfile,
-                      child: Transform.translate(
-                        offset: const Offset(0, -3),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.30,
-                          ),
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: SCText.h3.copyWith(
-                              fontSize: 15,
-                              color: SC.textPrimary.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (title.length <= 6)
-                    const Center(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: 'swayco'),
-                            TextSpan(
-                              text: '.ai',
-                              style: TextStyle(color: SC.accent),
-                            ),
-                          ],
-                        ),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final nameStyle = SCText.h3.copyWith(
+                    fontSize: 15,
+                    color: SC.textPrimary.withValues(alpha: 0.6),
+                  );
+                  const logoStyle = TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  );
+                  final scaler = MediaQuery.textScalerOf(context);
+                  double widthOf(String t, TextStyle s) => (TextPainter(
+                        text: TextSpan(text: t, style: s),
                         maxLines: 1,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
+                        textScaler: scaler,
+                        textDirection: TextDirection.ltr,
+                      )..layout())
+                      .width;
+                  final nameW = widthOf(title, nameStyle);
+                  final logoW = widthOf('swayco.ai', logoStyle);
+                  // Logo is centred over [0, c.maxWidth]; the name is left-
+                  // aligned [0, nameW]. Show the logo ONLY if the name's right
+                  // edge clears the logo's left edge with a 14px gap — measured,
+                  // so it never collides regardless of the name.
+                  final showLogo = nameW <= c.maxWidth / 2 - logoW / 2 - 14;
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onViewProfile,
+                          child: Transform.translate(
+                            offset: const Offset(0, -3),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: c.maxWidth),
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: nameStyle,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                      if (showLogo)
+                        const Center(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: 'swayco'),
+                                TextSpan(
+                                  text: '.ai',
+                                  style: TextStyle(color: SC.accent),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            style: logoStyle,
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
             // Single call button — a tap starts a video call (camera on).
