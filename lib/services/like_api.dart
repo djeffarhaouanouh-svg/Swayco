@@ -137,6 +137,32 @@ abstract final class LikeApi {
     }
   }
 
+  /// Like rows I created, as (photoUrl, ownerId) pairs — `liked` is the photo
+  /// owner. Lets the "Liked photos" page show whose photo each like was.
+  static Future<List<({String photoUrl, String ownerId})>> fetchMyLikedItems(
+    String likerId,
+  ) async {
+    if (!isSupabaseReady || likerId.isEmpty) return const [];
+    try {
+      final rows = await _c
+          .from('likes')
+          .select('liked, photo_url')
+          .eq('liker', likerId);
+      final out = <({String photoUrl, String ownerId})>[];
+      for (final r in rows as List) {
+        final m = Map<String, dynamic>.from(r as Map);
+        final photo = m['photo_url']?.toString() ?? '';
+        final owner = m['liked']?.toString() ?? '';
+        if (photo.isEmpty || owner.isEmpty) continue;
+        out.add((photoUrl: photo, ownerId: owner));
+      }
+      return out;
+    } catch (e) {
+      debugPrint('LikeApi.fetchMyLikedItems failed: $e');
+      return const [];
+    }
+  }
+
   /// Hydrated list of profiles that have liked [userId], newest first.
   /// Powers the "qui m'a liké" screen.
   static Future<List<RemoteProfile>> fetchLikersOf(String userId) async {

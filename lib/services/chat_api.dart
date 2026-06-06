@@ -158,6 +158,32 @@ abstract final class ChatApi {
     return out;
   }
 
+  /// Photos [meId] sent a heart (❤️) reaction on, as (photoUrl, ownerId)
+  /// pairs — `recipient` is the photo owner. Feeds the "Liked photos" page so
+  /// each row knows whose photo to link to.
+  static Future<List<({String photoUrl, String ownerId})>> fetchMyHeartedItems(
+    String meId,
+  ) async {
+    if (meId.isEmpty) return const [];
+    final rows = await _client
+        .from('messages')
+        .select('discover_photo, recipient, body')
+        .eq('sender', meId)
+        .inFilter('body', photoReactionEmojis)
+        .neq('discover_photo', '');
+    final out = <({String photoUrl, String ownerId})>[];
+    for (final r in rows as List) {
+      final map = Map<String, dynamic>.from(r as Map);
+      final body = map['body']?.toString() ?? '';
+      if (!body.contains('❤')) continue;
+      final photo = map['discover_photo']?.toString() ?? '';
+      final owner = map['recipient']?.toString() ?? '';
+      if (photo.isEmpty || owner.isEmpty) continue;
+      out.add((photoUrl: photo, ownerId: owner));
+    }
+    return out;
+  }
+
   /// Discover photos [meId] has already sent an intro message from. Used by
   /// Discover to enforce "one intro message per photo": once a card's photo is
   /// in this set, that card's message field collapses to its sent state. Each

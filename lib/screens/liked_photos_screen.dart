@@ -4,11 +4,18 @@ import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/like_api.dart';
+import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
-/// Grid of the photos the current user has liked. Tap one to open it
-/// full-screen. Reached from Settings → Confidentialité.
+/// One liked photo + the profile it belongs to.
+typedef _LikedItem = ({String photoUrl, RemoteProfile owner});
+
+/// List of the photos the current user has liked — rendered like the
+/// reaction rows (avatar + name on the left, the liked photo as a thumbnail
+/// on the right). Tapping a row opens that person's profile and the photo.
+/// Reached from Settings → Confidentialité.
 class LikedPhotosScreen extends StatefulWidget {
   const LikedPhotosScreen({super.key});
 
@@ -18,7 +25,7 @@ class LikedPhotosScreen extends StatefulWidget {
 
 class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
   bool _loading = true;
-  List<String> _photos = const [];
+  List<_LikedItem> _items = const [];
 
   @override
   void initState() {
@@ -28,25 +35,53 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
 
   Future<void> _load() async {
     final uid = await DeviceId.getOrCreate();
-    // Two like paths feed this page, both keyed by the device id:
+    // Two like paths, both keyed by the device id:
     //   1. LikeApi likes — the ❤ on a peer's profile photo.
     //   2. ❤️ reactions sent on the Discover feed (stored as messages).
-    // Union them so every photo I hearted, wherever I did it, shows up here.
+    // Each carries the photo's owner, so we can show the avatar + name and
+    // link to the right profile.
     final results = await Future.wait([
-      LikeApi.fetchMyLikedPhotos(uid),
-      ChatApi.fetchMyOutgoingPhotoReactions(uid),
+      LikeApi.fetchMyLikedItems(uid),
+      ChatApi.fetchMyHeartedItems(uid),
     ]);
-    final liked = results[0] as Set<String>;
-    final reactions = results[1] as Map<String, Set<String>>;
-    final hearted = <String>{
-      for (final e in reactions.entries)
-        if (e.value.any((emoji) => emoji.contains('❤'))) e.key,
-    };
+    final liked = results[0];
+    final hearted = results[1];
+    // Dedupe by photo URL, remembering its owner.
+    final ownerByPhoto = <String, String>{};
+    for (final it in [...liked, ...hearted]) {
+      ownerByPhoto.putIfAbsent(it.photoUrl, () => it.ownerId);
+    }
+    final ownerIds = ownerByPhoto.values.toSet().toList(growable: false);
+    final profiles =
+        ownerIds.isEmpty ? const <RemoteProfile>[] : await ProfileApi.fetchByIds(ownerIds);
+    final byId = {for (final p in profiles) p.id: p};
+    final items = <_LikedItem>[];
+    for (final e in ownerByPhoto.entries) {
+      final owner = byId[e.value];
+      if (owner == null) continue;
+      items.add((photoUrl: e.key, owner: owner));
+    }
     if (!mounted) return;
     setState(() {
-      _photos = <String>{...liked, ...hearted}.toList();
+      _items = items;
       _loading = false;
     });
+  }
+
+  /// Open the photo owner's profile, then surface the photo full-screen on
+  /// top — so the user lands on the person AND the exact photo they liked.
+  void _open(_LikedItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileScreen(userId: item.owner.id),
+      ),
+    );
+    showPhotoViewer(
+      context,
+      photos: [item.photoUrl],
+      index: 0,
+      viewerMode: true,
+    );
   }
 
   @override
@@ -64,7 +99,7 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: SC.accent))
-          : _photos.isEmpty
+          : _items.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -90,40 +125,88 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
               color: SC.accent,
               backgroundColor: SC.bubbleIn,
               onRefresh: _load,
-              child: GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  childAspectRatio: 3 / 4,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                itemCount: _items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 4),
+                itemBuilder: (context, i) => _LikedRow(
+                  item: _items[i],
+                  onTap: () => _open(_items[i]),
                 ),
-                itemCount: _photos.length,
-                itemBuilder: (context, i) => GestureDetector(
-                  onTap: () => showPhotoViewer(
-                    context,
-                    photos: _photos,
-                    index: i,
-                    viewerMode: true,
+              ),
+            ),
+    );
+  }
+}
+
+/// A single liked-photo row: avatar + name on the left, the liked photo as a
+/// thumbnail on the right (same footprint as the reaction-row emoji).
+class _LikedRow extends StatelessWidget {
+  const _LikedRow({required this.item, required this.onTap});
+
+  final _LikedItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = item.owner;
+    final name = o.displayName.isNotEmpty
+        ? o.displayName
+        : (o.handle.isNotEmpty ? '@${o.handle}' : AppStrings.t('chat_no_name'));
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                displayName: o.displayName,
+                avatarUrl: o.avatarUrl,
+                avatarColorHex: o.avatarColor,
+                size: 46,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      _photos[i],
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        color: SC.bubbleIn,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: SC.textMuted,
-                        ),
-                      ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  item.photoUrl,
+                  width: 46,
+                  height: 46,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 46,
+                    height: 46,
+                    color: SC.bubbleIn,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: SC.textMuted,
+                      size: 18,
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
