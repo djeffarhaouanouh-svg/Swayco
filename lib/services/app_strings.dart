@@ -69,7 +69,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} veut devenir ami·e avec toi',
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
     'discover_visibility_hint':
-        'Décide dans les paramètres si les personnes de ton pays peuvent voir ta photo Discover.\nLa photo entourée est celle qui apparaît dans le Discover.',
+        'Décide dans les **paramètres** si les personnes de ton pays peuvent voir ta **photo Discover**.\nLa **photo entourée** est celle qui apparaît dans le **Discover**.',
     'tab_placeholder_soon': 'Bientôt',
     'profile_title': 'Profil',
     'profile_followers': 'Abonnés',
@@ -103,7 +103,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Supprimer le compte',
     'settings_push': 'Notifications push',
     'settings_test_push': 'Envoyer une notification test',
-    'settings_test_push_sent': 'Notification envoyée — mets l\'app en arrière-plan pour la voir arriver',
+    'settings_test_push_sent':
+        'Notification envoyée — mets l\'app en arrière-plan pour la voir arriver',
     'settings_test_push_body': 'Ceci est une notification de test ✅',
     'settings_sounds': 'Sons des notifications',
     'settings_in_app_sounds': "Sons dans l'app",
@@ -191,7 +192,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Recevoir un like',
     'mission_receive_like_how': 'Quelqu\'un like une de tes photos',
     'missions_title': 'Tes missions',
-    'missions_subtitle': 'Complète les 6 missions pour gagner {min} min de traduction live.',
+    'missions_subtitle':
+        'Complète les 6 missions pour gagner {min} min de traduction live.',
     'missions_unlock': '{min} min à débloquer',
     'missions_earned': '+{min} min gagnées',
     'missions_done_short': 'Fait',
@@ -224,7 +226,8 @@ abstract final class AppStrings {
         'Rejoins-moi sur Swayco 🌍 — appels vidéo avec traduction en temps réel. En t\'inscrivant via mon lien, on gagne tous les deux du temps d\'appel : {link}',
     // Out-of-credits / invite-friends popup
     'invite_bonus_title': 'Parraine 3 amis, gagne 15 min',
-    'invite_bonus_body': 'Invite 3 amis qui s\'inscrivent avec ton lien et reçois 15 min de traduction live, automatiquement.',
+    'invite_bonus_body':
+        'Invite 3 amis qui s\'inscrivent avec ton lien et reçois 15 min de traduction live, automatiquement.',
     'invite_bonus_progress': 'Filleuls inscrits : {count} / {total}',
     'invite_bonus_share_cta': 'Partager mon lien',
     'invite_bonus_later': 'Plus tard',
@@ -300,7 +303,8 @@ abstract final class AppStrings {
     'call_go_back': 'Retour',
     'call_connecting': 'Connexion à {room}…',
     'call_connecting_short': 'Connexion à l\'appel…',
-    'call_connecting_caller_pays': 'Un seul abonnement suffit pour traduire la conversation.',
+    'call_connecting_caller_pays':
+        'Un seul abonnement suffit pour traduire la conversation.',
     'call_waiting_title': 'En attente de l’autre personne…',
     'call_waiting_body': 'Partage le même nom de salle sur un autre appareil.',
     'call_leave_q': 'Quitter l’appel ?',
@@ -526,7 +530,8 @@ abstract final class AppStrings {
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Ton profil',
     'out_of_credits_title': 'Oups… plus de crédits',
-    'out_of_credits_body': 'Recharge pour continuer à traduire tes appels en temps réel.',
+    'out_of_credits_body':
+        'Recharge pour continuer à traduire tes appels en temps réel.',
     'out_of_credits_cta': 'Recharger',
   };
 
@@ -548,7 +553,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} wants to be your friend',
     'settings_hide_from_country': 'Hide me from people in my country',
     'discover_visibility_hint':
-        'In settings, choose whether people in your country can see your Discover photo.\nThe framed photo is the one shown in Discover.',
+        'In **settings**, choose whether people in your country can see your **Discover photo**.\nThe **framed photo** is the one shown in **Discover**.',
     'tab_placeholder_soon': 'Soon',
     'profile_title': 'Profile',
     'profile_followers': 'Followers',
@@ -581,7 +586,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Delete account',
     'settings_push': 'Push notifications',
     'settings_test_push': 'Send a test notification',
-    'settings_test_push_sent': 'Notification sent — put the app in the background to see it arrive',
+    'settings_test_push_sent':
+        'Notification sent — put the app in the background to see it arrive',
     'settings_test_push_body': 'This is a test notification ✅',
     'settings_sounds': 'Notification sounds',
     'settings_in_app_sounds': 'In-app sounds',
@@ -665,7 +671,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Receive a like',
     'mission_receive_like_how': 'Someone likes one of your photos',
     'missions_title': 'Your missions',
-    'missions_subtitle': 'Complete all 6 missions to earn {min} min of live translation.',
+    'missions_subtitle':
+        'Complete all 6 missions to earn {min} min of live translation.',
     'missions_unlock': '{min} min to unlock',
     'missions_earned': '+{min} min earned',
     'missions_done_short': 'Done',
@@ -697,7 +704,8 @@ abstract final class AppStrings {
         'Join me on Swayco 🌍 — video calls with real-time translation. Sign up with my link and we both earn extra call time: {link}',
     // Out-of-credits / invite-friends popup
     'invite_bonus_title': 'Refer 3 friends, earn 15 min',
-    'invite_bonus_body': 'Invite 3 friends who sign up with your link and get 15 min of live translation, automatically.',
+    'invite_bonus_body':
+        'Invite 3 friends who sign up with your link and get 15 min of live translation, automatically.',
     'invite_bonus_progress': 'Signed-up referrals: {count} / {total}',
     'invite_bonus_share_cta': 'Share my link',
     'invite_bonus_later': 'Later',
@@ -772,7 +780,8 @@ abstract final class AppStrings {
     'call_go_back': 'Go back',
     'call_connecting': 'Connecting to {room}…',
     'call_connecting_short': 'Connecting to call…',
-    'call_connecting_caller_pays': 'A single subscription is enough to translate the conversation.',
+    'call_connecting_caller_pays':
+        'A single subscription is enough to translate the conversation.',
     'call_waiting_title': 'Waiting for the other person…',
     'call_waiting_body': 'Share the same room name on another device.',
     'call_leave_q': 'Leave call?',
@@ -995,7 +1004,8 @@ abstract final class AppStrings {
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Your profile',
     'out_of_credits_title': 'Oops… out of credits',
-    'out_of_credits_body': 'Top up to keep translating your calls in real time.',
+    'out_of_credits_body':
+        'Top up to keep translating your calls in real time.',
     'out_of_credits_cta': 'Top up',
   };
 
@@ -1017,7 +1027,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} quiere ser tu amigo·a',
     'settings_hide_from_country': 'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
-        'En los ajustes, decide si las personas de tu país pueden ver tu foto de Discover.\nLa foto enmarcada es la que aparece en Discover.',
+        'En los **ajustes**, decide si las personas de tu país pueden ver tu **foto de Discover**.\nLa **foto enmarcada** es la que aparece en **Discover**.',
     'tab_placeholder_soon': 'Pronto',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1050,7 +1060,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Eliminar la cuenta',
     'settings_push': 'Notificaciones push',
     'settings_test_push': 'Enviar una notificación de prueba',
-    'settings_test_push_sent': 'Notificación enviada — pon la app en segundo plano para verla',
+    'settings_test_push_sent':
+        'Notificación enviada — pon la app en segundo plano para verla',
     'settings_test_push_body': 'Esto es una notificación de prueba ✅',
     'settings_sounds': 'Sonidos de notificación',
     'settings_in_app_sounds': 'Sonidos en la app',
@@ -1121,7 +1132,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Recibir un me gusta',
     'mission_receive_like_how': 'Alguien da me gusta a una foto tuya',
     'missions_title': 'Tus misiones',
-    'missions_subtitle': 'Completa las 6 misiones para ganar {min} min de traducción en vivo.',
+    'missions_subtitle':
+        'Completa las 6 misiones para ganar {min} min de traducción en vivo.',
     'missions_unlock': '{min} min por desbloquear',
     'missions_earned': '+{min} min ganados',
     'missions_done_short': 'Hecho',
@@ -1197,7 +1209,8 @@ abstract final class AppStrings {
     'call_go_back': 'Volver',
     'call_connecting': 'Conectando a {room}…',
     'call_connecting_short': 'Conectando a la llamada…',
-    'call_connecting_caller_pays': 'Una sola suscripción basta para traducir la conversación.',
+    'call_connecting_caller_pays':
+        'Una sola suscripción basta para traducir la conversación.',
     'call_waiting_title': 'Esperando a la otra persona…',
     'call_waiting_body':
         'Comparte el mismo nombre de sala en otro dispositivo.',
@@ -1332,7 +1345,8 @@ abstract final class AppStrings {
     'report_details_hint': 'Más detalles (opcional)',
     'report_submit': 'Enviar reporte',
     'report_thanks': 'Reporte enviado. Gracias.',
-    'report_failed': 'No se pudo enviar el reporte. Inténtalo de nuevo más tarde.',
+    'report_failed':
+        'No se pudo enviar el reporte. Inténtalo de nuevo más tarde.',
     'report_reason_spam': 'Spam',
     'report_reason_harassment': 'Acoso / abuso',
     'report_reason_fake': 'Perfil falso',
@@ -1340,17 +1354,22 @@ abstract final class AppStrings {
     'report_reason_underage': 'Usuario menor de edad',
     'report_reason_scam': 'Estafa',
     'report_reason_other': 'Otro',
-    'invite_share_text': 'Únete a mí en Swayco 🌍 — videollamadas con traducción en tiempo real. Regístrate con mi enlace y ambos ganamos tiempo de llamada extra: {link}',
+    'invite_share_text':
+        'Únete a mí en Swayco 🌍 — videollamadas con traducción en tiempo real. Regístrate con mi enlace y ambos ganamos tiempo de llamada extra: {link}',
     'invite_bonus_title': 'Invita a 3 amigos y gana 15 min',
-    'invite_bonus_body': 'Invita a 3 amigos que se registren con tu enlace y consigue 15 min de traducción en vivo, automáticamente.',
+    'invite_bonus_body':
+        'Invita a 3 amigos que se registren con tu enlace y consigue 15 min de traducción en vivo, automáticamente.',
     'invite_bonus_progress': 'Invitados registrados: {count} / {total}',
     'invite_bonus_share_cta': 'Compartir mi enlace',
     'invite_bonus_later': 'Más tarde',
     'invite_to_call': 'Invitar a una llamada',
-    'invite_call_share_text': 'Únete a mi videollamada con traducción en directo en Swayco 🌍 — solo toca, sin necesidad de cuenta: {link}',
+    'invite_call_share_text':
+        'Únete a mi videollamada con traducción en directo en Swayco 🌍 — solo toca, sin necesidad de cuenta: {link}',
     'invite_call_creating': 'Creando enlace…',
-    'invite_call_failed': 'No se pudo crear el enlace de invitación. Inténtalo de nuevo.',
-    'invite_call_need_profile': 'Completa tu perfil (nombre + idioma) antes de invitar a alguien.',
+    'invite_call_failed':
+        'No se pudo crear el enlace de invitación. Inténtalo de nuevo.',
+    'invite_call_need_profile':
+        'Completa tu perfil (nombre + idioma) antes de invitar a alguien.',
     'call_share_invite': 'Compartir el enlace',
     'guest_title': 'Únete a la llamada',
     'guest_subtitle': 'No necesitas cuenta. Elige tu idioma y únete.',
@@ -1358,20 +1377,24 @@ abstract final class AppStrings {
     'guest_lang_label': 'Tú hablas…',
     'guest_join_cta': 'Únete a la llamada',
     'guest_need_lang': 'Elige tu idioma',
-    'guest_link_expired': 'Este enlace de invitación ha caducado. Pídele uno nuevo a la persona que te invitó.',
+    'guest_link_expired':
+        'Este enlace de invitación ha caducado. Pídele uno nuevo a la persona que te invitó.',
     'guest_join_error': 'No se pudo unir a la llamada. Inténtalo de nuevo.',
     'guest_connecting': 'Uniéndote a la llamada…',
     'profile_email_private': 'Privado · solo visible para ti',
     'profile_signout': 'Cerrar sesión',
     'profile_signout_confirm_title': '¿Cerrar sesión?',
-    'profile_signout_confirm_body': 'Puedes volver a iniciar sesión con tu correo y contraseña.',
+    'profile_signout_confirm_body':
+        'Puedes volver a iniciar sesión con tu correo y contraseña.',
     'cancel': 'Cancelar',
     'credits_remaining_inline': '{count} créditos restantes este mes',
     'credits_unlimited': 'Traducción ilimitada',
-    'credits_low_hint': 'Te quedan pocos. Se recargan el próximo mes — mejora tu plan si no quieres esperar.',
+    'credits_low_hint':
+        'Te quedan pocos. Se recargan el próximo mes — mejora tu plan si no quieres esperar.',
     'credits_low_hint_native': 'Te quedan pocos. Se recargan el próximo mes.',
     'credits_used_total_inline': '{time} traducidos en total',
-    'credits_exhausted_banner': 'Sin créditos — la traducción está desactivada, la llamada continúa.',
+    'credits_exhausted_banner':
+        'Sin créditos — la traducción está desactivada, la llamada continúa.',
     'login_title_signin': 'Bienvenido de nuevo',
     'login_title_signup': 'Crear una cuenta',
     'login_subtitle_signin': 'Inicia sesión en tu cuenta.',
@@ -1389,38 +1412,52 @@ abstract final class AppStrings {
     'login_have_account': '¿Ya tienes una cuenta?',
     'login_err_email': 'Introduce un correo válido.',
     'login_err_password': 'La contraseña debe tener al menos 6 caracteres.',
-    'login_check_inbox': 'Revisa tu bandeja de entrada — te enviamos un enlace de confirmación.',
+    'login_check_inbox':
+        'Revisa tu bandeja de entrada — te enviamos un enlace de confirmación.',
     'login_resend_confirm': 'Reenviar correo de confirmación',
-    'login_resend_sent': 'Correo de confirmación reenviado. Revisa tu bandeja de entrada (y la carpeta de spam).',
-    'login_err_not_confirmed': 'Correo aún sin confirmar. Haz clic en el enlace que te enviamos o reenvíalo.',
-    'login_reset_sent': 'Si existe una cuenta con ese correo, se ha enviado un enlace de restablecimiento.',
+    'login_resend_sent':
+        'Correo de confirmación reenviado. Revisa tu bandeja de entrada (y la carpeta de spam).',
+    'login_err_not_confirmed':
+        'Correo aún sin confirmar. Haz clic en el enlace que te enviamos o reenvíalo.',
+    'login_reset_sent':
+        'Si existe una cuenta con ese correo, se ha enviado un enlace de restablecimiento.',
     'onb_gender_title': 'Eres…',
-    'onb_gender_subtitle': 'Nos ayuda a acertar con la concordancia de género (femenino, masculino) al traducir tus mensajes.',
+    'onb_gender_subtitle':
+        'Nos ayuda a acertar con la concordancia de género (femenino, masculino) al traducir tus mensajes.',
     'onb_gender_male': 'Hombre',
     'onb_gender_female': 'Mujer',
     'onb_gender_neutral': 'Neutro',
     'onb_need_gender': 'Elige una opción para continuar.',
     'onb_skip': 'Omitir',
     'onb_city_title': 'Tu ciudad',
-    'onb_city_subtitle': '¿Desde dónde llamas? Nos ayuda a sugerirte personas cercanas. (opcional)',
+    'onb_city_subtitle':
+        '¿Desde dónde llamas? Nos ayuda a sugerirte personas cercanas. (opcional)',
     'onb_interests_title': 'Tus intereses',
-    'onb_interests_subtitle': 'Desliza por las categorías y elige lo que te encaje. (opcional)',
+    'onb_interests_subtitle':
+        'Desliza por las categorías y elige lo que te encaje. (opcional)',
     'onb_interests_count': '{n} / {max} seleccionados',
     'onb_interests_max': 'Hasta {n} intereses.',
     'onb_gift_title': 'Regalo de bienvenida',
-    'onb_gift_subtitle': 'Corre por nuestra cuenta — disfrútalo en tu primera llamada.',
+    'onb_gift_subtitle':
+        'Corre por nuestra cuenta — disfrútalo en tu primera llamada.',
     'onb_gift_headline': 'Bienvenido{hi} 🎉',
-    'onb_gift_body': 'Te regalamos 15 minutos de llamadas con traducción para empezar. Sin tarjeta.',
+    'onb_gift_body':
+        'Te regalamos 15 minutos de llamadas con traducción para empezar. Sin tarjeta.',
     'onb_gift_cta': '¡Vamos! 📞',
-    'voice_mic_denied': 'Acceso al micrófono denegado. Actívalo en los ajustes de la app.',
+    'voice_mic_denied':
+        'Acceso al micrófono denegado. Actívalo en los ajustes de la app.',
     'voice_recording_hint': 'Toca para enviar, o borra para cancelar',
     'voice_message': 'Mensaje de voz',
     'voice_dub_listen': 'Escuchar la traducción',
-    'voice_dub_upgrade': 'Mejora a Plus para escuchar los mensajes de voz traducidos en voz alta.',
-    'voice_dub_quota': 'Has alcanzado el límite mensual de traducción. Vuelve más tarde o mejora a Ultra Plus.',
-    'voice_dub_failed': 'Reproducción de la traducción no disponible, inténtalo de nuevo.',
+    'voice_dub_upgrade':
+        'Mejora a Plus para escuchar los mensajes de voz traducidos en voz alta.',
+    'voice_dub_quota':
+        'Has alcanzado el límite mensual de traducción. Vuelve más tarde o mejora a Ultra Plus.',
+    'voice_dub_failed':
+        'Reproducción de la traducción no disponible, inténtalo de nuevo.',
     'voice_clone_title': 'Clonar mi voz',
-    'voice_clone_subtitle': 'Graba 30 segundos hablando. Tus mensajes de voz se doblarán con TU voz para los oyentes de Ultra Plus.',
+    'voice_clone_subtitle':
+        'Graba 30 segundos hablando. Tus mensajes de voz se doblarán con TU voz para los oyentes de Ultra Plus.',
     'voice_clone_start': 'Grabar',
     'voice_clone_redo': 'Repetir',
     'voice_clone_send': 'Enviar',
@@ -1428,13 +1465,16 @@ abstract final class AppStrings {
     'voice_clone_success': '¡Voz clonada! 🎙',
     'voice_clone_too_short': 'Necesitas al menos 20 segundos para clonar.',
     'voice_clone_failed': 'La clonación falló, inténtalo de nuevo.',
-    'voice_clone_ultra_only': 'La clonación de voz está reservada para suscriptores de Ultra Plus.',
+    'voice_clone_ultra_only':
+        'La clonación de voz está reservada para suscriptores de Ultra Plus.',
     'voice_clone_enrolled_title': 'Voz clonada',
-    'voice_clone_enrolled_subtitle': 'Tus mensajes de voz ahora se doblan con tu propia voz para los oyentes de Ultra Plus. Vuelve a grabar cuando quieras para actualizar el clon.',
+    'voice_clone_enrolled_subtitle':
+        'Tus mensajes de voz ahora se doblan con tu propia voz para los oyentes de Ultra Plus. Vuelve a grabar cuando quieras para actualizar el clon.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Desbloquear con Ultra Plus',
     'out_of_credits_title': 'Ups… sin créditos',
-    'out_of_credits_body': 'Recarga para seguir traduciendo tus llamadas en tiempo real.',
+    'out_of_credits_body':
+        'Recarga para seguir traduciendo tus llamadas en tiempo real.',
     'out_of_credits_cta': 'Recargar',
   };
 
@@ -1456,7 +1496,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} möchte mit dir befreundet sein',
     'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
-        'Lege in den Einstellungen fest, ob Leute aus deinem Land dein Discover-Foto sehen.\nDas umrahmte Foto erscheint im Discover.',
+        'Lege in den **Einstellungen** fest, ob Leute aus deinem Land dein **Discover-Foto** sehen.\nDas **umrahmte Foto** erscheint im **Discover**.',
     'my_subscription_section': 'Mein Abo',
     'tab_placeholder_soon': 'Bald',
     'profile_title': 'Profil',
@@ -1487,7 +1527,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Ein Like erhalten',
     'mission_receive_like_how': 'Jemand liked eines deiner Fotos',
     'missions_title': 'Deine Missionen',
-    'missions_subtitle': 'Schließe alle 6 Missionen ab für {min} Min. Live-Übersetzung.',
+    'missions_subtitle':
+        'Schließe alle 6 Missionen ab für {min} Min. Live-Übersetzung.',
     'missions_unlock': '{min} Min. freischalten',
     'missions_earned': '+{min} Min. erhalten',
     'missions_done_short': 'Erledigt',
@@ -1563,7 +1604,8 @@ abstract final class AppStrings {
     'call_go_back': 'Zurück',
     'call_connecting': 'Verbinde mit {room}…',
     'call_connecting_short': 'Anruf wird verbunden…',
-    'call_connecting_caller_pays': 'Ein einziges Abo genügt, um das Gespräch zu übersetzen.',
+    'call_connecting_caller_pays':
+        'Ein einziges Abo genügt, um das Gespräch zu übersetzen.',
     'call_waiting_title': 'Warten auf die andere Person…',
     'call_waiting_body': 'Teile denselben Raumnamen auf einem anderen Gerät.',
     'call_leave_q': 'Anruf verlassen?',
@@ -1615,7 +1657,8 @@ abstract final class AppStrings {
     'accept': 'Annehmen',
     'call_declined': 'Anruf abgelehnt',
     'call_no_answer': 'Keine Antwort',
-    'call_speak_lang_hint': 'Sprich auf {lang}, damit die Übersetzung funktioniert',
+    'call_speak_lang_hint':
+        'Sprich auf {lang}, damit die Übersetzung funktioniert',
     'who_liked_me': 'Wer mich gelikt hat',
     'no_one_liked_yet': 'Noch niemand hat dich gelikt',
     'like_explainer':
@@ -1695,7 +1738,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Konto löschen',
     'settings_push': 'Push-Benachrichtigungen',
     'settings_test_push': 'Testbenachrichtigung senden',
-    'settings_test_push_sent': 'Benachrichtigung gesendet — lege die App in den Hintergrund, um sie zu sehen',
+    'settings_test_push_sent':
+        'Benachrichtigung gesendet — lege die App in den Hintergrund, um sie zu sehen',
     'settings_test_push_body': 'Das ist eine Testbenachrichtigung ✅',
     'settings_sounds': 'Benachrichtigungstöne',
     'settings_in_app_sounds': 'In-App-Töne',
@@ -1713,26 +1757,33 @@ abstract final class AppStrings {
     'settings_terms': 'Nutzungsbedingungen',
     'settings_privacy': 'Datenschutzerklärung',
     'settings_version': 'Version',
-    'settings_change_pwd_body': 'Eine E-Mail mit einem Zurücksetzen-Link wird an {email} gesendet. Über den Link kannst du ein neues Passwort wählen.',
+    'settings_change_pwd_body':
+        'Eine E-Mail mit einem Zurücksetzen-Link wird an {email} gesendet. Über den Link kannst du ein neues Passwort wählen.',
     'settings_change_pwd_confirm': 'Link senden',
     'settings_delete_title': 'Konto löschen?',
-    'settings_delete_body': 'Dein Profil, deine Freunde und Anfragen werden gelöscht. Du wirst sofort abgemeldet. Diese Aktion kann nicht rückgängig gemacht werden.',
+    'settings_delete_body':
+        'Dein Profil, deine Freunde und Anfragen werden gelöscht. Du wirst sofort abgemeldet. Diese Aktion kann nicht rückgängig gemacht werden.',
     'settings_delete_confirm': 'Löschen',
-    'settings_save_failed': 'Diese Einstellung konnte nicht gespeichert werden.',
+    'settings_save_failed':
+        'Diese Einstellung konnte nicht gespeichert werden.',
     'settings_email_not_found': 'E-Mail-Adresse nicht gefunden.',
     'settings_email_sent': 'E-Mail gesendet. Sieh in deinem Posteingang nach.',
-    'settings_subscription_appstore': 'Verwalte dein Abo über den App Store / Play Store.',
+    'settings_subscription_appstore':
+        'Verwalte dein Abo über den App Store / Play Store.',
     'settings_restore_soon': 'Kauf-Wiederherstellung — demnächst verfügbar.',
     'settings_help_soon': 'Hilfecenter — demnächst verfügbar.',
-    'settings_contact_soon': 'Schreib uns an support@swayco.app (mailto demnächst verfügbar).',
+    'settings_contact_soon':
+        'Schreib uns an support@swayco.app (mailto demnächst verfügbar).',
     'settings_terms_soon': 'Nutzungsbedingungen — demnächst verfügbar.',
     'settings_privacy_soon': 'Datenschutzerklärung — demnächst verfügbar.',
     'blocked_title': 'Blockiert',
     'blocked_unblock_title_q': '{name} entsperren?',
-    'blocked_unblock_body': 'Die Person kann dich wieder finden, kontaktieren und deine Nachrichten sehen.',
+    'blocked_unblock_body':
+        'Die Person kann dich wieder finden, kontaktieren und deine Nachrichten sehen.',
     'blocked_unblock_confirm': 'Entsperren',
     'blocked_empty_title': 'Keine blockierten Nutzer',
-    'blocked_empty_body': 'Blockiere ein Profil über das Menü einer Unterhaltung.',
+    'blocked_empty_body':
+        'Blockiere ein Profil über das Menü einer Unterhaltung.',
     'error_prefix': 'Fehler: {msg}',
     'report': 'Melden',
     'report_q': '{name} melden?',
@@ -1749,26 +1800,34 @@ abstract final class AppStrings {
     'report_reason_scam': 'Betrug',
     'report_reason_other': 'Sonstiges',
     'discover_message_sent': 'Nachricht gesendet',
-    'invite_share_text': 'Komm zu mir auf Swayco 🌍 — Videoanrufe mit Echtzeit-Übersetzung. Melde dich mit meinem Link an und wir beide bekommen extra Anrufzeit: {link}',
+    'invite_share_text':
+        'Komm zu mir auf Swayco 🌍 — Videoanrufe mit Echtzeit-Übersetzung. Melde dich mit meinem Link an und wir beide bekommen extra Anrufzeit: {link}',
     'invite_bonus_title': 'Wirb 3 Freunde, erhalte 15 Min',
-    'invite_bonus_body': 'Lade 3 Freunde ein, die sich über deinen Link registrieren, und erhalte automatisch 15 Min. Live-Übersetzung.',
+    'invite_bonus_body':
+        'Lade 3 Freunde ein, die sich über deinen Link registrieren, und erhalte automatisch 15 Min. Live-Übersetzung.',
     'invite_bonus_progress': 'Angemeldete Empfehlungen: {count} / {total}',
     'invite_bonus_share_cta': 'Meinen Link teilen',
     'invite_bonus_later': 'Später',
     'invite_to_call': 'Zu einem Anruf einladen',
-    'invite_call_share_text': 'Komm zu meinem live-übersetzten Videoanruf auf Swayco 🌍 — einfach tippen, kein Konto nötig: {link}',
+    'invite_call_share_text':
+        'Komm zu meinem live-übersetzten Videoanruf auf Swayco 🌍 — einfach tippen, kein Konto nötig: {link}',
     'invite_call_creating': 'Link wird erstellt…',
-    'invite_call_failed': 'Der Einladungslink konnte nicht erstellt werden. Versuche es erneut.',
-    'invite_call_need_profile': 'Vervollständige dein Profil (Name + Sprache), bevor du jemanden einlädst.',
+    'invite_call_failed':
+        'Der Einladungslink konnte nicht erstellt werden. Versuche es erneut.',
+    'invite_call_need_profile':
+        'Vervollständige dein Profil (Name + Sprache), bevor du jemanden einlädst.',
     'call_share_invite': 'Link teilen',
     'guest_title': 'Dem Anruf beitreten',
-    'guest_subtitle': 'Kein Konto nötig. Wähle deine Sprache und tritt dann bei.',
+    'guest_subtitle':
+        'Kein Konto nötig. Wähle deine Sprache und tritt dann bei.',
     'guest_default_name': 'Gast',
     'guest_lang_label': 'Du sprichst…',
     'guest_join_cta': 'Dem Anruf beitreten',
     'guest_need_lang': 'Wähle deine Sprache',
-    'guest_link_expired': 'Dieser Einladungslink ist abgelaufen. Bitte die Person, die dich eingeladen hat, um einen neuen.',
-    'guest_join_error': 'Dem Anruf konnte nicht beigetreten werden. Versuche es erneut.',
+    'guest_link_expired':
+        'Dieser Einladungslink ist abgelaufen. Bitte die Person, die dich eingeladen hat, um einen neuen.',
+    'guest_join_error':
+        'Dem Anruf konnte nicht beigetreten werden. Versuche es erneut.',
     'guest_connecting': 'Anruf wird beigetreten…',
     'lang_name_fr': 'Französisch',
     'lang_name_en': 'Englisch',
@@ -1782,19 +1841,24 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinesisch',
     'lang_name_ja': 'Japanisch',
     'lang_name_ko': 'Koreanisch',
-    'profile_call_language_warning': 'Während Anrufen musst du nur {lang} sprechen, damit die Übersetzung funktioniert.',
+    'profile_call_language_warning':
+        'Während Anrufen musst du nur {lang} sprechen, damit die Übersetzung funktioniert.',
     'sent_label': 'Gesendet',
     'profile_email_private': 'Privat · nur für dich sichtbar',
     'profile_signout': 'Abmelden',
     'profile_signout_confirm_title': 'Abmelden?',
-    'profile_signout_confirm_body': 'Du kannst dich wieder mit deiner E-Mail und deinem Passwort anmelden.',
+    'profile_signout_confirm_body':
+        'Du kannst dich wieder mit deiner E-Mail und deinem Passwort anmelden.',
     'cancel': 'Abbrechen',
     'credits_remaining_inline': 'Noch {count} Guthaben diesen Monat',
     'credits_unlimited': 'Unbegrenzte Übersetzung',
-    'credits_low_hint': 'Geht zur Neige. Wird nächsten Monat aufgefüllt — upgrade, wenn du nicht warten möchtest.',
-    'credits_low_hint_native': 'Geht zur Neige. Wird nächsten Monat aufgefüllt.',
+    'credits_low_hint':
+        'Geht zur Neige. Wird nächsten Monat aufgefüllt — upgrade, wenn du nicht warten möchtest.',
+    'credits_low_hint_native':
+        'Geht zur Neige. Wird nächsten Monat aufgefüllt.',
     'credits_used_total_inline': 'Insgesamt {time} übersetzt',
-    'credits_exhausted_banner': 'Guthaben aufgebraucht — die Übersetzung ist aus, der Anruf läuft weiter.',
+    'credits_exhausted_banner':
+        'Guthaben aufgebraucht — die Übersetzung ist aus, der Anruf läuft weiter.',
     'login_title_signin': 'Willkommen zurück',
     'login_title_signup': 'Konto erstellen',
     'login_subtitle_signin': 'Melde dich in deinem Konto an.',
@@ -1812,11 +1876,15 @@ abstract final class AppStrings {
     'login_have_account': 'Du hast bereits ein Konto?',
     'login_err_email': 'Gib eine gültige E-Mail-Adresse ein.',
     'login_err_password': 'Das Passwort muss mindestens 6 Zeichen lang sein.',
-    'login_check_inbox': 'Sieh in deinem Posteingang nach — wir haben dir einen Bestätigungslink gesendet.',
+    'login_check_inbox':
+        'Sieh in deinem Posteingang nach — wir haben dir einen Bestätigungslink gesendet.',
     'login_resend_confirm': 'Bestätigungs-E-Mail erneut senden',
-    'login_resend_sent': 'Bestätigungs-E-Mail erneut gesendet. Sieh in deinem Posteingang nach (und im Spam-Ordner).',
-    'login_err_not_confirmed': 'E-Mail noch nicht bestätigt. Klicke auf den gesendeten Link oder sende ihn erneut.',
-    'login_reset_sent': 'Falls ein Konto für diese E-Mail existiert, wurde ein Zurücksetzen-Link gesendet.',
+    'login_resend_sent':
+        'Bestätigungs-E-Mail erneut gesendet. Sieh in deinem Posteingang nach (und im Spam-Ordner).',
+    'login_err_not_confirmed':
+        'E-Mail noch nicht bestätigt. Klicke auf den gesendeten Link oder sende ihn erneut.',
+    'login_reset_sent':
+        'Falls ein Konto für diese E-Mail existiert, wurde ein Zurücksetzen-Link gesendet.',
     'onb_country_label': 'Land',
     'onb_country_hint': 'z. B. Frankreich',
     'onb_city_label': 'Stadt',
@@ -1828,32 +1896,41 @@ abstract final class AppStrings {
     'loc_other_city': 'Andere Stadt…',
     'loc_other_city_hint': 'Gib deine Stadt ein',
     'onb_gender_title': 'Du bist…',
-    'onb_gender_subtitle': 'Hilft uns, die grammatische Form (weiblich, männlich) beim Übersetzen deiner Nachrichten richtig zu treffen.',
+    'onb_gender_subtitle':
+        'Hilft uns, die grammatische Form (weiblich, männlich) beim Übersetzen deiner Nachrichten richtig zu treffen.',
     'onb_gender_male': 'Männlich',
     'onb_gender_female': 'Weiblich',
     'onb_gender_neutral': 'Neutral',
     'onb_need_gender': 'Wähle eine Option, um fortzufahren.',
     'onb_skip': 'Überspringen',
     'onb_city_title': 'Deine Stadt',
-    'onb_city_subtitle': 'Von wo aus rufst du an? Hilft uns, dir Leute in deiner Nähe vorzuschlagen. (optional)',
+    'onb_city_subtitle':
+        'Von wo aus rufst du an? Hilft uns, dir Leute in deiner Nähe vorzuschlagen. (optional)',
     'onb_interests_title': 'Deine Interessen',
-    'onb_interests_subtitle': 'Wische durch die Kategorien und wähle, was zu dir passt. (optional)',
+    'onb_interests_subtitle':
+        'Wische durch die Kategorien und wähle, was zu dir passt. (optional)',
     'onb_interests_count': '{n} / {max} ausgewählt',
     'onb_interests_max': 'Bis zu {n} Interessen.',
     'onb_gift_title': 'Willkommensgeschenk',
     'onb_gift_subtitle': 'Geht auf uns — genieße es bei deinem ersten Anruf.',
     'onb_gift_headline': 'Willkommen{hi} 🎉',
-    'onb_gift_body': 'Wir schenken dir 15 Minuten übersetzte Anrufzeit für den Start. Keine Karte erforderlich.',
+    'onb_gift_body':
+        'Wir schenken dir 15 Minuten übersetzte Anrufzeit für den Start. Keine Karte erforderlich.',
     'onb_gift_cta': 'Los geht\'s 📞',
-    'voice_mic_denied': 'Mikrofonzugriff verweigert. Aktiviere ihn in den App-Einstellungen.',
+    'voice_mic_denied':
+        'Mikrofonzugriff verweigert. Aktiviere ihn in den App-Einstellungen.',
     'voice_recording_hint': 'Tippe zum Senden oder lösche zum Abbrechen',
     'voice_message': 'Sprachnachricht',
     'voice_dub_listen': 'Übersetzung anhören',
-    'voice_dub_upgrade': 'Upgrade auf Plus, um Sprachnachrichten laut übersetzt zu hören.',
-    'voice_dub_quota': 'Monatliches Übersetzungslimit erreicht. Komm später wieder oder upgrade auf Ultra Plus.',
-    'voice_dub_failed': 'Übersetzungswiedergabe nicht verfügbar, versuche es erneut.',
+    'voice_dub_upgrade':
+        'Upgrade auf Plus, um Sprachnachrichten laut übersetzt zu hören.',
+    'voice_dub_quota':
+        'Monatliches Übersetzungslimit erreicht. Komm später wieder oder upgrade auf Ultra Plus.',
+    'voice_dub_failed':
+        'Übersetzungswiedergabe nicht verfügbar, versuche es erneut.',
     'voice_clone_title': 'Meine Stimme klonen',
-    'voice_clone_subtitle': 'Nimm 30 Sekunden von dir beim Sprechen auf. Deine Sprachnachrichten werden dann für Ultra-Plus-Hörer mit DEINER Stimme vertont.',
+    'voice_clone_subtitle':
+        'Nimm 30 Sekunden von dir beim Sprechen auf. Deine Sprachnachrichten werden dann für Ultra-Plus-Hörer mit DEINER Stimme vertont.',
     'voice_clone_start': 'Aufnehmen',
     'voice_clone_redo': 'Wiederholen',
     'voice_clone_send': 'Senden',
@@ -1861,13 +1938,16 @@ abstract final class AppStrings {
     'voice_clone_success': 'Stimme geklont! 🎙',
     'voice_clone_too_short': 'Du brauchst mindestens 20 Sekunden zum Klonen.',
     'voice_clone_failed': 'Klonen fehlgeschlagen, bitte versuche es erneut.',
-    'voice_clone_ultra_only': 'Das Klonen der Stimme ist Ultra-Plus-Abonnenten vorbehalten.',
+    'voice_clone_ultra_only':
+        'Das Klonen der Stimme ist Ultra-Plus-Abonnenten vorbehalten.',
     'voice_clone_enrolled_title': 'Stimme geklont',
-    'voice_clone_enrolled_subtitle': 'Deine Sprachnachrichten werden jetzt für Ultra-Plus-Hörer mit deiner eigenen Stimme vertont. Nimm jederzeit neu auf, um den Klon zu aktualisieren.',
+    'voice_clone_enrolled_subtitle':
+        'Deine Sprachnachrichten werden jetzt für Ultra-Plus-Hörer mit deiner eigenen Stimme vertont. Nimm jederzeit neu auf, um den Klon zu aktualisieren.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Mit Ultra Plus freischalten',
     'out_of_credits_title': 'Ups… keine Credits mehr',
-    'out_of_credits_body': 'Lade auf, um deine Anrufe weiter in Echtzeit zu übersetzen.',
+    'out_of_credits_body':
+        'Lade auf, um deine Anrufe weiter in Echtzeit zu übersetzen.',
     'out_of_credits_cta': 'Aufladen',
   };
 
@@ -1889,7 +1969,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} vuole essere tuo amico·a',
     'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
-        'Nelle impostazioni, decidi se le persone del tuo paese possono vedere la tua foto Discover.\nLa foto incorniciata è quella che appare nel Discover.',
+        'Nelle **impostazioni**, decidi se le persone del tuo paese possono vedere la tua **foto Discover**.\nLa **foto incorniciata** è quella che appare nel **Discover**.',
     'my_subscription_section': 'Il mio abbonamento',
     'tab_placeholder_soon': 'Presto',
     'profile_title': 'Profilo',
@@ -1920,7 +2000,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Ricevi un like',
     'mission_receive_like_how': 'Qualcuno mette like a una tua foto',
     'missions_title': 'Le tue missioni',
-    'missions_subtitle': 'Completa le 6 missioni per {min} min di traduzione live.',
+    'missions_subtitle':
+        'Completa le 6 missioni per {min} min di traduzione live.',
     'missions_unlock': '{min} min da sbloccare',
     'missions_earned': '+{min} min ottenuti',
     'missions_done_short': 'Fatto',
@@ -1995,7 +2076,8 @@ abstract final class AppStrings {
     'call_go_back': 'Indietro',
     'call_connecting': 'Connessione a {room}…',
     'call_connecting_short': 'Connessione alla chiamata…',
-    'call_connecting_caller_pays': 'Un solo abbonamento basta per tradurre la conversazione.',
+    'call_connecting_caller_pays':
+        'Un solo abbonamento basta per tradurre la conversazione.',
     'call_waiting_title': 'In attesa dell’altra persona…',
     'call_waiting_body':
         'Condividi lo stesso nome stanza su un altro dispositivo.',
@@ -2127,7 +2209,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Elimina account',
     'settings_push': 'Notifiche push',
     'settings_test_push': 'Invia una notifica di prova',
-    'settings_test_push_sent': 'Notifica inviata — metti l\'app in background per vederla arrivare',
+    'settings_test_push_sent':
+        'Notifica inviata — metti l\'app in background per vederla arrivare',
     'settings_test_push_body': 'Questa è una notifica di prova ✅',
     'settings_sounds': 'Suoni delle notifiche',
     'settings_in_app_sounds': 'Suoni nell\'app',
@@ -2145,30 +2228,36 @@ abstract final class AppStrings {
     'settings_terms': 'Condizioni d\'uso',
     'settings_privacy': 'Informativa sulla privacy',
     'settings_version': 'Versione',
-    'settings_change_pwd_body': 'Verrà inviata un\'email con un link di reimpostazione a {email}. Puoi scegliere una nuova password cliccando sul link.',
+    'settings_change_pwd_body':
+        'Verrà inviata un\'email con un link di reimpostazione a {email}. Puoi scegliere una nuova password cliccando sul link.',
     'settings_change_pwd_confirm': 'Invia link',
     'settings_delete_title': 'Eliminare l\'account?',
-    'settings_delete_body': 'Il tuo profilo, gli amici e le richieste verranno eliminati. Verrai disconnesso immediatamente. Questa azione non può essere annullata.',
+    'settings_delete_body':
+        'Il tuo profilo, gli amici e le richieste verranno eliminati. Verrai disconnesso immediatamente. Questa azione non può essere annullata.',
     'settings_delete_confirm': 'Elimina',
     'settings_save_failed': 'Impossibile salvare questa impostazione.',
     'settings_email_not_found': 'Indirizzo email non trovato.',
     'settings_email_sent': 'Email inviata. Controlla la tua casella di posta.',
-    'settings_subscription_appstore': 'Gestisci il tuo abbonamento dall\'App Store / Play Store.',
+    'settings_subscription_appstore':
+        'Gestisci il tuo abbonamento dall\'App Store / Play Store.',
     'settings_restore_soon': 'Ripristino acquisti — disponibile a breve.',
     'settings_help_soon': 'Centro assistenza — disponibile a breve.',
-    'settings_contact_soon': 'Scrivici a support@swayco.app (mailto disponibile a breve).',
+    'settings_contact_soon':
+        'Scrivici a support@swayco.app (mailto disponibile a breve).',
     'settings_terms_soon': 'Condizioni d\'uso — disponibili a breve.',
     'settings_privacy_soon': 'Informativa sulla privacy — disponibile a breve.',
     'blocked_title': 'Bloccati',
     'blocked_unblock_title_q': 'Sbloccare {name}?',
-    'blocked_unblock_body': 'Potrà di nuovo trovarti, contattarti e vedere i tuoi messaggi.',
+    'blocked_unblock_body':
+        'Potrà di nuovo trovarti, contattarti e vedere i tuoi messaggi.',
     'blocked_unblock_confirm': 'Sblocca',
     'blocked_empty_title': 'Nessun utente bloccato',
     'blocked_empty_body': 'Blocca un profilo dal menu di una conversazione.',
     'error_prefix': 'Errore: {msg}',
     'report': 'Segnala',
     'report_q': 'Segnalare {name}?',
-    'report_body': 'Scegli un motivo. Il nostro team esamina ogni segnalazione.',
+    'report_body':
+        'Scegli un motivo. Il nostro team esamina ogni segnalazione.',
     'report_details_hint': 'Maggiori dettagli (facoltativo)',
     'report_submit': 'Invia segnalazione',
     'report_thanks': 'Segnalazione inviata. Grazie.',
@@ -2181,25 +2270,31 @@ abstract final class AppStrings {
     'report_reason_scam': 'Truffa',
     'report_reason_other': 'Altro',
     'discover_message_sent': 'Messaggio inviato',
-    'invite_share_text': 'Unisciti a me su Swayco 🌍 — videochiamate con traduzione in tempo reale. Iscriviti con il mio link e otterremo entrambi più minuti di chiamata: {link}',
+    'invite_share_text':
+        'Unisciti a me su Swayco 🌍 — videochiamate con traduzione in tempo reale. Iscriviti con il mio link e otterremo entrambi più minuti di chiamata: {link}',
     'invite_bonus_title': 'Invita 3 amici, ottieni 15 min',
-    'invite_bonus_body': 'Invita 3 amici che si iscrivono con il tuo link e ottieni 15 min di traduzione live, automaticamente.',
+    'invite_bonus_body':
+        'Invita 3 amici che si iscrivono con il tuo link e ottieni 15 min di traduzione live, automaticamente.',
     'invite_bonus_progress': 'Iscritti tramite invito: {count} / {total}',
     'invite_bonus_share_cta': 'Condividi il mio link',
     'invite_bonus_later': 'Più tardi',
     'invite_to_call': 'Invita a una chiamata',
-    'invite_call_share_text': 'Unisciti alla mia videochiamata con traduzione in diretta su Swayco 🌍 — basta un tocco, senza bisogno di account: {link}',
+    'invite_call_share_text':
+        'Unisciti alla mia videochiamata con traduzione in diretta su Swayco 🌍 — basta un tocco, senza bisogno di account: {link}',
     'invite_call_creating': 'Creazione del link…',
     'invite_call_failed': 'Impossibile creare il link di invito. Riprova.',
-    'invite_call_need_profile': 'Completa il tuo profilo (nome + lingua) prima di invitare qualcuno.',
+    'invite_call_need_profile':
+        'Completa il tuo profilo (nome + lingua) prima di invitare qualcuno.',
     'call_share_invite': 'Condividi il link',
     'guest_title': 'Unisciti alla chiamata',
-    'guest_subtitle': 'Nessun account necessario. Scegli la tua lingua, poi unisciti.',
+    'guest_subtitle':
+        'Nessun account necessario. Scegli la tua lingua, poi unisciti.',
     'guest_default_name': 'Ospite',
     'guest_lang_label': 'Tu parli…',
     'guest_join_cta': 'Unisciti alla chiamata',
     'guest_need_lang': 'Scegli la tua lingua',
-    'guest_link_expired': 'Questo link di invito è scaduto. Chiedi alla persona che ti ha invitato un nuovo link.',
+    'guest_link_expired':
+        'Questo link di invito è scaduto. Chiedi alla persona che ti ha invitato un nuovo link.',
     'guest_join_error': 'Impossibile unirsi alla chiamata. Riprova.',
     'guest_connecting': 'Accesso alla chiamata…',
     'lang_name_fr': 'Francese',
@@ -2214,19 +2309,24 @@ abstract final class AppStrings {
     'lang_name_zh': 'Cinese',
     'lang_name_ja': 'Giapponese',
     'lang_name_ko': 'Coreano',
-    'profile_call_language_warning': 'Durante le chiamate devi parlare solo {lang} affinché la traduzione funzioni.',
+    'profile_call_language_warning':
+        'Durante le chiamate devi parlare solo {lang} affinché la traduzione funzioni.',
     'sent_label': 'Inviato',
     'profile_email_private': 'Privato · visibile solo a te',
     'profile_signout': 'Esci',
     'profile_signout_confirm_title': 'Uscire?',
-    'profile_signout_confirm_body': 'Puoi accedere di nuovo con la tua email e password.',
+    'profile_signout_confirm_body':
+        'Puoi accedere di nuovo con la tua email e password.',
     'cancel': 'Annulla',
     'credits_remaining_inline': '{count} crediti rimasti questo mese',
     'credits_unlimited': 'Traduzione illimitata',
-    'credits_low_hint': 'Stanno per finire. Si ricaricano il mese prossimo — passa a un piano superiore se non vuoi aspettare.',
-    'credits_low_hint_native': 'Stanno per finire. Si ricaricano il mese prossimo.',
+    'credits_low_hint':
+        'Stanno per finire. Si ricaricano il mese prossimo — passa a un piano superiore se non vuoi aspettare.',
+    'credits_low_hint_native':
+        'Stanno per finire. Si ricaricano il mese prossimo.',
     'credits_used_total_inline': '{time} tradotti in totale',
-    'credits_exhausted_banner': 'Crediti esauriti — la traduzione è disattivata, la chiamata continua.',
+    'credits_exhausted_banner':
+        'Crediti esauriti — la traduzione è disattivata, la chiamata continua.',
     'login_title_signin': 'Bentornato',
     'login_title_signup': 'Crea un account',
     'login_subtitle_signin': 'Accedi al tuo account.',
@@ -2244,11 +2344,15 @@ abstract final class AppStrings {
     'login_have_account': 'Hai già un account?',
     'login_err_email': 'Inserisci un indirizzo email valido.',
     'login_err_password': 'La password deve contenere almeno 6 caratteri.',
-    'login_check_inbox': 'Controlla la tua casella di posta — ti abbiamo inviato un link di conferma.',
+    'login_check_inbox':
+        'Controlla la tua casella di posta — ti abbiamo inviato un link di conferma.',
     'login_resend_confirm': 'Invia di nuovo l\'email di conferma',
-    'login_resend_sent': 'Email di conferma inviata di nuovo. Controlla la tua casella di posta (e la cartella spam).',
-    'login_err_not_confirmed': 'Email non ancora confermata. Clicca sul link che ti abbiamo inviato, oppure invialo di nuovo.',
-    'login_reset_sent': 'Se esiste un account con quell\'email, è stato inviato un link di reimpostazione.',
+    'login_resend_sent':
+        'Email di conferma inviata di nuovo. Controlla la tua casella di posta (e la cartella spam).',
+    'login_err_not_confirmed':
+        'Email non ancora confermata. Clicca sul link che ti abbiamo inviato, oppure invialo di nuovo.',
+    'login_reset_sent':
+        'Se esiste un account con quell\'email, è stato inviato un link di reimpostazione.',
     'onb_country_label': 'Paese',
     'onb_country_hint': 'es. Italia',
     'onb_city_label': 'Città',
@@ -2260,32 +2364,41 @@ abstract final class AppStrings {
     'loc_other_city': 'Altra città…',
     'loc_other_city_hint': 'Inserisci la tua città',
     'onb_gender_title': 'Tu sei…',
-    'onb_gender_subtitle': 'Ci aiuta a usare il genere corretto (femminile, maschile) nella traduzione dei tuoi messaggi.',
+    'onb_gender_subtitle':
+        'Ci aiuta a usare il genere corretto (femminile, maschile) nella traduzione dei tuoi messaggi.',
     'onb_gender_male': 'Uomo',
     'onb_gender_female': 'Donna',
     'onb_gender_neutral': 'Neutro',
     'onb_need_gender': 'Scegli un\'opzione per continuare.',
     'onb_skip': 'Salta',
     'onb_city_title': 'La tua città',
-    'onb_city_subtitle': 'Da dove chiami? Ci aiuta a suggerirti persone vicine a te. (facoltativo)',
+    'onb_city_subtitle':
+        'Da dove chiami? Ci aiuta a suggerirti persone vicine a te. (facoltativo)',
     'onb_interests_title': 'I tuoi interessi',
-    'onb_interests_subtitle': 'Scorri tra le categorie e scegli ciò che ti rappresenta. (facoltativo)',
+    'onb_interests_subtitle':
+        'Scorri tra le categorie e scegli ciò che ti rappresenta. (facoltativo)',
     'onb_interests_count': '{n} / {max} selezionati',
     'onb_interests_max': 'Fino a {n} interessi.',
     'onb_gift_title': 'Regalo di benvenuto',
     'onb_gift_subtitle': 'Offre la casa — goditelo alla tua prima chiamata.',
     'onb_gift_headline': 'Benvenuto{hi} 🎉',
-    'onb_gift_body': 'Ti regaliamo 15 minuti di chiamate tradotte per iniziare. Nessuna carta richiesta.',
+    'onb_gift_body':
+        'Ti regaliamo 15 minuti di chiamate tradotte per iniziare. Nessuna carta richiesta.',
     'onb_gift_cta': 'Iniziamo 📞',
-    'voice_mic_denied': 'Accesso al microfono negato. Attivalo nelle impostazioni dell\'app.',
+    'voice_mic_denied':
+        'Accesso al microfono negato. Attivalo nelle impostazioni dell\'app.',
     'voice_recording_hint': 'Tocca per inviare, oppure elimina per annullare',
     'voice_message': 'Messaggio vocale',
     'voice_dub_listen': 'Ascolta la traduzione',
-    'voice_dub_upgrade': 'Passa a Plus per ascoltare i messaggi vocali tradotti ad alta voce.',
-    'voice_dub_quota': 'Limite mensile di traduzione raggiunto. Torna più tardi o passa a Ultra Plus.',
-    'voice_dub_failed': 'Riproduzione della traduzione non disponibile, riprova.',
+    'voice_dub_upgrade':
+        'Passa a Plus per ascoltare i messaggi vocali tradotti ad alta voce.',
+    'voice_dub_quota':
+        'Limite mensile di traduzione raggiunto. Torna più tardi o passa a Ultra Plus.',
+    'voice_dub_failed':
+        'Riproduzione della traduzione non disponibile, riprova.',
     'voice_clone_title': 'Clona la mia voce',
-    'voice_clone_subtitle': 'Registra 30 secondi mentre parli. I tuoi messaggi vocali verranno poi doppiati con la TUA voce per gli ascoltatori Ultra Plus.',
+    'voice_clone_subtitle':
+        'Registra 30 secondi mentre parli. I tuoi messaggi vocali verranno poi doppiati con la TUA voce per gli ascoltatori Ultra Plus.',
     'voice_clone_start': 'Registra',
     'voice_clone_redo': 'Rifai',
     'voice_clone_send': 'Invia',
@@ -2293,13 +2406,16 @@ abstract final class AppStrings {
     'voice_clone_success': 'Voce clonata! 🎙',
     'voice_clone_too_short': 'Servono almeno 20 secondi per clonare.',
     'voice_clone_failed': 'Clonazione non riuscita, riprova.',
-    'voice_clone_ultra_only': 'La clonazione della voce è riservata agli abbonati Ultra Plus.',
+    'voice_clone_ultra_only':
+        'La clonazione della voce è riservata agli abbonati Ultra Plus.',
     'voice_clone_enrolled_title': 'Voce clonata',
-    'voice_clone_enrolled_subtitle': 'I tuoi messaggi vocali ora vengono doppiati con la tua voce per gli ascoltatori Ultra Plus. Registra di nuovo in qualsiasi momento per aggiornare il clone.',
+    'voice_clone_enrolled_subtitle':
+        'I tuoi messaggi vocali ora vengono doppiati con la tua voce per gli ascoltatori Ultra Plus. Registra di nuovo in qualsiasi momento per aggiornare il clone.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Sblocca con Ultra Plus',
     'out_of_credits_title': 'Ops… crediti esauriti',
-    'out_of_credits_body': 'Ricarica per continuare a tradurre le tue chiamate in tempo reale.',
+    'out_of_credits_body':
+        'Ricarica per continuare a tradurre le tue chiamate in tempo reale.',
     'out_of_credits_cta': 'Ricarica',
   };
 
@@ -2321,7 +2437,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} quer ser teu amigo·a',
     'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
-        'Nas definições, decide se as pessoas do teu país podem ver a tua foto Discover.\nA foto contornada é a que aparece no Discover.',
+        'Nas **definições**, decide se as pessoas do teu país podem ver a tua **foto Discover**.\nA **foto contornada** é a que aparece no **Discover**.',
     'my_subscription_section': 'A minha subscrição',
     'tab_placeholder_soon': 'Em breve',
     'profile_title': 'Perfil',
@@ -2352,7 +2468,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Receber um like',
     'mission_receive_like_how': 'Alguém curte uma das tuas fotos',
     'missions_title': 'As tuas missões',
-    'missions_subtitle': 'Completa as 6 missões para ganhar {min} min de tradução ao vivo.',
+    'missions_subtitle':
+        'Completa as 6 missões para ganhar {min} min de tradução ao vivo.',
     'missions_unlock': '{min} min para desbloquear',
     'missions_earned': '+{min} min ganhos',
     'missions_done_short': 'Feito',
@@ -2428,7 +2545,8 @@ abstract final class AppStrings {
     'call_go_back': 'Voltar',
     'call_connecting': 'A ligar a {room}…',
     'call_connecting_short': 'A ligar para a chamada…',
-    'call_connecting_caller_pays': 'Uma só assinatura basta para traduzir a conversa.',
+    'call_connecting_caller_pays':
+        'Uma só assinatura basta para traduzir a conversa.',
     'call_waiting_title': 'À espera da outra pessoa…',
     'call_waiting_body': 'Partilha o mesmo nome de sala noutro dispositivo.',
     'call_leave_q': 'Sair da chamada?',
@@ -2558,7 +2676,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Eliminar conta',
     'settings_push': 'Notificações push',
     'settings_test_push': 'Enviar uma notificação de teste',
-    'settings_test_push_sent': 'Notificação enviada — coloque a aplicação em segundo plano para a ver chegar',
+    'settings_test_push_sent':
+        'Notificação enviada — coloque a aplicação em segundo plano para a ver chegar',
     'settings_test_push_body': 'Esta é uma notificação de teste ✅',
     'settings_sounds': 'Sons de notificação',
     'settings_in_app_sounds': 'Sons na aplicação',
@@ -2576,30 +2695,37 @@ abstract final class AppStrings {
     'settings_terms': 'Termos de utilização',
     'settings_privacy': 'Política de privacidade',
     'settings_version': 'Versão',
-    'settings_change_pwd_body': 'Será enviado um e-mail com um link de reposição para {email}. Pode escolher uma nova palavra-passe clicando no link.',
+    'settings_change_pwd_body':
+        'Será enviado um e-mail com um link de reposição para {email}. Pode escolher uma nova palavra-passe clicando no link.',
     'settings_change_pwd_confirm': 'Enviar link',
     'settings_delete_title': 'Eliminar conta?',
-    'settings_delete_body': 'O seu perfil, amigos e pedidos serão apagados. A sua sessão será encerrada de imediato. Esta ação não pode ser anulada.',
+    'settings_delete_body':
+        'O seu perfil, amigos e pedidos serão apagados. A sua sessão será encerrada de imediato. Esta ação não pode ser anulada.',
     'settings_delete_confirm': 'Eliminar',
     'settings_save_failed': 'Não foi possível guardar esta definição.',
     'settings_email_not_found': 'Endereço de e-mail não encontrado.',
     'settings_email_sent': 'E-mail enviado. Verifique a sua caixa de entrada.',
-    'settings_subscription_appstore': 'Faça a gestão da sua subscrição na App Store / Play Store.',
+    'settings_subscription_appstore':
+        'Faça a gestão da sua subscrição na App Store / Play Store.',
     'settings_restore_soon': 'Restauro de compras — em breve.',
     'settings_help_soon': 'Centro de ajuda — em breve.',
-    'settings_contact_soon': 'Escreva-nos para support@swayco.app (mailto em breve).',
+    'settings_contact_soon':
+        'Escreva-nos para support@swayco.app (mailto em breve).',
     'settings_terms_soon': 'Termos de utilização — em breve.',
     'settings_privacy_soon': 'Política de privacidade — em breve.',
     'blocked_title': 'Bloqueados',
     'blocked_unblock_title_q': 'Desbloquear {name}?',
-    'blocked_unblock_body': 'Poderá voltar a encontrá-lo, contactá-lo e ver as suas mensagens.',
+    'blocked_unblock_body':
+        'Poderá voltar a encontrá-lo, contactá-lo e ver as suas mensagens.',
     'blocked_unblock_confirm': 'Desbloquear',
     'blocked_empty_title': 'Sem utilizadores bloqueados',
-    'blocked_empty_body': 'Bloqueie um perfil a partir do menu de uma conversa.',
+    'blocked_empty_body':
+        'Bloqueie um perfil a partir do menu de uma conversa.',
     'error_prefix': 'Erro: {msg}',
     'report': 'Denunciar',
     'report_q': 'Denunciar {name}?',
-    'report_body': 'Escolha um motivo. A nossa equipa analisa todas as denúncias.',
+    'report_body':
+        'Escolha um motivo. A nossa equipa analisa todas as denúncias.',
     'report_details_hint': 'Mais detalhes (opcional)',
     'report_submit': 'Enviar denúncia',
     'report_thanks': 'Denúncia enviada. Obrigado.',
@@ -2612,17 +2738,22 @@ abstract final class AppStrings {
     'report_reason_scam': 'Burla',
     'report_reason_other': 'Outro',
     'discover_message_sent': 'Mensagem enviada',
-    'invite_share_text': 'Junte-se a mim no Swayco 🌍 — videochamadas com tradução em tempo real. Registe-se com o meu link e ambos ganhamos tempo de chamada extra: {link}',
+    'invite_share_text':
+        'Junte-se a mim no Swayco 🌍 — videochamadas com tradução em tempo real. Registe-se com o meu link e ambos ganhamos tempo de chamada extra: {link}',
     'invite_bonus_title': 'Convida 3 amigos e ganha 15 min',
-    'invite_bonus_body': 'Convida 3 amigos que se registem com o teu link e recebe 15 min de tradução ao vivo, automaticamente.',
+    'invite_bonus_body':
+        'Convida 3 amigos que se registem com o teu link e recebe 15 min de tradução ao vivo, automaticamente.',
     'invite_bonus_progress': 'Indicações registadas: {count} / {total}',
     'invite_bonus_share_cta': 'Partilhar o meu link',
     'invite_bonus_later': 'Mais tarde',
     'invite_to_call': 'Convidar para uma chamada',
-    'invite_call_share_text': 'Junte-se à minha videochamada com tradução em direto no Swayco 🌍 — basta tocar, sem necessidade de conta: {link}',
+    'invite_call_share_text':
+        'Junte-se à minha videochamada com tradução em direto no Swayco 🌍 — basta tocar, sem necessidade de conta: {link}',
     'invite_call_creating': 'A criar link…',
-    'invite_call_failed': 'Não foi possível criar o link de convite. Tente novamente.',
-    'invite_call_need_profile': 'Complete o seu perfil (nome + idioma) antes de convidar alguém.',
+    'invite_call_failed':
+        'Não foi possível criar o link de convite. Tente novamente.',
+    'invite_call_need_profile':
+        'Complete o seu perfil (nome + idioma) antes de convidar alguém.',
     'call_share_invite': 'Partilhar o link',
     'guest_title': 'Juntar-se à chamada',
     'guest_subtitle': 'Não precisa de conta. Escolha o seu idioma e junte-se.',
@@ -2630,8 +2761,10 @@ abstract final class AppStrings {
     'guest_lang_label': 'Você fala…',
     'guest_join_cta': 'Juntar-se à chamada',
     'guest_need_lang': 'Escolha o seu idioma',
-    'guest_link_expired': 'Este link de convite expirou. Peça um novo à pessoa que o convidou.',
-    'guest_join_error': 'Não foi possível juntar-se à chamada. Tente novamente.',
+    'guest_link_expired':
+        'Este link de convite expirou. Peça um novo à pessoa que o convidou.',
+    'guest_join_error':
+        'Não foi possível juntar-se à chamada. Tente novamente.',
     'guest_connecting': 'A juntar-se à chamada…',
     'lang_name_fr': 'Francês',
     'lang_name_en': 'Inglês',
@@ -2645,19 +2778,23 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinês',
     'lang_name_ja': 'Japonês',
     'lang_name_ko': 'Coreano',
-    'profile_call_language_warning': 'Durante as chamadas tem de falar apenas {lang} para que a tradução funcione.',
+    'profile_call_language_warning':
+        'Durante as chamadas tem de falar apenas {lang} para que a tradução funcione.',
     'sent_label': 'Enviado',
     'profile_email_private': 'Privado · visível apenas para si',
     'profile_signout': 'Terminar sessão',
     'profile_signout_confirm_title': 'Terminar sessão?',
-    'profile_signout_confirm_body': 'Pode voltar a iniciar sessão com o seu e-mail e palavra-passe.',
+    'profile_signout_confirm_body':
+        'Pode voltar a iniciar sessão com o seu e-mail e palavra-passe.',
     'cancel': 'Cancelar',
     'credits_remaining_inline': '{count} créditos restantes este mês',
     'credits_unlimited': 'Tradução ilimitada',
-    'credits_low_hint': 'A esgotar. Recarrega no próximo mês — faça upgrade se não quiser esperar.',
+    'credits_low_hint':
+        'A esgotar. Recarrega no próximo mês — faça upgrade se não quiser esperar.',
     'credits_low_hint_native': 'A esgotar. Recarrega no próximo mês.',
     'credits_used_total_inline': '{time} traduzidos no total',
-    'credits_exhausted_banner': 'Sem créditos — a tradução está desligada, mas a chamada continua.',
+    'credits_exhausted_banner':
+        'Sem créditos — a tradução está desligada, mas a chamada continua.',
     'login_title_signin': 'Bem-vindo de volta',
     'login_title_signup': 'Criar uma conta',
     'login_subtitle_signin': 'Inicie sessão na sua conta.',
@@ -2675,11 +2812,15 @@ abstract final class AppStrings {
     'login_have_account': 'Já tem uma conta?',
     'login_err_email': 'Introduza um endereço de e-mail válido.',
     'login_err_password': 'A palavra-passe deve ter pelo menos 6 caracteres.',
-    'login_check_inbox': 'Verifique a sua caixa de entrada — enviámos-lhe um link de confirmação.',
+    'login_check_inbox':
+        'Verifique a sua caixa de entrada — enviámos-lhe um link de confirmação.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
-    'login_resend_sent': 'E-mail de confirmação reenviado. Verifique a sua caixa de entrada (e a pasta de spam).',
-    'login_err_not_confirmed': 'E-mail ainda não confirmado. Clique no link que lhe enviámos ou reenvie-o.',
-    'login_reset_sent': 'Se existir uma conta para esse e-mail, foi enviado um link de reposição.',
+    'login_resend_sent':
+        'E-mail de confirmação reenviado. Verifique a sua caixa de entrada (e a pasta de spam).',
+    'login_err_not_confirmed':
+        'E-mail ainda não confirmado. Clique no link que lhe enviámos ou reenvie-o.',
+    'login_reset_sent':
+        'Se existir uma conta para esse e-mail, foi enviado um link de reposição.',
     'onb_country_label': 'País',
     'onb_country_hint': 'ex.: Portugal',
     'onb_city_label': 'Cidade',
@@ -2691,32 +2832,41 @@ abstract final class AppStrings {
     'loc_other_city': 'Outra cidade…',
     'loc_other_city_hint': 'Introduza a sua cidade',
     'onb_gender_title': 'Você é…',
-    'onb_gender_subtitle': 'Ajuda-nos a acertar a concordância de género (feminino, masculino) ao traduzir as suas mensagens.',
+    'onb_gender_subtitle':
+        'Ajuda-nos a acertar a concordância de género (feminino, masculino) ao traduzir as suas mensagens.',
     'onb_gender_male': 'Homem',
     'onb_gender_female': 'Mulher',
     'onb_gender_neutral': 'Neutro',
     'onb_need_gender': 'Escolha uma opção para continuar.',
     'onb_skip': 'Ignorar',
     'onb_city_title': 'A sua cidade',
-    'onb_city_subtitle': 'De onde está a ligar? Ajuda-nos a sugerir pessoas perto de si. (opcional)',
+    'onb_city_subtitle':
+        'De onde está a ligar? Ajuda-nos a sugerir pessoas perto de si. (opcional)',
     'onb_interests_title': 'Os seus interesses',
-    'onb_interests_subtitle': 'Percorra as categorias e escolha o que combina consigo. (opcional)',
+    'onb_interests_subtitle':
+        'Percorra as categorias e escolha o que combina consigo. (opcional)',
     'onb_interests_count': '{n} / {max} selecionados',
     'onb_interests_max': 'Até {n} interesses.',
     'onb_gift_title': 'Presente de boas-vindas',
-    'onb_gift_subtitle': 'É por nossa conta — aproveite-o na sua primeira chamada.',
+    'onb_gift_subtitle':
+        'É por nossa conta — aproveite-o na sua primeira chamada.',
     'onb_gift_headline': 'Bem-vindo{hi} 🎉',
-    'onb_gift_body': 'Estamos a oferecer-lhe 15 minutos de chamadas com tradução para começar. Não é necessário cartão.',
+    'onb_gift_body':
+        'Estamos a oferecer-lhe 15 minutos de chamadas com tradução para começar. Não é necessário cartão.',
     'onb_gift_cta': 'Vamos lá 📞',
-    'voice_mic_denied': 'Acesso ao microfone negado. Ative-o nas definições da aplicação.',
+    'voice_mic_denied':
+        'Acesso ao microfone negado. Ative-o nas definições da aplicação.',
     'voice_recording_hint': 'Toque para enviar ou elimine para cancelar',
     'voice_message': 'Mensagem de voz',
     'voice_dub_listen': 'Ouvir a tradução',
-    'voice_dub_upgrade': 'Faça upgrade para o Plus para ouvir as mensagens de voz traduzidas em voz alta.',
-    'voice_dub_quota': 'Limite mensal de tradução atingido. Volte mais tarde ou faça upgrade para o Ultra Plus.',
+    'voice_dub_upgrade':
+        'Faça upgrade para o Plus para ouvir as mensagens de voz traduzidas em voz alta.',
+    'voice_dub_quota':
+        'Limite mensal de tradução atingido. Volte mais tarde ou faça upgrade para o Ultra Plus.',
     'voice_dub_failed': 'Reprodução da tradução indisponível, tente novamente.',
     'voice_clone_title': 'Clonar a minha voz',
-    'voice_clone_subtitle': 'Grave 30 segundos a falar. As suas mensagens de voz passarão a ser dobradas com a SUA voz para os ouvintes Ultra Plus.',
+    'voice_clone_subtitle':
+        'Grave 30 segundos a falar. As suas mensagens de voz passarão a ser dobradas com a SUA voz para os ouvintes Ultra Plus.',
     'voice_clone_start': 'Gravar',
     'voice_clone_redo': 'Repetir',
     'voice_clone_send': 'Enviar',
@@ -2724,13 +2874,16 @@ abstract final class AppStrings {
     'voice_clone_success': 'Voz clonada! 🎙',
     'voice_clone_too_short': 'Precisa de pelo menos 20 segundos para clonar.',
     'voice_clone_failed': 'A clonagem falhou, tente novamente.',
-    'voice_clone_ultra_only': 'A clonagem de voz está reservada aos subscritores Ultra Plus.',
+    'voice_clone_ultra_only':
+        'A clonagem de voz está reservada aos subscritores Ultra Plus.',
     'voice_clone_enrolled_title': 'Voz clonada',
-    'voice_clone_enrolled_subtitle': 'As suas mensagens de voz são agora dobradas com a sua própria voz para os ouvintes Ultra Plus. Volte a gravar a qualquer momento para atualizar o clone.',
+    'voice_clone_enrolled_subtitle':
+        'As suas mensagens de voz são agora dobradas com a sua própria voz para os ouvintes Ultra Plus. Volte a gravar a qualquer momento para atualizar o clone.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Desbloquear com o Ultra Plus',
     'out_of_credits_title': 'Ups… sem créditos',
-    'out_of_credits_body': 'Recarrega para continuares a traduzir as tuas chamadas em tempo real.',
+    'out_of_credits_body':
+        'Recarrega para continuares a traduzir as tuas chamadas em tempo real.',
     'out_of_credits_cta': 'Recarregar',
   };
 
@@ -2752,7 +2905,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} wil je vriend worden',
     'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
-        'Bepaal in de instellingen of mensen uit jouw land je Discover-foto kunnen zien.\nDe omkaderde foto verschijnt in Discover.',
+        'Bepaal in de **instellingen** of mensen uit jouw land je **Discover-foto** kunnen zien.\nDe **omkaderde foto** verschijnt in **Discover**.',
     'my_subscription_section': 'Mijn abonnement',
     'tab_placeholder_soon': 'Binnenkort',
     'profile_title': 'Profiel',
@@ -2783,7 +2936,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Een like ontvangen',
     'mission_receive_like_how': 'Iemand liket een van je foto\'s',
     'missions_title': 'Je missies',
-    'missions_subtitle': 'Voltooi alle 6 missies voor {min} min live vertaling.',
+    'missions_subtitle':
+        'Voltooi alle 6 missies voor {min} min live vertaling.',
     'missions_unlock': '{min} min te ontgrendelen',
     'missions_earned': '+{min} min verdiend',
     'missions_done_short': 'Gedaan',
@@ -2859,7 +3013,8 @@ abstract final class AppStrings {
     'call_go_back': 'Terug',
     'call_connecting': 'Verbinden met {room}…',
     'call_connecting_short': 'Verbinden met gesprek…',
-    'call_connecting_caller_pays': 'Eén abonnement is genoeg om het gesprek te vertalen.',
+    'call_connecting_caller_pays':
+        'Eén abonnement is genoeg om het gesprek te vertalen.',
     'call_waiting_title': 'Wachten op de andere persoon…',
     'call_waiting_body': 'Deel dezelfde kamernaam op een ander apparaat.',
     'call_leave_q': 'Oproep verlaten?',
@@ -2990,7 +3145,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Account verwijderen',
     'settings_push': 'Pushmeldingen',
     'settings_test_push': 'Een testmelding sturen',
-    'settings_test_push_sent': 'Melding verstuurd — zet de app op de achtergrond om hem te zien aankomen',
+    'settings_test_push_sent':
+        'Melding verstuurd — zet de app op de achtergrond om hem te zien aankomen',
     'settings_test_push_body': 'Dit is een testmelding ✅',
     'settings_sounds': 'Meldingsgeluiden',
     'settings_in_app_sounds': 'Geluiden in de app',
@@ -3008,23 +3164,28 @@ abstract final class AppStrings {
     'settings_terms': 'Gebruiksvoorwaarden',
     'settings_privacy': 'Privacybeleid',
     'settings_version': 'Versie',
-    'settings_change_pwd_body': 'Er wordt een e-mail met een herstellink gestuurd naar {email}. Via de link kun je een nieuw wachtwoord kiezen.',
+    'settings_change_pwd_body':
+        'Er wordt een e-mail met een herstellink gestuurd naar {email}. Via de link kun je een nieuw wachtwoord kiezen.',
     'settings_change_pwd_confirm': 'Link sturen',
     'settings_delete_title': 'Account verwijderen?',
-    'settings_delete_body': 'Je profiel, vrienden en verzoeken worden gewist. Je wordt meteen uitgelogd. Deze actie kan niet ongedaan worden gemaakt.',
+    'settings_delete_body':
+        'Je profiel, vrienden en verzoeken worden gewist. Je wordt meteen uitgelogd. Deze actie kan niet ongedaan worden gemaakt.',
     'settings_delete_confirm': 'Verwijderen',
     'settings_save_failed': 'Deze instelling kon niet worden opgeslagen.',
     'settings_email_not_found': 'E-mailadres niet gevonden.',
     'settings_email_sent': 'E-mail verstuurd. Controleer je inbox.',
-    'settings_subscription_appstore': 'Beheer je abonnement via de App Store / Play Store.',
+    'settings_subscription_appstore':
+        'Beheer je abonnement via de App Store / Play Store.',
     'settings_restore_soon': 'Aankoop herstellen — binnenkort beschikbaar.',
     'settings_help_soon': 'Helpcentrum — binnenkort beschikbaar.',
-    'settings_contact_soon': 'Schrijf ons op support@swayco.app (mailto binnenkort beschikbaar).',
+    'settings_contact_soon':
+        'Schrijf ons op support@swayco.app (mailto binnenkort beschikbaar).',
     'settings_terms_soon': 'Gebruiksvoorwaarden — binnenkort beschikbaar.',
     'settings_privacy_soon': 'Privacybeleid — binnenkort beschikbaar.',
     'blocked_title': 'Geblokkeerd',
     'blocked_unblock_title_q': '{name} deblokkeren?',
-    'blocked_unblock_body': 'Diegene kan je weer vinden, contact met je opnemen en je berichten zien.',
+    'blocked_unblock_body':
+        'Diegene kan je weer vinden, contact met je opnemen en je berichten zien.',
     'blocked_unblock_confirm': 'Deblokkeren',
     'blocked_empty_title': 'Geen geblokkeerde gebruikers',
     'blocked_empty_body': 'Blokkeer een profiel via het menu van een gesprek.',
@@ -3044,17 +3205,22 @@ abstract final class AppStrings {
     'report_reason_scam': 'Oplichting',
     'report_reason_other': 'Overig',
     'discover_message_sent': 'Bericht verstuurd',
-    'invite_share_text': 'Doe met me mee op Swayco 🌍 — videogesprekken met realtime vertaling. Meld je aan met mijn link en we krijgen allebei extra belminuten: {link}',
+    'invite_share_text':
+        'Doe met me mee op Swayco 🌍 — videogesprekken met realtime vertaling. Meld je aan met mijn link en we krijgen allebei extra belminuten: {link}',
     'invite_bonus_title': 'Nodig 3 vrienden uit, verdien 15 min',
-    'invite_bonus_body': 'Nodig 3 vrienden uit die zich met jouw link aanmelden en krijg automatisch 15 min live vertaling.',
+    'invite_bonus_body':
+        'Nodig 3 vrienden uit die zich met jouw link aanmelden en krijg automatisch 15 min live vertaling.',
     'invite_bonus_progress': 'Aangemelde verwijzingen: {count} / {total}',
     'invite_bonus_share_cta': 'Mijn link delen',
     'invite_bonus_later': 'Later',
     'invite_to_call': 'Uitnodigen voor een gesprek',
-    'invite_call_share_text': 'Doe mee aan mijn livevertaalde videogesprek op Swayco 🌍 — gewoon tikken, geen account nodig: {link}',
+    'invite_call_share_text':
+        'Doe mee aan mijn livevertaalde videogesprek op Swayco 🌍 — gewoon tikken, geen account nodig: {link}',
     'invite_call_creating': 'Link maken…',
-    'invite_call_failed': 'De uitnodigingslink kon niet worden gemaakt. Probeer opnieuw.',
-    'invite_call_need_profile': 'Maak je profiel compleet (naam + taal) voordat je iemand uitnodigt.',
+    'invite_call_failed':
+        'De uitnodigingslink kon niet worden gemaakt. Probeer opnieuw.',
+    'invite_call_need_profile':
+        'Maak je profiel compleet (naam + taal) voordat je iemand uitnodigt.',
     'call_share_invite': 'De link delen',
     'guest_title': 'Deelnemen aan het gesprek',
     'guest_subtitle': 'Geen account nodig. Kies je taal en doe mee.',
@@ -3062,8 +3228,10 @@ abstract final class AppStrings {
     'guest_lang_label': 'Jij spreekt…',
     'guest_join_cta': 'Deelnemen aan het gesprek',
     'guest_need_lang': 'Kies je taal',
-    'guest_link_expired': 'Deze uitnodigingslink is verlopen. Vraag de persoon die je uitnodigde om een nieuwe.',
-    'guest_join_error': 'Deelnemen aan het gesprek is mislukt. Probeer opnieuw.',
+    'guest_link_expired':
+        'Deze uitnodigingslink is verlopen. Vraag de persoon die je uitnodigde om een nieuwe.',
+    'guest_join_error':
+        'Deelnemen aan het gesprek is mislukt. Probeer opnieuw.',
     'guest_connecting': 'Deelnemen aan het gesprek…',
     'lang_name_fr': 'Frans',
     'lang_name_en': 'Engels',
@@ -3077,19 +3245,23 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinees',
     'lang_name_ja': 'Japans',
     'lang_name_ko': 'Koreaans',
-    'profile_call_language_warning': 'Tijdens gesprekken moet je alleen {lang} spreken zodat de vertaling werkt.',
+    'profile_call_language_warning':
+        'Tijdens gesprekken moet je alleen {lang} spreken zodat de vertaling werkt.',
     'sent_label': 'Verzonden',
     'profile_email_private': 'Privé · alleen zichtbaar voor jou',
     'profile_signout': 'Uitloggen',
     'profile_signout_confirm_title': 'Uitloggen?',
-    'profile_signout_confirm_body': 'Je kunt weer inloggen met je e-mailadres en wachtwoord.',
+    'profile_signout_confirm_body':
+        'Je kunt weer inloggen met je e-mailadres en wachtwoord.',
     'cancel': 'Annuleren',
     'credits_remaining_inline': 'Nog {count} tegoeden deze maand',
     'credits_unlimited': 'Onbeperkt vertalen',
-    'credits_low_hint': 'Bijna op. Wordt volgende maand aangevuld — upgrade als je niet wilt wachten.',
+    'credits_low_hint':
+        'Bijna op. Wordt volgende maand aangevuld — upgrade als je niet wilt wachten.',
     'credits_low_hint_native': 'Bijna op. Wordt volgende maand aangevuld.',
     'credits_used_total_inline': 'In totaal {time} vertaald',
-    'credits_exhausted_banner': 'Tegoed op — vertaling staat uit, het gesprek gaat door.',
+    'credits_exhausted_banner':
+        'Tegoed op — vertaling staat uit, het gesprek gaat door.',
     'login_title_signin': 'Welkom terug',
     'login_title_signup': 'Een account aanmaken',
     'login_subtitle_signin': 'Log in op je account.',
@@ -3107,11 +3279,15 @@ abstract final class AppStrings {
     'login_have_account': 'Heb je al een account?',
     'login_err_email': 'Voer een geldig e-mailadres in.',
     'login_err_password': 'Het wachtwoord moet minstens 6 tekens bevatten.',
-    'login_check_inbox': 'Controleer je inbox — we hebben je een bevestigingslink gestuurd.',
+    'login_check_inbox':
+        'Controleer je inbox — we hebben je een bevestigingslink gestuurd.',
     'login_resend_confirm': 'Bevestigingsmail opnieuw sturen',
-    'login_resend_sent': 'Bevestigingsmail opnieuw verstuurd. Controleer je inbox (en de spammap).',
-    'login_err_not_confirmed': 'E-mail nog niet bevestigd. Klik op de link die we je stuurden of vraag een nieuwe aan.',
-    'login_reset_sent': 'Als er een account bestaat voor dat e-mailadres, is er een herstellink verstuurd.',
+    'login_resend_sent':
+        'Bevestigingsmail opnieuw verstuurd. Controleer je inbox (en de spammap).',
+    'login_err_not_confirmed':
+        'E-mail nog niet bevestigd. Klik op de link die we je stuurden of vraag een nieuwe aan.',
+    'login_reset_sent':
+        'Als er een account bestaat voor dat e-mailadres, is er een herstellink verstuurd.',
     'onb_country_label': 'Land',
     'onb_country_hint': 'bijv. Frankrijk',
     'onb_city_label': 'Stad',
@@ -3123,32 +3299,40 @@ abstract final class AppStrings {
     'loc_other_city': 'Andere stad…',
     'loc_other_city_hint': 'Voer je stad in',
     'onb_gender_title': 'Jij bent…',
-    'onb_gender_subtitle': 'Helpt ons de juiste vorm (vrouwelijk, mannelijk) te kiezen bij het vertalen van je berichten.',
+    'onb_gender_subtitle':
+        'Helpt ons de juiste vorm (vrouwelijk, mannelijk) te kiezen bij het vertalen van je berichten.',
     'onb_gender_male': 'Man',
     'onb_gender_female': 'Vrouw',
     'onb_gender_neutral': 'Neutraal',
     'onb_need_gender': 'Kies een optie om door te gaan.',
     'onb_skip': 'Overslaan',
     'onb_city_title': 'Jouw stad',
-    'onb_city_subtitle': 'Waar bel je vandaan? Helpt ons mensen bij jou in de buurt voor te stellen. (optioneel)',
+    'onb_city_subtitle':
+        'Waar bel je vandaan? Helpt ons mensen bij jou in de buurt voor te stellen. (optioneel)',
     'onb_interests_title': 'Jouw interesses',
-    'onb_interests_subtitle': 'Veeg door de categorieën en kies wat bij je past. (optioneel)',
+    'onb_interests_subtitle':
+        'Veeg door de categorieën en kies wat bij je past. (optioneel)',
     'onb_interests_count': '{n} / {max} geselecteerd',
     'onb_interests_max': 'Maximaal {n} interesses.',
     'onb_gift_title': 'Welkomstcadeau',
     'onb_gift_subtitle': 'Van ons — geniet ervan tijdens je eerste gesprek.',
     'onb_gift_headline': 'Welkom{hi} 🎉',
-    'onb_gift_body': 'We geven je 15 minuten vertaald bellen om te beginnen. Geen kaart nodig.',
+    'onb_gift_body':
+        'We geven je 15 minuten vertaald bellen om te beginnen. Geen kaart nodig.',
     'onb_gift_cta': 'We gaan 📞',
-    'voice_mic_denied': 'Toegang tot de microfoon geweigerd. Schakel het in bij de app-instellingen.',
+    'voice_mic_denied':
+        'Toegang tot de microfoon geweigerd. Schakel het in bij de app-instellingen.',
     'voice_recording_hint': 'Tik om te versturen, of verwijder om te annuleren',
     'voice_message': 'Spraakbericht',
     'voice_dub_listen': 'Luister naar de vertaling',
-    'voice_dub_upgrade': 'Upgrade naar Plus om spraakberichten hardop vertaald te horen.',
-    'voice_dub_quota': 'Maandelijkse vertaallimiet bereikt. Kom later terug of upgrade naar Ultra Plus.',
+    'voice_dub_upgrade':
+        'Upgrade naar Plus om spraakberichten hardop vertaald te horen.',
+    'voice_dub_quota':
+        'Maandelijkse vertaallimiet bereikt. Kom later terug of upgrade naar Ultra Plus.',
     'voice_dub_failed': 'Vertaalde weergave niet beschikbaar, probeer opnieuw.',
     'voice_clone_title': 'Mijn stem klonen',
-    'voice_clone_subtitle': 'Neem 30 seconden van jezelf op terwijl je praat. Je spraakberichten worden dan in JOUW stem nagesproken voor Ultra Plus-luisteraars.',
+    'voice_clone_subtitle':
+        'Neem 30 seconden van jezelf op terwijl je praat. Je spraakberichten worden dan in JOUW stem nagesproken voor Ultra Plus-luisteraars.',
     'voice_clone_start': 'Opnemen',
     'voice_clone_redo': 'Opnieuw',
     'voice_clone_send': 'Versturen',
@@ -3156,13 +3340,16 @@ abstract final class AppStrings {
     'voice_clone_success': 'Stem gekloond! 🎙',
     'voice_clone_too_short': 'Je hebt minstens 20 seconden nodig om te klonen.',
     'voice_clone_failed': 'Klonen mislukt, probeer het opnieuw.',
-    'voice_clone_ultra_only': 'Stem klonen is voorbehouden aan Ultra Plus-abonnees.',
+    'voice_clone_ultra_only':
+        'Stem klonen is voorbehouden aan Ultra Plus-abonnees.',
     'voice_clone_enrolled_title': 'Stem gekloond',
-    'voice_clone_enrolled_subtitle': 'Je spraakberichten worden nu in je eigen stem nagesproken voor Ultra Plus-luisteraars. Neem op elk moment opnieuw op om de kloon te vernieuwen.',
+    'voice_clone_enrolled_subtitle':
+        'Je spraakberichten worden nu in je eigen stem nagesproken voor Ultra Plus-luisteraars. Neem op elk moment opnieuw op om de kloon te vernieuwen.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ontgrendelen met Ultra Plus',
     'out_of_credits_title': 'Oeps… geen tegoed meer',
-    'out_of_credits_body': 'Vul aan om je gesprekken in realtime te blijven vertalen.',
+    'out_of_credits_body':
+        'Vul aan om je gesprekken in realtime te blijven vertalen.',
     'out_of_credits_cta': 'Aanvullen',
   };
 
@@ -3184,7 +3371,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} يريد أن يصبح صديقك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
     'discover_visibility_hint':
-        'في الإعدادات، قرّر إن كان بإمكان الأشخاص من بلدك رؤية صورتك في ديسكفر.\nالصورة المحاطة بإطار هي التي تظهر في ديسكفر.',
+        'في **الإعدادات**، قرّر إن كان بإمكان الأشخاص من بلدك رؤية **صورتك في ديسكفر**.\n**الصورة المحاطة بإطار** هي التي تظهر في **ديسكفر**.',
     'my_subscription_section': 'اشتراكي',
     'tab_placeholder_soon': 'قريباً',
     'profile_title': 'الملف الشخصي',
@@ -3418,7 +3605,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'حذف الحساب',
     'settings_push': 'الإشعارات الفورية',
     'settings_test_push': 'إرسال إشعار تجريبي',
-    'settings_test_push_sent': 'تم إرسال الإشعار — أبقِ التطبيق في الخلفية لتراه يصل',
+    'settings_test_push_sent':
+        'تم إرسال الإشعار — أبقِ التطبيق في الخلفية لتراه يصل',
     'settings_test_push_body': 'هذا إشعار تجريبي ✅',
     'settings_sounds': 'أصوات الإشعارات',
     'settings_in_app_sounds': 'أصوات داخل التطبيق',
@@ -3436,10 +3624,12 @@ abstract final class AppStrings {
     'settings_terms': 'شروط الاستخدام',
     'settings_privacy': 'سياسة الخصوصية',
     'settings_version': 'الإصدار',
-    'settings_change_pwd_body': 'سيتم إرسال رسالة تحتوي على رابط إعادة التعيين إلى {email}. يمكنك اختيار كلمة مرور جديدة بالنقر على الرابط.',
+    'settings_change_pwd_body':
+        'سيتم إرسال رسالة تحتوي على رابط إعادة التعيين إلى {email}. يمكنك اختيار كلمة مرور جديدة بالنقر على الرابط.',
     'settings_change_pwd_confirm': 'إرسال الرابط',
     'settings_delete_title': 'حذف الحساب؟',
-    'settings_delete_body': 'سيتم محو ملفك الشخصي وأصدقائك والطلبات. سيتم تسجيل خروجك فورًا. لا يمكن التراجع عن هذا الإجراء.',
+    'settings_delete_body':
+        'سيتم محو ملفك الشخصي وأصدقائك والطلبات. سيتم تسجيل خروجك فورًا. لا يمكن التراجع عن هذا الإجراء.',
     'settings_delete_confirm': 'حذف',
     'settings_save_failed': 'تعذّر حفظ هذا الإعداد.',
     'settings_email_not_found': 'عنوان البريد الإلكتروني غير موجود.',
@@ -3447,12 +3637,14 @@ abstract final class AppStrings {
     'settings_subscription_appstore': 'أدِر اشتراكك من App Store / Play Store.',
     'settings_restore_soon': 'استعادة الشراء — قريبًا.',
     'settings_help_soon': 'مركز المساعدة — قريبًا.',
-    'settings_contact_soon': 'راسلنا على support@swayco.app (إرسال البريد قريبًا).',
+    'settings_contact_soon':
+        'راسلنا على support@swayco.app (إرسال البريد قريبًا).',
     'settings_terms_soon': 'شروط الاستخدام — قريبًا.',
     'settings_privacy_soon': 'سياسة الخصوصية — قريبًا.',
     'blocked_title': 'محظور',
     'blocked_unblock_title_q': 'إلغاء حظر {name}؟',
-    'blocked_unblock_body': 'سيتمكن من العثور عليك والتواصل معك ورؤية رسائلك مجددًا.',
+    'blocked_unblock_body':
+        'سيتمكن من العثور عليك والتواصل معك ورؤية رسائلك مجددًا.',
     'blocked_unblock_confirm': 'إلغاء الحظر',
     'blocked_empty_title': 'لا يوجد مستخدمون محظورون',
     'blocked_empty_body': 'احظر ملفًا شخصيًا من قائمة المحادثة.',
@@ -3472,17 +3664,21 @@ abstract final class AppStrings {
     'report_reason_scam': 'احتيال',
     'report_reason_other': 'أخرى',
     'discover_message_sent': 'تم إرسال الرسالة',
-    'invite_share_text': 'انضم إليّ على Swayco 🌍 — مكالمات فيديو بترجمة فورية. سجّل عبر رابطي ونحصل كلانا على وقت مكالمات إضافي: {link}',
+    'invite_share_text':
+        'انضم إليّ على Swayco 🌍 — مكالمات فيديو بترجمة فورية. سجّل عبر رابطي ونحصل كلانا على وقت مكالمات إضافي: {link}',
     'invite_bonus_title': 'ادعُ 3 أصدقاء واحصل على 15 دقيقة',
-    'invite_bonus_body': 'ادعُ 3 أصدقاء يسجّلون عبر رابطك واحصل تلقائيًا على 15 دقيقة ترجمة مباشرة.',
+    'invite_bonus_body':
+        'ادعُ 3 أصدقاء يسجّلون عبر رابطك واحصل تلقائيًا على 15 دقيقة ترجمة مباشرة.',
     'invite_bonus_progress': 'الدعوات المسجَّلة: {count} / {total}',
     'invite_bonus_share_cta': 'مشاركة رابطي',
     'invite_bonus_later': 'لاحقًا',
     'invite_to_call': 'دعوة إلى مكالمة',
-    'invite_call_share_text': 'انضم إلى مكالمة الفيديو المترجمة مباشرةً على Swayco 🌍 — اضغط فقط، دون الحاجة إلى حساب: {link}',
+    'invite_call_share_text':
+        'انضم إلى مكالمة الفيديو المترجمة مباشرةً على Swayco 🌍 — اضغط فقط، دون الحاجة إلى حساب: {link}',
     'invite_call_creating': 'جارٍ إنشاء الرابط…',
     'invite_call_failed': 'تعذّر إنشاء رابط الدعوة. حاول مجددًا.',
-    'invite_call_need_profile': 'أكمل ملفك الشخصي (الاسم + اللغة) قبل دعوة أحد.',
+    'invite_call_need_profile':
+        'أكمل ملفك الشخصي (الاسم + اللغة) قبل دعوة أحد.',
     'call_share_invite': 'مشاركة الرابط',
     'guest_title': 'الانضمام إلى المكالمة',
     'guest_subtitle': 'لا حاجة إلى حساب. اختر لغتك ثم انضم.',
@@ -3490,7 +3686,8 @@ abstract final class AppStrings {
     'guest_lang_label': 'أنت تتحدث…',
     'guest_join_cta': 'الانضمام إلى المكالمة',
     'guest_need_lang': 'اختر لغتك',
-    'guest_link_expired': 'انتهت صلاحية رابط الدعوة هذا. اطلب رابطًا جديدًا ممن دعاك.',
+    'guest_link_expired':
+        'انتهت صلاحية رابط الدعوة هذا. اطلب رابطًا جديدًا ممن دعاك.',
     'guest_join_error': 'تعذّر الانضمام إلى المكالمة. حاول مجددًا.',
     'guest_connecting': 'جارٍ الانضمام إلى المكالمة…',
     'lang_name_fr': 'الفرنسية',
@@ -3505,19 +3702,23 @@ abstract final class AppStrings {
     'lang_name_zh': 'الصينية',
     'lang_name_ja': 'اليابانية',
     'lang_name_ko': 'الكورية',
-    'profile_call_language_warning': 'أثناء المكالمات عليك التحدث بلغة {lang} فقط حتى تعمل الترجمة.',
+    'profile_call_language_warning':
+        'أثناء المكالمات عليك التحدث بلغة {lang} فقط حتى تعمل الترجمة.',
     'sent_label': 'تم الإرسال',
     'profile_email_private': 'خاص · مرئي لك فقط',
     'profile_signout': 'تسجيل الخروج',
     'profile_signout_confirm_title': 'تسجيل الخروج؟',
-    'profile_signout_confirm_body': 'يمكنك تسجيل الدخول مجددًا ببريدك الإلكتروني وكلمة المرور.',
+    'profile_signout_confirm_body':
+        'يمكنك تسجيل الدخول مجددًا ببريدك الإلكتروني وكلمة المرور.',
     'cancel': 'إلغاء',
     'credits_remaining_inline': 'تبقّى {count} من الرصيد هذا الشهر',
     'credits_unlimited': 'ترجمة غير محدودة',
-    'credits_low_hint': 'الرصيد منخفض. يتجدّد الشهر المقبل — قم بالترقية إن لم ترغب في الانتظار.',
+    'credits_low_hint':
+        'الرصيد منخفض. يتجدّد الشهر المقبل — قم بالترقية إن لم ترغب في الانتظار.',
     'credits_low_hint_native': 'الرصيد منخفض. يتجدّد الشهر المقبل.',
     'credits_used_total_inline': 'تمت ترجمة {time} إجمالًا',
-    'credits_exhausted_banner': 'نفد الرصيد — الترجمة متوقفة، لكن المكالمة مستمرة.',
+    'credits_exhausted_banner':
+        'نفد الرصيد — الترجمة متوقفة، لكن المكالمة مستمرة.',
     'login_title_signin': 'مرحبًا بعودتك',
     'login_title_signup': 'إنشاء حساب',
     'login_subtitle_signin': 'سجّل الدخول إلى حسابك.',
@@ -3537,9 +3738,12 @@ abstract final class AppStrings {
     'login_err_password': 'يجب ألا تقل كلمة المرور عن 6 أحرف.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
     'login_resend_confirm': 'إعادة إرسال بريد التأكيد',
-    'login_resend_sent': 'تمت إعادة إرسال بريد التأكيد. تحقق من صندوق الوارد (ومجلد الرسائل غير المرغوب فيها).',
-    'login_err_not_confirmed': 'لم يتم تأكيد البريد الإلكتروني بعد. انقر على الرابط الذي أرسلناه، أو أعد إرساله.',
-    'login_reset_sent': 'إذا كان هناك حساب مرتبط بهذا البريد، فقد تم إرسال رابط إعادة التعيين.',
+    'login_resend_sent':
+        'تمت إعادة إرسال بريد التأكيد. تحقق من صندوق الوارد (ومجلد الرسائل غير المرغوب فيها).',
+    'login_err_not_confirmed':
+        'لم يتم تأكيد البريد الإلكتروني بعد. انقر على الرابط الذي أرسلناه، أو أعد إرساله.',
+    'login_reset_sent':
+        'إذا كان هناك حساب مرتبط بهذا البريد، فقد تم إرسال رابط إعادة التعيين.',
     'onb_country_label': 'الدولة',
     'onb_country_hint': 'مثال: فرنسا',
     'onb_city_label': 'المدينة',
@@ -3551,14 +3755,16 @@ abstract final class AppStrings {
     'loc_other_city': 'مدينة أخرى…',
     'loc_other_city_hint': 'أدخل مدينتك',
     'onb_gender_title': 'أنت…',
-    'onb_gender_subtitle': 'يساعدنا ذلك على ضبط التذكير والتأنيث بشكل صحيح عند ترجمة رسائلك.',
+    'onb_gender_subtitle':
+        'يساعدنا ذلك على ضبط التذكير والتأنيث بشكل صحيح عند ترجمة رسائلك.',
     'onb_gender_male': 'ذكر',
     'onb_gender_female': 'أنثى',
     'onb_gender_neutral': 'محايد',
     'onb_need_gender': 'اختر خيارًا للمتابعة.',
     'onb_skip': 'تخطّي',
     'onb_city_title': 'مدينتك',
-    'onb_city_subtitle': 'من أين تتصل؟ يساعدنا ذلك على اقتراح أشخاص قريبين منك. (اختياري)',
+    'onb_city_subtitle':
+        'من أين تتصل؟ يساعدنا ذلك على اقتراح أشخاص قريبين منك. (اختياري)',
     'onb_interests_title': 'اهتماماتك',
     'onb_interests_subtitle': 'تصفّح الفئات واختر ما يناسبك. (اختياري)',
     'onb_interests_count': 'تم اختيار {n} / {max}',
@@ -3566,17 +3772,22 @@ abstract final class AppStrings {
     'onb_gift_title': 'هدية الترحيب',
     'onb_gift_subtitle': 'إنها على حسابنا — استمتع بها في مكالمتك الأولى.',
     'onb_gift_headline': 'مرحبًا{hi} 🎉',
-    'onb_gift_body': 'نهديك 15 دقيقة من المكالمات المترجمة للبدء. دون الحاجة إلى بطاقة.',
+    'onb_gift_body':
+        'نهديك 15 دقيقة من المكالمات المترجمة للبدء. دون الحاجة إلى بطاقة.',
     'onb_gift_cta': 'لننطلق 📞',
-    'voice_mic_denied': 'تم رفض الوصول إلى الميكروفون. فعّله من إعدادات التطبيق.',
+    'voice_mic_denied':
+        'تم رفض الوصول إلى الميكروفون. فعّله من إعدادات التطبيق.',
     'voice_recording_hint': 'اضغط للإرسال، أو احذف للإلغاء',
     'voice_message': 'رسالة صوتية',
     'voice_dub_listen': 'الاستماع إلى الترجمة',
-    'voice_dub_upgrade': 'قم بالترقية إلى Plus لسماع الرسائل الصوتية مترجمة بصوت مسموع.',
-    'voice_dub_quota': 'تم بلوغ الحد الشهري للترجمة. عُد لاحقًا أو قم بالترقية إلى Ultra Plus.',
+    'voice_dub_upgrade':
+        'قم بالترقية إلى Plus لسماع الرسائل الصوتية مترجمة بصوت مسموع.',
+    'voice_dub_quota':
+        'تم بلوغ الحد الشهري للترجمة. عُد لاحقًا أو قم بالترقية إلى Ultra Plus.',
     'voice_dub_failed': 'تشغيل الترجمة غير متاح، حاول مجددًا.',
     'voice_clone_title': 'استنساخ صوتي',
-    'voice_clone_subtitle': 'سجّل 30 ثانية وأنت تتحدث. عندها ستُدبلج رسائلك الصوتية بصوتك أنت لمستمعي Ultra Plus.',
+    'voice_clone_subtitle':
+        'سجّل 30 ثانية وأنت تتحدث. عندها ستُدبلج رسائلك الصوتية بصوتك أنت لمستمعي Ultra Plus.',
     'voice_clone_start': 'تسجيل',
     'voice_clone_redo': 'إعادة',
     'voice_clone_send': 'إرسال',
@@ -3586,7 +3797,8 @@ abstract final class AppStrings {
     'voice_clone_failed': 'فشل الاستنساخ، يرجى المحاولة مجددًا.',
     'voice_clone_ultra_only': 'استنساخ الصوت مخصّص لمشتركي Ultra Plus.',
     'voice_clone_enrolled_title': 'تم استنساخ الصوت',
-    'voice_clone_enrolled_subtitle': 'تُدبلج رسائلك الصوتية الآن بصوتك أنت لمستمعي Ultra Plus. أعد التسجيل في أي وقت لتحديث النسخة.',
+    'voice_clone_enrolled_subtitle':
+        'تُدبلج رسائلك الصوتية الآن بصوتك أنت لمستمعي Ultra Plus. أعد التسجيل في أي وقت لتحديث النسخة.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'افتحها مع Ultra Plus',
     'out_of_credits_title': 'عذرًا… لا يوجد رصيد',
@@ -3612,7 +3824,7 @@ abstract final class AppStrings {
     'demandes_wants_to_be_friend': '{name} хочет добавить вас в друзья',
     'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
-        'В настройках решите, могут ли люди из вашей страны видеть ваше фото в Discover.\nФото в рамке — это то, которое показывается в Discover.',
+        'В **настройках** решите, могут ли люди из вашей страны видеть ваше **фото в Discover**.\n**Фото в рамке** — это то, которое показывается в **Discover**.',
     'my_subscription_section': 'Моя подписка',
     'tab_placeholder_soon': 'Скоро',
     'profile_title': 'Профиль',
@@ -3643,7 +3855,8 @@ abstract final class AppStrings {
     'mission_receive_like': 'Получить лайк',
     'mission_receive_like_how': 'Кто-то лайкнул твоё фото',
     'missions_title': 'Твои задания',
-    'missions_subtitle': 'Выполни все 6 заданий и получи {min} мин живого перевода.',
+    'missions_subtitle':
+        'Выполни все 6 заданий и получи {min} мин живого перевода.',
     'missions_unlock': 'Открой {min} мин',
     'missions_earned': '+{min} мин получено',
     'missions_done_short': 'Готово',
@@ -3719,7 +3932,8 @@ abstract final class AppStrings {
     'call_go_back': 'Назад',
     'call_connecting': 'Подключение к {room}…',
     'call_connecting_short': 'Подключение к звонку…',
-    'call_connecting_caller_pays': 'Одной подписки достаточно, чтобы переводить разговор.',
+    'call_connecting_caller_pays':
+        'Одной подписки достаточно, чтобы переводить разговор.',
     'call_waiting_title': 'Ожидание другого участника…',
     'call_waiting_body': 'Откройте то же имя комнаты на другом устройстве.',
     'call_leave_q': 'Покинуть звонок?',
@@ -3849,7 +4063,8 @@ abstract final class AppStrings {
     'settings_delete_account': 'Удалить аккаунт',
     'settings_push': 'Push-уведомления',
     'settings_test_push': 'Отправить тестовое уведомление',
-    'settings_test_push_sent': 'Уведомление отправлено — сверните приложение, чтобы его увидеть',
+    'settings_test_push_sent':
+        'Уведомление отправлено — сверните приложение, чтобы его увидеть',
     'settings_test_push_body': 'Это тестовое уведомление ✅',
     'settings_sounds': 'Звуки уведомлений',
     'settings_in_app_sounds': 'Звуки в приложении',
@@ -3867,30 +4082,36 @@ abstract final class AppStrings {
     'settings_terms': 'Условия использования',
     'settings_privacy': 'Политика конфиденциальности',
     'settings_version': 'Версия',
-    'settings_change_pwd_body': 'Письмо со ссылкой для сброса будет отправлено на {email}. Вы сможете задать новый пароль, перейдя по ссылке.',
+    'settings_change_pwd_body':
+        'Письмо со ссылкой для сброса будет отправлено на {email}. Вы сможете задать новый пароль, перейдя по ссылке.',
     'settings_change_pwd_confirm': 'Отправить ссылку',
     'settings_delete_title': 'Удалить аккаунт?',
-    'settings_delete_body': 'Ваш профиль, друзья и запросы будут удалены. Вы сразу выйдете из аккаунта. Это действие необратимо.',
+    'settings_delete_body':
+        'Ваш профиль, друзья и запросы будут удалены. Вы сразу выйдете из аккаунта. Это действие необратимо.',
     'settings_delete_confirm': 'Удалить',
     'settings_save_failed': 'Не удалось сохранить эту настройку.',
     'settings_email_not_found': 'Адрес эл. почты не найден.',
     'settings_email_sent': 'Письмо отправлено. Проверьте почту.',
-    'settings_subscription_appstore': 'Управляйте подпиской через App Store / Play Store.',
+    'settings_subscription_appstore':
+        'Управляйте подпиской через App Store / Play Store.',
     'settings_restore_soon': 'Восстановление покупок — скоро.',
     'settings_help_soon': 'Центр помощи — скоро.',
-    'settings_contact_soon': 'Пишите нам на support@swayco.app (mailto скоро будет).',
+    'settings_contact_soon':
+        'Пишите нам на support@swayco.app (mailto скоро будет).',
     'settings_terms_soon': 'Условия использования — скоро.',
     'settings_privacy_soon': 'Политика конфиденциальности — скоро.',
     'blocked_title': 'Заблокированные',
     'blocked_unblock_title_q': 'Разблокировать {name}?',
-    'blocked_unblock_body': 'Этот человек снова сможет вас находить, писать вам и видеть ваши сообщения.',
+    'blocked_unblock_body':
+        'Этот человек снова сможет вас находить, писать вам и видеть ваши сообщения.',
     'blocked_unblock_confirm': 'Разблокировать',
     'blocked_empty_title': 'Нет заблокированных',
     'blocked_empty_body': 'Заблокировать профиль можно из меню переписки.',
     'error_prefix': 'Ошибка: {msg}',
     'report': 'Пожаловаться',
     'report_q': 'Пожаловаться на {name}?',
-    'report_body': 'Выберите причину. Наша команда рассматривает каждую жалобу.',
+    'report_body':
+        'Выберите причину. Наша команда рассматривает каждую жалобу.',
     'report_details_hint': 'Подробнее (необязательно)',
     'report_submit': 'Отправить жалобу',
     'report_thanks': 'Жалоба отправлена. Спасибо.',
@@ -3903,17 +4124,23 @@ abstract final class AppStrings {
     'report_reason_scam': 'Мошенничество',
     'report_reason_other': 'Другое',
     'discover_message_sent': 'Сообщение отправлено',
-    'invite_share_text': 'Присоединяйтесь ко мне в Swayco 🌍 — видеозвонки с переводом в реальном времени. Зарегистрируйтесь по моей ссылке, и мы оба получим дополнительное время для звонков: {link}',
+    'invite_share_text':
+        'Присоединяйтесь ко мне в Swayco 🌍 — видеозвонки с переводом в реальном времени. Зарегистрируйтесь по моей ссылке, и мы оба получим дополнительное время для звонков: {link}',
     'invite_bonus_title': 'Пригласите 3 друзей — получите 15 мин',
-    'invite_bonus_body': 'Пригласи 3 друзей по своей ссылке и получи 15 мин живого перевода автоматически.',
-    'invite_bonus_progress': 'Зарегистрировались по приглашению: {count} / {total}',
+    'invite_bonus_body':
+        'Пригласи 3 друзей по своей ссылке и получи 15 мин живого перевода автоматически.',
+    'invite_bonus_progress':
+        'Зарегистрировались по приглашению: {count} / {total}',
     'invite_bonus_share_cta': 'Поделиться ссылкой',
     'invite_bonus_later': 'Позже',
     'invite_to_call': 'Пригласить на звонок',
-    'invite_call_share_text': 'Присоединяйтесь к моему видеозвонку с живым переводом в Swayco 🌍 — просто нажмите, аккаунт не нужен: {link}',
+    'invite_call_share_text':
+        'Присоединяйтесь к моему видеозвонку с живым переводом в Swayco 🌍 — просто нажмите, аккаунт не нужен: {link}',
     'invite_call_creating': 'Создание ссылки…',
-    'invite_call_failed': 'Не удалось создать ссылку-приглашение. Попробуйте снова.',
-    'invite_call_need_profile': 'Заполните профиль (имя + язык), прежде чем приглашать кого-либо.',
+    'invite_call_failed':
+        'Не удалось создать ссылку-приглашение. Попробуйте снова.',
+    'invite_call_need_profile':
+        'Заполните профиль (имя + язык), прежде чем приглашать кого-либо.',
     'call_share_invite': 'Поделиться ссылкой',
     'guest_title': 'Присоединиться к звонку',
     'guest_subtitle': 'Аккаунт не нужен. Выберите язык и присоединяйтесь.',
@@ -3921,7 +4148,8 @@ abstract final class AppStrings {
     'guest_lang_label': 'Вы говорите на…',
     'guest_join_cta': 'Присоединиться к звонку',
     'guest_need_lang': 'Выберите язык',
-    'guest_link_expired': 'Срок действия этой ссылки-приглашения истёк. Попросите у пригласившего новую.',
+    'guest_link_expired':
+        'Срок действия этой ссылки-приглашения истёк. Попросите у пригласившего новую.',
     'guest_join_error': 'Не удалось присоединиться к звонку. Попробуйте снова.',
     'guest_connecting': 'Подключение к звонку…',
     'lang_name_fr': 'Французский',
@@ -3936,19 +4164,23 @@ abstract final class AppStrings {
     'lang_name_zh': 'Китайский',
     'lang_name_ja': 'Японский',
     'lang_name_ko': 'Корейский',
-    'profile_call_language_warning': 'Во время звонков нужно говорить только на {lang}, чтобы перевод работал.',
+    'profile_call_language_warning':
+        'Во время звонков нужно говорить только на {lang}, чтобы перевод работал.',
     'sent_label': 'Отправлено',
     'profile_email_private': 'Приватно · видно только вам',
     'profile_signout': 'Выйти',
     'profile_signout_confirm_title': 'Выйти из аккаунта?',
-    'profile_signout_confirm_body': 'Вы сможете снова войти, используя эл. почту и пароль.',
+    'profile_signout_confirm_body':
+        'Вы сможете снова войти, используя эл. почту и пароль.',
     'cancel': 'Отмена',
     'credits_remaining_inline': 'Осталось {count} кредитов в этом месяце',
     'credits_unlimited': 'Безлимитный перевод',
-    'credits_low_hint': 'Заканчиваются. Пополнятся в следующем месяце — оформите подписку, если не хотите ждать.',
+    'credits_low_hint':
+        'Заканчиваются. Пополнятся в следующем месяце — оформите подписку, если не хотите ждать.',
     'credits_low_hint_native': 'Заканчиваются. Пополнятся в следующем месяце.',
     'credits_used_total_inline': 'Всего переведено: {time}',
-    'credits_exhausted_banner': 'Кредиты закончились — перевод выключен, звонок продолжается.',
+    'credits_exhausted_banner':
+        'Кредиты закончились — перевод выключен, звонок продолжается.',
     'login_title_signin': 'С возвращением',
     'login_title_signup': 'Создать аккаунт',
     'login_subtitle_signin': 'Войдите в свой аккаунт.',
@@ -3966,11 +4198,15 @@ abstract final class AppStrings {
     'login_have_account': 'Уже есть аккаунт?',
     'login_err_email': 'Введите корректный адрес эл. почты.',
     'login_err_password': 'Пароль должен содержать не менее 6 символов.',
-    'login_check_inbox': 'Проверьте почту — мы отправили вам ссылку для подтверждения.',
+    'login_check_inbox':
+        'Проверьте почту — мы отправили вам ссылку для подтверждения.',
     'login_resend_confirm': 'Отправить письмо повторно',
-    'login_resend_sent': 'Письмо для подтверждения отправлено повторно. Проверьте почту (и папку «Спам»).',
-    'login_err_not_confirmed': 'Эл. почта ещё не подтверждена. Перейдите по отправленной ссылке или запросите её повторно.',
-    'login_reset_sent': 'Если аккаунт с такой почтой существует, ссылка для сброса отправлена.',
+    'login_resend_sent':
+        'Письмо для подтверждения отправлено повторно. Проверьте почту (и папку «Спам»).',
+    'login_err_not_confirmed':
+        'Эл. почта ещё не подтверждена. Перейдите по отправленной ссылке или запросите её повторно.',
+    'login_reset_sent':
+        'Если аккаунт с такой почтой существует, ссылка для сброса отправлена.',
     'onb_country_label': 'Страна',
     'onb_country_hint': 'например, Франция',
     'onb_city_label': 'Город',
@@ -3982,32 +4218,43 @@ abstract final class AppStrings {
     'loc_other_city': 'Другой город…',
     'loc_other_city_hint': 'Введите свой город',
     'onb_gender_title': 'Вы…',
-    'onb_gender_subtitle': 'Помогает нам правильно согласовывать род (женский, мужской) при переводе ваших сообщений.',
+    'onb_gender_subtitle':
+        'Помогает нам правильно согласовывать род (женский, мужской) при переводе ваших сообщений.',
     'onb_gender_male': 'Мужчина',
     'onb_gender_female': 'Женщина',
     'onb_gender_neutral': 'Нейтрально',
     'onb_need_gender': 'Выберите вариант, чтобы продолжить.',
     'onb_skip': 'Пропустить',
     'onb_city_title': 'Ваш город',
-    'onb_city_subtitle': 'Откуда вы звоните? Поможет нам предлагать людей рядом с вами. (необязательно)',
+    'onb_city_subtitle':
+        'Откуда вы звоните? Поможет нам предлагать людей рядом с вами. (необязательно)',
     'onb_interests_title': 'Ваши интересы',
-    'onb_interests_subtitle': 'Пролистайте категории и выберите подходящее. (необязательно)',
+    'onb_interests_subtitle':
+        'Пролистайте категории и выберите подходящее. (необязательно)',
     'onb_interests_count': 'Выбрано {n} / {max}',
     'onb_interests_max': 'До {n} интересов.',
     'onb_gift_title': 'Приветственный подарок',
-    'onb_gift_subtitle': 'Это за наш счёт — насладитесь им во время первого звонка.',
+    'onb_gift_subtitle':
+        'Это за наш счёт — насладитесь им во время первого звонка.',
     'onb_gift_headline': 'Добро пожаловать{hi} 🎉',
-    'onb_gift_body': 'Дарим вам 15 минут переводимых звонков для начала. Карта не нужна.',
+    'onb_gift_body':
+        'Дарим вам 15 минут переводимых звонков для начала. Карта не нужна.',
     'onb_gift_cta': 'Поехали 📞',
-    'voice_mic_denied': 'Доступ к микрофону запрещён. Включите его в настройках приложения.',
-    'voice_recording_hint': 'Нажмите, чтобы отправить, или удалите, чтобы отменить',
+    'voice_mic_denied':
+        'Доступ к микрофону запрещён. Включите его в настройках приложения.',
+    'voice_recording_hint':
+        'Нажмите, чтобы отправить, или удалите, чтобы отменить',
     'voice_message': 'Голосовое сообщение',
     'voice_dub_listen': 'Прослушать перевод',
-    'voice_dub_upgrade': 'Оформите Plus, чтобы слушать голосовые сообщения с озвученным переводом.',
-    'voice_dub_quota': 'Достигнут месячный лимит перевода. Вернитесь позже или оформите Ultra Plus.',
-    'voice_dub_failed': 'Воспроизведение перевода недоступно, попробуйте снова.',
+    'voice_dub_upgrade':
+        'Оформите Plus, чтобы слушать голосовые сообщения с озвученным переводом.',
+    'voice_dub_quota':
+        'Достигнут месячный лимит перевода. Вернитесь позже или оформите Ultra Plus.',
+    'voice_dub_failed':
+        'Воспроизведение перевода недоступно, попробуйте снова.',
     'voice_clone_title': 'Клонировать мой голос',
-    'voice_clone_subtitle': 'Запишите 30 секунд своей речи. После этого ваши голосовые сообщения будут озвучиваться ВАШИМ голосом для слушателей Ultra Plus.',
+    'voice_clone_subtitle':
+        'Запишите 30 секунд своей речи. После этого ваши голосовые сообщения будут озвучиваться ВАШИМ голосом для слушателей Ultra Plus.',
     'voice_clone_start': 'Записать',
     'voice_clone_redo': 'Перезаписать',
     'voice_clone_send': 'Отправить',
@@ -4015,13 +4262,16 @@ abstract final class AppStrings {
     'voice_clone_success': 'Голос клонирован! 🎙',
     'voice_clone_too_short': 'Для клонирования нужно не менее 20 секунд.',
     'voice_clone_failed': 'Не удалось клонировать, попробуйте снова.',
-    'voice_clone_ultra_only': 'Клонирование голоса доступно только подписчикам Ultra Plus.',
+    'voice_clone_ultra_only':
+        'Клонирование голоса доступно только подписчикам Ultra Plus.',
     'voice_clone_enrolled_title': 'Голос клонирован',
-    'voice_clone_enrolled_subtitle': 'Ваши голосовые сообщения теперь озвучиваются вашим собственным голосом для слушателей Ultra Plus. Перезапишите в любой момент, чтобы обновить клон.',
+    'voice_clone_enrolled_subtitle':
+        'Ваши голосовые сообщения теперь озвучиваются вашим собственным голосом для слушателей Ultra Plus. Перезапишите в любой момент, чтобы обновить клон.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Разблокировать с Ultra Plus',
     'out_of_credits_title': 'Упс… кредиты закончились',
-    'out_of_credits_body': 'Пополните, чтобы продолжать переводить звонки в реальном времени.',
+    'out_of_credits_body':
+        'Пополните, чтобы продолжать переводить звонки в реальном времени.',
     'out_of_credits_cta': 'Пополнить',
   };
 
@@ -4041,7 +4291,8 @@ abstract final class AppStrings {
     'chat_blocked_by_peer': '你无法再联系此人。',
     'demandes_wants_to_be_friend': '{name} 想成为你的好友',
     'settings_hide_from_country': '对来自我国家的人隐藏',
-    'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片。\n圈出的照片就是会在 Discover 中显示的那张。',
+    'discover_visibility_hint':
+        '在**设置**中决定来自您国家的人是否能看到您的 **Discover 照片**。\n**圈出的照片**就是会在 **Discover** 中显示的那张。',
     'my_subscription_section': '我的订阅',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
@@ -4313,7 +4564,8 @@ abstract final class AppStrings {
     'report_reason_scam': '诈骗',
     'report_reason_other': '其他',
     'discover_message_sent': '消息已发送',
-    'invite_share_text': '来 Swayco 和我一起吧 🌍 — 实时翻译的视频通话。用我的链接注册，我们俩都能获得额外通话时长：{link}',
+    'invite_share_text':
+        '来 Swayco 和我一起吧 🌍 — 实时翻译的视频通话。用我的链接注册，我们俩都能获得额外通话时长：{link}',
     'invite_bonus_title': '邀请 3 位好友，得 15 分钟',
     'invite_bonus_body': '邀请 3 位好友通过你的链接注册，自动获得 15 分钟实时翻译。',
     'invite_bonus_progress': '成功注册的推荐：{count} / {total}',
@@ -4427,7 +4679,8 @@ abstract final class AppStrings {
     'voice_clone_failed': '克隆失败，请重试。',
     'voice_clone_ultra_only': '声音克隆仅限 Ultra Plus 订阅用户。',
     'voice_clone_enrolled_title': '声音已克隆',
-    'voice_clone_enrolled_subtitle': '你的语音消息现在会用你自己的声音为 Ultra Plus 听众配音。随时可以重录以刷新克隆。',
+    'voice_clone_enrolled_subtitle':
+        '你的语音消息现在会用你自己的声音为 Ultra Plus 听众配音。随时可以重录以刷新克隆。',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': '通过 Ultra Plus 解锁',
     'out_of_credits_title': '哎呀…额度用完了',
@@ -4451,7 +4704,8 @@ abstract final class AppStrings {
     'chat_blocked_by_peer': 'この人にはもう連絡できません。',
     'demandes_wants_to_be_friend': '{name} さんがあなたと友達になりたがっています',
     'settings_hide_from_country': '自分の国の人から非表示にする',
-    'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める。\n枠で囲まれた写真が Discover に表示されます。',
+    'discover_visibility_hint':
+        '**設定**で、同じ国の人に **Discover の写真**を見せるか決める。\n**枠で囲まれた写真**が **Discover** に表示されます。',
     'my_subscription_section': 'マイサブスクリプション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
@@ -4690,15 +4944,18 @@ abstract final class AppStrings {
     'settings_terms': '利用規約',
     'settings_privacy': 'プライバシーポリシー',
     'settings_version': 'バージョン',
-    'settings_change_pwd_body': '{email} にリセットリンクのメールを送信します。リンクをクリックして新しいパスワードを設定できます。',
+    'settings_change_pwd_body':
+        '{email} にリセットリンクのメールを送信します。リンクをクリックして新しいパスワードを設定できます。',
     'settings_change_pwd_confirm': 'リンクを送信',
     'settings_delete_title': 'アカウントを削除しますか？',
-    'settings_delete_body': 'プロフィール、友達、リクエストが削除されます。すぐにサインアウトされます。この操作は取り消せません。',
+    'settings_delete_body':
+        'プロフィール、友達、リクエストが削除されます。すぐにサインアウトされます。この操作は取り消せません。',
     'settings_delete_confirm': '削除',
     'settings_save_failed': 'この設定を保存できませんでした。',
     'settings_email_not_found': 'メールアドレスが見つかりません。',
     'settings_email_sent': 'メールを送信しました。受信トレイを確認してください。',
-    'settings_subscription_appstore': 'サブスクリプションは App Store / Play ストアから管理してください。',
+    'settings_subscription_appstore':
+        'サブスクリプションは App Store / Play ストアから管理してください。',
     'settings_restore_soon': '購入の復元 — 近日対応。',
     'settings_help_soon': 'ヘルプセンター — 近日公開。',
     'settings_contact_soon': 'support@swayco.app までご連絡ください（メール連携は近日対応）。',
@@ -4726,14 +4983,16 @@ abstract final class AppStrings {
     'report_reason_scam': '詐欺',
     'report_reason_other': 'その他',
     'discover_message_sent': 'メッセージを送信しました',
-    'invite_share_text': 'Swayco で一緒に話そう 🌍 — リアルタイム翻訳付きのビデオ通話。私のリンクから登録すると、お互いに通話時間がもらえます: {link}',
+    'invite_share_text':
+        'Swayco で一緒に話そう 🌍 — リアルタイム翻訳付きのビデオ通話。私のリンクから登録すると、お互いに通話時間がもらえます: {link}',
     'invite_bonus_title': '友達を3人招待して15分ゲット',
     'invite_bonus_body': 'あなたのリンクで友達3人が登録すると、自動でライブ翻訳15分を獲得。',
     'invite_bonus_progress': '登録した紹介者: {count} / {total}',
     'invite_bonus_share_cta': 'リンクを共有',
     'invite_bonus_later': 'あとで',
     'invite_to_call': '通話に招待',
-    'invite_call_share_text': 'Swayco のリアルタイム翻訳ビデオ通話に参加しよう 🌍 — タップするだけ、アカウント不要: {link}',
+    'invite_call_share_text':
+        'Swayco のリアルタイム翻訳ビデオ通話に参加しよう 🌍 — タップするだけ、アカウント不要: {link}',
     'invite_call_creating': 'リンクを作成中…',
     'invite_call_failed': '招待リンクを作成できませんでした。もう一度お試しください。',
     'invite_call_need_profile': '招待する前にプロフィール（名前と言語）を完成させてください。',
@@ -4830,7 +5089,8 @@ abstract final class AppStrings {
     'voice_dub_quota': '今月の翻訳上限に達しました。後で戻るか、Ultra Plus にアップグレードしてください。',
     'voice_dub_failed': '翻訳の再生ができません。もう一度お試しください。',
     'voice_clone_title': '自分の声をクローン',
-    'voice_clone_subtitle': '自分が話す声を30秒録音します。すると、Ultra Plus のリスナーにはあなたのボイスメッセージがあなた自身の声で吹き替えられます。',
+    'voice_clone_subtitle':
+        '自分が話す声を30秒録音します。すると、Ultra Plus のリスナーにはあなたのボイスメッセージがあなた自身の声で吹き替えられます。',
     'voice_clone_start': '録音',
     'voice_clone_redo': 'やり直す',
     'voice_clone_send': '送信',
@@ -4840,7 +5100,8 @@ abstract final class AppStrings {
     'voice_clone_failed': 'クローン作成に失敗しました。もう一度お試しください。',
     'voice_clone_ultra_only': '声のクローンは Ultra Plus 加入者限定です。',
     'voice_clone_enrolled_title': '声をクローン済み',
-    'voice_clone_enrolled_subtitle': 'あなたのボイスメッセージは、Ultra Plus のリスナーにはあなた自身の声で吹き替えられます。いつでも録音し直してクローンを更新できます。',
+    'voice_clone_enrolled_subtitle':
+        'あなたのボイスメッセージは、Ultra Plus のリスナーにはあなた自身の声で吹き替えられます。いつでも録音し直してクローンを更新できます。',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ultra Plus で解除',
     'out_of_credits_title': 'おっと…クレジットがありません',
@@ -4864,7 +5125,8 @@ abstract final class AppStrings {
     'chat_blocked_by_peer': '이 사람에게 더 이상 연락할 수 없습니다.',
     'demandes_wants_to_be_friend': '{name}님이 친구가 되고 싶어 합니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
-    'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택.\n테두리가 표시된 사진이 Discover에 나타납니다.',
+    'discover_visibility_hint':
+        '**설정**에서 같은 나라 사람들이 **Discover 사진**을 볼 수 있는지 선택.\n**테두리가 표시된 사진**이 **Discover**에 나타납니다.',
     'my_subscription_section': '내 구독',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',
@@ -5102,7 +5364,8 @@ abstract final class AppStrings {
     'settings_terms': '이용약관',
     'settings_privacy': '개인정보 처리방침',
     'settings_version': '버전',
-    'settings_change_pwd_body': '{email}로 재설정 링크 이메일을 보내드려요. 링크를 클릭해 새 비밀번호를 설정할 수 있어요.',
+    'settings_change_pwd_body':
+        '{email}로 재설정 링크 이메일을 보내드려요. 링크를 클릭해 새 비밀번호를 설정할 수 있어요.',
     'settings_change_pwd_confirm': '링크 보내기',
     'settings_delete_title': '계정을 삭제할까요?',
     'settings_delete_body': '프로필, 친구, 요청이 모두 삭제돼요. 즉시 로그아웃되며 이 작업은 되돌릴 수 없어요.',
@@ -5113,7 +5376,8 @@ abstract final class AppStrings {
     'settings_subscription_appstore': 'App Store / Play Store에서 구독을 관리하세요.',
     'settings_restore_soon': '구매 복원 — 곧 제공될 예정이에요.',
     'settings_help_soon': '고객센터 — 곧 제공될 예정이에요.',
-    'settings_contact_soon': 'support@swayco.app로 문의해 주세요 (메일 링크는 곧 제공될 예정이에요).',
+    'settings_contact_soon':
+        'support@swayco.app로 문의해 주세요 (메일 링크는 곧 제공될 예정이에요).',
     'settings_terms_soon': '이용약관 — 곧 제공될 예정이에요.',
     'settings_privacy_soon': '개인정보 처리방침 — 곧 제공될 예정이에요.',
     'blocked_title': '차단됨',
@@ -5138,14 +5402,16 @@ abstract final class AppStrings {
     'report_reason_scam': '사기',
     'report_reason_other': '기타',
     'discover_message_sent': '메시지를 보냈어요',
-    'invite_share_text': 'Swayco에서 함께해요 🌍 — 실시간 번역 영상 통화예요. 제 링크로 가입하면 둘 다 추가 통화 시간을 받아요: {link}',
+    'invite_share_text':
+        'Swayco에서 함께해요 🌍 — 실시간 번역 영상 통화예요. 제 링크로 가입하면 둘 다 추가 통화 시간을 받아요: {link}',
     'invite_bonus_title': '친구 3명 초대하고 15분 받기',
     'invite_bonus_body': '내 링크로 친구 3명이 가입하면 자동으로 실시간 번역 15분을 받아요.',
     'invite_bonus_progress': '가입한 추천인: {count} / {total}',
     'invite_bonus_share_cta': '내 링크 공유',
     'invite_bonus_later': '나중에',
     'invite_to_call': '통화에 초대',
-    'invite_call_share_text': 'Swayco에서 실시간 번역 영상 통화에 함께해요 🌍 — 계정 없이 탭만 하면 돼요: {link}',
+    'invite_call_share_text':
+        'Swayco에서 실시간 번역 영상 통화에 함께해요 🌍 — 계정 없이 탭만 하면 돼요: {link}',
     'invite_call_creating': '링크 만드는 중…',
     'invite_call_failed': '초대 링크를 만들지 못했어요. 다시 시도해 주세요.',
     'invite_call_need_profile': '누군가를 초대하기 전에 프로필(이름 + 언어)을 완성해 주세요.',
@@ -5242,7 +5508,8 @@ abstract final class AppStrings {
     'voice_dub_quota': '월 번역 한도에 도달했어요. 나중에 다시 오거나 Ultra Plus로 업그레이드하세요.',
     'voice_dub_failed': '번역 재생을 사용할 수 없어요. 다시 시도해 주세요.',
     'voice_clone_title': '내 목소리 복제',
-    'voice_clone_subtitle': '말하는 모습을 30초 녹음하세요. 그러면 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요.',
+    'voice_clone_subtitle':
+        '말하는 모습을 30초 녹음하세요. 그러면 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요.',
     'voice_clone_start': '녹음',
     'voice_clone_redo': '다시 하기',
     'voice_clone_send': '전송',
@@ -5252,7 +5519,8 @@ abstract final class AppStrings {
     'voice_clone_failed': '복제에 실패했어요. 다시 시도해 주세요.',
     'voice_clone_ultra_only': '음성 복제는 Ultra Plus 구독자 전용이에요.',
     'voice_clone_enrolled_title': '목소리 복제됨',
-    'voice_clone_enrolled_subtitle': '이제 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요. 언제든 다시 녹음해 복제본을 갱신할 수 있어요.',
+    'voice_clone_enrolled_subtitle':
+        '이제 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요. 언제든 다시 녹음해 복제본을 갱신할 수 있어요.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ultra Plus로 잠금 해제',
     'out_of_credits_title': '앗… 크레딧이 없어요',

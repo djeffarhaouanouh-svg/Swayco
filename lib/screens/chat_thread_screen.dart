@@ -1111,6 +1111,9 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
           constraints: BoxConstraints(
+            // Floor so a tiny "👋" / "Coucou !" still reads as a bubble
+            // instead of shrink-wrapping to a cramped sliver.
+            minWidth: 72,
             maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
           decoration: BoxDecoration(

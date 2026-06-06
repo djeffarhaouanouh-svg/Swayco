@@ -589,8 +589,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     final trimmed = name.trim();
     // Ignore an empty name — a profile must keep one.
     if (trimmed.isEmpty) return;
-    final saved =
-        await ProfileApi.updateMyName(userId: _deviceId, name: trimmed);
+    final saved = await ProfileApi.updateMyName(
+      userId: _deviceId,
+      name: trimmed,
+    );
     if (saved == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -662,7 +664,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     // (the spoken language doesn't always match — a Brazilian speaks
     // Portuguese), else the language flag. This is NOT the language card's
     // flag, which stays the spoken language on purpose.
-    final nameFlag = ((_remote?.city.trim().isNotEmpty ?? false)
+    final nameFlag =
+        ((_remote?.city.trim().isNotEmpty ?? false)
             ? countryFlagFor(_remote?.country ?? '')
             : null) ??
         lang?.flag ??
@@ -771,6 +774,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                             showCallWarning: !_isViewingOther,
                           ),
                           if (!_isViewingOther) ...[
+                            // "Mon abonnement" — directly under the spoken-
+                            // language card. Web (Stripe) + native with
+                            // RevenueCat configured; hidden on native without it
+                            // (would fall back to forbidden Stripe).
+                            if (kIsWeb || RevenueCat.isConfigured) ...[
+                              const SizedBox(height: 16),
+                              _MySubscriptionSection(
+                                currentTier:
+                                    _remote?.subscriptionTier ?? 'free',
+                              ),
+                            ],
                             // Missions ring — earn call minutes by completing
                             // onboarding quests. Sits above the referral block.
                             const SizedBox(height: 20),
@@ -805,19 +819,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             //   ),
                             //   const SizedBox(height: 16),
                             // ],
-                            // Show "Mon abonnement" on web (Stripe checkout —
-                            // allowed on web) AND on any native platform where
-                            // RevenueCat is configured (iOS now; Android once
-                            // its goog_ key is set), where the purchase goes
-                            // through the compliant native store. Stays hidden
-                            // on a native platform WITHOUT RevenueCat, which
-                            // would otherwise fall back to forbidden Stripe.
-                            if (kIsWeb || RevenueCat.isConfigured) ...[
-                              const SizedBox(height: 16),
-                              _MySubscriptionSection(
-                                currentTier: _remote?.subscriptionTier ?? 'free',
-                              ),
-                            ],
                           ],
                         ],
                       ),
@@ -1204,8 +1205,9 @@ class _InviteFriendsSectionState extends State<_InviteFriendsSection> {
         ShareParams(
           text: AppStrings.t('invite_share_text', args: {'link': link}),
           subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin:
-              box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
         ),
       );
     } catch (_) {
@@ -1347,10 +1349,7 @@ class _MySubscriptionSection extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: SC.textMuted,
-                ),
+                const Icon(Icons.chevron_right_rounded, color: SC.textMuted),
               ],
             ),
           ),
@@ -1425,8 +1424,9 @@ class _LanguageCard extends StatelessWidget {
     // Language name localised to the UI language (e.g. "French" in EN,
     // "Français" in FR) — not the native label, so it never reads
     // "Speaks Français".
-    final langName =
-        language != null ? AppStrings.t('lang_name_${language!.code}') : '';
+    final langName = language != null
+        ? AppStrings.t('lang_name_${language!.code}')
+        : '';
     final label = language != null
         ? AppStrings.t('profile_speaks', args: {'lang': langName})
         : AppStrings.t('profile_no_language');
@@ -1789,11 +1789,15 @@ class _IdentitySection extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: SC.accent.withValues(alpha: 0.6)),
+                      border: Border.all(
+                        color: SC.accent.withValues(alpha: 0.6),
+                      ),
                     ),
-                    child: const Icon(Icons.edit_outlined,
-                        size: 16, color: SC.accent),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: SC.accent,
+                    ),
                   ),
                 ),
               ),
@@ -1839,11 +1843,7 @@ class _IdentitySection extends StatelessWidget {
                 ),
               ),
             ),
-            const Positioned(
-              right: 0,
-              top: -4,
-              child: _RewardHint(),
-            ),
+            const Positioned(right: 0, top: -4, child: _RewardHint()),
           ],
         ),
         const SizedBox(height: 16),
@@ -1874,10 +1874,7 @@ class _IdentitySection extends StatelessWidget {
         // Centres d'intérêt — picked chips + an "add" chip; tapping either
         // unfolds the category picker inline, right under the chips (no
         // overlay), then folds back when you're done. Shown ABOVE the photos.
-        _InterestsSection(
-          interests: interests,
-          onSave: onEditInterests,
-        ),
+        _InterestsSection(interests: interests, onSave: onEditInterests),
         const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
@@ -2119,7 +2116,11 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.photo_camera_outlined, size: 34, color: SC.textMuted),
+          const Icon(
+            Icons.photo_camera_outlined,
+            size: 34,
+            color: SC.textMuted,
+          ),
           const SizedBox(height: 10),
           Text(
             AppStrings.t('profile_no_photos'),
@@ -2434,7 +2435,8 @@ class _PhotoGallery extends StatelessWidget {
               child: _PhotoCell(
                 photoUrl: url,
                 viewerMode: false,
-                isDiscover: discoverPhotoUrl.isNotEmpty &&
+                isDiscover:
+                    discoverPhotoUrl.isNotEmpty &&
                     url.split('?').first == discoverPhotoUrl.split('?').first,
                 onTap: () => showPhotoViewer(
                   context,
@@ -2478,7 +2480,8 @@ class _PhotoGallery extends StatelessWidget {
                 photoUrl: photos[i],
                 viewerMode: viewerMode,
                 // Cyan ring on the photo currently shown in Discover.
-                isDiscover: !viewerMode &&
+                isDiscover:
+                    !viewerMode &&
                     discoverPhotoUrl.isNotEmpty &&
                     photos[i].split('?').first ==
                         discoverPhotoUrl.split('?').first,
@@ -2502,11 +2505,7 @@ class _PhotoGallery extends StatelessWidget {
               ),
             ),
         ];
-        return Wrap(
-          spacing: _spacing,
-          runSpacing: _spacing,
-          children: cells,
-        );
+        return Wrap(spacing: _spacing, runSpacing: _spacing, children: cells);
       },
     );
   }
@@ -2587,7 +2586,9 @@ class _InlineEditableState extends State<_InlineEditable> {
             overflow: TextOverflow.ellipsis,
             style: empty
                 ? widget.style.copyWith(
-                    color: SC.textMuted, fontStyle: FontStyle.italic)
+                    color: SC.textMuted,
+                    fontStyle: FontStyle.italic,
+                  )
                 : widget.style,
           ),
         ),
@@ -2611,8 +2612,10 @@ class _InlineEditableState extends State<_InlineEditable> {
         counterText: '',
         filled: true,
         fillColor: SC.bubbleIn,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: SC.glassBorder),
@@ -2909,10 +2912,10 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
   }
 
   void _goTo(int i) => _pager.animateToPage(
-        i,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
+    i,
+    duration: const Duration(milliseconds: 280),
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -3043,8 +3046,10 @@ class _CategoryPage extends StatelessWidget {
               if (picked > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: cat.color.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(999),
@@ -3095,6 +3100,24 @@ class _CategoryPage extends StatelessWidget {
   }
 }
 
+/// Build a rich span from [raw], rendering any run wrapped in `**…**` in the
+/// cyan accent (the markers are stripped). Used to highlight a few keywords in
+/// the two-sentence Discover visibility hint, in every language.
+TextSpan _highlightKeywords(String raw) {
+  final parts = raw.split('**');
+  return TextSpan(
+    children: [
+      for (var i = 0; i < parts.length; i++)
+        TextSpan(
+          text: parts[i],
+          style: i.isOdd
+              ? const TextStyle(color: SC.accent, fontWeight: FontWeight.w600)
+              : null,
+        ),
+    ],
+  );
+}
+
 /// Small ⓘ + text row rendered under the Discover photo tile on the
 /// user's own profile. Taps jump to Settings, where the "Hide me
 /// from my country" toggle lives — keeps the profile clean while
@@ -3119,8 +3142,9 @@ class _DiscoverVisibilityHint extends StatelessWidget {
               const Icon(Icons.info_outline, size: 14, color: SC.textMuted),
               const SizedBox(width: 6),
               Flexible(
-                child: Text(
-                  AppStrings.t('discover_visibility_hint'),
+                child: Text.rich(
+                  // Keywords wrapped in **…** in app_strings render cyan.
+                  _highlightKeywords(AppStrings.t('discover_visibility_hint')),
                   style: const TextStyle(
                     color: SC.textMuted,
                     fontSize: 12,
@@ -3166,7 +3190,11 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
                 color: SC.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
           ),
         ),
