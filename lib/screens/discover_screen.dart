@@ -1671,46 +1671,47 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onSend == null ? null : () => _handleTap(ctx),
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_breathe, _pop]),
-            builder: (context, child) => Transform.scale(
-              // Idle breath (1.0 → 1.20 → 1.0) multiplied by the tap pop.
-              scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
-              child: child,
-            ),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: widget.reacted
-                    ? Colors.white.withValues(alpha: 0.18)
-                    : Colors.black.withValues(alpha: 0.35),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white
-                      .withValues(alpha: widget.reacted ? 0.85 : 0.20),
-                  width: widget.reacted ? 2 : 1,
-                ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: widget.reacted
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.black.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white
+                    .withValues(alpha: widget.reacted ? 0.85 : 0.20),
+                width: widget.reacted ? 2 : 1,
               ),
-              child: Center(
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 160),
-                  style: TextStyle(
-                    fontSize: widget.reacted ? 24 : 22,
-                    color: Colors.white,
-                    shadows: const [
-                      Shadow(
-                        color: Color(0x66000000),
-                        blurRadius: 6,
-                        offset: Offset(0, 3),
-                      ),
-                      Shadow(
-                        color: Color(0x99000000),
-                        blurRadius: 2,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
+            ),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 160),
+                style: TextStyle(
+                  fontSize: widget.reacted ? 24 : 22,
+                  color: Colors.white,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 3),
+                    ),
+                    Shadow(
+                      color: Color(0x99000000),
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                // Breath + tap-pop scale ONLY the emoji glyph, not the
+                // circular button or its background.
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_breathe, _pop]),
+                  builder: (context, child) => Transform.scale(
+                    scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
+                    child: child,
                   ),
                   child: Text(widget.emoji),
                 ),
