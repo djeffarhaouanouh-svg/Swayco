@@ -723,7 +723,7 @@ class _ThreadHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (title.length <= 9)
+                  if (title.length <= 6)
                     const Center(
                       child: Text.rich(
                         TextSpan(
