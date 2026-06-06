@@ -2117,6 +2117,126 @@ class _RewardHint extends StatelessWidget {
   }
 }
 
+/// Full-screen overlay for a profile photo. Tap the backdrop or the ✕ to
+/// dismiss; pinch to zoom. On the own profile a "set as Discover photo" button
+/// is shown so that action survives the tap-to-open change.
+Future<void> showPhotoViewer(
+  BuildContext context, {
+  required String url,
+  bool viewerMode = false,
+  VoidCallback? onSetDiscover,
+}) {
+  if (url.isEmpty) return Future<void>.value();
+  return Navigator.of(context).push<void>(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (ctx, anim, _) => FadeTransition(
+        opacity: anim,
+        child: _PhotoViewer(
+          url: url,
+          viewerMode: viewerMode,
+          onSetDiscover: onSetDiscover,
+        ),
+      ),
+    ),
+  );
+}
+
+class _PhotoViewer extends StatelessWidget {
+  const _PhotoViewer({
+    required this.url,
+    this.viewerMode = false,
+    this.onSetDiscover,
+  });
+  final String url;
+  final bool viewerMode;
+  final VoidCallback? onSetDiscover;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: 0.96),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: SC.textMuted,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: top + 8,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+          if (!viewerMode && onSetDiscover != null)
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: bottom + 28,
+              child: GestureDetector(
+                onTap: () {
+                  onSetDiscover!();
+                  Navigator.of(context).pop();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: SC.accent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    AppStrings.t('set_discover_photo'),
+                    style: const TextStyle(
+                      color: SC.bgDeep,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// "Tes photos" — a horizontal gallery of portrait photo tiles (capture-1
 /// style). On my own profile the first tile is the yellow/accent "+" add
 /// CTA, followed by each photo with a delete badge; the PDP (index 0) also
@@ -2197,9 +2317,13 @@ class _PhotoGallery extends StatelessWidget {
                 viewerMode: false,
                 isDiscover: discoverPhotoUrl.isNotEmpty &&
                     url.split('?').first == discoverPhotoUrl.split('?').first,
-                onTap: onSelectDiscover == null
-                    ? () {}
-                    : () => onSelectDiscover!(url),
+                onTap: () => showPhotoViewer(
+                  context,
+                  url: url,
+                  onSetDiscover: onSelectDiscover == null
+                      ? null
+                      : () => onSelectDiscover!(url),
+                ),
                 onDelete: () => onRemove(url),
                 likesCount: likesByPhoto[url] ?? 0,
                 onTapLikes: onTapLikes,
@@ -2240,10 +2364,9 @@ class _PhotoGallery extends StatelessWidget {
                     discoverPhotoUrl.isNotEmpty &&
                     photos[i].split('?').first ==
                         discoverPhotoUrl.split('?').first,
-                // Tapping a photo picks it as the Discover photo.
-                onTap: onSelectDiscover == null
-                    ? () {}
-                    : () => onSelectDiscover!(photos[i]),
+                // Tapping a photo opens it full-screen (overlay).
+                onTap: () =>
+                    showPhotoViewer(context, url: photos[i], viewerMode: true),
                 // Delete badge on every photo on my own profile.
                 onDelete: viewerMode ? null : () => onRemove(photos[i]),
                 // Per-photo likes badge on each of my own photos.
