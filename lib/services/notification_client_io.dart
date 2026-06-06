@@ -19,6 +19,7 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'notification_api.dart';
 import 'notification_router.dart';
@@ -133,9 +134,22 @@ abstract final class NotificationClient {
       } catch (e) {
         fcm = 'erreur: $e';
       }
+      // What the NATIVE side (AppDelegate) actually saw — written to
+      // UserDefaults under the `flutter.` prefix, so it surfaces the real
+      // reason behind "Token APNs: AUCUN" (registration failed? token never
+      // arrived? Firebase not ready?).
+      var native = '(aucune trace)';
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // The native side updates this key seconds after launch (token arrival)
+        // — reload() bypasses the in-memory cache to read the latest value.
+        await prefs.reload();
+        native = prefs.getString('apns_native_status') ?? native;
+      } catch (_) {}
       return 'Permission: ${settings.authorizationStatus.name}\n'
           'Token APNs: $apns\n'
-          'Token FCM: $fcm';
+          'Token FCM: $fcm\n'
+          'Natif iOS: $native';
     } catch (e) {
       return 'Erreur: $e';
     }

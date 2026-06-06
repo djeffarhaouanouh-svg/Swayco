@@ -47,6 +47,16 @@ import FirebaseMessaging
     rtcConfig.mode = AVAudioSession.Mode.videoChat.rawValue
     RTCAudioSessionConfiguration.setWebRTC(rtcConfig)
 
+    // Proactively ask APNs for the REGULAR device token at launch. firebase_
+    // messaging normally triggers this, but our plugins live in the Scene-
+    // Delegate's engine so that path is unreliable here — without the token FCM
+    // never mints one and message pushes never arrive (the in-app diagnostic
+    // showed "APNs: AUCUN"). The token lands in didRegister...DeviceToken below.
+    // Harmless before the permission prompt; it just fetches the token early.
+    UserDefaults.standard.set("registerForRemoteNotifications() appelé",
+                              forKey: "flutter.apns_native_status")
+    application.registerForRemoteNotifications()
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -61,11 +71,50 @@ import FirebaseMessaging
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
-    if FirebaseApp.app() != nil {
-      Messaging.messaging().apnsToken = deviceToken
-    }
+    UserDefaults.standard.set(
+      "token APNs reçu (\(deviceToken.count) octets)",
+      forKey: "flutter.apns_native_status")
+    forwardAPNsTokenToFirebase(deviceToken)
     super.application(
       application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  // Registration can fail (no aps-environment entitlement, no network, etc.).
+  // Record the reason so the in-app diagnostic can surface it instead of a
+  // silent "APNs: AUCUN".
+  override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    UserDefaults.standard.set(
+      "ÉCHEC registerForRemoteNotifications: \(error.localizedDescription)",
+      forKey: "flutter.apns_native_status")
+    super.application(
+      application, didFailToRegisterForRemoteNotificationsWithError: error)
+  }
+
+  // Firebase is configured asynchronously from Dart (Firebase.initializeApp in
+  // main()), so the APNs token can arrive a hair before it's ready. Retry on
+  // the main queue (up to ~10s) until FirebaseApp exists, then hand the token
+  // to FCM — fixes the timing race where the token was dropped and never
+  // re-delivered.
+  private func forwardAPNsTokenToFirebase(_ token: Data, retriesLeft: Int = 20) {
+    if FirebaseApp.app() != nil {
+      Messaging.messaging().apnsToken = token
+      UserDefaults.standard.set(
+        "token APNs transmis à Firebase ✅",
+        forKey: "flutter.apns_native_status")
+      return
+    }
+    if retriesLeft > 0 {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        self?.forwardAPNsTokenToFirebase(token, retriesLeft: retriesLeft - 1)
+      }
+    } else {
+      UserDefaults.standard.set(
+        "token APNs reçu mais FirebaseApp jamais prêt",
+        forKey: "flutter.apns_native_status")
+    }
   }
 
   // MARK: - PKPushRegistryDelegate (VoIP / CallKit)
