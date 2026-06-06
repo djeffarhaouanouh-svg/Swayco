@@ -3471,9 +3471,9 @@ class _GhostIconButton extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: SizedBox(
-            width: 38,
-            height: 38,
-            child: Icon(icon, size: 18, color: Colors.white),
+            width: 44,
+            height: 44,
+            child: Icon(icon, size: 21, color: Colors.white),
           ),
         ),
       ),

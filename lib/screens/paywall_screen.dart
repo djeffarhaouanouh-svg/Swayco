@@ -261,7 +261,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     const SizedBox(height: 10),
                     Text(
                       'Parlez toutes les langues, sans barrière. '
-                      'Traduction vocale et messages, en temps réel.',
+                      'Traduction vocale en temps réel.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: SC.textMuted,

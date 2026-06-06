@@ -439,7 +439,10 @@ class _RequestRow extends StatelessWidget {
         : (p?.handle.isNotEmpty == true
               ? '@${p!.handle}'
               : AppStrings.t('chat_no_name'));
-    final handle = (p?.handle.isNotEmpty ?? false) ? '@${p!.handle}' : '';
+    final subtitle = AppStrings.t(
+      'demandes_wants_to_be_friend',
+      args: {'name': name},
+    );
 
     return Material(
       color: Colors.transparent,
@@ -459,28 +462,14 @@ class _RequestRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: SCText.name,
-                    ),
-                    if (handle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        handle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                        style: SCText.preview,
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: SCText.body.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
