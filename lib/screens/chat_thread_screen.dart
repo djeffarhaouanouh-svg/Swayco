@@ -660,96 +660,92 @@ class _ThreadHeader extends StatelessWidget {
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 8),
-            // Name cluster (avatar + online dot + name). Non-flex with a capped
-            // name width, so the single Expanded below absorbs all slack and
-            // keeps the call buttons pinned hard right.
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
+            // PDP bubble + online dot — tap opens the peer's profile.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Online presence is a green dot ON the avatar.
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ProfileAvatar(
-                          displayName: title,
-                          avatarUrl: peer?.avatarUrl,
-                          avatarColorHex: peer?.avatarColor,
-                          size: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ProfileAvatar(
+                    displayName: title,
+                    avatarUrl: peer?.avatarUrl,
+                    avatarColorHex: peer?.avatarColor,
+                    size: 36,
+                  ),
+                  if (_peerOnline)
+                    Positioned(
+                      right: -1,
+                      bottom: -1,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: SC.online,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: SC.bgDeep, width: 2),
                         ),
-                        if (_peerOnline)
-                          Positioned(
-                            right: -1,
-                            bottom: -1,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: SC.online,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: SC.bgDeep, width: 2),
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    // Nudge the name up slightly so it sits a touch above the
-                    // avatar's vertical centre.
-                    Transform.translate(
-                      offset: const Offset(0, -2),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * 0.42,
-                        ),
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SCText.h3.copyWith(
-                            fontSize: 15,
-                            color: SC.textPrimary.withValues(alpha: 0.6),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Middle zone: the swayco.ai logo CENTRED between the PDP and the
+            // call button (its own, larger size), with the peer name small and
+            // left-aligned, nudged up. The logo is dropped for a long name so
+            // the two never collide.
+            Expanded(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onViewProfile,
+                      child: Transform.translate(
+                        offset: const Offset(0, -3),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * 0.30,
+                          ),
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: SC.textPrimary.withValues(alpha: 0.6),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            // Brand wordmark — centred in the gap between the name and the call
-            // buttons. Measured dynamically: shown at FULL size only when the
-            // remaining gap is wide enough; for a long name the gap is too
-            // small and the logo is dropped entirely (never squashed). The
-            // Expanded still absorbs the slack, keeping the buttons pinned right.
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, c) => c.maxWidth >= 80
-                    ? const Center(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: 'swayco'),
-                              TextSpan(
-                                text: '.ai',
-                                style: TextStyle(color: SC.accent),
-                              ),
-                            ],
-                          ),
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
-                          ),
+                  ),
+                  if (title.length <= 9)
+                    const Center(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: 'swayco'),
+                            TextSpan(
+                              text: '.ai',
+                              style: TextStyle(color: SC.accent),
+                            ),
+                          ],
                         ),
-                      )
-                    : const SizedBox.shrink(),
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             // Single call button — a tap starts a video call (camera on).

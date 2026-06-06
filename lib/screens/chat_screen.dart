@@ -640,6 +640,58 @@ class _FriendChatRow extends StatelessWidget {
     return '$d/$mo';
   }
 
+  /// Long-press menu (the per-row 3-dots was removed): block / report /
+  /// delete the conversation.
+  void _showRowActions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SC.bubbleIn,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.block, color: Color(0xFFE53935)),
+              title: Text(
+                AppStrings.t('block'),
+                style: const TextStyle(color: SC.textPrimary),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onBlock();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined, color: SC.textPrimary),
+              title: Text(
+                AppStrings.t('report'),
+                style: const TextStyle(color: SC.textPrimary),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onReport();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: SC.textPrimary),
+              title: Text(
+                AppStrings.t('delete_conversation'),
+                style: const TextStyle(color: SC.textPrimary),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                onDeleteConversation();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(profile.language);
@@ -672,6 +724,7 @@ class _FriendChatRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
+        onLongPress: () => _showRowActions(context),
         borderRadius: BorderRadius.circular(18),
         child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -711,77 +764,73 @@ class _FriendChatRow extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: SCText.name.copyWith(
-                      fontWeight:
-                          unread ? FontWeight.w800 : FontWeight.w700,
-                    ),
+                  // WhatsApp-style top line: name on the left, date on the
+                  // right (small & dim, cyan when unread).
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          style: SCText.name.copyWith(
+                            fontWeight:
+                                unread ? FontWeight.w800 : FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        lastMessage != null
+                            ? _formatTime(lastMessage!.createdAt)
+                            : '',
+                        style: SCText.meta.copyWith(
+                          color: unread ? SC.accent : SC.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
-                  RichText(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    text: TextSpan(
-                      style: SCText.preview.copyWith(
-                        color: unread ? SC.textPrimary : SC.textMuted,
-                        fontWeight:
-                            unread ? FontWeight.w600 : FontWeight.w400,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          text: TextSpan(
+                            style: SCText.preview.copyWith(
+                              color: unread ? SC.textPrimary : SC.textMuted,
+                              fontWeight:
+                                  unread ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                            children: subtitleParts,
+                          ),
+                        ),
                       ),
-                      children: subtitleParts,
-                    ),
+                      if (unread) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: SC.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (unread) ...[
-                      Container(
-                        width: 7,
-                        height: 7,
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: const BoxDecoration(
-                          color: SC.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                    Text(
-                      lastMessage != null
-                          ? _formatTime(lastMessage!.createdAt)
-                          : '',
-                      style: SCText.meta.copyWith(
-                        color: unread ? SC.accent : SC.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            // Quick audio-call shortcut, then the 3-dots popup (red-only:
-            // report / block / delete) on the far right.
+            const SizedBox(width: 10),
+            // Quick audio-call shortcut. The 3-dots menu was removed — long-
+            // press the row for block / report / delete.
             _RowCallButton(onTap: onCall),
-            const SizedBox(width: 6),
-            _RowMoreMenu(
-              onReport: onReport,
-              onBlock: onBlock,
-              onDeleteConversation: onDeleteConversation,
-            ),
           ],
         ),
         ),
@@ -809,80 +858,6 @@ class _RowCallButton extends StatelessWidget {
           padding: EdgeInsets.all(9),
           child: Icon(Icons.phone_rounded, color: SC.accent, size: 18),
         ),
-      ),
-    );
-  }
-}
-
-/// Small round "more" (⋮) button at the far-right of every chat-list row.
-/// Opens a compact dropdown popup with the destructive (red) actions only:
-/// Report / Block / Delete conversation. Call lives on the phone shortcut.
-class _RowMoreMenu extends StatelessWidget {
-  const _RowMoreMenu({
-    required this.onReport,
-    required this.onBlock,
-    required this.onDeleteConversation,
-  });
-
-  final VoidCallback onReport;
-  final VoidCallback onBlock;
-  final VoidCallback onDeleteConversation;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: '',
-      color: const Color(0xFF0E0E0E),
-      elevation: 12,
-      shadowColor: Colors.black.withValues(alpha: 0.5),
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: SC.glassBorderStrong),
-      ),
-      onSelected: (v) {
-        switch (v) {
-          case 'report':
-            onReport();
-            break;
-          case 'block':
-            onBlock();
-            break;
-          case 'delete':
-            onDeleteConversation();
-            break;
-        }
-      },
-      itemBuilder: (ctx) => [
-        _redItem('report', Icons.flag_outlined, 'report'),
-        _redItem('block', Icons.block, 'block'),
-        _redItem('delete', Icons.delete_outline, 'delete_conversation'),
-      ],
-      child: Container(
-        padding: const EdgeInsets.all(9),
-        decoration: const BoxDecoration(
-          color: SC.glassStrong,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.more_vert, color: SC.textPrimary, size: 18),
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _redItem(String value, IconData icon, String key) {
-    const red = Color(0xFFE53935);
-    return PopupMenuItem<String>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon, color: red, size: 20),
-          const SizedBox(width: 14),
-          Text(
-            AppStrings.t(key),
-            style: SCText.body.copyWith(color: red, fontSize: 15),
-          ),
-        ],
       ),
     );
   }
