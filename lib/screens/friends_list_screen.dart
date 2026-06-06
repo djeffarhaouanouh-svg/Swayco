@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
+import '../services/block_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
@@ -74,10 +75,21 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       // the local user by default, or the peer when navigating from
       // someone else's profile.
       final targetId = widget.userId ?? myId;
-      final peers = await FriendshipApi.fetchAcceptedPeers(
+      var peers = await FriendshipApi.fetchAcceptedPeers(
         meId: targetId,
         direction: widget.direction,
       );
+      // On MY own lists, hide anyone who has blocked me — their edge with me
+      // is dead on their side, so they shouldn't sit in my abonnés/abonnements.
+      if (targetId == myId) {
+        try {
+          final blockers = await BlockApi.fetchMyBlockerIds();
+          if (blockers.isNotEmpty) {
+            peers =
+                peers.where((p) => !blockers.contains(p.id)).toList(growable: false);
+          }
+        } catch (_) {}
+      }
       // The "Follow / Following" affordance on each row is always
       // relative to the LOCAL user (so we can offer follow-back),
       // hence we still read MY edges below regardless of whose list

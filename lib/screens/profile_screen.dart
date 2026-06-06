@@ -76,6 +76,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _loading = true;
   // Viewer-mode only: am I currently blocking the displayed user?
   bool _peerBlocked = false;
+  // Viewer-mode only: has the displayed user blocked ME? Hides the
+  // relationship actions (their edge with me is dead on their side).
+  bool _peerBlockedMe = false;
   // Viewer-mode only: which of the peer's photo URLs I've liked. Drives the
   // filled heart on each of the peer's gallery photos.
   Set<String> _likedPhotoUrls = const {};
@@ -163,6 +166,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     final blocked = _isViewingOther && isSupabaseReady && deviceId.isNotEmpty
         ? await BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
         : false;
+    // Has the displayed peer blocked ME? If so, hide the relationship
+    // actions — the edge is dead on their side.
+    var peerBlockedMe = false;
+    if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
+      try {
+        peerBlockedMe = (await BlockApi.fetchMyBlockerIds()).contains(targetId);
+      } catch (_) {}
+    }
     // In viewer mode we also need the set of the peer's photos I've liked so
     // each photo's heart renders in the right state on first paint.
     Set<String> likedPhotoUrls = const {};
@@ -192,6 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       _counts = counts;
       _likesByPhoto = likesByPhoto;
       _peerBlocked = blocked;
+      _peerBlockedMe = peerBlockedMe;
       _likedPhotoUrls = likedPhotoUrls;
       _peerFollowsMe = peerFollowsMe;
       _iFollowPeer = iFollowPeer;
@@ -731,6 +743,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             iFollowPeer: _iFollowPeer,
                             iRequestedPeer: _iRequestedPeer,
                             peerBlocked: _peerBlocked,
+                            peerBlockedMe: _peerBlockedMe,
                             likedPhotoUrls: _likedPhotoUrls,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
@@ -1517,6 +1530,7 @@ class _IdentitySection extends StatelessWidget {
     this.iFollowPeer = false,
     this.iRequestedPeer = false,
     this.peerBlocked = false,
+    this.peerBlockedMe = false,
     this.onFollowBack,
     this.onAddPeer,
     this.onUnfollow,
@@ -1601,6 +1615,11 @@ class _IdentitySection extends StatelessWidget {
   /// action stack collapses to a single "Débloquer" button — the follow
   /// relation and Message CTA are meaningless on a profile I've cut off.
   final bool peerBlocked;
+
+  /// Viewer-mode only: has the displayed peer blocked ME? When true the
+  /// relationship actions (Unfollow / Follow-back / Add) are hidden — the
+  /// edge is dead on their side, so offering to manage it is misleading.
+  final bool peerBlockedMe;
 
   /// Viewer-mode only: follow the peer back (instant abonnement).
   final VoidCallback? onFollowBack;
@@ -1990,35 +2009,40 @@ class _IdentitySection extends StatelessWidget {
             onTap: onMessagePeer ?? () {},
             glass: true,
           ),
-          if (iFollowPeer) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('follow_unfollow'),
-              icon: Icons.person_remove_alt_1,
-              onTap: onUnfollow ?? () {},
-            ),
-          ] else if (peerFollowsMe) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('follow_back'),
-              icon: Icons.person_add_alt_1,
-              onTap: onFollowBack ?? () {},
-            ),
-          ] else if (iRequestedPeer) ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('friendship_sent'),
-              icon: Icons.schedule,
-              onTap: () {},
-              subdued: true,
-            ),
-          ] else ...[
-            const SizedBox(height: 10),
-            _GradientActionButton(
-              label: AppStrings.t('profile_add'),
-              icon: Icons.person_add_alt_1,
-              onTap: onAddPeer ?? () {},
-            ),
+          // The peer blocked me → their edge with me is dead on their side,
+          // so hide the relationship actions (no Unfollow / Follow-back /
+          // Add). Only the Message button stays above.
+          if (!peerBlockedMe) ...[
+            if (iFollowPeer) ...[
+              const SizedBox(height: 10),
+              _GradientActionButton(
+                label: AppStrings.t('follow_unfollow'),
+                icon: Icons.person_remove_alt_1,
+                onTap: onUnfollow ?? () {},
+              ),
+            ] else if (peerFollowsMe) ...[
+              const SizedBox(height: 10),
+              _GradientActionButton(
+                label: AppStrings.t('follow_back'),
+                icon: Icons.person_add_alt_1,
+                onTap: onFollowBack ?? () {},
+              ),
+            ] else if (iRequestedPeer) ...[
+              const SizedBox(height: 10),
+              _GradientActionButton(
+                label: AppStrings.t('friendship_sent'),
+                icon: Icons.schedule,
+                onTap: () {},
+                subdued: true,
+              ),
+            ] else ...[
+              const SizedBox(height: 10),
+              _GradientActionButton(
+                label: AppStrings.t('profile_add'),
+                icon: Icons.person_add_alt_1,
+                onTap: onAddPeer ?? () {},
+              ),
+            ],
           ],
         ],
         // Centres d'intérêt (read-only) — just above the photos.
