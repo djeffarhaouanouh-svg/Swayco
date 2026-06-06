@@ -714,9 +714,8 @@ class _ThreadHeader extends StatelessWidget {
                             title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                            style: SCText.h3.copyWith(
+                              fontSize: 15,
                               color: SC.textPrimary.withValues(alpha: 0.6),
                             ),
                           ),
