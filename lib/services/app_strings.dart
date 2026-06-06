@@ -499,6 +499,9 @@ abstract final class AppStrings {
     'join_header_subtitle': 'LiveKit · 1-on-1',
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Ton profil',
+    'out_of_credits_title': 'Oups… plus de crédits',
+    'out_of_credits_body': 'Recharge pour continuer à traduire tes appels en temps réel.',
+    'out_of_credits_cta': 'Recharger',
   };
 
   // ─── English ──────────────────────────────────────────────────────────────
@@ -939,6 +942,9 @@ abstract final class AppStrings {
     'join_header_subtitle': 'LiveKit · 1-on-1',
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Your profile',
+    'out_of_credits_title': 'Oops… out of credits',
+    'out_of_credits_body': 'Top up to keep translating your calls in real time.',
+    'out_of_credits_cta': 'Top up',
   };
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
@@ -1348,6 +1354,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'Tus mensajes de voz ahora se doblan con tu propia voz para los oyentes de Ultra Plus. Vuelve a grabar cuando quieras para actualizar el clon.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Desbloquear con Ultra Plus',
+    'out_of_credits_title': 'Ups… sin créditos',
+    'out_of_credits_body': 'Recarga para seguir traduciendo tus llamadas en tiempo real.',
+    'out_of_credits_cta': 'Recargar',
   };
 
   // ─── German ───────────────────────────────────────────────────────────────
@@ -1752,6 +1761,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'Deine Sprachnachrichten werden jetzt für Ultra-Plus-Hörer mit deiner eigenen Stimme vertont. Nimm jederzeit neu auf, um den Klon zu aktualisieren.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Mit Ultra Plus freischalten',
+    'out_of_credits_title': 'Ups… keine Credits mehr',
+    'out_of_credits_body': 'Lade auf, um deine Anrufe weiter in Echtzeit zu übersetzen.',
+    'out_of_credits_cta': 'Aufladen',
   };
 
   // ─── Italian ──────────────────────────────────────────────────────────────
@@ -2154,6 +2166,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'I tuoi messaggi vocali ora vengono doppiati con la tua voce per gli ascoltatori Ultra Plus. Registra di nuovo in qualsiasi momento per aggiornare il clone.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Sblocca con Ultra Plus',
+    'out_of_credits_title': 'Ops… crediti esauriti',
+    'out_of_credits_body': 'Ricarica per continuare a tradurre le tue chiamate in tempo reale.',
+    'out_of_credits_cta': 'Ricarica',
   };
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
@@ -2555,6 +2570,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'As suas mensagens de voz são agora dobradas com a sua própria voz para os ouvintes Ultra Plus. Volte a gravar a qualquer momento para atualizar o clone.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Desbloquear com o Ultra Plus',
+    'out_of_credits_title': 'Ups… sem créditos',
+    'out_of_credits_body': 'Recarrega para continuares a traduzir as tuas chamadas em tempo real.',
+    'out_of_credits_cta': 'Recarregar',
   };
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
@@ -2957,6 +2975,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'Je spraakberichten worden nu in je eigen stem nagesproken voor Ultra Plus-luisteraars. Neem op elk moment opnieuw op om de kloon te vernieuwen.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ontgrendelen met Ultra Plus',
+    'out_of_credits_title': 'Oeps… geen tegoed meer',
+    'out_of_credits_body': 'Vul aan om je gesprekken in realtime te blijven vertalen.',
+    'out_of_credits_cta': 'Aanvullen',
   };
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
@@ -3355,6 +3376,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'تُدبلج رسائلك الصوتية الآن بصوتك أنت لمستمعي Ultra Plus. أعد التسجيل في أي وقت لتحديث النسخة.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'افتحها مع Ultra Plus',
+    'out_of_credits_title': 'عذرًا… لا يوجد رصيد',
+    'out_of_credits_body': 'أعد الشحن لمواصلة ترجمة مكالماتك في الوقت الفعلي.',
+    'out_of_credits_cta': 'إعادة الشحن',
   };
 
   // ─── Russian ──────────────────────────────────────────────────────────────
@@ -3756,6 +3780,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'Ваши голосовые сообщения теперь озвучиваются вашим собственным голосом для слушателей Ultra Plus. Перезапишите в любой момент, чтобы обновить клон.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Разблокировать с Ultra Plus',
+    'out_of_credits_title': 'Упс… кредиты закончились',
+    'out_of_credits_body': 'Пополните, чтобы продолжать переводить звонки в реальном времени.',
+    'out_of_credits_cta': 'Пополнить',
   };
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
@@ -4135,6 +4162,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': '你的语音消息现在会用你自己的声音为 Ultra Plus 听众配音。随时可以重录以刷新克隆。',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': '通过 Ultra Plus 解锁',
+    'out_of_credits_title': '哎呀…额度用完了',
+    'out_of_credits_body': '充值以继续实时翻译你的通话。',
+    'out_of_credits_cta': '充值',
   };
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
@@ -4517,6 +4547,9 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': 'あなたのボイスメッセージは、Ultra Plus のリスナーにはあなた自身の声で吹き替えられます。いつでも録音し直してクローンを更新できます。',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ultra Plus で解除',
+    'out_of_credits_title': 'おっと…クレジットがありません',
+    'out_of_credits_body': 'チャージして、通話のリアルタイム翻訳を続けましょう。',
+    'out_of_credits_cta': 'チャージ',
   };
 
   // ─── Korean ───────────────────────────────────────────────────────────────
@@ -4898,5 +4931,8 @@ abstract final class AppStrings {
     'voice_clone_enrolled_subtitle': '이제 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요. 언제든 다시 녹음해 복제본을 갱신할 수 있어요.',
     'voice_clone_ultra_badge': 'ULTRA PLUS',
     'voice_clone_unlock': 'Ultra Plus로 잠금 해제',
+    'out_of_credits_title': '앗… 크레딧이 없어요',
+    'out_of_credits_body': '충전하여 통화를 실시간으로 계속 번역하세요.',
+    'out_of_credits_cta': '충전하기',
   };
 }

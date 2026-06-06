@@ -31,6 +31,7 @@ import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
 import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
+import 'paywall_screen.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -431,7 +432,7 @@ class _CallScreenState extends State<CallScreen> {
       // was already `true` from a prior session, so no value change).
       await widget.translation.detach();
       if (mounted && !_inviteDialogShown) {
-        unawaited(_showInviteFriendsDialog());
+        unawaited(_showOutOfCreditsDialog());
       }
     }
   }
@@ -446,25 +447,14 @@ class _CallScreenState extends State<CallScreen> {
     unawaited(widget.translation.detach());
     if (!mounted) return;
     if (_inviteDialogShown) return;
-    unawaited(_showInviteFriendsDialog());
+    unawaited(_showOutOfCreditsDialog());
   }
 
-  /// Modal shown when the user runs out of credits — explains the bonus
-  /// and offers to open the OS share sheet with their personal referral
-  /// link. Best-effort: a missing profile / referral_code falls back to
-  /// the generic `https://www.swayco.fr` URL so the share still works.
-  Future<void> _showInviteFriendsDialog() async {
+  /// Modal shown when the user is out of translation credits: a quick
+  /// "Oups… plus de crédits" with a Recharger button that opens the paywall.
+  Future<void> _showOutOfCreditsDialog() async {
     _inviteDialogShown = true;
-    final uid = AuthService.currentUserId;
-    String code = '';
-    int referrals = 0;
-    if (uid.isNotEmpty) {
-      final p = await ProfileApi.fetchById(uid);
-      code = p?.referralCode ?? '';
-      referrals = await ProfileApi.countReferrals(uid);
-    }
     if (!mounted) return;
-    final progress = referrals % 3;
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -491,14 +481,14 @@ class _CallScreenState extends State<CallScreen> {
                   color: SC.accent.withValues(alpha: 0.15),
                 ),
                 child: const Icon(
-                  Icons.group_add_rounded,
+                  Icons.bolt_rounded,
                   color: SC.accent,
                   size: 44,
                 ),
               ),
               const SizedBox(height: 18),
               Text(
-                AppStrings.t('invite_bonus_title'),
+                AppStrings.t('out_of_credits_title'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
@@ -508,24 +498,12 @@ class _CallScreenState extends State<CallScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                AppStrings.t('invite_bonus_body'),
+                AppStrings.t('out_of_credits_body'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14.5,
                   height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                AppStrings.t(
-                  'invite_bonus_progress',
-                  args: {'count': '$progress', 'total': '3'},
-                ),
-                style: const TextStyle(
-                  color: SC.accent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 24),
@@ -538,9 +516,9 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    _shareReferral(code);
+                    unawaited(showPaywallSheet(context));
                   },
-                  child: Text(AppStrings.t('invite_bonus_share_cta')),
+                  child: Text(AppStrings.t('out_of_credits_cta')),
                 ),
               ),
               const SizedBox(height: 4),
@@ -556,26 +534,6 @@ class _CallScreenState extends State<CallScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _shareReferral(String code) async {
-    final box = context.findRenderObject() as RenderBox?;
-    final link = code.isEmpty
-        ? 'https://www.swayco.fr'
-        : 'https://www.swayco.fr/?ref=$code';
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text', args: {'link': link}),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // User cancelled or sharing unavailable.
-    }
   }
 
   Future<void> _start() async {
@@ -1061,6 +1019,12 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _openLanguageSheet() {
+    // Out of credits → translation is off; tapping the translate button opens
+    // the recharge paywall instead of the language picker.
+    if (!UsageTracker.isDisabled && UsageTracker.creditsExhausted.value) {
+      unawaited(_showOutOfCreditsDialog());
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E0E0E),
