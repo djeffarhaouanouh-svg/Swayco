@@ -100,6 +100,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// after every block / unblock toggle. Drives the menu label.
   bool _peerBlocked = false;
 
+  /// Cached "has this peer blocked ME" flag. When true the composer and the
+  /// call button are disabled — messages / calls would go into a black hole.
+  bool _peerBlockedMe = false;
+
   Future<void> _reportPeer() async {
     if (_myId.isEmpty || widget.peerDeviceId.isEmpty) return;
     final peerName = _peer?.displayName.isNotEmpty == true
@@ -280,6 +284,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final blocked = isSupabaseReady && id.isNotEmpty
         ? await BlockApi.isBlocked(blockerId: id, otherId: widget.peerDeviceId)
         : false;
+    // Has the peer blocked ME? Disables the composer + call button below.
+    var blockedMe = false;
+    if (isSupabaseReady && id.isNotEmpty) {
+      try {
+        blockedMe =
+            (await BlockApi.fetchMyBlockerIds()).contains(widget.peerDeviceId);
+      } catch (_) {}
+    }
     // Opening this thread = peer's messages here are now "seen". Clears
     // the per-row dot on the chat list for this conversation.
     unawaited(ChatUnread.markConversationSeen(widget.conversationId));
@@ -302,6 +314,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _myTier = mine?.subscriptionTier ?? 'free';
       _peer = peer;
       _peerBlocked = blocked;
+      _peerBlockedMe = blockedMe;
     });
 
     if (!isSupabaseReady) {
@@ -489,12 +502,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   _ThreadHeader(
                     title: widget.title,
                     peer: _peer,
-                    onCall: () => CallLauncher.startCall(
-                      context,
-                      peerDeviceId: widget.peerDeviceId,
-                      translation: widget.translation,
-                      startWithCamera: true,
-                    ),
+                    blockedByPeer: _peerBlockedMe,
+                    onCall: _peerBlockedMe
+                        ? () => ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                AppStrings.t('chat_blocked_by_peer'),
+                              ),
+                            ),
+                          )
+                        : () => CallLauncher.startCall(
+                            context,
+                            peerDeviceId: widget.peerDeviceId,
+                            translation: widget.translation,
+                            startWithCamera: true,
+                          ),
                     onViewProfile: () => Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
                         builder: (_) =>
@@ -520,16 +542,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       ),
                     ),
                   ),
-                  _Composer(
-                    controller: _inputCtrl,
-                    sending: _sending,
-                    onSend: _send,
-                    onSendVoice: _sendVoice,
-                    onSendImage: _sendImage,
-                    autoTranslate: _autoTranslate,
-                    onToggleTranslate: _toggleAutoTranslate,
-                    myLang: _myLang,
-                  ),
+                  if (_peerBlockedMe)
+                    const _BlockedComposerNotice()
+                  else
+                    _Composer(
+                      controller: _inputCtrl,
+                      sending: _sending,
+                      onSend: _send,
+                      onSendVoice: _sendVoice,
+                      onSendImage: _sendImage,
+                      autoTranslate: _autoTranslate,
+                      onToggleTranslate: _toggleAutoTranslate,
+                      myLang: _myLang,
+                    ),
                 ],
               ),
             ),
@@ -613,11 +638,15 @@ class _ThreadHeader extends StatelessWidget {
     required this.onCall,
     required this.onViewProfile,
     this.peerBlocked = false,
+    this.blockedByPeer = false,
     this.onToggleBlock,
     this.onReport,
   });
   final String title;
   final RemoteProfile? peer;
+
+  /// True when the peer has blocked ME — greys out the call button.
+  final bool blockedByPeer;
 
   /// Call button — starts a video call (camera on).
   final VoidCallback onCall;
@@ -769,11 +798,15 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             // Single call button — a tap starts a video call (camera on).
-            GlassIconButton(
-              icon: Icons.phone_rounded,
-              size: 40,
-              iconSize: 20,
-              onTap: onCall,
+            // Greyed when the peer has blocked me (the call can't connect).
+            Opacity(
+              opacity: blockedByPeer ? 0.4 : 1.0,
+              child: GlassIconButton(
+                icon: Icons.phone_rounded,
+                size: 40,
+                iconSize: 20,
+                onTap: onCall,
+              ),
             ),
           ],
         ),
@@ -1277,6 +1310,40 @@ class _VoicePlayerState extends State<_VoicePlayer> {
 /// `messages.audio_duration_ms` (120000 ms) but capped lower in the UI
 /// so users see a clear ceiling. Mirrors WhatsApp's UX.
 const Duration _kMaxVoiceMessage = Duration(seconds: 60);
+
+/// Replaces the composer when the peer has blocked me — a flat, disabled
+/// notice bar so it's obvious messages can't be sent (they'd go nowhere).
+class _BlockedComposerNotice extends StatelessWidget {
+  const _BlockedComposerNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF0E0E0E),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        14,
+        16,
+        14 + MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.block, size: 18, color: SC.textMuted),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              AppStrings.t('chat_blocked_by_peer'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SC.textMuted, fontSize: 13.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _Composer extends StatefulWidget {
   const _Composer({

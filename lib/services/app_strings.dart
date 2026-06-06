@@ -65,6 +65,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} a réagi à votre photo',
     'demandes_liked_your_photo': '{name} a liké ta photo',
     'demandes_started_following': "{name} s'est abonné·e à toi",
+    'chat_blocked_by_peer': 'Tu ne peux plus contacter cette personne.',
     'demandes_wants_to_be_friend': '{name} veut devenir ami·e avec toi',
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
     'discover_visibility_hint':
@@ -543,6 +544,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} reacted to your photo',
     'demandes_liked_your_photo': '{name} liked your photo',
     'demandes_started_following': '{name} started following you',
+    'chat_blocked_by_peer': 'You can no longer contact this person.',
     'demandes_wants_to_be_friend': '{name} wants to be your friend',
     'settings_hide_from_country': 'Hide me from people in my country',
     'discover_visibility_hint':
@@ -1011,6 +1013,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} reaccionó a tu foto',
     'demandes_liked_your_photo': 'A {name} le gustó tu foto',
     'demandes_started_following': '{name} empezó a seguirte',
+    'chat_blocked_by_peer': 'Ya no puedes contactar a esta persona.',
     'demandes_wants_to_be_friend': '{name} quiere ser tu amigo·a',
     'settings_hide_from_country': 'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
@@ -1449,6 +1452,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} hat auf dein Foto reagiert',
     'demandes_liked_your_photo': '{name} gefällt dein Foto',
     'demandes_started_following': '{name} folgt dir jetzt',
+    'chat_blocked_by_peer': 'Du kannst diese Person nicht mehr kontaktieren.',
     'demandes_wants_to_be_friend': '{name} möchte mit dir befreundet sein',
     'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
@@ -1881,6 +1885,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} ha reagito alla tua foto',
     'demandes_liked_your_photo': 'A {name} è piaciuta la tua foto',
     'demandes_started_following': '{name} ha iniziato a seguirti',
+    'chat_blocked_by_peer': 'Non puoi più contattare questa persona.',
     'demandes_wants_to_be_friend': '{name} vuole essere tuo amico·a',
     'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
@@ -2312,6 +2317,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} reagiu à tua foto',
     'demandes_liked_your_photo': '{name} curtiu a tua foto',
     'demandes_started_following': '{name} começou a seguir-te',
+    'chat_blocked_by_peer': 'Já não podes contactar esta pessoa.',
     'demandes_wants_to_be_friend': '{name} quer ser teu amigo·a',
     'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
@@ -2742,6 +2748,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} reageerde op je foto',
     'demandes_liked_your_photo': '{name} vindt je foto leuk',
     'demandes_started_following': '{name} volgt je nu',
+    'chat_blocked_by_peer': 'Je kunt deze persoon niet meer bereiken.',
     'demandes_wants_to_be_friend': '{name} wil je vriend worden',
     'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
@@ -3173,6 +3180,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} تفاعل مع صورتك',
     'demandes_liked_your_photo': '{name} أعجب بصورتك',
     'demandes_started_following': '{name} بدأ بمتابعتك',
+    'chat_blocked_by_peer': 'لم يعد بإمكانك التواصل مع هذا الشخص.',
     'demandes_wants_to_be_friend': '{name} يريد أن يصبح صديقك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
     'discover_visibility_hint':
@@ -3600,6 +3608,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} отреагировал(а) на ваше фото',
     'demandes_liked_your_photo': '{name} оценил(а) ваше фото',
     'demandes_started_following': '{name} подписался(ась) на вас',
+    'chat_blocked_by_peer': 'Вы больше не можете связаться с этим человеком.',
     'demandes_wants_to_be_friend': '{name} хочет добавить вас в друзья',
     'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
@@ -4029,6 +4038,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} 回应了您的照片',
     'demandes_liked_your_photo': '{name} 赞了您的照片',
     'demandes_started_following': '{name} 开始关注您了',
+    'chat_blocked_by_peer': '你无法再联系此人。',
     'demandes_wants_to_be_friend': '{name} 想成为你的好友',
     'settings_hide_from_country': '对来自我国家的人隐藏',
     'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片。\n圈出的照片就是会在 Discover 中显示的那张。',
@@ -4438,6 +4448,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name} があなたの写真にリアクション',
     'demandes_liked_your_photo': '{name} があなたの写真にいいねしました',
     'demandes_started_following': '{name} があなたをフォローしました',
+    'chat_blocked_by_peer': 'この人にはもう連絡できません。',
     'demandes_wants_to_be_friend': '{name} さんがあなたと友達になりたがっています',
     'settings_hide_from_country': '自分の国の人から非表示にする',
     'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める。\n枠で囲まれた写真が Discover に表示されます。',
@@ -4850,6 +4861,7 @@ abstract final class AppStrings {
     'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 반응했습니다',
     'demandes_liked_your_photo': '{name}님이 회원님의 사진을 좋아합니다',
     'demandes_started_following': '{name}님이 회원님을 팔로우하기 시작했습니다',
+    'chat_blocked_by_peer': '이 사람에게 더 이상 연락할 수 없습니다.',
     'demandes_wants_to_be_friend': '{name}님이 친구가 되고 싶어 합니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
     'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택.\n테두리가 표시된 사진이 Discover에 나타납니다.',
