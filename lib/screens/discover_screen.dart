@@ -1618,7 +1618,7 @@ class _ReactionEmojiButton extends StatefulWidget {
 
 class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     with TickerProviderStateMixin {
-  // Idle float — a gentle ±5px up/down loop, phase-shifted per index so the
+  // Idle float — a gentle ±3px up/down loop, phase-shifted per index so the
   // rail ripples instead of bobbing in unison.
   late final AnimationController _float = AnimationController(
     vsync: this,
@@ -1683,10 +1683,10 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           child: AnimatedBuilder(
             animation: Listenable.merge([_float, _pop]),
             builder: (context, child) {
-              // Smooth ±5px sine bob, phase-shifted per rail index.
+              // Smooth ±3px sine bob, phase-shifted per rail index.
               final dy =
                   math.sin((_float.value + widget.index * 0.27) * 2 * math.pi) *
-                      5;
+                      3;
               return Transform.translate(
                 offset: Offset(0, dy),
                 child: Transform.scale(scale: _popScale.value, child: child),
