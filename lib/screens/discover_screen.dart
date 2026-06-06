@@ -1634,8 +1634,16 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     ),
   ]).animate(_pop);
 
+  // Idle "breath" — a gentle grow/shrink scale loop (~5s full cycle) so the
+  // emojis feel alive WITHOUT moving up/down.
+  late final AnimationController _breathe = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2500),
+  )..repeat(reverse: true);
+
   @override
   void dispose() {
+    _breathe.dispose();
     _pop.dispose();
     super.dispose();
   }
@@ -1664,9 +1672,12 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           behavior: HitTestBehavior.opaque,
           onTap: widget.onSend == null ? null : () => _handleTap(ctx),
           child: AnimatedBuilder(
-            animation: _pop,
-            builder: (context, child) =>
-                Transform.scale(scale: _popScale.value, child: child),
+            animation: Listenable.merge([_breathe, _pop]),
+            builder: (context, child) => Transform.scale(
+              // Idle breath (1.0 → 1.10 → 1.0) multiplied by the tap pop.
+              scale: (1.0 + 0.10 * _breathe.value) * _popScale.value,
+              child: child,
+            ),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               width: 48,
