@@ -1794,22 +1794,32 @@ class _IdentitySection extends StatelessWidget {
         // the text → it turns into a field), no bottom-sheet popup. Shows
         // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        Column(
+        // +20 sits INLINE to the right of the bio, nudged slightly up — not
+        // on its own line above (which would push everything down on a phone
+        // when the bio runs to two lines). The Row hugs its content so the
+        // bio + hint group stays centred under the name.
+        Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _RewardHint(),
-            const SizedBox(height: 2),
-            _InlineEditable(
-              value: bio,
-              placeholder: _bioPlaceholder,
-              onSave: onEditBio,
-              maxLength: profileBioMaxLength,
-              maxLines: 2,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 16.5,
-                height: 1.4,
+            Flexible(
+              child: _InlineEditable(
+                value: bio,
+                placeholder: _bioPlaceholder,
+                onSave: onEditBio,
+                maxLength: profileBioMaxLength,
+                maxLines: 2,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 16.5,
+                  height: 1.4,
+                ),
               ),
+            ),
+            const SizedBox(width: 6),
+            Transform.translate(
+              offset: const Offset(0, -6),
+              child: const _RewardHint(),
             ),
           ],
         ),
