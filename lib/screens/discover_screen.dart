@@ -264,7 +264,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   /// Re-arms so the nudge repeats every few seconds until the user moves.
   void _fireSwipeHint() {
     if (!mounted) return;
-    if (_cards.length > 1 && !_searchExpanded) _startNudge();
+    // Don't peek while the user is writing a message (keyboard up) — it would
+    // make the card jump under the composer.
+    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
+    if (_cards.length > 1 && !_searchExpanded && !keyboardUp) _startNudge();
     _swipeHintTimer = Timer(const Duration(seconds: 4), _fireSwipeHint);
   }
 
@@ -1615,7 +1618,7 @@ class _ReactionEmojiButton extends StatefulWidget {
 
 class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     with TickerProviderStateMixin {
-  // Idle float — a gentle ±3px up/down loop, phase-shifted per index so the
+  // Idle float — a gentle ±5px up/down loop, phase-shifted per index so the
   // rail ripples instead of bobbing in unison.
   late final AnimationController _float = AnimationController(
     vsync: this,
