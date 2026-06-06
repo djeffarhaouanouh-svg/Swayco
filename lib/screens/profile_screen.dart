@@ -1794,32 +1794,36 @@ class _IdentitySection extends StatelessWidget {
         // the text → it turns into a field), no bottom-sheet popup. Shows
         // the placeholder when empty so it stays an obvious edit affordance.
         const SizedBox(height: 12),
-        // +20 sits INLINE to the right of the bio, nudged slightly up — not
-        // on its own line above (which would push everything down on a phone
-        // when the bio runs to two lines). The Row hugs its content so the
-        // bio + hint group stays centred under the name.
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        // Bio stays fully centred under the name; the +20 reward hint floats
+        // at the far right of the same line, nudged up — it lines up with the
+        // Interests / Your photos +20 badges below and never pushes the bio
+        // down or off-centre. Symmetric side padding keeps a long bio clear
+        // of the hint while preserving the centring.
+        Stack(
+          clipBehavior: Clip.none,
           children: [
-            Flexible(
-              child: _InlineEditable(
-                value: bio,
-                placeholder: _bioPlaceholder,
-                onSave: onEditBio,
-                maxLength: profileBioMaxLength,
-                maxLines: 2,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 16.5,
-                  height: 1.4,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 44),
+              child: SizedBox(
+                width: double.infinity,
+                child: _InlineEditable(
+                  value: bio,
+                  placeholder: _bioPlaceholder,
+                  onSave: onEditBio,
+                  maxLength: profileBioMaxLength,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 16.5,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            Transform.translate(
-              offset: const Offset(0, -6),
-              child: const _RewardHint(),
+            const Positioned(
+              right: 0,
+              top: -4,
+              child: _RewardHint(),
             ),
           ],
         ),
