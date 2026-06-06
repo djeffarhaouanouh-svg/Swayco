@@ -30,6 +30,7 @@ import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
 import '../widgets/glass.dart';
+import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
 
@@ -1805,14 +1806,13 @@ class _RoundCallButton extends StatelessWidget {
     return Semantics(
       label: label,
       button: true,
-      child: Material(
-        color: background,
-        shape: const CircleBorder(),
-        elevation: 3,
-        shadowColor: Colors.black54,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
+      child: Pressable(
+        onTap: onTap,
+        child: Material(
+          color: background,
+          shape: const CircleBorder(),
+          elevation: 3,
+          shadowColor: Colors.black54,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Icon(icon, color: Colors.white, size: 21),

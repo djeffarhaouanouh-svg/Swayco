@@ -302,47 +302,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final overlay = Overlay.of(context);
     late final OverlayEntry entry;
     entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        top: MediaQuery.of(ctx).padding.top + 10,
-        left: 16,
-        right: 16,
-        child: IgnorePointer(
-          child: Center(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                decoration: BoxDecoration(
-                  color: SC.accent,
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black45,
-                      blurRadius: 14,
-                      offset: Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF04141A),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+      builder: (_) => _TopToast(
+        message: message,
+        onDismissed: () {
+          if (entry.mounted) entry.remove();
+        },
       ),
     );
     overlay.insert(entry);
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (entry.mounted) entry.remove();
-    });
   }
 
   /// Random LiveKit identity for the host joining a guest-invite call.
@@ -838,6 +805,98 @@ class _FriendChatRow extends StatelessWidget {
     );
   }
 
+}
+
+/// Cyan top-toast that slides down + fades in, holds, then slides up + fades
+/// out before removing its own overlay entry via [onDismissed].
+class _TopToast extends StatefulWidget {
+  const _TopToast({required this.message, required this.onDismissed});
+
+  final String message;
+  final VoidCallback onDismissed;
+
+  @override
+  State<_TopToast> createState() => _TopToastState();
+}
+
+class _TopToastState extends State<_TopToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  late final Animation<double> _t =
+      CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    await _c.forward();
+    await Future<void>.delayed(const Duration(milliseconds: 1700));
+    if (!mounted) return;
+    await _c.reverse();
+    widget.onDismissed();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 10,
+      left: 16,
+      right: 16,
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _t,
+          builder: (context, child) => Opacity(
+            opacity: _t.value.clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, (1 - _t.value) * -14),
+              child: child,
+            ),
+          ),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                decoration: BoxDecoration(
+                  color: SC.accent,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black45,
+                      blurRadius: 14,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  widget.message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF04141A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Small round audio-call shortcut at the far-right of every chat-list row.

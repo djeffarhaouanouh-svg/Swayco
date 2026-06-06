@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
+import 'pressable.dart';
 
 /// "Apple-glass" container — blur + low-alpha white tint + hairline border.
 /// Use it for headers, the bottom nav, the chat composer, list cards.
@@ -63,9 +64,8 @@ class GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
