@@ -28,10 +28,10 @@ const List<_MissionDef> _missions = [
       Icons.favorite_rounded),
   _MissionDef('first_message', 'mission_first_message',
       'mission_first_message_how', Icons.send_rounded),
-  _MissionDef('fill_bio', 'mission_fill_bio', 'mission_fill_bio_how',
-      Icons.edit_note_rounded),
   _MissionDef('add_interests', 'mission_add_interests',
       'mission_add_interests_how', Icons.interests_rounded),
+  _MissionDef('receive_like', 'mission_receive_like', 'mission_receive_like_how',
+      Icons.recommend_rounded),
 ];
 
 /// The mission def for a stable [key] (or null).
@@ -310,14 +310,18 @@ class _RingPainter extends CustomPainter {
 /// Full missions card for the profile: ring + a collapsible per-mission
 /// checklist. Tap the header to unfold the list (dropdown).
 class MissionsCard extends StatefulWidget {
-  const MissionsCard({super.key});
+  const MissionsCard({super.key, this.collapsible = true});
+
+  /// When false the checklist is always open and the chevron is hidden — used
+  /// in the Discover sheet (no dropdown there).
+  final bool collapsible;
 
   @override
   State<MissionsCard> createState() => _MissionsCardState();
 }
 
 class _MissionsCardState extends State<MissionsCard> {
-  bool _expanded = false;
+  late bool _expanded = !widget.collapsible;
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +335,9 @@ class _MissionsCardState extends State<MissionsCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkWell(
-                onTap: () => setState(() => _expanded = !_expanded),
+                onTap: widget.collapsible
+                    ? () => setState(() => _expanded = !_expanded)
+                    : null,
                 borderRadius: BorderRadius.circular(12),
                 child: Row(
                   children: [
@@ -382,15 +388,17 @@ class _MissionsCardState extends State<MissionsCard> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    AnimatedRotation(
-                      turns: _expanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: SC.textMuted,
+                    if (widget.collapsible) ...[
+                      const SizedBox(width: 6),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: SC.textMuted,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -550,7 +558,11 @@ Future<void> showMissionsSheet(BuildContext context) {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Flexible(child: SingleChildScrollView(child: MissionsCard())),
+          const Flexible(
+            child: SingleChildScrollView(
+              child: MissionsCard(collapsible: false),
+            ),
+          ),
         ],
       ),
     ),

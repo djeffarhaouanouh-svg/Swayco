@@ -11,10 +11,10 @@ import 'profile_api.dart';
 const List<String> missionKeys = <String>[
   'friend_request', // sent any friend request
   'post_photo', // added a gallery photo
-  'like_someone', // liked at least one photo
+  'like_someone', // liked a photo / sent a reaction
   'first_message', // sent a real (non-emoji) message
-  'fill_bio', // bio is non-empty
   'add_interests', // picked 3+ interests
+  'receive_like', // someone liked one of your photos
 ];
 
 const int missionCount = 6;
@@ -93,12 +93,14 @@ class MissionsService {
         ChatApi.fetchMyOutgoingPhotoReactions(userId),
         ChatApi.hasSentAnyMessage(userId),
         ProfileApi.fetchById(userId),
+        LikeApi.hasReceivedLike(userId),
       ]);
       final friendships = res[0] as List<Friendship>;
       final liked = res[1] as Set<String>;
       final reactions = res[2] as Map<String, Set<String>>;
       final sentMessage = res[3] as bool;
       final profile = res[4] as RemoteProfile?;
+      final receivedLike = res[5] as bool;
 
       final done = <String>{};
       if (friendships.any((f) => f.requester == userId)) {
@@ -111,8 +113,9 @@ class MissionsService {
       // "First message" must catch a message from ANY screen (chat thread,
       // Discover intro, image, voice), not just Discover-card intros.
       if (sentMessage) done.add('first_message');
-      if (profile?.bio.trim().isNotEmpty ?? false) done.add('fill_bio');
       if ((profile?.interests.length ?? 0) >= 3) done.add('add_interests');
+      // Passive mission — someone liked one of your photos.
+      if (receivedLike) done.add('receive_like');
 
       final wasLoaded = state.value.loaded;
       final prevDone = state.value.done;
@@ -121,6 +124,7 @@ class MissionsService {
       final r = await ProfileApi.syncMissions(
         userId: userId,
         liveDone: done,
+        validKeys: missionKeys.toSet(),
         totalCount: missionCount,
         totalRewardSeconds: missionTotalRewardSeconds,
       );

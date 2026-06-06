@@ -872,6 +872,7 @@ abstract final class ProfileApi {
   syncMissions({
     required String userId,
     required Set<String> liveDone,
+    required Set<String> validKeys,
     required int totalCount,
     required int totalRewardSeconds,
   }) async {
@@ -893,9 +894,15 @@ abstract final class ProfileApi {
       final rewarded = <String>{
         ...?(row['missions_rewarded'] as List?)?.map((e) => e.toString()),
       };
-      final merged = {...persisted, ...liveDone};
+      // Drop any stale keys no longer in the mission set (e.g. a retired
+      // mission like 'fill_bio') so the count + persisted set stay clean.
+      final merged = {...persisted, ...liveDone}
+        ..removeWhere((k) => !validKeys.contains(k));
       final updates = <String, dynamic>{};
-      if (merged.length != persisted.length) {
+      final changed =
+          merged.length != persisted.length ||
+          merged.any((k) => !persisted.contains(k));
+      if (changed) {
         updates['missions_done'] = merged.toList();
       }
       var claimed = rewarded.contains('__complete__');

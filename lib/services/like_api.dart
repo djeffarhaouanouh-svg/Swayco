@@ -59,6 +59,24 @@ abstract final class LikeApi {
     }
   }
 
+  /// True once anyone has liked one of [userId]'s photos — drives the "receive
+  /// a like" onboarding mission. Passive (the user can't trigger it), so it's
+  /// detected on refresh rather than poked.
+  static Future<bool> hasReceivedLike(String userId) async {
+    if (!isSupabaseReady || userId.isEmpty) return false;
+    try {
+      final rows = await _c
+          .from('likes')
+          .select('liker')
+          .eq('liked', userId)
+          .limit(1);
+      return (rows as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('LikeApi.hasReceivedLike failed: $e');
+      return false;
+    }
+  }
+
   static Future<void> _notifyLike(String likerId, String likedId) async {
     try {
       final likerProfile = await ProfileApi.fetchById(likerId);
