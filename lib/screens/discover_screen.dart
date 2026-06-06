@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -1570,8 +1572,9 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
   @override
   void initState() {
     super.initState();
-    _float.repeat(reverse: true);
-    _float.value = (widget.index * 0.27) % 1.0;
+    // Linear 0→1 loop; the per-index phase is applied in the builder via sin,
+    // so setting .value here (which would STOP the repeat) is avoided.
+    _float.repeat();
   }
 
   @override
@@ -1607,7 +1610,10 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           child: AnimatedBuilder(
             animation: Listenable.merge([_float, _pop]),
             builder: (context, child) {
-              final dy = (_float.value - 0.5) * 6; // ±3 px bob
+              // Smooth ±3px sine bob, phase-shifted per rail index.
+              final dy =
+                  math.sin((_float.value + widget.index * 0.27) * 2 * math.pi) *
+                      3;
               return Transform.translate(
                 offset: Offset(0, dy),
                 child: Transform.scale(scale: _popScale.value, child: child),
