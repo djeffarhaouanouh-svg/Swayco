@@ -471,8 +471,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
-      body: Stack(
-        children: [
+      body: GestureDetector(
+        // Swipe right anywhere to leave the conversation (back).
+        onHorizontalDragEnd: (d) {
+          if ((d.primaryVelocity ?? 0) > 300) Navigator.of(context).maybePop();
+        },
+        child: Stack(
+          children: [
           ColoredBox(
             color: const Color(0xFF0E0E0E),
             child: SafeArea(
@@ -483,11 +488,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     title: widget.title,
                     peer: _peer,
                     onCall: () => CallLauncher.startCall(
-                      context,
-                      peerDeviceId: widget.peerDeviceId,
-                      translation: widget.translation,
-                    ),
-                    onCallVideo: () => CallLauncher.startCall(
                       context,
                       peerDeviceId: widget.peerDeviceId,
                       translation: widget.translation,
@@ -538,6 +538,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -608,7 +609,6 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
-    required this.onCallVideo,
     required this.onViewProfile,
     this.peerBlocked = false,
     this.onToggleBlock,
@@ -617,11 +617,8 @@ class _ThreadHeader extends StatelessWidget {
   final String title;
   final RemoteProfile? peer;
 
-  /// Audio call (phone icon).
+  /// Call button — starts a video call (camera on).
   final VoidCallback onCall;
-
-  /// Video call (camera icon).
-  final VoidCallback onCallVideo;
   final VoidCallback onViewProfile;
 
   // Block / report are no longer surfaced in the header (the ⋮ menu was
@@ -710,6 +707,7 @@ class _ThreadHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: SCText.h3.copyWith(
+                          fontSize: 15,
                           color: SC.textPrimary.withValues(alpha: 0.6),
                         ),
                       ),
@@ -749,19 +747,12 @@ class _ThreadHeader extends StatelessWidget {
                     : const SizedBox.shrink(),
               ),
             ),
-            // Audio call (phone) + video call (camera).
+            // Single call button — a tap starts a video call (camera on).
             GlassIconButton(
               icon: Icons.phone_rounded,
               size: 40,
               iconSize: 20,
               onTap: onCall,
-            ),
-            const SizedBox(width: 6),
-            GlassIconButton(
-              icon: Icons.videocam_rounded,
-              size: 40,
-              iconSize: 20,
-              onTap: onCallVideo,
             ),
           ],
         ),
