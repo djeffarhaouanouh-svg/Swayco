@@ -13,7 +13,6 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
-import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
@@ -661,7 +660,6 @@ class _FriendChatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = findLanguageByCode(profile.language);
     final name = profile.displayName.isNotEmpty
         ? profile.displayName
         : (profile.handle.isNotEmpty
@@ -680,8 +678,6 @@ class _FriendChatRow extends StatelessWidget {
         ));
       }
       subtitleParts.add(TextSpan(text: lastMessage!.body));
-    } else if (lang != null) {
-      subtitleParts.add(TextSpan(text: '${lang.flag}  ${lang.label}'));
     } else {
       subtitleParts.add(TextSpan(text: AppStrings.t('chat_tap_to_chat')));
     }

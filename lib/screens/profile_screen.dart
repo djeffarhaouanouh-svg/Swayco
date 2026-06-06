@@ -1793,7 +1793,10 @@ class _IdentitySection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _InlineStat(value: photos.length, label: 'posts'),
+            _InlineStat(
+              value: photos.length,
+              label: AppStrings.t('profile_posts').toLowerCase(),
+            ),
             const _StatDivider(),
             _InlineStat(
               value: counts.followers,
@@ -1906,7 +1909,10 @@ class _IdentitySection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _InlineStat(value: photos.length, label: 'posts'),
+            _InlineStat(
+              value: photos.length,
+              label: AppStrings.t('profile_posts').toLowerCase(),
+            ),
             const _StatDivider(),
             _InlineStat(
               value: counts.followers,
