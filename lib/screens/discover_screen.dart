@@ -968,9 +968,7 @@ class _DiscoverHeader extends StatelessWidget {
           child: SizedBox(
             height: height,
             child: Padding(
-              // A mini left margin nudges the title off the screen edge; the
-              // right inset keeps the search pill off the edge too.
-              padding: const EdgeInsets.only(left: 10, right: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   // Hidden while the search is open so the field has room and
