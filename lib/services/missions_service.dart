@@ -19,28 +19,29 @@ const List<String> missionKeys = <String>[
 
 const int missionCount = 6;
 
-/// Call-time granted per completed mission (in seconds). 6 × 5 min = 30 min.
-const int missionRewardSeconds = 5 * 60;
+/// One-off bonus (in seconds) granted when ALL missions are done. 15 min.
+const int missionTotalRewardSeconds = 15 * 60;
 
 @immutable
 class MissionsState {
   const MissionsState({
     this.done = const {},
-    this.rewarded = const {},
+    this.claimed = false,
     this.loaded = false,
   });
 
-  /// Mission keys the user has completed.
+  /// Mission keys the user has completed (sticky — never un-completes).
   final Set<String> done;
 
-  /// Mission keys whose minutes reward has been credited.
-  final Set<String> rewarded;
+  /// True once the 15-minute "all missions done" bonus has been credited.
+  final bool claimed;
 
   /// True once the first fetch has resolved (drives "don't animate the very
   /// first paint" logic and skeleton states).
   final bool loaded;
 
   int get completed => done.length;
+  bool get allDone => done.length >= missionCount;
   bool isDone(String key) => done.contains(key);
 }
 
@@ -116,21 +117,26 @@ class MissionsService {
       final wasLoaded = state.value.loaded;
       final prevDone = state.value.done;
 
-      // Credit minutes for newly-done, not-yet-rewarded missions (idempotent).
-      final r = await ProfileApi.syncMissionRewards(
+      // Merge into the STICKY set + grant the 15-min bonus once all are done.
+      final r = await ProfileApi.syncMissions(
         userId: userId,
-        doneKeys: done,
-        rewardSecondsEach: missionRewardSeconds,
+        liveDone: done,
+        totalCount: missionCount,
+        totalRewardSeconds: missionTotalRewardSeconds,
       );
 
       _userId = userId;
       _lastFetch = DateTime.now();
-      state.value = MissionsState(done: done, rewarded: r.rewarded, loaded: true);
+      state.value = MissionsState(
+        done: r.done,
+        claimed: r.claimed,
+        loaded: true,
+      );
 
       // Fire the shooting star only for a mission that flipped AFTER the first
       // load — otherwise the ring would "complete" everything on first paint.
       if (wasLoaded) {
-        final newly = done.difference(prevDone);
+        final newly = r.done.difference(prevDone);
         if (newly.isNotEmpty) justCompleted.value = newly.first;
       }
     } catch (e) {

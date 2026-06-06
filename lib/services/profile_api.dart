@@ -860,48 +860,60 @@ abstract final class ProfileApi {
     }
   }
 
-  /// Onboarding-missions reward. Given the mission keys the client has detected
-  /// as DONE, credit [rewardSecondsEach] of call time for every done key not
-  /// yet recorded in `missions_rewarded`, then record it so it never pays
-  /// twice. Returns the full rewarded set plus the keys credited in THIS call
-  /// (empty when nothing new). Honor-system v1 like [consumeCredits] — swap for
-  /// a SECURITY DEFINER function if abuse appears.
-  static Future<({Set<String> rewarded, Set<String> grantedNow})>
-  syncMissionRewards({
+  /// Sticky-missions sync. Merges the live-detected [liveDone] into the
+  /// persisted `missions_done` (monotonic — never removes a key, so a completed
+  /// mission stays done even if the user deletes the photo / clears the bio).
+  /// Grants the one-off [totalRewardSeconds] of call time the FIRST time all
+  /// [totalCount] missions are done (recorded via a '__complete__' sentinel in
+  /// `missions_rewarded` so it pays exactly once). Returns the sticky done set,
+  /// whether the reward is claimed, and whether it was granted in THIS call.
+  /// Honor-system v1 like [consumeCredits].
+  static Future<({Set<String> done, bool claimed, bool justRewarded})>
+  syncMissions({
     required String userId,
-    required Set<String> doneKeys,
-    required int rewardSecondsEach,
+    required Set<String> liveDone,
+    required int totalCount,
+    required int totalRewardSeconds,
   }) async {
-    const empty = (rewarded: <String>{}, grantedNow: <String>{});
-    if (!isSupabaseReady || userId.isEmpty) return empty;
+    if (!isSupabaseReady || userId.isEmpty) {
+      return (done: liveDone, claimed: false, justRewarded: false);
+    }
     try {
       final row = await _c
           .from('profiles')
-          .select('credits_seconds, missions_rewarded')
+          .select('credits_seconds, missions_done, missions_rewarded')
           .eq('id', userId)
           .maybeSingle();
-      if (row == null) return empty;
+      if (row == null) {
+        return (done: liveDone, claimed: false, justRewarded: false);
+      }
+      final persisted = <String>{
+        ...?(row['missions_done'] as List?)?.map((e) => e.toString()),
+      };
       final rewarded = <String>{
         ...?(row['missions_rewarded'] as List?)?.map((e) => e.toString()),
       };
-      final grantedNow = doneKeys.difference(rewarded);
-      if (grantedNow.isEmpty) {
-        return (rewarded: rewarded, grantedNow: <String>{});
+      final merged = {...persisted, ...liveDone};
+      final updates = <String, dynamic>{};
+      if (merged.length != persisted.length) {
+        updates['missions_done'] = merged.toList();
       }
-      final current = RemoteProfile._parseInt(row['credits_seconds'], 0);
-      final next = current + grantedNow.length * rewardSecondsEach;
-      final newRewarded = {...rewarded, ...grantedNow};
-      await _c
-          .from('profiles')
-          .update({
-            'credits_seconds': next,
-            'missions_rewarded': newRewarded.toList(),
-          })
-          .eq('id', userId);
-      return (rewarded: newRewarded, grantedNow: grantedNow);
+      var claimed = rewarded.contains('__complete__');
+      var justRewarded = false;
+      if (merged.length >= totalCount && !claimed) {
+        final current = RemoteProfile._parseInt(row['credits_seconds'], 0);
+        updates['credits_seconds'] = current + totalRewardSeconds;
+        updates['missions_rewarded'] = [...rewarded, '__complete__'];
+        claimed = true;
+        justRewarded = true;
+      }
+      if (updates.isNotEmpty) {
+        await _c.from('profiles').update(updates).eq('id', userId);
+      }
+      return (done: merged, claimed: claimed, justRewarded: justRewarded);
     } catch (e) {
-      debugPrint('ProfileApi.syncMissionRewards failed: $e');
-      return empty;
+      debugPrint('ProfileApi.syncMissions failed: $e');
+      return (done: liveDone, claimed: false, justRewarded: false);
     }
   }
 

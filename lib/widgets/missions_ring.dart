@@ -320,74 +320,105 @@ class _RingPainter extends CustomPainter {
       old.fraction != fraction || old.completed != completed;
 }
 
-/// Full missions card for the profile: ring + per-mission checklist with the
-/// "how to" hint and the minutes reward.
-class MissionsCard extends StatelessWidget {
+/// Full missions card for the profile: ring + a collapsible per-mission
+/// checklist. Tap the header to unfold the list (dropdown).
+class MissionsCard extends StatefulWidget {
   const MissionsCard({super.key});
 
   @override
+  State<MissionsCard> createState() => _MissionsCardState();
+}
+
+class _MissionsCardState extends State<MissionsCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final totalMin = missionTotalRewardSeconds ~/ 60;
     return ValueListenableBuilder<MissionsState>(
       valueListenable: MissionsService.instance.state,
       builder: (context, st, _) {
-        final earnedMin = (st.completed * missionRewardSeconds) ~/ 60;
-        final allDone = st.completed == missionCount;
         return GlassContainer(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const MissionsRing(
-                    width: 116,
-                    height: 96,
-                    stroke: 9,
-                    flyTarget: true,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Tes missions',
-                          style: SCText.h3.copyWith(color: SC.textPrimary),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Complète-les pour gagner des minutes d\'appel gratuites.',
-                          style: SCText.preview.copyWith(
-                            color: SC.textMuted,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: SC.accent.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            allDone
-                                ? 'Tout est complété 🎉  +$earnedMin min'
-                                : '+$earnedMin min gagnées',
-                            style: SCText.accent,
-                          ),
-                        ),
-                      ],
+              InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    const MissionsRing(
+                      width: 116,
+                      height: 96,
+                      stroke: 9,
+                      flyTarget: true,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Tes missions',
+                            style: SCText.h3.copyWith(color: SC.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Complète les 6 missions pour gagner $totalMin min d\'appel.',
+                            style: SCText.preview.copyWith(
+                              color: SC.textMuted,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: SC.accent.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              st.claimed
+                                  ? '+$totalMin min gagnées 🎉'
+                                  : '🎁 $totalMin min à débloquer',
+                              style: SCText.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: SC.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              for (final m in _missions)
-                _MissionRow(def: m, done: st.isDone(m.key)),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: _expanded
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          for (final m in _missions)
+                            _MissionRow(def: m, done: st.isDone(m.key)),
+                        ],
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
             ],
           ),
         );
@@ -454,7 +485,11 @@ class _MissionRow extends StatelessWidget {
           if (done)
             const Icon(Icons.check_circle_rounded, color: SC.accent, size: 22)
           else
-            Text('+${missionRewardSeconds ~/ 60} min', style: SCText.accent),
+            Icon(
+              Icons.circle_outlined,
+              color: Colors.white.withValues(alpha: 0.18),
+              size: 22,
+            ),
         ],
       ),
     );
@@ -471,13 +506,30 @@ class MissionsRingCompact extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => showMissionsSheet(context),
-      child: const MissionsRing(
-        width: 40,
-        height: 30,
-        stroke: 4.5,
-        dotRadius: 2.6,
-        showCount: false,
-        flyTarget: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MissionsRing(
+            width: 40,
+            height: 30,
+            stroke: 4.5,
+            dotRadius: 2.6,
+            showCount: false,
+            flyTarget: true,
+          ),
+          const SizedBox(width: 6),
+          ValueListenableBuilder<MissionsState>(
+            valueListenable: MissionsService.instance.state,
+            builder: (context, st, _) => Text(
+              '${st.completed}/$missionCount',
+              style: SCText.meta.copyWith(
+                color: SC.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -698,6 +750,8 @@ class _CelebrationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final allDone = MissionsService.instance.state.value.allDone;
+    final totalMin = missionTotalRewardSeconds ~/ 60;
     return GlassContainer(
       borderRadius: BorderRadius.circular(999),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -709,14 +763,16 @@ class _CelebrationBanner extends StatelessWidget {
           const Icon(Icons.auto_awesome_rounded, color: SC.accent, size: 18),
           const SizedBox(width: 8),
           Text(
-            'Mission accomplie',
+            allDone ? 'Toutes les missions !' : 'Mission accomplie',
             style: SCText.name.copyWith(color: SC.textPrimary, fontSize: 14),
           ),
-          const SizedBox(width: 8),
-          Text(
-            '+${missionRewardSeconds ~/ 60} min',
-            style: SCText.accent.copyWith(fontSize: 14),
-          ),
+          if (allDone) ...[
+            const SizedBox(width: 8),
+            Text(
+              '+$totalMin min',
+              style: SCText.accent.copyWith(fontSize: 14),
+            ),
+          ],
         ],
       ),
     );

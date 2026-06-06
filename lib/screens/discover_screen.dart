@@ -1721,7 +1721,19 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
                     scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
                     child: child,
                   ),
-                  child: Text(widget.emoji),
+                  // The heart is a real icon: white outline that fills red
+                  // once tapped (reacted). The other emojis stay as glyphs.
+                  child: widget.emoji == '❤️'
+                      ? Icon(
+                          widget.reacted
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          size: widget.reacted ? 26 : 24,
+                          color: widget.reacted
+                              ? const Color(0xFFFF3B5C)
+                              : Colors.white,
+                        )
+                      : Text(widget.emoji),
                 ),
               ),
             ),
