@@ -1674,8 +1674,8 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           child: AnimatedBuilder(
             animation: Listenable.merge([_breathe, _pop]),
             builder: (context, child) => Transform.scale(
-              // Idle breath (1.0 → 1.10 → 1.0) multiplied by the tap pop.
-              scale: (1.0 + 0.10 * _breathe.value) * _popScale.value,
+              // Idle breath (1.0 → 1.20 → 1.0) multiplied by the tap pop.
+              scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
               child: child,
             ),
             child: AnimatedContainer(
