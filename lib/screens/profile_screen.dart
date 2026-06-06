@@ -24,6 +24,7 @@ import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/like_api.dart';
+import '../services/missions_service.dart';
 import '../services/revenue_cat.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
@@ -33,6 +34,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/missions_ring.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -177,6 +179,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       _iRequestedPeer = iRequestedPeer;
       _loading = false;
     });
+    // Refresh the onboarding-missions ring for my OWN profile (force so an edit
+    // just made — bio, interests, photo — shows up and fires the shooting star).
+    if (!_isViewingOther) {
+      MissionsService.instance.refresh(deviceId, force: true);
+    }
   }
 
   /// Optimistic like/unlike of one of the peer's photos (viewer mode). Roll
@@ -732,6 +739,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                             showCallWarning: !_isViewingOther,
                           ),
                           if (!_isViewingOther) ...[
+                            // Missions ring — earn call minutes by completing
+                            // onboarding quests. Sits above the referral block.
+                            const SizedBox(height: 20),
+                            const MissionsCard(),
                             // Referral section — sits between the language card
                             // (above) and "Mon abonnement" (below): invite 3
                             // friends, earn 15 min of translated calls.

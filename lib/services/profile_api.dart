@@ -860,6 +860,51 @@ abstract final class ProfileApi {
     }
   }
 
+  /// Onboarding-missions reward. Given the mission keys the client has detected
+  /// as DONE, credit [rewardSecondsEach] of call time for every done key not
+  /// yet recorded in `missions_rewarded`, then record it so it never pays
+  /// twice. Returns the full rewarded set plus the keys credited in THIS call
+  /// (empty when nothing new). Honor-system v1 like [consumeCredits] — swap for
+  /// a SECURITY DEFINER function if abuse appears.
+  static Future<({Set<String> rewarded, Set<String> grantedNow})>
+  syncMissionRewards({
+    required String userId,
+    required Set<String> doneKeys,
+    required int rewardSecondsEach,
+  }) async {
+    const empty = (rewarded: <String>{}, grantedNow: <String>{});
+    if (!isSupabaseReady || userId.isEmpty) return empty;
+    try {
+      final row = await _c
+          .from('profiles')
+          .select('credits_seconds, missions_rewarded')
+          .eq('id', userId)
+          .maybeSingle();
+      if (row == null) return empty;
+      final rewarded = <String>{
+        ...?(row['missions_rewarded'] as List?)?.map((e) => e.toString()),
+      };
+      final grantedNow = doneKeys.difference(rewarded);
+      if (grantedNow.isEmpty) {
+        return (rewarded: rewarded, grantedNow: <String>{});
+      }
+      final current = RemoteProfile._parseInt(row['credits_seconds'], 0);
+      final next = current + grantedNow.length * rewardSecondsEach;
+      final newRewarded = {...rewarded, ...grantedNow};
+      await _c
+          .from('profiles')
+          .update({
+            'credits_seconds': next,
+            'missions_rewarded': newRewarded.toList(),
+          })
+          .eq('id', userId);
+      return (rewarded: newRewarded, grantedNow: grantedNow);
+    } catch (e) {
+      debugPrint('ProfileApi.syncMissionRewards failed: $e');
+      return empty;
+    }
+  }
+
   /// Persist the user's display name (the "prénom"). Trims to
   /// [profileNameMaxLength]; ignores a blank value (a profile must keep a
   /// name). Only `display_name` is written — the `@handle` is a stable,

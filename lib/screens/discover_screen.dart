@@ -10,6 +10,7 @@ import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/missions_service.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
@@ -20,6 +21,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
+import '../widgets/missions_ring.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -155,6 +157,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final id = await DeviceId.getOrCreate();
     if (!mounted) return;
     setState(() => _myId = id);
+    // Warm the shared missions cache (cheap / cached) so the compact ring in
+    // the Discover header shows the right progress without extra round-trips.
+    MissionsService.instance.refresh(id);
     if (!isSupabaseReady || id.isEmpty) {
       setState(() => _feedLoading = false);
       AppBoot.markHomeReady();
@@ -862,6 +867,8 @@ class _DiscoverHeader extends StatelessWidget {
                 children: [
                   Text(AppStrings.t('discover_title'), style: SCText.h1),
                   const Spacer(),
+                  const MissionsRingCompact(),
+                  const SizedBox(width: 10),
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width.
                   AnimatedContainer(
