@@ -2,58 +2,45 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../services/app_strings.dart';
 import '../services/missions_service.dart';
 import '../theme/swayco_theme.dart';
 import 'glass.dart';
 
-/// UI metadata for each mission key (label + how-to + icon). Detection and
-/// reward live in [MissionsService]; this is purely presentation.
+/// UI metadata for each mission. [titleKey]/[howKey] are i18n keys resolved at
+/// build time; detection + reward live in [MissionsService].
 class _MissionDef {
-  const _MissionDef(this.key, this.title, this.howTo, this.icon);
+  const _MissionDef(this.key, this.titleKey, this.howKey, this.icon);
   final String key;
-  final String title;
-  final String howTo;
+  final String titleKey;
+  final String howKey;
   final IconData icon;
+  String get title => AppStrings.t(titleKey);
+  String get howTo => AppStrings.t(howKey);
 }
 
 const List<_MissionDef> _missions = [
-  _MissionDef(
-    'friend_request',
-    'Faire une demande d\'ami',
-    'Ajoute quelqu\'un depuis son profil',
-    Icons.person_add_alt_1_rounded,
-  ),
-  _MissionDef(
-    'post_photo',
-    'Poster une photo',
-    'Ajoute une photo à ta galerie',
-    Icons.add_a_photo_rounded,
-  ),
-  _MissionDef(
-    'like_someone',
-    'Liker quelqu\'un',
-    'Mets un cœur sur une photo',
-    Icons.favorite_rounded,
-  ),
-  _MissionDef(
-    'first_message',
-    'Envoyer un premier message',
-    'Écris à quelqu\'un dans le chat',
-    Icons.send_rounded,
-  ),
-  _MissionDef(
-    'fill_bio',
-    'Remplir sa bio',
-    'Décris-toi en quelques mots',
-    Icons.edit_note_rounded,
-  ),
-  _MissionDef(
-    'add_interests',
-    'Ajouter 3 intérêts',
-    'Choisis au moins 3 centres d\'intérêt',
-    Icons.interests_rounded,
-  ),
+  _MissionDef('friend_request', 'mission_friend_request',
+      'mission_friend_request_how', Icons.person_add_alt_1_rounded),
+  _MissionDef('post_photo', 'mission_post_photo', 'mission_post_photo_how',
+      Icons.add_a_photo_rounded),
+  _MissionDef('like_someone', 'mission_like_someone', 'mission_like_someone_how',
+      Icons.favorite_rounded),
+  _MissionDef('first_message', 'mission_first_message',
+      'mission_first_message_how', Icons.send_rounded),
+  _MissionDef('fill_bio', 'mission_fill_bio', 'mission_fill_bio_how',
+      Icons.edit_note_rounded),
+  _MissionDef('add_interests', 'mission_add_interests',
+      'mission_add_interests_how', Icons.interests_rounded),
 ];
+
+/// The mission def for a stable [key] (or null).
+_MissionDef? _missionFor(String? key) {
+  for (final m in _missions) {
+    if (m.key == key) return m;
+  }
+  return null;
+}
 
 /// Couples mission "sources" (where a reward originates — a photo grid, the bio
 /// field …) with the ring "targets" it flies into, for [MissionCelebrationOverlay].
@@ -361,12 +348,15 @@ class _MissionsCardState extends State<MissionsCard> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Tes missions',
+                            AppStrings.t('missions_title'),
                             style: SCText.h3.copyWith(color: SC.textPrimary),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Complète les 6 missions pour gagner $totalMin min d\'appel.',
+                            AppStrings.t(
+                              'missions_subtitle',
+                              args: {'min': '$totalMin'},
+                            ),
                             style: SCText.preview.copyWith(
                               color: SC.textMuted,
                               height: 1.3,
@@ -384,8 +374,8 @@ class _MissionsCardState extends State<MissionsCard> {
                             ),
                             child: Text(
                               st.claimed
-                                  ? '+$totalMin min gagnées 🎉'
-                                  : '🎁 $totalMin min à débloquer',
+                                  ? '${AppStrings.t('missions_earned', args: {'min': '$totalMin'})} 🎉'
+                                  : '🎁 ${AppStrings.t('missions_unlock', args: {'min': '$totalMin'})}',
                               style: SCText.accent,
                             ),
                           ),
@@ -473,7 +463,7 @@ class _MissionRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  done ? 'Fait ✓' : def.howTo,
+                  done ? '${AppStrings.t('missions_done_short')} ✓' : def.howTo,
                   style: SCText.preview.copyWith(
                     color: done ? SC.accent : SC.textMuted,
                   ),
@@ -599,6 +589,7 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
   Offset? _from; // reward source centre (null → streak)
   Offset? _to; // nearest jalon
   GlobalKey? _targetKey;
+  String? _completedKey; // which mission just completed (drives the toast)
 
   MissionsService get _svc => MissionsService.instance;
 
@@ -618,6 +609,7 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
   void _onEvent() {
     if (!mounted || _svc.justCompleted.value == null) return;
     final key = _svc.justCompleted.value!;
+    _completedKey = key;
     // Brief beat so the screen can scroll the ring into view (the profile
     // ensures its missions card is visible) before we resolve positions and
     // fly — otherwise the target jalon could still be off-screen.
@@ -727,12 +719,16 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
                     ),
                   ),
                   Positioned(
-                    top: topInset + 22 + (1 - inT.clamp(0.0, 1.0)) * -28,
+                    // Descends from above the screen down to just under the
+                    // status bar (like the block toast), then slides back up.
+                    top: -70 + (topInset + 80) * inT.clamp(0.0, 1.0),
                     left: 0,
                     right: 0,
                     child: Opacity(
                       opacity: inT.clamp(0.0, 1.0) * outT,
-                      child: const Center(child: _CelebrationBanner()),
+                      child: Center(
+                        child: _MissionToast(completedKey: _completedKey),
+                      ),
                     ),
                   ),
                 ],
@@ -745,35 +741,57 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
   }
 }
 
-class _CelebrationBanner extends StatelessWidget {
-  const _CelebrationBanner();
+/// Top toast that descends to announce a completed mission + the progress
+/// ("✔ Poster une photo  3/6"), or the 15-min payout once all are done.
+class _MissionToast extends StatelessWidget {
+  const _MissionToast({required this.completedKey});
+  final String? completedKey;
 
   @override
   Widget build(BuildContext context) {
-    final allDone = MissionsService.instance.state.value.allDone;
+    final st = MissionsService.instance.state.value;
     final totalMin = missionTotalRewardSeconds ~/ 60;
-    return GlassContainer(
-      borderRadius: BorderRadius.circular(999),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: SC.accent.withValues(alpha: 0.16),
-      border: SC.accent.withValues(alpha: 0.5),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.auto_awesome_rounded, color: SC.accent, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            allDone ? 'Toutes les missions !' : 'Mission accomplie',
-            style: SCText.name.copyWith(color: SC.textPrimary, fontSize: 14),
-          ),
-          if (allDone) ...[
-            const SizedBox(width: 8),
-            Text(
-              '+$totalMin min',
-              style: SCText.accent.copyWith(fontSize: 14),
+    final allDone = st.allDone;
+    final def = _missionFor(completedKey);
+    final title = allDone
+        ? AppStrings.t('missions_all_done')
+        : (def?.title ?? AppStrings.t('missions_title'));
+    final trailing = allDone
+        ? '+$totalMin min'
+        : AppStrings.t(
+            'missions_progress',
+            args: {'done': '${st.completed}', 'total': '$missionCount'},
+          );
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width - 48,
+      ),
+      child: GlassContainer(
+        borderRadius: BorderRadius.circular(999),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        color: SC.accent.withValues(alpha: 0.18),
+        border: SC.accent.withValues(alpha: 0.55),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              allDone ? Icons.celebration_rounded : Icons.check_circle_rounded,
+              color: SC.accent,
+              size: 18,
             ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SCText.name.copyWith(color: SC.textPrimary, fontSize: 14),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(trailing, style: SCText.accent.copyWith(fontSize: 14)),
           ],
-        ],
+        ),
       ),
     );
   }
