@@ -69,7 +69,7 @@ import FirebaseMessaging
   // path) still do.
   override func application(
     _ application: UIApplication,
-    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Foundation.Data
   ) {
     UserDefaults.standard.set(
       "token APNs reçu (\(deviceToken.count) octets)",
@@ -98,7 +98,9 @@ import FirebaseMessaging
   // the main queue (up to ~10s) until FirebaseApp exists, then hand the token
   // to FCM — fixes the timing race where the token was dropped and never
   // re-delivered.
-  private func forwardAPNsTokenToFirebase(_ token: Data, retriesLeft: Int = 20) {
+  private func forwardAPNsTokenToFirebase(
+    _ token: Foundation.Data, retriesLeft: Int = 20
+  ) {
     if FirebaseApp.app() != nil {
       Messaging.messaging().apnsToken = token
       UserDefaults.standard.set(
