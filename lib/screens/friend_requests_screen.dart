@@ -578,7 +578,7 @@ class _ReactionRow extends StatelessWidget {
               : AppStrings.t('chat_no_name'));
     final subtitle = AppStrings.t(
       'demandes_reacted_to_photo',
-      args: {'name': name, 'emoji': reaction.message.body},
+      args: {'name': name},
     );
 
     return Material(

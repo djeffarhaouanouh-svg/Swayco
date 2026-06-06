@@ -252,6 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
+      // Keep the sheet below the status bar / Dynamic Island — with the full
+      // language list it grows tall enough to otherwise reach the very top.
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

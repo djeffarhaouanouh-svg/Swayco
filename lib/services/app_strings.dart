@@ -62,7 +62,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Pas encore de demandes',
     'demandes_empty_body':
         "Quand quelqu'un t'ajoutera depuis Discover ou la recherche, sa demande apparaîtra ici.",
-    'demandes_reacted_to_photo': '{name} a réagi {emoji} à votre photo',
+    'demandes_reacted_to_photo': '{name} a réagi à votre photo',
     'demandes_liked_your_photo': '{name} a liké ta photo',
     'demandes_started_following': "{name} s'est abonné·e à toi",
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
@@ -514,7 +514,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'No requests yet',
     'demandes_empty_body':
         'When someone adds you from Discover or Search, their request will appear here.',
-    'demandes_reacted_to_photo': '{name} reacted {emoji} to your photo',
+    'demandes_reacted_to_photo': '{name} reacted to your photo',
     'demandes_liked_your_photo': '{name} liked your photo',
     'demandes_started_following': '{name} started following you',
     'settings_hide_from_country': 'Hide me from people in my country',
@@ -956,7 +956,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Aún no hay solicitudes',
     'demandes_empty_body':
         'Cuando alguien te añada desde Discover o la búsqueda, su solicitud aparecerá aquí.',
-    'demandes_reacted_to_photo': '{name} reaccionó {emoji} a tu foto',
+    'demandes_reacted_to_photo': '{name} reaccionó a tu foto',
     'demandes_liked_your_photo': 'A {name} le gustó tu foto',
     'demandes_started_following': '{name} empezó a seguirte',
     'settings_hide_from_country': 'Ocultarme de las personas de mi país',
@@ -1368,8 +1368,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Noch keine Anfragen',
     'demandes_empty_body':
         'Wenn dich jemand über Discover oder die Suche hinzufügt, erscheint die Anfrage hier.',
-    'demandes_reacted_to_photo':
-        '{name} hat mit {emoji} auf dein Foto reagiert',
+    'demandes_reacted_to_photo': '{name} hat auf dein Foto reagiert',
     'demandes_liked_your_photo': '{name} gefällt dein Foto',
     'demandes_started_following': '{name} folgt dir jetzt',
     'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
@@ -1775,7 +1774,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Nessuna richiesta',
     'demandes_empty_body':
         'Quando qualcuno ti aggiungerà da Discover o dalla ricerca, la sua richiesta apparirà qui.',
-    'demandes_reacted_to_photo': '{name} ha reagito {emoji} alla tua foto',
+    'demandes_reacted_to_photo': '{name} ha reagito alla tua foto',
     'demandes_liked_your_photo': 'A {name} è piaciuta la tua foto',
     'demandes_started_following': '{name} ha iniziato a seguirti',
     'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
@@ -2180,7 +2179,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Ainda não há pedidos',
     'demandes_empty_body':
         'Quando alguém te adicionar do Discover ou da pesquisa, o pedido aparecerá aqui.',
-    'demandes_reacted_to_photo': '{name} reagiu {emoji} à tua foto',
+    'demandes_reacted_to_photo': '{name} reagiu à tua foto',
     'demandes_liked_your_photo': '{name} curtiu a tua foto',
     'demandes_started_following': '{name} começou a seguir-te',
     'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
@@ -2584,7 +2583,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Nog geen verzoeken',
     'demandes_empty_body':
         'Wanneer iemand je toevoegt via Discover of de zoekbalk, verschijnt het verzoek hier.',
-    'demandes_reacted_to_photo': '{name} reageerde {emoji} op je foto',
+    'demandes_reacted_to_photo': '{name} reageerde op je foto',
     'demandes_liked_your_photo': '{name} vindt je foto leuk',
     'demandes_started_following': '{name} volgt je nu',
     'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
@@ -2989,7 +2988,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'لا توجد طلبات بعد',
     'demandes_empty_body':
         'عندما يضيفك شخص من ديسكفر أو البحث، سيظهر طلبه هنا.',
-    'demandes_reacted_to_photo': '{name} تفاعل {emoji} مع صورتك',
+    'demandes_reacted_to_photo': '{name} تفاعل مع صورتك',
     'demandes_liked_your_photo': '{name} أعجب بصورتك',
     'demandes_started_following': '{name} بدأ بمتابعتك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
@@ -3390,7 +3389,7 @@ abstract final class AppStrings {
     'demandes_empty_title': 'Запросов пока нет',
     'demandes_empty_body':
         'Когда кто-то добавит вас из Discover или поиска, его запрос появится здесь.',
-    'demandes_reacted_to_photo': '{name} отреагировал(а) {emoji} на ваше фото',
+    'demandes_reacted_to_photo': '{name} отреагировал(а) на ваше фото',
     'demandes_liked_your_photo': '{name} оценил(а) ваше фото',
     'demandes_started_following': '{name} подписался(ась) на вас',
     'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
@@ -3793,7 +3792,7 @@ abstract final class AppStrings {
     'demandes_title': '请求',
     'demandes_empty_title': '暂无请求',
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
-    'demandes_reacted_to_photo': '{name} 用 {emoji} 回应了您的照片',
+    'demandes_reacted_to_photo': '{name} 回应了您的照片',
     'demandes_liked_your_photo': '{name} 赞了您的照片',
     'demandes_started_following': '{name} 开始关注您了',
     'settings_hide_from_country': '对来自我国家的人隐藏',
@@ -4175,7 +4174,7 @@ abstract final class AppStrings {
     'demandes_title': 'リクエスト',
     'demandes_empty_title': 'リクエストはまだありません',
     'demandes_empty_body': '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
-    'demandes_reacted_to_photo': '{name} があなたの写真に {emoji} でリアクション',
+    'demandes_reacted_to_photo': '{name} があなたの写真にリアクション',
     'demandes_liked_your_photo': '{name} があなたの写真にいいねしました',
     'demandes_started_following': '{name} があなたをフォローしました',
     'settings_hide_from_country': '自分の国の人から非表示にする',
@@ -4560,7 +4559,7 @@ abstract final class AppStrings {
     'demandes_title': '요청',
     'demandes_empty_title': '아직 요청이 없습니다',
     'demandes_empty_body': '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
-    'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 {emoji} 반응했습니다',
+    'demandes_reacted_to_photo': '{name}님이 회원님의 사진에 반응했습니다',
     'demandes_liked_your_photo': '{name}님이 회원님의 사진을 좋아합니다',
     'demandes_started_following': '{name}님이 회원님을 팔로우하기 시작했습니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
