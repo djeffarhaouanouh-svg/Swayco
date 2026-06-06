@@ -3082,12 +3082,18 @@ class _InlineStat extends StatelessWidget {
     final col = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '$value',
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+        // Count up to the value when it first appears / changes.
+        TweenAnimationBuilder<int>(
+          tween: IntTween(begin: 0, end: value),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) => Text(
+            '$v',
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 2),
