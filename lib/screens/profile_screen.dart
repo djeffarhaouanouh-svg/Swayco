@@ -8,11 +8,13 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/voice_message_api.dart';
 
 import '../services/app_strings.dart';
+import '../services/auth_service.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
@@ -732,6 +734,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             showCallWarning: !_isViewingOther,
                           ),
                           if (!_isViewingOther) ...[
+                            // Referral section — sits between the language card
+                            // (above) and "Mon abonnement" (below): invite 3
+                            // friends, earn 15 min of translated calls.
+                            const SizedBox(height: 20),
+                            const _InviteFriendsSection(),
                             // Voice-clone card. Shown to ALL tiers when viewing
                             // your own profile — Ultra users get the recording
                             // flow, everyone else gets a locked state that
@@ -1114,6 +1121,139 @@ class CreditsCard extends StatelessWidget {
 /// the [_PlansSection] in / out via an AnimatedSize. Hidden entirely
 /// when the user is on the top tier (Ultra Plus) — no upgrades to
 /// surface.
+/// Referral section on the user's own profile (between the language card and
+/// "Mon abonnement"): invite 3 friends with your link, earn 15 min. Fetches
+/// the referral code + signed-up count itself and opens the OS share sheet.
+class _InviteFriendsSection extends StatefulWidget {
+  const _InviteFriendsSection();
+
+  @override
+  State<_InviteFriendsSection> createState() => _InviteFriendsSectionState();
+}
+
+class _InviteFriendsSectionState extends State<_InviteFriendsSection> {
+  String _code = '';
+  int _referrals = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final uid = AuthService.currentUserId;
+    if (uid.isEmpty) return;
+    final p = await ProfileApi.fetchById(uid);
+    final n = await ProfileApi.countReferrals(uid);
+    if (!mounted) return;
+    setState(() {
+      _code = p?.referralCode ?? '';
+      _referrals = n;
+    });
+  }
+
+  Future<void> _share() async {
+    final box = context.findRenderObject() as RenderBox?;
+    final link = _code.isEmpty
+        ? 'https://www.swayco.fr'
+        : 'https://www.swayco.fr/?ref=$_code';
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: AppStrings.t('invite_share_text', args: {'link': link}),
+          subject: AppStrings.t('invite_friend'),
+          sharePositionOrigin:
+              box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+        ),
+      );
+    } catch (_) {
+      // User cancelled or sharing unavailable.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _referrals % 3;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: SC.accent.withValues(alpha: 0.15),
+                ),
+                child: const Icon(
+                  Icons.group_add_rounded,
+                  color: SC.accent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  AppStrings.t('invite_bonus_title'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            AppStrings.t('invite_bonus_body'),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            AppStrings.t(
+              'invite_bonus_progress',
+              args: {'count': '$progress', 'total': '3'},
+            ),
+            style: const TextStyle(
+              color: SC.accent,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _share,
+              style: FilledButton.styleFrom(
+                backgroundColor: SC.accent,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
+              label: Text(AppStrings.t('invite_bonus_share_cta')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MySubscriptionSection extends StatelessWidget {
   const _MySubscriptionSection({required this.currentTier});
 
