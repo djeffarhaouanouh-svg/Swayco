@@ -285,16 +285,64 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       await BlockApi.block(blockerId: _myId, blockedId: peer.id);
       if (!mounted) return;
-      // Snackbar = compact confirmation, reuse the block label.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${peer.displayName} · ${AppStrings.t('block')}')),
-      );
+      // Cyan top toast as a compact confirmation (reuse the block label).
+      _showTopToast('${peer.displayName} · ${AppStrings.t('block')}');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
       ));
     }
+  }
+
+  /// Cyan pill notification at the TOP of the screen that auto-dismisses —
+  /// used for the block confirmation instead of the default white bottom
+  /// snackbar.
+  void _showTopToast(String message) {
+    final overlay = Overlay.of(context);
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        top: MediaQuery.of(ctx).padding.top + 10,
+        left: 16,
+        right: 16,
+        child: IgnorePointer(
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                decoration: BoxDecoration(
+                  color: SC.accent,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black45,
+                      blurRadius: 14,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF04141A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    Future.delayed(const Duration(milliseconds: 2200), () {
+      if (entry.mounted) entry.remove();
+    });
   }
 
   /// Random LiveKit identity for the host joining a guest-invite call.
