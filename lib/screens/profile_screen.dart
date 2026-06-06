@@ -3203,7 +3203,10 @@ class _PhotoCell extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           InkWell(
-            onTap: tappable ? onTap : null,
+            // A real photo is always tappable to open it full-screen — on a
+            // peer's profile (viewer mode) too, not just my own. Only the
+            // empty "add" cell is gated to my own profile (tappable).
+            onTap: (hasPhoto || tappable) ? onTap : null,
             child: hasPhoto
                 ? Image.network(
                     photoUrl!,

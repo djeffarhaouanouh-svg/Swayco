@@ -1444,6 +1444,9 @@ class _CallScreenState extends State<CallScreen> {
                   height: 210,
                   fit: BoxFit.contain,
                 ),
+                // Mini white "time left" readout under the logo — only shows
+                // when the caller's credit is below 5 min (else zero-size).
+                const _LowCreditCounter(),
                 const SizedBox(height: 22),
                 const SizedBox(
                   height: 28,
@@ -1764,20 +1767,28 @@ class _CallScreenState extends State<CallScreen> {
                   child: IgnorePointer(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'swayco.ai',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 25,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'swayco.ai',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          // Mini white countdown just under the watermark —
+                          // appears only when credit drops below 5 min.
+                          const _LowCreditCounter(),
+                        ],
                       ),
                     ),
                   ),
@@ -1790,6 +1801,42 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
+}
+
+/// Tiny white "credit time left" readout. Renders a compact mm:ss only when
+/// this side is genuinely being debited (the usage tracker is running — i.e.
+/// not a paying callee, not test mode) AND the remaining credit has dropped
+/// below five minutes. Zero-size otherwise, so it never shifts the layout
+/// while there's plenty of credit left.
+class _LowCreditCounter extends StatelessWidget {
+  const _LowCreditCounter();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: UsageTracker.creditsRemaining,
+      builder: (context, secs, _) {
+        if (!UsageTracker.isRunning || secs <= 0 || secs >= 300) {
+          return const SizedBox.shrink();
+        }
+        final m = secs ~/ 60;
+        final s = (secs % 60).toString().padLeft(2, '0');
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            '$m:$s',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _RoundCallButton extends StatelessWidget {
