@@ -160,6 +160,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       AuthService.currentUserId,
     }..removeWhere((e) => e.isEmpty);
     if (ids.isEmpty) return;
+    // App-start registration can fail if the APNs token wasn't ready yet —
+    // re-register now (user-initiated, APNs surely available) so this device
+    // actually gets an FCM row in notification_targets.
+    for (final id in ids) {
+      await NotificationClient.register(id);
+    }
     for (final id in ids) {
       await PushDispatcher.notify(
         recipientUid: id,
@@ -168,8 +174,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
         type: 'test',
       );
     }
+    final info = await NotificationClient.debugInfo();
     if (!mounted) return;
-    _toast(AppStrings.t('settings_test_push_sent'));
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SC.bubbleIn,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: SC.glassBorder),
+        ),
+        title: const Text(
+          'Diagnostic notification',
+          style: TextStyle(color: SC.textPrimary, fontSize: 16),
+        ),
+        content: Text(
+          'Push envoyé. État de ce téléphone :\n\n$info\n\n'
+          'Si "Token FCM : AUCUN" → permission iOS refusée ou APNs indisponible '
+          '(c\'est pour ça qu\'aucune notif n\'arrive). Si "OK ✅" mais rien ne '
+          's\'affiche → souci de livraison (clé APNs dans la console Firebase).',
+          style: const TextStyle(
+            color: SC.textPrimary,
+            height: 1.45,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ───── Actions ─────────────────────────────────────────────────────────

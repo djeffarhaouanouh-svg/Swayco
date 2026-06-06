@@ -9,4 +9,7 @@ abstract final class NotificationClient {
 
   /// Best-effort cleanup on sign-out. No-op here.
   static Future<void> unregister(String userId) async {}
+
+  /// Diagnostic for the in-app test button — not applicable on web/stub.
+  static Future<String> debugInfo() async => 'Non disponible (web).';
 }

@@ -112,4 +112,32 @@ abstract final class NotificationClient {
       debugPrint('[notify] unregister (firebase) failed: $e');
     }
   }
+
+  /// Diagnostic for the in-app "test notification" button: surfaces whether
+  /// iOS granted permission and whether an APNs / FCM token was actually
+  /// obtained — the usual reasons a regular push never arrives.
+  static Future<String> debugInfo() async {
+    try {
+      final m = FirebaseMessaging.instance;
+      final settings = await m.getNotificationSettings();
+      var apns = 'AUCUN ❌';
+      try {
+        if (await m.getAPNSToken() != null) apns = 'OK ✅';
+      } catch (_) {}
+      var fcm = 'AUCUN ❌';
+      try {
+        final t = await m.getToken();
+        if (t != null && t.isNotEmpty) {
+          fcm = 'OK ✅ (${t.substring(0, t.length < 14 ? t.length : 14)}…)';
+        }
+      } catch (e) {
+        fcm = 'erreur: $e';
+      }
+      return 'Permission: ${settings.authorizationStatus.name}\n'
+          'Token APNs: $apns\n'
+          'Token FCM: $fcm';
+    } catch (e) {
+      return 'Erreur: $e';
+    }
+  }
 }
