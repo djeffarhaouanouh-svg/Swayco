@@ -698,17 +698,22 @@ class _ThreadHeader extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(width: 10),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.sizeOf(context).width * 0.42,
-                      ),
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SCText.h3.copyWith(
-                          fontSize: 15,
-                          color: SC.textPrimary.withValues(alpha: 0.6),
+                    // Nudge the name up slightly so it sits a touch above the
+                    // avatar's vertical centre.
+                    Transform.translate(
+                      offset: const Offset(0, -2),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.42,
+                        ),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SCText.h3.copyWith(
+                            fontSize: 15,
+                            color: SC.textPrimary.withValues(alpha: 0.6),
+                          ),
                         ),
                       ),
                     ),
