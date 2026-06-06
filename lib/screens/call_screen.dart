@@ -1444,9 +1444,6 @@ class _CallScreenState extends State<CallScreen> {
                   height: 210,
                   fit: BoxFit.contain,
                 ),
-                // Mini white "time left" readout under the logo — only shows
-                // when the caller's credit is below 5 min (else zero-size).
-                const _LowCreditCounter(),
                 const SizedBox(height: 22),
                 const SizedBox(
                   height: 28,
