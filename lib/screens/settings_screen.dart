@@ -12,7 +12,6 @@ import '../services/block_api.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
-import '../services/push_dispatcher.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
@@ -144,69 +143,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       await NotificationClient.unregister(uid);
     }
-  }
-
-  /// Send a push to THIS device (same id the FCM/VoIP token is registered
-  /// under) so the whole pipeline — token → backend /api/notify → APNs/FCM →
-  /// device banner — can be verified on a real build. iOS won't show a banner
-  /// while the app is foregrounded, so the toast tells the user to background
-  /// it; the round-trip takes a couple of seconds, by which time it shows.
-  Future<void> _sendTestNotification() async {
-    // The FCM token may be registered under the device id (Settings toggle) or
-    // the auth uid (app-start). Fire to every distinct id so the test reaches
-    // this device's token regardless of which one it landed under.
-    final ids = <String>{
-      await DeviceId.getOrCreate(),
-      AuthService.currentUserId,
-    }..removeWhere((e) => e.isEmpty);
-    if (ids.isEmpty) return;
-    // App-start registration can fail if the APNs token wasn't ready yet —
-    // re-register now (user-initiated, APNs surely available) so this device
-    // actually gets an FCM row in notification_targets.
-    for (final id in ids) {
-      await NotificationClient.register(id);
-    }
-    for (final id in ids) {
-      await PushDispatcher.notify(
-        recipientUid: id,
-        title: 'Swayco',
-        body: AppStrings.t('settings_test_push_body'),
-        type: 'test',
-      );
-    }
-    final info = await NotificationClient.debugInfo();
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: SC.glassBorder),
-        ),
-        title: const Text(
-          'Diagnostic notification',
-          style: TextStyle(color: SC.textPrimary, fontSize: 16),
-        ),
-        content: Text(
-          'Push envoyé. État de ce téléphone :\n\n$info\n\n'
-          'Si "Token FCM : AUCUN" → permission iOS refusée ou APNs indisponible '
-          '(c\'est pour ça qu\'aucune notif n\'arrive). Si "OK ✅" mais rien ne '
-          's\'affiche → souci de livraison (clé APNs dans la console Firebase).',
-          style: const TextStyle(
-            color: SC.textPrimary,
-            height: 1.45,
-            fontSize: 13,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   // ───── Actions ─────────────────────────────────────────────────────────
@@ -486,11 +422,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
                       },
-                    ),
-                    _SettingsRow(
-                      icon: Icons.notification_add_outlined,
-                      label: AppStrings.t('settings_test_push'),
-                      onTap: _sendTestNotification,
                     ),
                   ],
                 ),

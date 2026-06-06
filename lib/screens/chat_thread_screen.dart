@@ -90,7 +90,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// When true, replace each foreign-language message body with its
   /// translation into [_myLang]. Translations are cached by message id so we
   /// only hit OpenAI once per message.
-  bool _autoTranslate = false;
+  // Auto-translate is ON by default for every conversation — foreign messages
+  // get translated into the reader's language without them flipping a switch.
+  bool _autoTranslate = true;
   final Map<String, String> _translations = {};
   final Set<String> _translatingIds = {};
 
