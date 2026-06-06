@@ -14,6 +14,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/analytics.dart';
 import 'services/app_settings.dart';
+import 'services/remote_config.dart';
 import 'services/app_strings.dart';
 import 'services/app_boot.dart';
 import 'services/auth_service.dart';
@@ -96,6 +97,9 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('Supabase init slow/failed: $e');
     }
+    // Remote config (kill-switches / tunables like the online badge) —
+    // best-effort, non-blocking; widgets rebuild via RemoteConfig.version.
+    unawaited(RemoteConfig.load());
     // Native push (FCM). Best-effort — a missing google-services on a
     // dev build shouldn't crash the app.
     if (!kIsWeb) {
