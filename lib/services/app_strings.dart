@@ -67,7 +67,7 @@ abstract final class AppStrings {
     'demandes_started_following': "{name} s'est abonné·e à toi",
     'settings_hide_from_country': 'Me cacher des personnes de mon pays',
     'discover_visibility_hint':
-        'Décide dans les paramètres si les personnes de ton pays peuvent voir ta photo Discover. La photo entourée est celle qui apparaît dans le Discover.',
+        'Décide dans les paramètres si les personnes de ton pays peuvent voir ta photo Discover.\nLa photo entourée est celle qui apparaît dans le Discover.',
     'tab_placeholder_soon': 'Bientôt',
     'profile_title': 'Profil',
     'profile_followers': 'Abonnés',
@@ -519,7 +519,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} started following you',
     'settings_hide_from_country': 'Hide me from people in my country',
     'discover_visibility_hint':
-        'In settings, choose whether people in your country can see your Discover photo. The framed photo is the one shown in Discover.',
+        'In settings, choose whether people in your country can see your Discover photo.\nThe framed photo is the one shown in Discover.',
     'tab_placeholder_soon': 'Soon',
     'profile_title': 'Profile',
     'profile_followers': 'Followers',
@@ -961,7 +961,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} empezó a seguirte',
     'settings_hide_from_country': 'Ocultarme de las personas de mi país',
     'discover_visibility_hint':
-        'En los ajustes, decide si las personas de tu país pueden ver tu foto de Discover. La foto enmarcada es la que aparece en Discover.',
+        'En los ajustes, decide si las personas de tu país pueden ver tu foto de Discover.\nLa foto enmarcada es la que aparece en Discover.',
     'tab_placeholder_soon': 'Pronto',
     'profile_title': 'Perfil',
     'profile_followers': 'Seguidores',
@@ -1374,7 +1374,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} folgt dir jetzt',
     'settings_hide_from_country': 'Mich vor Leuten aus meinem Land verbergen',
     'discover_visibility_hint':
-        'Lege in den Einstellungen fest, ob Leute aus deinem Land dein Discover-Foto sehen. Das umrahmte Foto erscheint im Discover.',
+        'Lege in den Einstellungen fest, ob Leute aus deinem Land dein Discover-Foto sehen.\nDas umrahmte Foto erscheint im Discover.',
     'my_subscription_section': 'Mein Abo',
     'tab_placeholder_soon': 'Bald',
     'profile_title': 'Profil',
@@ -1780,7 +1780,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} ha iniziato a seguirti',
     'settings_hide_from_country': 'Nascondimi dalle persone del mio paese',
     'discover_visibility_hint':
-        'Nelle impostazioni, decidi se le persone del tuo paese possono vedere la tua foto Discover. La foto incorniciata è quella che appare nel Discover.',
+        'Nelle impostazioni, decidi se le persone del tuo paese possono vedere la tua foto Discover.\nLa foto incorniciata è quella che appare nel Discover.',
     'my_subscription_section': 'Il mio abbonamento',
     'tab_placeholder_soon': 'Presto',
     'profile_title': 'Profilo',
@@ -2185,7 +2185,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} começou a seguir-te',
     'settings_hide_from_country': 'Esconder-me das pessoas do meu país',
     'discover_visibility_hint':
-        'Nas definições, decide se as pessoas do teu país podem ver a tua foto Discover. A foto contornada é a que aparece no Discover.',
+        'Nas definições, decide se as pessoas do teu país podem ver a tua foto Discover.\nA foto contornada é a que aparece no Discover.',
     'my_subscription_section': 'A minha subscrição',
     'tab_placeholder_soon': 'Em breve',
     'profile_title': 'Perfil',
@@ -2589,7 +2589,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} volgt je nu',
     'settings_hide_from_country': 'Mij verbergen voor mensen uit mijn land',
     'discover_visibility_hint':
-        'Bepaal in de instellingen of mensen uit jouw land je Discover-foto kunnen zien. De omkaderde foto verschijnt in Discover.',
+        'Bepaal in de instellingen of mensen uit jouw land je Discover-foto kunnen zien.\nDe omkaderde foto verschijnt in Discover.',
     'my_subscription_section': 'Mijn abonnement',
     'tab_placeholder_soon': 'Binnenkort',
     'profile_title': 'Profiel',
@@ -2994,7 +2994,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} بدأ بمتابعتك',
     'settings_hide_from_country': 'إخفائي عن الأشخاص من بلدي',
     'discover_visibility_hint':
-        'في الإعدادات، قرّر إن كان بإمكان الأشخاص من بلدك رؤية صورتك في ديسكفر. الصورة المحاطة بإطار هي التي تظهر في ديسكفر.',
+        'في الإعدادات، قرّر إن كان بإمكان الأشخاص من بلدك رؤية صورتك في ديسكفر.\nالصورة المحاطة بإطار هي التي تظهر في ديسكفر.',
     'my_subscription_section': 'اشتراكي',
     'tab_placeholder_soon': 'قريباً',
     'profile_title': 'الملف الشخصي',
@@ -3395,7 +3395,7 @@ abstract final class AppStrings {
     'demandes_started_following': '{name} подписался(ась) на вас',
     'settings_hide_from_country': 'Скрыть меня от людей из моей страны',
     'discover_visibility_hint':
-        'В настройках решите, могут ли люди из вашей страны видеть ваше фото в Discover. Фото в рамке — это то, которое показывается в Discover.',
+        'В настройках решите, могут ли люди из вашей страны видеть ваше фото в Discover.\nФото в рамке — это то, которое показывается в Discover.',
     'my_subscription_section': 'Моя подписка',
     'tab_placeholder_soon': 'Скоро',
     'profile_title': 'Профиль',
@@ -3797,7 +3797,7 @@ abstract final class AppStrings {
     'demandes_liked_your_photo': '{name} 赞了您的照片',
     'demandes_started_following': '{name} 开始关注您了',
     'settings_hide_from_country': '对来自我国家的人隐藏',
-    'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片。圈出的照片就是会在 Discover 中显示的那张。',
+    'discover_visibility_hint': '在设置中决定来自您国家的人是否能看到您的 Discover 照片。\n圈出的照片就是会在 Discover 中显示的那张。',
     'my_subscription_section': '我的订阅',
     'tab_placeholder_soon': '即将推出',
     'profile_title': '个人资料',
@@ -4179,7 +4179,7 @@ abstract final class AppStrings {
     'demandes_liked_your_photo': '{name} があなたの写真にいいねしました',
     'demandes_started_following': '{name} があなたをフォローしました',
     'settings_hide_from_country': '自分の国の人から非表示にする',
-    'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める。枠で囲まれた写真が Discover に表示されます。',
+    'discover_visibility_hint': '設定で、同じ国の人に Discover の写真を見せるか決める。\n枠で囲まれた写真が Discover に表示されます。',
     'my_subscription_section': 'マイサブスクリプション',
     'tab_placeholder_soon': '近日公開',
     'profile_title': 'プロフィール',
@@ -4564,7 +4564,7 @@ abstract final class AppStrings {
     'demandes_liked_your_photo': '{name}님이 회원님의 사진을 좋아합니다',
     'demandes_started_following': '{name}님이 회원님을 팔로우하기 시작했습니다',
     'settings_hide_from_country': '같은 나라 사람들에게 나를 숨기기',
-    'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택. 테두리가 표시된 사진이 Discover에 나타납니다.',
+    'discover_visibility_hint': '설정에서 같은 나라 사람들이 Discover 사진을 볼 수 있는지 선택.\n테두리가 표시된 사진이 Discover에 나타납니다.',
     'my_subscription_section': '내 구독',
     'tab_placeholder_soon': '곧 출시',
     'profile_title': '프로필',
