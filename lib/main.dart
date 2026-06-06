@@ -464,7 +464,15 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
               data: mq.copyWith(
                 textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
               ),
-              child: child ?? const SizedBox.shrink(),
+              // App-wide: tapping anywhere that isn't an interactive widget
+              // (button, field, scrollable…) dismisses the keyboard, so no
+              // screen can leave it stuck open. translucent = it only catches
+              // taps that fall through, never blocks real taps.
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           home: ValueListenableBuilder<bool>(
