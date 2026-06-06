@@ -2117,25 +2117,28 @@ class _RewardHint extends StatelessWidget {
   }
 }
 
-/// Full-screen overlay for a profile photo. Tap the backdrop or the ✕ to
-/// dismiss; pinch to zoom. On the own profile a "set as Discover photo" button
-/// is shown so that action survives the tap-to-open change.
+/// Full-screen overlay for profile photos. Swipe or use the side arrows to
+/// move between several photos; pinch to zoom; the ✕ in the photo's top-right
+/// corner (or a tap on the backdrop) dismisses. On the own profile a "set as
+/// Discover photo" button sets whichever photo is currently in view.
 Future<void> showPhotoViewer(
   BuildContext context, {
-  required String url,
+  required List<String> photos,
+  required int index,
   bool viewerMode = false,
-  VoidCallback? onSetDiscover,
+  void Function(String url)? onSetDiscover,
 }) {
-  if (url.isEmpty) return Future<void>.value();
+  if (photos.isEmpty) return Future<void>.value();
   return Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
       opaque: false,
       barrierColor: Colors.black,
-      transitionDuration: const Duration(milliseconds: 220),
+      transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (ctx, anim, _) => FadeTransition(
         opacity: anim,
         child: _PhotoViewer(
-          url: url,
+          photos: photos,
+          initialIndex: index.clamp(0, photos.length - 1),
           viewerMode: viewerMode,
           onSetDiscover: onSetDiscover,
         ),
@@ -2144,73 +2147,158 @@ Future<void> showPhotoViewer(
   );
 }
 
-class _PhotoViewer extends StatelessWidget {
+class _PhotoViewer extends StatefulWidget {
   const _PhotoViewer({
-    required this.url,
+    required this.photos,
+    required this.initialIndex,
     this.viewerMode = false,
     this.onSetDiscover,
   });
-  final String url;
+  final List<String> photos;
+  final int initialIndex;
   final bool viewerMode;
-  final VoidCallback? onSetDiscover;
+  final void Function(String url)? onSetDiscover;
+
+  @override
+  State<_PhotoViewer> createState() => _PhotoViewerState();
+}
+
+class _PhotoViewerState extends State<_PhotoViewer> {
+  late final PageController _pc = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  void _go(int delta) {
+    final next = (_index + delta).clamp(0, widget.photos.length - 1);
+    if (next != _index) {
+      _pc.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Widget _circleBtn(IconData icon, VoidCallback? onTap, {double size = 36}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: onTap == null ? 0.25 : 1,
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: size * 0.55),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
+    final size = MediaQuery.sizeOf(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final multi = widget.photos.length > 1;
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.96),
+      backgroundColor: Colors.black.withValues(alpha: 0.78),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: GestureDetector(
+          PageView.builder(
+            controller: _pc,
+            itemCount: widget.photos.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (ctx, i) => GestureDetector(
               onTap: () => Navigator.of(context).pop(),
-              child: InteractiveViewer(
-                minScale: 1,
-                maxScale: 4,
-                child: Center(
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.broken_image_outlined,
-                      color: SC.textMuted,
-                      size: 48,
+              behavior: HitTestBehavior.opaque,
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: size.width - 28,
+                        maxHeight: size.height * 0.78,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Image.network(
+                            widget.photos[i],
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: SC.textMuted,
+                                size: 48,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    // ✕ in the photo's top-right corner.
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: _circleBtn(
+                        Icons.close_rounded,
+                        () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          Positioned(
-            top: top + 8,
-            right: 12,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 22,
+          // Side arrows when there's more than one photo.
+          if (multi) ...[
+            Positioned(
+              left: 6,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _circleBtn(
+                  Icons.chevron_left_rounded,
+                  _index > 0 ? () => _go(-1) : null,
+                  size: 44,
                 ),
               ),
             ),
-          ),
-          if (!viewerMode && onSetDiscover != null)
+            Positioned(
+              right: 6,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _circleBtn(
+                  Icons.chevron_right_rounded,
+                  _index < widget.photos.length - 1 ? () => _go(1) : null,
+                  size: 44,
+                ),
+              ),
+            ),
+          ],
+          if (!widget.viewerMode && widget.onSetDiscover != null)
             Positioned(
               left: 24,
               right: 24,
               bottom: bottom + 28,
               child: GestureDetector(
                 onTap: () {
-                  onSetDiscover!();
+                  widget.onSetDiscover!(widget.photos[_index]);
                   Navigator.of(context).pop();
                 },
                 child: Container(
@@ -2319,10 +2407,9 @@ class _PhotoGallery extends StatelessWidget {
                     url.split('?').first == discoverPhotoUrl.split('?').first,
                 onTap: () => showPhotoViewer(
                   context,
-                  url: url,
-                  onSetDiscover: onSelectDiscover == null
-                      ? null
-                      : () => onSelectDiscover!(url),
+                  photos: photos,
+                  index: canAdd ? index - 1 : index,
+                  onSetDiscover: onSelectDiscover,
                 ),
                 onDelete: () => onRemove(url),
                 likesCount: likesByPhoto[url] ?? 0,
@@ -2365,8 +2452,12 @@ class _PhotoGallery extends StatelessWidget {
                     photos[i].split('?').first ==
                         discoverPhotoUrl.split('?').first,
                 // Tapping a photo opens it full-screen (overlay).
-                onTap: () =>
-                    showPhotoViewer(context, url: photos[i], viewerMode: true),
+                onTap: () => showPhotoViewer(
+                  context,
+                  photos: photos,
+                  index: i,
+                  viewerMode: true,
+                ),
                 // Delete badge on every photo on my own profile.
                 onDelete: viewerMode ? null : () => onRemove(photos[i]),
                 // Per-photo likes badge on each of my own photos.
