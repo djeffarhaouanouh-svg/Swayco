@@ -102,11 +102,12 @@ class ChatMessage {
 abstract final class ChatApi {
   static SupabaseClient get _client => Supabase.instance.client;
 
-  /// The four emojis the Discover reaction rail can send. A chat
-  /// message whose body matches one of these is treated as a "photo
-  /// reaction" and surfaces on the Demandes feed in addition to the
-  /// regular chat thread.
-  static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍'];
+  /// Emojis recognised as "photo reactions": a chat message whose body
+  /// matches one of these surfaces on the Demandes feed in addition to the
+  /// regular chat thread. Superset of the live Discover rail
+  /// (`_ReactionRail._emojis` = 🔥 😍 ❤️) — the older ✨ / 💯 are kept so
+  /// reactions sent before the rail changed still resolve.
+  static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍', '❤️'];
 
   /// Delete every photo-reaction message the local user (`meId`) sent
   /// to [peerId] with body [emoji]. Used by the Discover rail when the

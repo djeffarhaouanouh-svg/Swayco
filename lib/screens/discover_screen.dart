@@ -1509,7 +1509,8 @@ class _ReactionRail extends StatelessWidget {
   final bool pendingOutgoing;
 
   // Fixed across all cards so users learn the rail by muscle memory.
-  static const _emojis = <String>['🔥', '✨', '😍'];
+  // Top → bottom: flame, heart-eyes, plain heart (the ✨ star was dropped).
+  static const _emojis = <String>['🔥', '😍', '❤️'];
 
   @override
   Widget build(BuildContext context) {
