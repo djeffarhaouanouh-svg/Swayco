@@ -977,15 +977,19 @@ class _DiscoverHeader extends StatelessWidget {
                   const MissionsRingCompact(),
                   const SizedBox(width: 10),
                   // Search pill: compact button when collapsed, wider TextField
-                  // when expanded — but never full-width.
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    width: expanded ? 200 : null,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                  // when expanded — but never full-width. The whole pill is the
+                  // tap target (not just the label) for an easier hit.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: expanded ? null : onTapPill,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      width: expanded ? 200 : null,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
                     decoration: BoxDecoration(
                       color: SC.glassStrong,
                       borderRadius: BorderRadius.circular(999),
@@ -1063,6 +1067,7 @@ class _DiscoverHeader extends StatelessWidget {
                           ),
                       ],
                     ),
+                  ),
                   ),
                 ],
               ),
