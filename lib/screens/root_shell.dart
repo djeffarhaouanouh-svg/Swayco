@@ -26,6 +26,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/missions_ring.dart';
 import '../widgets/profile_avatar.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
@@ -505,6 +506,8 @@ class _RootShellState extends State<RootShell> {
                         },
                       ),
                     ),
+                    // Game-style mission celebration, drawn above every tab.
+                    const Positioned.fill(child: MissionCelebrationOverlay()),
                   ],
                 );
               },
