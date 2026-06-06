@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
+import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/like_api.dart';
 import '../theme/swayco_theme.dart';
@@ -27,10 +28,23 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
 
   Future<void> _load() async {
     final uid = await DeviceId.getOrCreate();
-    final set = await LikeApi.fetchMyLikedPhotos(uid);
+    // Two like paths feed this page, both keyed by the device id:
+    //   1. LikeApi likes — the ❤ on a peer's profile photo.
+    //   2. ❤️ reactions sent on the Discover feed (stored as messages).
+    // Union them so every photo I hearted, wherever I did it, shows up here.
+    final results = await Future.wait([
+      LikeApi.fetchMyLikedPhotos(uid),
+      ChatApi.fetchMyOutgoingPhotoReactions(uid),
+    ]);
+    final liked = results[0] as Set<String>;
+    final reactions = results[1] as Map<String, Set<String>>;
+    final hearted = <String>{
+      for (final e in reactions.entries)
+        if (e.value.any((emoji) => emoji.contains('❤'))) e.key,
+    };
     if (!mounted) return;
     setState(() {
-      _photos = set.toList();
+      _photos = <String>{...liked, ...hearted}.toList();
       _loading = false;
     });
   }
