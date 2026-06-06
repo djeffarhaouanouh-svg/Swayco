@@ -18,6 +18,7 @@ import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
@@ -73,6 +74,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   StreamSubscription<List<ChatMessage>>? _sub;
   Timer? _pollTimer;
+
+  /// Ticks every minute so the peer's local-time bubble stays current
+  /// without the user reopening the thread.
+  Timer? _clockTimer;
   List<ChatMessage> _messages = const [];
   String _myId = '';
   String _myName = '';
@@ -157,6 +162,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   void initState() {
     super.initState();
     _bootstrap();
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Local time at the peer's place, derived from the free-text city they
+  /// filled into their profile (country as a fallback). Null when no city is
+  /// set or the place isn't in our timezone table — the bubble then hides.
+  PeerLocalTime? get _peerClock {
+    final p = _peer;
+    if (p == null || p.city.trim().isEmpty) return null;
+    return resolvePeerLocalTime(city: p.city, country: p.country);
   }
 
   /// Toggle the auto-translate state. On turn-on, kick translation for all
@@ -288,8 +305,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     var blockedMe = false;
     if (isSupabaseReady && id.isNotEmpty) {
       try {
-        blockedMe =
-            (await BlockApi.fetchMyBlockerIds()).contains(widget.peerDeviceId);
+        blockedMe = (await BlockApi.fetchMyBlockerIds()).contains(
+          widget.peerDeviceId,
+        );
       } catch (_) {}
     }
     // Opening this thread = peer's messages here are now "seen". Clears
@@ -381,6 +399,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   void dispose() {
     _sub?.cancel();
     _pollTimer?.cancel();
+    _clockTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     _activationWave.dispose();
@@ -484,6 +503,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   @override
   Widget build(BuildContext context) {
+    final peerClock = _peerClock;
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
       body: GestureDetector(
@@ -493,79 +513,99 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         },
         child: Stack(
           children: [
-          ColoredBox(
-            color: const Color(0xFF0E0E0E),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  _ThreadHeader(
-                    title: widget.title,
-                    peer: _peer,
-                    blockedByPeer: _peerBlockedMe,
-                    onCall: _peerBlockedMe
-                        ? () => ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                AppStrings.t('chat_blocked_by_peer'),
+            ColoredBox(
+              color: const Color(0xFF0E0E0E),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    _ThreadHeader(
+                      title: widget.title,
+                      peer: _peer,
+                      blockedByPeer: _peerBlockedMe,
+                      onCall: _peerBlockedMe
+                          ? () => ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  AppStrings.t('chat_blocked_by_peer'),
+                                ),
+                              ),
+                            )
+                          : () => CallLauncher.startCall(
+                              context,
+                              peerDeviceId: widget.peerDeviceId,
+                              translation: widget.translation,
+                              startWithCamera: true,
+                            ),
+                      onViewProfile: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ProfileScreen(userId: widget.peerDeviceId),
+                        ),
+                      ),
+                      peerBlocked: _peerBlocked,
+                      onToggleBlock: _toggleBlockPeer,
+                      onReport: _reportPeer,
+                    ),
+                    if (_error != null) _ErrorBanner(message: _error!),
+                    // Pure-black background ONLY behind the messages zone — the
+                    // header and composer keep the lighter 0E0E0E surface.
+                    // Tapping anywhere in the area dismisses the keyboard;
+                    // translucent so the list still scrolls and taps register.
+                    Expanded(
+                      child: ColoredBox(
+                        color: const Color(0xFF000000),
+                        child: Stack(
+                          children: [
+                            GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: () => FocusScope.of(context).unfocus(),
+                              child: _buildMessageList(
+                                hasClockChip: peerClock != null,
                               ),
                             ),
-                          )
-                        : () => CallLauncher.startCall(
-                            context,
-                            peerDeviceId: widget.peerDeviceId,
-                            translation: widget.translation,
-                            startWithCamera: true,
-                          ),
-                    onViewProfile: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            ProfileScreen(userId: widget.peerDeviceId),
+                            // Floating "local time at the peer's place" bubble,
+                            // centred just under the header.
+                            if (peerClock != null)
+                              Positioned(
+                                top: 8,
+                                left: 0,
+                                right: 0,
+                                child: IgnorePointer(
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: _PeerClockChip(clock: peerClock),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    peerBlocked: _peerBlocked,
-                    onToggleBlock: _toggleBlockPeer,
-                    onReport: _reportPeer,
-                  ),
-                  if (_error != null) _ErrorBanner(message: _error!),
-                  // Pure-black background ONLY behind the messages zone — the
-                  // header and composer keep the lighter 0E0E0E surface.
-                  // Tapping anywhere in the area dismisses the keyboard;
-                  // translucent so the list still scrolls and taps register.
-                  Expanded(
-                    child: ColoredBox(
-                      color: const Color(0xFF000000),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTap: () => FocusScope.of(context).unfocus(),
-                        child: _buildMessageList(),
+                    if (_peerBlockedMe)
+                      const _BlockedComposerNotice()
+                    else
+                      _Composer(
+                        controller: _inputCtrl,
+                        sending: _sending,
+                        onSend: _send,
+                        onSendVoice: _sendVoice,
+                        onSendImage: _sendImage,
+                        autoTranslate: _autoTranslate,
+                        onToggleTranslate: _toggleAutoTranslate,
+                        myLang: _myLang,
                       ),
-                    ),
-                  ),
-                  if (_peerBlockedMe)
-                    const _BlockedComposerNotice()
-                  else
-                    _Composer(
-                      controller: _inputCtrl,
-                      sending: _sending,
-                      onSend: _send,
-                      onSendVoice: _sendVoice,
-                      onSendImage: _sendImage,
-                      autoTranslate: _autoTranslate,
-                      onToggleTranslate: _toggleAutoTranslate,
-                      myLang: _myLang,
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: _ActivationWaveOverlay(animation: _activationWave),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _ActivationWaveOverlay(animation: _activationWave),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -593,7 +633,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  Widget _buildMessageList() {
+  Widget _buildMessageList({bool hasClockChip = false}) {
     if (_messages.isEmpty) {
       return Center(
         child: Padding(
@@ -611,7 +651,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final canDub = _myTier == 'plus' || _myTier == 'pro' || _myTier == 'ultra';
     return ListView.builder(
       controller: _scrollCtrl,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      // Extra top room when the floating local-time bubble is shown so the
+      // first message never hides behind it.
+      padding: EdgeInsets.fromLTRB(12, hasClockChip ? 46 : 12, 12, 12),
       itemCount: _messages.length,
       itemBuilder: (ctx, i) {
         final m = _messages[i];
@@ -741,12 +783,11 @@ class _ThreadHeader extends StatelessWidget {
                   );
                   final scaler = MediaQuery.textScalerOf(context);
                   double widthOf(String t, TextStyle s) => (TextPainter(
-                        text: TextSpan(text: t, style: s),
-                        maxLines: 1,
-                        textScaler: scaler,
-                        textDirection: TextDirection.ltr,
-                      )..layout())
-                      .width;
+                    text: TextSpan(text: t, style: s),
+                    maxLines: 1,
+                    textScaler: scaler,
+                    textDirection: TextDirection.ltr,
+                  )..layout()).width;
                   final nameW = widthOf(title, nameStyle);
                   final logoW = widthOf('swayco.ai', logoStyle);
                   // Logo is centred over [0, c.maxWidth]; the name is left-
@@ -815,6 +856,52 @@ class _ThreadHeader extends StatelessWidget {
   }
 }
 
+/// Small floating bubble under the header showing the peer's local time, with
+/// a white sun (day) / moon (night) icon. Orange-tinted, darker border.
+class _PeerClockChip extends StatelessWidget {
+  const _PeerClockChip({required this.clock});
+
+  final PeerLocalTime clock;
+
+  @override
+  Widget build(BuildContext context) {
+    // Frosted-glass orange pill — translucent so the chat behind shows
+    // through. White icon + time, with a faint shadow to stay legible.
+    const shadows = [
+      Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+    ];
+    return GlassContainer(
+      blur: 14,
+      borderRadius: BorderRadius.circular(999),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      color: const Color(0x55FFA726), // light orange, ~33% — lets the bg bleed
+      border: const Color(0xAAEF8C00), // darker orange edge
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+            size: 14,
+            color: Colors.white,
+            shadows: shadows,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            clock.hhmm,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              shadows: shadows,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
@@ -863,6 +950,158 @@ class _MessageBubble extends StatelessWidget {
     final time =
         '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
 
+    // Text-only bubbles hug their content so a short "👋" or "Coucou !" no
+    // longer stretches the full width; media bubbles keep their own width.
+    final hugContent =
+        !message.isImage && !message.hasDiscoverPhoto && !message.isVoice;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!mine && message.senderName.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text(
+              message.senderName,
+              style: const TextStyle(
+                color: SC.accent,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        // Discover reaction / intro: a small Snapchat-style thumbnail
+        // of the photo it was about, with the message stuck below it.
+        if (message.hasDiscoverPhoto)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: GestureDetector(
+              onTap: () => _openFullImage(context, message.discoverPhoto),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 150,
+                    maxWidth: 120,
+                  ),
+                  child: Image.network(
+                    message.discoverPhoto,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: SC.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        // Image messages: show the photo (tap to view full-screen).
+        if (message.isImage)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: GestureDetector(
+              onTap: () => _openFullImage(context, message.imageUrl),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: Image.network(
+                    message.imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (ctx, child, progress) => progress == null
+                        ? child
+                        : const SizedBox(
+                            height: 160,
+                            width: 200,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: SC.accent,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      height: 120,
+                      width: 200,
+                      child: Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: SC.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        // Voice messages render an inline mini-player above the body.
+        // The body itself stays so the transcript / translation is
+        // always visible underneath the audio control.
+        if (message.isVoice)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _VoicePlayer(
+              audioUrl: message.audioUrl,
+              durationMs: message.audioDurationMs,
+            ),
+          ),
+        // For voice messages the transcription / translation is only
+        // for the recipient — the sender already knows what they said,
+        // so we hide the text under their own voice bubble (the player
+        // alone is enough). Non-voice messages always show their body.
+        // When [displayBody] is empty (raw STT returned nothing), drop
+        // the Text node entirely so the bubble shows no phantom line.
+        if (displayBody.isNotEmpty && !(message.isVoice && mine))
+          Text(
+            displayBody,
+            style: TextStyle(
+              color: translating
+                  ? bubbleText.withValues(alpha: 0.55)
+                  : bubbleText,
+              fontSize: 15,
+              height: 1.3,
+              fontStyle: translating ? FontStyle.italic : FontStyle.normal,
+            ),
+          ),
+        // "🔊 Écouter la traduction" CTA. Only shown for incoming
+        // foreign voice messages when the local user is on a paid
+        // tier and we already have a translated body to dub.
+        if (message.isVoice &&
+            !mine &&
+            canDubAudio &&
+            !translating &&
+            displayBody.isNotEmpty &&
+            displayBody != message.body &&
+            myLang.isNotEmpty)
+          _DubButton(
+            key: ValueKey('dub-${message.id}-$myLang'),
+            messageId: message.id,
+            targetLang: myLang,
+            translatedText: displayBody,
+          ),
+        const SizedBox(height: 2),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Text(
+            time,
+            style: TextStyle(
+              color: bubbleText.withValues(alpha: 0.5),
+              fontSize: 10,
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Align(
       alignment: align,
       child: GestureDetector(
@@ -879,156 +1118,9 @@ class _MessageBubble extends StatelessWidget {
             // neutral grey, sent = pale cyan with a cyan border.
             color: mine ? SC.msgOutBg : SC.msgInBg,
             borderRadius: radius,
-            border: Border.all(
-              color: mine ? SC.msgOutBorder : SC.msgInBorder,
-            ),
+            border: Border.all(color: mine ? SC.msgOutBorder : SC.msgInBorder),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!mine && message.senderName.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    message.senderName,
-                    style: const TextStyle(
-                      color: SC.accent,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              // Discover reaction / intro: a small Snapchat-style thumbnail
-              // of the photo it was about, with the message stuck below it.
-              if (message.hasDiscoverPhoto)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: GestureDetector(
-                    onTap: () =>
-                        _openFullImage(context, message.discoverPhoto),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxHeight: 150,
-                          maxWidth: 120,
-                        ),
-                        child: Image.network(
-                          message.discoverPhoto,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox(
-                            height: 100,
-                            width: 100,
-                            child: Center(
-                              child: Icon(Icons.broken_image_outlined,
-                                  color: SC.textMuted),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              // Image messages: show the photo (tap to view full-screen).
-              if (message.isImage)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: GestureDetector(
-                    onTap: () => _openFullImage(context, message.imageUrl),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 280),
-                        child: Image.network(
-                          message.imageUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (ctx, child, progress) =>
-                              progress == null
-                                  ? child
-                                  : const SizedBox(
-                                      height: 160,
-                                      width: 200,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: SC.accent,
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    ),
-                          errorBuilder: (_, _, _) => const SizedBox(
-                            height: 120,
-                            width: 200,
-                            child: Center(
-                              child: Icon(Icons.broken_image_outlined,
-                                  color: SC.textMuted),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              // Voice messages render an inline mini-player above the body.
-              // The body itself stays so the transcript / translation is
-              // always visible underneath the audio control.
-              if (message.isVoice)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: _VoicePlayer(
-                    audioUrl: message.audioUrl,
-                    durationMs: message.audioDurationMs,
-                  ),
-                ),
-              // For voice messages the transcription / translation is only
-              // for the recipient — the sender already knows what they said,
-              // so we hide the text under their own voice bubble (the player
-              // alone is enough). Non-voice messages always show their body.
-              // When [displayBody] is empty (raw STT returned nothing), drop
-              // the Text node entirely so the bubble shows no phantom line.
-              if (displayBody.isNotEmpty && !(message.isVoice && mine))
-                Text(
-                  displayBody,
-                  style: TextStyle(
-                    color: translating
-                        ? bubbleText.withValues(alpha: 0.55)
-                        : bubbleText,
-                    fontSize: 15,
-                    height: 1.3,
-                    fontStyle: translating
-                        ? FontStyle.italic
-                        : FontStyle.normal,
-                  ),
-                ),
-              // "🔊 Écouter la traduction" CTA. Only shown for incoming
-              // foreign voice messages when the local user is on a paid
-              // tier and we already have a translated body to dub.
-              if (message.isVoice &&
-                  !mine &&
-                  canDubAudio &&
-                  !translating &&
-                  displayBody.isNotEmpty &&
-                  displayBody != message.body &&
-                  myLang.isNotEmpty)
-                _DubButton(
-                  key: ValueKey('dub-${message.id}-$myLang'),
-                  messageId: message.id,
-                  targetLang: myLang,
-                  translatedText: displayBody,
-                ),
-              const SizedBox(height: 2),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Text(
-                  time,
-                  style: TextStyle(
-                    color: bubbleText.withValues(alpha: 0.5),
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: hugContent ? IntrinsicWidth(child: content) : content,
         ),
       ),
     );
@@ -1412,7 +1504,9 @@ class _ComposerState extends State<_Composer> {
     super.initState();
     widget.controller.addListener(_onTextChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startHintWhenSettled());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _startHintWhenSettled(),
+    );
   }
 
   @override
@@ -1458,6 +1552,7 @@ class _ComposerState extends State<_Composer> {
           _animateHint();
         }
       }
+
       anim.addStatusListener(onStatus);
     } else {
       _hintReady = true;
@@ -1610,7 +1705,10 @@ class _ComposerState extends State<_Composer> {
   String get _composerHint {
     final lang = findLanguageByCode(widget.myLang);
     if (lang == null) return AppStrings.t('composer_message_hint');
-    return AppStrings.t('composer_message_hint_lang', args: {'lang': lang.label});
+    return AppStrings.t(
+      'composer_message_hint_lang',
+      args: {'lang': lang.label},
+    );
   }
 
   Widget _buildIdleBar() {
@@ -1647,8 +1745,12 @@ class _ComposerState extends State<_Composer> {
                             // onto a second line and made the whole bar tall.
                             hintMaxLines: 1,
                             filled: false,
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(4, 8, 12, 8),
+                            contentPadding: const EdgeInsets.fromLTRB(
+                              4,
+                              8,
+                              12,
+                              8,
+                            ),
                             // Only the translate toggle on the left — the photo
                             // button now sits OUTSIDE the bar (right).
                             prefixIcon: Row(
