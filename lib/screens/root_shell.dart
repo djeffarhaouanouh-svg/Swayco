@@ -542,6 +542,19 @@ class _SnappyTabPhysics extends PageScrollPhysics {
     // 2 · √(0.5 · 220) ≈ 21 → critically damped, no bounce past the tab.
     damping: 22,
   );
+
+  @override
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
+    // PageScrollPhysics already clamps the *target* to the adjacent page
+    // (a swipe never lands two tabs over). Capping the launch velocity keeps
+    // a hard flick from visually shooting past the next tab before the stiff
+    // spring settles it.
+    final clamped = velocity.clamp(-900.0, 900.0);
+    return super.createBallisticSimulation(position, clamped);
+  }
 }
 
 /// Keeps a tab page alive while it's swiped off-screen in the [PageView],
