@@ -990,9 +990,9 @@ class _DiscoverHeader extends StatelessWidget {
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
                       width: expanded ? 200 : null,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: expanded ? 16 : 12,
+                        vertical: expanded ? 11 : 12,
                       ),
                     decoration: BoxDecoration(
                       color: SC.glassStrong,
@@ -1004,8 +1004,12 @@ class _DiscoverHeader extends StatelessWidget {
                           ? MainAxisSize.max
                           : MainAxisSize.min,
                       children: [
-                        const Icon(Icons.search, size: 16, color: SC.textMuted),
-                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.search,
+                          size: expanded ? 16 : 24,
+                          color: SC.textMuted,
+                        ),
+                        if (expanded) const SizedBox(width: 6),
                         if (expanded)
                           Expanded(
                             // Local TextSelectionTheme so the selection halo /
@@ -1040,19 +1044,6 @@ class _DiscoverHeader extends StatelessWidget {
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.zero,
                                 ),
-                              ),
-                            ),
-                          )
-                        else
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: onTapPill,
-                            child: Text(
-                              AppStrings.t('search_chercher'),
-                              style: const TextStyle(
-                                color: SC.textMuted,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
