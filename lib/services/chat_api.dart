@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'mission_signal.dart';
 import 'push_dispatcher.dart';
 
 class ChatMessage {
@@ -326,6 +327,7 @@ abstract final class ChatApi {
         data: {'conversationId': conversationId, 'senderId': senderId},
       ),
     );
+    pokeMissions();
   }
 
   /// Upload [bytes] as a chat image and insert an image message. The file
@@ -374,6 +376,7 @@ abstract final class ChatApi {
         data: {'conversationId': conversationId, 'senderId': senderId},
       ),
     );
+    pokeMissions();
   }
 
   /// Delete a single message by id. Used by "long-press → delete" on a

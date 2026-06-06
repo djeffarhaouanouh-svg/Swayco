@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'chat_api.dart';
 import 'friendship_api.dart';
 import 'like_api.dart';
+import 'mission_signal.dart';
 import 'profile_api.dart';
 
 /// Stable mission keys, in display order. Mirrored in
@@ -50,7 +51,10 @@ class MissionsState {
 /// screen mount — concurrent calls and a short TTL keep it off the hot path
 /// (important on Discover).
 class MissionsService {
-  MissionsService._();
+  MissionsService._() {
+    // Re-check the moment an action that could complete a mission fires.
+    missionSignal.addListener(_bumpFromSignal);
+  }
   static final MissionsService instance = MissionsService._();
 
   /// Current mission state. Widgets bind to this via [ValueListenableBuilder]
@@ -134,6 +138,16 @@ class MissionsService {
     } finally {
       _inFlight = false;
     }
+  }
+
+  void _bumpFromSignal() => bump();
+
+  /// Re-check missions for the current user after an action that might complete
+  /// one (a like, message, reaction, friend request). No-op until the first
+  /// refresh has established the user id. Concurrency-guarded by [refresh].
+  Future<void> bump() async {
+    if (_userId.isEmpty) return;
+    await refresh(_userId, force: true);
   }
 
   void consumeJustCompleted() => justCompleted.value = null;

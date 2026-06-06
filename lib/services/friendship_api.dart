@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -229,6 +230,7 @@ abstract final class FriendshipApi {
     // Fire-and-forget push: peer gets a "X veut être ami" notif. Best
     // effort — never block the friendship insert on the dispatch call.
     unawaited(_notifyNewFollower(meId, peerId));
+    pokeMissions();
     return Friendship.fromMap(Map<String, dynamic>.from(inserted));
   }
 
@@ -278,6 +280,7 @@ abstract final class FriendshipApi {
         .single();
     // Tell the peer they have a new follower. Best-effort.
     unawaited(_notifyNewFollower(meId, peerId));
+    pokeMissions();
     return Friendship.fromMap(Map<String, dynamic>.from(inserted));
   }
 

@@ -60,9 +60,6 @@ const List<_MissionDef> _missions = [
 class MissionFx {
   MissionFx._();
 
-  /// mission key → the on-screen widget the reward flies FROM.
-  static final Map<String, GlobalKey> sources = {};
-
   /// full-ring key → closure returning its 6 milestone centres in GLOBAL
   /// coordinates (empty when the ring isn't laid out / on-screen).
   static final Map<GlobalKey, List<Offset> Function()> rings = {};
@@ -71,49 +68,6 @@ class MissionFx {
   static final ValueNotifier<GlobalKey?> arrived = ValueNotifier<GlobalKey?>(
     null,
   );
-}
-
-/// Wrap a section so the celebration star can fly FROM it when [missionKey]
-/// completes (e.g. the photos grid for `post_photo`).
-class MissionSource extends StatefulWidget {
-  const MissionSource({
-    super.key,
-    required this.missionKey,
-    required this.child,
-  });
-  final String missionKey;
-  final Widget child;
-
-  @override
-  State<MissionSource> createState() => _MissionSourceState();
-}
-
-class _MissionSourceState extends State<MissionSource> {
-  final GlobalKey _key = GlobalKey();
-
-  @override
-  void initState() {
-    super.initState();
-    MissionFx.sources[widget.missionKey] = _key;
-  }
-
-  @override
-  void dispose() {
-    if (MissionFx.sources[widget.missionKey] == _key) {
-      MissionFx.sources.remove(widget.missionKey);
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      KeyedSubtree(key: _key, child: widget.child);
-}
-
-Offset? _globalCenter(GlobalKey? key) {
-  final box = key?.currentContext?.findRenderObject() as RenderBox?;
-  if (box == null || !box.hasSize) return null;
-  return box.localToGlobal(box.size.center(Offset.zero));
 }
 
 /// The oval progress ring with 6 milestone dots. Arc + dots reflect
@@ -617,10 +571,12 @@ class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
     // fly — otherwise the target jalon could still be off-screen.
     Future.delayed(const Duration(milliseconds: 380), () {
       if (!mounted || _svc.justCompleted.value != key) return;
-      final from = _globalCenter(MissionFx.sources[key]);
-      final ref = from ?? MediaQuery.sizeOf(context).center(Offset.zero);
-      final near = _nearestJalon(ref);
-      _from = from;
+      // Always fly from the screen centre to the nearest visible jalon — no
+      // matter the action or where the user is. If no ring is on-screen, _from
+      // stays null and we fall back to the top streak.
+      final center = MediaQuery.sizeOf(context).center(Offset.zero);
+      final near = _nearestJalon(center);
+      _from = near != null ? center : null;
       _to = near?.$2;
       _targetKey = near?.$1;
       _c.forward(from: 0);

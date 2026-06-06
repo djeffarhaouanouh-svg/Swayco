@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -51,6 +52,7 @@ abstract final class LikeApi {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'liker,liked,photo_url');
       unawaited(_notifyLike(likerId, likedId));
+      pokeMissions();
     } catch (e) {
       debugPrint('LikeApi.like failed: $e');
       rethrow;
