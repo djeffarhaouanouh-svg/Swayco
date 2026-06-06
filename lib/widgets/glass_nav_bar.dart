@@ -71,8 +71,8 @@ class GlassNavBar extends StatelessWidget {
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
-        icon: Icons.group_outlined,
-        selectedIcon: Icons.group,
+        icon: Icons.favorite_border,
+        selectedIcon: Icons.favorite,
         label: AppStrings.t('nav_demandes'),
         badge: unreadRequests,
       ),
