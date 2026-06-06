@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
@@ -1446,6 +1447,7 @@ class _ReactionRail extends StatelessWidget {
           if (i > 0) const SizedBox(height: 10),
           _ReactionEmojiButton(
             emoji: _emojis[i],
+            index: i,
             reacted: reactedEmojis.contains(_emojis[i]),
             onSend:
                 onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
@@ -1510,14 +1512,19 @@ class _RailAddFriendButton extends StatelessWidget {
 /// the parent card hydrates the persisted set from past messages and
 /// updates it optimistically when [onSend] fires, so the fill survives
 /// refreshes and revisits.
-class _ReactionEmojiButton extends StatelessWidget {
+class _ReactionEmojiButton extends StatefulWidget {
   const _ReactionEmojiButton({
     required this.emoji,
     required this.reacted,
     this.onSend,
+    this.index = 0,
   });
 
   final String emoji;
+
+  /// Position in the rail — phase-shifts the idle float so the buttons don't
+  /// bob in unison.
+  final int index;
 
   /// True when the local user has already sent this emoji to the peer.
   /// Drives the filled / unfilled visuals; no local state.
@@ -1531,71 +1538,117 @@ class _ReactionEmojiButton extends StatelessWidget {
   final VoidCallback? onSend;
 
   @override
+  State<_ReactionEmojiButton> createState() => _ReactionEmojiButtonState();
+}
+
+class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
+    with TickerProviderStateMixin {
+  // Idle float — a gentle ±3px up/down loop, phase-shifted per index so the
+  // rail ripples instead of bobbing in unison.
+  late final AnimationController _float = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  );
+  // Tap pop — a punch up to 1.35 then an elastic settle back to 1.0.
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+  late final Animation<double> _popScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.0, end: 1.35)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 35,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(begin: 1.35, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 65,
+    ),
+  ]).animate(_pop);
+
+  @override
+  void initState() {
+    super.initState();
+    _float.repeat(reverse: true);
+    _float.value = (widget.index * 0.27) % 1.0;
+  }
+
+  @override
+  void dispose() {
+    _float.dispose();
+    _pop.dispose();
+    super.dispose();
+  }
+
+  void _handleTap(BuildContext ctx) {
+    HapticFeedback.lightImpact();
+    _pop.forward(from: 0);
+    // Spawn a particle burst only on the send branch (about to flip to true).
+    if (!widget.reacted) {
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        final pos = box.localToGlobal(box.size.center(Offset.zero));
+        EmojiBurst.show(ctx, position: pos, emoji: widget.emoji);
+      }
+    }
+    widget.onSend!();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Builder so the [GestureDetector] gets its own BuildContext
-    // whose RenderObject is the actual button — we resolve its global
-    // position from there to anchor the emoji burst.
+    // Builder so the [GestureDetector] gets its own BuildContext whose
+    // RenderObject is the actual button — used to anchor the emoji burst.
     return Builder(
       builder: (ctx) {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: onSend == null
-              ? null
-              : () {
-                  // Spawn a particle burst only on the send branch
-                  // (reacted=false now → about to flip to true). The
-                  // unsend branch fires without the celebration so the
-                  // gesture stays calm.
-                  if (!reacted) {
-                    final box = ctx.findRenderObject() as RenderBox?;
-                    if (box != null && box.hasSize) {
-                      final pos = box.localToGlobal(
-                        box.size.center(Offset.zero),
-                      );
-                      EmojiBurst.show(ctx, position: pos, emoji: emoji);
-                    }
-                  }
-                  onSend!();
-                },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: reacted
-                  ? Colors.white.withValues(alpha: 0.18)
-                  : Colors.black.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: reacted ? 0.85 : 0.20),
-                width: reacted ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 160),
-                // Keep the emojis at full opacity in both states —
-                // the background fill + bigger glyph still signal
-                // "this one is sent", but the un-tapped emojis stop
-                // reading as ghosted / disabled. Drop shadow lifts
-                // each glyph off the chip for a subtle 3D feel.
-                style: TextStyle(
-                  fontSize: reacted ? 24 : 22,
-                  color: Colors.white,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x66000000),
-                      blurRadius: 6,
-                      offset: Offset(0, 3),
-                    ),
-                    Shadow(
-                      color: Color(0x99000000),
-                      blurRadius: 2,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
+          onTap: widget.onSend == null ? null : () => _handleTap(ctx),
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_float, _pop]),
+            builder: (context, child) {
+              final dy = (_float.value - 0.5) * 6; // ±3 px bob
+              return Transform.translate(
+                offset: Offset(0, dy),
+                child: Transform.scale(scale: _popScale.value, child: child),
+              );
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: widget.reacted
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : Colors.black.withValues(alpha: 0.35),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white
+                      .withValues(alpha: widget.reacted ? 0.85 : 0.20),
+                  width: widget.reacted ? 2 : 1,
                 ),
-                child: Text(emoji),
+              ),
+              child: Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 160),
+                  style: TextStyle(
+                    fontSize: widget.reacted ? 24 : 22,
+                    color: Colors.white,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x66000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
+                      ),
+                      Shadow(
+                        color: Color(0x99000000),
+                        blurRadius: 2,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Text(widget.emoji),
+                ),
               ),
             ),
           ),
