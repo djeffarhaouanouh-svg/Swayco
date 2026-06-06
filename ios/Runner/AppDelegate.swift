@@ -4,6 +4,8 @@ import PushKit
 import CallKit
 import flutter_callkit_incoming
 import WebRTC
+import FirebaseCore
+import FirebaseMessaging
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CallkitIncomingAppDelegate {
@@ -46,6 +48,24 @@ import WebRTC
     RTCAudioSessionConfiguration.setWebRTC(rtcConfig)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // The REGULAR APNs device token is delivered here (not the VoIP token —
+  // PushKit handles that separately). Our Flutter plugins live in the
+  // SceneDelegate's engine, so Firebase's method swizzling doesn't reliably
+  // capture this token. Hand it to FCM explicitly; without it getToken()
+  // fails with "apns-token-not-set" and no FCM target is ever registered, so
+  // message pushes never arrive while VoIP/CallKit calls (a separate APNs
+  // path) still do.
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    if FirebaseApp.app() != nil {
+      Messaging.messaging().apnsToken = deviceToken
+    }
+    super.application(
+      application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
 
   // MARK: - PKPushRegistryDelegate (VoIP / CallKit)
