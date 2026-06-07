@@ -803,7 +803,7 @@ class _ThreadHeader extends StatelessWidget {
                 builder: (context, c) {
                   final nameStyle = SCText.h3.copyWith(
                     fontSize: 15,
-                    color: Colors.white,
+                    color: Colors.white.withValues(alpha: 0.9),
                   );
                   const logoStyle = TextStyle(
                     color: Colors.white,
