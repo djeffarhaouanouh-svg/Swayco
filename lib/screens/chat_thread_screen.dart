@@ -564,13 +564,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 hasClockChip: peerClock != null,
                               ),
                             ),
-                            // Floating "local time at the peer's place" bubble,
-                            // centred just under the header.
+                            // Floating "local time at the peer's place" bubble.
+                            // Centred under the swayco.ai logo, not the screen:
+                            // the header's logo sits in an Expanded offset by
+                            // the back+avatar cluster on the left (18 padding +
+                            // 40 + 8 + 36 + 10 = 112) and the call button on the
+                            // right (18 padding + 40 = 58). Matching those insets
+                            // here puts the bubble's centre on the logo's centre.
                             if (peerClock != null)
                               Positioned(
                                 top: 8,
-                                left: 0,
-                                right: 0,
+                                left: 112,
+                                right: 58,
                                 child: IgnorePointer(
                                   child: Align(
                                     alignment: Alignment.topCenter,
@@ -1111,9 +1116,9 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
           constraints: BoxConstraints(
-            // Floor so a tiny "👋" / "Coucou !" still reads as a bubble
-            // instead of shrink-wrapping to a cramped sliver.
-            minWidth: 72,
+            // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
+            // proper bubble instead of a cramped little square.
+            minWidth: 110,
             maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
           decoration: BoxDecoration(
