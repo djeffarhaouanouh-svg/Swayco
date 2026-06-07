@@ -1775,19 +1775,30 @@ class _CallScreenState extends State<CallScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'swayco.ai',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  blurRadius: 8,
-                                ),
-                              ],
+                          Opacity(
+                            opacity: 0.7,
+                            child: Text.rich(
+                              const TextSpan(
+                                children: [
+                                  TextSpan(text: 'swayco'),
+                                  TextSpan(
+                                    text: '.ai',
+                                    style: TextStyle(color: SC.accent),
+                                  ),
+                                ],
+                              ),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 25,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           // Mini white countdown just under the watermark —
@@ -1868,12 +1879,25 @@ class _RoundCallButton extends StatelessWidget {
       child: Pressable(
         bounce: true,
         onTap: onTap,
-        child: NativeGlass(
-          circle: true,
-          tint: background,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(icon, color: Colors.white, size: 21),
+        // Stable Flutter frosted-glass circle (NOT a platform view): the
+        // native glass flickered/reset under the keyboard animation. Tinted
+        // with the button colour (cyan / red).
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: background.withValues(alpha: 0.55),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(icon, color: Colors.white, size: 21),
+              ),
+            ),
           ),
         ),
       ),
