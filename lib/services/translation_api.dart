@@ -3,8 +3,20 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+
+/// The signed-in user's Supabase JWT, or null for guests / when Supabase isn't
+/// initialised. Attached to the translation-session request so the backend can
+/// gate on the caller's remaining live-translation credits.
+String? _supabaseAccessToken() {
+  try {
+    return Supabase.instance.client.auth.currentSession?.accessToken;
+  } catch (_) {
+    return null;
+  }
+}
 
 class TranslationApiException implements Exception {
   TranslationApiException(this.message, {this.statusCode});
@@ -149,11 +161,12 @@ Future<Map<String, dynamic>> fetchTranslationSession({
   if (inputLanguage != null && inputLanguage.trim().isNotEmpty) {
     body['inputLanguage'] = inputLanguage;
   }
-  final res = await http.post(
-    uri,
-    headers: const {'Content-Type': 'application/json'},
-    body: jsonEncode(body),
-  );
+  final headers = <String, String>{'Content-Type': 'application/json'};
+  final token = _supabaseAccessToken();
+  if (token != null && token.isNotEmpty) {
+    headers['Authorization'] = 'Bearer $token';
+  }
+  final res = await http.post(uri, headers: headers, body: jsonEncode(body));
   if (res.statusCode < 200 || res.statusCode >= 300) {
     throw TranslationApiException(
       res.body.length > 400 ? '${res.body.substring(0, 400)}…' : res.body,

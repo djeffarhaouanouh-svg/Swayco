@@ -215,12 +215,71 @@ function verifyInvite(room, exp, sig) {
   return crypto.timingSafeEqual(a, b);
 }
 
+// ── Rate limiting ─────────────────────────────────────────────────────────
+// Lightweight in-memory limiter (no external deps). Per-process, so it's a
+// first line of defense against request floods / cost-abuse, not a distributed
+// quota. For multi-instance deployments, move the bucket store to Redis later.
+const _rlBuckets = new Map(); // key -> { count, resetAt }
+
+function _clientKey(req) {
+  const xff = req.headers['x-forwarded-for'];
+  return (
+    (typeof xff === 'string' && xff.split(',')[0].trim()) ||
+    req.socket?.remoteAddress ||
+    'unknown'
+  );
+}
+
+function rateLimit({ name = 'rl', windowMs = 60000, max = 120 }) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${name}:${_clientKey(req)}`;
+    let b = _rlBuckets.get(key);
+    if (!b || now >= b.resetAt) {
+      b = { count: 0, resetAt: now + windowMs };
+      _rlBuckets.set(key, b);
+    }
+    b.count += 1;
+    if (b.count > max) {
+      const retry = Math.max(1, Math.ceil((b.resetAt - now) / 1000));
+      res.set('Retry-After', String(retry));
+      return res.status(429).json({ error: 'rate_limited', retryAfter: retry });
+    }
+    return next();
+  };
+}
+
+// Drop expired buckets every minute so the Map can't grow unbounded.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, b] of _rlBuckets) {
+    if (now >= b.resetAt) _rlBuckets.delete(k);
+  }
+}, 60000).unref();
+
+// Heavy / cost-bearing endpoints (OpenAI / ElevenLabs) — tight per-IP caps.
+const _limTight = rateLimit({ name: 'ai', windowMs: 60000, max: 30 });
+const _limText = rateLimit({ name: 'text', windowMs: 60000, max: 90 });
+const _limClone = rateLimit({ name: 'clone', windowMs: 60000, max: 6 });
+// Cheaper endpoints (tokens, invites, push) — looser caps.
+const _limLite = rateLimit({ name: 'lite', windowMs: 60000, max: 120 });
+
 const app = express();
 app.use(cors());
+
+// Global flood guard. Skips the Stripe webhook, which legitimately bursts from
+// a handful of Stripe IPs and must never be rate-limited (dropped = billing
+// desync).
+const _limGlobal = rateLimit({ name: 'global', windowMs: 60000, max: 600 });
+app.use((req, res, next) => {
+  if (req.path === '/api/stripe/webhook') return next();
+  return _limGlobal(req, res, next);
+});
 
 // Raw SDP body (not JSON) — must run before express.json().
 app.post(
   '/translation/realtime/calls',
+  _limTight,
   express.text({ limit: '1mb', type: '*/*' }),
   async (req, res) => {
     const auth = req.headers.authorization;
@@ -327,7 +386,7 @@ app.get('/api', (_req, res) => {
  * - sourceLang: this participant's spoken language (BCP-47). Translate the remote participant's speech into this language for this participant to hear.
  * - targetLang: the remote participant's spoken language (BCP-47). Translate this participant's speech into this language for the remote participant to hear.
  */
-app.post('/livekit/token', async (req, res) => {
+app.post('/livekit/token', _limLite, async (req, res) => {
   try {
     assertEnv();
   } catch (e) {
@@ -388,7 +447,7 @@ app.post('/livekit/token', async (req, res) => {
  * shares the link; whoever opens it can join that room with no account.
  * Returns: { roomName, exp, sig, ttlMs }
  */
-app.post('/invite/create', async (req, res) => {
+app.post('/invite/create', _limLite, async (req, res) => {
   const uid = await stripeAuthUserId(req);
   if (!uid) return res.status(401).json({ error: 'unauthenticated' });
   if (!INVITE_SIGNING_SECRET) {
@@ -465,7 +524,7 @@ app.get('/invite/resolve', async (req, res) => {
  * Body: { outputLanguage: "fr", inputLanguage?: "en" }  (BCP-47; primary subtag is used)
  * Proxies OpenAI Realtime Translation client_secrets (short-lived key for WebRTC).
  */
-app.post('/translation/realtime/session', async (req, res) => {
+app.post('/translation/realtime/session', _limTight, async (req, res) => {
   try {
     assertOpenAI();
   } catch (e) {
@@ -484,6 +543,44 @@ app.post('/translation/realtime/session', async (req, res) => {
   const inputTagCandidate = primaryLanguageTag(req.body?.inputLanguage);
   const inputTag =
     isReasonableLanguageTag(inputTagCandidate) ? inputTagCandidate : null;
+
+  // Credit gate: an authenticated user must have live-translation credit left
+  // before we mint an OpenAI session (each session is billable). Guests (no
+  // Supabase JWT) pass through and are bounded by the rate limiter above. We
+  // only GATE here — the client still owns debiting / refilling the balance.
+  // Fail-open on any lookup error so a flaky auth/DB never kills translation.
+  try {
+    const uid = await stripeAuthUserId(req);
+    if (uid) {
+      const sb = supabase();
+      if (sb) {
+        const { data: prof } = await sb
+          .from('profiles')
+          .select('subscription_tier, credits_seconds, credits_reset_at')
+          .eq('id', uid)
+          .maybeSingle();
+        if (prof) {
+          const tier = normalizeTier(prof.subscription_tier);
+          const allotment = featuresFor(tier).monthlySeconds;
+          const resetAt = prof.credits_reset_at
+            ? new Date(prof.credits_reset_at).getTime()
+            : 0;
+          // If the refill window has elapsed the balance is effectively full
+          // (the client tops it up lazily); otherwise use the stored balance.
+          const available =
+            !resetAt || Date.now() >= resetAt
+              ? allotment
+              : Number(prof.credits_seconds) || 0;
+          if (available <= 0) {
+            return res.status(402).json({ error: 'out_of_credits' });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[xlate-session] credit gate error', e);
+  }
 
   try {
     const audioInput = {};
@@ -588,7 +685,7 @@ app.post('/translation/realtime/session', async (req, res) => {
  * The system prompt is wrapped with `cache_control` so OpenAI caches it
  * across requests in the same 5-min window (~-50% on input tokens).
  */
-app.post('/translation/text', async (req, res) => {
+app.post('/translation/text', _limText, async (req, res) => {
   try {
     assertOpenAI();
   } catch (e) {
@@ -785,7 +882,7 @@ app.post('/translation/text', async (req, res) => {
  * Returns the inserted row so the client can render it locally without
  * waiting on the realtime subscription.
  */
-app.post('/messages/voice', voiceUpload.single('audio'), async (req, res) => {
+app.post('/messages/voice', _limTight, voiceUpload.single('audio'), async (req, res) => {
   if (!ELEVENLABS_API_KEY) {
     return res.status(500).json({ error: 'elevenlabs_not_configured' });
   }
@@ -983,7 +1080,7 @@ app.post('/messages/voice', voiceUpload.single('audio'), async (req, res) => {
  * Cache: results are keyed by (message_id, target_language) in the
  * `voice_dubs` table so a second listener never re-bills ElevenLabs.
  */
-app.post('/voice/dub', async (req, res) => {
+app.post('/voice/dub', _limTight, async (req, res) => {
   if (!ELEVENLABS_API_KEY) {
     return res.status(500).json({ error: 'elevenlabs_not_configured' });
   }
@@ -1207,7 +1304,7 @@ app.post('/voice/dub', async (req, res) => {
  *
  * Returns: { voiceId }
  */
-app.post('/voice/enroll', voiceUpload.single('audio'), async (req, res) => {
+app.post('/voice/enroll', _limClone, voiceUpload.single('audio'), async (req, res) => {
   if (!ELEVENLABS_API_KEY) {
     return res.status(500).json({ error: 'elevenlabs_not_configured' });
   }
@@ -1377,7 +1474,7 @@ app.post('/api/stripe/portal', async (req, res) => {
 
 // Fan-out push notification dispatcher. Body: { recipientUid, title,
 // body, type, data }. See backend/notify.js for env-var requirements.
-app.post('/api/notify', async (req, res) => {
+app.post('/api/notify', _limLite, async (req, res) => {
   const { recipientUid, title, body, type, data } = req.body || {};
   if (!recipientUid || !title) {
     return res.status(400).json({ error: 'missing_recipient_or_title' });
