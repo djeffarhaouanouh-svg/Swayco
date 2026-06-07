@@ -1142,6 +1142,22 @@ class _SearchResultsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Intro state: no card chrome — just a soft, smaller, centered hint
+    // floating under the bar ("minimal discret" style).
+    if (query.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+        child: Text(
+          AppStrings.t('search_intro_hint'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: SC.textMuted.withValues(alpha: 0.7),
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+      );
+    }
     return Material(
       color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(16),
@@ -1154,15 +1170,6 @@ class _SearchResultsPanel extends StatelessWidget {
   }
 
   Widget _buildBody() {
-    if (query.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          AppStrings.t('search_intro_hint'),
-          style: const TextStyle(color: SC.textMuted, fontSize: 13),
-        ),
-      );
-    }
     if (loading) {
       return const Padding(
         padding: EdgeInsets.all(20),
