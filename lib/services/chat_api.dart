@@ -444,6 +444,31 @@ abstract final class ChatApi {
     return out;
   }
 
+  /// Recent inbound messages addressed to [meId] (newest first), as
+  /// (conversationId, createdAt) pairs. Feeds the per-row UNREAD COUNT on
+  /// the chat list: the caller keeps those newer than its last-seen time
+  /// per conversation. Bounded window — a conversation with more unread
+  /// than fits is capped (the badge shows e.g. "99+").
+  static Future<List<({String conversationId, DateTime createdAt})>>
+      fetchInboundForUnread(String meId, {int limit = 500}) async {
+    if (meId.isEmpty) return const [];
+    final rows = await _client
+        .from('messages')
+        .select('conversation_id, created_at')
+        .eq('recipient', meId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    final out = <({String conversationId, DateTime createdAt})>[];
+    for (final r in rows as List) {
+      final m = Map<String, dynamic>.from(r as Map);
+      final cid = m['conversation_id']?.toString() ?? '';
+      final ts = DateTime.tryParse(m['created_at']?.toString() ?? '');
+      if (cid.isEmpty || ts == null) continue;
+      out.add((conversationId: cid, createdAt: ts));
+    }
+    return out;
+  }
+
   /// Live stream of all messages in a conversation, ordered chronologically
   /// ascending (oldest first, newest last) so the UI can render them
   /// top-to-bottom in chronological order. Re-emits the entire list on

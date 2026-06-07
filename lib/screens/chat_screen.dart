@@ -48,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<RemoteProfile> _friends = const [];
   Map<String, ChatMessage> _latestByConv = const {};
   Map<String, DateTime> _seenByConv = const {};
+  Map<String, int> _unreadCountByConv = const {};
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
@@ -141,6 +142,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Either side of a block hides the row in both directions.
         BlockApi.fetchMyBlockedProfiles(id),
         BlockApi.fetchMyBlockerIds(),
+        // Recent inbound messages — counted per conversation for the badge.
+        ChatApi.fetchInboundForUnread(id),
       ]);
       final followers = results[0] as List<RemoteProfile>;
       final following = results[1] as List<RemoteProfile>;
@@ -149,6 +152,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final cleared = results[4] as Map<String, DateTime>;
       final iBlocked = results[5] as List<RemoteProfile>;
       final blockedMe = results[6] as Set<String>;
+      final inbound =
+          results[7] as List<({String conversationId, DateTime createdAt})>;
 
       final byId = <String, RemoteProfile>{};
       for (final p in followers) {
@@ -200,12 +205,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (lb == null) return -1;
           return lb.compareTo(la); // most recent first
         });
+      // Per-conversation unread COUNT: inbound messages newer than the last
+      // time I opened that thread (never opened → all of them count).
+      final unreadCounts = <String, int>{};
+      for (final m in inbound) {
+        final s = seen[m.conversationId];
+        if (s == null || m.createdAt.isAfter(s)) {
+          unreadCounts[m.conversationId] =
+              (unreadCounts[m.conversationId] ?? 0) + 1;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _myId = id;
         _friends = friends;
         _latestByConv = latest;
         _seenByConv = seen;
+        _unreadCountByConv = unreadCounts;
         _loading = false;
       });
     } catch (e) {
@@ -499,6 +515,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ?.senderId ==
                         _myId,
                     unread: _isUnread(p),
+                    unreadCount: _unreadCountFor(p),
                     onTap: () => _openThread(p),
                     onViewProfile: () => _viewProfile(p),
                     onBlock: () => _blockPeer(p),
@@ -540,6 +557,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         last.senderId != _myId &&
         (seen == null || last.createdAt.isAfter(seen));
   }
+
+  /// Number of unread inbound messages in [p]'s conversation (0 = none).
+  int _unreadCountFor(RemoteProfile p) =>
+      _unreadCountByConv[_conversationIdFor(p.id)] ?? 0;
 }
 
 class _FriendChatRow extends StatelessWidget {
@@ -548,6 +569,7 @@ class _FriendChatRow extends StatelessWidget {
     required this.lastMessage,
     required this.isMine,
     required this.unread,
+    required this.unreadCount,
     required this.onTap,
     required this.onViewProfile,
     required this.onBlock,
@@ -562,6 +584,11 @@ class _FriendChatRow extends StatelessWidget {
   /// True when the last message is from the peer and hasn't been read
   /// yet — drives the green dot + bold name styling on the row.
   final bool unread;
+
+  /// Number of unread messages in this conversation (0 = none). Drives the
+  /// cyan count badge; falls back to a dot when [unread] but the count
+  /// window missed it.
+  final int unreadCount;
   final VoidCallback onTap;
   final VoidCallback onViewProfile;
   final VoidCallback onBlock;
@@ -685,7 +712,7 @@ class _FriendChatRow extends StatelessWidget {
     }
 
     return Material(
-      color: Colors.transparent,
+      color: unread ? SC.accent.withValues(alpha: 0.07) : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -776,7 +803,10 @@ class _FriendChatRow extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (unread) ...[
+                      if (unreadCount > 0) ...[
+                        const SizedBox(width: 8),
+                        _UnreadBadge(count: unreadCount),
+                      ] else if (unread) ...[
                         const SizedBox(width: 8),
                         Container(
                           width: 8,
@@ -803,6 +833,37 @@ class _FriendChatRow extends StatelessWidget {
     );
   }
 
+}
+
+/// Filled cyan pill showing the unread-message count on a chat row (caps at
+/// 99+). High-contrast — the primary "new messages" signal on the list.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 20),
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: SC.accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          color: SC.bgDeep,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+    );
+  }
 }
 
 /// Cyan top-toast that slides down + fades in, holds, then slides up + fades
