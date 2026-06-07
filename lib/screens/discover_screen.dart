@@ -1015,7 +1015,7 @@ class _DiscoverHeader extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.search,
-                            size: expanded ? 18 : 24,
+                            size: expanded ? 18 : 20,
                             color: SC.textMuted,
                           ),
                           if (expanded) const SizedBox(width: 6),
@@ -1142,22 +1142,8 @@ class _SearchResultsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Intro state: no card chrome — just a soft, smaller, centered hint
-    // floating under the bar ("minimal discret" style).
-    if (query.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-        child: Text(
-          AppStrings.t('search_intro_hint'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: SC.textMuted.withValues(alpha: 0.7),
-            fontSize: 12,
-            height: 1.4,
-          ),
-        ),
-      );
-    }
+    // No intro hint at all — users figure the search out on their own.
+    if (query.isEmpty) return const SizedBox.shrink();
     return Material(
       color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(16),
