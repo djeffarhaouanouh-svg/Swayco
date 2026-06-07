@@ -18,6 +18,8 @@ class NativeGlass extends StatelessWidget {
     this.borderRadius = 24,
     this.fallbackColor = const Color(0x80000000),
     this.fallbackBorder,
+    this.tint,
+    this.circle = false,
   });
 
   final Widget child;
@@ -25,21 +27,33 @@ class NativeGlass extends StatelessWidget {
   final Color fallbackColor;
   final Color? fallbackBorder;
 
+  /// Optional glass tint (e.g. the cyan accent) — colours both the native
+  /// glass and the fallback fill.
+  final Color? tint;
+
+  /// Render as a circle (uses CNGlassEffectShape.circle natively).
+  final bool circle;
+
   @override
   Widget build(BuildContext context) {
     if (useNativeGlass) {
       return cnp.LiquidGlassContainer(
         config: cnp.LiquidGlassConfig(
-          shape: cnp.CNGlassEffectShape.rect,
-          cornerRadius: borderRadius,
+          shape: circle
+              ? cnp.CNGlassEffectShape.circle
+              : cnp.CNGlassEffectShape.rect,
+          cornerRadius: circle ? null : borderRadius,
+          tint: tint,
         ),
         child: child,
       );
     }
+    final fill = tint != null ? tint!.withValues(alpha: 0.32) : fallbackColor;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: fallbackColor,
-        borderRadius: BorderRadius.circular(borderRadius),
+        color: fill,
+        shape: circle ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: circle ? null : BorderRadius.circular(borderRadius),
         border:
             fallbackBorder == null ? null : Border.all(color: fallbackBorder!),
       ),

@@ -1866,12 +1866,11 @@ class _RoundCallButton extends StatelessWidget {
       label: label,
       button: true,
       child: Pressable(
+        bounce: true,
         onTap: onTap,
-        child: Material(
-          color: background,
-          shape: const CircleBorder(),
-          elevation: 3,
-          shadowColor: Colors.black54,
+        child: NativeGlass(
+          circle: true,
+          tint: background,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Icon(icon, color: Colors.white, size: 21),
