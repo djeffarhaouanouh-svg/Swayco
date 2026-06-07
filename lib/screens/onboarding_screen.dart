@@ -294,56 +294,61 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _GlassTextField(
-                        controller: _nameCtrl,
-                        textCapitalization: TextCapitalization.words,
-                        label: AppStrings.t('onb_first_name_label'),
-                        hint: AppStrings.t('onb_first_name_hint'),
-                        icon: Icons.badge_outlined,
+                      // Each field carries a cyan "+10" reward hint pinned at
+                      // its top-right — same nudge style as the profile page.
+                      _RewardField(
+                        child: _GlassTextField(
+                          controller: _nameCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          label: AppStrings.t('onb_first_name_label'),
+                          hint: AppStrings.t('onb_first_name_hint'),
+                          icon: Icons.badge_outlined,
+                        ),
                       ),
                       const SizedBox(height: 14),
-                      Stack(
-                        children: [
-                          _GlassTextField(
-                            controller: _bioCtrl,
-                            textCapitalization: TextCapitalization.sentences,
-                            maxLength: profileBioMaxLength,
-                            minLines: 2,
-                            maxLines: 3,
-                            label: 'Bio',
-                            hint: AppStrings.t('profile_bio_placeholder'),
-                            icon: Icons.short_text,
-                            alignLabelWithHint: true,
-                            // Show the prompt directly (not only on focus).
-                            alwaysFloatLabel: true,
-                          ),
-                          // Cyan "+10" reward tag to motivate filling the bio.
-                          const Positioned(
-                            top: 7,
-                            right: 10,
-                            child: _RewardTag(),
-                          ),
-                        ],
+                      _RewardField(
+                        child: _GlassTextField(
+                          controller: _bioCtrl,
+                          textCapitalization: TextCapitalization.sentences,
+                          maxLength: profileBioMaxLength,
+                          minLines: 2,
+                          maxLines: 3,
+                          label: 'Bio',
+                          hint: AppStrings.t('profile_bio_placeholder'),
+                          icon: Icons.short_text,
+                          alignLabelWithHint: true,
+                          // Show the prompt directly (not only on focus).
+                          alwaysFloatLabel: true,
+                        ),
                       ),
                       const SizedBox(height: 14),
                       // Single field: tap to pick country → then city.
-                      _GlassSelectField(
-                        icon: Icons.public,
-                        label: AppStrings.t('onb_location_label'),
-                        hint: AppStrings.t('onb_location_hint'),
-                        value: [
-                          _cityCtrl.text.trim(),
-                          _countryCtrl.text.trim(),
-                        ].where((s) => s.isNotEmpty).join(', '),
-                        onTap: _openLocationPicker,
+                      _RewardField(
+                        child: _GlassSelectField(
+                          icon: Icons.public,
+                          label: AppStrings.t('onb_location_label'),
+                          hint: AppStrings.t('onb_location_hint'),
+                          value: [
+                            _cityCtrl.text.trim(),
+                            _countryCtrl.text.trim(),
+                          ].where((s) => s.isNotEmpty).join(', '),
+                          onTap: _openLocationPicker,
+                        ),
                       ),
                       const SizedBox(height: 22),
-                      Text(
-                        AppStrings.t('onb_language_picker_label'),
-                        style: SCText.body.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              AppStrings.t('onb_language_picker_label'),
+                              style: SCText.body.copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const _RewardTag(),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       _LanguageGrid(
@@ -1267,27 +1272,40 @@ class _LanguageGrid extends StatelessWidget {
 /// the "Your profile" edit form. Wraps a [TextField] so the
 /// surrounding screen doesn't have to repeat the border / fill /
 /// cursor configuration each time.
-/// Small cyan "+10" reward tag — a motivational nudge shown on the Bio field.
+/// Cyan "+10" reward hint — same plain-accent style as the profile page
+/// section rewards. Floated at the top-right of editor fields by [_RewardField]
+/// to nudge the user to fill them.
 class _RewardTag extends StatelessWidget {
   const _RewardTag();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: SC.accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
+    return const Text(
+      '+10',
+      style: TextStyle(
+        color: SC.accent,
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
       ),
-      child: const Text(
-        '+10',
-        style: TextStyle(
-          color: SC.accent,
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
-        ),
-      ),
+    );
+  }
+}
+
+/// Wraps a field with the cyan "+10" hint pinned at its top-right corner —
+/// matching how the profile page floats its reward hints.
+class _RewardField extends StatelessWidget {
+  const _RewardField({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        const Positioned(right: 2, top: -6, child: _RewardTag()),
+      ],
     );
   }
 }
