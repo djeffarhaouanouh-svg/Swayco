@@ -691,14 +691,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               left: 20,
               child: const _OnlineBadge(),
             ),
-            // Tap-outside scrim to dismiss the search.
+            // Tap-outside catcher to dismiss the search. Transparent now —
+            // no dark overlay over the card; HitTestBehavior.opaque still
+            // captures the tap so tapping outside closes the search.
             if (_searchExpanded)
               Positioned.fill(
                 top: safeTop + 64,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _collapseSearch,
-                  child: const ColoredBox(color: Color(0x88000000)),
+                  child: const ColoredBox(color: Colors.transparent),
                 ),
               ),
             // Search results dropdown — overlays the cards.
