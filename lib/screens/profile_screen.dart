@@ -1228,13 +1228,9 @@ class _InviteFriendsSectionState extends State<_InviteFriendsSection> {
   @override
   Widget build(BuildContext context) {
     final progress = _referrals % 3;
-    return Container(
+    return GlassPanel(
+      borderRadius: 20,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
