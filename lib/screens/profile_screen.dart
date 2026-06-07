@@ -3554,24 +3554,15 @@ class _GhostIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dark frosted-glass circle (same surface as the cards) with a white
-    // glyph — no blue tint.
-    return Pressable(
-      bounce: true,
-      onTap: onTap,
-      child: Tooltip(
-        message: tooltip,
-        child: Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: SC.glassStrong,
-            shape: BoxShape.circle,
-            border: Border.all(color: SC.glassBorder),
-          ),
-          child: Icon(icon, size: 21, color: Colors.white),
-        ),
+    // Real glass circle — the same widget as the header back/call buttons
+    // (BackdropFilter glass + spring bounce), not a flat fill.
+    return Tooltip(
+      message: tooltip,
+      child: GlassIconButton(
+        icon: icon,
+        onTap: onTap,
+        size: 44,
+        iconSize: 21,
       ),
     );
   }
