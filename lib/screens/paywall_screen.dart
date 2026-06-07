@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -186,6 +187,44 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     }
   }
 
+  /// Where the charge lands, per platform — Apple's auto-renewal
+  /// disclosure must name the billing account on the paywall itself.
+  String _accountPhrase() {
+    if (kIsWeb) return 'votre moyen de paiement';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return 'votre compte Apple';
+      case TargetPlatform.android:
+        return 'votre compte Google Play';
+      default:
+        return 'votre compte';
+    }
+  }
+
+  /// Auto-renewable subscription disclosure required by App Store
+  /// Guideline 3.1.2(c): title, length, price, plus the renewal and
+  /// cancellation terms — shown on the paywall, next to the functional
+  /// Conditions / Confidentialité links in the footer below.
+  Widget _legalDisclosure() {
+    final tiers = _plans.map((p) => '${p.name} ${p.price}${p.period}').join(', ');
+    return Text(
+      'Abonnement à renouvellement automatique. $tiers : le montant est '
+      'débité sur ${_accountPhrase()} à la confirmation de l\'achat. '
+      "L'abonnement se renouvelle automatiquement pour la même durée et au "
+      'même tarif, sauf désactivation au moins 24 h avant la fin de la '
+      'période en cours. Vous pouvez gérer ou résilier votre abonnement à '
+      'tout moment dans les réglages de votre compte. En vous abonnant, vous '
+      "acceptez les Conditions d'utilisation et la Politique de "
+      'confidentialité (liens ci-dessous).',
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: SC.textMuted,
+        fontSize: 10.5,
+        height: 1.35,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Cap the sheet height so a tall screen doesn't stretch it edge to
@@ -281,6 +320,8 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                             setState(() => _selected = _plans[i].tier),
                       ),
                     ],
+                    const SizedBox(height: 18),
+                    _legalDisclosure(),
                   ],
                 ),
               ),
