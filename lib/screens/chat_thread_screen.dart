@@ -578,6 +578,54 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 hasClockChip: peerClock != null,
                               ),
                             ),
+                            // Top fade — messages dissolve into black under the
+                            // header (floating, not empty).
+                            const Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: IgnorePointer(
+                                child: SizedBox(
+                                  height: 40,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0xFF000000),
+                                          Color(0x00000000),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Bottom fade — messages dissolve into black under
+                            // the floating composer.
+                            const Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: IgnorePointer(
+                                child: SizedBox(
+                                  height: 160,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0x00000000),
+                                          Color(0xFF000000),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                             // Floating "local time at the peer's place" bubble.
                             // Centred under the swayco.ai logo, not the screen:
                             // the header's logo sits in an Expanded offset by
@@ -1726,11 +1774,16 @@ class _ComposerState extends State<_Composer> {
   }
 
   Widget _buildIdleBar() {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 8, 6),
-        child: Row(
+    // Lowered: use only part of the bottom safe-area inset so the bar sits a
+    // bit closer to the screen edge.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        4,
+        8,
+        6 + MediaQuery.paddingOf(context).bottom * 0.4,
+      ),
+      child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
@@ -1807,11 +1860,12 @@ class _ComposerState extends State<_Composer> {
             GlassIconButton(
               icon: Icons.add_photo_alternate_outlined,
               onTap: widget.sending ? null : widget.onSendImage,
+              size: 46,
+              iconSize: 24,
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildRecordingBar() {
