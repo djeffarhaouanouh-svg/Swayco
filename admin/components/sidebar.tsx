@@ -8,6 +8,7 @@ import {
   LogOut,
   Radio,
   Repeat,
+  Table2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
+  { href: "/tableau", label: "Tableau global", icon: Table2 },
   { href: "/live", label: "Live", icon: Radio },
   { href: "/traduction", label: "Traduction", icon: Languages },
   { href: "/social", label: "Social", icon: Users },

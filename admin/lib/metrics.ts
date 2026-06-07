@@ -9,7 +9,14 @@
 // grows large, promote the heavy aggregates to SQL views / RPCs.
 
 import { createSupabaseServiceClient } from "./supabase/service";
-import { dayKey } from "./format";
+import {
+  dayKey,
+  fmtEur,
+  fmtInt,
+  fmtMinutes,
+  fmtNum,
+  fmtPct,
+} from "./format";
 
 const DAY_MS = 86_400_000;
 
@@ -575,6 +582,330 @@ export async function getReferralStats(): Promise<ReferralStats> {
     bonusTranchesPaid: tranches,
     bonusMinutesGranted: tranches * 30,
   };
+}
+
+// ─── consolidated single table ──────────────────────────────────────────────
+
+export type MetricGroup =
+  | "Croissance"
+  | "Rétention"
+  | "Social"
+  | "Appels"
+  | "Profil"
+  | "Monétisation";
+
+/** One line of the "Tableau global" page — already formatted for display. */
+export type MetricRow = {
+  group: MetricGroup;
+  label: string;
+  /** Total / valeur globale. */
+  total: string;
+  /** Moyenne par utilisateur — "—" quand la notion n'a pas de sens. */
+  perUser: string;
+  /** Contexte (fenêtre temporelle, définition) — "" si rien à dire. */
+  detail: string;
+};
+
+/**
+ * Everything the app tracks, on ONE table, one row per metric. Reuses
+ * the per-section aggregates (overview / retention / social / costs /
+ * referrals) and adds the per-user averages no other page computes:
+ * likes, voice messages, calls, photos, interests and profile
+ * completion.
+ *
+ * Per-user averages divide an ALL-TIME total by the total user count (a
+ * lifetime average), while activity metrics (DAU, retention, new users)
+ * keep their natural time window — each row's `detail` says which. Every
+ * underlying query is defensive (safeCount / safeRows resolve to 0 / []),
+ * so a table that doesn't exist yet just shows 0 instead of crashing.
+ */
+export async function getGlobalTable(): Promise<MetricRow[]> {
+  const [
+    overview,
+    retention,
+    social,
+    costs,
+    referrals,
+    newUsers30d,
+    friendshipsTotal,
+    messagesTotal,
+    voiceMessages,
+    likeRows,
+    callsTotal,
+    callRows,
+    blocks,
+    reports,
+    profileRows,
+  ] = await Promise.all([
+    getOverview(),
+    getRetention(30),
+    getSocial(30),
+    getCosts(30),
+    getReferralStats(),
+    safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
+    safeCount("friendships"),
+    safeCount("messages"),
+    safeCount("messages", (q) =>
+      q.not("audio_url", "is", null).neq("audio_url", ""),
+    ),
+    safeRows("likes", "liker, liked", (q) => q.limit(200000)),
+    safeCount("incoming_calls"),
+    safeRows("incoming_calls", "duration_seconds", (q) =>
+      q.not("duration_seconds", "is", null).limit(200000),
+    ),
+    safeCount("blocked_users"),
+    safeCount("reports"),
+    safeRows("profiles", "photos, interests, missions_done", (q) =>
+      q.limit(200000),
+    ),
+  ]);
+
+  const users = overview.totalUsers || 0;
+  const per = (n: number) => (users > 0 ? n / users : 0);
+
+  // Likes: distinct (liker → liked) pairs, so liking three photos of the
+  // same person counts once toward "people liked".
+  const likePairs = new Set<string>();
+  for (const r of likeRows) {
+    if (r.liker && r.liked) likePairs.add(`${r.liker}→${r.liked}`);
+  }
+
+  // Calls: average + cumulative duration over ended calls only.
+  let callSecs = 0;
+  let endedCalls = 0;
+  for (const c of callRows) {
+    const s = Number(c.duration_seconds);
+    if (Number.isFinite(s) && s > 0) {
+      callSecs += s;
+      endedCalls++;
+    }
+  }
+  const avgCallMin = endedCalls > 0 ? callSecs / endedCalls / 60 : 0;
+
+  // Profiles: photos, interests, and mission-based completion. The app's
+  // onboarding has 6 missions (see lib/services/missions_service.dart);
+  // completion = filled missions / 6, averaged across all profiles.
+  const MISSIONS = 6;
+  let photoTotal = 0;
+  let withPhoto = 0;
+  let interestTotal = 0;
+  let missionTotal = 0;
+  for (const p of profileRows) {
+    const photos = Array.isArray(p.photos) ? p.photos : [];
+    const interests = Array.isArray(p.interests) ? p.interests : [];
+    const missions = Array.isArray(p.missions_done) ? p.missions_done : [];
+    photoTotal += photos.length;
+    if (photos.length > 0) withPhoto++;
+    interestTotal += interests.length;
+    missionTotal += Math.min(missions.length, MISSIONS);
+  }
+  const seen = profileRows.length || 0;
+  const avgPhotos = seen > 0 ? photoTotal / seen : 0;
+  const avgInterests = seen > 0 ? interestTotal / seen : 0;
+  const avgMissions = seen > 0 ? missionTotal / seen : 0;
+  const withPhotoRate = seen > 0 ? withPhoto / seen : 0;
+
+  const todayDau = retention.dau.length
+    ? retention.dau[retention.dau.length - 1].value
+    : 0;
+
+  return [
+    // ─── Croissance & activité ───
+    {
+      group: "Croissance",
+      label: "Nombre d'utilisateurs",
+      total: fmtInt(users),
+      perUser: "—",
+      detail: "total cumulé",
+    },
+    {
+      group: "Croissance",
+      label: "Nouveaux utilisateurs",
+      total: fmtInt(newUsers30d),
+      perUser: "—",
+      detail: `${fmtInt(overview.newUsers24h)} (24 h) · ${fmtInt(
+        overview.newUsers7d,
+      )} (7 j) · ${fmtInt(newUsers30d)} (30 j)`,
+    },
+    {
+      group: "Croissance",
+      label: "Actifs aujourd'hui (DAU)",
+      total: fmtInt(todayDau),
+      perUser: "—",
+      detail: "ouvertures d'app, jour J",
+    },
+    {
+      group: "Croissance",
+      label: "Utilisateurs récurrents",
+      total: fmtInt(social.recurringUsers),
+      perUser: fmtPct(social.recurringRate),
+      detail: "≥ 2 jours actifs (30 j)",
+    },
+    {
+      group: "Croissance",
+      label: "Utilisateurs perdus",
+      total: fmtInt(retention.lostUsers),
+      perUser: "—",
+      detail: "aucune ouverture depuis 30 j",
+    },
+
+    // ─── Rétention ───
+    {
+      group: "Rétention",
+      label: "Rétention J1",
+      total: fmtPct(retention.overall.d1),
+      perUser: "—",
+      detail: "reviennent le lendemain",
+    },
+    {
+      group: "Rétention",
+      label: "Rétention J7",
+      total: fmtPct(retention.overall.d7),
+      perUser: "—",
+      detail: "reviennent à 7 jours",
+    },
+    {
+      group: "Rétention",
+      label: "Rétention J30",
+      total: fmtPct(retention.overall.d30),
+      perUser: "—",
+      detail: "reviennent à 30 jours",
+    },
+
+    // ─── Social & engagement ───
+    {
+      group: "Social",
+      label: "Amis (acceptés)",
+      total: fmtInt(social.friendsTotal),
+      perUser: fmtNum(per(social.friendsTotal * 2)),
+      detail: "moyenne d'amis par utilisateur",
+    },
+    {
+      group: "Social",
+      label: "Demandes d'ami envoyées",
+      total: fmtInt(friendshipsTotal),
+      perUser: fmtNum(per(friendshipsTotal)),
+      detail: "acceptées + en attente + refusées",
+    },
+    {
+      group: "Social",
+      label: "Messages envoyés",
+      total: fmtInt(messagesTotal),
+      perUser: fmtNum(per(messagesTotal)),
+      detail: "texte, image et vocal",
+    },
+    {
+      group: "Social",
+      label: "Messages vocaux",
+      total: fmtInt(voiceMessages),
+      perUser: fmtNum(per(voiceMessages)),
+      detail: "",
+    },
+    {
+      group: "Social",
+      label: "Likes",
+      total: fmtInt(likePairs.size),
+      perUser: fmtNum(per(likePairs.size)),
+      detail: "personnes likées distinctes",
+    },
+    {
+      group: "Social",
+      label: "Conversations actives",
+      total: fmtInt(social.conversationsActive),
+      perUser: "—",
+      detail: "30 j",
+    },
+    {
+      group: "Social",
+      label: "Blocages",
+      total: fmtInt(blocks),
+      perUser: fmtNum(per(blocks)),
+      detail: "",
+    },
+    {
+      group: "Social",
+      label: "Signalements",
+      total: fmtInt(reports),
+      perUser: "—",
+      detail: "total cumulé",
+    },
+
+    // ─── Appels ───
+    {
+      group: "Appels",
+      label: "Appels passés",
+      total: fmtInt(callsTotal),
+      perUser: fmtNum(per(callsTotal)),
+      detail: "appels entre amis (hors invités)",
+    },
+    {
+      group: "Appels",
+      label: "Durée moyenne d'un appel",
+      total: fmtMinutes(avgCallMin),
+      perUser: "—",
+      detail: `${fmtInt(endedCalls)} appels terminés`,
+    },
+    {
+      group: "Appels",
+      label: "Minutes d'appel cumulées",
+      total: fmtMinutes(callSecs / 60),
+      perUser: `${fmtNum(per(callSecs / 60))} min`,
+      detail: "",
+    },
+
+    // ─── Profil ───
+    {
+      group: "Profil",
+      label: "Complétion de profil",
+      total: fmtPct(avgMissions / MISSIONS),
+      perUser: `${fmtNum(avgMissions)} / ${MISSIONS}`,
+      detail: "missions d'onboarding remplies",
+    },
+    {
+      group: "Profil",
+      label: "Photos",
+      total: fmtInt(photoTotal),
+      perUser: fmtNum(avgPhotos),
+      detail: `${fmtPct(withPhotoRate)} ont ≥ 1 photo`,
+    },
+    {
+      group: "Profil",
+      label: "Centres d'intérêt",
+      total: "—",
+      perUser: fmtNum(avgInterests),
+      detail: "tags choisis par utilisateur",
+    },
+
+    // ─── Monétisation ───
+    {
+      group: "Monétisation",
+      label: "Abonnés Plus",
+      total: fmtInt(costs.plusCount),
+      perUser: "—",
+      detail: "7,97 €/mois",
+    },
+    {
+      group: "Monétisation",
+      label: "Abonnés Ultra+",
+      total: fmtInt(costs.ultraPlusCount),
+      perUser: "—",
+      detail: "15,97 €/mois",
+    },
+    {
+      group: "Monétisation",
+      label: "MRR",
+      total: fmtEur(costs.mrrEur),
+      perUser: "—",
+      detail: "revenu mensuel récurrent",
+    },
+    {
+      group: "Monétisation",
+      label: "Filleuls (parrainage)",
+      total: fmtInt(referrals.totalAttributed),
+      perUser: "—",
+      detail: `${fmtInt(referrals.activeReferrers)} parrains actifs`,
+    },
+  ];
 }
 
 // ─── monetisation ─────────────────────────────────────────────────────────
