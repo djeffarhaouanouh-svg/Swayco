@@ -7,6 +7,7 @@ import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
+import '../widgets/glass_panel.dart';
 
 /// Opens the subscription paywall as a modal sheet that slides up from
 /// the bottom (rounded top corners, grab handle, dismiss by swipe / tap
@@ -403,10 +404,9 @@ class _SocialProofPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassContainer(
-      borderRadius: const BorderRadius.all(Radius.circular(999)),
+    return GlassPanel(
+      borderRadius: 999,
       color: SC.glassStrong,
-      border: SC.glassBorder,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       child: Row(
         mainAxisSize: MainAxisSize.min,

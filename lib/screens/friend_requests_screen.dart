@@ -15,7 +15,6 @@ import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -407,10 +406,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           // (with the stronger glass shade so it doesn't read as a
           // dark void on the mesh) and the centered copy inside.
           if (sections.isEmpty)
-            GlassContainer(
-              borderRadius: BorderRadius.circular(24),
+            GlassPanel(
+              borderRadius: 24,
               color: SC.glassStrong,
-              border: SC.glassBorderStrong,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
               child: const _NoRequestsEmpty(),
             ),

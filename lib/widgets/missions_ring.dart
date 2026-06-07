@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/missions_service.dart';
 import '../theme/swayco_theme.dart';
-import 'glass.dart';
 import 'glass_panel.dart';
 
 /// UI metadata for each mission. [titleKey]/[howKey] are i18n keys resolved at
@@ -869,11 +868,10 @@ class _MissionToast extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width - 48,
       ),
-      child: GlassContainer(
-        borderRadius: BorderRadius.circular(999),
+      child: GlassPanel(
+        borderRadius: 999,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         color: SC.accent.withValues(alpha: 0.18),
-        border: SC.accent.withValues(alpha: 0.55),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

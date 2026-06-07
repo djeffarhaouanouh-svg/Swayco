@@ -28,7 +28,6 @@ import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -910,12 +909,10 @@ class _PeerClockChip extends StatelessWidget {
     const shadows = [
       Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
     ];
-    return GlassContainer(
-      blur: 14,
-      borderRadius: BorderRadius.circular(999),
+    return GlassPanel(
+      borderRadius: 999,
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      color: const Color(0x55FFA726), // light orange, ~33% — lets the bg bleed
-      border: const Color(0xAAEF8C00), // darker orange edge
+      color: const Color(0x55FFA726), // light orange — recording tint
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1841,8 +1838,8 @@ class _ComposerState extends State<_Composer> {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-        child: GlassContainer(
-          borderRadius: BorderRadius.circular(28),
+        child: GlassPanel(
+          borderRadius: 28,
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
           child: Row(
             children: [
