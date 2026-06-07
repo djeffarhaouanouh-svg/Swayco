@@ -25,7 +25,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
-import '../widgets/glass_backdrop.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -429,7 +428,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
-      body: GlassBackdrop(
+      body: ColoredBox(
+        color: const Color(0xFF0E0E0E),
         child: SafeArea(
           bottom: false,
           // Fixed "Messages" band at the top; the conversation list scrolls

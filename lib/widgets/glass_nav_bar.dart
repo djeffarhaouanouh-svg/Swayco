@@ -5,6 +5,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
 import '../services/app_strings.dart';
 import '../services/platform_glass.dart';
+import '../theme/swayco_theme.dart';
 
 /// Full-width glass-morphism bottom-nav, flush against the screen bottom,
 /// with a sliding pill that animates between selected tabs. Rendered by
@@ -284,17 +285,24 @@ class _NavItem extends StatelessWidget {
         onTap: onTap,
         child: Center(
           child: _badged(
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: Icon(
-                selected ? data.selectedIcon : data.icon,
-                key: ValueKey(selected),
-                size: 22,
-                // Keep every nav icon white; the sliding pill behind
-                // the selected one already signals which tab is
-                // active, so tinting the icon cyan on hover / select
-                // was visual noise.
-                color: Colors.white.withValues(alpha: selected ? 1.0 : 0.78),
+            AnimatedScale(
+              // Small bounce on selection — easeOutBack overshoots past 1.0
+              // then settles, so the active icon "pops".
+              scale: selected ? 1.18 : 1.0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutBack,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  selected ? data.selectedIcon : data.icon,
+                  key: ValueKey(selected),
+                  size: 22,
+                  // Colour transition white → cyan accent on selection (the
+                  // AnimatedSwitcher cross-fades between the two icons).
+                  color: selected
+                      ? SC.accent
+                      : Colors.white.withValues(alpha: 0.78),
+                ),
               ),
             ),
             data.badge,
