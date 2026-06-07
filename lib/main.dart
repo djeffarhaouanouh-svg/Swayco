@@ -391,63 +391,55 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// locally-stored onboarding data (display name + spoken language) up
   /// to the Supabase `profiles` row, then start the unread-count
   /// listener.
-  /// Pull the Supabase profile's interface language and apply it to
-  /// [AppStrings]. Best-effort — a network failure just leaves the
-  /// current locale untouched.
-  Future<void> _applyRemoteLanguage(String uid) async {
-    try {
-      final remote = await ProfileApi.fetchById(uid);
-      final code = remote?.language.trim() ?? '';
-      if (code.isNotEmpty) AppStrings.setFromCode(code);
-    } catch (e) {
-      debugPrint('applyRemoteLanguage failed: $e');
-    }
-  }
-
   Future<void> _hydrateAuthedSession() async {
     final uid = AuthService.currentUserId;
     if (uid.isEmpty) return;
     // Tie store purchases to this account (no-op on web / unconfigured).
     unawaited(RevenueCat.identify(uid));
     final profile = await UserPrefs.loadProfile();
+    // The ACCOUNT (remote profile) is the source of truth for the interface
+    // language: a change made on another device / the web syncs DOWN here
+    // instead of this device's stale local cache clobbering it. Fetch it once
+    // and reuse it for the language sync AND the returning-user path.
+    RemoteProfile? remote;
+    try {
+      remote = await ProfileApi.fetchById(uid);
+    } catch (e) {
+      debugPrint('hydrate fetch remote profile failed: $e');
+    }
+    final remoteLang = remote?.language.trim() ?? '';
+
     if (profile != null && profile.firstName.isNotEmpty) {
+      // Prefer the account's language; fall back to the local pick only when
+      // the account has none yet (the first upsert from this device).
+      final lang = remoteLang.isNotEmpty ? remoteLang : profile.sourceLang;
+      if (lang.trim().isNotEmpty) {
+        AppStrings.setFromCode(lang);
+        // Keep the local cache in step so the next cold boot restores in the
+        // account's language immediately (no stale-language flash).
+        if (lang != profile.sourceLang) {
+          await UserPrefs.setSourceLang(lang);
+        }
+      }
       await ProfileApi.upsertMyProfile(
         deviceId: uid,
         displayName: profile.firstName,
-        language: profile.sourceLang,
+        // Canonical language — never overwrites a change made elsewhere.
+        language: lang,
         gender: profile.gender,
       );
-      // Local prefs may predate the language picker, or hold an empty
-      // source lang — fall back to the Supabase value so the UI still
-      // speaks the user's chosen language.
-      if (profile.sourceLang.trim().isEmpty) {
-        await _applyRemoteLanguage(uid);
-      }
-    } else {
-      // Returning user on a fresh device / freshly-installed app: local
-      // prefs are empty but the Supabase profile holds their name +
-      // language. The boot-time restore reads ONLY local prefs, so
-      // without this the UI stays on the English default even though the
-      // account is set to French. Pull the remote profile down, apply its
-      // language, and cache it locally so the next cold boot restores
-      // instantly with no round-trip.
-      try {
-        final remote = await ProfileApi.fetchById(uid);
-        if (remote != null) {
-          if (remote.language.trim().isNotEmpty) {
-            AppStrings.setFromCode(remote.language);
-          }
-          if (remote.displayName.trim().isNotEmpty) {
-            await UserPrefs.completeOnboarding(
-              firstName: remote.displayName,
-              sourceLang: remote.language,
-              targetLang: '',
-              gender: remote.gender,
-            );
-          }
-        }
-      } catch (e) {
-        debugPrint('hydrate remote profile/language failed: $e');
+    } else if (remote != null) {
+      // Returning user on a fresh device / freshly-installed app: local prefs
+      // are empty but the account holds their name + language. Apply it and
+      // cache everything so the next cold boot restores instantly.
+      if (remoteLang.isNotEmpty) AppStrings.setFromCode(remoteLang);
+      if (remote.displayName.trim().isNotEmpty) {
+        await UserPrefs.completeOnboarding(
+          firstName: remote.displayName,
+          sourceLang: remote.language,
+          targetLang: '',
+          gender: remote.gender,
+        );
       }
     }
     // Once the profile row exists, fire the deferred referral
