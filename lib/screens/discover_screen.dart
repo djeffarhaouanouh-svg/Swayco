@@ -901,13 +901,10 @@ class _OnlineBadgeState extends State<_OnlineBadge> {
     final count = _count;
     // No badge when nobody's online (or it's disabled remotely).
     if (count == null || count <= 0) return const SizedBox.shrink();
-    return Container(
+    return GlassPanel(
+      borderRadius: 999,
+      color: const Color(0x4D000000),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.30),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

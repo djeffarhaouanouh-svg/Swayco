@@ -178,7 +178,7 @@ class GlassNavBar extends StatelessWidget {
           glassColor: Color(0x12FFFFFF),
           refractiveIndex: 1.3,
         ),
-        padding: EdgeInsets.only(bottom: bottomInset),
+        padding: EdgeInsets.only(bottom: bottomInset * 0.5),
         child: inner,
       );
     }
@@ -200,7 +200,7 @@ class GlassNavBar extends StatelessWidget {
         // safe-area inset.
         padding: EdgeInsets.only(
           top: hugTopCorners ? hugRadius : 0,
-          bottom: bottomInset,
+          bottom: bottomInset * 0.5,
         ),
         child: inner,
       ),
@@ -291,7 +291,7 @@ class _NavItem extends StatelessWidget {
                 child: Icon(
                   selected ? data.selectedIcon : data.icon,
                   key: ValueKey(selected),
-                  size: 22,
+                  size: 26,
                   // Colour transition white → cyan accent on selection (the
                   // AnimatedSwitcher cross-fades between the two icons).
                   color: selected
