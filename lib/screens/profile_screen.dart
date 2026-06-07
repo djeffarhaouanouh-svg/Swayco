@@ -36,6 +36,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/missions_ring.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -1445,12 +1446,9 @@ class _LanguageCard extends StatelessWidget {
             args: {'lang': langName},
           )
         : null;
-    return Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SC.glassBorder),
-      ),
+    return GlassPanel(
+      borderRadius: 16,
+      color: SC.glassStrong,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

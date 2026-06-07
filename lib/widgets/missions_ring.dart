@@ -6,6 +6,7 @@ import '../services/app_strings.dart';
 import '../services/missions_service.dart';
 import '../theme/swayco_theme.dart';
 import 'glass.dart';
+import 'glass_panel.dart';
 
 /// UI metadata for each mission. [titleKey]/[howKey] are i18n keys resolved at
 /// build time; detection + reward live in [MissionsService].
@@ -353,7 +354,7 @@ class _MissionsCardState extends State<MissionsCard> {
     return ValueListenableBuilder<MissionsState>(
       valueListenable: MissionsService.instance.state,
       builder: (context, st, _) {
-        return GlassContainer(
+        return GlassPanel(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
