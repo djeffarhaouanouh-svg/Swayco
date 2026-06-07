@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
@@ -119,6 +120,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   @override
   void initState() {
     super.initState();
+    Analytics.track('screen_view', props: {'screen': 'discover'});
     _hintCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -372,6 +374,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _sendFriendRequest(RemoteProfile peer) async {
     final f = await FriendshipApi.sendRequest(meId: _myId, peerId: peer.id);
+    Analytics.track(
+      'friend_request_sent',
+      props: {'source': 'discover', 'kind': 'request'},
+    );
     if (!mounted) return;
     if (f != null) {
       setState(() => _myFriendships = [..._myFriendships, f]);
@@ -470,6 +476,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       body: emoji,
       snack: '$emoji envoyé à ${peer.displayName}',
       discoverPhoto: photo,
+      type: 'reaction',
     );
   }
 
@@ -512,6 +519,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     required String body,
     required String snack,
     String discoverPhoto = '',
+    String type = 'text',
   }) async {
     if (_myId.isEmpty || peer.id.isEmpty) return;
     try {
@@ -535,6 +543,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         body: body,
         language: myLang,
         discoverPhoto: discoverPhoto,
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'discover', 'type': type},
       );
       if (!mounted) return;
       _showAddedSnack(snack);

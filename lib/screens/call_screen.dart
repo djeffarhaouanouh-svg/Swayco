@@ -328,6 +328,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    Analytics.track('screen_view', props: {'screen': 'live'});
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
@@ -805,6 +806,10 @@ class _CallScreenState extends State<CallScreen> {
       _chatSending = false;
     });
     _pushCaption(orig: text, trans: trans, mine: true);
+    Analytics.track(
+      'message_sent',
+      props: {'source': 'live', 'type': 'text'},
+    );
     try {
       final payload = jsonEncode({'orig': text, 'trans': trans, 'lang': to});
       await room.localParticipant?.publishData(

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
@@ -56,6 +57,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    Analytics.track('screen_view', props: {'screen': 'chat'});
     WidgetsBinding.instance.addObserver(this);
     // Rebuild when the local "hide my online status" toggle flips
     // so the green dots on every row vanish (or come back)

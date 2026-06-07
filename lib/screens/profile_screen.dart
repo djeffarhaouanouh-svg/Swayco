@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/analytics.dart';
 import '../services/voice_message_api.dart';
 
 import '../services/app_strings.dart';
@@ -245,6 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           likedId: _targetId,
           photoUrl: photoUrl,
         );
+        Analytics.track('like_sent', props: {'source': 'profile'});
       }
     } catch (_) {
       if (!mounted) return;
@@ -306,6 +308,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _iFollowPeer = true);
     try {
       await FriendshipApi.follow(meId: _deviceId, peerId: _targetId);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'profile', 'kind': 'follow'},
+      );
       if (!mounted) return;
       // Re-pull so the followers/following counts reflect the new edge.
       await _reload(silent: true);
@@ -327,6 +333,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _iRequestedPeer = true);
     try {
       await FriendshipApi.sendRequest(meId: _deviceId, peerId: _targetId);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'profile', 'kind': 'request'},
+      );
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;

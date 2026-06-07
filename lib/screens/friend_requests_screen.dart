@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
@@ -227,6 +228,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     setState(() => _newFollowers = next);
     try {
       await FriendshipApi.follow(meId: _myId, peerId: peer.id);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'requests', 'kind': 'follow'},
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _newFollowers = [..._newFollowers, peer]);

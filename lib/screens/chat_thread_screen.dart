@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
@@ -424,6 +425,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         body: body,
         language: _myLang,
       );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'text'},
+      );
       _inputCtrl.clear();
     } catch (e) {
       setState(() => _error = 'Envoi échoué: $e');
@@ -456,6 +461,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         senderName: _myName.isEmpty ? 'Moi' : _myName,
         hintLanguage: _myLang.isEmpty ? null : _myLang,
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'voice'},
       );
     } catch (e) {
       if (mounted) {
@@ -493,6 +502,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         bytes: bytes,
         contentType: isPng ? 'image/png' : 'image/jpeg',
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'image'},
       );
     } catch (e) {
       if (mounted) setState(() => _error = 'Envoi image échoué: $e');

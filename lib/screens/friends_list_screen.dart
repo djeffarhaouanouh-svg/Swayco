@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/device_id.dart';
@@ -126,6 +127,10 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   Future<void> _followBack(RemoteProfile peer) async {
     try {
       final f = await FriendshipApi.follow(meId: _myId, peerId: peer.id);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'friends_list', 'kind': 'follow'},
+      );
       if (!mounted) return;
       if (f == null) {
         ScaffoldMessenger.of(context).showSnackBar(
