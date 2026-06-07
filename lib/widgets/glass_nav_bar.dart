@@ -288,7 +288,7 @@ class _NavItemData {
   final int badge;
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.data,
     required this.selected,
@@ -304,33 +304,81 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  // One-shot "pop" played the instant this tab becomes selected: the icon
+  // grows past its size, then springs back to normal — the grow-then-shrink
+  // on click. Layered (multiplied) on top of the swipe lens magnification.
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+  );
+  late final Animation<double> _popScale = TweenSequence<double>([
+    // Quick grow to the overshoot peak…
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.35)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 35,
+    ),
+    // …then a springy settle back to normal size.
+    TweenSequenceItem(
+      tween: Tween(begin: 1.35, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 65,
+    ),
+  ]).animate(_pop);
+
+  @override
+  void didUpdateWidget(_NavItem old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) {
+      _pop.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Real spring (physics) bounce on tap — compress then overshoot, iOS-style.
+    // Real spring (physics) bounce on press; the pop adds the grow-then-shrink
+    // on selection; the swipe lens magnifies as the pill nears.
     return SpringPress(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Center(
-          child: _badged(
-            Transform.scale(
-              // WhatsApp-style lens magnification driven by the pill position;
-              // it flows from one icon to the next as the pill slides.
-              scale: magnify,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  selected ? data.selectedIcon : data.icon,
-                  key: ValueKey(selected),
-                  size: 26,
-                  // Colour transition white → cyan accent on selection (the
-                  // AnimatedSwitcher cross-fades between the two icons).
-                  color: selected
-                      ? SC.accent
-                      : Colors.white.withValues(alpha: 0.78),
-                ),
+        child: _badged(
+          AnimatedBuilder(
+            animation: _popScale,
+            builder: (context, child) => Transform.scale(
+              // Swipe lens × selection pop.
+              scale: widget.magnify * _popScale.value,
+              child: child,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                widget.selected
+                    ? widget.data.selectedIcon
+                    : widget.data.icon,
+                key: ValueKey(widget.selected),
+                size: 26,
+                // Colour transition white → cyan accent on selection (the
+                // AnimatedSwitcher cross-fades between the two icons).
+                color: widget.selected
+                    ? SC.accent
+                    : Colors.white.withValues(alpha: 0.78),
               ),
             ),
-            data.badge,
           ),
+          widget.data.badge,
         ),
+      ),
     );
   }
 
