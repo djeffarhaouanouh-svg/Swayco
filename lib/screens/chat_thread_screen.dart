@@ -879,13 +879,6 @@ class _PeerClockChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-            size: 14,
-            color: Colors.white,
-            shadows: shadows,
-          ),
-          const SizedBox(width: 6),
           Text(
             clock.hhmm,
             style: const TextStyle(
@@ -895,6 +888,13 @@ class _PeerClockChip extends StatelessWidget {
               shadows: shadows,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
+          ),
+          const SizedBox(width: 6),
+          Icon(
+            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+            size: 14,
+            color: Colors.white,
+            shadows: shadows,
           ),
         ],
       ),
