@@ -388,7 +388,7 @@ class _MissionsCardState extends State<MissionsCard> {
                               args: {'min': '$totalMin'},
                             ),
                             style: SCText.preview.copyWith(
-                              color: SC.textMuted,
+                              color: Colors.white.withValues(alpha: 0.85),
                               height: 1.3,
                             ),
                           ),
