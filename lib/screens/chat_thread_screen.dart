@@ -1136,27 +1136,10 @@ class _MessageBubble extends StatelessWidget {
 
   /// Full-screen image viewer — tap anywhere or pinch to zoom; tap to close.
   void _openFullImage(BuildContext context, String url) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.92),
-      builder: (ctx) => GestureDetector(
-        onTap: () => Navigator.of(ctx).pop(),
-        child: InteractiveViewer(
-          minScale: 0.8,
-          maxScale: 4,
-          child: Center(
-            child: Image.network(
-              url,
-              errorBuilder: (_, _, _) => const Icon(
-                Icons.broken_image_outlined,
-                color: Colors.white54,
-                size: 48,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    // Reuse the profile photo overlay (rounded corners, ✕, pinch-zoom, fade,
+    // tap-to-dismiss). viewerMode hides the "set as Discover" button and a
+    // single-photo list means no side arrows.
+    showPhotoViewer(context, photos: [url], index: 0, viewerMode: true);
   }
 }
 
