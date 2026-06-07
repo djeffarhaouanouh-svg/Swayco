@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
-import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -1096,30 +1095,29 @@ class _CallScreenState extends State<CallScreen> {
     return '$m min ${s.toString().padLeft(2, '0')} s';
   }
 
-  /// Capture the summary card to a PNG and hand it to the OS share sheet —
-  /// "partager la page". Best-effort: a capture / share failure is swallowed.
-  Future<void> _shareSummary() async {
+  /// Share the user's referral link — invite friends, both earn free live
+  /// minutes. Mirrors the profile's invite-a-friend section. Best-effort.
+  Future<void> _shareReferral() async {
     try {
-      final obj = _shareCardKey.currentContext?.findRenderObject();
-      if (obj is! RenderRepaintBoundary) return;
-      final image = await obj.toImage(pixelRatio: 3);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (bytes == null) return;
-      final data = bytes.buffer.asUint8List();
+      final uid = AuthService.currentUserId;
+      final code =
+          uid.isEmpty ? '' : (await ProfileApi.fetchById(uid))?.referralCode ?? '';
+      final link = code.isEmpty
+          ? 'https://www.swayco.fr'
+          : 'https://www.swayco.fr/?ref=$code';
       if (!mounted) return;
       final box = context.findRenderObject() as RenderBox?;
       await SharePlus.instance.share(
         ShareParams(
-          files: [
-            XFile.fromData(data, name: 'swayco-call.png', mimeType: 'image/png'),
-          ],
+          text: AppStrings.t('invite_share_text', args: {'link': link}),
+          subject: AppStrings.t('invite_friend'),
           sharePositionOrigin: box != null
               ? box.localToGlobal(Offset.zero) & box.size
               : null,
         ),
       );
     } catch (_) {
-      // Sheet dismissed / capture unavailable — nothing to do.
+      // Sheet dismissed / sharing unavailable — nothing to do.
     }
   }
 
@@ -1183,10 +1181,11 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                         ),
                       ),
-                      // Peer PDP, then the first name aligned on the same row
-                      // as the flag, a touch above centre.
+                      // Peer PDP + first name + call duration, grouped in the
+                      // upper area (the duration sits right under the name and
+                      // is the biggest figure on the card).
                       Align(
-                        alignment: const Alignment(0, -0.18),
+                        alignment: const Alignment(0, -0.42),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1222,41 +1221,20 @@ class _CallScreenState extends State<CallScreen> {
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      // Minutes spent — raised well above the logo.
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 170,
-                        child: Column(
-                          children: [
+                            const SizedBox(height: 26),
+                            // Call duration — enlarged, just under the name.
                             const Icon(Icons.schedule_rounded,
-                                color: SC.accent, size: 22),
-                            const SizedBox(height: 6),
+                                color: SC.accent, size: 30),
+                            const SizedBox(height: 8),
                             Text(
                               _formatCallDuration(dur),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                      // Brand icon — dead bottom-centre.
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 22,
-                        child: Center(
-                          child: Image.asset(
-                            'assets/icon-fg-transparent.png',
-                            height: 52,
-                            fit: BoxFit.contain,
-                          ),
                         ),
                       ),
                     ],
@@ -1274,36 +1252,49 @@ class _CallScreenState extends State<CallScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            // Share the card — bottom-right, also out of the capture. Cyan
-            // frosted-glass circle (same tinted-glass style as the live
-            // controls), keeping the accent colour + bounce.
+            // Invite friends → both earn free live minutes (referral link).
+            // Full-width cyan -> blue gradient CTA pinned to the bottom.
             Positioned(
+              left: 20,
               right: 20,
-              bottom: 24,
+              bottom: 28,
               child: Pressable(
                 bounce: true,
-                onTap: _shareSummary,
-                child: ClipOval(
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: SC.accent.withValues(alpha: 0.55),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.22),
-                        ),
+                onTap: _shareReferral,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: const LinearGradient(
+                      colors: [SC.accent, SC.meshBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SC.accent.withValues(alpha: 0.35),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
                       ),
-                      // Curved "forward/share" arrow: a horizontally mirrored
-                      // reply glyph so it points up to the right.
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Transform.flip(
-                          flipX: true,
-                          child: const Icon(Icons.reply_rounded,
-                              color: Colors.white, size: 24),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.group_add_rounded,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 10),
+                        Text(
+                          AppStrings.t('invite_bonus_share_cta'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
