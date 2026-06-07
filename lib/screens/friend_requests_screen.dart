@@ -16,6 +16,7 @@ import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -324,8 +325,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     // reactions. Built as a list so the 18px gaps fall only between cards.
     final sections = <Widget>[
       if (_requests.isNotEmpty)
-        GlassContainer(
-          borderRadius: BorderRadius.circular(24),
+        GlassPanel(
+          borderRadius: 24,
           padding: const EdgeInsets.all(6),
           child: Column(
             children: [
@@ -343,8 +344,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           ),
         ),
       if (_newFollowers.isNotEmpty)
-        GlassContainer(
-          borderRadius: BorderRadius.circular(24),
+        GlassPanel(
+          borderRadius: 24,
           padding: const EdgeInsets.all(6),
           child: Column(
             children: [
@@ -359,8 +360,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       // Likes received on my photos.
       if (_likers.isNotEmpty)
-        GlassContainer(
-          borderRadius: BorderRadius.circular(24),
+        GlassPanel(
+          borderRadius: 24,
           padding: const EdgeInsets.all(6),
           child: Column(
             children: [
@@ -370,8 +371,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           ),
         ),
       if (_reactions.isNotEmpty)
-        GlassContainer(
-          borderRadius: BorderRadius.circular(24),
+        GlassPanel(
+          borderRadius: 24,
           padding: const EdgeInsets.all(6),
           child: Column(
             children: [

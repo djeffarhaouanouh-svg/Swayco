@@ -29,6 +29,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -738,10 +739,12 @@ class _ThreadHeader extends StatelessWidget {
       // No frosted block behind the header any more — only the round glass
       // buttons keep their glass. The row sits transparently over the chat.
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
-      child: Padding(
-        // Slightly taller header (vertical 4 → 8); the round buttons + avatar
-        // grow with it, but the name text and wordmark keep their size.
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      child: GlassPanel(
+        // Frosted header bar (re-added per design): the round buttons sit on
+        // top of it. NOTE: that's glass-on-glass — flatten the buttons if it
+        // reads muddy.
+        borderRadius: 22,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
             GlassIconButton(
@@ -1724,8 +1727,8 @@ class _ComposerState extends State<_Composer> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: GlassContainer(
-                borderRadius: BorderRadius.circular(26),
+              child: GlassPanel(
+                borderRadius: 26,
                 padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
