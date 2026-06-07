@@ -5,8 +5,10 @@ import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
 import '../services/analytics.dart';
+import '../services/platform_glass.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
@@ -1867,70 +1869,92 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     // RenderObject is the actual button — used to anchor the emoji burst.
     return Builder(
       builder: (ctx) {
+        // The animated emoji / heart glyph (breath + tap-pop) — KEPT as-is.
+        final glyph = Center(
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 160),
+            style: TextStyle(
+              fontSize: widget.reacted ? 24 : 22,
+              color: Colors.white,
+              shadows: const [
+                Shadow(
+                  color: Color(0x66000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+                Shadow(
+                  color: Color(0x99000000),
+                  blurRadius: 2,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_breathe, _pop]),
+              builder: (context, child) => Transform.scale(
+                scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
+                child: child,
+              ),
+              // The heart is a real icon: white outline that fills red once
+              // tapped (reacted). The other emojis stay as glyphs.
+              child: widget.emoji == '❤️'
+                  ? Icon(
+                      widget.reacted ? Icons.favorite : Icons.favorite_border,
+                      size: widget.reacted ? 26 : 24,
+                      color: widget.reacted
+                          ? const Color(0xFFFF3B5C)
+                          : Colors.white,
+                    )
+                  : Text(widget.emoji),
+            ),
+          ),
+        );
+
+        // Native: REPLACE the dark circle with a real iOS-26 liquid-glass oval
+        // (no glass-on-glass). Web keeps the previous translucent circle.
+        final Widget surface = useShaderGlass
+            ? lg.GlassContainer(
+                useOwnLayer: true,
+                clipBehavior: Clip.antiAlias,
+                width: 48,
+                height: 48,
+                shape: const lg.LiquidOval(),
+                settings: lg.LiquidGlassSettings(
+                  blur: 6,
+                  thickness: 12,
+                  glassColor: widget.reacted
+                      ? const Color(0x3322D3EE)
+                      : const Color(0x14FFFFFF),
+                  refractiveIndex: 1.3,
+                  glowIntensity: widget.reacted ? 1.0 : 0.5,
+                ),
+                child: glyph,
+              )
+            : AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: widget.reacted
+                      ? Colors.white.withValues(alpha: 0.18)
+                      : Colors.black.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(
+                      alpha: widget.reacted ? 0.85 : 0.20,
+                    ),
+                    width: widget.reacted ? 2 : 1,
+                  ),
+                ),
+                child: glyph,
+              );
+
+        // Bounce on click — KEPT.
         return Pressable(
           behavior: HitTestBehavior.opaque,
           bounce: true,
           onTap: widget.onSend == null ? null : () => _handleTap(ctx),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: widget.reacted
-                  ? Colors.white.withValues(alpha: 0.18)
-                  : Colors.black.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(
-                  alpha: widget.reacted ? 0.85 : 0.20,
-                ),
-                width: widget.reacted ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 160),
-                style: TextStyle(
-                  fontSize: widget.reacted ? 24 : 22,
-                  color: Colors.white,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x66000000),
-                      blurRadius: 6,
-                      offset: Offset(0, 3),
-                    ),
-                    Shadow(
-                      color: Color(0x99000000),
-                      blurRadius: 2,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-                ),
-                // Breath + tap-pop scale ONLY the emoji glyph, not the
-                // circular button or its background.
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([_breathe, _pop]),
-                  builder: (context, child) => Transform.scale(
-                    scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
-                    child: child,
-                  ),
-                  // The heart is a real icon: white outline that fills red
-                  // once tapped (reacted). The other emojis stay as glyphs.
-                  child: widget.emoji == '❤️'
-                      ? Icon(
-                          widget.reacted
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          size: widget.reacted ? 26 : 24,
-                          color: widget.reacted
-                              ? const Color(0xFFFF3B5C)
-                              : Colors.white,
-                        )
-                      : Text(widget.emoji),
-                ),
-              ),
-            ),
-          ),
+          child: surface,
         );
       },
     );
