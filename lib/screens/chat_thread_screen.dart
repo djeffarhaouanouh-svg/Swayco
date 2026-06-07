@@ -28,8 +28,8 @@ import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
-import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -751,28 +751,16 @@ class _ThreadHeader extends StatelessWidget {
       // No frosted block behind the header any more — only the round glass
       // buttons keep their glass. The row sits transparently over the chat.
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
-      child: GlassPanel(
-        // Frosted header bar (re-added per design): the round buttons sit on
-        // top of it. NOTE: that's glass-on-glass — flatten the buttons if it
-        // reads muddy.
-        borderRadius: 22,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Padding(
+        // Transparent header — only the round glass buttons carry the glass.
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         child: Row(
           children: [
-            // Flat icon (no glass circle) — the header bar is already glass,
-            // so a glass button here would be glass-on-glass. Bounce kept.
-            Pressable(
-              bounce: true,
+            GlassIconButton(
+              icon: Icons.arrow_back_rounded,
+              size: 40,
+              iconSize: 20,
               onTap: () => Navigator.of(context).maybePop(),
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(
-                  Icons.arrow_back_rounded,
-                  color: SC.textPrimary,
-                  size: 22,
-                ),
-              ),
             ),
             const SizedBox(width: 8),
             // PDP bubble + online dot — tap opens the peer's profile.
@@ -884,20 +872,11 @@ class _ThreadHeader extends StatelessWidget {
             // Greyed when the peer has blocked me (the call can't connect).
             Opacity(
               opacity: blockedByPeer ? 0.4 : 1.0,
-              // Flat icon (no glass circle) — avoid glass-on-glass on the
-              // glass header bar. Bounce kept.
-              child: Pressable(
-                bounce: true,
+              child: GlassIconButton(
+                icon: Icons.phone_rounded,
+                size: 40,
+                iconSize: 20,
                 onTap: onCall,
-                child: const SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Icon(
-                    Icons.phone_rounded,
-                    color: SC.textPrimary,
-                    size: 22,
-                  ),
-                ),
               ),
             ),
           ],
