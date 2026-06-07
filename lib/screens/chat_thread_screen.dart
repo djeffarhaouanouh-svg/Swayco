@@ -596,7 +596,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                         begin: Alignment.topCenter,
                                         end: Alignment.bottomCenter,
                                         colors: [
-                                          Color(0xB3000000),
+                                          Color(0x99000000),
                                           Color(0x00000000),
                                         ],
                                       ),
@@ -621,7 +621,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                         end: Alignment.bottomCenter,
                                         colors: [
                                           Color(0x00000000),
-                                          Color(0xFF000000),
+                                          Color(0x99000000),
                                         ],
                                       ),
                                     ),
