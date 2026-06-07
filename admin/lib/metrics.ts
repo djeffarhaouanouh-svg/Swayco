@@ -908,6 +908,98 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
   ];
 }
 
+// ─── engagement par surface ─────────────────────────────────────────────────
+
+export type SurfaceBreakdown = {
+  /** Total events of this kind in the window. */
+  total: number;
+  /** Per-source counts, sorted desc. */
+  bySource: Pair[];
+};
+
+export type SurfaceEngagement = {
+  windowDays: number;
+  messages: SurfaceBreakdown;
+  messagesByType: SurfaceBreakdown;
+  friendRequests: SurfaceBreakdown;
+  likes: SurfaceBreakdown;
+  screenViews: SurfaceBreakdown;
+};
+
+/** Count rows by a string field inside `props`, sorted desc. */
+function countByProp(rows: Row[], field: string): Pair[] {
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    const p = (r.props as Record<string, unknown> | null) ?? {};
+    const v = p[field];
+    const key = typeof v === "string" && v ? v : "inconnu";
+    m.set(key, (m.get(key) ?? 0) + 1);
+  }
+  return [...m.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
+ * WHERE engagement happens. Reads the surface-tagged events the app now
+ * emits — `message_sent`, `friend_request_sent`, `like_sent`,
+ * `screen_view` — and breaks each down by its `source` (or `screen` /
+ * `type`) prop. These events ship from the app's action sites (see
+ * lib/screens/*), so the numbers only start the day a build carrying the
+ * instrumentation is live and used — older history has no surface tag.
+ */
+export async function getSurfaceEngagement(
+  days = 30,
+): Promise<SurfaceEngagement> {
+  const [msgRows, frRows, likeRows, svRows] = await Promise.all([
+    safeRows("analytics_events", "props", (q) =>
+      q
+        .eq("event", "message_sent")
+        .gte("created_at", sinceISO(days))
+        .limit(200000),
+    ),
+    safeRows("analytics_events", "props", (q) =>
+      q
+        .eq("event", "friend_request_sent")
+        .gte("created_at", sinceISO(days))
+        .limit(200000),
+    ),
+    safeRows("analytics_events", "props", (q) =>
+      q.eq("event", "like_sent").gte("created_at", sinceISO(days)).limit(200000),
+    ),
+    safeRows("analytics_events", "props", (q) =>
+      q
+        .eq("event", "screen_view")
+        .gte("created_at", sinceISO(days))
+        .limit(200000),
+    ),
+  ]);
+
+  return {
+    windowDays: days,
+    messages: {
+      total: msgRows.length,
+      bySource: countByProp(msgRows, "source"),
+    },
+    messagesByType: {
+      total: msgRows.length,
+      bySource: countByProp(msgRows, "type"),
+    },
+    friendRequests: {
+      total: frRows.length,
+      bySource: countByProp(frRows, "source"),
+    },
+    likes: {
+      total: likeRows.length,
+      bySource: countByProp(likeRows, "source"),
+    },
+    screenViews: {
+      total: svRows.length,
+      bySource: countByProp(svRows, "screen"),
+    },
+  };
+}
+
 // ─── monetisation ─────────────────────────────────────────────────────────
 
 export type CostBreakdown = {

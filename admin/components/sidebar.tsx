@@ -8,6 +8,7 @@ import {
   LogOut,
   Radio,
   Repeat,
+  Split,
   Table2,
   Users,
   Wallet,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/tableau", label: "Tableau global", icon: Table2 },
+  { href: "/surfaces", label: "Par surface", icon: Split },
   { href: "/live", label: "Live", icon: Radio },
   { href: "/traduction", label: "Traduction", icon: Languages },
   { href: "/social", label: "Social", icon: Users },
