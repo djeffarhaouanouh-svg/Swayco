@@ -998,10 +998,10 @@ class _DiscoverHeader extends StatelessWidget {
                             )
                           : null,
                       padding: EdgeInsets.symmetric(
-                        horizontal: expanded ? 16 : 12,
+                        horizontal: expanded ? 16 : 10,
                         // When expanded the TextField carries the height itself
                         // (contentPadding below), so keep the outer pad small.
-                        vertical: expanded ? 6 : 12,
+                        vertical: expanded ? 6 : 10,
                       ),
                       decoration: BoxDecoration(
                         color: SC.glassStrong,
@@ -1013,9 +1013,9 @@ class _DiscoverHeader extends StatelessWidget {
                             ? MainAxisSize.max
                             : MainAxisSize.min,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.search,
-                            size: expanded ? 18 : 20,
+                            size: 18,
                             color: SC.textMuted,
                           ),
                           if (expanded) const SizedBox(width: 6),
