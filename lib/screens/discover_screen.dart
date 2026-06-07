@@ -978,7 +978,10 @@ class _DiscoverHeader extends StatelessWidget {
                   // other page titles), since hiding it removes the need to
                   // shrink it for long localized titles.
                   if (!expanded)
-                    Text(AppStrings.t('discover_title'), style: SCText.h1),
+                    _TypewriterTitle(
+                      text: AppStrings.t('discover_title'),
+                      style: SCText.h1,
+                    ),
                   const Spacer(),
                   const MissionsRingCompact(),
                   const SizedBox(width: 10),
@@ -1123,6 +1126,58 @@ class _BottomHugClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(_BottomHugClipper oldClipper) =>
       oldClipper.radius != radius;
+}
+
+/// The "Discover" title, revealed one letter at a time. Only mounted while the
+/// search is collapsed, so it re-types every time the search closes and the
+/// title reappears — same typewriter feel as the chat composer placeholder.
+class _TypewriterTitle extends StatefulWidget {
+  const _TypewriterTitle({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  State<_TypewriterTitle> createState() => _TypewriterTitleState();
+}
+
+class _TypewriterTitleState extends State<_TypewriterTitle> {
+  String _shown = '';
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _animate();
+  }
+
+  /// Reveal [widget.text] one char at a time on a 75 ms tick — matches the
+  /// chat composer's placeholder reveal.
+  void _animate() {
+    _timer?.cancel();
+    final full = widget.text;
+    _shown = '';
+    var shown = 0;
+    _timer = Timer.periodic(const Duration(milliseconds: 75), (t) {
+      if (!mounted || shown >= full.length) {
+        t.cancel();
+        return;
+      }
+      shown++;
+      setState(() => _shown = full.substring(0, shown));
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(_shown, style: widget.style, maxLines: 1);
+  }
 }
 
 class _SearchResultsPanel extends StatelessWidget {
