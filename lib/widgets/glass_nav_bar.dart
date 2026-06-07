@@ -8,6 +8,16 @@ import '../services/platform_glass.dart';
 import '../theme/swayco_theme.dart';
 import 'spring_press.dart';
 
+/// WhatsApp-style lens magnification for the nav icon at index [i], given the
+/// continuous pill position [frac]. The icon swells as the pill slides PAST it
+/// and returns to its normal size once the pill settles ON it: a parabolic
+/// bump that is 1.0 at distance 0 (settled) and 1.0 at distance >= 1 (far),
+/// peaking at ~`1 + amp` mid-transit. Tune [amp].
+double _navLensScale(int i, double frac, {double amp = 0.45}) {
+  final d = (i - frac).abs().clamp(0.0, 1.0);
+  return 1.0 + amp * 4.0 * d * (1.0 - d);
+}
+
 /// Full-width glass-morphism bottom-nav, flush against the screen bottom,
 /// with a sliding pill that animates between selected tabs. Rendered by
 /// [RootShell] and re-used by screens pushed on top of it (e.g. a peer's
@@ -95,7 +105,11 @@ class GlassNavBar extends StatelessWidget {
     // The pill + items row — identical in every rendering path.
     final inner = SizedBox(
       height: height,
-      child: LayoutBuilder(
+      child: Padding(
+        // Pull the icons in from the screen edges so they sit a bit tighter;
+        // the glass bar itself stays full-width. Tune the horizontal inset.
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        child: LayoutBuilder(
             builder: (context, constraints) {
               // Each tab gets an equal slice of the full width; the pill
               // and the icons share the same slot geometry so they line up.
@@ -153,11 +167,11 @@ class GlassNavBar extends StatelessWidget {
                             child: _NavItem(
                               data: items[i],
                               selected: selected == i,
-                              // WhatsApp lens: grows as the pill nears it
-                              // (1.0 far → 1.45 right under it). Tune the 0.45.
-                              magnify: 1.0 +
-                                  0.45 *
-                                      (1.0 - (i - frac).abs()).clamp(0.0, 1.0),
+                              // WhatsApp lens: the icon swells as the pill
+                              // slides PAST it, then settles back to normal
+                              // size once the pill arrives ON it (parabolic
+                              // bump — see _navLensScale).
+                              magnify: _navLensScale(i, frac),
                               onTap: () => onSelect(i),
                             ),
                           ),
@@ -168,7 +182,8 @@ class GlassNavBar extends StatelessWidget {
               );
             },
           ),
-        );
+        ),
+      );
 
     // Native flat bar → real shader Liquid Glass (single static surface, no
     // platform view). The Discover "hug" state keeps the BackdropFilter path
