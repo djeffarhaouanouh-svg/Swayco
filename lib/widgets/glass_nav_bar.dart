@@ -102,7 +102,10 @@ class GlassNavBar extends StatelessWidget {
               final slot = constraints.maxWidth / items.length;
               // Continuous pill position when a fraction is supplied (glides
               // with the swipe); otherwise the integer slot.
-              final pillLeft = slot * (selectedFraction ?? selected.toDouble());
+              // Continuous pill position — drives the pill AND the proximity
+              // "lens" that magnifies the icon it nears.
+              final frac = selectedFraction ?? selected.toDouble();
+              final pillLeft = slot * frac;
               final pill = Center(
                 child: Container(
                   width: slot - 24,
@@ -150,6 +153,11 @@ class GlassNavBar extends StatelessWidget {
                             child: _NavItem(
                               data: items[i],
                               selected: selected == i,
+                              // WhatsApp lens: grows as the pill nears it
+                              // (1.0 far → 1.45 right under it). Tune the 0.45.
+                              magnify: 1.0 +
+                                  0.45 *
+                                      (1.0 - (i - frac).abs()).clamp(0.0, 1.0),
                               onTap: () => onSelect(i),
                             ),
                           ),
@@ -266,11 +274,15 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.data,
     required this.selected,
+    required this.magnify,
     required this.onTap,
   });
 
   final _NavItemData data;
   final bool selected;
+
+  /// Proximity scale from the sliding pill (1.0 far → larger right under it).
+  final double magnify;
   final VoidCallback onTap;
 
   @override
@@ -280,12 +292,10 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       child: Center(
           child: _badged(
-            AnimatedScale(
-              // Small bounce on selection — easeOutBack overshoots past 1.0
-              // then settles, so the active icon "pops".
-              scale: selected ? 1.18 : 1.0,
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutBack,
+            Transform.scale(
+              // WhatsApp-style lens magnification driven by the pill position;
+              // it flows from one icon to the next as the pill slides.
+              scale: magnify,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Icon(
