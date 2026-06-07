@@ -1255,14 +1255,25 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ),
             ),
-            // Close — kept OUT of the captured card.
+            // Close — bottom-left, mirroring the share button (kept OUT of the
+            // captured card).
             Positioned(
-              top: 4,
-              left: 4,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 26),
-                onPressed: () => Navigator.of(context).pop(),
+              left: 20,
+              bottom: 24,
+              child: Material(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: const CircleBorder(),
+                elevation: 3,
+                shadowColor: Colors.black54,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Icon(Icons.close_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                ),
               ),
             ),
             // Share the card — bottom-right, also out of the capture.
