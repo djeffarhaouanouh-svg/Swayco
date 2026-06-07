@@ -983,7 +983,13 @@ class _DiscoverHeader extends StatelessWidget {
                       style: SCText.h1,
                     ),
                   const Spacer(),
-                  const MissionsRingCompact(),
+                  // Collapsed: "X/6" glued left of the ring with a breathing
+                  // cyan halo. Expanded: just the ring, so the search field has
+                  // room and the bar doesn't overflow.
+                  if (expanded)
+                    const MissionsRingCompact()
+                  else
+                    const MissionsScoreRing(),
                   const SizedBox(width: 10),
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width. The whole pill is the

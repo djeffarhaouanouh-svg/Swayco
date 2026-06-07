@@ -20,18 +20,42 @@ class _MissionDef {
 }
 
 const List<_MissionDef> _missions = [
-  _MissionDef('friend_request', 'mission_friend_request',
-      'mission_friend_request_how', Icons.person_add_alt_1_rounded),
-  _MissionDef('post_photo', 'mission_post_photo', 'mission_post_photo_how',
-      Icons.add_a_photo_rounded),
-  _MissionDef('like_someone', 'mission_like_someone', 'mission_like_someone_how',
-      Icons.favorite_rounded),
-  _MissionDef('first_message', 'mission_first_message',
-      'mission_first_message_how', Icons.send_rounded),
-  _MissionDef('add_interests', 'mission_add_interests',
-      'mission_add_interests_how', Icons.interests_rounded),
-  _MissionDef('receive_like', 'mission_receive_like', 'mission_receive_like_how',
-      Icons.recommend_rounded),
+  _MissionDef(
+    'friend_request',
+    'mission_friend_request',
+    'mission_friend_request_how',
+    Icons.person_add_alt_1_rounded,
+  ),
+  _MissionDef(
+    'post_photo',
+    'mission_post_photo',
+    'mission_post_photo_how',
+    Icons.add_a_photo_rounded,
+  ),
+  _MissionDef(
+    'like_someone',
+    'mission_like_someone',
+    'mission_like_someone_how',
+    Icons.favorite_rounded,
+  ),
+  _MissionDef(
+    'first_message',
+    'mission_first_message',
+    'mission_first_message_how',
+    Icons.send_rounded,
+  ),
+  _MissionDef(
+    'add_interests',
+    'mission_add_interests',
+    'mission_add_interests_how',
+    Icons.interests_rounded,
+  ),
+  _MissionDef(
+    'receive_like',
+    'mission_receive_like',
+    'mission_receive_like_how',
+    Icons.recommend_rounded,
+  ),
 ];
 
 /// The mission def for a stable [key] (or null).
@@ -516,26 +540,83 @@ class MissionsRingCompact extends StatelessWidget {
   }
 }
 
-/// The "X/6" missions score, shown on the LEFT of the Discover header.
-/// Tapping it opens the missions sheet (same as the ring on the right).
-class MissionsScoreLabel extends StatelessWidget {
-  const MissionsScoreLabel({super.key});
+/// The "X/6" missions score glued to the LEFT of the compact ring, with a
+/// breathing cyan halo around BOTH so the user notices it. Tapping anywhere
+/// opens the missions sheet (same as the ring alone).
+class MissionsScoreRing extends StatefulWidget {
+  const MissionsScoreRing({super.key});
+
+  @override
+  State<MissionsScoreRing> createState() => _MissionsScoreRingState();
+}
+
+class _MissionsScoreRingState extends State<MissionsScoreRing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _glow = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => showMissionsSheet(context),
-      child: ValueListenableBuilder<MissionsState>(
-        valueListenable: MissionsService.instance.state,
-        builder: (context, st, _) => Text(
-          '${st.completed}/$missionCount',
-          style: SCText.meta.copyWith(
-            color: SC.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+      child: AnimatedBuilder(
+        animation: _glow,
+        builder: (context, _) {
+          final t = Curves.easeInOut.transform(_glow.value);
+          final blur = 5 + 11 * t; // 5 → 16
+          final alpha = 0.30 + 0.55 * t; // 0.30 → 0.85
+          final glow = SC.accent.withValues(alpha: alpha);
+          final glowSoft = SC.accent.withValues(alpha: alpha * 0.6);
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // X/6 with a breathing cyan halo (text shadows).
+              ValueListenableBuilder<MissionsState>(
+                valueListenable: MissionsService.instance.state,
+                builder: (context, st, _) => Text(
+                  '${st.completed}/$missionCount',
+                  style: SCText.meta.copyWith(
+                    color: SC.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    shadows: [
+                      Shadow(color: glow, blurRadius: blur),
+                      Shadow(color: glowSoft, blurRadius: blur * 1.7),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              // Ring with the same breathing cyan halo behind it.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(color: glow, blurRadius: blur, spreadRadius: 0.5),
+                    BoxShadow(color: glowSoft, blurRadius: blur * 1.7),
+                  ],
+                ),
+                child: const MissionsRing(
+                  width: 40,
+                  height: 30,
+                  stroke: 4.5,
+                  dotRadius: 2.6,
+                  showCount: false,
+                  flyTarget: true,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -592,19 +673,20 @@ class MissionCelebrationOverlay extends StatefulWidget {
 
 class _MissionCelebrationOverlayState extends State<MissionCelebrationOverlay>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1150),
-  )..addStatusListener((s) {
-    if (s == AnimationStatus.completed) {
-      if (_targetKey != null) {
-        // Pulse the ring (then reset so the next completion re-fires).
-        MissionFx.arrived.value = _targetKey;
-        MissionFx.arrived.value = null;
-      }
-      MissionsService.instance.consumeJustCompleted();
-    }
-  });
+  late final AnimationController _c =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1150),
+      )..addStatusListener((s) {
+        if (s == AnimationStatus.completed) {
+          if (_targetKey != null) {
+            // Pulse the ring (then reset so the next completion re-fires).
+            MissionFx.arrived.value = _targetKey;
+            MissionFx.arrived.value = null;
+          }
+          MissionsService.instance.consumeJustCompleted();
+        }
+      });
 
   Offset? _from; // reward source centre (null → streak)
   Offset? _to; // nearest jalon
@@ -805,7 +887,10 @@ class _MissionToast extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: SCText.name.copyWith(color: SC.textPrimary, fontSize: 14),
+                style: SCText.name.copyWith(
+                  color: SC.textPrimary,
+                  fontSize: 14,
+                ),
               ),
             ),
             const SizedBox(width: 10),
