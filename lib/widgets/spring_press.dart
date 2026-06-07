@@ -17,6 +17,7 @@ class SpringPress extends StatefulWidget {
     required this.child,
     this.onTap,
     this.pressedScale = 0.85,
+    this.popScale,
     this.haptic = true,
     this.behavior = HitTestBehavior.opaque,
   });
@@ -26,6 +27,12 @@ class SpringPress extends StatefulWidget {
 
   /// How far the child compresses while held (1.0 = no compression).
   final double pressedScale;
+
+  /// When set (> 1.0), the release plays a MARKED pop: the child grows past
+  /// full size to this scale, then spring-settles back to 1.0 — a bigger, more
+  /// visible bounce (like the nav bar's selection pop). Null → the plain
+  /// compress-then-small-overshoot bounce.
+  final double? popScale;
   final bool haptic;
   final HitTestBehavior behavior;
 
@@ -66,7 +73,20 @@ class _SpringPressState extends State<SpringPress>
 
   void _up(TapUpDetails _) {
     if (widget.haptic) HapticFeedback.lightImpact();
-    _springBack();
+    final pop = widget.popScale;
+    if (pop != null && pop > 1.0) {
+      // Marked pop: grow past full size, then let the spring carry it home —
+      // a clearly visible "claque + rebond" rather than a subtle overshoot.
+      _c
+          .animateTo(pop,
+              duration: const Duration(milliseconds: 130),
+              curve: Curves.easeOut)
+          .whenComplete(() {
+        if (mounted) _springBack();
+      });
+    } else {
+      _springBack();
+    }
   }
 
   @override

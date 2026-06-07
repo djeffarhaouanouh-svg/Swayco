@@ -811,6 +811,8 @@ class _ThreadHeader extends StatelessWidget {
               icon: Icons.arrow_back_rounded,
               size: 40,
               iconSize: 20,
+              // Bigger, marked grow-then-settle pop on tap (like the nav bar).
+              popScale: 1.25,
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 8),
@@ -927,6 +929,8 @@ class _ThreadHeader extends StatelessWidget {
                 icon: Icons.phone_rounded,
                 size: 40,
                 iconSize: 20,
+                // Marked pop on tap (matches the back button / nav bar).
+                popScale: 1.25,
                 onTap: onCall,
               ),
             ),

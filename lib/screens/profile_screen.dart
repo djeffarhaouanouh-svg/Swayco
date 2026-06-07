@@ -3563,6 +3563,8 @@ class _GhostIconButton extends StatelessWidget {
         onTap: onTap,
         size: 44,
         iconSize: 21,
+        // Bigger, marked grow-then-settle pop on tap (like the nav bar).
+        popScale: 1.25,
       ),
     );
   }

@@ -16,6 +16,7 @@ class Pressable extends StatefulWidget {
     this.scale = 0.93,
     this.haptic = true,
     this.bounce = false,
+    this.popScale,
     this.behavior = HitTestBehavior.opaque,
   });
 
@@ -31,6 +32,10 @@ class Pressable extends StatefulWidget {
   /// (compress then overshoot) — the same feel as the nav bar. When false, a
   /// plain ease-out squish.
   final bool bounce;
+
+  /// Forwarded to [SpringPress.popScale] (bounce path only): when > 1.0 the
+  /// release plays a bigger, marked grow-then-settle pop.
+  final double? popScale;
   final HitTestBehavior behavior;
 
   @override
@@ -54,6 +59,7 @@ class _PressableState extends State<Pressable> {
       return SpringPress(
         onTap: widget.onTap,
         pressedScale: widget.scale,
+        popScale: widget.popScale,
         haptic: widget.haptic,
         behavior: widget.behavior,
         child: widget.child,

@@ -54,6 +54,7 @@ class GlassIconButton extends StatelessWidget {
     this.size = 40,
     this.iconSize = 20,
     this.iconColor,
+    this.popScale,
   });
 
   final IconData icon;
@@ -62,11 +63,16 @@ class GlassIconButton extends StatelessWidget {
   final double iconSize;
   final Color? iconColor;
 
+  /// When > 1.0, the tap plays a bigger, marked grow-then-settle pop (forwarded
+  /// to [Pressable.popScale]). Null → the default subtle bounce.
+  final double? popScale;
+
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
       bounce: true,
+      popScale: popScale,
       child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
