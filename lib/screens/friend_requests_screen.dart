@@ -674,9 +674,17 @@ class _LikeRow extends StatelessWidget {
 /// jumps only the FIRST time it's seen (not on every tab revisit).
 final Set<String> _poppedEmojiIds = <String>{};
 
-/// An emoji that, the first time it's seen, does a little dopamine "jump":
-/// springs up and scales with an elastic settle. Subsequent appearances render
-/// statically (the jump is one-shot per id, per session).
+/// One segment of the emoji's damped left-right shake (radians).
+TweenSequenceItem<double> _wiggle(double begin, double end, double weight) =>
+    TweenSequenceItem(
+      tween: Tween(begin: begin, end: end)
+          .chain(CurveTween(curve: Curves.easeInOut)),
+      weight: weight,
+    );
+
+/// An emoji that, the first time it's seen, does a little dopamine "wiggle":
+/// a quick pop + a damped left-right shake (it jiggles, not just hops up).
+/// Subsequent appearances render statically (one-shot per id, per session).
 class _PopInEmoji extends StatefulWidget {
   const _PopInEmoji({
     required this.id,
@@ -696,33 +704,32 @@ class _PopInEmojiState extends State<_PopInEmoji>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 720),
-    // Settled by default; only the very first sighting plays the jump.
+    duration: const Duration(milliseconds: 820),
+    // Settled by default; only the very first sighting plays the wiggle.
     value: 1.0,
   );
+  // A small pop so it has some life…
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.35)
-          .chain(CurveTween(curve: Curves.easeOutCubic)),
-      weight: 28,
+      tween: Tween(begin: 1.0, end: 1.18)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 18,
     ),
     TweenSequenceItem(
-      tween: Tween(begin: 1.35, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
-      weight: 72,
+      tween: Tween(begin: 1.18, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 82,
     ),
   ]).animate(_c);
-  late final Animation<double> _lift = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween(begin: 0.0, end: -14.0)
-          .chain(CurveTween(curve: Curves.easeOutCubic)),
-      weight: 28,
-    ),
-    TweenSequenceItem(
-      tween: Tween(begin: -14.0, end: 0.0)
-          .chain(CurveTween(curve: Curves.bounceOut)),
-      weight: 72,
-    ),
+  // …and a damped left-right shake (radians) — the "remue".
+  late final Animation<double> _rot = TweenSequence<double>([
+    _wiggle(0.0, 0.24, 12),
+    _wiggle(0.24, -0.21, 16),
+    _wiggle(-0.21, 0.15, 16),
+    _wiggle(0.15, -0.11, 14),
+    _wiggle(-0.11, 0.06, 14),
+    _wiggle(0.06, -0.03, 12),
+    _wiggle(-0.03, 0.0, 16),
   ]).animate(_c);
 
   @override
@@ -744,8 +751,8 @@ class _PopInEmojiState extends State<_PopInEmoji>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _c,
-      builder: (context, child) => Transform.translate(
-        offset: Offset(0, _lift.value),
+      builder: (context, child) => Transform.rotate(
+        angle: _rot.value,
         child: Transform.scale(scale: _scale.value, child: child),
       ),
       child: Text(widget.emoji, style: TextStyle(fontSize: widget.fontSize)),
