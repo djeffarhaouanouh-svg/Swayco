@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
+    show LiquidGlassWidgets;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -144,7 +146,23 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('Analytics start failed: $e');
     }
-    runApp(const LiveKitTranslateApp());
+    // Pre-warm the Liquid Glass shaders so the first glass surface doesn't
+    // flash white; skips Impeller on web automatically. Best-effort.
+    try {
+      await LiquidGlassWidgets.initialize().timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('LiquidGlass init slow/failed: $e');
+    }
+    runApp(
+      // respectSystemAccessibility honours iOS "Reduce Transparency / Motion"
+      // (glass degrades to a solid surface); adaptiveQuality keeps the shader
+      // affordable on Android / web (caps quality on slow hardware).
+      LiquidGlassWidgets.wrap(
+        child: const LiveKitTranslateApp(),
+        respectSystemAccessibility: true,
+        adaptiveQuality: true,
+      ),
+    );
   }, (e, s) {
     debugPrint('Uncaught zone error: $e\n$s');
   });

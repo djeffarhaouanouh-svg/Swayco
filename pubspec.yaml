@@ -87,6 +87,16 @@ dependencies:
   # web support).
   purchases_flutter: ^10.2.2
 
+  # Liquid Glass (iOS 26) on the Messages screen.
+  # - cupertino_native_plus: native platform-view glass for the STATIC
+  #   "Invite to a call" button (CNButton.glass) on iOS 26+. iOS/macOS only —
+  #   every use is guarded behind PlatformVersion.shouldUseNativeGlass, with a
+  #   fallback widget so Android / iOS<26 never instantiate it.
+  # - liquid_glass_widgets: cross-platform shader glass (incl. web) for the
+  #   nav bar and the chat-list card.
+  cupertino_native_plus: ^0.0.11
+  liquid_glass_widgets: ^0.15.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

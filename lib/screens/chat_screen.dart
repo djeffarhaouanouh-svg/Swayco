@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:cupertino_native_plus/cupertino_native_plus.dart'
+    show CNButton, CNIcon, CNButtonConfig, CNButtonStyle;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -14,6 +16,7 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
+import '../services/platform_glass.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
@@ -997,6 +1000,30 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // iOS 26+: real NATIVE Liquid Glass button (platform view). It's a static
+    // element (NOT inside a ListView.builder), so a platform view is safe.
+    // Older iOS / Android / web fall back to the app's glass design below.
+    if (useNativeGlass) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: SizedBox(
+          width: double.infinity,
+          child: CNButton(
+            label: creatingInvite
+                ? AppStrings.t('invite_call_creating')
+                : AppStrings.t('invite_to_call'),
+            icon: const CNIcon.symbol('video.fill'),
+            onPressed: onInviteToCall,
+            config: const CNButtonConfig(
+              style: CNButtonStyle.prominentGlass,
+              minHeight: 56,
+              shrinkWrap: false,
+              borderRadius: 22,
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: GlassContainer(
