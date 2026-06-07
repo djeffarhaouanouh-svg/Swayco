@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
 import '../services/app_strings.dart';
@@ -18,12 +19,20 @@ double _navLensScale(int i, double frac, {double amp = 0.45}) {
   return 1.0 + amp * 4.0 * d * (1.0 - d);
 }
 
+/// Pill-centred lens magnification: the icon directly under the dragging pill
+/// is the biggest (distance 0 → `1 + amp`), tapering back to 1.0 a slot away.
+/// Used WHILE dragging the pill, where the icon under the finger should bulge.
+double _navPeakLens(int i, double frac, {double amp = 0.45}) {
+  final d = (i - frac).abs().clamp(0.0, 1.0);
+  return 1.0 + amp * (1.0 - d);
+}
+
 /// Full-width glass-morphism bottom-nav, flush against the screen bottom,
 /// with a sliding pill that animates between selected tabs. Rendered by
 /// [RootShell] and re-used by screens pushed on top of it (e.g. a peer's
 /// profile) so the bar stays visible. The bar pads its own bottom by the
 /// system safe-area inset, so callers anchor it at `bottom: 0`.
-class GlassNavBar extends StatelessWidget {
+class GlassNavBar extends StatefulWidget {
   const GlassNavBar({
     super.key,
     required this.selected,
@@ -70,7 +79,101 @@ class GlassNavBar extends StatelessWidget {
   static const double hugRadius = 28;
 
   @override
+  State<GlassNavBar> createState() => _GlassNavBarState();
+}
+
+class _GlassNavBarState extends State<GlassNavBar>
+    with SingleTickerProviderStateMixin {
+  // ── Drag-to-switch (iOS-26 liquid glass): press & hold the bar, the pill
+  // grows, then slide left/right to pick a tab; release snaps to the nearest.
+  double? _dragFrac; // pill position override while dragging / settling
+  bool _dragging = false; // finger held → pill grown + pill-centred lens
+  double _slot = 1; // slot width, cached from the LayoutBuilder each build
+  int _count = 1; // number of tabs
+  int _lastHovered = -1; // last tab the pill crossed (for a tick of haptic)
+
+  // Snap-back animation played on release: glides the pill from where the
+  // finger let go to the nearest tab, then hands control back to the pager.
+  late final AnimationController _settle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  double _settleFrom = 0;
+  double _settleTo = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _settle
+      ..addListener(() {
+        setState(() {
+          _dragFrac = lerpDouble(
+            _settleFrom,
+            _settleTo,
+            Curves.easeOutCubic.transform(_settle.value),
+          );
+        });
+      })
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) {
+          setState(() => _dragFrac = null);
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _settle.dispose();
+    super.dispose();
+  }
+
+  // Map a local x (within the icon row) to a continuous tab position so the
+  // pill centres under the finger.
+  double _fracFromX(double dx) =>
+      (dx / _slot - 0.5).clamp(0.0, (_count - 1).toDouble());
+
+  void _onDragStart(double dx) {
+    _settle.stop();
+    final frac = _fracFromX(dx);
+    _lastHovered = frac.round();
+    HapticFeedback.selectionClick();
+    setState(() {
+      _dragging = true;
+      _dragFrac = frac;
+    });
+  }
+
+  void _onDragUpdate(double dx) {
+    final frac = _fracFromX(dx);
+    // A soft tick each time the pill crosses onto a new tab — iOS-style.
+    final hovered = frac.round();
+    if (hovered != _lastHovered) {
+      _lastHovered = hovered;
+      HapticFeedback.selectionClick();
+    }
+    setState(() => _dragFrac = frac);
+  }
+
+  void _onDragEnd() {
+    final frac = _dragFrac ?? widget.selected.toDouble();
+    final nearest = frac.round().clamp(0, _count - 1);
+    widget.onSelect(nearest);
+    setState(() => _dragging = false); // pill shrinks + lens off
+    _settleFrom = frac;
+    _settleTo = nearest.toDouble();
+    _settle.forward(from: 0);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
+    final selectedFraction = widget.selectedFraction;
+    final unreadChat = widget.unreadChat;
+    final unreadRequests = widget.unreadRequests;
+    final onSelect = widget.onSelect;
+    final hugTopCorners = widget.hugTopCorners;
+    const height = GlassNavBar.height;
+    const hugRadius = GlassNavBar.hugRadius;
     final items = <_NavItemData>[
       _NavItemData(
         icon: Icons.chat_bubble_outline,
@@ -111,74 +214,95 @@ class GlassNavBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 22),
         child: LayoutBuilder(
             builder: (context, constraints) {
-              // Each tab gets an equal slice of the full width; the pill
-              // and the icons share the same slot geometry so they line up.
+              // Each tab gets an equal slice of the full width; the pill and
+              // the icons share the same slot geometry so they line up. Cache
+              // slot/count so the drag gesture can map x → tab position.
               final slot = constraints.maxWidth / items.length;
-              // Continuous pill position when a fraction is supplied (glides
-              // with the swipe); otherwise the integer slot.
-              // Continuous pill position — drives the pill AND the proximity
-              // "lens" that magnifies the icon it nears.
-              final frac = selectedFraction ?? selected.toDouble();
+              _slot = slot;
+              _count = items.length;
+              // Continuous pill position: a live drag (or its snap-back)
+              // overrides everything, then the pager fraction (glides with a
+              // swipe), else the settled tab. Drives the pill AND the lens.
+              final frac =
+                  _dragFrac ?? selectedFraction ?? selected.toDouble();
+              final tracking = _dragFrac != null;
               final pillLeft = slot * frac;
               final pill = Center(
-                child: Container(
-                  width: slot - 24,
-                  height: height - 16,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.28),
+                child: AnimatedScale(
+                  // Grows while the finger is held, springs back on release.
+                  scale: _dragging ? 1.14 : 1.0,
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    width: slot - 24,
+                    height: height - 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withValues(alpha: _dragging ? 0.26 : 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.28),
+                      ),
                     ),
                   ),
                 ),
               );
-              return Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  // Sliding highlight pill. With a fraction it tracks the
-                  // swipe live (plain Positioned); without one it animates
-                  // between integer slots on tap.
-                  if (selectedFraction != null)
-                    Positioned(
-                      left: pillLeft,
-                      top: 0,
-                      bottom: 0,
-                      width: slot,
-                      child: pill,
-                    )
-                  else
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                      left: pillLeft,
-                      top: 0,
-                      bottom: 0,
-                      width: slot,
-                      child: pill,
-                    ),
-                  // Items — one equal-width slot each.
-                  Row(
-                    children: [
-                      for (var i = 0; i < items.length; i++)
-                        Expanded(
-                          child: SizedBox(
-                            height: height,
-                            child: _NavItem(
-                              data: items[i],
-                              selected: selected == i,
-                              // WhatsApp lens: the icon swells as the pill
-                              // slides PAST it, then settles back to normal
-                              // size once the pill arrives ON it (parabolic
-                              // bump — see _navLensScale).
-                              magnify: _navLensScale(i, frac),
-                              onTap: () => onSelect(i),
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // Press & hold then slide to switch tabs. A quick tap on an
+                // icon still wins the gesture arena (handled by _NavItem).
+                onLongPressStart: (d) => _onDragStart(d.localPosition.dx),
+                onLongPressMoveUpdate: (d) =>
+                    _onDragUpdate(d.localPosition.dx),
+                onLongPressEnd: (_) => _onDragEnd(),
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    // Sliding highlight pill. A live drag / its snap-back and
+                    // a pager swipe both track immediately (plain Positioned);
+                    // otherwise it animates between integer slots on tap.
+                    if (tracking || selectedFraction != null)
+                      Positioned(
+                        left: pillLeft,
+                        top: 0,
+                        bottom: 0,
+                        width: slot,
+                        child: pill,
+                      )
+                    else
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                        left: pillLeft,
+                        top: 0,
+                        bottom: 0,
+                        width: slot,
+                        child: pill,
+                      ),
+                    // Items — one equal-width slot each.
+                    Row(
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          Expanded(
+                            child: SizedBox(
+                              height: height,
+                              child: _NavItem(
+                                data: items[i],
+                                selected: selected == i,
+                                // Dragging → a lens centred on the pill (icon
+                                // under the finger bulges). Otherwise the swipe
+                                // bump that settles back to normal size.
+                                magnify: _dragging
+                                    ? _navPeakLens(i, frac)
+                                    : _navLensScale(i, frac),
+                                onTap: () => onSelect(i),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               );
             },
           ),
