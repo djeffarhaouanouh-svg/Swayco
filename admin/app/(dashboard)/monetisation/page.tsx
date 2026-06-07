@@ -3,7 +3,7 @@ import { SectionHeader } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatList } from "@/components/stat-list";
-import { fmtEur, fmtInt, fmtMinutes, fmtUsd } from "@/lib/format";
+import { fmtEur, fmtEur2, fmtInt, fmtMinutes, fmtUsd } from "@/lib/format";
 
 export default async function MonetisationPage() {
   const [c, r] = await Promise.all([getCosts(30), getReferralStats()]);
@@ -88,8 +88,14 @@ export default async function MonetisationPage() {
             <StatList
               items={[
                 { label: "Free", value: fmtInt(c.freeCount), tone: "muted" },
-                { label: "Plus (7,97 €)", value: fmtInt(c.plusCount) },
-                { label: "Ultra Plus (15,97 €)", value: fmtInt(c.ultraPlusCount) },
+                {
+                  label: `Plus (${fmtEur2(c.pricePlus)})`,
+                  value: fmtInt(c.plusCount),
+                },
+                {
+                  label: `Ultra Plus (${fmtEur2(c.priceUltraPlus)})`,
+                  value: fmtInt(c.ultraPlusCount),
+                },
                 {
                   label: "MRR estimé",
                   value: fmtEur(c.mrrEur),

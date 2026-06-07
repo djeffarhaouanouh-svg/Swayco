@@ -25,6 +25,16 @@ export function fmtEur(n: number | null | undefined): string {
   }).format(Number(n) || 0);
 }
 
+/** Euro with 2 decimals — for subscription prices like 9,99 €. */
+export function fmtEur2(n: number | null | undefined): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(n) || 0);
+}
+
 export function fmtUsd(n: number | null | undefined): string {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",

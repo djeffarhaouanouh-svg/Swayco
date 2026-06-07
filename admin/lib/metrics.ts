@@ -12,6 +12,7 @@ import { createSupabaseServiceClient } from "./supabase/service";
 import {
   dayKey,
   fmtEur,
+  fmtEur2,
   fmtInt,
   fmtMinutes,
   fmtNum,
@@ -882,14 +883,14 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       label: "Abonnés Plus",
       total: fmtInt(costs.plusCount),
       perUser: "—",
-      detail: "7,97 €/mois",
+      detail: `${fmtEur2(costs.pricePlus)}/mois`,
     },
     {
       group: "Monétisation",
       label: "Abonnés Ultra+",
       total: fmtInt(costs.ultraPlusCount),
       perUser: "—",
-      detail: "15,97 €/mois",
+      detail: `${fmtEur2(costs.priceUltraPlus)}/mois`,
     },
     {
       group: "Monétisation",
@@ -1011,15 +1012,18 @@ export type CostBreakdown = {
   costLivekitUsd: number;
   costTextUsd: number;
   costTotalEur: number;
-  /** Paying subscribers on the entry tier (€7,97 — was "pro"). */
+  /** Paying subscribers on the entry tier (Plus). */
   plusCount: number;
-  /** Paying subscribers on the top tier (€15,97 — was "ultra"). */
+  /** Paying subscribers on the top tier (Ultra Plus). */
   ultraPlusCount: number;
   freeCount: number;
   mrrEur: number;
   marginEur: number;
   ratesConfigured: boolean;
   windowDays: number;
+  /** Monthly price of each paid tier (EUR), as used to compute the MRR. */
+  pricePlus: number;
+  priceUltraPlus: number;
 };
 
 /**
@@ -1035,8 +1039,8 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
   const rateLivekit = num(process.env.COST_LIVEKIT_USD_PER_MIN, 0.0005);
   const rateText = num(process.env.COST_TEXT_USD_PER_1K_TOKENS, 0.001);
   const usdToEur = num(process.env.USD_TO_EUR, 0.92);
-  const pricePlus = num(process.env.PRICE_PLUS_EUR, 7.97);
-  const priceUltraPlus = num(process.env.PRICE_ULTRA_PLUS_EUR, 15.97);
+  const pricePlus = num(process.env.PRICE_PLUS_EUR, 9.99);
+  const priceUltraPlus = num(process.env.PRICE_ULTRA_PLUS_EUR, 15.99);
 
   const [calls, texts, plusCount, ultraPlusCount, freeCount] = await Promise.all([
     safeRows("analytics_events", "props", (q) =>
@@ -1099,5 +1103,7 @@ export async function getCosts(days = 30): Promise<CostBreakdown> {
     marginEur: mrrEur - costTotalEur,
     ratesConfigured: rateRealtime > 0 || rateLivekit > 0 || rateText > 0,
     windowDays: days,
+    pricePlus,
+    priceUltraPlus,
   };
 }
