@@ -27,7 +27,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/missions_ring.dart';
-import '../widgets/native_glass.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -1011,29 +1011,25 @@ class _DiscoverHeader extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     bounce: true,
                     onTap: expanded ? null : onTapPill,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      // Fill most of the bar while typing, but cap it so it
-                      // never overflows the bar on a narrow screen.
-                      width: expanded
-                          ? (MediaQuery.sizeOf(context).width - 135).clamp(
-                              180.0,
-                              250.0,
-                            )
-                          : null,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: expanded ? 16 : 10,
-                        // When expanded the TextField carries the height itself
-                        // (contentPadding below), so keep the outer pad small.
-                        vertical: expanded ? 6 : 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: SC.glassStrong,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: SC.glassBorder),
-                      ),
-                      child: Row(
+                    child: GlassPanel(
+                      borderRadius: 999,
+                      color: SC.glassStrong,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        // Fill most of the bar while typing, but cap it so it
+                        // never overflows the bar on a narrow screen.
+                        width: expanded
+                            ? (MediaQuery.sizeOf(context).width - 135).clamp(
+                                180.0,
+                                250.0,
+                              )
+                            : null,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: expanded ? 16 : 10,
+                          vertical: expanded ? 6 : 10,
+                        ),
+                        child: Row(
                         mainAxisSize: expanded
                             ? MainAxisSize.max
                             : MainAxisSize.min,
@@ -1102,6 +1098,7 @@ class _DiscoverHeader extends StatelessWidget {
                             ),
                         ],
                       ),
+                    ),
                     ),
                   ),
                 ],
@@ -2024,12 +2021,11 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
     final hintText = firstName.isEmpty
         ? AppStrings.t('discover_message_hint')
         : AppStrings.t('discover_message_hint_name', args: {'name': firstName});
-    // Native Apple liquid glass REPLACES the old dark fill (no superposition);
-    // web / older OS fall back to the previous translucent dark pill.
-    return NativeGlass(
+    // Shader liquid glass (not a platform view) — safe inside the swipeable
+    // Discover deck. Dark tint so the hint reads over a bright photo.
+    return GlassPanel(
       borderRadius: 24,
-      fallbackColor: const Color(0x80000000),
-      fallbackBorder: const Color(0x4DFFFFFF),
+      color: const Color(0x80000000),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
