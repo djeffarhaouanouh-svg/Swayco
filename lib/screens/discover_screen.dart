@@ -999,9 +999,9 @@ class _DiscoverHeader extends StatelessWidget {
                           : null,
                       padding: EdgeInsets.symmetric(
                         horizontal: expanded ? 16 : 12,
-                        // Keep the same thickness as the collapsed magnifier
-                        // button so the bar doesn't get thinner while typing.
-                        vertical: expanded ? 15 : 12,
+                        // When expanded the TextField carries the height itself
+                        // (contentPadding below), so keep the outer pad small.
+                        vertical: expanded ? 6 : 12,
                       ),
                       decoration: BoxDecoration(
                         color: SC.glassStrong,
@@ -1053,7 +1053,11 @@ class _DiscoverHeader extends StatelessWidget {
                                       fontSize: 15,
                                     ),
                                     border: InputBorder.none,
-                                    contentPadding: EdgeInsets.zero,
+                                    // Vertical room so the writing zone isn't a
+                                    // cramped thin line.
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
                                   ),
                                 ),
                               ),
