@@ -1002,17 +1002,14 @@ class _RowCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: SC.glassStrong,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.all(9),
-          child: Icon(Icons.phone_rounded, color: SC.accent, size: 18),
-        ),
-      ),
+    // Real glass circle + spring bounce (like the header / photo buttons),
+    // keeping the cyan phone glyph.
+    return GlassIconButton(
+      icon: Icons.phone_rounded,
+      onTap: onTap,
+      size: 38,
+      iconSize: 18,
+      iconColor: SC.accent,
     );
   }
 }
