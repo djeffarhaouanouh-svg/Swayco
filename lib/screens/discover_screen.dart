@@ -1053,10 +1053,10 @@ class _DiscoverHeader extends StatelessWidget {
                                       fontSize: 15,
                                     ),
                                     border: InputBorder.none,
-                                    // Vertical room so the writing zone isn't a
-                                    // cramped thin line.
+                                    // A little vertical room so the writing zone
+                                    // isn't a cramped thin line — but not bulky.
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                                      vertical: 8,
                                     ),
                                   ),
                                 ),
