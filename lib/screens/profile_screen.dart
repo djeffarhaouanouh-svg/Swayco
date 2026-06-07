@@ -3129,6 +3129,12 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The hint is two sentences joined by "\n". Show each on its own row with
+    // its own ⓘ, and put the short "framed photo" sentence (always the 2nd)
+    // first — hence the reversed order.
+    final sentences = AppStrings.t(
+      'discover_visibility_hint',
+    ).split('\n').where((s) => s.trim().isNotEmpty).toList().reversed.toList();
     return Align(
       alignment: Alignment.centerLeft,
       child: InkWell(
@@ -3136,22 +3142,40 @@ class _DiscoverVisibilityHint extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.info_outline, size: 14, color: SC.textMuted),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text.rich(
-                  // Keywords wrapped in **…** in app_strings render cyan.
-                  _highlightKeywords(AppStrings.t('discover_visibility_hint')),
-                  style: const TextStyle(
-                    color: SC.textMuted,
-                    fontSize: 12,
-                    height: 1.7,
+              for (var i = 0; i < sentences.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1),
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 14,
+                          color: SC.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        // Keywords wrapped in **…** in app_strings render cyan.
+                        child: Text.rich(
+                          _highlightKeywords(sentences[i]),
+                          style: const TextStyle(
+                            color: SC.textMuted,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
             ],
           ),
         ),
