@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:cupertino_native_plus/cupertino_native_plus.dart'
-    show CNButton, CNIcon, CNButtonConfig, CNButtonStyle;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 import 'package:share_plus/share_plus.dart';
@@ -1030,36 +1028,25 @@ class _InviteToCallBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // iOS 26+: real NATIVE Liquid Glass button (platform view). It's a static
-    // element (NOT inside a ListView.builder), so a platform view is safe.
-    // Older iOS / Android / web fall back to the app's glass design below.
-    if (useNativeGlass) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: SizedBox(
-          width: double.infinity,
-          child: CNButton(
-            label: creatingInvite
-                ? AppStrings.t('invite_call_creating')
-                : AppStrings.t('invite_to_call'),
-            icon: const CNIcon.symbol('video.fill'),
-            onPressed: onInviteToCall,
-            config: const CNButtonConfig(
-              style: CNButtonStyle.prominentGlass,
-              minHeight: 56,
-              shrinkWrap: false,
-              borderRadius: 22,
-            ),
-          ),
-        ),
-      );
-    }
+    // No glass — a solid cyan → blue gradient CTA.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: GlassContainer(
-        borderRadius: BorderRadius.circular(22),
-        color: SC.glassStrong,
-        border: SC.glassBorderStrong,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            colors: [SC.accent, SC.meshBlue],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: SC.accent.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
