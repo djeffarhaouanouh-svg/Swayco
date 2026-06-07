@@ -586,14 +586,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               right: 0,
                               child: IgnorePointer(
                                 child: SizedBox(
-                                  height: 40,
+                                  // Taller + lower-opacity peak so the top fades
+                                  // gently (floating, not a hard black bar) —
+                                  // same soft feel as the footer fade below.
+                                  height: 88,
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         begin: Alignment.topCenter,
                                         end: Alignment.bottomCenter,
                                         colors: [
-                                          Color(0xFF000000),
+                                          Color(0xB3000000),
                                           Color(0x00000000),
                                         ],
                                       ),
@@ -1479,7 +1482,8 @@ class _BlockedComposerNotice extends StatelessWidget {
         16,
         14,
         16,
-        14 + MediaQuery.paddingOf(context).bottom,
+        // Match the idle bar's slight upward nudge (was 14).
+        20 + MediaQuery.paddingOf(context).bottom,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1781,7 +1785,9 @@ class _ComposerState extends State<_Composer> {
         12,
         4,
         8,
-        6 + MediaQuery.paddingOf(context).bottom * 0.4,
+        // Nudged up very slightly (was 6) so the floating bar + photo button
+        // sit a touch higher off the bottom edge.
+        12 + MediaQuery.paddingOf(context).bottom * 0.4,
       ),
       child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
