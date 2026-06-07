@@ -268,12 +268,16 @@ abstract final class ChatApi {
         .inFilter('body', photoReactionEmojis)
         .order('created_at', ascending: false)
         .limit(200);
-    final seenSenders = <String>{};
+    final seen = <String>{};
     final out = <ChatMessage>[];
     for (final r in rows as List) {
       final msg = ChatMessage.fromMap(Map<String, dynamic>.from(r as Map));
       if (msg.senderId.isEmpty || msg.senderId == meId) continue;
-      if (!seenSenders.add(msg.senderId)) continue;
+      // Dedup by the actual reaction (sender + photo + emoji), NOT by sender
+      // alone — otherwise a second reaction from the same person replaced the
+      // first instead of accumulating. Distinct photos / emojis each show.
+      final key = '${msg.senderId}|${msg.discoverPhoto}|${msg.body}';
+      if (!seen.add(key)) continue;
       out.add(msg);
     }
     return out;
