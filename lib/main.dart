@@ -146,23 +146,29 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('Analytics start failed: $e');
     }
-    // Pre-warm the Liquid Glass shaders so the first glass surface doesn't
-    // flash white; skips Impeller on web automatically. Best-effort.
-    try {
-      await LiquidGlassWidgets.initialize().timeout(const Duration(seconds: 3));
-    } catch (e) {
-      debugPrint('LiquidGlass init slow/failed: $e');
+    if (kIsWeb) {
+      // Web stays EXACTLY as before — no Liquid Glass wrap, no shader
+      // pre-warm. The whole redesign is native-only (iPhone build).
+      runApp(const LiveKitTranslateApp());
+    } else {
+      // Native (iOS/Android): pre-warm the Liquid Glass shaders so the first
+      // glass surface doesn't flash white, then wrap the app.
+      // respectSystemAccessibility honours iOS "Reduce Transparency / Motion";
+      // adaptiveQuality caps shader quality on slow hardware.
+      try {
+        await LiquidGlassWidgets.initialize()
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('LiquidGlass init slow/failed: $e');
+      }
+      runApp(
+        LiquidGlassWidgets.wrap(
+          child: const LiveKitTranslateApp(),
+          respectSystemAccessibility: true,
+          adaptiveQuality: true,
+        ),
+      );
     }
-    runApp(
-      // respectSystemAccessibility honours iOS "Reduce Transparency / Motion"
-      // (glass degrades to a solid surface); adaptiveQuality keeps the shader
-      // affordable on Android / web (caps quality on slow hardware).
-      LiquidGlassWidgets.wrap(
-        child: const LiveKitTranslateApp(),
-        respectSystemAccessibility: true,
-        adaptiveQuality: true,
-      ),
-    );
   }, (e, s) {
     debugPrint('Uncaught zone error: $e\n$s');
   });
