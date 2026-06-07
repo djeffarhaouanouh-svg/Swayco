@@ -803,7 +803,7 @@ class _ThreadHeader extends StatelessWidget {
                 builder: (context, c) {
                   final nameStyle = SCText.h3.copyWith(
                     fontSize: 15,
-                    color: SC.textPrimary.withValues(alpha: 0.6),
+                    color: Colors.white,
                   );
                   const logoStyle = TextStyle(
                     color: Colors.white,
@@ -993,7 +993,7 @@ class _MessageBubble extends StatelessWidget {
             child: Text(
               message.senderName,
               style: const TextStyle(
-                color: Colors.white,
+                color: SC.accent,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
