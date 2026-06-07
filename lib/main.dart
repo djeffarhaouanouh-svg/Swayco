@@ -402,8 +402,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // instead of this device's stale local cache clobbering it. Fetch it once
     // and reuse it for the language sync AND the returning-user path.
     RemoteProfile? remote;
+    var remoteOk = false;
     try {
       remote = await ProfileApi.fetchById(uid);
+      remoteOk = true;
     } catch (e) {
       debugPrint('hydrate fetch remote profile failed: $e');
     }
@@ -411,7 +413,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
 
     if (profile != null && profile.firstName.isNotEmpty) {
       // Prefer the account's language; fall back to the local pick only when
-      // the account has none yet (the first upsert from this device).
+      // the account genuinely has none yet (read OK + empty).
       final lang = remoteLang.isNotEmpty ? remoteLang : profile.sourceLang;
       if (lang.trim().isNotEmpty) {
         AppStrings.setFromCode(lang);
@@ -421,13 +423,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           await UserPrefs.setSourceLang(lang);
         }
       }
-      await ProfileApi.upsertMyProfile(
-        deviceId: uid,
-        displayName: profile.firstName,
-        // Canonical language — never overwrites a change made elsewhere.
-        language: lang,
-        gender: profile.gender,
-      );
+      // Only publish UP when we have a trustworthy read of the account. Two
+      // devices can share one account, so a flaky read on THIS device must
+      // never clobber the language the OTHER device just set — skip the write
+      // rather than risk pushing this device's stale cache.
+      if (remoteOk) {
+        await ProfileApi.upsertMyProfile(
+          deviceId: uid,
+          displayName: profile.firstName,
+          language: lang,
+          gender: profile.gender,
+        );
+      }
     } else if (remote != null) {
       // Returning user on a fresh device / freshly-installed app: local prefs
       // are empty but the account holds their name + language. Apply it and
