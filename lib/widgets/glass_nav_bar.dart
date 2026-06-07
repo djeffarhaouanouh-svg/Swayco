@@ -6,6 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 import '../services/app_strings.dart';
 import '../services/platform_glass.dart';
 import '../theme/swayco_theme.dart';
+import 'spring_press.dart';
 
 /// Full-width glass-morphism bottom-nav, flush against the screen bottom,
 /// with a sliding pill that animates between selected tabs. Rendered by
@@ -274,16 +275,10 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        onTap: onTap,
-        child: Center(
+    // Real spring (physics) bounce on tap — compress then overshoot, iOS-style.
+    return SpringPress(
+      onTap: onTap,
+      child: Center(
           child: _badged(
             AnimatedScale(
               // Small bounce on selection — easeOutBack overshoots past 1.0
@@ -308,7 +303,6 @@ class _NavItem extends StatelessWidget {
             data.badge,
           ),
         ),
-      ),
     );
   }
 
