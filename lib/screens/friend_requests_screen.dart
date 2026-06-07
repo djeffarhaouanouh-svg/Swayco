@@ -603,7 +603,7 @@ class _ReactionRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(reaction.message.body, style: const TextStyle(fontSize: 26)),
+              _PopInEmoji(id: reaction.message.id, emoji: reaction.message.body),
             ],
           ),
         ),
@@ -661,11 +661,94 @@ class _LikeRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('❤', style: TextStyle(fontSize: 24)),
+              _PopInEmoji(id: 'like_${liker.id}', emoji: '❤', fontSize: 24),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// IDs whose pop-in has already played this session, so a notification's emoji
+/// jumps only the FIRST time it's seen (not on every tab revisit).
+final Set<String> _poppedEmojiIds = <String>{};
+
+/// An emoji that, the first time it's seen, does a little dopamine "jump":
+/// springs up and scales with an elastic settle. Subsequent appearances render
+/// statically (the jump is one-shot per id, per session).
+class _PopInEmoji extends StatefulWidget {
+  const _PopInEmoji({
+    required this.id,
+    required this.emoji,
+    this.fontSize = 26,
+  });
+
+  final String id;
+  final String emoji;
+  final double fontSize;
+
+  @override
+  State<_PopInEmoji> createState() => _PopInEmojiState();
+}
+
+class _PopInEmojiState extends State<_PopInEmoji>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 720),
+    // Settled by default; only the very first sighting plays the jump.
+    value: 1.0,
+  );
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.35)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 28,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.35, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 72,
+    ),
+  ]).animate(_c);
+  late final Animation<double> _lift = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 0.0, end: -14.0)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 28,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: -14.0, end: 0.0)
+          .chain(CurveTween(curve: Curves.bounceOut)),
+      weight: 72,
+    ),
+  ]).animate(_c);
+
+  @override
+  void initState() {
+    super.initState();
+    // Set.add returns true only when the id is new → first sighting → jump.
+    if (_poppedEmojiIds.add(widget.id)) {
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, _lift.value),
+        child: Transform.scale(scale: _scale.value, child: child),
+      ),
+      child: Text(widget.emoji, style: TextStyle(fontSize: widget.fontSize)),
     );
   }
 }
