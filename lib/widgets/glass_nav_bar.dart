@@ -1,8 +1,10 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
 import '../services/app_strings.dart';
+import '../services/platform_glass.dart';
 
 /// Full-width glass-morphism bottom-nav, flush against the screen bottom,
 /// with a sliding pill that animates between selected tabs. Rendered by
@@ -88,29 +90,10 @@ class GlassNavBar extends StatelessWidget {
     // while the icons stay above it.
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    final bar = BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          // Plain bar: a hairline top edge. The hugging bar's outline is
-          // defined by the concave notch clip instead, so no border there.
-          border: hugTopCorners
-              ? null
-              : Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-                ),
-        ),
-        // Reserve the notch strip on top only when hugging, so the icon row
-        // sits in exactly the same place whether or not the notches are
-        // carved; bottom pad by the safe-area inset.
-        padding: EdgeInsets.only(
-          top: hugTopCorners ? hugRadius : 0,
-          bottom: bottomInset,
-        ),
-        child: SizedBox(
-          height: height,
-          child: LayoutBuilder(
+    // The pill + items row — identical in every rendering path.
+    final inner = SizedBox(
+      height: height,
+      child: LayoutBuilder(
             builder: (context, constraints) {
               // Each tab gets an equal slice of the full width; the pill
               // and the icons share the same slot geometry so they line up.
@@ -175,12 +158,54 @@ class GlassNavBar extends StatelessWidget {
               );
             },
           ),
+        );
+
+    // Native flat bar → real shader Liquid Glass (single static surface, no
+    // platform view). The Discover "hug" state keeps the BackdropFilter path
+    // (its concave notches can't be a rounded-superellipse), and web keeps the
+    // BackdropFilter design unchanged.
+    if (useShaderGlass && !hugTopCorners) {
+      return lg.GlassContainer(
+        useOwnLayer: true,
+        clipBehavior: Clip.antiAlias,
+        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 0),
+        // Tune blur / thickness / refractiveIndex to taste.
+        settings: const lg.LiquidGlassSettings(
+          blur: 10,
+          thickness: 14,
+          glassColor: Color(0x12FFFFFF),
+          refractiveIndex: 1.3,
         ),
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: inner,
+      );
+    }
+
+    final bar = BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          // Plain bar: a hairline top edge. The hugging bar's outline is
+          // defined by the concave notch clip instead, so no border there.
+          border: hugTopCorners
+              ? null
+              : Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+        ),
+        // Reserve the notch strip on top only when hugging; bottom pad by the
+        // safe-area inset.
+        padding: EdgeInsets.only(
+          top: hugTopCorners ? hugRadius : 0,
+          bottom: bottomInset,
+        ),
+        child: inner,
       ),
     );
 
-    // Concave corner notches that hug the Discover card; a plain flat bar
-    // on every other tab. The body height is identical either way.
+    // Concave corner notches that hug the Discover card; a plain flat bar on
+    // every other tab. The body height is identical either way.
     return hugTopCorners
         ? ClipPath(clipper: const _TopHugClipper(hugRadius), child: bar)
         : ClipRect(child: bar);

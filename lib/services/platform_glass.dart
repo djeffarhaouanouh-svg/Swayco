@@ -15,3 +15,10 @@ import 'package:cupertino_native_plus/cupertino_native_plus.dart'
 /// Single source of truth so screens don't import the package directly and
 /// the gate can be tweaked in one place.
 bool get useNativeGlass => !kIsWeb && PlatformVersion.shouldUseNativeGlass;
+
+/// Whether to use the cross-platform SHADER Liquid Glass (liquid_glass_widgets)
+/// for surfaces like the nav bar and the chat-list card. Native (iOS/Android)
+/// only — the web build is intentionally left on its previous design, and the
+/// package's `LiquidGlassWidgets.wrap` (which the shader widgets need) is also
+/// gated to native in main().
+bool get useShaderGlass => !kIsWeb;

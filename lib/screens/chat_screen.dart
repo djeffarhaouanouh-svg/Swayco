@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cupertino_native_plus/cupertino_native_plus.dart'
     show CNButton, CNIcon, CNButtonConfig, CNButtonStyle;
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 import 'package:share_plus/share_plus.dart';
 
 import '../services/analytics.dart';
@@ -24,6 +25,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
+import '../widgets/glass_backdrop.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -427,8 +429,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
-      body: ColoredBox(
-        color: const Color(0xFF0E0E0E),
+      body: GlassBackdrop(
         child: SafeArea(
           bottom: false,
           // Fixed "Messages" band at the top; the conversation list scrolls
@@ -494,9 +495,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           // Single glass card holding every conversation row, with a thin
           // hairline divider between them (inset past the avatar) so each
           // conversation reads as a distinct entry.
-          GlassContainer(
-            borderRadius: BorderRadius.circular(24),
-            padding: const EdgeInsets.all(6),
+          _GlassListCard(
             child: Column(
               children: [
                 for (final (i, p) in _friends.indexed) ...[
@@ -865,6 +864,40 @@ class _UnreadBadge extends StatelessWidget {
           height: 1,
         ),
       ),
+    );
+  }
+}
+
+/// The chat-list card surface. On native (iPhone) it's real shader Liquid
+/// Glass (liquid_glass_widgets); on web it stays the app's BackdropFilter
+/// [GlassContainer], unchanged. Same rounded-24 / 6 px padding either way.
+class _GlassListCard extends StatelessWidget {
+  const _GlassListCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (useShaderGlass) {
+      return lg.GlassContainer(
+        useOwnLayer: true,
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.all(6),
+        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 24),
+        // Tune blur / thickness / refractiveIndex for more or less refraction.
+        settings: const lg.LiquidGlassSettings(
+          blur: 8,
+          thickness: 16,
+          glassColor: Color(0x14FFFFFF),
+          refractiveIndex: 1.35,
+        ),
+        child: child,
+      );
+    }
+    return GlassContainer(
+      borderRadius: BorderRadius.circular(24),
+      padding: const EdgeInsets.all(6),
+      child: child,
     );
   }
 }
