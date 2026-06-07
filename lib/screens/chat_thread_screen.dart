@@ -993,7 +993,7 @@ class _MessageBubble extends StatelessWidget {
             child: Text(
               message.senderName,
               style: const TextStyle(
-                color: SC.accent,
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
