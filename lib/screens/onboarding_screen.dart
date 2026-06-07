@@ -39,16 +39,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _countryCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   String? _selectedLang;
+
   /// `m` / `f` / `x` or null. Asked once on the gender step right after
   /// language. Skipped entirely on subsequent runs (see [_genderAlreadySet]).
   String? _selectedGender;
+
   /// True after [_prefill] has read SharedPreferences. While false, the
   /// gender step is hidden from the page count so the dots / total stays
   /// stable when the answer becomes known.
   bool _prefillDone = false;
+
   /// Set in [_prefill] from [UserPrefs.isGenderSet]. When true the gender
   /// page is omitted from the flow ("Une fois choisi, plus s'afficher").
   bool _genderAlreadySet = false;
+
   /// Centres d'intérêt picked on the interests step. Plain labels matching
   /// [kInterestCategories]; persisted via [ProfileApi.updateMyInterests].
   /// Capped at [profileInterestsMax].
@@ -175,9 +179,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finish() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('onb_need_name'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('onb_need_name'))));
       return;
     }
     if (_selectedLang == null) {
@@ -190,9 +194,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // shown). In editing mode + on later sessions, [_genderAlreadySet] is
     // true and we accept whatever was saved before (or none).
     if (!widget.editing && !_genderAlreadySet && _selectedGender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('onb_need_gender'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('onb_need_gender'))));
       return;
     }
     final genderToSave = _selectedGender ?? '';
@@ -259,109 +263,120 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return Scaffold(
         backgroundColor: const Color(0xFF0E0E0E),
         body: SafeArea(
-            child: Column(
-              children: [
-                // Header matching the rest of the app: a big left-aligned
-                // SCText.h1 title (same font as Discover / Chat / Messages),
-                // preceded by a plain back button.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 4),
-                  child: Row(
-                    children: [
-                      GlassIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        onTap: () => Navigator.of(context).maybePop(),
+          child: Column(
+            children: [
+              // Header matching the rest of the app: a big left-aligned
+              // SCText.h1 title (same font as Discover / Chat / Messages),
+              // preceded by a plain back button.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 20, 4),
+                child: Row(
+                  children: [
+                    GlassIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        AppStrings.t('onb_profile_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SCText.h1,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _GlassTextField(
+                        controller: _nameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        label: AppStrings.t('onb_first_name_label'),
+                        hint: AppStrings.t('onb_first_name_hint'),
+                        icon: Icons.badge_outlined,
+                      ),
+                      const SizedBox(height: 14),
+                      Stack(
+                        children: [
+                          _GlassTextField(
+                            controller: _bioCtrl,
+                            textCapitalization: TextCapitalization.sentences,
+                            maxLength: profileBioMaxLength,
+                            minLines: 2,
+                            maxLines: 3,
+                            label: 'Bio',
+                            hint: AppStrings.t('profile_bio_placeholder'),
+                            icon: Icons.short_text,
+                            alignLabelWithHint: true,
+                            // Show the prompt directly (not only on focus).
+                            alwaysFloatLabel: true,
+                          ),
+                          // Cyan "+10" reward tag to motivate filling the bio.
+                          const Positioned(
+                            top: 7,
+                            right: 10,
+                            child: _RewardTag(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      // Single field: tap to pick country → then city.
+                      _GlassSelectField(
+                        icon: Icons.public,
+                        label: AppStrings.t('onb_location_label'),
+                        hint: AppStrings.t('onb_location_hint'),
+                        value: [
+                          _cityCtrl.text.trim(),
+                          _countryCtrl.text.trim(),
+                        ].where((s) => s.isNotEmpty).join(', '),
+                        onTap: _openLocationPicker,
+                      ),
+                      const SizedBox(height: 22),
+                      Text(
+                        AppStrings.t('onb_language_picker_label'),
+                        style: SCText.body.copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _LanguageGrid(
+                        selected: _selectedLang,
+                        onSelect: _onLanguageSelected,
+                      ),
+                      const SizedBox(height: 28),
+                      FilledButton(
+                        onPressed: _finish,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: SC.accent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                         child: Text(
-                          AppStrings.t('onb_profile_title'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SCText.h1,
+                          AppStrings.t('onb_save'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _GlassTextField(
-                          controller: _nameCtrl,
-                          textCapitalization: TextCapitalization.words,
-                          label: AppStrings.t('onb_first_name_label'),
-                          hint: AppStrings.t('onb_first_name_hint'),
-                          icon: Icons.badge_outlined,
-                        ),
-                        const SizedBox(height: 14),
-                        _GlassTextField(
-                          controller: _bioCtrl,
-                          textCapitalization: TextCapitalization.sentences,
-                          maxLength: profileBioMaxLength,
-                          minLines: 2,
-                          maxLines: 3,
-                          label: 'Bio',
-                          hint: AppStrings.t('profile_bio_placeholder'),
-                          icon: Icons.short_text,
-                          alignLabelWithHint: true,
-                          // Show the prompt directly (not only on focus).
-                          alwaysFloatLabel: true,
-                        ),
-                        const SizedBox(height: 14),
-                        // Single field: tap to pick country → then city.
-                        _GlassSelectField(
-                          icon: Icons.public,
-                          label: AppStrings.t('onb_location_label'),
-                          hint: AppStrings.t('onb_location_hint'),
-                          value: [_cityCtrl.text.trim(), _countryCtrl.text.trim()]
-                              .where((s) => s.isNotEmpty)
-                              .join(', '),
-                          onTap: _openLocationPicker,
-                        ),
-                        const SizedBox(height: 22),
-                        Text(
-                          AppStrings.t('onb_language_picker_label'),
-                          style: SCText.body.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _LanguageGrid(
-                          selected: _selectedLang,
-                          onSelect: _onLanguageSelected,
-                        ),
-                        const SizedBox(height: 28),
-                        FilledButton(
-                          onPressed: _finish,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: SC.accent,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Text(
-                            AppStrings.t('onb_save'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
       );
     }
 
@@ -382,70 +397,73 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       backgroundColor: SC.bg,
       body: MeshBackground(
         child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _OnboardingHeader(
-              page: _page,
-              pageCount: _pageCount,
-              showGenderStep: showGenderStep,
-            ),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (i) => setState(() => _page = i),
-                children: [
-                  _StepWelcome(
-                    nameCtrl: _nameCtrl,
-                    onNext: () {
-                      if (_nameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(AppStrings.t('onb_need_name'))),
-                        );
-                        return;
-                      }
-                      _next();
-                    },
-                  ),
-                  _StepLanguage(
-                    selected: _selectedLang,
-                    onSelect: _onLanguageSelected,
-                    onBack: _back,
-                    onFinish: _goFromLanguage,
-                    finishLabelKey: 'onb_next',
-                  ),
-                  if (showGenderStep)
-                    _StepGender(
-                      selected: _selectedGender,
-                      onSelect: (g) => setState(() => _selectedGender = g),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _OnboardingHeader(
+                page: _page,
+                pageCount: _pageCount,
+                showGenderStep: showGenderStep,
+              ),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _page = i),
+                  children: [
+                    _StepWelcome(
+                      nameCtrl: _nameCtrl,
+                      onNext: () {
+                        if (_nameCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(AppStrings.t('onb_need_name')),
+                            ),
+                          );
+                          return;
+                        }
+                        _next();
+                      },
+                    ),
+                    _StepLanguage(
+                      selected: _selectedLang,
+                      onSelect: _onLanguageSelected,
                       onBack: _back,
-                      onFinish: _next,
+                      onFinish: _goFromLanguage,
                       finishLabelKey: 'onb_next',
                     ),
-                  _StepCity(
-                    location: [_cityCtrl.text.trim(), _countryCtrl.text.trim()]
-                        .where((s) => s.isNotEmpty)
-                        .join(', '),
-                    onOpenPicker: _openLocationPicker,
-                    onBack: _back,
-                    onNext: _next,
-                  ),
-                  _StepInterests(
-                    selected: _selectedInterests,
-                    onToggle: _toggleInterest,
-                    onBack: _back,
-                    onNext: _next,
-                  ),
-                  _StepGift(
-                    firstName: _nameCtrl.text.trim(),
-                    onFinish: _finish,
-                  ),
-                ],
+                    if (showGenderStep)
+                      _StepGender(
+                        selected: _selectedGender,
+                        onSelect: (g) => setState(() => _selectedGender = g),
+                        onBack: _back,
+                        onFinish: _next,
+                        finishLabelKey: 'onb_next',
+                      ),
+                    _StepCity(
+                      location: [
+                        _cityCtrl.text.trim(),
+                        _countryCtrl.text.trim(),
+                      ].where((s) => s.isNotEmpty).join(', '),
+                      onOpenPicker: _openLocationPicker,
+                      onBack: _back,
+                      onNext: _next,
+                    ),
+                    _StepInterests(
+                      selected: _selectedInterests,
+                      onToggle: _toggleInterest,
+                      onBack: _back,
+                      onNext: _next,
+                    ),
+                    _StepGift(
+                      firstName: _nameCtrl.text.trim(),
+                      onFinish: _finish,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -453,15 +471,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Advance one page with the shared transition.
   void _next() => _pageController.nextPage(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
+    duration: const Duration(milliseconds: 280),
+    curve: Curves.easeOutCubic,
+  );
 
   /// Go back one page with the shared transition.
   void _back() => _pageController.previousPage(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
+    duration: const Duration(milliseconds: 280),
+    curve: Curves.easeOutCubic,
+  );
 
   /// Language → next, but guard the required language pick first.
   void _goFromLanguage() {
@@ -485,9 +503,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                AppStrings.t('onb_interests_max', args: {
-                  'n': '$profileInterestsMax',
-                }),
+                AppStrings.t(
+                  'onb_interests_max',
+                  args: {'n': '$profileInterestsMax'},
+                ),
               ),
             ),
           );
@@ -520,7 +539,8 @@ class _OnboardingHeader extends StatelessWidget {
     if (showGenderStep && page == 2) {
       return ('onb_gender_title', 'onb_gender_subtitle');
     }
-    if (page == 2 + genderOffset) return ('onb_city_title', 'onb_city_subtitle');
+    if (page == 2 + genderOffset)
+      return ('onb_city_title', 'onb_city_subtitle');
     if (page == 3 + genderOffset) {
       return ('onb_interests_title', 'onb_interests_subtitle');
     }
@@ -577,9 +597,7 @@ class _Dot extends StatelessWidget {
       width: active ? 22 : 8,
       height: 8,
       decoration: BoxDecoration(
-        color: active
-            ? SC.accent
-            : Colors.white.withValues(alpha: 0.30),
+        color: active ? SC.accent : Colors.white.withValues(alpha: 0.30),
         borderRadius: BorderRadius.circular(4),
       ),
     );
@@ -587,10 +605,7 @@ class _Dot extends StatelessWidget {
 }
 
 class _StepWelcome extends StatelessWidget {
-  const _StepWelcome({
-    required this.nameCtrl,
-    required this.onNext,
-  });
+  const _StepWelcome({required this.nameCtrl, required this.onNext});
 
   final TextEditingController nameCtrl;
   final VoidCallback onNext;
@@ -665,7 +680,9 @@ class _StepLanguage extends StatelessWidget {
           Text(
             AppStrings.t('onb_translation_help'),
             style: const TextStyle(
-              color: SC.textMuted, fontSize: 13, height: 1.4,
+              color: SC.textMuted,
+              fontSize: 13,
+              height: 1.4,
             ),
           ),
           const SizedBox(height: 28),
@@ -673,9 +690,7 @@ class _StepLanguage extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: onBack,
-                style: TextButton.styleFrom(
-                  foregroundColor: SC.textMuted,
-                ),
+                style: TextButton.styleFrom(foregroundColor: SC.textMuted),
                 child: Text(AppStrings.t('onb_back')),
               ),
               const SizedBox(width: 12),
@@ -878,10 +893,13 @@ class _StepInterestsState extends State<_StepInterests> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
           child: Text(
-            AppStrings.t('onb_interests_count', args: {
-              'n': '${widget.selected.length}',
-              'max': '$profileInterestsMax',
-            }),
+            AppStrings.t(
+              'onb_interests_count',
+              args: {
+                'n': '${widget.selected.length}',
+                'max': '$profileInterestsMax',
+              },
+            ),
             style: const TextStyle(color: SC.textMuted, fontSize: 13),
           ),
         ),
@@ -1161,10 +1179,7 @@ class _GenderOption extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: border,
-              width: selected ? 1.5 : 1,
-            ),
+            border: Border.all(color: border, width: selected ? 1.5 : 1),
           ),
           child: Row(
             children: [
@@ -1199,8 +1214,8 @@ class _LanguageGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final value =
         (selected != null && supportedLanguages.any((l) => l.code == selected))
-            ? selected
-            : null;
+        ? selected
+        : null;
     return Container(
       decoration: BoxDecoration(
         color: SC.bubbleIn,
@@ -1252,6 +1267,31 @@ class _LanguageGrid extends StatelessWidget {
 /// the "Your profile" edit form. Wraps a [TextField] so the
 /// surrounding screen doesn't have to repeat the border / fill /
 /// cursor configuration each time.
+/// Small cyan "+10" reward tag — a motivational nudge shown on the Bio field.
+class _RewardTag extends StatelessWidget {
+  const _RewardTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: SC.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
+      ),
+      child: const Text(
+        '+10',
+        style: TextStyle(
+          color: SC.accent,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
 class _GlassTextField extends StatelessWidget {
   const _GlassTextField({
     required this.controller,
@@ -1390,7 +1430,10 @@ class _GlassSelectField extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: SC.textMuted),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: SC.textMuted,
+              ),
             ],
           ),
         ),
@@ -1430,8 +1473,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     setState(() {
       _country = c;
       _onCityStep = true;
-      _otherCityCtrl.text =
-          c.name == widget.initialCountry ? widget.initialCity : '';
+      _otherCityCtrl.text = c.name == widget.initialCountry
+          ? widget.initialCity
+          : '';
     });
   }
 
@@ -1470,8 +1514,10 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 children: [
                   if (_onCityStep)
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded,
-                          color: SC.textPrimary),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: SC.textPrimary,
+                      ),
                       onPressed: () => setState(() => _onCityStep = false),
                     )
                   else
@@ -1507,8 +1553,8 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     final list = q.isEmpty
         ? kCountries
         : kCountries
-            .where((c) => c.name.toLowerCase().contains(q))
-            .toList(growable: false);
+              .where((c) => c.name.toLowerCase().contains(q))
+              .toList(growable: false);
     return Column(
       children: [
         Padding(
@@ -1552,7 +1598,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 title: Text(
                   c.name,
                   style: const TextStyle(
-                      color: SC.textPrimary, fontWeight: FontWeight.w600),
+                    color: SC.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
                 onTap: () => _pickCountry(c),
@@ -1584,9 +1632,10 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 },
                 decoration: InputDecoration(
                   isDense: true,
-                  prefixIcon:
-                      const Icon(Icons.edit_location_alt_outlined,
-                          color: SC.textMuted),
+                  prefixIcon: const Icon(
+                    Icons.edit_location_alt_outlined,
+                    color: SC.textMuted,
+                  ),
                   hintText: AppStrings.t('loc_other_city_hint'),
                   hintStyle: const TextStyle(color: SC.textMuted),
                   filled: true,
@@ -1627,9 +1676,12 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
             title: Text(
               city,
               style: const TextStyle(
-                  color: SC.textPrimary, fontWeight: FontWeight.w600),
+                color: SC.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            trailing: city == widget.initialCity &&
+            trailing:
+                city == widget.initialCity &&
                     _country?.name == widget.initialCountry
                 ? const Icon(Icons.check_rounded, color: SC.accent)
                 : null,
