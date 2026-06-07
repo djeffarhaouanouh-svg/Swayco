@@ -27,6 +27,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/missions_ring.dart';
+import '../widgets/native_glass.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -2023,19 +2024,19 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
     final hintText = firstName.isEmpty
         ? AppStrings.t('discover_message_hint')
         : AppStrings.t('discover_message_hint_name', args: {'name': firstName});
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      // Slightly narrower at rest; grows back to the full width on tap.
-      width: expanded ? 270 : 232,
-      decoration: BoxDecoration(
-        // Neutral translucent dark over the photo.
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-      ),
-      padding: EdgeInsets.fromLTRB(14, 3, expanded ? 5 : 16, 3),
-      child: Row(
+    // Native Apple liquid glass REPLACES the old dark fill (no superposition);
+    // web / older OS fall back to the previous translucent dark pill.
+    return NativeGlass(
+      borderRadius: 24,
+      fallbackColor: const Color(0x80000000),
+      fallbackBorder: const Color(0x4DFFFFFF),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        // Slightly narrower at rest; grows back to the full width on tap.
+        width: expanded ? 270 : 232,
+        padding: EdgeInsets.fromLTRB(14, 3, expanded ? 5 : 16, 3),
+        child: Row(
         children: [
           Expanded(
             child: TextField(
@@ -2086,6 +2087,7 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
             ),
           ],
         ],
+      ),
       ),
     );
   }

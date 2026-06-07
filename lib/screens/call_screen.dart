@@ -29,7 +29,7 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
-import '../widgets/glass.dart';
+import '../widgets/native_glass.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -913,13 +913,15 @@ class _CallScreenState extends State<CallScreen> {
         if (mounted) _animateChatHint();
       });
     }
-    // Same frosted-glass bar as the messages composer.
-    return GlassContainer(
-      borderRadius: BorderRadius.circular(26),
-      color: Colors.black.withValues(alpha: 0.35),
-      border: Colors.white.withValues(alpha: 0.18),
-      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-      child: Row(
+    // Native Apple liquid glass REPLACES the frosted fill (no superposition);
+    // web / older OS fall back to the previous translucent dark bar.
+    return NativeGlass(
+      borderRadius: 26,
+      fallbackColor: Colors.black.withValues(alpha: 0.35),
+      fallbackBorder: Colors.white.withValues(alpha: 0.18),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+        child: Row(
         children: [
           // Translation stays always on (_chatTranslate defaults to true); the
           // toggle icon was removed so the text field can start hard left and
@@ -966,6 +968,7 @@ class _CallScreenState extends State<CallScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

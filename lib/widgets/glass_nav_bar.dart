@@ -316,8 +316,8 @@ class _NavItem extends StatelessWidget {
     if (count <= 0) return child;
     return Badge.count(
       count: count,
-      backgroundColor: const Color(0xFFE53935),
-      textColor: Colors.white,
+      backgroundColor: SC.accent,
+      textColor: SC.bgDeep,
       child: child,
     );
   }
