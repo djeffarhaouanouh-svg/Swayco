@@ -297,6 +297,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       // Each field carries a cyan "+10" reward hint pinned at
                       // its top-right — same nudge style as the profile page.
                       _RewardField(
+                        // Single-line field: label floats on the top border.
+                        top: 4,
                         child: _GlassTextField(
                           controller: _nameCtrl,
                           textCapitalization: TextCapitalization.words,
@@ -307,6 +309,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(height: 14),
                       _RewardField(
+                        // Multi-line field, label floats on the top border too.
+                        top: 4,
                         child: _GlassTextField(
                           controller: _bioCtrl,
                           textCapitalization: TextCapitalization.sentences,
@@ -325,6 +329,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       // Single field: tap to pick country → then city.
                       // Wider inset so the "+10" clears the chevron.
                       _RewardField(
+                        // Select field: its label sits lower inside the box.
+                        top: 10,
                         rightInset: 42,
                         child: _GlassSelectField(
                           icon: Icons.public,
@@ -1298,17 +1304,27 @@ class _RewardTag extends StatelessWidget {
 /// [rightInset] is widened for fields with a trailing chevron so the "+10"
 /// clears it.
 class _RewardField extends StatelessWidget {
-  const _RewardField({required this.child, this.rightInset = 14});
+  const _RewardField({
+    required this.child,
+    this.rightInset = 14,
+    this.top = 9,
+  });
 
   final Widget child;
   final double rightInset;
+
+  /// Distance of the "+10" from the field's top edge. Tuned PER SECTION so it
+  /// lines up with that section's label: a TextField floats its label up on the
+  /// top border (small [top]), a select field's label sits lower (larger
+  /// [top]). One shared value would mis-place them.
+  final double top;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
         child,
-        Positioned(top: 9, right: rightInset, child: const _RewardTag()),
+        Positioned(top: top, right: rightInset, child: const _RewardTag()),
       ],
     );
   }
