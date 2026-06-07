@@ -66,6 +66,7 @@ class GlassIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
+      bounce: true,
       child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),

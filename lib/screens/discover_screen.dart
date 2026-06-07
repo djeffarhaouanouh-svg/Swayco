@@ -25,6 +25,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/emoji_burst.dart';
 import '../widgets/missions_ring.dart';
+import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -1003,8 +1004,9 @@ class _DiscoverHeader extends StatelessWidget {
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width. The whole pill is the
                   // tap target (not just the label) for an easier hit.
-                  GestureDetector(
+                  Pressable(
                     behavior: HitTestBehavior.opaque,
+                    bounce: true,
                     onTap: expanded ? null : onTapPill,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
@@ -1865,8 +1867,9 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     // RenderObject is the actual button — used to anchor the emoji burst.
     return Builder(
       builder: (ctx) {
-        return GestureDetector(
+        return Pressable(
           behavior: HitTestBehavior.opaque,
+          bounce: true,
           onTap: widget.onSend == null ? null : () => _handleTap(ctx),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),

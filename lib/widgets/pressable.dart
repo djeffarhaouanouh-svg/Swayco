@@ -13,6 +13,7 @@ class Pressable extends StatefulWidget {
     this.onLongPress,
     this.scale = 0.93,
     this.haptic = true,
+    this.bounce = false,
     this.behavior = HitTestBehavior.opaque,
   });
 
@@ -23,6 +24,10 @@ class Pressable extends StatefulWidget {
   /// How far the child shrinks while pressed (1.0 = no shrink).
   final double scale;
   final bool haptic;
+
+  /// When true, the release springs back with an elastic overshoot past 1.0
+  /// (a little "pop"/bounce) instead of a plain ease-out.
+  final bool bounce;
   final HitTestBehavior behavior;
 
   @override
@@ -54,8 +59,11 @@ class _PressableState extends State<Pressable> {
       onLongPress: widget.onLongPress,
       child: AnimatedScale(
         scale: _down ? widget.scale : 1.0,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOut,
+        // Press = quick squish; release with [bounce] = springy overshoot.
+        duration: _down || !widget.bounce
+            ? const Duration(milliseconds: 110)
+            : const Duration(milliseconds: 420),
+        curve: _down || !widget.bounce ? Curves.easeOut : Curves.elasticOut,
         child: widget.child,
       ),
     );

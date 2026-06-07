@@ -34,8 +34,10 @@ import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/missions_ring.dart';
+import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -848,12 +850,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_rounded,
-                            color: SC.textPrimary,
-                          ),
-                          onPressed: () => Navigator.of(context).maybePop(),
+                        GlassIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.of(context).maybePop(),
                         ),
                         const Spacer(),
                         PopupMenuButton<String>(
@@ -3511,38 +3510,36 @@ class _GradientActionButton extends StatelessWidget {
     // Solid colors — glass card for the primary Message action, accent for
     // the default action, dark bubble for the subdued state.
     final bg = glass ? SC.glassStrong : (subdued ? SC.bubbleIn : SC.accent);
-    return Material(
-      color: bg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
-        side: glass ? const BorderSide(color: SC.glassBorder) : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          alignment: Alignment.center,
-          // Scale the icon+label down to fit when a translation is long
-          // (German / Russian / katakana run wider) instead of overflowing.
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 18, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+    return Pressable(
+      bounce: true,
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: glass ? Border.all(color: SC.glassBorder) : null,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        alignment: Alignment.center,
+        // Scale the icon+label down to fit when a translation is long
+        // (German / Russian / katakana run wider) instead of overflowing.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -3565,19 +3562,21 @@ class _GhostIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     // Dark frosted-glass circle (same surface as the cards) with a white
     // glyph — no blue tint.
-    return Material(
-      color: SC.glassStrong,
-      shape: const CircleBorder(side: BorderSide(color: SC.glassBorder)),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Tooltip(
-          message: tooltip,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, size: 21, color: Colors.white),
+    return Pressable(
+      bounce: true,
+      onTap: onTap,
+      child: Tooltip(
+        message: tooltip,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: SC.glassStrong,
+            shape: BoxShape.circle,
+            border: Border.all(color: SC.glassBorder),
           ),
+          child: Icon(icon, size: 21, color: Colors.white),
         ),
       ),
     );
