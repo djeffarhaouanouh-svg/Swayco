@@ -220,9 +220,12 @@ class GlassNavBar extends StatelessWidget {
                 ),
         ),
         // Reserve the notch strip on top only when hugging; bottom pad by the
-        // safe-area inset.
+        // safe-area inset. When hugging, the glass also grows UP by the slice we
+        // trimmed off the bottom (0.3*inset) so its top edge rises back to the
+        // Discover card's bottom and keeps the image covered (no blue gap) —
+        // WITHOUT lowering the icon row, which is anchored by the bottom pad.
         padding: EdgeInsets.only(
-          top: hugTopCorners ? hugRadius : 0,
+          top: hugTopCorners ? hugRadius + bottomInset * 0.3 : 0,
           bottom: bottomInset * 0.7,
         ),
         child: inner,
