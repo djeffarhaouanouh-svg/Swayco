@@ -186,7 +186,7 @@ class GlassNavBar extends StatelessWidget {
           glassColor: Color(0x12FFFFFF),
           refractiveIndex: 1.3,
         ),
-        padding: EdgeInsets.only(bottom: bottomInset * 0.5),
+        padding: EdgeInsets.only(bottom: bottomInset * 0.7),
         child: inner,
       );
     }
@@ -208,7 +208,7 @@ class GlassNavBar extends StatelessWidget {
         // safe-area inset.
         padding: EdgeInsets.only(
           top: hugTopCorners ? hugRadius : 0,
-          bottom: bottomInset * 0.5,
+          bottom: bottomInset * 0.7,
         ),
         child: inner,
       ),

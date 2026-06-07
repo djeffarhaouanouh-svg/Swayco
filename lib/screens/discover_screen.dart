@@ -957,7 +957,7 @@ class _DiscoverHeader extends StatelessWidget {
   /// Height of the bar's content row (below the safe-area inset, which the
   /// bar pads itself). Exposed so the Discover card can reserve exactly
   /// this much space at the top and sit flush against the bar's edge.
-  static const double height = 60;
+  static const double height = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -983,7 +983,7 @@ class _DiscoverHeader extends StatelessWidget {
           child: SizedBox(
             height: height,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Row(
                 children: [
                   // Hidden while the search is open so the field has room and
@@ -999,7 +999,11 @@ class _DiscoverHeader extends StatelessWidget {
                   // "X/6" glued left of the ring with a breathing cyan halo —
                   // shown in both states (the expanded field is capped below to
                   // leave room so the bar never overflows).
-                  const MissionsScoreRing(),
+                  // Slight nudge up to sit in line with the title + loupe.
+                  Transform.translate(
+                    offset: const Offset(0, -3),
+                    child: const MissionsScoreRing(),
+                  ),
                   const SizedBox(width: 10),
                   // Search pill: compact button when collapsed, wider TextField
                   // when expanded — but never full-width. The whole pill is the
@@ -1033,7 +1037,7 @@ class _DiscoverHeader extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.search,
-                            size: 18,
+                            size: 22,
                             color: SC.textMuted,
                           ),
                           if (expanded) const SizedBox(width: 6),
