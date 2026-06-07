@@ -1802,18 +1802,11 @@ class _ComposerState extends State<_Composer> {
               ),
             ),
             const SizedBox(width: 4),
-            // Photo (add image) button — OUTSIDE the glass bar, on the right.
-            InkWell(
-              borderRadius: BorderRadius.circular(22),
+            // Photo (add image) button — OUTSIDE the glass bar, so it gets its
+            // own glass circle + spring bounce (like the header buttons).
+            GlassIconButton(
+              icon: Icons.add_photo_alternate_outlined,
               onTap: widget.sending ? null : widget.onSendImage,
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 24,
-                  color: SC.textMuted,
-                ),
-              ),
             ),
           ],
         ),
