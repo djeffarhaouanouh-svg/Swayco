@@ -635,7 +635,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     // then grow over these edges with concave notches (see GlassNavBar /
     // _DiscoverHeader) that hug the card's rounded corners, no gap.
     final deckTop = safeTop + _DiscoverHeader.height;
-    final deckBottom = GlassNavBar.height + safeBottom;
+    // The card's bottom edge must land exactly on the bottom bar's notch strip
+    // so the concave notches hug the card's rounded corners with no blue gap.
+    // The nav pads its own bottom by `safeBottom * 0.7` (see GlassNavBar), so we
+    // mirror that factor here — otherwise the card stops ~0.3*safeBottom short
+    // and a sliver of background shows between the image and the glass.
+    final deckBottom = GlassNavBar.height + safeBottom * 0.7;
     return Scaffold(
       backgroundColor: SC.bg,
       // Cards extend behind the floating nav bar (rendered by RootShell).
