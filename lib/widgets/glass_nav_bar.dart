@@ -208,11 +208,7 @@ class _GlassNavBarState extends State<GlassNavBar>
     // The pill + items row — identical in every rendering path.
     final inner = SizedBox(
       height: height,
-      child: Padding(
-        // Pull the icons in from the screen edges so they sit a bit tighter;
-        // the glass bar itself stays full-width. Tune the horizontal inset.
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        child: LayoutBuilder(
+      child: LayoutBuilder(
             builder: (context, constraints) {
               // Each tab gets an equal slice of the full width; the pill and
               // the icons share the same slot geometry so they line up. Cache
@@ -306,7 +302,6 @@ class _GlassNavBarState extends State<GlassNavBar>
               );
             },
           ),
-        ),
       );
 
     // Native flat bar → real shader Liquid Glass (single static surface, no
