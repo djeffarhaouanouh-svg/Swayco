@@ -323,7 +323,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(height: 14),
                       // Single field: tap to pick country → then city.
+                      // Wider inset so the "+10" clears the chevron.
                       _RewardField(
+                        rightInset: 42,
                         child: _GlassSelectField(
                           icon: Icons.public,
                           label: AppStrings.t('onb_location_label'),
@@ -1291,20 +1293,22 @@ class _RewardTag extends StatelessWidget {
   }
 }
 
-/// Wraps a field with the cyan "+10" hint pinned at its top-right corner —
-/// matching how the profile page floats its reward hints.
+/// Wraps a field with the cyan "+10" hint sitting INSIDE the field at the
+/// top-right, aligned with the field's label (label-left / +10-right). The
+/// [rightInset] is widened for fields with a trailing chevron so the "+10"
+/// clears it.
 class _RewardField extends StatelessWidget {
-  const _RewardField({required this.child});
+  const _RewardField({required this.child, this.rightInset = 14});
 
   final Widget child;
+  final double rightInset;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
-      clipBehavior: Clip.none,
       children: [
         child,
-        const Positioned(right: 2, top: -6, child: _RewardTag()),
+        Positioned(top: 9, right: rightInset, child: const _RewardTag()),
       ],
     );
   }
