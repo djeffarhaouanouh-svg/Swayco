@@ -1160,8 +1160,17 @@ class _CallScreenState extends State<CallScreen> {
                         left: 0,
                         right: 0,
                         child: Center(
-                          child: Text(
-                            'swayco.ai',
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: 'swayco'),
+                                // ".ai" in cyan accent.
+                                TextSpan(
+                                  text: '.ai',
+                                  style: TextStyle(color: SC.accent),
+                                ),
+                              ],
+                            ),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 25,
