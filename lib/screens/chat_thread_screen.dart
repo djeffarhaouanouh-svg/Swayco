@@ -319,15 +319,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     setState(() {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
-      // Prefer the locally-stored spoken language, but fall back to the
-      // Supabase profile when local prefs are empty — otherwise a
-      // returning user on a freshly-installed app has an empty _myLang,
-      // which makes _maybeFetchTranslation bail out and the translate
-      // toggle silently does nothing (works on web only because the
-      // browser session still holds the onboarding prefs).
-      _myLang = (profile?.sourceLang.trim().isNotEmpty ?? false)
-          ? profile!.sourceLang.trim()
-          : (mine?.language.trim() ?? '');
+      // The ACCOUNT (remote profile) is the source of truth for my language,
+      // so incoming messages translate into whatever the account is set to
+      // (e.g. Russian) — NOT this device's stale local cache. That cache was
+      // the bug: account ru, but messages came back in the cached fr. Local
+      // prefs are only the fallback (offline / account has no language yet).
+      _myLang = (mine?.language.trim().isNotEmpty ?? false)
+          ? mine!.language.trim()
+          : (profile?.sourceLang.trim() ?? '');
       _myGender = (profile?.gender.trim().isNotEmpty ?? false)
           ? profile!.gender.trim()
           : (mine?.gender.trim() ?? '');
