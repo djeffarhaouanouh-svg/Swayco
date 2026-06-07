@@ -989,80 +989,91 @@ class _DiscoverHeader extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
-                      width: expanded ? 200 : null,
+                      // Fill most of the bar while typing, but cap it so it
+                      // never overflows the bar on a narrow screen.
+                      width: expanded
+                          ? (MediaQuery.sizeOf(context).width - 100).clamp(
+                              200.0,
+                              260.0,
+                            )
+                          : null,
                       padding: EdgeInsets.symmetric(
                         horizontal: expanded ? 16 : 12,
-                        vertical: expanded ? 11 : 12,
+                        // Keep the same thickness as the collapsed magnifier
+                        // button so the bar doesn't get thinner while typing.
+                        vertical: expanded ? 15 : 12,
                       ),
-                    decoration: BoxDecoration(
-                      color: SC.glassStrong,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: SC.glassBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: expanded
-                          ? MainAxisSize.max
-                          : MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.search,
-                          size: expanded ? 16 : 24,
-                          color: SC.textMuted,
-                        ),
-                        if (expanded) const SizedBox(width: 6),
-                        if (expanded)
-                          Expanded(
-                            // Local TextSelectionTheme so the selection halo /
-                            // handles match the Midnight cyan instead of the
-                            // legacy WhatsApp-green accent inherited from the
-                            // global theme.
-                            child: TextSelectionTheme(
-                              data: TextSelectionThemeData(
-                                cursorColor: SC.accent,
-                                selectionColor: SC.accent.withValues(
-                                  alpha: 0.35,
-                                ),
-                                selectionHandleColor: SC.accent,
-                              ),
-                              child: TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                onChanged: onChanged,
-                                textInputAction: TextInputAction.search,
-                                cursorColor: SC.accent,
-                                style: const TextStyle(
-                                  color: SC.textPrimary,
-                                  fontSize: 13,
-                                ),
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  hintText: AppStrings.t('search_friend_hint'),
-                                  hintStyle: const TextStyle(
-                                    color: SC.textMuted,
-                                    fontSize: 13,
+                      decoration: BoxDecoration(
+                        color: SC.glassStrong,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: SC.glassBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: expanded
+                            ? MainAxisSize.max
+                            : MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search,
+                            size: expanded ? 18 : 24,
+                            color: SC.textMuted,
+                          ),
+                          if (expanded) const SizedBox(width: 6),
+                          if (expanded)
+                            Expanded(
+                              // Local TextSelectionTheme so the selection halo /
+                              // handles match the Midnight cyan instead of the
+                              // legacy WhatsApp-green accent inherited from the
+                              // global theme.
+                              child: TextSelectionTheme(
+                                data: TextSelectionThemeData(
+                                  cursorColor: SC.accent,
+                                  selectionColor: SC.accent.withValues(
+                                    alpha: 0.35,
                                   ),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
+                                  selectionHandleColor: SC.accent,
+                                ),
+                                child: TextField(
+                                  controller: controller,
+                                  focusNode: focusNode,
+                                  onChanged: onChanged,
+                                  textInputAction: TextInputAction.search,
+                                  cursorColor: SC.accent,
+                                  style: const TextStyle(
+                                    color: SC.textPrimary,
+                                    fontSize: 15,
+                                  ),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    hintText: AppStrings.t(
+                                      'search_friend_hint',
+                                    ),
+                                    hintStyle: const TextStyle(
+                                      color: SC.textMuted,
+                                      fontSize: 15,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        if (expanded)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: onSubmittedClose,
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                Icons.close,
-                                size: 16,
-                                color: SC.textMuted,
+                          if (expanded)
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: onSubmittedClose,
+                              child: const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: SC.textMuted,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 ],
               ),
@@ -1385,15 +1396,17 @@ class _ProfileCardState extends State<_ProfileCard> {
     // language doesn't always match the country — a Brazilian speaks
     // Portuguese but flies 🇧🇷). Falls back to the language flag when there's
     // no city, as before.
-    final flag = (profile.city.trim().isNotEmpty
+    final flag =
+        (profile.city.trim().isNotEmpty
             ? countryFlagFor(profile.country)
             : null) ??
         findLanguageByCode(profile.language)?.flag ??
         '';
     // "Ville, Pays" shown small under the name (either part may be empty).
-    final locationLabel = [profile.city.trim(), profile.country.trim()]
-        .where((s) => s.isNotEmpty)
-        .join(', ');
+    final locationLabel = [
+      profile.city.trim(),
+      profile.country.trim(),
+    ].where((s) => s.isNotEmpty).join(', ');
     return DecoratedBox(
       decoration: BoxDecoration(
         // Match the bars' notch radius so the card's rounded corners nest
@@ -1637,17 +1650,13 @@ class _ReactionRail extends StatelessWidget {
             emoji: _emojis[i],
             index: i,
             reacted: reactedEmojis.contains(_emojis[i]),
-            onSend:
-                onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
+            onSend: onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
           ),
         ],
         // Friend-request button at the bottom of the rail.
         if (onAddFriend != null) ...[
           const SizedBox(height: 10),
-          _RailAddFriendButton(
-            pending: pendingOutgoing,
-            onTap: onAddFriend!,
-          ),
+          _RailAddFriendButton(pending: pendingOutgoing, onTap: onAddFriend!),
         ],
       ],
     );
@@ -1738,13 +1747,17 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
   );
   late final Animation<double> _popScale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween<double>(begin: 1.0, end: 1.35)
-          .chain(CurveTween(curve: Curves.easeOut)),
+      tween: Tween<double>(
+        begin: 1.0,
+        end: 1.35,
+      ).chain(CurveTween(curve: Curves.easeOut)),
       weight: 35,
     ),
     TweenSequenceItem(
-      tween: Tween<double>(begin: 1.35, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
+      tween: Tween<double>(
+        begin: 1.35,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.elasticOut)),
       weight: 65,
     ),
   ]).animate(_pop);
@@ -1796,8 +1809,9 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
                   : Colors.black.withValues(alpha: 0.35),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white
-                    .withValues(alpha: widget.reacted ? 0.85 : 0.20),
+                color: Colors.white.withValues(
+                  alpha: widget.reacted ? 0.85 : 0.20,
+                ),
                 width: widget.reacted ? 2 : 1,
               ),
             ),
