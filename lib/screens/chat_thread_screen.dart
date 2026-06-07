@@ -601,22 +601,28 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         ),
                       ),
                     ),
-                    if (_peerBlockedMe)
-                      const _BlockedComposerNotice()
-                    else
-                      _Composer(
-                        controller: _inputCtrl,
-                        sending: _sending,
-                        onSend: _send,
-                        onSendVoice: _sendVoice,
-                        onSendImage: _sendImage,
-                        autoTranslate: _autoTranslate,
-                        onToggleTranslate: _toggleAutoTranslate,
-                        myLang: _myLang,
-                      ),
                   ],
                 ),
               ),
+            ),
+            // Floating glass composer OVER the messages — no dark footer behind
+            // it, so the glass refracts the conversation.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _peerBlockedMe
+                  ? const _BlockedComposerNotice()
+                  : _Composer(
+                      controller: _inputCtrl,
+                      sending: _sending,
+                      onSend: _send,
+                      onSendVoice: _sendVoice,
+                      onSendImage: _sendImage,
+                      autoTranslate: _autoTranslate,
+                      onToggleTranslate: _toggleAutoTranslate,
+                      myLang: _myLang,
+                    ),
             ),
             Positioned.fill(
               child: IgnorePointer(
@@ -672,7 +678,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       controller: _scrollCtrl,
       // Extra top room when the floating local-time bubble is shown so the
       // first message never hides behind it.
-      padding: EdgeInsets.fromLTRB(12, hasClockChip ? 46 : 12, 12, 12),
+      // Bottom room so the last message clears the floating composer.
+      padding: EdgeInsets.fromLTRB(
+        12,
+        hasClockChip ? 46 : 12,
+        12,
+        96 + MediaQuery.paddingOf(context).bottom,
+      ),
       itemCount: _messages.length,
       itemBuilder: (ctx, i) {
         final m = _messages[i];
