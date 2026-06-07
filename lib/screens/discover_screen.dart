@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
@@ -14,6 +15,7 @@ import '../services/missions_service.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
+import '../services/remote_config.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
@@ -681,6 +683,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 onChanged: _onSearchQueryChanged,
               ),
             ),
+            // Live "X en ligne" badge over the card's top-left. Remote-gated
+            // (online_badge_enabled) so it can be killed from the dashboard if
+            // App Review objects — no app update needed.
+            Positioned(
+              top: deckTop + 10,
+              left: 20,
+              child: const _OnlineBadge(),
+            ),
             // Tap-outside catcher to dismiss the search. Transparent now —
             // no dark overlay over the card; HitTestBehavior.opaque still
             // captures the tap so tapping outside closes the search.
@@ -814,6 +824,101 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// "X en ligne" badge with a pulsing green dot. The count is a random number
+/// inside the remote-config range; the whole badge hides instantly when
+/// `online_badge_enabled` is flipped off in the dashboard (App Review
+/// kill-switch). Drifts gently so it feels alive.
+class _OnlineBadge extends StatefulWidget {
+  const _OnlineBadge();
+
+  @override
+  State<_OnlineBadge> createState() => _OnlineBadgeState();
+}
+
+class _OnlineBadgeState extends State<_OnlineBadge> {
+  final _rng = Random();
+  int? _count;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _roll();
+    RemoteConfig.version.addListener(_roll);
+    _timer = Timer.periodic(const Duration(seconds: 18), (_) => _drift());
+  }
+
+  @override
+  void dispose() {
+    RemoteConfig.version.removeListener(_roll);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  int get _lo => RemoteConfig.integer('online_min', 40);
+  int get _hi {
+    final h = RemoteConfig.integer('online_max', 180);
+    return h < _lo ? _lo : h;
+  }
+
+  void _roll() {
+    if (!mounted) return;
+    if (!RemoteConfig.flag('online_badge_enabled')) {
+      setState(() => _count = null);
+      return;
+    }
+    setState(() => _count = _lo + _rng.nextInt(_hi - _lo + 1));
+  }
+
+  void _drift() {
+    if (!mounted || _count == null) return;
+    setState(() => _count = (_count! + _rng.nextInt(7) - 3).clamp(_lo, _hi));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _count;
+    // No badge when nobody's online (or it's disabled remotely).
+    if (count == null || count <= 0) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.30),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFF22C55E),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.6),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            AppStrings.t('online_count', args: {'n': '$count'}),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
