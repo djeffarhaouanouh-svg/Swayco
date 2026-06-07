@@ -256,9 +256,10 @@ abstract final class ChatApi {
     }
   }
 
-  /// Most recent photo reactions (Discover-rail emoji taps) addressed
-  /// to [meId]. One entry per sender — the latest emoji a given peer
-  /// reacted with. Ordered by most recent first.
+  /// Photo reactions (Discover-rail emoji taps) addressed to [meId] — one
+  /// entry per DISTINCT reaction (sender + photo + emoji), so a person who
+  /// reacts to several photos (or with several emojis) accumulates instead of
+  /// collapsing to one. Ordered by most recent first.
   static Future<List<ChatMessage>> fetchPhotoReactions(String meId) async {
     if (meId.isEmpty) return const [];
     final rows = await _client
