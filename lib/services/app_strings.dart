@@ -53,6 +53,31 @@ abstract final class AppStrings {
 
   // ─── French ───────────────────────────────────────────────────────────────
   static const Map<String, String> _fr = {
+    'paywall_headline': 'Activez votre abonnement\net parlez sans limite',
+    'paywall_subtitle':
+        'Parlez toutes les langues, sans barrière. Traduction vocale en temps réel.',
+    'paywall_social_proof': 'Plus de 10 000 utilisateurs nous font confiance',
+    'paywall_plus_sub': 'Jusqu\'à *10h* d\'appels traduits par mois',
+    'paywall_ultra_sub': 'Heures d\'appel *illimitées*',
+    'paywall_period_month': '/mois',
+    'paywall_popular': 'Populaire',
+    'paywall_cta': 'S\'abonner',
+    'paywall_restore': 'Restaurer les achats',
+    'paywall_terms': 'Conditions',
+    'paywall_privacy': 'Confidentialité',
+    'paywall_account_apple': 'votre compte Apple',
+    'paywall_account_google': 'votre compte Google Play',
+    'paywall_account_web': 'votre moyen de paiement',
+    'paywall_account_other': 'votre compte',
+    'paywall_legal':
+        'Abonnement à renouvellement automatique. {tiers} : le montant est débité sur {account} à la confirmation de l\'achat. L\'abonnement se renouvelle automatiquement pour la même durée et au même tarif, sauf désactivation au moins 24 h avant la fin de la période en cours. Vous pouvez gérer ou résilier votre abonnement à tout moment dans les réglages de votre compte. En vous abonnant, vous acceptez les Conditions d\'utilisation et la Politique de confidentialité (liens ci-dessous).',
+    'paywall_snack_activated': 'Abonnement activé 🎉',
+    'paywall_snack_unavailable': 'Offre indisponible pour le moment.',
+    'paywall_snack_error': 'L\'achat n\'a pas pu être finalisé. Réessaie.',
+    'paywall_snack_checkout_error':
+        'Impossible d\'ouvrir la page de paiement. Réessaye dans un instant.',
+    'paywall_snack_restored': 'Achats restaurés ✅',
+    'paywall_snack_nothing_restore': 'Aucun abonnement à restaurer.',
     'nav_search': 'Recherche',
     'nav_call': 'Appel',
     'nav_chat': 'Chat',
@@ -537,6 +562,31 @@ abstract final class AppStrings {
 
   // ─── English ──────────────────────────────────────────────────────────────
   static const Map<String, String> _en = {
+    'paywall_headline': 'Activate your subscription\nand talk without limits',
+    'paywall_subtitle':
+        'Speak every language, no barriers. Real-time voice translation.',
+    'paywall_social_proof': 'Trusted by over 10,000 users',
+    'paywall_plus_sub': 'Up to *10h* of translated calls per month',
+    'paywall_ultra_sub': '*Unlimited* call hours',
+    'paywall_period_month': '/mo',
+    'paywall_popular': 'Popular',
+    'paywall_cta': 'Subscribe',
+    'paywall_restore': 'Restore purchases',
+    'paywall_terms': 'Terms',
+    'paywall_privacy': 'Privacy',
+    'paywall_account_apple': 'your Apple account',
+    'paywall_account_google': 'your Google Play account',
+    'paywall_account_web': 'your payment method',
+    'paywall_account_other': 'your account',
+    'paywall_legal':
+        'Auto-renewing subscription. {tiers}: payment is charged to {account} upon purchase confirmation. The subscription renews automatically for the same duration and price unless turned off at least 24 hours before the end of the current period. You can manage or cancel your subscription at any time in your account settings. By subscribing, you agree to the Terms of Use and Privacy Policy (links below).',
+    'paywall_snack_activated': 'Subscription activated 🎉',
+    'paywall_snack_unavailable': 'Offer unavailable right now.',
+    'paywall_snack_error': 'The purchase could not be completed. Please try again.',
+    'paywall_snack_checkout_error':
+        'Couldn\'t open the payment page. Please try again shortly.',
+    'paywall_snack_restored': 'Purchases restored ✅',
+    'paywall_snack_nothing_restore': 'No subscription to restore.',
     'nav_search': 'Search',
     'nav_call': 'Call',
     'nav_chat': 'Chat',
@@ -1011,6 +1061,31 @@ abstract final class AppStrings {
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
   static const Map<String, String> _es = {
+    'paywall_headline': 'Activa tu suscripción\ny habla sin límites',
+    'paywall_subtitle':
+        'Habla todos los idiomas, sin barreras. Traducción de voz en tiempo real.',
+    'paywall_social_proof': 'Más de 10 000 usuarios confían en nosotros',
+    'paywall_plus_sub': 'Hasta *10 h* de llamadas traducidas al mes',
+    'paywall_ultra_sub': 'Horas de llamada *ilimitadas*',
+    'paywall_period_month': '/mes',
+    'paywall_popular': 'Popular',
+    'paywall_cta': 'Suscribirse',
+    'paywall_restore': 'Restaurar compras',
+    'paywall_terms': 'Condiciones',
+    'paywall_privacy': 'Privacidad',
+    'paywall_account_apple': 'tu cuenta de Apple',
+    'paywall_account_google': 'tu cuenta de Google Play',
+    'paywall_account_web': 'tu método de pago',
+    'paywall_account_other': 'tu cuenta',
+    'paywall_legal':
+        'Suscripción de renovación automática. {tiers}: el importe se cobra en {account} al confirmar la compra. La suscripción se renueva automáticamente por la misma duración y precio, salvo que la desactives al menos 24 h antes del final del período en curso. Puedes gestionar o cancelar tu suscripción en cualquier momento en los ajustes de tu cuenta. Al suscribirte, aceptas las Condiciones de uso y la Política de privacidad (enlaces abajo).',
+    'paywall_snack_activated': 'Suscripción activada 🎉',
+    'paywall_snack_unavailable': 'Oferta no disponible por ahora.',
+    'paywall_snack_error': 'No se pudo completar la compra. Inténtalo de nuevo.',
+    'paywall_snack_checkout_error':
+        'No se pudo abrir la página de pago. Inténtalo en un momento.',
+    'paywall_snack_restored': 'Compras restauradas ✅',
+    'paywall_snack_nothing_restore': 'No hay suscripción que restaurar.',
     'nav_search': 'Buscar',
     'nav_call': 'Llamada',
     'nav_chat': 'Chat',
@@ -1480,6 +1555,32 @@ abstract final class AppStrings {
 
   // ─── German ───────────────────────────────────────────────────────────────
   static const Map<String, String> _de = {
+    'paywall_headline': 'Aktiviere dein Abo\nund sprich ohne Grenzen',
+    'paywall_subtitle':
+        'Sprich jede Sprache, ohne Barrieren. Sprachübersetzung in Echtzeit.',
+    'paywall_social_proof': 'Über 10.000 Nutzer vertrauen uns',
+    'paywall_plus_sub': 'Bis zu *10 Std.* übersetzte Anrufe pro Monat',
+    'paywall_ultra_sub': '*Unbegrenzte* Anrufstunden',
+    'paywall_period_month': '/Monat',
+    'paywall_popular': 'Beliebt',
+    'paywall_cta': 'Abonnieren',
+    'paywall_restore': 'Käufe wiederherstellen',
+    'paywall_terms': 'Bedingungen',
+    'paywall_privacy': 'Datenschutz',
+    'paywall_account_apple': 'dein Apple-Konto',
+    'paywall_account_google': 'dein Google-Play-Konto',
+    'paywall_account_web': 'dein Zahlungsmittel',
+    'paywall_account_other': 'dein Konto',
+    'paywall_legal':
+        'Automatisch verlängerbares Abo. {tiers}: Der Betrag wird bei Kaufbestätigung über {account} abgebucht. Das Abo verlängert sich automatisch um denselben Zeitraum zum selben Preis, sofern es nicht mindestens 24 Std. vor Ende des laufenden Zeitraums deaktiviert wird. Du kannst dein Abo jederzeit in den Einstellungen deines Kontos verwalten oder kündigen. Mit dem Abschluss stimmst du den Nutzungsbedingungen und der Datenschutzerklärung zu (Links unten).',
+    'paywall_snack_activated': 'Abo aktiviert 🎉',
+    'paywall_snack_unavailable': 'Angebot derzeit nicht verfügbar.',
+    'paywall_snack_error':
+        'Kauf konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+    'paywall_snack_checkout_error':
+        'Zahlungsseite konnte nicht geöffnet werden. Bitte versuche es gleich erneut.',
+    'paywall_snack_restored': 'Käufe wiederhergestellt ✅',
+    'paywall_snack_nothing_restore': 'Kein Abo zum Wiederherstellen.',
     'nav_search': 'Suche',
     'nav_call': 'Anruf',
     'nav_chat': 'Chat',
@@ -1953,6 +2054,31 @@ abstract final class AppStrings {
 
   // ─── Italian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _it = {
+    'paywall_headline': 'Attiva il tuo abbonamento\ne parla senza limiti',
+    'paywall_subtitle':
+        'Parla ogni lingua, senza barriere. Traduzione vocale in tempo reale.',
+    'paywall_social_proof': 'Più di 10.000 utenti si fidano di noi',
+    'paywall_plus_sub': 'Fino a *10 h* di chiamate tradotte al mese',
+    'paywall_ultra_sub': 'Ore di chiamata *illimitate*',
+    'paywall_period_month': '/mese',
+    'paywall_popular': 'Popolare',
+    'paywall_cta': 'Abbonati',
+    'paywall_restore': 'Ripristina acquisti',
+    'paywall_terms': 'Condizioni',
+    'paywall_privacy': 'Privacy',
+    'paywall_account_apple': 'il tuo account Apple',
+    'paywall_account_google': 'il tuo account Google Play',
+    'paywall_account_web': 'il tuo metodo di pagamento',
+    'paywall_account_other': 'il tuo account',
+    'paywall_legal':
+        'Abbonamento a rinnovo automatico. {tiers}: l\'importo viene addebitato su {account} alla conferma dell\'acquisto. L\'abbonamento si rinnova automaticamente per la stessa durata e allo stesso prezzo, salvo disattivazione almeno 24 h prima della fine del periodo in corso. Puoi gestire o annullare l\'abbonamento in qualsiasi momento nelle impostazioni del tuo account. Abbonandoti accetti le Condizioni d\'uso e l\'Informativa sulla privacy (link in basso).',
+    'paywall_snack_activated': 'Abbonamento attivato 🎉',
+    'paywall_snack_unavailable': 'Offerta non disponibile al momento.',
+    'paywall_snack_error': 'Impossibile completare l\'acquisto. Riprova.',
+    'paywall_snack_checkout_error':
+        'Impossibile aprire la pagina di pagamento. Riprova tra poco.',
+    'paywall_snack_restored': 'Acquisti ripristinati ✅',
+    'paywall_snack_nothing_restore': 'Nessun abbonamento da ripristinare.',
     'nav_search': 'Cerca',
     'nav_call': 'Chiamata',
     'nav_chat': 'Chat',
@@ -2421,6 +2547,31 @@ abstract final class AppStrings {
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
   static const Map<String, String> _pt = {
+    'paywall_headline': 'Ative a sua subscrição\ne fale sem limites',
+    'paywall_subtitle':
+        'Fale todos os idiomas, sem barreiras. Tradução de voz em tempo real.',
+    'paywall_social_proof': 'Mais de 10 000 utilizadores confiam em nós',
+    'paywall_plus_sub': 'Até *10 h* de chamadas traduzidas por mês',
+    'paywall_ultra_sub': 'Horas de chamada *ilimitadas*',
+    'paywall_period_month': '/mês',
+    'paywall_popular': 'Popular',
+    'paywall_cta': 'Subscrever',
+    'paywall_restore': 'Restaurar compras',
+    'paywall_terms': 'Condições',
+    'paywall_privacy': 'Privacidade',
+    'paywall_account_apple': 'a sua conta Apple',
+    'paywall_account_google': 'a sua conta Google Play',
+    'paywall_account_web': 'o seu método de pagamento',
+    'paywall_account_other': 'a sua conta',
+    'paywall_legal':
+        'Subscrição de renovação automática. {tiers}: o valor é cobrado em {account} na confirmação da compra. A subscrição renova-se automaticamente pela mesma duração e preço, salvo se for desativada pelo menos 24 h antes do fim do período em curso. Pode gerir ou cancelar a subscrição a qualquer momento nas definições da sua conta. Ao subscrever, aceita os Termos de utilização e a Política de privacidade (ligações abaixo).',
+    'paywall_snack_activated': 'Subscrição ativada 🎉',
+    'paywall_snack_unavailable': 'Oferta indisponível de momento.',
+    'paywall_snack_error': 'Não foi possível concluir a compra. Tenta novamente.',
+    'paywall_snack_checkout_error':
+        'Não foi possível abrir a página de pagamento. Tenta daqui a pouco.',
+    'paywall_snack_restored': 'Compras restauradas ✅',
+    'paywall_snack_nothing_restore': 'Nenhuma subscrição para restaurar.',
     'nav_search': 'Pesquisa',
     'nav_call': 'Chamada',
     'nav_chat': 'Chat',
@@ -2889,6 +3040,32 @@ abstract final class AppStrings {
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
   static const Map<String, String> _nl = {
+    'paywall_headline': 'Activeer je abonnement\nen praat zonder grenzen',
+    'paywall_subtitle':
+        'Spreek elke taal, zonder barrières. Spraakvertaling in realtime.',
+    'paywall_social_proof': 'Meer dan 10.000 gebruikers vertrouwen ons',
+    'paywall_plus_sub': 'Tot *10 u* vertaalde gesprekken per maand',
+    'paywall_ultra_sub': '*Onbeperkte* beluren',
+    'paywall_period_month': '/maand',
+    'paywall_popular': 'Populair',
+    'paywall_cta': 'Abonneren',
+    'paywall_restore': 'Aankopen herstellen',
+    'paywall_terms': 'Voorwaarden',
+    'paywall_privacy': 'Privacy',
+    'paywall_account_apple': 'je Apple-account',
+    'paywall_account_google': 'je Google Play-account',
+    'paywall_account_web': 'je betaalmethode',
+    'paywall_account_other': 'je account',
+    'paywall_legal':
+        'Automatisch verlengend abonnement. {tiers}: het bedrag wordt bij aankoopbevestiging afgeschreven van {account}. Het abonnement wordt automatisch verlengd voor dezelfde duur en prijs, tenzij het minstens 24 u vóór het einde van de huidige periode wordt uitgeschakeld. Je kunt je abonnement op elk moment beheren of opzeggen in de instellingen van je account. Door te abonneren ga je akkoord met de Gebruiksvoorwaarden en het Privacybeleid (links hieronder).',
+    'paywall_snack_activated': 'Abonnement geactiveerd 🎉',
+    'paywall_snack_unavailable': 'Aanbod momenteel niet beschikbaar.',
+    'paywall_snack_error':
+        'De aankoop kon niet worden voltooid. Probeer het opnieuw.',
+    'paywall_snack_checkout_error':
+        'Kan de betaalpagina niet openen. Probeer het zo opnieuw.',
+    'paywall_snack_restored': 'Aankopen hersteld ✅',
+    'paywall_snack_nothing_restore': 'Geen abonnement om te herstellen.',
     'nav_search': 'Zoeken',
     'nav_call': 'Oproep',
     'nav_chat': 'Chat',
@@ -3355,6 +3532,29 @@ abstract final class AppStrings {
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ar = {
+    'paywall_headline': 'فعّل اشتراكك\nوتحدّث بلا حدود',
+    'paywall_subtitle': 'تحدث بكل اللغات، بلا حواجز. ترجمة صوتية فورية.',
+    'paywall_social_proof': 'يثق بنا أكثر من 10٬000 مستخدم',
+    'paywall_plus_sub': 'حتى *10 ساعات* من المكالمات المترجمة شهريًا',
+    'paywall_ultra_sub': 'ساعات مكالمات *غير محدودة*',
+    'paywall_period_month': '/شهر',
+    'paywall_popular': 'شائع',
+    'paywall_cta': 'اشترك',
+    'paywall_restore': 'استعادة المشتريات',
+    'paywall_terms': 'الشروط',
+    'paywall_privacy': 'الخصوصية',
+    'paywall_account_apple': 'حساب Apple الخاص بك',
+    'paywall_account_google': 'حساب Google Play الخاص بك',
+    'paywall_account_web': 'وسيلة الدفع الخاصة بك',
+    'paywall_account_other': 'حسابك',
+    'paywall_legal':
+        'اشتراك تلقائي التجديد. {tiers}: يُخصم المبلغ من {account} عند تأكيد الشراء. يتجدد الاشتراك تلقائيًا للمدة نفسها وبالسعر نفسه ما لم يتم إيقافه قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك إدارة اشتراكك أو إلغاؤه في أي وقت من إعدادات حسابك. بالاشتراك، فإنك توافق على شروط الاستخدام وسياسة الخصوصية (الروابط أدناه).',
+    'paywall_snack_activated': 'تم تفعيل الاشتراك 🎉',
+    'paywall_snack_unavailable': 'العرض غير متاح حاليًا.',
+    'paywall_snack_error': 'تعذّر إتمام عملية الشراء. حاول مرة أخرى.',
+    'paywall_snack_checkout_error': 'تعذّر فتح صفحة الدفع. حاول بعد قليل.',
+    'paywall_snack_restored': 'تمت استعادة المشتريات ✅',
+    'paywall_snack_nothing_restore': 'لا يوجد اشتراك لاستعادته.',
     'nav_search': 'بحث',
     'nav_call': 'مكالمة',
     'nav_chat': 'دردشة',
@@ -3808,6 +4008,31 @@ abstract final class AppStrings {
 
   // ─── Russian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _ru = {
+    'paywall_headline': 'Активируйте подписку\nи говорите без границ',
+    'paywall_subtitle':
+        'Говорите на любом языке без барьеров. Голосовой перевод в реальном времени.',
+    'paywall_social_proof': 'Нам доверяют более 10 000 пользователей',
+    'paywall_plus_sub': 'До *10 ч* переведённых звонков в месяц',
+    'paywall_ultra_sub': '*Безлимитные* часы звонков',
+    'paywall_period_month': '/мес',
+    'paywall_popular': 'Популярно',
+    'paywall_cta': 'Оформить подписку',
+    'paywall_restore': 'Восстановить покупки',
+    'paywall_terms': 'Условия',
+    'paywall_privacy': 'Конфиденциальность',
+    'paywall_account_apple': 'ваш аккаунт Apple',
+    'paywall_account_google': 'ваш аккаунт Google Play',
+    'paywall_account_web': 'ваш способ оплаты',
+    'paywall_account_other': 'ваш аккаунт',
+    'paywall_legal':
+        'Подписка с автопродлением. {tiers}: сумма списывается с {account} при подтверждении покупки. Подписка автоматически продлевается на тот же срок и по той же цене, если не отключить её не менее чем за 24 часа до окончания текущего периода. Вы можете управлять подпиской или отменить её в любое время в настройках аккаунта. Оформляя подписку, вы принимаете Условия использования и Политику конфиденциальности (ссылки ниже).',
+    'paywall_snack_activated': 'Подписка активирована 🎉',
+    'paywall_snack_unavailable': 'Предложение сейчас недоступно.',
+    'paywall_snack_error': 'Не удалось завершить покупку. Попробуйте снова.',
+    'paywall_snack_checkout_error':
+        'Не удалось открыть страницу оплаты. Попробуйте чуть позже.',
+    'paywall_snack_restored': 'Покупки восстановлены ✅',
+    'paywall_snack_nothing_restore': 'Нет подписки для восстановления.',
     'nav_search': 'Поиск',
     'nav_call': 'Звонок',
     'nav_chat': 'Чат',
@@ -4277,6 +4502,29 @@ abstract final class AppStrings {
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
   static const Map<String, String> _zh = {
+    'paywall_headline': '开通订阅\n畅聊无限制',
+    'paywall_subtitle': '畅说每种语言，毫无障碍。实时语音翻译。',
+    'paywall_social_proof': '超过 10,000 名用户信赖我们',
+    'paywall_plus_sub': '每月最多 *10 小时* 翻译通话',
+    'paywall_ultra_sub': '*无限* 通话时长',
+    'paywall_period_month': '/月',
+    'paywall_popular': '热门',
+    'paywall_cta': '订阅',
+    'paywall_restore': '恢复购买',
+    'paywall_terms': '条款',
+    'paywall_privacy': '隐私',
+    'paywall_account_apple': '你的 Apple 账户',
+    'paywall_account_google': '你的 Google Play 账户',
+    'paywall_account_web': '你的支付方式',
+    'paywall_account_other': '你的账户',
+    'paywall_legal':
+        '自动续订订阅。{tiers}：确认购买时将从{account}扣款。订阅将按相同时长和价格自动续订，除非在当前周期结束前至少 24 小时关闭。你可以随时在账户设置中管理或取消订阅。订阅即表示你同意《使用条款》和《隐私政策》（链接见下方）。',
+    'paywall_snack_activated': '订阅已激活 🎉',
+    'paywall_snack_unavailable': '该优惠暂时不可用。',
+    'paywall_snack_error': '购买未能完成，请重试。',
+    'paywall_snack_checkout_error': '无法打开支付页面，请稍后重试。',
+    'paywall_snack_restored': '购买已恢复 ✅',
+    'paywall_snack_nothing_restore': '没有可恢复的订阅。',
     'nav_search': '搜索',
     'nav_call': '通话',
     'nav_chat': '聊天',
@@ -4690,6 +4938,30 @@ abstract final class AppStrings {
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
   static const Map<String, String> _ja = {
+    'paywall_headline': 'サブスクを開始して\n制限なく話そう',
+    'paywall_subtitle': 'あらゆる言語を、壁なく話せる。リアルタイム音声翻訳。',
+    'paywall_social_proof': '10,000人以上のユーザーに利用されています',
+    'paywall_plus_sub': '毎月最大 *10時間* の翻訳通話',
+    'paywall_ultra_sub': '通話時間 *無制限*',
+    'paywall_period_month': '/月',
+    'paywall_popular': '人気',
+    'paywall_cta': '登録する',
+    'paywall_restore': '購入を復元',
+    'paywall_terms': '利用規約',
+    'paywall_privacy': 'プライバシー',
+    'paywall_account_apple': 'あなたのAppleアカウント',
+    'paywall_account_google': 'あなたのGoogle Playアカウント',
+    'paywall_account_web': 'あなたの支払い方法',
+    'paywall_account_other': 'あなたのアカウント',
+    'paywall_legal':
+        '自動更新サブスクリプション。{tiers}：購入確定時に{account}へ課金されます。現在の期間終了の少なくとも24時間前に解約しない限り、同じ期間・同じ料金で自動更新されます。サブスクリプションはアカウント設定からいつでも管理・解約できます。登録すると、利用規約とプライバシーポリシーに同意したものとみなされます（リンクは下記）。',
+    'paywall_snack_activated': 'サブスクを有効化しました 🎉',
+    'paywall_snack_unavailable': '現在この特典はご利用いただけません。',
+    'paywall_snack_error': '購入を完了できませんでした。もう一度お試しください。',
+    'paywall_snack_checkout_error':
+        '決済ページを開けませんでした。しばらくしてからお試しください。',
+    'paywall_snack_restored': '購入を復元しました ✅',
+    'paywall_snack_nothing_restore': '復元できるサブスクリプションはありません。',
     'nav_search': '検索',
     'nav_call': '通話',
     'nav_chat': 'チャット',
@@ -5111,6 +5383,29 @@ abstract final class AppStrings {
 
   // ─── Korean ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ko = {
+    'paywall_headline': '구독을 활성화하고\n제한 없이 대화하세요',
+    'paywall_subtitle': '모든 언어를 장벽 없이. 실시간 음성 번역.',
+    'paywall_social_proof': '10,000명 이상의 사용자가 신뢰합니다',
+    'paywall_plus_sub': '매월 최대 *10시간* 번역 통화',
+    'paywall_ultra_sub': '*무제한* 통화 시간',
+    'paywall_period_month': '/월',
+    'paywall_popular': '인기',
+    'paywall_cta': '구독하기',
+    'paywall_restore': '구매 복원',
+    'paywall_terms': '약관',
+    'paywall_privacy': '개인정보',
+    'paywall_account_apple': '내 Apple 계정',
+    'paywall_account_google': '내 Google Play 계정',
+    'paywall_account_web': '내 결제 수단',
+    'paywall_account_other': '내 계정',
+    'paywall_legal':
+        '자동 갱신 구독. {tiers}: 구매 확인 시 {account}에서 결제됩니다. 현재 기간 종료 최소 24시간 전에 해제하지 않으면 동일한 기간과 가격으로 자동 갱신됩니다. 계정 설정에서 언제든지 구독을 관리하거나 취소할 수 있습니다. 구독하면 이용약관 및 개인정보 처리방침에 동의하는 것입니다(아래 링크).',
+    'paywall_snack_activated': '구독이 활성화되었습니다 🎉',
+    'paywall_snack_unavailable': '현재 이용할 수 없는 혜택입니다.',
+    'paywall_snack_error': '구매를 완료하지 못했습니다. 다시 시도해 주세요.',
+    'paywall_snack_checkout_error': '결제 페이지를 열 수 없습니다. 잠시 후 다시 시도해 주세요.',
+    'paywall_snack_restored': '구매가 복원되었습니다 ✅',
+    'paywall_snack_nothing_restore': '복원할 구독이 없습니다.',
     'nav_search': '검색',
     'nav_call': '통화',
     'nav_chat': '채팅',

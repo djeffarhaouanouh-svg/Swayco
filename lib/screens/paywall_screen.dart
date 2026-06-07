@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/app_strings.dart';
 import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
@@ -55,19 +56,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       tier: 'plus',
       name: 'Plus',
       price: '9,99 €',
-      period: '/mois',
-      // Highlighted (cyan) fragments are wrapped in *asterisks* and
-      // split out at render time, mirroring the green words in the
-      // reference paywall.
-      sublabel: 'Jusqu\'à *10h* d\'appels traduits par mois',
+      // Sublabel resolved at render via AppStrings; highlighted (cyan)
+      // fragments are wrapped in *asterisks* and split out at render time.
+      subKey: 'paywall_plus_sub',
       popular: true,
     ),
     _Plan(
       tier: 'ultra_plus',
       name: 'Ultra Plus',
       price: '15,99 €',
-      period: '/mois',
-      sublabel: 'Heures d\'appel *illimitées*',
+      subKey: 'paywall_ultra_sub',
       popular: false,
     ),
   ];
@@ -103,18 +101,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     if (!mounted) return;
     if (outcome == PurchaseOutcome.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Abonnement activé 🎉')),
+        SnackBar(content: Text(AppStrings.t('paywall_snack_activated'))),
       );
       Navigator.of(context).maybePop();
     } else if (outcome == PurchaseOutcome.unavailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Offre indisponible pour le moment.')),
+        SnackBar(content: Text(AppStrings.t('paywall_snack_unavailable'))),
       );
     } else if (outcome == PurchaseOutcome.error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("L'achat n'a pas pu être finalisé. Réessaie."),
-        ),
+        SnackBar(content: Text(AppStrings.t('paywall_snack_error'))),
       );
     }
     // PurchaseOutcome.cancelled → the user backed out; say nothing.
@@ -125,11 +121,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     if (!mounted) return;
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Impossible d'ouvrir la page de paiement. Réessaye dans un instant.",
-          ),
-        ),
+        SnackBar(content: Text(AppStrings.t('paywall_snack_checkout_error'))),
       );
       return;
     }
@@ -164,12 +156,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       setState(() => _busy = false);
       if (active.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Achats restaurés ✅')),
+          SnackBar(content: Text(AppStrings.t('paywall_snack_restored'))),
         );
         Navigator.of(context).maybePop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Aucun abonnement à restaurer.')),
+          SnackBar(content: Text(AppStrings.t('paywall_snack_nothing_restore'))),
         );
       }
       return;
@@ -180,9 +172,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       await _openExternal(url);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Aucun achat à restaurer pour le moment.'),
-        ),
+        SnackBar(content: Text(AppStrings.t('paywall_snack_nothing_restore'))),
       );
     }
   }
@@ -190,14 +180,14 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// Where the charge lands, per platform — Apple's auto-renewal
   /// disclosure must name the billing account on the paywall itself.
   String _accountPhrase() {
-    if (kIsWeb) return 'votre moyen de paiement';
+    if (kIsWeb) return AppStrings.t('paywall_account_web');
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
-        return 'votre compte Apple';
+        return AppStrings.t('paywall_account_apple');
       case TargetPlatform.android:
-        return 'votre compte Google Play';
+        return AppStrings.t('paywall_account_google');
       default:
-        return 'votre compte';
+        return AppStrings.t('paywall_account_other');
     }
   }
 
@@ -206,16 +196,13 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// cancellation terms — shown on the paywall, next to the functional
   /// Conditions / Confidentialité links in the footer below.
   Widget _legalDisclosure() {
-    final tiers = _plans.map((p) => '${p.name} ${p.price}${p.period}').join(', ');
+    final period = AppStrings.t('paywall_period_month');
+    final tiers = _plans.map((p) => '${p.name} ${p.price}$period').join(', ');
     return Text(
-      'Abonnement à renouvellement automatique. $tiers : le montant est '
-      'débité sur ${_accountPhrase()} à la confirmation de l\'achat. '
-      "L'abonnement se renouvelle automatiquement pour la même durée et au "
-      'même tarif, sauf désactivation au moins 24 h avant la fin de la '
-      'période en cours. Vous pouvez gérer ou résilier votre abonnement à '
-      'tout moment dans les réglages de votre compte. En vous abonnant, vous '
-      "acceptez les Conditions d'utilisation et la Politique de "
-      'confidentialité (liens ci-dessous).',
+      AppStrings.t(
+        'paywall_legal',
+        args: {'tiers': tiers, 'account': _accountPhrase()},
+      ),
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: SC.textMuted,
@@ -293,14 +280,13 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                   children: [
                     const SizedBox(height: 4),
                     Text(
-                      'Activez votre abonnement\net parlez sans limite',
+                      AppStrings.t('paywall_headline'),
                       textAlign: TextAlign.center,
                       style: SCText.h1.copyWith(fontSize: 25, height: 1.12),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Parlez toutes les langues, sans barrière. '
-                      'Traduction vocale en temps réel.',
+                      AppStrings.t('paywall_subtitle'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: SC.textMuted,
@@ -351,9 +337,9 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                             color: SC.bgDeep,
                           ),
                         )
-                      : const Text(
-                          'S\'abonner',
-                          style: TextStyle(
+                      : Text(
+                          AppStrings.t('paywall_cta'),
+                          style: const TextStyle(
                             fontSize: 16.5,
                             fontWeight: FontWeight.w800,
                           ),
@@ -371,15 +357,15 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _FooterLink('Restaurer les achats', _restore),
+                    _FooterLink(AppStrings.t('paywall_restore'), _restore),
                     const _FooterDot(),
                     _FooterLink(
-                      'Conditions',
+                      AppStrings.t('paywall_terms'),
                       () => _openExternal('https://www.swayco.fr/terms'),
                     ),
                     const _FooterDot(),
                     _FooterLink(
-                      'Confidentialité',
+                      AppStrings.t('paywall_privacy'),
                       () => _openExternal('https://www.swayco.fr/privacy'),
                     ),
                   ],
@@ -399,16 +385,15 @@ class _Plan {
     required this.tier,
     required this.name,
     required this.price,
-    required this.period,
-    required this.sublabel,
+    required this.subKey,
     required this.popular,
   });
 
   final String tier;
   final String name;
   final String price;
-  final String period;
-  final String sublabel;
+  /// AppStrings key for the localized sublabel (with *highlight* markers).
+  final String subKey;
   final bool popular;
 }
 
@@ -423,14 +408,14 @@ class _SocialProofPill extends StatelessWidget {
       color: SC.glassStrong,
       border: SC.glassBorder,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.verified_rounded, size: 16, color: SC.accent),
-          SizedBox(width: 7),
+          const Icon(Icons.verified_rounded, size: 16, color: SC.accent),
+          const SizedBox(width: 7),
           Text(
-            'Plus de 10 000 utilisateurs nous font confiance',
-            style: TextStyle(
+            AppStrings.t('paywall_social_proof'),
+            style: const TextStyle(
               color: SC.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -521,7 +506,7 @@ class _PlanTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                _Sublabel(plan.sublabel),
+                _Sublabel(AppStrings.t(plan.subKey)),
               ],
             ),
           ),
@@ -538,7 +523,7 @@ class _PlanTile extends StatelessWidget {
                 ),
               ),
               Text(
-                plan.period,
+                AppStrings.t('paywall_period_month'),
                 style: const TextStyle(
                   color: SC.textMuted,
                   fontSize: 12,
@@ -576,9 +561,9 @@ class _PlanTile extends StatelessWidget {
               color: SC.accent,
               borderRadius: BorderRadius.circular(999),
             ),
-            child: const Text(
-              'Populaire',
-              style: TextStyle(
+            child: Text(
+              AppStrings.t('paywall_popular'),
+              style: const TextStyle(
                 color: SC.bgDeep,
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
