@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'spring_press.dart';
+
 /// Wraps a tappable child with an iOS-style "squish": it scales down while
 /// held and fires a light haptic on tap. Drop-in around buttons, icons and
 /// CTAs so every tap feels responsive. When [onTap] and [onLongPress] are both
@@ -25,8 +27,9 @@ class Pressable extends StatefulWidget {
   final double scale;
   final bool haptic;
 
-  /// When true, the release springs back with an elastic overshoot past 1.0
-  /// (a little "pop"/bounce) instead of a plain ease-out.
+  /// When true, delegates to [SpringPress] for a real spring-physics bounce
+  /// (compress then overshoot) — the same feel as the nav bar. When false, a
+  /// plain ease-out squish.
   final bool bounce;
   final HitTestBehavior behavior;
 
@@ -45,6 +48,18 @@ class _PressableState extends State<Pressable> {
 
   @override
   Widget build(BuildContext context) {
+    // Bounce path → the shared spring-physics press (same as the nav bar),
+    // so every bounce button across the app uses one identical spring.
+    if (widget.bounce) {
+      return SpringPress(
+        onTap: widget.onTap,
+        pressedScale: widget.scale,
+        haptic: widget.haptic,
+        behavior: widget.behavior,
+        child: widget.child,
+      );
+    }
+    // Plain squish (no overshoot) for callers that opt out of bounce.
     return GestureDetector(
       behavior: widget.behavior,
       onTapDown: _enabled ? (_) => _set(true) : null,
@@ -59,11 +74,8 @@ class _PressableState extends State<Pressable> {
       onLongPress: widget.onLongPress,
       child: AnimatedScale(
         scale: _down ? widget.scale : 1.0,
-        // Press = quick squish; release with [bounce] = springy overshoot.
-        duration: _down || !widget.bounce
-            ? const Duration(milliseconds: 110)
-            : const Duration(milliseconds: 420),
-        curve: _down || !widget.bounce ? Curves.easeOut : Curves.elasticOut,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
         child: widget.child,
       ),
     );
