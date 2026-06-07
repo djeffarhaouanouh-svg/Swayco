@@ -1255,47 +1255,46 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ),
             ),
-            // Close — bottom-left, mirroring the share button (kept OUT of the
-            // captured card).
+            // Close — top-left, kept OUT of the captured card.
             Positioned(
-              left: 20,
-              bottom: 24,
-              child: Material(
-                color: Colors.white.withValues(alpha: 0.14),
-                shape: const CircleBorder(),
-                elevation: 3,
-                shadowColor: Colors.black54,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Icon(Icons.close_rounded,
-                        color: Colors.white, size: 24),
-                  ),
-                ),
+              top: 4,
+              left: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 26),
+                onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            // Share the card — bottom-right, also out of the capture.
+            // Share the card — bottom-right, also out of the capture. Cyan
+            // frosted-glass circle (same tinted-glass style as the live
+            // controls), keeping the accent colour + bounce.
             Positioned(
               right: 20,
               bottom: 24,
-              child: Material(
-                color: SC.accent,
-                shape: const CircleBorder(),
-                elevation: 3,
-                shadowColor: Colors.black54,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _shareSummary,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    // Curved "forward/share" arrow: a horizontally mirrored
-                    // reply glyph so it points up to the right.
-                    child: Transform.flip(
-                      flipX: true,
-                      child: const Icon(Icons.reply_rounded,
-                          color: Colors.white, size: 24),
+              child: Pressable(
+                bounce: true,
+                onTap: _shareSummary,
+                child: ClipOval(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: SC.accent.withValues(alpha: 0.55),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.22),
+                        ),
+                      ),
+                      // Curved "forward/share" arrow: a horizontally mirrored
+                      // reply glyph so it points up to the right.
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Transform.flip(
+                          flipX: true,
+                          child: const Icon(Icons.reply_rounded,
+                              color: Colors.white, size: 24),
+                        ),
+                      ),
                     ),
                   ),
                 ),
