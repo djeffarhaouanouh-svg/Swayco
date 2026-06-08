@@ -855,7 +855,8 @@ class _NoRequestsEmpty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            Breathing(
+              child: Container(
               width: 72,
               height: 72,
               decoration: BoxDecoration(
@@ -868,6 +869,7 @@ class _NoRequestsEmpty extends StatelessWidget {
                 color: SC.accent,
                 size: 34,
               ),
+            ),
             ),
             const SizedBox(height: 18),
             Text(

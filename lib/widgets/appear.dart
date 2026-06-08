@@ -78,3 +78,46 @@ class _FadeSlideInState extends State<FadeSlideIn>
     );
   }
 }
+
+/// Gently pulses its child's scale forever — a subtle "breathing" idle motion,
+/// e.g. for empty-state icons so the screen feels alive instead of static.
+class Breathing extends StatefulWidget {
+  const Breathing({
+    super.key,
+    required this.child,
+    this.minScale = 0.96,
+    this.maxScale = 1.06,
+    this.period = const Duration(milliseconds: 2600),
+  });
+
+  final Widget child;
+  final double minScale;
+  final double maxScale;
+  final Duration period;
+
+  @override
+  State<Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<Breathing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: widget.period,
+  )..repeat(reverse: true);
+  late final Animation<double> _s = Tween<double>(
+    begin: widget.minScale,
+    end: widget.maxScale,
+  ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(scale: _s, child: widget.child);
+  }
+}

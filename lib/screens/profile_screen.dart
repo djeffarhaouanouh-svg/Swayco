@@ -2173,16 +2173,26 @@ Future<void> showPhotoViewer(
     PageRouteBuilder<void>(
       opaque: false,
       barrierColor: Colors.black,
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (ctx, anim, _) => FadeTransition(
-        opacity: anim,
-        child: _PhotoViewer(
-          photos: photos,
-          initialIndex: index.clamp(0, photos.length - 1),
-          viewerMode: viewerMode,
-          onSetDiscover: onSetDiscover,
-        ),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (ctx, anim, _) => _PhotoViewer(
+        photos: photos,
+        initialIndex: index.clamp(0, photos.length - 1),
+        viewerMode: viewerMode,
+        onSetDiscover: onSetDiscover,
       ),
+      // Fade + grow-in (scale from 90%) instead of a flat fade, so the photo
+      // eases open instead of popping.
+      transitionsBuilder: (ctx, anim, _, child) {
+        final curved =
+            CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
     ),
   );
 }
