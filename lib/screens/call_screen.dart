@@ -28,6 +28,7 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -911,18 +912,14 @@ class _CallScreenState extends State<CallScreen> {
         if (mounted) _animateChatHint();
       });
     }
-    // PLAIN translucent bar — deliberately NO glass. Any glass wrapper here
-    // (native Apple Liquid Glass platform view OR the shader GlassPanel with
-    // its own layer) breaks the keyboard on the call screen: the field gains
-    // focus, the keyboard blips open, then dismisses. The original plain
-    // Container always worked the keyboard, so keep it.
-    return Container(
+    // Frosted glass via GlassPanel (Flutter SHADER glass, NOT the NativeGlass
+    // platform view — that one genuinely swallows touches). Safe now that the
+    // composer Positioned is keyed (b2f3293): the keyboard stays open. The
+    // earlier "keyboard won't open" was the unkeyed-siblings bug, not the glass.
+    return GlassPanel(
+      borderRadius: 26,
+      color: Colors.black.withValues(alpha: 0.35),
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
       child: Row(
         children: [
           // Translation stays always on (_chatTranslate defaults to true); the
