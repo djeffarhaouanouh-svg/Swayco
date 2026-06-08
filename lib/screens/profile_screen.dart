@@ -2059,7 +2059,6 @@ class _IdentitySection extends StatelessWidget {
                 _InterestChip(
                   label: tag,
                   color: interestColor(tag),
-                  glass: true,
                 ),
             ],
           ),
@@ -2672,17 +2671,11 @@ class _InterestChip extends StatelessWidget {
     this.shape,
     this.selected = true,
     this.showCheck = false,
-    this.glass = false,
     this.onTap,
   });
 
   final String label;
   final Color color;
-
-  /// Frosted-glass rendering: the category colour becomes a translucent tint
-  /// over a blur of what's behind, instead of an opaque fill. Used by the
-  /// read-only profile chips.
-  final bool glass;
 
   /// Per-category silhouette. Null → derived from the label's category
   /// (used by the read-only display chips, which only know the stored label).
@@ -2736,21 +2729,6 @@ class _InterestChip extends StatelessWidget {
         ),
       ),
     );
-    if (glass) {
-      // Frosted glass clipped to the chip's silhouette: a translucent tint of
-      // the category colour over a blur of what's behind it.
-      return ClipPath(
-        clipper: ShapeBorderClipper(shape: outer),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Material(
-            color: color.withValues(alpha: 0.42),
-            shape: outer,
-            child: inner,
-          ),
-        ),
-      );
-    }
     return Material(
       color: color,
       elevation: selected ? 3 : 1,
