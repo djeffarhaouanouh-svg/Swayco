@@ -517,6 +517,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
+    // Vertical space the floating header occupies (safe-area + the header row);
+    // used to inset the message list / fades / clock so they clear it while the
+    // messages still scroll BEHIND the translucent header.
+    final headerSpace = MediaQuery.paddingOf(context).top + 56.0;
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
       body: GestureDetector(
@@ -526,69 +530,34 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         },
         child: Stack(
           children: [
-            ColoredBox(
-              color: const Color(0xFF0E0E0E),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
+            // Full-bleed black messages BEHIND everything, so the header (and
+            // the composer) float translucently OVER the conversation — the
+            // soft fades dissolve messages under each.
+            Positioned.fill(
+              child: ColoredBox(
+                color: const Color(0xFF000000),
+                child: Stack(
                   children: [
-                    _ThreadHeader(
-                      title: widget.title,
-                      peer: _peer,
-                      blockedByPeer: _peerBlockedMe,
-                      onCall: _peerBlockedMe
-                          ? () => ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  AppStrings.t('chat_blocked_by_peer'),
-                                ),
-                              ),
-                            )
-                          : () => CallLauncher.startCall(
-                              context,
-                              peerDeviceId: widget.peerDeviceId,
-                              translation: widget.translation,
-                              startWithCamera: true,
-                            ),
-                      onViewProfile: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ProfileScreen(userId: widget.peerDeviceId),
-                        ),
+                    GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: _buildMessageList(
+                        hasClockChip: peerClock != null,
+                        topInset: headerSpace,
                       ),
-                      peerBlocked: _peerBlocked,
-                      onToggleBlock: _toggleBlockPeer,
-                      onReport: _reportPeer,
                     ),
-                    if (_error != null) _ErrorBanner(message: _error!),
-                    // Pure-black background ONLY behind the messages zone — the
-                    // header and composer keep the lighter 0E0E0E surface.
-                    // Tapping anywhere in the area dismisses the keyboard;
-                    // translucent so the list still scrolls and taps register.
-                    Expanded(
-                      child: ColoredBox(
-                        color: const Color(0xFF000000),
-                        child: Stack(
-                          children: [
-                            GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onTap: () => FocusScope.of(context).unfocus(),
-                              child: _buildMessageList(
-                                hasClockChip: peerClock != null,
-                              ),
-                            ),
                             // Top fade — messages dissolve into black under the
                             // header (floating, not empty).
-                            const Positioned(
+                            Positioned(
                               top: 0,
                               left: 0,
                               right: 0,
                               child: IgnorePointer(
                                 child: SizedBox(
-                                  // Taller + lower-opacity peak so the top fades
-                                  // gently (floating, not a hard black bar) —
-                                  // same soft feel as the footer fade below.
-                                  height: 88,
+                                  // Covers the floating header + a soft fade
+                                  // below it, so the messages dissolve under the
+                                  // translucent header (low-opacity, floating).
+                                  height: headerSpace + 24,
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
@@ -637,7 +606,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             // here puts the bubble's centre on the logo's centre.
                             if (peerClock != null)
                               Positioned(
-                                top: 8,
+                                top: headerSpace - 16,
                                 left: 112,
                                 right: 58,
                                 child: IgnorePointer(
@@ -651,8 +620,44 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         ),
                       ),
                     ),
-                  ],
-                ),
+            // Floating header — a transparent row (only the round glass buttons
+            // carry glass); the soft top fade behind it gives the low-opacity,
+            // floating look instead of an opaque bar. Messages scroll behind it.
+            SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ThreadHeader(
+                    title: widget.title,
+                    peer: _peer,
+                    blockedByPeer: _peerBlockedMe,
+                    onCall: _peerBlockedMe
+                        ? () => ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                AppStrings.t('chat_blocked_by_peer'),
+                              ),
+                            ),
+                          )
+                        : () => CallLauncher.startCall(
+                            context,
+                            peerDeviceId: widget.peerDeviceId,
+                            translation: widget.translation,
+                            startWithCamera: true,
+                          ),
+                    onViewProfile: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            ProfileScreen(userId: widget.peerDeviceId),
+                      ),
+                    ),
+                    peerBlocked: _peerBlocked,
+                    onToggleBlock: _toggleBlockPeer,
+                    onReport: _reportPeer,
+                  ),
+                  if (_error != null) _ErrorBanner(message: _error!),
+                ],
               ),
             ),
             // Floating glass composer OVER the messages — no dark footer behind
@@ -708,7 +713,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  Widget _buildMessageList({bool hasClockChip = false}) {
+  Widget _buildMessageList({bool hasClockChip = false, double topInset = 0}) {
     if (_messages.isEmpty) {
       return Center(
         child: Padding(
@@ -731,7 +736,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       // Bottom room so the last message clears the floating composer.
       padding: EdgeInsets.fromLTRB(
         12,
-        hasClockChip ? 46 : 12,
+        topInset + (hasClockChip ? 46 : 12),
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
