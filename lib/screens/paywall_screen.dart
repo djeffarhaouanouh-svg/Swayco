@@ -349,10 +349,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 12),
-              // Keep the three links on one centred line, scaling down on
-              // narrower devices / larger system fonts instead of clipping
-              // "Confidentialité" off the right edge.
+              // Horizontal margins so the scaled-down line never touches the
+              // edges; FittedBox shrinks the three links to fit on ONE line
+              // (so "Restaurer" / "Confidentialité" aren't clipped).
+              padding: const EdgeInsets.fromLTRB(28, 2, 28, 12),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
