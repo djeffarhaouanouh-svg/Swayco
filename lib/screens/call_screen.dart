@@ -28,7 +28,6 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
-import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -904,28 +903,6 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
-  /// iOS first-responder rescue. The call screen's native video views
-  /// (`RTCVideoView` platform views) can reclaim the keyboard's first
-  /// responder the instant it presents — the field gains focus, the keyboard
-  /// blips open, then immediately dismisses ("it jumps but the keyboard never
-  /// comes out"). Messages has no platform views, so its keyboard is fine.
-  /// Re-assert focus + force the soft keyboard across the ~300ms settle window
-  /// so it sticks. Bounded (4 shots) so it never fights a deliberate dismiss.
-  void _forceCallKeyboard() {
-    void assertKeyboard() {
-      if (!mounted) return;
-      if (!_chatFocus.hasFocus) _chatFocus.requestFocus();
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show').catchError(
-        (_) {},
-      );
-    }
-
-    assertKeyboard();
-    for (final ms in const [50, 150, 300]) {
-      Future.delayed(Duration(milliseconds: ms), assertKeyboard);
-    }
-  }
-
   Widget _buildChatComposer() {
     // Type the placeholder in the first time the composer appears.
     if (!_chatHintStarted) {
@@ -934,16 +911,18 @@ class _CallScreenState extends State<CallScreen> {
         if (mounted) _animateChatHint();
       });
     }
-    // Native Apple liquid glass REPLACES the frosted fill (no superposition);
-    // web / older OS fall back to the previous translucent dark bar.
-    // GlassPanel (Flutter shader glass), NOT NativeGlass: the native Apple
-    // glass is a platform view that swallows touches, so the TextField never
-    // gets focus and the keyboard won't open. The shader glass keeps the
-    // field interactive (same surface the chat composer uses).
-    return GlassPanel(
-      borderRadius: 26,
-      color: Colors.black.withValues(alpha: 0.35),
+    // PLAIN translucent bar — deliberately NO glass. Any glass wrapper here
+    // (native Apple Liquid Glass platform view OR the shader GlassPanel with
+    // its own layer) breaks the keyboard on the call screen: the field gains
+    // focus, the keyboard blips open, then dismisses. The original plain
+    // Container always worked the keyboard, so keep it.
+    return Container(
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
       child: Row(
         children: [
           // Translation stays always on (_chatTranslate defaults to true); the
@@ -953,8 +932,6 @@ class _CallScreenState extends State<CallScreen> {
             child: TextField(
               controller: _chatCtrl,
               focusNode: _chatFocus,
-              // Beat the native video views' first-responder grab on iOS.
-              onTap: _forceCallKeyboard,
               minLines: 1,
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
