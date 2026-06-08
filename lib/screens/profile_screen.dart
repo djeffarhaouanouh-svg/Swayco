@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -2055,7 +2056,11 @@ class _IdentitySection extends StatelessWidget {
             runSpacing: 10,
             children: [
               for (final tag in interests)
-                _InterestChip(label: tag, color: interestColor(tag)),
+                _InterestChip(
+                  label: tag,
+                  color: interestColor(tag),
+                  glass: true,
+                ),
             ],
           ),
         ],
@@ -2648,11 +2653,17 @@ class _InterestChip extends StatelessWidget {
     this.shape,
     this.selected = true,
     this.showCheck = false,
+    this.glass = false,
     this.onTap,
   });
 
   final String label;
   final Color color;
+
+  /// Frosted-glass rendering: the category colour becomes a translucent tint
+  /// over a blur of what's behind, instead of an opaque fill. Used by the
+  /// read-only profile chips.
+  final bool glass;
 
   /// Per-category silhouette. Null → derived from the label's category
   /// (used by the read-only display chips, which only know the stored label).
@@ -2681,36 +2692,52 @@ class _InterestChip extends StatelessWidget {
         width: selected ? 2 : 1,
       ),
     );
+    final inner = InkWell(
+      customBorder: outer,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: ShapeDecoration(shape: bordered),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showCheck) ...[
+              Icon(Icons.check_rounded, size: 18, color: fg),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: fg,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (glass) {
+      // Frosted glass clipped to the chip's silhouette: a translucent tint of
+      // the category colour over a blur of what's behind it.
+      return ClipPath(
+        clipper: ShapeBorderClipper(shape: outer),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Material(
+            color: color.withValues(alpha: 0.42),
+            shape: outer,
+            child: inner,
+          ),
+        ),
+      );
+    }
     return Material(
       color: color,
       elevation: selected ? 3 : 1,
       shadowColor: color.withValues(alpha: 0.6),
       shape: outer,
-      child: InkWell(
-        customBorder: outer,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: ShapeDecoration(shape: bordered),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (showCheck) ...[
-                Icon(Icons.check_rounded, size: 18, color: fg),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: inner,
     );
   }
 }
@@ -3501,41 +3528,65 @@ class _GradientActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Solid colors — glass card for the primary Message action, accent for
-    // the default action, dark bubble for the subdued state.
-    final bg = glass ? SC.glassStrong : (subdued ? SC.bubbleIn : SC.accent);
+    // Scale the icon+label down to fit when a translation is long (German /
+    // Russian / katakana run wider) instead of overflowing.
+    final content = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+    const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+
+    // Primary "Message" action → REAL frosted glass (BackdropFilter blur), like
+    // the header / nav glass; accent fill for the default action, dark bubble
+    // for the subdued "Following" state.
+    if (glass) {
+      return Pressable(
+        bounce: true,
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              decoration: BoxDecoration(
+                color: SC.glassStrong,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: SC.glassBorder),
+              ),
+              padding: padding,
+              alignment: Alignment.center,
+              child: content,
+            ),
+          ),
+        ),
+      );
+    }
     return Pressable(
       bounce: true,
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: bg,
+          color: subdued ? SC.bubbleIn : SC.accent,
           borderRadius: BorderRadius.circular(999),
-          border: glass ? Border.all(color: SC.glassBorder) : null,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: padding,
         alignment: Alignment.center,
-        // Scale the icon+label down to fit when a translation is long
-        // (German / Russian / katakana run wider) instead of overflowing.
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }

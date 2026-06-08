@@ -49,7 +49,9 @@ class _SwaycoConfirmDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Container(
         decoration: BoxDecoration(
-          color: SC.bubbleIn,
+          // Site black (same surface as the profile / chat) instead of the
+          // lighter bubble grey.
+          color: const Color(0xFF0E0E0E),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: SC.glassBorderStrong),
           boxShadow: [
