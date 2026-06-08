@@ -349,26 +349,28 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
-              // One readable line when the three links fit; they wrap to a
-              // second line on small phones instead of shrinking to an
-              // unreadable size or clipping at the edges.
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 16,
-                runSpacing: 6,
-                children: [
-                  _FooterLink(AppStrings.t('paywall_restore'), _restore),
-                  _FooterLink(
-                    AppStrings.t('paywall_terms'),
-                    () => _openExternal('https://www.swayco.fr/terms'),
-                  ),
-                  _FooterLink(
-                    AppStrings.t('paywall_privacy'),
-                    () => _openExternal('https://www.swayco.fr/privacy'),
-                  ),
-                ],
+              // Horizontal margins so the scaled-down line never touches the
+              // edges; FittedBox shrinks the three links to fit on ONE line
+              // (so "Restaurer" / "Confidentialité" aren't clipped).
+              padding: const EdgeInsets.fromLTRB(28, 2, 28, 12),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _FooterLink(AppStrings.t('paywall_restore'), _restore),
+                    const _FooterDot(),
+                    _FooterLink(
+                      AppStrings.t('paywall_terms'),
+                      () => _openExternal('https://www.swayco.fr/terms'),
+                    ),
+                    const _FooterDot(),
+                    _FooterLink(
+                      AppStrings.t('paywall_privacy'),
+                      () => _openExternal('https://www.swayco.fr/privacy'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -662,6 +664,18 @@ class _FooterLink extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FooterDot extends StatelessWidget {
+  const _FooterDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10),
+      child: Text('·', style: TextStyle(color: SC.textMuted, fontSize: 12)),
     );
   }
 }
