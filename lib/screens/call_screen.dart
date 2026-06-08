@@ -1683,6 +1683,12 @@ class _CallScreenState extends State<CallScreen> {
                 // otherwise there's no way to dismiss the keyboard here.
                 if (MediaQuery.viewInsetsOf(context).bottom > 0)
                   Positioned.fill(
+                    // Keyed so inserting/removing this layer when the keyboard
+                    // toggles never makes Flutter re-map the (same-typed,
+                    // adjacent) composer Positioned's element — that recreated
+                    // the TextField and dropped focus, slamming the keyboard
+                    // shut the instant it opened.
+                    key: const ValueKey('call_kb_dismiss'),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => FocusScope.of(context).unfocus(),
@@ -1692,6 +1698,10 @@ class _CallScreenState extends State<CallScreen> {
                 // bottom-left so they clear the control rail on the right.
                 // Lifts with the keyboard.
                 Positioned(
+                  // Stable key: the composer's element must survive the dismiss
+                  // layer being inserted/removed as the keyboard toggles, or
+                  // the TextField is recreated and loses focus.
+                  key: const ValueKey('call_chat_composer'),
                   left: 8,
                   // Extra right margin so the bar clears the round control rail
                   // on the right (it was touching the buttons on phones).
@@ -1730,6 +1740,7 @@ class _CallScreenState extends State<CallScreen> {
                 // they grow upward from the bottom and never reach the PiP
                 // self-view in the top-right corner.
                 Positioned(
+                  key: const ValueKey('call_controls'),
                   right: 12,
                   bottom: 0,
                   child: SafeArea(
