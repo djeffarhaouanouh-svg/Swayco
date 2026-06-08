@@ -1007,10 +1007,12 @@ class _PeerClockChipState extends State<_PeerClockChip> {
       style: textStyle,
     );
 
-    return Listener(
-      onPointerDown: (_) => _set(true),
-      onPointerUp: (_) => _set(false),
-      onPointerCancel: (_) => _set(false),
+    return GestureDetector(
+      // A real press-and-hold (~0.5s) opens it — a brush/tap does nothing.
+      // Stays open while held; snaps shut the instant the finger lifts.
+      onLongPressStart: (_) => _set(true),
+      onLongPressEnd: (_) => _set(false),
+      onLongPressCancel: () => _set(false),
       child: GlassPanel(
         borderRadius: 999,
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
