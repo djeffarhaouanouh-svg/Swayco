@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -553,20 +554,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               left: 0,
                               right: 0,
                               child: IgnorePointer(
-                                child: SizedBox(
-                                  // Covers the floating header + a soft fade
-                                  // below it, so the messages dissolve under the
-                                  // translucent header (low-opacity, floating).
-                                  height: headerSpace + 24,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0x99000000),
-                                          Color(0x00000000),
-                                        ],
+                                // Frosted translucent BLACK band behind the
+                                // header — messages show through, blurred (like
+                                // a Telegram-style header), not an opaque bar.
+                                child: ClipRect(
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                      sigmaX: 18,
+                                      sigmaY: 18,
+                                    ),
+                                    child: SizedBox(
+                                      height: headerSpace,
+                                      width: double.infinity,
+                                      child: ColoredBox(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.4,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -575,22 +578,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             ),
                             // Bottom fade — messages dissolve into black under
                             // the floating composer.
-                            const Positioned(
+                            Positioned(
                               bottom: 0,
                               left: 0,
                               right: 0,
                               child: IgnorePointer(
-                                child: SizedBox(
-                                  height: 160,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0x00000000),
-                                          Color(0x99000000),
-                                        ],
+                                // Frosted translucent BLACK band behind the
+                                // composer — same as the header.
+                                child: ClipRect(
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                      sigmaX: 18,
+                                      sigmaY: 18,
+                                    ),
+                                    child: SizedBox(
+                                      height: 130,
+                                      width: double.infinity,
+                                      child: ColoredBox(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.4,
+                                        ),
                                       ),
                                     ),
                                   ),
