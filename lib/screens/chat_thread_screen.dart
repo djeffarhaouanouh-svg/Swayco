@@ -530,6 +530,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           if ((d.primaryVelocity ?? 0) > 300) Navigator.of(context).maybePop();
         },
         child: Stack(
+          // All the visible children are Positioned now (full-bleed messages,
+          // floating header + composer), so the Stack must be told to fill the
+          // body — otherwise it collapses to the only non-positioned child
+          // (the header) and the composer ends up at the top.
+          fit: StackFit.expand,
           children: [
             // Full-bleed black messages BEHIND everything, so the header (and
             // the composer) float translucently OVER the conversation — the
@@ -631,13 +636,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             // Floating header — a transparent row (only the round glass buttons
             // carry glass); the soft top fade behind it gives the low-opacity,
             // floating look instead of an opaque bar. Messages scroll behind it.
-            SafeArea(
-              bottom: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ThreadHeader(
-                    title: widget.title,
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ThreadHeader(
+                      title: widget.title,
                     peer: _peer,
                     blockedByPeer: _peerBlockedMe,
                     onCall: _peerBlockedMe
@@ -667,6 +676,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   if (_error != null) _ErrorBanner(message: _error!),
                 ],
               ),
+            ),
             ),
             // Floating glass composer OVER the messages — no dark footer behind
             // it, so the glass refracts the conversation.
