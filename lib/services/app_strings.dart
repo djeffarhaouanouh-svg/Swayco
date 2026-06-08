@@ -83,6 +83,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profil',
     'nav_demandes': 'Demandes',
+    'peer_clock_phrase': 'Il est {time} chez {name}',
     'demandes_title': 'Demandes',
     'demandes_empty_title': 'Pas encore de demandes',
     'demandes_empty_body':
@@ -592,6 +593,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profile',
     'nav_demandes': 'Requests',
+    'peer_clock_phrase': 'It\'s {time} at {name}\'s',
     'demandes_title': 'Requests',
     'demandes_empty_title': 'No requests yet',
     'demandes_empty_body':
@@ -1091,6 +1093,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Perfil',
     'nav_demandes': 'Solicitudes',
+    'peer_clock_phrase': 'Son las {time} donde {name}',
     'demandes_title': 'Solicitudes',
     'demandes_empty_title': 'Aún no hay solicitudes',
     'demandes_empty_body':
@@ -1586,6 +1589,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profil',
     'nav_demandes': 'Anfragen',
+    'peer_clock_phrase': 'Es ist {time} bei {name}',
     'demandes_title': 'Anfragen',
     'demandes_empty_title': 'Noch keine Anfragen',
     'demandes_empty_body':
@@ -2084,6 +2088,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profilo',
     'nav_demandes': 'Richieste',
+    'peer_clock_phrase': 'Sono le {time} da {name}',
     'demandes_title': 'Richieste',
     'demandes_empty_title': 'Nessuna richiesta',
     'demandes_empty_body':
@@ -2577,6 +2582,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Perfil',
     'nav_demandes': 'Pedidos',
+    'peer_clock_phrase': 'São {time} na casa de {name}',
     'demandes_title': 'Pedidos',
     'demandes_empty_title': 'Ainda não há pedidos',
     'demandes_empty_body':
@@ -3071,6 +3077,7 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profiel',
     'nav_demandes': 'Verzoeken',
+    'peer_clock_phrase': 'Het is {time} bij {name}',
     'demandes_title': 'Verzoeken',
     'demandes_empty_title': 'Nog geen verzoeken',
     'demandes_empty_body':
@@ -3560,6 +3567,7 @@ abstract final class AppStrings {
     'nav_chat': 'دردشة',
     'nav_tab3': 'الملف الشخصي',
     'nav_demandes': 'طلبات',
+    'peer_clock_phrase': 'الساعة {time} عند {name}',
     'demandes_title': 'طلبات',
     'demandes_empty_title': 'لا توجد طلبات بعد',
     'demandes_empty_body':
@@ -4038,6 +4046,7 @@ abstract final class AppStrings {
     'nav_chat': 'Чат',
     'nav_tab3': 'Профиль',
     'nav_demandes': 'Запросы',
+    'peer_clock_phrase': 'Сейчас {time} у {name}',
     'demandes_title': 'Запросы',
     'demandes_empty_title': 'Запросов пока нет',
     'demandes_empty_body':
@@ -4530,6 +4539,7 @@ abstract final class AppStrings {
     'nav_chat': '聊天',
     'nav_tab3': '个人资料',
     'nav_demandes': '请求',
+    'peer_clock_phrase': '{name} 那里现在是 {time}',
     'demandes_title': '请求',
     'demandes_empty_title': '暂无请求',
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
@@ -4967,6 +4977,7 @@ abstract final class AppStrings {
     'nav_chat': 'チャット',
     'nav_tab3': 'プロフィール',
     'nav_demandes': 'リクエスト',
+    'peer_clock_phrase': '{name} は {time} です',
     'demandes_title': 'リクエスト',
     'demandes_empty_title': 'リクエストはまだありません',
     'demandes_empty_body': '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
@@ -5411,6 +5422,7 @@ abstract final class AppStrings {
     'nav_chat': '채팅',
     'nav_tab3': '프로필',
     'nav_demandes': '요청',
+    'peer_clock_phrase': '{name}님은 {time}이에요',
     'demandes_title': '요청',
     'demandes_empty_title': '아직 요청이 없습니다',
     'demandes_empty_body': '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',

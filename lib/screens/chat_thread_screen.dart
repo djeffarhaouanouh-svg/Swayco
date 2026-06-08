@@ -616,10 +616,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 top: headerSpace - 16,
                                 left: 112,
                                 right: 58,
-                                child: IgnorePointer(
-                                  child: Align(
-                                    alignment: Alignment.topCenter,
-                                    child: _PeerClockChip(clock: peerClock),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: _PeerClockChip(
+                                    clock: peerClock,
+                                    name: widget.title,
                                   ),
                                 ),
                               ),
@@ -954,43 +955,87 @@ class _ThreadHeader extends StatelessWidget {
 
 /// Small floating bubble under the header showing the peer's local time, with
 /// a white sun (day) / moon (night) icon. Orange-tinted, darker border.
-class _PeerClockChip extends StatelessWidget {
-  const _PeerClockChip({required this.clock});
+class _PeerClockChip extends StatefulWidget {
+  const _PeerClockChip({required this.clock, required this.name});
 
   final PeerLocalTime clock;
+  final String name;
+
+  @override
+  State<_PeerClockChip> createState() => _PeerClockChipState();
+}
+
+class _PeerClockChipState extends State<_PeerClockChip> {
+  // Held down → the pill stretches open to spell out whose local time it is;
+  // released → it snaps back to just the time + sun/moon.
+  bool _open = false;
+  void _set(bool v) {
+    if (mounted && _open != v) setState(() => _open = v);
+  }
 
   @override
   Widget build(BuildContext context) {
     // Frosted-glass orange pill — translucent so the chat behind shows
-    // through. White icon + time, with a faint shadow to stay legible.
+    // through. White text/icon with a faint shadow to stay legible.
     const shadows = [
       Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
     ];
-    return GlassPanel(
-      borderRadius: 999,
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      color: const Color(0x55FFA726), // light orange — recording tint
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            clock.hhmm,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              shadows: shadows,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
+    const textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      shadows: shadows,
+    );
+    final firstName = widget.name.trim().split(RegExp(r'\s+')).first;
+
+    final timeRow = Row(
+      key: const ValueKey('time'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.clock.hhmm,
+          style: textStyle.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
-          const SizedBox(width: 6),
-          Icon(
-            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-            size: 14,
-            color: Colors.white,
-            shadows: shadows,
+        ),
+        const SizedBox(width: 6),
+        Icon(
+          widget.clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+          size: 14,
+          color: Colors.white,
+          shadows: shadows,
+        ),
+      ],
+    );
+    final phrase = Text(
+      AppStrings.t(
+        'peer_clock_phrase',
+        args: {'time': widget.clock.hhmm, 'name': firstName},
+      ),
+      key: const ValueKey('phrase'),
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.fade,
+      style: textStyle,
+    );
+
+    return Listener(
+      onPointerDown: (_) => _set(true),
+      onPointerUp: (_) => _set(false),
+      onPointerCancel: (_) => _set(false),
+      child: GlassPanel(
+        borderRadius: 999,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        color: const Color(0x55FFA726), // light orange — recording tint
+        // Stretch the pill open/closed; the text cross-fades inside it.
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutBack,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: _open ? phrase : timeRow,
           ),
-        ],
+        ),
       ),
     );
   }
