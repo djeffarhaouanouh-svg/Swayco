@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:typed_data';
-import 'dart:ui' show ImageFilter;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -320,14 +319,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     setState(() {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
-      // The ACCOUNT (remote profile) is the source of truth for my language,
-      // so incoming messages translate into whatever the account is set to
-      // (e.g. Russian) — NOT this device's stale local cache. That cache was
-      // the bug: account ru, but messages came back in the cached fr. Local
-      // prefs are only the fallback (offline / account has no language yet).
-      _myLang = (mine?.language.trim().isNotEmpty ?? false)
-          ? mine!.language.trim()
-          : (profile?.sourceLang.trim() ?? '');
+      // Prefer the locally-stored spoken language, but fall back to the
+      // Supabase profile when local prefs are empty — otherwise a
+      // returning user on a freshly-installed app has an empty _myLang,
+      // which makes _maybeFetchTranslation bail out and the translate
+      // toggle silently does nothing (works on web only because the
+      // browser session still holds the onboarding prefs).
+      _myLang = (profile?.sourceLang.trim().isNotEmpty ?? false)
+          ? profile!.sourceLang.trim()
+          : (mine?.language.trim() ?? '');
       _myGender = (profile?.gender.trim().isNotEmpty ?? false)
           ? profile!.gender.trim()
           : (mine?.gender.trim() ?? '');
@@ -518,10 +518,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
-    // Vertical space the floating header occupies (safe-area + the header row);
-    // used to inset the message list / fades / clock so they clear it while the
-    // messages still scroll BEHIND the translucent header.
-    final headerSpace = MediaQuery.paddingOf(context).top + 56.0;
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
       body: GestureDetector(
@@ -530,51 +526,84 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           if ((d.primaryVelocity ?? 0) > 300) Navigator.of(context).maybePop();
         },
         child: Stack(
-          // All the visible children are Positioned now (full-bleed messages,
-          // floating header + composer), so the Stack must be told to fill the
-          // body — otherwise it collapses to the only non-positioned child
-          // (the header) and the composer ends up at the top.
-          fit: StackFit.expand,
           children: [
-            // Full-bleed black messages BEHIND everything, so the header (and
-            // the composer) float translucently OVER the conversation — the
-            // soft fades dissolve messages under each.
-            Positioned.fill(
-              child: ColoredBox(
-                color: const Color(0xFF000000),
-                child: Stack(
+            ColoredBox(
+              color: const Color(0xFF0E0E0E),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
                   children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () => FocusScope.of(context).unfocus(),
-                      child: _buildMessageList(
-                        hasClockChip: peerClock != null,
-                        topInset: headerSpace,
+                    // Header bar — translucent black (30%) background; the round
+                    // glass buttons sit on top.
+                    ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      child: _ThreadHeader(
+                        title: widget.title,
+                      peer: _peer,
+                      blockedByPeer: _peerBlockedMe,
+                      onCall: _peerBlockedMe
+                          ? () => ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  AppStrings.t('chat_blocked_by_peer'),
+                                ),
+                              ),
+                            )
+                          : () => CallLauncher.startCall(
+                              context,
+                              peerDeviceId: widget.peerDeviceId,
+                              translation: widget.translation,
+                              startWithCamera: true,
+                            ),
+                      onViewProfile: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ProfileScreen(userId: widget.peerDeviceId),
+                        ),
+                      ),
+                      peerBlocked: _peerBlocked,
+                      onToggleBlock: _toggleBlockPeer,
+                      onReport: _reportPeer,
                       ),
                     ),
+                    if (_error != null) _ErrorBanner(message: _error!),
+                    // Pure-black background ONLY behind the messages zone — the
+                    // header and composer keep the lighter 0E0E0E surface.
+                    // Tapping anywhere in the area dismisses the keyboard;
+                    // translucent so the list still scrolls and taps register.
+                    Expanded(
+                      child: ColoredBox(
+                        color: const Color(0xFF000000),
+                        child: Stack(
+                          children: [
+                            GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: () => FocusScope.of(context).unfocus(),
+                              child: _buildMessageList(
+                                hasClockChip: peerClock != null,
+                              ),
+                            ),
                             // Top fade — messages dissolve into black under the
                             // header (floating, not empty).
-                            Positioned(
+                            const Positioned(
                               top: 0,
                               left: 0,
                               right: 0,
                               child: IgnorePointer(
-                                // Frosted translucent BLACK band behind the
-                                // header — messages show through, blurred (like
-                                // a Telegram-style header), not an opaque bar.
-                                child: ClipRect(
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                      sigmaX: 18,
-                                      sigmaY: 18,
-                                    ),
-                                    child: SizedBox(
-                                      height: headerSpace,
-                                      width: double.infinity,
-                                      child: ColoredBox(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.4,
-                                        ),
+                                child: SizedBox(
+                                  // Taller + lower-opacity peak so the top fades
+                                  // gently (floating, not a hard black bar) —
+                                  // same soft feel as the footer fade below.
+                                  height: 88,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0x99000000),
+                                          Color(0x00000000),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -583,26 +612,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             ),
                             // Bottom fade — messages dissolve into black under
                             // the floating composer.
-                            Positioned(
+                            const Positioned(
                               bottom: 0,
                               left: 0,
                               right: 0,
                               child: IgnorePointer(
-                                // Frosted translucent BLACK band behind the
-                                // composer — same as the header.
-                                child: ClipRect(
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                      sigmaX: 18,
-                                      sigmaY: 18,
-                                    ),
-                                    child: SizedBox(
-                                      height: 130,
-                                      width: double.infinity,
-                                      child: ColoredBox(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.4,
-                                        ),
+                                child: SizedBox(
+                                  height: 160,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0x00000000),
+                                          Color(0x99000000),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -618,14 +643,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             // here puts the bubble's centre on the logo's centre.
                             if (peerClock != null)
                               Positioned(
-                                top: headerSpace - 16,
+                                top: 8,
                                 left: 112,
                                 right: 58,
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: _PeerClockChip(
-                                    clock: peerClock,
-                                    name: widget.title,
+                                child: IgnorePointer(
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: _PeerClockChip(clock: peerClock),
                                   ),
                                 ),
                               ),
@@ -633,50 +657,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         ),
                       ),
                     ),
-            // Floating header — a transparent row (only the round glass buttons
-            // carry glass); the soft top fade behind it gives the low-opacity,
-            // floating look instead of an opaque bar. Messages scroll behind it.
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ThreadHeader(
-                      title: widget.title,
-                    peer: _peer,
-                    blockedByPeer: _peerBlockedMe,
-                    onCall: _peerBlockedMe
-                        ? () => ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                AppStrings.t('chat_blocked_by_peer'),
-                              ),
-                            ),
-                          )
-                        : () => CallLauncher.startCall(
-                            context,
-                            peerDeviceId: widget.peerDeviceId,
-                            translation: widget.translation,
-                            startWithCamera: true,
-                          ),
-                    onViewProfile: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            ProfileScreen(userId: widget.peerDeviceId),
-                      ),
-                    ),
-                    peerBlocked: _peerBlocked,
-                    onToggleBlock: _toggleBlockPeer,
-                    onReport: _reportPeer,
-                  ),
-                  if (_error != null) _ErrorBanner(message: _error!),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
             // Floating glass composer OVER the messages — no dark footer behind
             // it, so the glass refracts the conversation.
@@ -684,7 +667,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               left: 0,
               right: 0,
               bottom: 0,
-              child: _peerBlockedMe
+              // Footer bar — translucent black (30%) background behind the
+              // glass composer.
+              child: ColoredBox(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: _peerBlockedMe
                   ? const _BlockedComposerNotice()
                   : _Composer(
                       controller: _inputCtrl,
@@ -696,6 +683,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       onToggleTranslate: _toggleAutoTranslate,
                       myLang: _myLang,
                     ),
+              ),
             ),
             Positioned.fill(
               child: IgnorePointer(
@@ -731,7 +719,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  Widget _buildMessageList({bool hasClockChip = false, double topInset = 0}) {
+  Widget _buildMessageList({bool hasClockChip = false}) {
     if (_messages.isEmpty) {
       return Center(
         child: Padding(
@@ -754,7 +742,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       // Bottom room so the last message clears the floating composer.
       padding: EdgeInsets.fromLTRB(
         12,
-        topInset + (hasClockChip ? 46 : 12),
+        hasClockChip ? 46 : 12,
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
@@ -965,87 +953,43 @@ class _ThreadHeader extends StatelessWidget {
 
 /// Small floating bubble under the header showing the peer's local time, with
 /// a white sun (day) / moon (night) icon. Orange-tinted, darker border.
-class _PeerClockChip extends StatefulWidget {
-  const _PeerClockChip({required this.clock, required this.name});
+class _PeerClockChip extends StatelessWidget {
+  const _PeerClockChip({required this.clock});
 
   final PeerLocalTime clock;
-  final String name;
-
-  @override
-  State<_PeerClockChip> createState() => _PeerClockChipState();
-}
-
-class _PeerClockChipState extends State<_PeerClockChip> {
-  // Held down → the pill stretches open to spell out whose local time it is;
-  // released → it snaps back to just the time + sun/moon.
-  bool _open = false;
-  void _set(bool v) {
-    if (mounted && _open != v) setState(() => _open = v);
-  }
 
   @override
   Widget build(BuildContext context) {
     // Frosted-glass orange pill — translucent so the chat behind shows
-    // through. White text/icon with a faint shadow to stay legible.
+    // through. White icon + time, with a faint shadow to stay legible.
     const shadows = [
       Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
     ];
-    const textStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      shadows: shadows,
-    );
-    final firstName = widget.name.trim().split(RegExp(r'\s+')).first;
-
-    final timeRow = Row(
-      key: const ValueKey('time'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          widget.clock.hhmm,
-          style: textStyle.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
+    return GlassPanel(
+      borderRadius: 999,
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      color: const Color(0x55FFA726), // light orange — recording tint
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            clock.hhmm,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              shadows: shadows,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Icon(
-          widget.clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-          size: 14,
-          color: Colors.white,
-          shadows: shadows,
-        ),
-      ],
-    );
-    final phrase = Text(
-      AppStrings.t(
-        'peer_clock_phrase',
-        args: {'time': widget.clock.hhmm, 'name': firstName},
-      ),
-      key: const ValueKey('phrase'),
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.fade,
-      style: textStyle,
-    );
-
-    return Listener(
-      onPointerDown: (_) => _set(true),
-      onPointerUp: (_) => _set(false),
-      onPointerCancel: (_) => _set(false),
-      child: GlassPanel(
-        borderRadius: 999,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        color: const Color(0x55FFA726), // light orange — recording tint
-        // Stretch the pill open/closed; the text cross-fades inside it.
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutBack,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: _open ? phrase : timeRow,
+          const SizedBox(width: 6),
+          Icon(
+            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+            size: 14,
+            color: Colors.white,
+            shadows: shadows,
           ),
-        ),
+        ],
       ),
     );
   }
