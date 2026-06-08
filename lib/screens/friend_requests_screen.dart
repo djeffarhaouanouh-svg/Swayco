@@ -15,6 +15,7 @@ import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/appear.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
@@ -414,7 +415,11 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
             ),
           for (var i = 0; i < sections.length; i++) ...[
             if (i > 0) const SizedBox(height: 18),
-            sections[i],
+            // Cards ease in (fade + slide up) in a quick cascade on load.
+            FadeSlideIn(
+              delay: Duration(milliseconds: i * 90),
+              child: sections[i],
+            ),
           ],
         ],
       ),
