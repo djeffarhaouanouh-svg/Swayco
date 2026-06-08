@@ -579,23 +579,31 @@ class _MissionsScoreRingState extends State<MissionsScoreRing>
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // X/6 with a breathing cyan halo (text shadows).
+              // X/6 with a breathing cyan halo (text shadows) — hidden once all
+              // missions are done (6/6): only the completed ring stays.
               ValueListenableBuilder<MissionsState>(
                 valueListenable: MissionsService.instance.state,
-                builder: (context, st, _) => Text(
-                  '${st.completed}/$missionCount',
-                  style: SCText.meta.copyWith(
-                    color: SC.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    shadows: [
-                      Shadow(color: glow, blurRadius: blur),
-                      Shadow(color: glowSoft, blurRadius: blur * 1.7),
-                    ],
-                  ),
-                ),
+                builder: (context, st, _) {
+                  if (st.completed >= missionCount) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 5),
+                    child: Text(
+                      '${st.completed}/$missionCount',
+                      style: SCText.meta.copyWith(
+                        color: SC.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        shadows: [
+                          Shadow(color: glow, blurRadius: blur),
+                          Shadow(color: glowSoft, blurRadius: blur * 1.7),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-              const SizedBox(width: 5),
               // Ring with the same breathing cyan halo behind it.
               DecoratedBox(
                 decoration: BoxDecoration(

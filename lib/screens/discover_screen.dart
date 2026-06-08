@@ -999,9 +999,9 @@ class _DiscoverHeader extends StatelessWidget {
                   // "X/6" glued left of the ring with a breathing cyan halo —
                   // shown in both states (the expanded field is capped below to
                   // leave room so the bar never overflows).
-                  // Slight nudge up to sit in line with the title + loupe.
+                  // Sits a touch lower than the title + loupe.
                   Transform.translate(
-                    offset: const Offset(0, -3),
+                    offset: const Offset(0, 2),
                     child: const MissionsScoreRing(),
                   ),
                   const SizedBox(width: 10),
