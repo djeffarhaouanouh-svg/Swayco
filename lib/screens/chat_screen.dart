@@ -22,6 +22,7 @@ import '../services/token_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
+import '../widgets/appear.dart';
 import '../widgets/glass.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -496,8 +497,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _GlassListCard(
             child: Column(
               children: [
-                for (final (i, p) in _friends.indexed) ...[
-                  if (i > 0)
+                // Rows cascade in (fade + slide) on first load.
+                for (final (i, p) in _friends.indexed)
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: i * 55),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i > 0)
                     Divider(
                       height: 1,
                       thickness: 1,
@@ -533,7 +540,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       startWithCamera: true,
                     ),
                   ),
-                ],
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
