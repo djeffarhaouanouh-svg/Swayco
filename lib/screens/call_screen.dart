@@ -904,6 +904,28 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
+  /// iOS first-responder rescue. The call screen's native video views
+  /// (`RTCVideoView` platform views) can reclaim the keyboard's first
+  /// responder the instant it presents — the field gains focus, the keyboard
+  /// blips open, then immediately dismisses ("it jumps but the keyboard never
+  /// comes out"). Messages has no platform views, so its keyboard is fine.
+  /// Re-assert focus + force the soft keyboard across the ~300ms settle window
+  /// so it sticks. Bounded (4 shots) so it never fights a deliberate dismiss.
+  void _forceCallKeyboard() {
+    void assertKeyboard() {
+      if (!mounted) return;
+      if (!_chatFocus.hasFocus) _chatFocus.requestFocus();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show').catchError(
+        (_) {},
+      );
+    }
+
+    assertKeyboard();
+    for (final ms in const [50, 150, 300]) {
+      Future.delayed(Duration(milliseconds: ms), assertKeyboard);
+    }
+  }
+
   Widget _buildChatComposer() {
     // Type the placeholder in the first time the composer appears.
     if (!_chatHintStarted) {
@@ -931,6 +953,8 @@ class _CallScreenState extends State<CallScreen> {
             child: TextField(
               controller: _chatCtrl,
               focusNode: _chatFocus,
+              // Beat the native video views' first-responder grab on iOS.
+              onTap: _forceCallKeyboard,
               minLines: 1,
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
