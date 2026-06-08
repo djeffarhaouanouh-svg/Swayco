@@ -1479,6 +1479,11 @@ class _ProfileCardState extends State<_ProfileCard> {
       profile.city.trim(),
       profile.country.trim(),
     ].where((s) => s.isNotEmpty).join(', ');
+    // Real presence: active in the last 2 min and not hiding their status.
+    final online = !profile.hideOnlineStatus &&
+        profile.lastSeen != null &&
+        DateTime.now().difference(profile.lastSeen!) <
+            const Duration(minutes: 2);
     return DecoratedBox(
       decoration: BoxDecoration(
         // Match the bars' notch radius so the card's rounded corners nest
@@ -1598,6 +1603,32 @@ class _ProfileCardState extends State<_ProfileCard> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        // Green "en ligne" line under the address when active.
+                        if (online) ...[
+                          const SizedBox(height: 5),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: SC.online,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                AppStrings.t('online_now'),
+                                style: const TextStyle(
+                                  color: SC.online,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
