@@ -2231,15 +2231,24 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       onTap: onTap,
       child: Opacity(
         opacity: onTap == null ? 0.25 : 1,
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
-            shape: BoxShape.circle,
+        // Frosted-glass circle (blur + faint white tint), not a flat black fill.
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Icon(icon, color: Colors.white, size: size * 0.55),
+            ),
           ),
-          child: Icon(icon, color: Colors.white, size: size * 0.55),
         ),
       ),
     );
