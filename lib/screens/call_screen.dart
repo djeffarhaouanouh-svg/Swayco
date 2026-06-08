@@ -28,7 +28,7 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
-import '../widgets/native_glass.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -914,13 +914,15 @@ class _CallScreenState extends State<CallScreen> {
     }
     // Native Apple liquid glass REPLACES the frosted fill (no superposition);
     // web / older OS fall back to the previous translucent dark bar.
-    return NativeGlass(
+    // GlassPanel (Flutter shader glass), NOT NativeGlass: the native Apple
+    // glass is a platform view that swallows touches, so the TextField never
+    // gets focus and the keyboard won't open. The shader glass keeps the
+    // field interactive (same surface the chat composer uses).
+    return GlassPanel(
       borderRadius: 26,
-      fallbackColor: Colors.black.withValues(alpha: 0.35),
-      fallbackBorder: Colors.white.withValues(alpha: 0.18),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-        child: Row(
+      color: Colors.black.withValues(alpha: 0.35),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      child: Row(
         children: [
           // Translation stays always on (_chatTranslate defaults to true); the
           // toggle icon was removed so the text field can start hard left and
@@ -968,7 +970,6 @@ class _CallScreenState extends State<CallScreen> {
           ),
         ],
         ),
-      ),
     );
   }
 
@@ -1519,9 +1520,21 @@ class _CallScreenState extends State<CallScreen> {
           // screen; only the chat composer lifts above the keyboard (it adds
           // viewInsets.bottom itself).
           resizeToAvoidBottomInset: false,
-          body: SafeArea(
-            child: Stack(
-              fit: StackFit.expand,
+          body: Builder(
+            builder: (context) {
+              // Pin the bottom safe-area inset so it stays CONSTANT when the
+              // keyboard opens — otherwise MediaQuery.padding.bottom collapses
+              // to 0, the right-side control rail's SafeArea shrinks, and the
+              // buttons jump down. The composer reads viewInsets directly, so
+              // it still lifts above the keyboard.
+              final mq = MediaQuery.of(context);
+              return MediaQuery(
+                data: mq.copyWith(
+                  padding: mq.padding.copyWith(bottom: mq.viewPadding.bottom),
+                ),
+                child: SafeArea(
+                  child: Stack(
+                    fit: StackFit.expand,
               children: [
                 // Main view priority:
                 //   1. Remote video, if the remote has a published camera.
@@ -1821,9 +1834,12 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ],
             ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
-      ),
     );
   }
 
