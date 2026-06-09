@@ -22,11 +22,13 @@
     <!-- WhatsApp-style incoming call: a full-screen-intent notification that
          rings over the lock screen even when the app is closed. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- image_picker uses Android's photo picker on API 33+, which needs no
-         permission. On older Android it falls back to the legacy gallery —
-         scope storage read to images, capped at API 32 since 33+ uses the
-         scoped READ_MEDIA_IMAGES instead. -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- image_picker uses Android's system photo picker on API 33+, which
+         needs NO runtime permission, so READ_MEDIA_IMAGES is deliberately
+         NOT declared. This keeps us off Google Play's "photos and videos
+         permissions" declaration (the picker is the policy-preferred path
+         for one-shot, user-initiated image selection). On Android 12 and
+         below image_picker falls back to the legacy gallery, which needs a
+         scoped image read — capped at API 32. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
