@@ -2728,7 +2728,7 @@ class _InterestChip extends StatelessWidget {
               const SizedBox(width: 6),
             ],
             Text(
-              label,
+              interestLabel(label),
               style: TextStyle(
                 color: fg,
                 fontSize: 16,
@@ -3084,7 +3084,7 @@ class _CategoryPage extends StatelessWidget {
               Text(cat.emoji, style: const TextStyle(fontSize: 18)),
               const SizedBox(width: 8),
               Text(
-                cat.label,
+                interestLabel(cat.label),
                 style: TextStyle(
                   color: cat.color,
                   fontSize: 16,

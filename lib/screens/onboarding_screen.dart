@@ -943,7 +943,7 @@ class _StepInterestsState extends State<_StepInterests> {
                       children: [
                         Text(cat.emoji, style: const TextStyle(fontSize: 22)),
                         const SizedBox(width: 10),
-                        Text(cat.label, style: SCText.h3),
+                        Text(interestLabel(cat.label), style: SCText.h3),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -1034,7 +1034,7 @@ class _InterestChip extends StatelessWidget {
                 const SizedBox(width: 6),
               ],
               Text(
-                label,
+                interestLabel(label),
                 style: TextStyle(
                   color: fg,
                   fontSize: 14,

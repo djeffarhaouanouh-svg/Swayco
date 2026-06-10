@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Re-export the display-translation helper so every importer of this file
+// (onboarding, profile) gets `interestLabel(...)` without an extra import.
+export 'interests_i18n.dart';
+
 /// The geometric silhouette used for a category's chips ("pins"). Each
 /// interest category renders its chips with a distinct shape so the
 /// categories are recognisable at a glance (pill vs cut-corner vs leaf …).
