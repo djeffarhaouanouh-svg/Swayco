@@ -33,7 +33,8 @@ class InterestCategory {
 /// the profile as their plain label string, so editing these lists later is
 /// safe as long as the labels stay stable.
 
-/// What (non-Japanese) users love about Japan — the default set.
+/// What (non-Japanese) users love about Japan — the default set. Generous but
+/// curated: every tag is an iconic, popular pick (no filler).
 const List<InterestCategory> kJapanInterestCategories = [
   InterestCategory(
     label: 'Manga & Anime',
@@ -42,7 +43,7 @@ const List<InterestCategory> kJapanInterestCategories = [
     shape: InterestShape.stadium, // pill / "ovale"
     options: [
       'Manga', 'Anime', 'Studio Ghibli', 'One Piece', 'Naruto',
-      'Demon Slayer', 'Cosplay',
+      'Dragon Ball', 'Demon Slayer', 'Cosplay',
     ],
   ),
   InterestCategory(
@@ -61,8 +62,8 @@ const List<InterestCategory> kJapanInterestCategories = [
     color: Color(0xFF22C55E), // green
     shape: InterestShape.rounded, // soft rounded rectangle
     options: [
-      'Samouraïs', 'Geishas', 'Sakura', 'Onsen', 'Kimono', 'Sumo', 'Temples',
-      'Cérémonie du thé',
+      'Samouraïs', 'Ninjas', 'Geishas', 'Sakura', 'Onsen', 'Kimono', 'Sumo',
+      'Temples',
     ],
   ),
   InterestCategory(
@@ -71,8 +72,8 @@ const List<InterestCategory> kJapanInterestCategories = [
     color: Color(0xFF38BDF8), // sky blue
     shape: InterestShape.beveled, // cut corners
     options: [
-      'Nintendo', 'Pokémon', 'J-pop', 'Karaoké', 'Vocaloid', 'Arcades',
-      'Robots',
+      'Nintendo', 'Pokémon', 'J-pop', 'Karaoké', 'Kawaii', 'Vocaloid',
+      'Arcades', 'Robots',
     ],
   ),
   InterestCategory(
@@ -81,15 +82,26 @@ const List<InterestCategory> kJapanInterestCategories = [
     color: Color(0xFFA855F7), // violet
     shape: InterestShape.leaf, // diagonally rounded
     options: [
-      'Mont Fuji', 'Tokyo', 'Kyoto', 'Jardins zen', 'Cerisiers', 'Bonsaï',
-      'Calligraphie',
+      'Mont Fuji', 'Tokyo', 'Kyoto', 'Osaka', 'Jardins zen', 'Bonsaï',
+      'Calligraphie', 'Bambou',
     ],
   ),
 ];
 
 /// What Japanese users love about France — shown only when the picked country
-/// is Japan.
+/// is Japan. Generous but curated: Paris, gastronomy, fashion/luxury, art and
+/// the art de vivre, with only iconic, desirable picks.
 const List<InterestCategory> kFranceInterestCategories = [
+  InterestCategory(
+    label: 'Paris & Monuments',
+    emoji: '🗼',
+    color: Color(0xFF38BDF8), // sky blue
+    shape: InterestShape.beveled, // cut corners
+    options: [
+      'Tour Eiffel', 'Paris', 'Versailles', 'Mont-Saint-Michel', 'Notre-Dame',
+      'Arc de Triomphe', 'Châteaux',
+    ],
+  ),
   InterestCategory(
     label: 'Gastronomie',
     emoji: '🥐',
@@ -97,7 +109,7 @@ const List<InterestCategory> kFranceInterestCategories = [
     shape: InterestShape.rectangle, // crisp rectangle
     options: [
       'Croissant', 'Baguette', 'Fromage', 'Macarons', 'Crêpes', 'Pâtisserie',
-      'Escargots',
+      'Escargots', 'Foie gras',
     ],
   ),
   InterestCategory(
@@ -110,32 +122,31 @@ const List<InterestCategory> kFranceInterestCategories = [
     ],
   ),
   InterestCategory(
-    label: 'Culture & Art',
-    emoji: '🎨',
-    color: Color(0xFFA855F7), // violet
+    label: 'Mode & Luxe',
+    emoji: '👜',
+    color: Color(0xFFF472B6), // pink
     shape: InterestShape.leaf, // diagonally rounded
     options: [
-      'Louvre', 'Impressionnisme', 'Cinéma', 'Littérature', 'Musées',
-      'Architecture', 'Théâtre',
+      'Mode', 'Haute couture', 'Parfum', 'Luxe', 'Élégance', 'Bijoux',
     ],
   ),
   InterestCategory(
-    label: 'Monuments',
-    emoji: '🗼',
-    color: Color(0xFF38BDF8), // sky blue
-    shape: InterestShape.beveled, // cut corners
+    label: 'Art & Culture',
+    emoji: '🎨',
+    color: Color(0xFFA855F7), // violet
+    shape: InterestShape.rounded, // soft rounded rectangle
     options: [
-      'Tour Eiffel', 'Paris', 'Versailles', 'Mont-Saint-Michel', 'Provence',
-      "Côte d'Azur", 'Châteaux',
+      'Louvre', 'Impressionnisme', 'Monet', 'Cinéma', 'Littérature', 'Musées',
+      'Théâtre', 'Architecture',
     ],
   ),
   InterestCategory(
     label: 'Art de vivre',
     emoji: '✨',
     color: Color(0xFF22C55E), // green
-    shape: InterestShape.rounded, // soft rounded rectangle
+    shape: InterestShape.stadium, // pill / "ovale"
     options: [
-      'Mode', 'Parfum', 'Romance', 'Terrasses', 'Marchés', 'Flâner', 'Luxe',
+      'Romance', 'Terrasses', 'Marchés', 'Flâner', 'Provence', "Côte d'Azur",
     ],
   ),
 ];
