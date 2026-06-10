@@ -745,6 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             // an editable field on my own profile.
                             displayName: _displayName,
                             flag: nameFlag,
+                            country: _remote?.country ?? '',
                             handle: _handle,
                             online: _peerOnline,
                             bio: _remote?.bio ?? '',
@@ -1508,6 +1509,7 @@ class _IdentitySection extends StatelessWidget {
   const _IdentitySection({
     required this.displayName,
     this.flag = '',
+    this.country = '',
     required this.handle,
     this.online = false,
     required this.bio,
@@ -1548,6 +1550,10 @@ class _IdentitySection extends StatelessWidget {
 
   /// Country flag emoji shown right of the name ('' to hide).
   final String flag;
+
+  /// The user's stored country name (e.g. 'Japon'). Selects which interests
+  /// taxonomy the own-profile picker shows. Empty in viewer mode.
+  final String country;
   final String handle;
 
   /// Viewer-mode only: show a green "online" line under the handle.
@@ -1878,7 +1884,11 @@ class _IdentitySection extends StatelessWidget {
         // Centres d'intérêt — picked chips + an "add" chip; tapping either
         // unfolds the category picker inline, right under the chips (no
         // overlay), then folds back when you're done. Shown ABOVE the photos.
-        _InterestsSection(interests: interests, onSave: onEditInterests),
+        _InterestsSection(
+          interests: interests,
+          onSave: onEditInterests,
+          country: country,
+        ),
         const SizedBox(height: 24),
         // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
         _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
@@ -2783,10 +2793,17 @@ class _InterestAddChip extends StatelessWidget {
 /// under the chips (no overlay / bottom sheet) — pick the tags, then tap
 /// "Enregistrer" to fold it back and persist. Enforces [profileInterestsMax].
 class _InterestsSection extends StatefulWidget {
-  const _InterestsSection({required this.interests, required this.onSave});
+  const _InterestsSection({
+    required this.interests,
+    required this.onSave,
+    this.country = '',
+  });
 
   final List<String> interests;
   final Future<void> Function(List<String>)? onSave;
+
+  /// The user's country — selects which interests taxonomy the picker shows.
+  final String country;
 
   @override
   State<_InterestsSection> createState() => _InterestsSectionState();
@@ -2892,6 +2909,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
               sel: _sel,
               onToggle: _toggle,
               onDone: _close,
+              country: widget.country,
             ),
           ),
           crossFadeState: _expanded
@@ -2918,11 +2936,15 @@ class _InlineInterestPicker extends StatefulWidget {
     required this.sel,
     required this.onToggle,
     required this.onDone,
+    this.country = '',
   });
 
   final Set<String> sel;
   final void Function(String tag) onToggle;
   final VoidCallback onDone;
+
+  /// The user's country — selects which interests taxonomy to display.
+  final String country;
 
   @override
   State<_InlineInterestPicker> createState() => _InlineInterestPickerState();
@@ -2947,7 +2969,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
   @override
   Widget build(BuildContext context) {
     final full = widget.sel.length >= profileInterestsMax;
-    final cats = kInterestCategories;
+    final cats = interestCategoriesFor(widget.country);
     return Container(
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),

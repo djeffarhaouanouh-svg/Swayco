@@ -54,7 +54,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _genderAlreadySet = false;
 
   /// Centres d'intérêt picked on the interests step. Plain labels matching
-  /// [kInterestCategories]; persisted via [ProfileApi.updateMyInterests].
+  /// [interestCategoriesFor]; persisted via [ProfileApi.updateMyInterests].
   /// Capped at [profileInterestsMax].
   final Set<String> _selectedInterests = {};
   int _page = 0;
@@ -410,6 +410,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 page: _page,
                 pageCount: _pageCount,
                 showGenderStep: showGenderStep,
+                interestsAboutFrance: _countryCtrl.text.trim() == 'Japon',
               ),
               Expanded(
                 child: PageView(
@@ -457,6 +458,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     _StepInterests(
                       selected: _selectedInterests,
+                      categories: interestCategoriesFor(_countryCtrl.text),
                       onToggle: _toggleInterest,
                       onBack: _back,
                       onNext: _next,
@@ -529,11 +531,16 @@ class _OnboardingHeader extends StatelessWidget {
     required this.page,
     required this.pageCount,
     required this.showGenderStep,
+    required this.interestsAboutFrance,
   });
 
   final int page;
   final int pageCount;
   final bool showGenderStep;
+
+  /// Interests step only: the picked country is Japan, so the step asks about
+  /// France (title flips to the France question); otherwise it asks about Japan.
+  final bool interestsAboutFrance;
 
   /// Maps the current PageView index to a title/subtitle key pair. The gender
   /// step shifts every page after Language by one when present, so we resolve
@@ -545,10 +552,16 @@ class _OnboardingHeader extends StatelessWidget {
     if (showGenderStep && page == 2) {
       return ('onb_gender_title', 'onb_gender_subtitle');
     }
-    if (page == 2 + genderOffset)
+    if (page == 2 + genderOffset) {
       return ('onb_city_title', 'onb_city_subtitle');
+    }
     if (page == 3 + genderOffset) {
-      return ('onb_interests_title', 'onb_interests_subtitle');
+      return (
+        interestsAboutFrance
+            ? 'onb_interests_title_france'
+            : 'onb_interests_title_japan',
+        'onb_interests_subtitle',
+      );
     }
     return ('onb_gift_title', 'onb_gift_subtitle');
   }
@@ -865,12 +878,17 @@ class _StepCity extends StatelessWidget {
 class _StepInterests extends StatefulWidget {
   const _StepInterests({
     required this.selected,
+    required this.categories,
     required this.onToggle,
     required this.onBack,
     required this.onNext,
   });
 
   final Set<String> selected;
+
+  /// The category set to display — picked by the parent from the chosen
+  /// country (France set when the country is Japan, Japan set otherwise).
+  final List<InterestCategory> categories;
   final ValueChanged<String> onToggle;
   final VoidCallback onBack;
   final VoidCallback onNext;
@@ -912,10 +930,10 @@ class _StepInterestsState extends State<_StepInterests> {
         Expanded(
           child: PageView.builder(
             controller: _carousel,
-            itemCount: kInterestCategories.length,
+            itemCount: widget.categories.length,
             onPageChanged: (i) => setState(() => _category = i),
             itemBuilder: (context, i) {
-              final cat = kInterestCategories[i];
+              final cat = widget.categories[i];
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
                 child: Column(
@@ -953,7 +971,7 @@ class _StepInterestsState extends State<_StepInterests> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (var i = 0; i < kInterestCategories.length; i++) ...[
+            for (var i = 0; i < widget.categories.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
               _Dot(active: i == _category),
             ],

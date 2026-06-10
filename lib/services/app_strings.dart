@@ -495,6 +495,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         "D'où tu appelles ? Ça aide à te proposer des gens près de toi. (facultatif)",
     'onb_interests_title': 'Tes centres d\'intérêt',
+    'onb_interests_title_japan': 'Qu\'est-ce que tu aimes le plus au Japon ?',
+    'onb_interests_title_france': 'Qu\'est-ce que tu aimes le plus en France ?',
     'onb_interests_subtitle':
         'Swipe entre les catégories et choisis ce qui te ressemble. (facultatif)',
     'onb_interests_count': '{n} / {max} sélectionnés',
@@ -993,6 +995,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'Where are you calling from? Helps us suggest people near you. (optional)',
     'onb_interests_title': 'Your interests',
+    'onb_interests_title_japan': 'What do you love most about Japan?',
+    'onb_interests_title_france': 'What do you love most about France?',
     'onb_interests_subtitle':
         'Swipe through the categories and pick what fits you. (optional)',
     'onb_interests_count': '{n} / {max} selected',
@@ -1511,6 +1515,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         '¿Desde dónde llamas? Nos ayuda a sugerirte personas cercanas. (opcional)',
     'onb_interests_title': 'Tus intereses',
+    'onb_interests_title_japan': '¿Qué es lo que más te gusta de Japón?',
+    'onb_interests_title_france': '¿Qué es lo que más te gusta de Francia?',
     'onb_interests_subtitle':
         'Desliza por las categorías y elige lo que te encaje. (opcional)',
     'onb_interests_count': '{n} / {max} seleccionados',
@@ -2012,6 +2018,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'Von wo aus rufst du an? Hilft uns, dir Leute in deiner Nähe vorzuschlagen. (optional)',
     'onb_interests_title': 'Deine Interessen',
+    'onb_interests_title_japan': 'Was magst du am meisten an Japan?',
+    'onb_interests_title_france': 'Was magst du am meisten an Frankreich?',
     'onb_interests_subtitle':
         'Wische durch die Kategorien und wähle, was zu dir passt. (optional)',
     'onb_interests_count': '{n} / {max} ausgewählt',
@@ -2506,6 +2514,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'Da dove chiami? Ci aiuta a suggerirti persone vicine a te. (facoltativo)',
     'onb_interests_title': 'I tuoi interessi',
+    'onb_interests_title_japan': 'Cosa ami di più del Giappone?',
+    'onb_interests_title_france': 'Cosa ami di più della Francia?',
     'onb_interests_subtitle':
         'Scorri tra le categorie e scegli ciò che ti rappresenta. (facoltativo)',
     'onb_interests_count': '{n} / {max} selezionati',
@@ -3000,6 +3010,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'De onde está a ligar? Ajuda-nos a sugerir pessoas perto de si. (opcional)',
     'onb_interests_title': 'Os seus interesses',
+    'onb_interests_title_japan': 'O que você mais ama no Japão?',
+    'onb_interests_title_france': 'O que você mais ama na França?',
     'onb_interests_subtitle':
         'Percorra as categorias e escolha o que combina consigo. (opcional)',
     'onb_interests_count': '{n} / {max} selecionados',
@@ -3494,6 +3506,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'Waar bel je vandaan? Helpt ons mensen bij jou in de buurt voor te stellen. (optioneel)',
     'onb_interests_title': 'Jouw interesses',
+    'onb_interests_title_japan': 'Wat vind je het leukst aan Japan?',
+    'onb_interests_title_france': 'Wat vind je het leukst aan Frankrijk?',
     'onb_interests_subtitle':
         'Veeg door de categorieën en kies wat bij je past. (optioneel)',
     'onb_interests_count': '{n} / {max} geselecteerd',
@@ -3974,6 +3988,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'من أين تتصل؟ يساعدنا ذلك على اقتراح أشخاص قريبين منك. (اختياري)',
     'onb_interests_title': 'اهتماماتك',
+    'onb_interests_title_japan': 'ما الذي تحبه أكثر في اليابان؟',
+    'onb_interests_title_france': 'ما الذي تحبه أكثر في فرنسا؟',
     'onb_interests_subtitle': 'تصفّح الفئات واختر ما يناسبك. (اختياري)',
     'onb_interests_count': 'تم اختيار {n} / {max}',
     'onb_interests_max': 'حتى {n} من الاهتمامات.',
@@ -4463,6 +4479,8 @@ abstract final class AppStrings {
     'onb_city_subtitle':
         'Откуда вы звоните? Поможет нам предлагать людей рядом с вами. (необязательно)',
     'onb_interests_title': 'Ваши интересы',
+    'onb_interests_title_japan': 'Что тебе больше всего нравится в Японии?',
+    'onb_interests_title_france': 'Что тебе больше всего нравится во Франции?',
     'onb_interests_subtitle':
         'Пролистайте категории и выберите подходящее. (необязательно)',
     'onb_interests_count': 'Выбрано {n} / {max}',
@@ -4911,6 +4929,8 @@ abstract final class AppStrings {
     'onb_city_title': '你的城市',
     'onb_city_subtitle': '你从哪里发起通话？方便我们为你推荐附近的人。（可选）',
     'onb_interests_title': '你的兴趣',
+    'onb_interests_title_japan': '你最喜欢日本的什么？',
+    'onb_interests_title_france': '你最喜欢法国的什么？',
     'onb_interests_subtitle': '滑动浏览各个分类，选出适合你的。（可选）',
     'onb_interests_count': '已选 {n} / {max}',
     'onb_interests_max': '最多 {n} 个兴趣。',
@@ -5356,6 +5376,8 @@ abstract final class AppStrings {
     'onb_city_title': 'あなたの都市',
     'onb_city_subtitle': 'どこから通話していますか？近くの人を提案するのに役立ちます。（任意）',
     'onb_interests_title': 'あなたの興味',
+    'onb_interests_title_japan': '日本の何が一番好きですか？',
+    'onb_interests_title_france': 'フランスの何が一番好きですか？',
     'onb_interests_subtitle': 'カテゴリーをスワイプして、自分に合うものを選んでください。（任意）',
     'onb_interests_count': '{n} / {max} 選択中',
     'onb_interests_max': '興味は{n}個まで。',
@@ -5799,6 +5821,8 @@ abstract final class AppStrings {
     'onb_city_title': '내 도시',
     'onb_city_subtitle': '어디에서 통화하시나요? 근처 사람을 추천하는 데 도움이 돼요. (선택)',
     'onb_interests_title': '내 관심사',
+    'onb_interests_title_japan': '일본에서 가장 좋아하는 것은 무엇인가요?',
+    'onb_interests_title_france': '프랑스에서 가장 좋아하는 것은 무엇인가요?',
     'onb_interests_subtitle': '카테고리를 넘기며 나에게 맞는 것을 골라요. (선택)',
     'onb_interests_count': '{n} / {max} 선택됨',
     'onb_interests_max': '관심사는 최대 {n}개까지예요.',
