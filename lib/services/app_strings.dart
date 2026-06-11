@@ -195,6 +195,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Changer le mot de passe',
     'settings_delete_account': 'Supprimer le compte',
     'settings_push': 'Notifications push',
+    'settings_email_notifs': 'Notifications par e-mail',
     'settings_test_push': 'Envoyer une notification test',
     'settings_test_push_sent':
         'Notification envoyée — mets l\'app en arrière-plan pour la voir arriver',
@@ -753,6 +754,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Change password',
     'settings_delete_account': 'Delete account',
     'settings_push': 'Push notifications',
+    'settings_email_notifs': 'Email notifications',
     'settings_test_push': 'Send a test notification',
     'settings_test_push_sent':
         'Notification sent — put the app in the background to see it arrive',
@@ -1302,6 +1304,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Cambiar contraseña',
     'settings_delete_account': 'Eliminar la cuenta',
     'settings_push': 'Notificaciones push',
+    'settings_email_notifs': 'Notificaciones por correo',
     'settings_test_push': 'Enviar una notificación de prueba',
     'settings_test_push_sent':
         'Notificación enviada — pon la app en segundo plano para verla',
@@ -2056,6 +2059,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Passwort ändern',
     'settings_delete_account': 'Konto löschen',
     'settings_push': 'Push-Benachrichtigungen',
+    'settings_email_notifs': 'E-Mail-Benachrichtigungen',
     'settings_test_push': 'Testbenachrichtigung senden',
     'settings_test_push_sent':
         'Benachrichtigung gesendet — lege die App in den Hintergrund, um sie zu sehen',
@@ -2602,6 +2606,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Cambia password',
     'settings_delete_account': 'Elimina account',
     'settings_push': 'Notifiche push',
+    'settings_email_notifs': 'Notifiche email',
     'settings_test_push': 'Invia una notifica di prova',
     'settings_test_push_sent':
         'Notifica inviata — metti l\'app in background per vederla arrivare',
@@ -3144,6 +3149,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Alterar palavra-passe',
     'settings_delete_account': 'Eliminar conta',
     'settings_push': 'Notificações push',
+    'settings_email_notifs': 'Notificações por email',
     'settings_test_push': 'Enviar uma notificação de teste',
     'settings_test_push_sent':
         'Notificação enviada — coloque a aplicação em segundo plano para a ver chegar',
@@ -3689,6 +3695,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Wachtwoord wijzigen',
     'settings_delete_account': 'Account verwijderen',
     'settings_push': 'Pushmeldingen',
+    'settings_email_notifs': 'E-mailmeldingen',
     'settings_test_push': 'Een testmelding sturen',
     'settings_test_push_sent':
         'Melding verstuurd — zet de app op de achtergrond om hem te zien aankomen',
@@ -4219,6 +4226,7 @@ abstract final class AppStrings {
     'settings_change_password': 'تغيير كلمة المرور',
     'settings_delete_account': 'حذف الحساب',
     'settings_push': 'الإشعارات الفورية',
+    'settings_email_notifs': 'إشعارات البريد الإلكتروني',
     'settings_test_push': 'إرسال إشعار تجريبي',
     'settings_test_push_sent':
         'تم إرسال الإشعار — أبقِ التطبيق في الخلفية لتراه يصل',
@@ -4751,6 +4759,7 @@ abstract final class AppStrings {
     'settings_change_password': 'Сменить пароль',
     'settings_delete_account': 'Удалить аккаунт',
     'settings_push': 'Push-уведомления',
+    'settings_email_notifs': 'Уведомления по e-mail',
     'settings_test_push': 'Отправить тестовое уведомление',
     'settings_test_push_sent':
         'Уведомление отправлено — сверните приложение, чтобы его увидеть',
@@ -5266,6 +5275,7 @@ abstract final class AppStrings {
     'settings_change_password': '修改密码',
     'settings_delete_account': '删除账户',
     'settings_push': '推送通知',
+    'settings_email_notifs': '邮件通知',
     'settings_test_push': '发送测试通知',
     'settings_test_push_sent': '通知已发送 — 把应用切到后台即可看到它到达',
     'settings_test_push_body': '这是一条测试通知 ✅',
@@ -5752,6 +5762,7 @@ abstract final class AppStrings {
     'settings_change_password': 'パスワードを変更',
     'settings_delete_account': 'アカウントを削除',
     'settings_push': 'プッシュ通知',
+    'settings_email_notifs': 'メール通知',
     'settings_test_push': 'テスト通知を送信',
     'settings_test_push_sent': '通知を送信しました — アプリをバックグラウンドにすると届くのが確認できます',
     'settings_test_push_body': 'これはテスト通知です ✅',
@@ -6241,6 +6252,7 @@ abstract final class AppStrings {
     'settings_change_password': '비밀번호 변경',
     'settings_delete_account': '계정 삭제',
     'settings_push': '푸시 알림',
+    'settings_email_notifs': '이메일 알림',
     'settings_test_push': '테스트 알림 보내기',
     'settings_test_push_sent': '알림을 보냈어요 — 앱을 백그라운드로 두면 도착하는 걸 볼 수 있어요',
     'settings_test_push_body': '테스트 알림이에요 ✅',

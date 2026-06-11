@@ -43,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _busy = false;
   bool _push = true;
+  bool _emailNotifs = true;
   bool _hideOnline = false;
   bool _hideFromCountry = false;
   // My profile — used to render the translation-credits card (moved here
@@ -86,7 +87,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final uid = await DeviceId.getOrCreate();
         final remote = await ProfileApi.fetchById(uid);
         if (!mounted || remote == null) return;
-        setState(() => _profile = remote);
+        setState(() {
+          _profile = remote;
+          _emailNotifs = remote.emailNotifications;
+        });
         if (remote.hideOnlineStatus != _hideOnline) {
           setState(() => _hideOnline = remote.hideOnlineStatus);
           await _saveBool(_kHideOnline, remote.hideOnlineStatus);
@@ -113,6 +117,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _hideOnline = !value);
       await _saveBool(_kHideOnline, !value);
       AppSettings.hideOnlineLocal.value = !value;
+      _toast(AppStrings.t('settings_save_failed'));
+    }
+  }
+
+  /// Toggle re-engagement emails. Source of truth is the remote profile column
+  /// the backend reads, so this writes straight to Supabase (optimistic, with
+  /// rollback on failure).
+  Future<void> _setEmailNotifs(bool value) async {
+    setState(() => _emailNotifs = value);
+    final uid = await DeviceId.getOrCreate();
+    final ok = await ProfileApi.updateEmailNotifications(
+      userId: uid,
+      enabled: value,
+    );
+    if (!ok && mounted) {
+      setState(() => _emailNotifs = !value);
       _toast(AppStrings.t('settings_save_failed'));
     }
   }
@@ -429,6 +449,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _saveBool(_kPush, v);
                         _applyPushPref(v);
                       },
+                    ),
+                    _SettingsToggleRow(
+                      icon: Icons.alternate_email,
+                      label: AppStrings.t('settings_email_notifs'),
+                      value: _emailNotifs,
+                      onChanged: _setEmailNotifs,
                     ),
                   ],
                 ),

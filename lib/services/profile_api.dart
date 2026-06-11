@@ -48,6 +48,7 @@ class RemoteProfile {
     this.gender = '',
     this.hideOnlineStatus = false,
     this.hideFromCountry = false,
+    this.emailNotifications = true,
     this.isPro = false,
     this.subscriptionTier = 'free',
     this.elevenlabsVoiceId = '',
@@ -115,6 +116,12 @@ class RemoteProfile {
   /// their "last seen" timestamp. Source of truth lives on the server so it
   /// can't be bypassed by a tampered client.
   final bool hideOnlineStatus;
+
+  /// Opt-in to re-engagement emails (backend/email.js). Source of truth lives
+  /// on the server (`profiles.email_notifications`) since the backend decides
+  /// whether to email; the Settings toggle and the unsubscribe link both write
+  /// it. Defaults to true.
+  final bool emailNotifications;
 
   /// When true, this profile is hidden from the Discover feed for
   /// users whose [language] matches theirs (used as a country proxy
@@ -250,6 +257,8 @@ class RemoteProfile {
     }(),
     hideOnlineStatus: m['hide_online_status'] == true,
     hideFromCountry: m['hide_from_country'] == true,
+    // Default ON: a null/absent column (legacy row) means "not opted out".
+    emailNotifications: m['email_notifications'] != false,
     isPro: m['is_pro'] == true,
     subscriptionTier: () {
       final t = m['subscription_tier']?.toString().trim().toLowerCase() ?? '';
@@ -288,6 +297,7 @@ class RemoteProfile {
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
+    bool? emailNotifications,
     bool? isPro,
     String? subscriptionTier,
     String? elevenlabsVoiceId,
@@ -314,6 +324,7 @@ class RemoteProfile {
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
     hideFromCountry: hideFromCountry ?? this.hideFromCountry,
+    emailNotifications: emailNotifications ?? this.emailNotifications,
     isPro: isPro ?? this.isPro,
     subscriptionTier: subscriptionTier ?? this.subscriptionTier,
     elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
@@ -1085,6 +1096,30 @@ abstract final class ProfileApi {
       return true;
     } catch (e) {
       debugPrint('ProfileApi.updateHideOnlineStatus failed: $e');
+      return false;
+    }
+  }
+
+  /// Persist the "send me re-engagement emails" toggle. The backend reads
+  /// `profiles.email_notifications` before sending any email, so this is the
+  /// source of truth (mirrors the one-click unsubscribe link). Returns true on
+  /// success so the caller can revert optimistic UI on failure.
+  static Future<bool> updateEmailNotifications({
+    required String userId,
+    required bool enabled,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return false;
+    try {
+      await _c
+          .from('profiles')
+          .update({
+            'email_notifications': enabled,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('ProfileApi.updateEmailNotifications failed: $e');
       return false;
     }
   }
