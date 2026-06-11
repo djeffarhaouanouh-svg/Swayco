@@ -50,6 +50,8 @@ COPY backend/apns_voip.js ./apns_voip.js
 COPY backend/stripe.js ./stripe.js
 COPY backend/analytics.js ./analytics.js
 COPY backend/tiers.js ./tiers.js
+# Online "X en ligne" broadcast tables — required by server.js (require('./nationalities')).
+COPY backend/nationalities.js ./nationalities.js
 COPY --from=flutter-build /app/build/web ./web
 # Static legal site (Terms / Privacy / Help) — served by server.js at
 # /terms, /privacy, /help, /legal alongside the Flutter web bundle.
