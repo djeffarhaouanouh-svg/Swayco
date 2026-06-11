@@ -394,7 +394,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         physics: const AlwaysScrollableScrollPhysics(),
         // Drop the panel a touch below the title; clear the floating nav at the
         // bottom. The whole white panel scrolls (it lives inside this list).
-        padding: EdgeInsets.fromLTRB(0, 14, 0, navReserve),
+        padding: EdgeInsets.fromLTRB(0, 26, 0, navReserve),
         children: [
           WhiteBlock(
             child: rows.isEmpty

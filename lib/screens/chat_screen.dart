@@ -534,7 +534,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         // Drop the panel a touch below the title; clear the floating nav at
         // the bottom so the scrolled panel never hides under it.
-        padding: EdgeInsets.fromLTRB(0, 14, 0, navReserve),
+        padding: EdgeInsets.fromLTRB(0, 26, 0, navReserve),
         children: [
           if (_notifBlocked && !_notifBannerDismissed)
             Padding(
@@ -1226,7 +1226,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
     // the layout doesn't shift when the data lands.
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
+      padding: const EdgeInsets.fromLTRB(0, 26, 0, 16),
       children: [
         WhiteBlock(
           child: AnimatedBuilder(
