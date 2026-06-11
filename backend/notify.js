@@ -20,6 +20,7 @@
 //  - Supabase missing → endpoint returns 503
 
 const { sendVoipPush, apnsConfigured } = require('./apns_voip');
+const { maybeEmailNotification } = require('./email');
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -235,6 +236,11 @@ async function notifyUser(recipientUid, payload) {
       }
     }),
   );
+
+  // Re-engagement email fallback — best-effort, fire-and-forget so it never
+  // adds latency to (or fails) the push path. Self-gates on offline + throttle
+  // + opt-out inside, and no-ops entirely when RESEND_API_KEY is unset.
+  maybeEmailNotification(sb, recipientUid, payload).catch(() => {});
 
   // Per-target outcome in the Railway logs so a missing push can be
   // diagnosed at a glance: e.g. `sent: ios_voip`, `error: BadDeviceToken`,

@@ -1707,6 +1707,51 @@ if (hasLegalSite) {
   }
 }
 
+// One-click unsubscribe from re-engagement emails. Every email footer links
+// here with the user id + their secret token (RGPD requirement). Registered
+// BEFORE the Flutter SPA fallback so it isn't swallowed by index.html.
+function unsubPage(ok) {
+  const msg = ok
+    ? 'Vous êtes désabonné des e-mails Swayco. / You have been unsubscribed from Swayco emails.'
+    : 'Lien invalide ou expiré. / Invalid or expired link.';
+  return (
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+    '<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0e0e0e;' +
+    'color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;' +
+    'text-align:center;padding:24px;margin:0;"><div>' +
+    '<div style="font-size:22px;font-weight:800;margin-bottom:16px;">swayco' +
+    '<span style="color:#00BCD4;">.ai</span></div>' +
+    `<p style="color:#bbb;max-width:360px;">${msg}</p></div></body></html>`
+  );
+}
+app.get('/email/unsubscribe', async (req, res) => {
+  const u = String(req.query.u || '');
+  const t = String(req.query.t || '');
+  const sb = supabase();
+  if (!sb || !u || !t) {
+    return res.status(400).type('html').send(unsubPage(false));
+  }
+  try {
+    const { data: prof } = await sb
+      .from('profiles')
+      .select('email_unsub_token')
+      .eq('id', u)
+      .maybeSingle();
+    if (!prof || String(prof.email_unsub_token) !== t) {
+      return res.status(403).type('html').send(unsubPage(false));
+    }
+    await sb
+      .from('profiles')
+      .update({ email_notifications: false })
+      .eq('id', u);
+    return res.type('html').send(unsubPage(true));
+  } catch (e) {
+    console.error('/email/unsubscribe error', e);
+    return res.status(500).type('html').send(unsubPage(false));
+  }
+});
+
 if (hasWebUi) {
   app.use(express.static(webPath));
   app.use((req, res, next) => {
