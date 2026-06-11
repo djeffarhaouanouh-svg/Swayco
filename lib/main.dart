@@ -468,7 +468,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // notification client is a stub (web, or native before FCM is
     // wired).
     if (prefs.getBool(AppSettings.kPush) ?? true) {
-      unawaited(NotificationClient.register(uid));
+      // Boot only registers the FCM token when permission is ALREADY granted
+      // — it never fires the native prompt cold. A fresh user is asked later,
+      // with rationale, via the message-list priming flow ([NotifEnableFlow]),
+      // so the one-shot iOS prompt isn't wasted before they understand why.
+      unawaited(NotificationClient.registerIfAuthorized(uid));
     }
   }
 

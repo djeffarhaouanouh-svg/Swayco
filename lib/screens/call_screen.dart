@@ -22,6 +22,7 @@ import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
+import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
 import '../services/translation_api.dart';
 import '../services/usage_tracker.dart';
@@ -538,6 +539,28 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _start() async {
+    // Pre-permission priming: the mic is essential to a call, so we never
+    // fire the OS prompt cold. Explain why first; if the user declines the
+    // rationale we abort without burning the one-shot iOS prompt.
+    if (!(await Permission.microphone.status).isGranted) {
+      if (!mounted) return;
+      final ok = await PermissionPriming.show(
+        context,
+        icon: Icons.mic_rounded,
+        title: AppStrings.t('mic_prime_title'),
+        body: AppStrings.t('mic_prime_body'),
+        confirmLabel: AppStrings.t('mic_prime_enable'),
+      );
+      if (!ok) {
+        if (mounted) {
+          setState(() {
+            _connecting = false;
+            _connectError = AppStrings.t('call_perm_required');
+          });
+        }
+        return;
+      }
+    }
     final mic = await Permission.microphone.request();
     if (!mic.isGranted) {
       setState(() {

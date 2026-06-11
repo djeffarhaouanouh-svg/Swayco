@@ -18,9 +18,12 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/interests_i18n.dart';
 import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
+import '../services/push_dispatcher.dart';
+import '../services/scheduled_call_api.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
@@ -438,6 +441,120 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// Contextual ice-breakers shown above the composer while the thread is
+  /// still empty — the hardest message to write is the first one, doubly so
+  /// across a language barrier. Built from the peer's own profile (interests,
+  /// place) so the opener references something real, which lifts the reply
+  /// rate. All copy is in MY UI language (it's my outgoing text); the peer
+  /// gets it auto-translated on their side like any other message.
+  List<String> _iceBreakers() {
+    final out = <String>[];
+    final peer = _peer;
+    final firstName = (peer?.displayName.trim().isNotEmpty == true
+            ? peer!.displayName
+            : widget.title)
+        .split(' ')
+        .first
+        .trim();
+    out.add(
+      firstName.isEmpty
+          ? AppStrings.t('ib_hi_noname')
+          : AppStrings.t('ib_hi', args: {'name': firstName}),
+    );
+    final interests = peer?.interests ?? const <String>[];
+    if (interests.isNotEmpty) {
+      out.add(
+        AppStrings.t('ib_interest', args: {'interest': interestLabel(interests.first)}),
+      );
+    }
+    final place = (peer?.city.trim().isNotEmpty ?? false)
+        ? peer!.city.trim()
+        : (peer?.country.trim() ?? '');
+    if (place.isNotEmpty) {
+      out.add(AppStrings.t('ib_place', args: {'place': place}));
+    }
+    out.add(AppStrings.t('ib_call'));
+    return out;
+  }
+
+  /// Tapping a suggestion just pre-fills the composer and reuses the normal
+  /// send path, so the message goes through translation / analytics like any
+  /// hand-typed one.
+  void _sendSuggestion(String text) {
+    if (_sending) return;
+    _inputCtrl.text = text;
+    _send();
+  }
+
+  String _formatWhen(DateTime when) {
+    final loc = MaterialLocalizations.of(context);
+    final d = loc.formatMediumDate(when);
+    final t = loc.formatTimeOfDay(
+      TimeOfDay.fromDateTime(when),
+      alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
+    );
+    return '$d · $t';
+  }
+
+  /// Plan a future call: pick a date + time (in MY local zone — it's stored as
+  /// an absolute UTC instant, so each side later sees it in their own zone),
+  /// persist it, tell the peer now, and let the backend cron fire the reminder
+  /// push to both of us shortly before it starts.
+  Future<void> _scheduleCall() async {
+    if (_myId.isEmpty || widget.peerDeviceId.isEmpty) return;
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 60)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+    );
+    if (time == null || !mounted) return;
+    final when =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (!when.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('schedule_past_error'))),
+      );
+      return;
+    }
+    final res = await ScheduledCallApi.schedule(
+      callerId: _myId,
+      calleeId: widget.peerDeviceId,
+      when: when,
+    );
+    if (!mounted) return;
+    if (res.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('schedule_failed'))),
+      );
+      return;
+    }
+    final whenLabel = _formatWhen(when);
+    final caller = _myName.trim().isEmpty
+        ? AppStrings.t('call_locked_peer_fallback')
+        : _myName.trim();
+    unawaited(PushDispatcher.notify(
+      recipientUid: widget.peerDeviceId,
+      title: AppStrings.t('schedule_push_title', args: {'name': caller}),
+      body: AppStrings.t('schedule_push_body', args: {'when': whenLabel}),
+      type: 'call_scheduled',
+      data: {'fromId': _myId, 'whenIso': when.toUtc().toIso8601String()},
+    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppStrings.t('schedule_confirmed', args: {'when': whenLabel}),
+        ),
+      ),
+    );
+  }
+
   /// Upload a recorded voice message via the backend STT pipeline. The
   /// backend persists the audio, transcribes it and inserts the row;
   /// the realtime stream will surface the new message to both sides so
@@ -551,6 +668,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               translation: widget.translation,
                               startWithCamera: true,
                             ),
+                      onSchedule: _scheduleCall,
                       onViewProfile: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
                           builder: (_) =>
@@ -665,15 +783,25 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               bottom: 0,
               child: _peerBlockedMe
                   ? const _BlockedComposerNotice()
-                  : _Composer(
-                      controller: _inputCtrl,
-                      sending: _sending,
-                      onSend: _send,
-                      onSendVoice: _sendVoice,
-                      onSendImage: _sendImage,
-                      autoTranslate: _autoTranslate,
-                      onToggleTranslate: _toggleAutoTranslate,
-                      myLang: _myLang,
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_messages.isEmpty)
+                          _IceBreakers(
+                            suggestions: _iceBreakers(),
+                            onTap: _sendSuggestion,
+                          ),
+                        _Composer(
+                          controller: _inputCtrl,
+                          sending: _sending,
+                          onSend: _send,
+                          onSendVoice: _sendVoice,
+                          onSendImage: _sendImage,
+                          autoTranslate: _autoTranslate,
+                          onToggleTranslate: _toggleAutoTranslate,
+                          myLang: _myLang,
+                        ),
+                      ],
                     ),
             ),
             Positioned.fill(
@@ -761,6 +889,7 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
+    required this.onSchedule,
     required this.onViewProfile,
     this.peerBlocked = false,
     this.blockedByPeer = false,
@@ -775,6 +904,9 @@ class _ThreadHeader extends StatelessWidget {
 
   /// Call button — starts a video call (camera on).
   final VoidCallback onCall;
+
+  /// Calendar button — opens the date/time picker to plan a future call.
+  final VoidCallback onSchedule;
   final VoidCallback onViewProfile;
 
   // Block / report are no longer surfaced in the header (the ⋮ menu was
@@ -922,6 +1054,15 @@ class _ThreadHeader extends StatelessWidget {
                 },
               ),
             ),
+            // Plan a future call (date/time picker → reminder push to both).
+            GlassIconButton(
+              icon: Icons.event_rounded,
+              size: 40,
+              iconSize: 19,
+              popScale: 1.25,
+              onTap: onSchedule,
+            ),
+            const SizedBox(width: 8),
             // Single call button — a tap starts a video call (camera on).
             // Greyed when the peer has blocked me (the call can't connect).
             Opacity(
@@ -1520,6 +1661,60 @@ const Duration _kMaxVoiceMessage = Duration(seconds: 60);
 
 /// Replaces the composer when the peer has blocked me — a flat, disabled
 /// notice bar so it's obvious messages can't be sent (they'd go nowhere).
+/// Horizontal strip of tappable ice-breaker suggestions, floated just above
+/// the composer while the thread is empty. Tapping one sends it immediately.
+class _IceBreakers extends StatelessWidget {
+  const _IceBreakers({required this.suggestions, required this.onTap});
+
+  final List<String> suggestions;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: suggestions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final text = suggestions[i];
+          return Center(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => onTap(text),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: SC.accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: SC.accent.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _BlockedComposerNotice extends StatelessWidget {
   const _BlockedComposerNotice();
 

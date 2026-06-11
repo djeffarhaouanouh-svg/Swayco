@@ -7,6 +7,14 @@ abstract final class NotificationClient {
   /// for the current user. Stub always returns false.
   static Future<bool> register(String userId) async => false;
 
+  /// Mirrors the io client. On web there's no native notification permission
+  /// to manage, so report `'enabled'` — the message-list banner then stays
+  /// hidden instead of nagging web users.
+  static Future<String> notifStatus() async => 'enabled';
+
+  /// No native prompt to guard on web — always a no-op.
+  static Future<bool> registerIfAuthorized(String userId) async => false;
+
   /// Best-effort cleanup on sign-out. No-op here.
   static Future<void> unregister(String userId) async {}
 

@@ -53,6 +53,45 @@ abstract final class AppStrings {
 
   // ─── French ───────────────────────────────────────────────────────────────
   static const Map<String, String> _fr = {
+    // ── Call credit gate (péage) ──
+    'call_locked_title': 'Plus de crédits d\'appel',
+    'call_locked_body':
+        'Tu n\'as plus de crédits pour appeler. Demande à {name} de t\'appeler — c\'est gratuit de ton côté.',
+    'call_locked_invite': 'Inviter {name} à m\'appeler',
+    'call_locked_subscribe': 'Voir les abonnements',
+    'call_locked_invite_sent': 'Invitation envoyée 📞',
+    'call_locked_peer_fallback': 'quelqu\'un',
+    'call_invite_push_title': '{name} aimerait que tu l\'appelles',
+    'call_invite_push_body': '📞 Lance l\'appel quand tu veux',
+    // ── Ice-breakers ──
+    'ib_hi': 'Coucou {name} 👋',
+    'ib_hi_noname': 'Coucou 👋',
+    'ib_interest':
+        'J\'ai vu que tu aimes {interest} — tu pratiques depuis longtemps ?',
+    'ib_place': 'Tu es à {place} ? Raconte-moi !',
+    'ib_call': 'Ça te dit qu\'on s\'appelle ?',
+    // ── Permission priming + banner ──
+    'prime_later': 'Plus tard',
+    'notif_prime_title': 'Active les notifications',
+    'notif_prime_body':
+        'Pour savoir quand on te répond et ne rater aucun appel.',
+    'notif_prime_enable': 'Activer',
+    'notif_prime_settings_body':
+        'Active les notifications dans les Réglages pour savoir quand on te répond.',
+    'notif_prime_open_settings': 'Ouvrir les Réglages',
+    'mic_prime_title': 'Accès au micro',
+    'mic_prime_body':
+        'On a besoin du micro pour qu\'on t\'entende pendant l\'appel.',
+    'mic_prime_enable': 'Autoriser',
+    'notif_banner_text':
+        'Notifications désactivées — tu rates les messages et les appels.',
+    'notif_banner_cta': 'Activer',
+    // ── Scheduled calls ──
+    'schedule_past_error': 'Choisis une date à venir.',
+    'schedule_failed': 'Impossible de planifier l\'appel.',
+    'schedule_push_title': '{name} propose un appel',
+    'schedule_push_body': 'Appel prévu le {when}',
+    'schedule_confirmed': 'Appel planifié le {when} ✅',
     'paywall_headline': 'Activez votre abonnement\net parlez sans limite',
     'paywall_subtitle':
         'Parlez toutes les langues, sans barrière. Traduction vocale en temps réel.',
@@ -565,6 +604,40 @@ abstract final class AppStrings {
 
   // ─── English ──────────────────────────────────────────────────────────────
   static const Map<String, String> _en = {
+    'call_locked_title': 'Out of call credit',
+    'call_locked_body':
+        'You\'re out of credit to place a call. Ask {name} to call you — it\'s free on your side.',
+    'call_locked_invite': 'Ask {name} to call me',
+    'call_locked_subscribe': 'See plans',
+    'call_locked_invite_sent': 'Invitation sent 📞',
+    'call_locked_peer_fallback': 'someone',
+    'call_invite_push_title': '{name} would like you to call them',
+    'call_invite_push_body': '📞 Start the call whenever you want',
+    'ib_hi': 'Hi {name} 👋',
+    'ib_hi_noname': 'Hi 👋',
+    'ib_interest': 'I saw you\'re into {interest} — been doing it long?',
+    'ib_place': 'You\'re in {place}? Tell me about it!',
+    'ib_call': 'Fancy a call?',
+    'prime_later': 'Later',
+    'notif_prime_title': 'Turn on notifications',
+    'notif_prime_body':
+        'So you know when someone replies and never miss a call.',
+    'notif_prime_enable': 'Turn on',
+    'notif_prime_settings_body':
+        'Turn on notifications in Settings so you know when someone replies.',
+    'notif_prime_open_settings': 'Open Settings',
+    'mic_prime_title': 'Microphone access',
+    'mic_prime_body':
+        'We need the mic so the other person can hear you during the call.',
+    'mic_prime_enable': 'Allow',
+    'notif_banner_text':
+        'Notifications are off — you\'re missing messages and calls.',
+    'notif_banner_cta': 'Turn on',
+    'schedule_past_error': 'Pick a time in the future.',
+    'schedule_failed': 'Couldn\'t schedule the call.',
+    'schedule_push_title': '{name} suggests a call',
+    'schedule_push_body': 'Call planned for {when}',
+    'schedule_confirmed': 'Call scheduled for {when} ✅',
     'paywall_headline': 'Activate your subscription\nand talk without limits',
     'paywall_subtitle':
         'Speak every language, no barriers. Real-time voice translation.',
@@ -1067,6 +1140,40 @@ abstract final class AppStrings {
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
   static const Map<String, String> _es = {
+    'call_locked_title': 'Sin créditos de llamada',
+    'call_locked_body':
+        'Te has quedado sin crédito para llamar. Pídele a {name} que te llame — para ti es gratis.',
+    'call_locked_invite': 'Pedir a {name} que me llame',
+    'call_locked_subscribe': 'Ver planes',
+    'call_locked_invite_sent': 'Invitación enviada 📞',
+    'call_locked_peer_fallback': 'alguien',
+    'call_invite_push_title': 'A {name} le gustaría que le llames',
+    'call_invite_push_body': '📞 Inicia la llamada cuando quieras',
+    'ib_hi': '¡Hola {name}! 👋',
+    'ib_hi_noname': '¡Hola! 👋',
+    'ib_interest': 'Vi que te gusta {interest}, ¿hace mucho que lo practicas?',
+    'ib_place': '¿Estás en {place}? ¡Cuéntame!',
+    'ib_call': '¿Te apetece una llamada?',
+    'prime_later': 'Más tarde',
+    'notif_prime_title': 'Activa las notificaciones',
+    'notif_prime_body':
+        'Para saber cuándo te responden y no perderte ninguna llamada.',
+    'notif_prime_enable': 'Activar',
+    'notif_prime_settings_body':
+        'Activa las notificaciones en Ajustes para saber cuándo te responden.',
+    'notif_prime_open_settings': 'Abrir Ajustes',
+    'mic_prime_title': 'Acceso al micrófono',
+    'mic_prime_body':
+        'Necesitamos el micrófono para que te oigan durante la llamada.',
+    'mic_prime_enable': 'Permitir',
+    'notif_banner_text':
+        'Notificaciones desactivadas: te pierdes mensajes y llamadas.',
+    'notif_banner_cta': 'Activar',
+    'schedule_past_error': 'Elige una fecha futura.',
+    'schedule_failed': 'No se pudo programar la llamada.',
+    'schedule_push_title': '{name} propone una llamada',
+    'schedule_push_body': 'Llamada prevista para el {when}',
+    'schedule_confirmed': 'Llamada programada para el {when} ✅',
     'paywall_headline': 'Activa tu suscripción\ny habla sin límites',
     'paywall_subtitle':
         'Habla todos los idiomas, sin barreras. Traducción de voz en tiempo real.',
@@ -1564,6 +1671,40 @@ abstract final class AppStrings {
 
   // ─── German ───────────────────────────────────────────────────────────────
   static const Map<String, String> _de = {
+    'call_locked_title': 'Kein Anrufguthaben',
+    'call_locked_body':
+        'Dein Guthaben für Anrufe ist aufgebraucht. Bitte {name}, dich anzurufen — für dich ist es kostenlos.',
+    'call_locked_invite': '{name} bitten, mich anzurufen',
+    'call_locked_subscribe': 'Abos ansehen',
+    'call_locked_invite_sent': 'Einladung gesendet 📞',
+    'call_locked_peer_fallback': 'jemand',
+    'call_invite_push_title': '{name} möchte von dir angerufen werden',
+    'call_invite_push_body': '📞 Starte den Anruf, wann du willst',
+    'ib_hi': 'Hi {name} 👋',
+    'ib_hi_noname': 'Hi 👋',
+    'ib_interest': 'Ich habe gesehen, du magst {interest} — schon lange dabei?',
+    'ib_place': 'Du bist in {place}? Erzähl mal!',
+    'ib_call': 'Lust auf einen Anruf?',
+    'prime_later': 'Später',
+    'notif_prime_title': 'Benachrichtigungen aktivieren',
+    'notif_prime_body':
+        'Damit du weißt, wann jemand antwortet, und keinen Anruf verpasst.',
+    'notif_prime_enable': 'Aktivieren',
+    'notif_prime_settings_body':
+        'Aktiviere Benachrichtigungen in den Einstellungen, damit du weißt, wann jemand antwortet.',
+    'notif_prime_open_settings': 'Einstellungen öffnen',
+    'mic_prime_title': 'Mikrofonzugriff',
+    'mic_prime_body':
+        'Wir brauchen das Mikrofon, damit man dich im Anruf hört.',
+    'mic_prime_enable': 'Erlauben',
+    'notif_banner_text':
+        'Benachrichtigungen aus — du verpasst Nachrichten und Anrufe.',
+    'notif_banner_cta': 'Aktivieren',
+    'schedule_past_error': 'Wähle einen Zeitpunkt in der Zukunft.',
+    'schedule_failed': 'Anruf konnte nicht geplant werden.',
+    'schedule_push_title': '{name} schlägt einen Anruf vor',
+    'schedule_push_body': 'Anruf geplant für {when}',
+    'schedule_confirmed': 'Anruf geplant für {when} ✅',
     'paywall_headline': 'Aktiviere dein Abo\nund sprich ohne Grenzen',
     'paywall_subtitle':
         'Sprich jede Sprache, ohne Barrieren. Sprachübersetzung in Echtzeit.',
@@ -2066,6 +2207,40 @@ abstract final class AppStrings {
 
   // ─── Italian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _it = {
+    'call_locked_title': 'Crediti di chiamata esauriti',
+    'call_locked_body':
+        'Hai esaurito i crediti per chiamare. Chiedi a {name} di chiamarti — per te è gratis.',
+    'call_locked_invite': 'Chiedi a {name} di chiamarmi',
+    'call_locked_subscribe': 'Vedi gli abbonamenti',
+    'call_locked_invite_sent': 'Invito inviato 📞',
+    'call_locked_peer_fallback': 'qualcuno',
+    'call_invite_push_title': '{name} vorrebbe che lo chiamassi',
+    'call_invite_push_body': '📞 Avvia la chiamata quando vuoi',
+    'ib_hi': 'Ciao {name} 👋',
+    'ib_hi_noname': 'Ciao 👋',
+    'ib_interest': 'Ho visto che ti piace {interest} — è da tanto che lo fai?',
+    'ib_place': 'Sei a {place}? Raccontami!',
+    'ib_call': 'Ti va di farci una chiamata?',
+    'prime_later': 'Più tardi',
+    'notif_prime_title': 'Attiva le notifiche',
+    'notif_prime_body':
+        'Per sapere quando ti rispondono e non perdere nessuna chiamata.',
+    'notif_prime_enable': 'Attiva',
+    'notif_prime_settings_body':
+        'Attiva le notifiche nelle Impostazioni per sapere quando ti rispondono.',
+    'notif_prime_open_settings': 'Apri Impostazioni',
+    'mic_prime_title': 'Accesso al microfono',
+    'mic_prime_body':
+        'Ci serve il microfono perché ti sentano durante la chiamata.',
+    'mic_prime_enable': 'Consenti',
+    'notif_banner_text':
+        'Notifiche disattivate: ti perdi messaggi e chiamate.',
+    'notif_banner_cta': 'Attiva',
+    'schedule_past_error': 'Scegli una data futura.',
+    'schedule_failed': 'Impossibile pianificare la chiamata.',
+    'schedule_push_title': '{name} propone una chiamata',
+    'schedule_push_body': 'Chiamata prevista per il {when}',
+    'schedule_confirmed': 'Chiamata pianificata per il {when} ✅',
     'paywall_headline': 'Attiva il tuo abbonamento\ne parla senza limiti',
     'paywall_subtitle':
         'Parla ogni lingua, senza barriere. Traduzione vocale in tempo reale.',
@@ -2562,6 +2737,40 @@ abstract final class AppStrings {
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
   static const Map<String, String> _pt = {
+    'call_locked_title': 'Sem créditos de chamada',
+    'call_locked_body':
+        'Ficaste sem crédito para ligar. Pede a {name} para te ligar — do teu lado é grátis.',
+    'call_locked_invite': 'Pedir a {name} para me ligar',
+    'call_locked_subscribe': 'Ver planos',
+    'call_locked_invite_sent': 'Convite enviado 📞',
+    'call_locked_peer_fallback': 'alguém',
+    'call_invite_push_title': '{name} gostava que lhe ligasses',
+    'call_invite_push_body': '📞 Inicia a chamada quando quiseres',
+    'ib_hi': 'Olá {name} 👋',
+    'ib_hi_noname': 'Olá 👋',
+    'ib_interest': 'Vi que gostas de {interest} — já há muito tempo?',
+    'ib_place': 'Estás em {place}? Conta-me!',
+    'ib_call': 'Apetece-te uma chamada?',
+    'prime_later': 'Mais tarde',
+    'notif_prime_title': 'Ativa as notificações',
+    'notif_prime_body':
+        'Para saberes quando te respondem e não perderes nenhuma chamada.',
+    'notif_prime_enable': 'Ativar',
+    'notif_prime_settings_body':
+        'Ativa as notificações nas Definições para saberes quando te respondem.',
+    'notif_prime_open_settings': 'Abrir Definições',
+    'mic_prime_title': 'Acesso ao microfone',
+    'mic_prime_body':
+        'Precisamos do microfone para que te oiçam durante a chamada.',
+    'mic_prime_enable': 'Permitir',
+    'notif_banner_text':
+        'Notificações desativadas — estás a perder mensagens e chamadas.',
+    'notif_banner_cta': 'Ativar',
+    'schedule_past_error': 'Escolhe uma data futura.',
+    'schedule_failed': 'Não foi possível agendar a chamada.',
+    'schedule_push_title': '{name} sugere uma chamada',
+    'schedule_push_body': 'Chamada marcada para {when}',
+    'schedule_confirmed': 'Chamada agendada para {when} ✅',
     'paywall_headline': 'Ative a sua subscrição\ne fale sem limites',
     'paywall_subtitle':
         'Fale todos os idiomas, sem barreiras. Tradução de voz em tempo real.',
@@ -3058,6 +3267,40 @@ abstract final class AppStrings {
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
   static const Map<String, String> _nl = {
+    'call_locked_title': 'Geen beltegoed meer',
+    'call_locked_body':
+        'Je hebt geen tegoed meer om te bellen. Vraag {name} om jou te bellen — voor jou is het gratis.',
+    'call_locked_invite': '{name} vragen mij te bellen',
+    'call_locked_subscribe': 'Abonnementen bekijken',
+    'call_locked_invite_sent': 'Uitnodiging verstuurd 📞',
+    'call_locked_peer_fallback': 'iemand',
+    'call_invite_push_title': '{name} wil graag door jou gebeld worden',
+    'call_invite_push_body': '📞 Start het gesprek wanneer je wilt',
+    'ib_hi': 'Hoi {name} 👋',
+    'ib_hi_noname': 'Hoi 👋',
+    'ib_interest': 'Ik zag dat je van {interest} houdt — doe je dat al lang?',
+    'ib_place': 'Je zit in {place}? Vertel!',
+    'ib_call': 'Zin om te bellen?',
+    'prime_later': 'Later',
+    'notif_prime_title': 'Meldingen inschakelen',
+    'notif_prime_body':
+        'Zodat je weet wanneer iemand reageert en geen oproep mist.',
+    'notif_prime_enable': 'Inschakelen',
+    'notif_prime_settings_body':
+        'Schakel meldingen in bij Instellingen zodat je weet wanneer iemand reageert.',
+    'notif_prime_open_settings': 'Instellingen openen',
+    'mic_prime_title': 'Toegang tot microfoon',
+    'mic_prime_body':
+        'We hebben de microfoon nodig zodat men je hoort tijdens het gesprek.',
+    'mic_prime_enable': 'Toestaan',
+    'notif_banner_text':
+        'Meldingen staan uit — je mist berichten en oproepen.',
+    'notif_banner_cta': 'Inschakelen',
+    'schedule_past_error': 'Kies een tijdstip in de toekomst.',
+    'schedule_failed': 'Kon het gesprek niet plannen.',
+    'schedule_push_title': '{name} stelt een gesprek voor',
+    'schedule_push_body': 'Gesprek gepland voor {when}',
+    'schedule_confirmed': 'Gesprek gepland voor {when} ✅',
     'paywall_headline': 'Activeer je abonnement\nen praat zonder grenzen',
     'paywall_subtitle':
         'Spreek elke taal, zonder barrières. Spraakvertaling in realtime.',
@@ -3553,6 +3796,37 @@ abstract final class AppStrings {
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ar = {
+    'call_locked_title': 'لا يوجد رصيد للمكالمات',
+    'call_locked_body':
+        'لم يتبقَّ لديك رصيد لإجراء مكالمة. اطلب من {name} الاتصال بك — فهو مجاني من جانبك.',
+    'call_locked_invite': 'اطلب من {name} الاتصال بي',
+    'call_locked_subscribe': 'عرض الاشتراكات',
+    'call_locked_invite_sent': 'تم إرسال الدعوة 📞',
+    'call_locked_peer_fallback': 'شخص ما',
+    'call_invite_push_title': '{name} يودّ أن تتصل به',
+    'call_invite_push_body': '📞 ابدأ المكالمة وقتما تشاء',
+    'ib_hi': 'مرحبًا {name} 👋',
+    'ib_hi_noname': 'مرحبًا 👋',
+    'ib_interest': 'رأيت أنك تحب {interest} — منذ متى وأنت تمارسه؟',
+    'ib_place': 'هل أنت في {place}؟ احكِ لي!',
+    'ib_call': 'ما رأيك أن نتحدث في مكالمة؟',
+    'prime_later': 'لاحقًا',
+    'notif_prime_title': 'فعّل الإشعارات',
+    'notif_prime_body': 'لتعرف متى يردّ عليك أحد ولا تفوّت أي مكالمة.',
+    'notif_prime_enable': 'تفعيل',
+    'notif_prime_settings_body':
+        'فعّل الإشعارات من الإعدادات لتعرف متى يردّ عليك أحد.',
+    'notif_prime_open_settings': 'فتح الإعدادات',
+    'mic_prime_title': 'الوصول إلى الميكروفون',
+    'mic_prime_body': 'نحتاج إلى الميكروفون كي يسمعك الطرف الآخر أثناء المكالمة.',
+    'mic_prime_enable': 'السماح',
+    'notif_banner_text': 'الإشعارات معطّلة — أنت تفوّت رسائل ومكالمات.',
+    'notif_banner_cta': 'تفعيل',
+    'schedule_past_error': 'اختر وقتًا في المستقبل.',
+    'schedule_failed': 'تعذّر جدولة المكالمة.',
+    'schedule_push_title': '{name} يقترح مكالمة',
+    'schedule_push_body': 'مكالمة مقرّرة في {when}',
+    'schedule_confirmed': 'تمت جدولة المكالمة في {when} ✅',
     'paywall_headline': 'فعّل اشتراكك\nوتحدّث بلا حدود',
     'paywall_subtitle': 'تحدث بكل اللغات، بلا حواجز. ترجمة صوتية فورية.',
     'paywall_social_proof': 'يثق بنا أكثر من 10٬000 مستخدم',
@@ -4032,6 +4306,39 @@ abstract final class AppStrings {
 
   // ─── Russian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _ru = {
+    'call_locked_title': 'Закончились минуты для звонка',
+    'call_locked_body':
+        'У тебя нет кредитов на звонок. Попроси {name} позвонить тебе — для тебя это бесплатно.',
+    'call_locked_invite': 'Попросить {name} позвонить мне',
+    'call_locked_subscribe': 'Посмотреть тарифы',
+    'call_locked_invite_sent': 'Приглашение отправлено 📞',
+    'call_locked_peer_fallback': 'кто-нибудь',
+    'call_invite_push_title': '{name} хочет, чтобы ты позвонил',
+    'call_invite_push_body': '📞 Начни звонок в любой момент',
+    'ib_hi': 'Привет, {name} 👋',
+    'ib_hi_noname': 'Привет 👋',
+    'ib_interest': 'Я заметил, что тебе нравится {interest} — давно увлекаешься?',
+    'ib_place': 'Ты в {place}? Расскажи!',
+    'ib_call': 'Может, созвонимся?',
+    'prime_later': 'Позже',
+    'notif_prime_title': 'Включи уведомления',
+    'notif_prime_body':
+        'Чтобы знать, когда тебе ответят, и не пропустить звонок.',
+    'notif_prime_enable': 'Включить',
+    'notif_prime_settings_body':
+        'Включи уведомления в настройках, чтобы знать, когда тебе ответят.',
+    'notif_prime_open_settings': 'Открыть настройки',
+    'mic_prime_title': 'Доступ к микрофону',
+    'mic_prime_body': 'Микрофон нужен, чтобы тебя слышали во время звонка.',
+    'mic_prime_enable': 'Разрешить',
+    'notif_banner_text':
+        'Уведомления выключены — ты пропускаешь сообщения и звонки.',
+    'notif_banner_cta': 'Включить',
+    'schedule_past_error': 'Выбери время в будущем.',
+    'schedule_failed': 'Не удалось запланировать звонок.',
+    'schedule_push_title': '{name} предлагает созвон',
+    'schedule_push_body': 'Звонок запланирован на {when}',
+    'schedule_confirmed': 'Звонок запланирован на {when} ✅',
     'paywall_headline': 'Активируйте подписку\nи говорите без границ',
     'paywall_subtitle':
         'Говорите на любом языке без барьеров. Голосовой перевод в реальном времени.',
@@ -4529,6 +4836,35 @@ abstract final class AppStrings {
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
   static const Map<String, String> _zh = {
+    'call_locked_title': '通话额度已用完',
+    'call_locked_body': '你的通话额度已用完。让 {name} 打给你吧——你这边是免费的。',
+    'call_locked_invite': '请 {name} 打给我',
+    'call_locked_subscribe': '查看订阅',
+    'call_locked_invite_sent': '邀请已发送 📞',
+    'call_locked_peer_fallback': '某人',
+    'call_invite_push_title': '{name} 希望你打给他',
+    'call_invite_push_body': '📞 随时可以发起通话',
+    'ib_hi': '你好 {name} 👋',
+    'ib_hi_noname': '你好 👋',
+    'ib_interest': '我看到你喜欢{interest}——玩很久了吗？',
+    'ib_place': '你在{place}吗？跟我说说吧！',
+    'ib_call': '要不要通个话？',
+    'prime_later': '以后再说',
+    'notif_prime_title': '开启通知',
+    'notif_prime_body': '这样你就能知道谁回复了你，也不会错过来电。',
+    'notif_prime_enable': '开启',
+    'notif_prime_settings_body': '在设置中开启通知，就能知道谁回复了你。',
+    'notif_prime_open_settings': '打开设置',
+    'mic_prime_title': '麦克风权限',
+    'mic_prime_body': '通话时需要麦克风，对方才能听到你。',
+    'mic_prime_enable': '允许',
+    'notif_banner_text': '通知已关闭——你正在错过消息和来电。',
+    'notif_banner_cta': '开启',
+    'schedule_past_error': '请选择一个将来的时间。',
+    'schedule_failed': '无法安排通话。',
+    'schedule_push_title': '{name} 想约个通话',
+    'schedule_push_body': '通话已约定在 {when}',
+    'schedule_confirmed': '通话已安排在 {when} ✅',
     'paywall_headline': '开通订阅\n畅聊无限制',
     'paywall_subtitle': '畅说每种语言，毫无障碍。实时语音翻译。',
     'paywall_social_proof': '超过 10,000 名用户信赖我们',
@@ -4968,6 +5304,36 @@ abstract final class AppStrings {
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
   static const Map<String, String> _ja = {
+    'call_locked_title': '通話クレジットがありません',
+    'call_locked_body':
+        '通話するクレジットがなくなりました。{name} に電話してもらいましょう — あなたは無料です。',
+    'call_locked_invite': '{name} に電話してもらう',
+    'call_locked_subscribe': 'プランを見る',
+    'call_locked_invite_sent': '招待を送りました 📞',
+    'call_locked_peer_fallback': '誰か',
+    'call_invite_push_title': '{name} があなたからの電話を待っています',
+    'call_invite_push_body': '📞 いつでも電話をかけられます',
+    'ib_hi': 'こんにちは {name} 👋',
+    'ib_hi_noname': 'こんにちは 👋',
+    'ib_interest': '{interest} が好きなんだね — 長くやってるの？',
+    'ib_place': '{place} にいるの？聞かせて！',
+    'ib_call': '電話で話さない？',
+    'prime_later': 'あとで',
+    'notif_prime_title': '通知をオンにする',
+    'notif_prime_body': '返信が来たときにわかり、電話を逃さないために。',
+    'notif_prime_enable': 'オンにする',
+    'notif_prime_settings_body': '設定で通知をオンにすると、返信が来たときにわかります。',
+    'notif_prime_open_settings': '設定を開く',
+    'mic_prime_title': 'マイクへのアクセス',
+    'mic_prime_body': '通話中に声を届けるためにマイクが必要です。',
+    'mic_prime_enable': '許可',
+    'notif_banner_text': '通知がオフです — メッセージや電話を逃しています。',
+    'notif_banner_cta': 'オンにする',
+    'schedule_past_error': '未来の時間を選んでください。',
+    'schedule_failed': '通話を予約できませんでした。',
+    'schedule_push_title': '{name} が通話を提案しています',
+    'schedule_push_body': '{when} に通話予定',
+    'schedule_confirmed': '{when} に通話を予約しました ✅',
     'paywall_headline': 'サブスクを開始して\n制限なく話そう',
     'paywall_subtitle': 'あらゆる言語を、壁なく話せる。リアルタイム音声翻訳。',
     'paywall_social_proof': '10,000人以上のユーザーに利用されています',
@@ -5416,6 +5782,36 @@ abstract final class AppStrings {
 
   // ─── Korean ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ko = {
+    'call_locked_title': '통화 크레딧이 없습니다',
+    'call_locked_body':
+        '통화할 크레딧이 없어요. {name} 님에게 전화해 달라고 하세요 — 당신은 무료예요.',
+    'call_locked_invite': '{name} 님에게 전화해 달라고 하기',
+    'call_locked_subscribe': '요금제 보기',
+    'call_locked_invite_sent': '초대를 보냈어요 📞',
+    'call_locked_peer_fallback': '누군가',
+    'call_invite_push_title': '{name} 님이 당신의 전화를 기다려요',
+    'call_invite_push_body': '📞 언제든 전화를 걸 수 있어요',
+    'ib_hi': '안녕하세요 {name} 👋',
+    'ib_hi_noname': '안녕하세요 👋',
+    'ib_interest': '{interest}을(를) 좋아하시는군요 — 오래 하셨어요?',
+    'ib_place': '{place}에 계세요? 얘기 들려주세요!',
+    'ib_call': '통화 한번 할까요?',
+    'prime_later': '나중에',
+    'notif_prime_title': '알림 켜기',
+    'notif_prime_body': '답장이 오면 바로 알고 전화를 놓치지 않도록.',
+    'notif_prime_enable': '켜기',
+    'notif_prime_settings_body': '설정에서 알림을 켜면 답장이 올 때 알 수 있어요.',
+    'notif_prime_open_settings': '설정 열기',
+    'mic_prime_title': '마이크 접근',
+    'mic_prime_body': '통화 중 상대가 당신의 목소리를 들으려면 마이크가 필요해요.',
+    'mic_prime_enable': '허용',
+    'notif_banner_text': '알림이 꺼져 있어요 — 메시지와 전화를 놓치고 있어요.',
+    'notif_banner_cta': '켜기',
+    'schedule_past_error': '미래 시간을 선택하세요.',
+    'schedule_failed': '통화를 예약하지 못했어요.',
+    'schedule_push_title': '{name} 님이 통화를 제안해요',
+    'schedule_push_body': '{when}에 통화 예정',
+    'schedule_confirmed': '{when}에 통화를 예약했어요 ✅',
     'paywall_headline': '구독을 활성화하고\n제한 없이 대화하세요',
     'paywall_subtitle': '모든 언어를 장벽 없이. 실시간 음성 번역.',
     'paywall_social_proof': '10,000명 이상의 사용자가 신뢰합니다',

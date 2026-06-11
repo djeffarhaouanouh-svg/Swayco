@@ -25,6 +25,44 @@ import 'notification_api.dart';
 import 'notification_router.dart';
 
 abstract final class NotificationClient {
+  /// Notification authorization, normalised to the three states the UI cares
+  /// about: `'enabled'` (authorized / provisional), `'undetermined'` (never
+  /// asked — safe to show the native prompt), `'denied'` (refused — only the
+  /// OS Settings can re-enable). Fail-open to `'enabled'` so a read error
+  /// never nags the user with a banner.
+  static Future<String> notifStatus() async {
+    try {
+      final s = await FirebaseMessaging.instance.getNotificationSettings();
+      final a = s.authorizationStatus;
+      if (a == AuthorizationStatus.authorized ||
+          a == AuthorizationStatus.provisional) {
+        return 'enabled';
+      }
+      if (a == AuthorizationStatus.denied) return 'denied';
+      return 'undetermined';
+    } catch (e) {
+      debugPrint('[notify] notifStatus failed: $e');
+      return 'enabled';
+    }
+  }
+
+  /// Boot-time registration that NEVER shows the native prompt: it registers
+  /// the FCM token only when permission is already granted, otherwise no-ops.
+  /// This stops the cold iOS prompt from being burned at launch before the
+  /// user has seen the priming rationale (now shown contextually from the
+  /// message list via [NotifEnableFlow]).
+  static Future<bool> registerIfAuthorized(String userId) async {
+    if (userId.isEmpty) return false;
+    final status = await notifStatus();
+    if (status != 'enabled') {
+      // Still wire tap-routing so a push that does arrive (provisional, or
+      // after a later grant from Settings) routes to the right screen.
+      unawaited(_wireTapRouting());
+      return false;
+    }
+    return register(userId);
+  }
+
   static Future<bool> register(String userId) async {
     if (userId.isEmpty) return false;
     try {

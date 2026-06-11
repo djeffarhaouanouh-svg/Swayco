@@ -15,6 +15,8 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
+import '../services/notif_enable_flow.dart';
+import '../services/notification_client.dart';
 import '../services/platform_glass.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
@@ -58,6 +60,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
   bool _creatingInvite = false;
 
+  /// True when OS notifications are off (never asked or refused). Drives the
+  /// recovery banner at the top of the conversation list — the moment where a
+  /// missed-message notification matters most. Dismissible per session.
+  bool _notifBlocked = false;
+  bool _notifBannerDismissed = false;
+
+  Future<void> _checkNotifStatus() async {
+    final blocked = (await NotificationClient.notifStatus()) != 'enabled';
+    if (!mounted || blocked == _notifBlocked) return;
+    setState(() => _notifBlocked = blocked);
+  }
+
+  Future<void> _onEnableNotifs() async {
+    await NotifEnableFlow.run(context);
+    await _checkNotifStatus();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +87,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // immediately, without waiting for the 7 s poll.
     AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
     _reload();
+    _checkNotifStatus();
     // Web build doesn't always get realtime push reliably — poll the list
     // silently so new messages / new friends appear without pull-to-refresh.
     _pollTimer = WebPoll.every(
@@ -99,6 +119,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _reload();
+      // Re-check after the user may have toggled notifications in Settings.
+      _checkNotifStatus();
     }
   }
 
@@ -491,6 +513,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           84 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
+          if (_notifBlocked && !_notifBannerDismissed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _NotifBanner(
+                onEnable: _onEnableNotifs,
+                onDismiss: () =>
+                    setState(() => _notifBannerDismissed = true),
+              ),
+            ),
           // Single glass card holding every conversation row, with a thin
           // hairline divider between them (inset past the avatar) so each
           // conversation reads as a distinct entry.
@@ -878,6 +909,66 @@ class _UnreadBadge extends StatelessWidget {
 /// The chat-list card surface. On native (iPhone) it's real shader Liquid
 /// Glass (liquid_glass_widgets); on web it stays the app's BackdropFilter
 /// [GlassContainer], unchanged. Same rounded-24 / 6 px padding either way.
+/// Snapchat-style recovery banner: when notifications are off, nudge the user
+/// to turn them on right where missed messages hurt. Benefit-framed copy, a
+/// one-tap "enable" that runs the priming → OS-prompt / Settings flow, and a
+/// dismiss for the session.
+class _NotifBanner extends StatelessWidget {
+  const _NotifBanner({required this.onEnable, required this.onDismiss});
+
+  final VoidCallback onEnable;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: SC.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SC.accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_off_rounded,
+              color: SC.accent, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppStrings.t('notif_banner_text'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onEnable,
+            style: TextButton.styleFrom(
+              foregroundColor: SC.accent,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              AppStrings.t('notif_banner_cta'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            onPressed: onDismiss,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close_rounded,
+                color: Colors.white54, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GlassListCard extends StatelessWidget {
   const _GlassListCard({required this.child});
 
