@@ -14,6 +14,7 @@ import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/interests.dart';
 import '../services/missions_service.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
@@ -1634,18 +1635,40 @@ class _ProfileCardState extends State<_ProfileCard> {
                             ],
                           ),
                         ],
-                        // Bio under the name line.
-                        if (profile.bio.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            profile.bio,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                              height: 1.35,
-                            ),
+                        // Interests under the name line — replaces the bio.
+                        // Up to 3 frosted pills over the photo, localised for
+                        // display (the stored value stays the French key).
+                        if (profile.interests.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final tag in profile.interests.take(3))
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    interestLabel(tag),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                         const SizedBox(height: 14),
