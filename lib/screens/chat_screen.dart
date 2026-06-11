@@ -521,81 +521,92 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return const _NoFriendsEmpty();
     }
     // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
-    // white block is the middle layer, sized to its content and living inside
-    // the page scroll view so the WHOLE panel scrolls; the conversation rows +
-    // invite are the message sections laid on top (transparent, thin dividers).
+    // white block is the middle layer. It FILLS the zone down to just above the
+    // nav at rest (min-height = available area, like the Discover deck) yet it
+    // lives INSIDE the page scroll view, so the whole panel scrolls/moves once
+    // there are enough rows. Rounded corners let the mesh show above & below.
     final navReserve =
         GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
-    return RefreshIndicator(
-      color: SC.accent,
-      backgroundColor: Colors.white,
-      onRefresh: _reload,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        // Drop the panel a touch below the title; clear the floating nav at
-        // the bottom so the scrolled panel never hides under it.
-        padding: EdgeInsets.fromLTRB(0, 26, 0, navReserve),
-        children: [
-          if (_notifBlocked && !_notifBannerDismissed)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-              child: _NotifBanner(
-                onEnable: _onEnableNotifs,
-                onDismiss: () =>
-                    setState(() => _notifBannerDismissed = true),
-              ),
-            ),
-          WhiteBlock(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Conversation rows — laid directly on the white block.
-                for (final (i, p) in _friends.indexed)
-                  FadeSlideIn(
-                    delay: Duration(milliseconds: i * 55),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (i > 0) _rowDivider,
-                        _FriendChatRow(
-                          profile: p,
-                          lastMessage: _latestByConv[_conversationIdFor(p.id)],
-                          isMine: _latestByConv[_conversationIdFor(p.id)]
-                                  ?.senderId ==
-                              _myId,
-                          unread: _isUnread(p),
-                          unreadCount: _unreadCountFor(p),
-                          onTap: () => _openThread(p),
-                          onViewProfile: () => _viewProfile(p),
-                          onBlock: () => _blockPeer(p),
-                          onReport: () => _reportPeer(p),
-                          onDeleteConversation: () => _deleteConversation(p),
-                          onCall: () => CallLauncher.startCall(
-                            context,
-                            peerDeviceId: p.id,
-                            translation: widget.translation,
-                          ),
-                          onCallVideo: () => CallLauncher.startCall(
-                            context,
-                            peerDeviceId: p.id,
-                            translation: widget.translation,
-                            startWithCamera: true,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fillHeight = constraints.maxHeight - 26 - navReserve;
+        return RefreshIndicator(
+          color: SC.accent,
+          backgroundColor: Colors.white,
+          onRefresh: _reload,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(top: 26, bottom: navReserve),
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: fillHeight > 0 ? fillHeight : 0,
+                ),
+                child: WhiteBlock(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_notifBlocked && !_notifBannerDismissed)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                          child: _NotifBanner(
+                            onEnable: _onEnableNotifs,
+                            onDismiss: () =>
+                                setState(() => _notifBannerDismissed = true),
                           ),
                         ),
-                      ],
-                    ),
+                      // Conversation rows — laid on the white block.
+                      for (final (i, p) in _friends.indexed)
+                        FadeSlideIn(
+                          delay: Duration(milliseconds: i * 55),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (i > 0) _rowDivider,
+                              _FriendChatRow(
+                                profile: p,
+                                lastMessage:
+                                    _latestByConv[_conversationIdFor(p.id)],
+                                isMine: _latestByConv[_conversationIdFor(p.id)]
+                                        ?.senderId ==
+                                    _myId,
+                                unread: _isUnread(p),
+                                unreadCount: _unreadCountFor(p),
+                                onTap: () => _openThread(p),
+                                onViewProfile: () => _viewProfile(p),
+                                onBlock: () => _blockPeer(p),
+                                onReport: () => _reportPeer(p),
+                                onDeleteConversation: () =>
+                                    _deleteConversation(p),
+                                onCall: () => CallLauncher.startCall(
+                                  context,
+                                  peerDeviceId: p.id,
+                                  translation: widget.translation,
+                                ),
+                                onCallVideo: () => CallLauncher.startCall(
+                                  context,
+                                  peerDeviceId: p.id,
+                                  translation: widget.translation,
+                                  startWithCamera: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      _rowDivider,
+                      // "Invite to a call" — last section in the panel.
+                      _InviteToCallRow(
+                        onTap: _creatingInvite ? null : _shareCallInvite,
+                        creatingInvite: _creatingInvite,
+                      ),
+                    ],
                   ),
-                _rowDivider,
-                // "Invite to a call" — last section, at the bottom of the panel.
-                _InviteToCallRow(
-                  onTap: _creatingInvite ? null : _shareCallInvite,
-                  creatingInvite: _creatingInvite,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

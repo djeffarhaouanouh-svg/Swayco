@@ -386,42 +386,53 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     ];
     final navReserve =
         GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
-    return RefreshIndicator(
-      color: SC.accent,
-      backgroundColor: Colors.white,
-      onRefresh: _reload,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        // Drop the panel a touch below the title; clear the floating nav at the
-        // bottom. The whole white panel scrolls (it lives inside this list).
-        padding: EdgeInsets.fromLTRB(0, 26, 0, navReserve),
-        children: [
-          WhiteBlock(
-            child: rows.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 44),
-                    child: _NoRequestsEmpty(),
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final (i, row) in rows.indexed)
-                        // Rows ease in (fade + slide) in a quick cascade.
-                        FadeSlideIn(
-                          delay: Duration(milliseconds: i * 55),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (i > 0) _rowDivider,
-                              row,
-                            ],
-                          ),
+    // The white block FILLS the zone down to just above the nav at rest yet
+    // lives inside the page scroll view, so the whole panel scrolls/moves once
+    // there are enough rows (same as the Messages page).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fillHeight = constraints.maxHeight - 26 - navReserve;
+        return RefreshIndicator(
+          color: SC.accent,
+          backgroundColor: Colors.white,
+          onRefresh: _reload,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(top: 26, bottom: navReserve),
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: fillHeight > 0 ? fillHeight : 0,
+                ),
+                child: WhiteBlock(
+                  child: rows.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 44),
+                          child: _NoRequestsEmpty(),
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final (i, row) in rows.indexed)
+                              // Rows ease in (fade + slide) in a quick cascade.
+                              FadeSlideIn(
+                                delay: Duration(milliseconds: i * 55),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (i > 0) _rowDivider,
+                                    row,
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
