@@ -33,6 +33,7 @@ import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -448,6 +449,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// place) so the opener references something real, which lifts the reply
   /// rate. All copy is in MY UI language (it's my outgoing text); the peer
   /// gets it auto-translated on their side like any other message.
+  /// True once the peer has sent at least one message — the ice-breakers then
+  /// retire. While it's still just me (empty thread, or only my own openers /
+  /// an emoji), they stay above the composer to help me get a real reply.
+  bool get _peerHasReplied => _messages.any((m) => m.senderId != _myId);
+
   List<String> _iceBreakers() {
     final out = <String>[];
     final peer = _peer;
@@ -457,6 +463,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         .split(' ')
         .first
         .trim();
+    // Country-adapted opener first — the peer's home country is the most
+    // natural, culturally-tuned thing to open on across a language barrier.
+    final country = peer?.country.trim() ?? '';
+    if (country.isNotEmpty) {
+      out.add(AppStrings.t('ib_country', args: {'country': country}));
+    }
     out.add(
       firstName.isEmpty
           ? AppStrings.t('ib_hi_noname')
@@ -790,7 +802,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_messages.isEmpty)
+                        if (!_peerHasReplied)
                           _IceBreakers(
                             suggestions: _iceBreakers(),
                             onTap: _sendSuggestion,
@@ -1686,28 +1698,21 @@ class _IceBreakers extends StatelessWidget {
         itemBuilder: (_, i) {
           final text = suggestions[i];
           return Center(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => onTap(text),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: SC.accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: SC.accent.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                    ),
+            child: Pressable(
+              onTap: () => onTap(text),
+              bounce: true,
+              // Apple-glass bubble: blur + low-alpha white tint + hairline,
+              // white text. Same language as the header / composer glass.
+              child: GlassContainer(
+                borderRadius: BorderRadius.circular(22),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

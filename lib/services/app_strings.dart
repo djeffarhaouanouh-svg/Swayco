@@ -84,6 +84,7 @@ abstract final class AppStrings {
         'J\'ai vu que tu aimes {interest} — tu pratiques depuis longtemps ?',
     'ib_place': 'Tu es à {place} ? Raconte-moi !',
     'ib_call': 'Ça te dit qu\'on s\'appelle ?',
+    'ib_country': '{country}, ça me fait rêver — c\'est comment la vie là-bas ?',
     // ── Permission priming + banner ──
     'prime_later': 'Plus tard',
     'notif_prime_title': 'Active les notifications',
@@ -641,6 +642,7 @@ abstract final class AppStrings {
     'ib_interest': 'I saw you\'re into {interest} — been doing it long?',
     'ib_place': 'You\'re in {place}? Tell me about it!',
     'ib_call': 'Fancy a call?',
+    'ib_country': '{country} — that\'s a dream of mine. What\'s life like there?',
     'prime_later': 'Later',
     'notif_prime_title': 'Turn on notifications',
     'notif_prime_body':
@@ -1185,6 +1187,7 @@ abstract final class AppStrings {
     'ib_interest': 'Vi que te gusta {interest}, ¿hace mucho que lo practicas?',
     'ib_place': '¿Estás en {place}? ¡Cuéntame!',
     'ib_call': '¿Te apetece una llamada?',
+    'ib_country': '{country} me encanta — ¿cómo es la vida allí?',
     'prime_later': 'Más tarde',
     'notif_prime_title': 'Activa las notificaciones',
     'notif_prime_body':
@@ -1724,6 +1727,7 @@ abstract final class AppStrings {
     'ib_interest': 'Ich habe gesehen, du magst {interest} — schon lange dabei?',
     'ib_place': 'Du bist in {place}? Erzähl mal!',
     'ib_call': 'Lust auf einen Anruf?',
+    'ib_country': '{country} fasziniert mich — wie ist das Leben dort?',
     'prime_later': 'Später',
     'notif_prime_title': 'Benachrichtigungen aktivieren',
     'notif_prime_body':
@@ -2268,6 +2272,7 @@ abstract final class AppStrings {
     'ib_interest': 'Ho visto che ti piace {interest} — è da tanto che lo fai?',
     'ib_place': 'Sei a {place}? Raccontami!',
     'ib_call': 'Ti va di farci una chiamata?',
+    'ib_country': '{country} mi affascina — com\'è la vita lì?',
     'prime_later': 'Più tardi',
     'notif_prime_title': 'Attiva le notifiche',
     'notif_prime_body':
@@ -2806,6 +2811,7 @@ abstract final class AppStrings {
     'ib_interest': 'Vi que gostas de {interest} — já há muito tempo?',
     'ib_place': 'Estás em {place}? Conta-me!',
     'ib_call': 'Apetece-te uma chamada?',
+    'ib_country': '{country} fascina-me — como é a vida aí?',
     'prime_later': 'Mais tarde',
     'notif_prime_title': 'Ativa as notificações',
     'notif_prime_body':
@@ -3344,6 +3350,7 @@ abstract final class AppStrings {
     'ib_interest': 'Ik zag dat je van {interest} houdt — doe je dat al lang?',
     'ib_place': 'Je zit in {place}? Vertel!',
     'ib_call': 'Zin om te bellen?',
+    'ib_country': '{country} spreekt me aan — hoe is het leven daar?',
     'prime_later': 'Later',
     'notif_prime_title': 'Meldingen inschakelen',
     'notif_prime_body':
@@ -3881,6 +3888,7 @@ abstract final class AppStrings {
     'ib_interest': 'رأيت أنك تحب {interest} — منذ متى وأنت تمارسه؟',
     'ib_place': 'هل أنت في {place}؟ احكِ لي!',
     'ib_call': 'ما رأيك أن نتحدث في مكالمة؟',
+    'ib_country': '{country} يثير اهتمامي — كيف هي الحياة هناك؟',
     'prime_later': 'لاحقًا',
     'notif_prime_title': 'فعّل الإشعارات',
     'notif_prime_body': 'لتعرف متى يردّ عليك أحد ولا تفوّت أي مكالمة.',
@@ -4399,6 +4407,7 @@ abstract final class AppStrings {
     'ib_interest': 'Я заметил, что тебе нравится {interest} — давно увлекаешься?',
     'ib_place': 'Ты в {place}? Расскажи!',
     'ib_call': 'Может, созвонимся?',
+    'ib_country': '{country} меня восхищает — как там жизнь?',
     'prime_later': 'Позже',
     'notif_prime_title': 'Включи уведомления',
     'notif_prime_body':
@@ -4936,6 +4945,7 @@ abstract final class AppStrings {
     'ib_interest': '我看到你喜欢{interest}——玩很久了吗？',
     'ib_place': '你在{place}吗？跟我说说吧！',
     'ib_call': '要不要通个话？',
+    'ib_country': '{country}让我很向往——那里的生活怎么样？',
     'prime_later': '以后再说',
     'notif_prime_title': '开启通知',
     'notif_prime_body': '这样你就能知道谁回复了你，也不会错过来电。',
@@ -5413,6 +5423,7 @@ abstract final class AppStrings {
     'ib_interest': '{interest} が好きなんだね — 長くやってるの？',
     'ib_place': '{place} にいるの？聞かせて！',
     'ib_call': '電話で話さない？',
+    'ib_country': '{country} に憧れてるんだ — 暮らしはどんな感じ？',
     'prime_later': 'あとで',
     'notif_prime_title': '通知をオンにする',
     'notif_prime_body': '返信が来たときにわかり、電話を逃さないために。',
@@ -5899,6 +5910,7 @@ abstract final class AppStrings {
     'ib_interest': '{interest}을(를) 좋아하시는군요 — 오래 하셨어요?',
     'ib_place': '{place}에 계세요? 얘기 들려주세요!',
     'ib_call': '통화 한번 할까요?',
+    'ib_country': '{country} 정말 가보고 싶어요 — 그곳 생활은 어때요?',
     'prime_later': '나중에',
     'notif_prime_title': '알림 켜기',
     'notif_prime_body': '답장이 오면 바로 알고 전화를 놓치지 않도록.',
