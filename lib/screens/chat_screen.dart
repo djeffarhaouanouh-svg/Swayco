@@ -26,6 +26,7 @@ import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/white_block.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'call_screen.dart';
@@ -519,74 +520,81 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
-    // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; this
-    // big white rounded block is the middle layer that fills the whole content
-    // zone down to the bottom; the conversation rows + invite are the message
-    // sections laid on TOP of the white block (transparent rows, thin dividers).
-    return _WhiteBlock(
-      child: RefreshIndicator(
-        color: SC.accent,
-        backgroundColor: Colors.white,
-        onRefresh: _reload,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          // The white block already stops above the nav, so just a little
-          // breathing room at the bottom of the list.
-          padding: const EdgeInsets.fromLTRB(6, 10, 6, 16),
-          children: [
-            if (_notifBlocked && !_notifBannerDismissed)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
-                child: _NotifBanner(
-                  onEnable: _onEnableNotifs,
-                  onDismiss: () =>
-                      setState(() => _notifBannerDismissed = true),
-                ),
+    // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
+    // white block is the middle layer, sized to its content and living inside
+    // the page scroll view so the WHOLE panel scrolls; the conversation rows +
+    // invite are the message sections laid on top (transparent, thin dividers).
+    final navReserve =
+        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
+    return RefreshIndicator(
+      color: SC.accent,
+      backgroundColor: Colors.white,
+      onRefresh: _reload,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // Drop the panel a touch below the title; clear the floating nav at
+        // the bottom so the scrolled panel never hides under it.
+        padding: EdgeInsets.fromLTRB(0, 14, 0, navReserve),
+        children: [
+          if (_notifBlocked && !_notifBannerDismissed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+              child: _NotifBanner(
+                onEnable: _onEnableNotifs,
+                onDismiss: () =>
+                    setState(() => _notifBannerDismissed = true),
               ),
-            // Conversation rows — laid directly on the white block.
-            for (final (i, p) in _friends.indexed)
-              FadeSlideIn(
-                delay: Duration(milliseconds: i * 55),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (i > 0) _rowDivider,
-                    _FriendChatRow(
-                      profile: p,
-                      lastMessage: _latestByConv[_conversationIdFor(p.id)],
-                      isMine: _latestByConv[_conversationIdFor(p.id)]
-                              ?.senderId ==
-                          _myId,
-                      unread: _isUnread(p),
-                      unreadCount: _unreadCountFor(p),
-                      onTap: () => _openThread(p),
-                      onViewProfile: () => _viewProfile(p),
-                      onBlock: () => _blockPeer(p),
-                      onReport: () => _reportPeer(p),
-                      onDeleteConversation: () => _deleteConversation(p),
-                      onCall: () => CallLauncher.startCall(
-                        context,
-                        peerDeviceId: p.id,
-                        translation: widget.translation,
-                      ),
-                      onCallVideo: () => CallLauncher.startCall(
-                        context,
-                        peerDeviceId: p.id,
-                        translation: widget.translation,
-                        startWithCamera: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            _rowDivider,
-            // "Invite to a call" — last section, at the bottom of the list.
-            _InviteToCallRow(
-              onTap: _creatingInvite ? null : _shareCallInvite,
-              creatingInvite: _creatingInvite,
             ),
-          ],
-        ),
+          WhiteBlock(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Conversation rows — laid directly on the white block.
+                for (final (i, p) in _friends.indexed)
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: i * 55),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i > 0) _rowDivider,
+                        _FriendChatRow(
+                          profile: p,
+                          lastMessage: _latestByConv[_conversationIdFor(p.id)],
+                          isMine: _latestByConv[_conversationIdFor(p.id)]
+                                  ?.senderId ==
+                              _myId,
+                          unread: _isUnread(p),
+                          unreadCount: _unreadCountFor(p),
+                          onTap: () => _openThread(p),
+                          onViewProfile: () => _viewProfile(p),
+                          onBlock: () => _blockPeer(p),
+                          onReport: () => _reportPeer(p),
+                          onDeleteConversation: () => _deleteConversation(p),
+                          onCall: () => CallLauncher.startCall(
+                            context,
+                            peerDeviceId: p.id,
+                            translation: widget.translation,
+                          ),
+                          onCallVideo: () => CallLauncher.startCall(
+                            context,
+                            peerDeviceId: p.id,
+                            translation: widget.translation,
+                            startWithCamera: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                _rowDivider,
+                // "Invite to a call" — last section, at the bottom of the panel.
+                _InviteToCallRow(
+                  onTap: _creatingInvite ? null : _shareCallInvite,
+                  creatingInvite: _creatingInvite,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -985,44 +993,6 @@ class _NotifBanner extends StatelessWidget {
   }
 }
 
-/// The big white rounded block that sits BETWEEN the mesh fond and the
-/// message rows. It fills the whole content zone (rounded top corners,
-/// extending down behind the floating nav), so the rows read as sections
-/// laid on top of it.
-class _WhiteBlock extends StatelessWidget {
-  const _WhiteBlock({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    // Rounded card on all four corners (like the Discover deck). It stops just
-    // ABOVE the floating nav bar (bottom margin = nav height + safe-area inset
-    // + a small gap) so the mesh fond shows through under the rounded bottom
-    // edge and behind the nav, keeping its icons legible.
-    final navReserve =
-        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
-    return Padding(
-      padding: EdgeInsets.only(top: 14, bottom: navReserve),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
 /// Cyan top-toast that slides down + fades in, holds, then slides up + fades
 /// out before removing its own overlay entry via [onDismissed].
 class _TopToast extends StatefulWidget {
@@ -1252,14 +1222,14 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    // Same big white block as the loaded list, with shimmering placeholder
-    // rows on top so the layout doesn't shift when the data lands.
-    return _WhiteBlock(
-      child: ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(6, 10, 6, 16),
-        children: [
-          AnimatedBuilder(
+    // Same white block as the loaded list, with shimmering placeholder rows so
+    // the layout doesn't shift when the data lands.
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
+      children: [
+        WhiteBlock(
+          child: AnimatedBuilder(
             animation: _ctrl,
             builder: (_, _) {
               final t = Curves.easeInOut.transform(_ctrl.value);
@@ -1268,6 +1238,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
               final shimmer =
                   Colors.black.withValues(alpha: 0.06 + 0.05 * t);
               return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   for (var i = 0; i < 5; i++)
                     _SkeletonRow(shimmer: shimmer),
@@ -1275,8 +1246,8 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
               );
             },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

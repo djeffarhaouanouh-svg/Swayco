@@ -16,8 +16,10 @@ import '../services/received_activity_unread.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
-import '../widgets/glass_panel.dart';
+import '../widgets/glass_nav_bar.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/white_block.dart';
 import 'profile_screen.dart';
 
 /// A reaction entry rendered on the Demandes feed — the chat message
@@ -281,27 +283,57 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
-      body: ColoredBox(
-        color: const Color(0xFF0E0E0E),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: Stack(
+          children: [
+            // Same cyan-blue ambient wash as the Discover / Messages pages.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 1.2,
+                    colors: [
+                      SC.meshCyan.withValues(alpha: 0.50),
+                      SC.meshBlue.withValues(alpha: 0.30),
+                      SC.meshNavy.withValues(alpha: 0.22),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
-              Expanded(child: _buildBody()),
-            ],
-          ),
+            ),
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child:
+                          Text(AppStrings.t('demandes_title'), style: SCText.h1),
+                    ),
+                  ),
+                  Expanded(child: _buildBody()),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  /// Hairline divider between sections on the white block — inset past the
+  /// avatar on the left, stopping before the action cluster on the right.
+  static const Widget _rowDivider = Divider(
+    height: 1,
+    thickness: 1,
+    indent: 70,
+    endIndent: 24,
+    color: Color(0x14000000),
+  );
 
   Widget _buildBody() {
     if (_loading) {
@@ -320,107 +352,74 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       );
     }
-    // One glass card per non-empty category, in priority order: pending
+    // Every category flattened into one list of rows, laid on the single white
+    // block (same panel as the Messages page), in priority order: pending
     // requests (need a decision) → new followers (follow back) → likes →
-    // reactions. Built as a list so the 18px gaps fall only between cards.
-    final sections = <Widget>[
-      if (_requests.isNotEmpty)
-        GlassPanel(
-          borderRadius: 24,
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            children: [
-              for (final req in _requests)
-                _RequestRow(
-                  request: req,
-                  onTap: () {
-                    final p = req.requester;
-                    if (p != null) _openProfile(p);
-                  },
-                  onAccept: () => _accept(req),
-                  onReject: () => _reject(req),
-                ),
-            ],
-          ),
+    // reactions. A hairline divider falls between consecutive rows.
+    final rows = <Widget>[
+      for (final req in _requests)
+        _RequestRow(
+          request: req,
+          onTap: () {
+            final p = req.requester;
+            if (p != null) _openProfile(p);
+          },
+          onAccept: () => _accept(req),
+          onReject: () => _reject(req),
         ),
-      if (_newFollowers.isNotEmpty)
-        GlassPanel(
-          borderRadius: 24,
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            children: [
-              for (final p in _newFollowers)
-                _FollowBackRow(
-                  follower: p,
-                  onTap: () => _openProfile(p),
-                  onFollowBack: () => _followBack(p),
-                ),
-            ],
-          ),
+      for (final p in _newFollowers)
+        _FollowBackRow(
+          follower: p,
+          onTap: () => _openProfile(p),
+          onFollowBack: () => _followBack(p),
         ),
-      // Likes received on my photos.
-      if (_likers.isNotEmpty)
-        GlassPanel(
-          borderRadius: 24,
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            children: [
-              for (final p in _likers)
-                _LikeRow(liker: p, onTap: () => _openProfile(p)),
-            ],
-          ),
-        ),
-      if (_reactions.isNotEmpty)
-        GlassPanel(
-          borderRadius: 24,
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            children: [
-              for (final r in _reactions)
-                _ReactionRow(
-                  reaction: r,
-                  onTap: () {
-                    final a = r.author;
-                    if (a != null) _openProfile(a);
-                  },
-                ),
-            ],
-          ),
+      for (final p in _likers)
+        _LikeRow(liker: p, onTap: () => _openProfile(p)),
+      for (final r in _reactions)
+        _ReactionRow(
+          reaction: r,
+          onTap: () {
+            final a = r.author;
+            if (a != null) _openProfile(a);
+          },
         ),
     ];
+    final navReserve =
+        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
     return RefreshIndicator(
       color: SC.accent,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: Colors.white,
       onRefresh: _reload,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Clear the floating nav bar so the last row stays reachable.
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          84 + MediaQuery.paddingOf(context).bottom,
-        ),
+        // Drop the panel a touch below the title; clear the floating nav at the
+        // bottom. The whole white panel scrolls (it lives inside this list).
+        padding: EdgeInsets.fromLTRB(0, 14, 0, navReserve),
         children: [
-          // Empty state still gets the glass frame so the page never
-          // feels like a void — same surface the populated list uses
-          // (with the stronger glass shade so it doesn't read as a
-          // dark void on the mesh) and the centered copy inside.
-          if (sections.isEmpty)
-            GlassPanel(
-              borderRadius: 24,
-              color: SC.glassStrong,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
-              child: const _NoRequestsEmpty(),
-            ),
-          for (var i = 0; i < sections.length; i++) ...[
-            if (i > 0) const SizedBox(height: 18),
-            // Cards ease in (fade + slide up) in a quick cascade on load.
-            FadeSlideIn(
-              delay: Duration(milliseconds: i * 90),
-              child: sections[i],
-            ),
-          ],
+          WhiteBlock(
+            child: rows.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 44),
+                    child: _NoRequestsEmpty(),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final (i, row) in rows.indexed)
+                        // Rows ease in (fade + slide) in a quick cascade.
+                        FadeSlideIn(
+                          delay: Duration(milliseconds: i * 55),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (i > 0) _rowDivider,
+                              row,
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
         ],
       ),
     );
@@ -476,6 +475,7 @@ class _RequestRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
+                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -542,6 +542,7 @@ class _FollowBackRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
+                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -602,6 +603,7 @@ class _ReactionRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
+                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -660,6 +662,7 @@ class _LikeRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
+                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -837,7 +840,7 @@ class _RejectButton extends StatelessWidget {
         onTap: onTap,
         child: const Padding(
           padding: EdgeInsets.all(6),
-          child: Icon(Icons.close_rounded, color: SC.textMuted, size: 22),
+          child: Icon(Icons.close_rounded, color: Color(0xFF8A93A6), size: 22),
         ),
       ),
     );
@@ -876,9 +879,9 @@ class _NoRequestsEmpty extends StatelessWidget {
               AppStrings.t('demandes_empty_title'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: SC.textPrimary,
+                color: Color(0xFF263043),
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
@@ -886,7 +889,7 @@ class _NoRequestsEmpty extends StatelessWidget {
               AppStrings.t('demandes_empty_body'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: SC.textMuted,
+                color: Color(0xFF8A93A6),
                 fontSize: 13,
                 height: 1.4,
               ),
