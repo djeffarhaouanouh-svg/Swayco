@@ -11,6 +11,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { AccessToken } = require('livekit-server-sdk');
 const { notifyUser } = require('./notify');
+const { onlineNotif } = require('./nationalities');
 const { track, ingestEvents, countryFromReq } = require('./analytics');
 const {
   authUserId: stripeAuthUserId,
@@ -76,6 +77,53 @@ const INVITE_SIGNING_SECRET = (
 const GUEST_ROOM_PREFIX = 'guest-';
 /** How long an invite link stays valid after creation. */
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// ── "X Japonaises en ligne" pull-notification broadcast ──────────────────────
+// Shared secret that gates the manual trigger (POST /api/notify-online-broadcast
+// with header `x-broadcast-secret`). Falls back to INVITE_SIGNING_SECRET so it
+// works with zero extra config; empty → manual endpoint disabled.
+const BROADCAST_SECRET = (
+  process.env.BROADCAST_SECRET || INVITE_SIGNING_SECRET || ''
+).trim();
+// Minimum opposite-sex users online in a country before we bother notifying —
+// "1 en ligne" reads as desperate, so default to 3.
+const BROADCAST_MIN_COUNT = Number(process.env.BROADCAST_MIN_COUNT || 3);
+// Presence window in seconds (matches the SQL default).
+const BROADCAST_WINDOW_SECONDS = Number(process.env.BROADCAST_WINDOW_SECONDS || 300);
+// Per-market auto-broadcast. France and Japan are ~8h apart, so a single
+// server-clock schedule can't hit both at their own peak — each market fires at
+// its OWN local peak hours (DST-correct via Intl) and only nudges recipients in
+// that market's language. Hours are a CSV in the market's local time; empty
+// disables that market's auto-fire (the manual endpoint still works for it).
+function parseHours(raw, fallback) {
+  return String(raw ?? fallback)
+    .split(',')
+    .map((h) => Number(h.trim()))
+    .filter((h) => Number.isInteger(h) && h >= 0 && h <= 23);
+}
+const BROADCAST_MARKETS = [
+  { lang: 'fr', tz: 'Europe/Paris', hours: parseHours(process.env.BROADCAST_HOURS_FR, '19,21') },
+  { lang: 'ja', tz: 'Asia/Tokyo', hours: parseHours(process.env.BROADCAST_HOURS_JA, '20,22') },
+];
+// Current { hour, day } in a given IANA timezone — drives both the hour match
+// and a once-per-local-hour fire guard. Returns null on a bad zone.
+function localParts(tz) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+    const o = {};
+    for (const p of parts) o[p.type] = p.value;
+    return { hour: Number(o.hour) % 24, day: `${o.year}-${o.month}-${o.day}` };
+  } catch (e) {
+    return null;
+  }
+}
 
 /** Supabase service-role client — backs the guest-invite short-code store.
  *  Same env pair already used by notify.js / analytics.js. */
@@ -1488,6 +1536,151 @@ app.post('/api/notify', _limLite, async (req, res) => {
   }
 });
 
+// ── "X Japonaises en ligne" broadcast engine ─────────────────────────────────
+// For each push-registered user who is NOT currently in the app, find the
+// country with the most opposite-sex users online right now and nudge them with
+// it. Recipient gender unknown/'x'/NULL is treated as a man (→ advertise women).
+async function runOnlineBroadcast({
+  minCount,
+  windowSeconds,
+  dryRun,
+  recipientLang,
+} = {}) {
+  const sb = supabase();
+  if (!sb) return { ok: false, error: 'supabase_not_configured' };
+  recipientLang = recipientLang
+    ? String(recipientLang).toLowerCase().split(/[-_]/)[0]
+    : null;
+  minCount = Number.isFinite(minCount) ? minCount : BROADCAST_MIN_COUNT;
+  windowSeconds = Number.isFinite(windowSeconds)
+    ? windowSeconds
+    : BROADCAST_WINDOW_SECONDS;
+
+  // 1. Who's online, by country + gender.
+  const { data: counts, error: cErr } = await sb.rpc(
+    'online_counts_by_country_gender',
+    { p_window_seconds: windowSeconds },
+  );
+  if (cErr) return { ok: false, error: cErr.message };
+
+  // For each target gender, keep the country with the most online users of it.
+  const bestByGender = { m: null, f: null };
+  for (const row of counts || []) {
+    const g = row.gender;
+    if (g !== 'm' && g !== 'f') continue;
+    if (row.n < minCount) continue;
+    if (!bestByGender[g] || row.n > bestByGender[g].n) {
+      bestByGender[g] = { country: row.country, n: row.n };
+    }
+  }
+  if (!bestByGender.m && !bestByGender.f) {
+    return { ok: true, sent: 0, skipped: 0, reason: 'nobody_online_above_min' };
+  }
+
+  // 2. Recipients = everyone with a registered push target.
+  const { data: targets, error: tErr } = await sb
+    .from('notification_targets')
+    .select('user_id');
+  if (tErr) return { ok: false, error: tErr.message };
+  const recipientIds = [...new Set((targets || []).map((t) => t.user_id))];
+  if (recipientIds.length === 0) {
+    return { ok: true, sent: 0, skipped: 0, reason: 'no_push_targets' };
+  }
+
+  // Their gender + language + presence (chunked to keep the IN() list sane).
+  const profiles = [];
+  for (let i = 0; i < recipientIds.length; i += 500) {
+    const slice = recipientIds.slice(i, i + 500);
+    let q = sb
+      .from('profiles')
+      .select('id, gender, language, last_seen')
+      .in('id', slice);
+    // Market-targeted run: only this language's users (matches 'fr', 'fr-FR'…).
+    if (recipientLang) q = q.ilike('language', `${recipientLang}%`);
+    // eslint-disable-next-line no-await-in-loop
+    const { data, error } = await q;
+    if (error) return { ok: false, error: error.message };
+    if (data) profiles.push(...data);
+  }
+
+  const onlineCutoffMs = Date.now() - windowSeconds * 1000;
+  let skipped = 0;
+  const sends = [];
+  for (const p of profiles) {
+    // Already in the app → they can see who's online themselves. Skip.
+    const seen = p.last_seen ? Date.parse(p.last_seen) : 0;
+    if (seen && seen > onlineCutoffMs) {
+      skipped += 1;
+      continue;
+    }
+    // 'f' → advertise men; anything else (m / x / null) → advertise women.
+    const targetGender = p.gender === 'f' ? 'm' : 'f';
+    const best = bestByGender[targetGender];
+    if (!best) {
+      skipped += 1;
+      continue;
+    }
+    const lang = (p.language || 'en').toLowerCase().split(/[-_]/)[0];
+    const payload = onlineNotif(lang, best.country, targetGender, best.n);
+    if (!payload) {
+      skipped += 1;
+      continue;
+    }
+    sends.push({ uid: p.id, payload });
+  }
+
+  if (dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      wouldSend: sends.length,
+      skipped,
+      bestByGender,
+      sample: sends.slice(0, 5).map((s) => s.payload.title),
+    };
+  }
+
+  // Fan out with a small concurrency cap so we don't stampede push/DB.
+  let sent = 0;
+  const POOL = 16;
+  for (let i = 0; i < sends.length; i += POOL) {
+    const batch = sends.slice(i, i + POOL);
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(
+      batch.map(async (s) => {
+        try {
+          await notifyUser(s.uid, s.payload);
+          sent += 1;
+        } catch (e) {
+          console.error('[broadcast] notify failed', s.uid, e?.message || e);
+        }
+      }),
+    );
+  }
+  return { ok: true, sent, skipped, bestByGender };
+}
+
+// Manual trigger. Header `x-broadcast-secret` must equal BROADCAST_SECRET.
+// Body (all optional): { minCount, windowSeconds, dryRun }.
+app.post('/api/notify-online-broadcast', async (req, res) => {
+  if (!BROADCAST_SECRET || req.get('x-broadcast-secret') !== BROADCAST_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const { minCount, windowSeconds, dryRun, recipientLang } = req.body || {};
+  try {
+    const out = await runOnlineBroadcast({
+      minCount: minCount != null ? Number(minCount) : undefined,
+      windowSeconds: windowSeconds != null ? Number(windowSeconds) : undefined,
+      dryRun: dryRun === true || dryRun === 'true',
+      recipientLang: recipientLang || undefined,
+    });
+    return res.json(out);
+  } catch (e) {
+    console.error('/api/notify-online-broadcast error', e);
+    return res.status(500).json({ error: 'broadcast_failed' });
+  }
+});
+
 // Legal site — Terms, Privacy, Help. Must be registered BEFORE the
 // Flutter SPA fallback so /terms etc. serve the HTML files rather
 // than falling through to the Flutter index.html.
@@ -1565,3 +1758,138 @@ app.listen(PORT, '0.0.0.0', () => {
     `Listening on http://0.0.0.0:${PORT} (web UI: ${hasWebUi ? 'yes' : 'no'})`,
   );
 });
+
+// In-process per-market scheduler for the "X en ligne" broadcast. Zero-dep:
+// every minute, for each market, it checks the market's LOCAL hour (DST-correct)
+// and fires once per matching local hour, nudging only that market's language.
+// A market with no hours configured is skipped; the manual endpoint still works.
+const activeMarkets = BROADCAST_MARKETS.filter((m) => m.hours.length > 0);
+if (activeMarkets.length > 0) {
+  const lastSlot = {}; // lang → last fired "day-hour"
+  const timer = setInterval(() => {
+    for (const m of activeMarkets) {
+      const p = localParts(m.tz);
+      if (!p || !m.hours.includes(p.hour)) continue;
+      const slot = `${p.day}-${p.hour}`;
+      if (lastSlot[m.lang] === slot) continue; // already fired this local hour
+      lastSlot[m.lang] = slot;
+      runOnlineBroadcast({ recipientLang: m.lang })
+        .then((out) =>
+          console.log(`[broadcast] auto ${m.lang}`, JSON.stringify(out)))
+        .catch((e) =>
+          console.error(`[broadcast] auto ${m.lang} error`, e?.message || e));
+    }
+  }, 60 * 1000);
+  timer.unref?.();
+  // eslint-disable-next-line no-console
+  console.log(
+    `[broadcast] scheduler on: ${activeMarkets
+      .map((m) => `${m.lang}@${m.tz}[${m.hours.join(',')}]`)
+      .join(' ')}`,
+  );
+}
+
+// Reminder copy, localised into each RECIPIENT's language (so a Japanese user
+// never gets a French reminder). Falls back en → fr for unlisted languages.
+const SCHED_REMINDER_I18N = {
+  fr: { title: '📞 Rappel d\'appel', body: (n) => `Ton appel avec ${n} commence bientôt`, none: 'Ton appel planifié commence bientôt' },
+  en: { title: '📞 Call reminder', body: (n) => `Your call with ${n} starts soon`, none: 'Your scheduled call starts soon' },
+  es: { title: '📞 Recordatorio de llamada', body: (n) => `Tu llamada con ${n} empieza pronto`, none: 'Tu llamada programada empieza pronto' },
+  de: { title: '📞 Anruf-Erinnerung', body: (n) => `Dein Anruf mit ${n} beginnt bald`, none: 'Dein geplanter Anruf beginnt bald' },
+  it: { title: '📞 Promemoria chiamata', body: (n) => `La tua chiamata con ${n} sta per iniziare`, none: 'La tua chiamata pianificata sta per iniziare' },
+  pt: { title: '📞 Lembrete de chamada', body: (n) => `A tua chamada com ${n} começa em breve`, none: 'A tua chamada agendada começa em breve' },
+  nl: { title: '📞 Herinnering oproep', body: (n) => `Je gesprek met ${n} begint binnenkort`, none: 'Je geplande gesprek begint binnenkort' },
+  ar: { title: '📞 تذكير بمكالمة', body: (n) => `مكالمتك مع ${n} ستبدأ قريبًا`, none: 'مكالمتك المجدولة ستبدأ قريبًا' },
+  ru: { title: '📞 Напоминание о звонке', body: (n) => `Твой звонок с ${n} скоро начнётся`, none: 'Твой запланированный звонок скоро начнётся' },
+  zh: { title: '📞 通话提醒', body: (n) => `你和 ${n} 的通话即将开始`, none: '你预约的通话即将开始' },
+  ja: { title: '📞 通話リマインダー', body: (n) => `${n} との通話がまもなく始まります`, none: '予約した通話がまもなく始まります' },
+  ko: { title: '📞 통화 알림', body: (n) => `${n} 님과의 통화가 곧 시작돼요`, none: '예약한 통화가 곧 시작돼요' },
+};
+function schedReminderPayload(lang, peerName, callId) {
+  const code = String(lang || '').toLowerCase().split(/[-_]/)[0];
+  const m = SCHED_REMINDER_I18N[code] || SCHED_REMINDER_I18N.en;
+  return {
+    title: m.title,
+    body: peerName ? m.body(peerName) : m.none,
+    type: 'call_reminder',
+    data: { scheduledCallId: String(callId) },
+  };
+}
+
+// ── Scheduled-call reminders ─────────────────────────────────────────────────
+// Every minute, find planned calls (table `scheduled_calls`, migration 0042)
+// whose start is within SCHEDULED_CALL_LEAD_MS and that haven't been reminded
+// yet, push BOTH parties, and stamp `reminder_sent_at` so each fires exactly
+// once. Rows whose start is long past are marked without notifying (stale).
+const SCHEDULED_CALL_LEAD_MS = Number(
+  process.env.SCHEDULED_CALL_LEAD_MS || 5 * 60 * 1000,
+);
+async function runScheduledCallReminders() {
+  const sb = supabase();
+  if (!sb) return { ok: false, error: 'supabase_not_configured' };
+  const now = Date.now();
+  const dueBefore = new Date(now + SCHEDULED_CALL_LEAD_MS).toISOString();
+  const staleBefore = now - 2 * 60 * 60 * 1000; // 2h grace window
+  const { data: rows, error } = await sb
+    .from('scheduled_calls')
+    .select('id, caller, callee, scheduled_at')
+    .is('reminder_sent_at', null)
+    .lte('scheduled_at', dueBefore)
+    .order('scheduled_at', { ascending: true })
+    .limit(100);
+  if (error) {
+    console.error('[sched] query error', error.message || error);
+    return { ok: false, error: 'query_failed' };
+  }
+  let sent = 0;
+  for (const r of rows || []) {
+    const startMs = Date.parse(r.scheduled_at);
+    // Stamp FIRST so a transient push failure can't make a row re-fire forever.
+    await sb
+      .from('scheduled_calls')
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq('id', r.id);
+    if (Number.isFinite(startMs) && startMs < staleBefore) continue; // stale
+    // Each party's name (for the body) and language (to localise) — best-effort.
+    const { data: people } = await sb
+      .from('profiles')
+      .select('id, display_name, language')
+      .in('id', [r.caller, r.callee]);
+    const personOf = (id) => (people || []).find((x) => x.id === id) || {};
+    const nameOf = (id) => {
+      const p = personOf(id);
+      return typeof p.display_name === 'string' ? p.display_name.trim() : '';
+    };
+    const langOf = (id) => {
+      const p = personOf(id);
+      return typeof p.language === 'string' ? p.language : '';
+    };
+    try {
+      await notifyUser(
+        r.caller,
+        schedReminderPayload(langOf(r.caller), nameOf(r.callee), r.id),
+      );
+      await notifyUser(
+        r.callee,
+        schedReminderPayload(langOf(r.callee), nameOf(r.caller), r.id),
+      );
+      sent += 1;
+    } catch (e) {
+      console.error('[sched] notify error', e?.message || e);
+    }
+  }
+  return { ok: true, scanned: (rows || []).length, sent };
+}
+
+if (supabase()) {
+  const schedTimer = setInterval(() => {
+    runScheduledCallReminders()
+      .then((out) => {
+        if (out && out.sent) console.log('[sched] reminders', JSON.stringify(out));
+      })
+      .catch((e) => console.error('[sched] error', e?.message || e));
+  }, 60 * 1000);
+  schedTimer.unref?.();
+  // eslint-disable-next-line no-console
+  console.log(`[sched] reminder scheduler on (lead ${SCHEDULED_CALL_LEAD_MS}ms)`);
+}
