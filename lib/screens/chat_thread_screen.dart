@@ -452,7 +452,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// True once the peer has sent at least one message — the ice-breakers then
   /// retire. While it's still just me (empty thread, or only my own openers /
   /// an emoji), they stay above the composer to help me get a real reply.
-  bool get _peerHasReplied => _messages.any((m) => m.senderId != _myId);
+  ///
+  /// Keyed on the peer's id, NOT `senderId != _myId`: at boot `_myId` can still
+  /// be empty, which would make my OWN messages look like the peer's and hide
+  /// the bubbles the instant I send a wave.
+  bool get _peerHasReplied =>
+      _messages.any((m) => m.senderId == widget.peerDeviceId);
 
   List<String> _iceBreakers() {
     final out = <String>[];
