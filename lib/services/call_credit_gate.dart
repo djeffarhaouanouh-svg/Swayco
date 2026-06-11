@@ -138,13 +138,16 @@ abstract final class CallCreditGate {
     required String myId,
     required String myName,
   }) async {
+    // Localise the push into the PEER's language (they receive it).
+    final peer = await ProfileApi.fetchById(peerId);
+    final lang = peer?.language ?? '';
     final caller = myName.trim().isEmpty
-        ? AppStrings.t('call_locked_peer_fallback')
+        ? AppStrings.tIn(lang, 'call_locked_peer_fallback')
         : myName.trim();
     unawaited(PushDispatcher.notify(
       recipientUid: peerId,
-      title: AppStrings.t('call_invite_push_title', args: {'name': caller}),
-      body: AppStrings.t('call_invite_push_body'),
+      title: AppStrings.tIn(lang, 'call_invite_push_title', args: {'name': caller}),
+      body: AppStrings.tIn(lang, 'call_invite_push_body'),
       type: 'call_invite',
       data: {'fromId': myId, 'fromName': myName},
     ));

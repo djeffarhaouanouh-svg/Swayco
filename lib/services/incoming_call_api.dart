@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_strings.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -141,10 +142,16 @@ abstract final class IncomingCallApi {
     try {
       final caller = await ProfileApi.fetchById(callerId);
       final callerName = caller?.displayName.trim() ?? '';
+      // Localise into the CALLEE's language — they shouldn't get "Appel
+      // entrant" in French just because the caller's app is in French.
+      final callee = await ProfileApi.fetchById(calleeId);
+      final lang = callee?.language ?? '';
       await PushDispatcher.notify(
         recipientUid: calleeId,
-        title: callerName.isEmpty ? 'Appel entrant' : callerName,
-        body: '📞 Appel entrant',
+        title: callerName.isEmpty
+            ? AppStrings.tIn(lang, 'push_incoming_call_title')
+            : callerName,
+        body: AppStrings.tIn(lang, 'push_incoming_call_body'),
         type: 'incoming_call',
         data: {
           'callId': callId,

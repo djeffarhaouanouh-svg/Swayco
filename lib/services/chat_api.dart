@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_strings.dart';
 import 'mission_signal.dart';
+import 'profile_api.dart';
 import 'push_dispatcher.dart';
 
 class ChatMessage {
@@ -335,6 +337,7 @@ abstract final class ChatApi {
     required String body,
     required String language,
     String discoverPhoto = '',
+    String recipientLang = '',
   }) async {
     await _client.from('messages').insert({
       'conversation_id': conversationId,
@@ -347,18 +350,45 @@ abstract final class ChatApi {
       // so the "one message per photo" rule survives restarts.
       if (discoverPhoto.isNotEmpty) 'discover_photo': discoverPhoto,
     });
-    // Fire-and-forget push to the recipient. Best-effort; never block
-    // or fail the send because of a notification hiccup.
-    unawaited(
-      PushDispatcher.notify(
-        recipientUid: recipientId,
-        title: senderName.isEmpty ? 'Nouveau message' : senderName,
-        body: body,
-        type: 'message',
-        data: {'conversationId': conversationId, 'senderId': senderId},
-      ),
-    );
+    // Fire-and-forget push to the recipient, localised into THEIR language.
+    // Best-effort; never block or fail the send on a notification hiccup.
+    // [recipientLang] is passed by the chat thread (peer profile already in
+    // hand) to avoid a fetch; falls back to a lookup when it's empty.
+    unawaited(_notifyMessage(
+      recipientId: recipientId,
+      recipientLang: recipientLang,
+      senderName: senderName,
+      conversationId: conversationId,
+      senderId: senderId,
+      body: body,
+    ));
     pokeMissions();
+  }
+
+  /// Resolve the recipient's language (param or fetch) and fire the localised
+  /// "new message" push. [imageBody] true → the body is a localised "📷 Photo"
+  /// label instead of the message text.
+  static Future<void> _notifyMessage({
+    required String recipientId,
+    required String recipientLang,
+    required String senderName,
+    required String conversationId,
+    required String senderId,
+    String body = '',
+    bool imageBody = false,
+  }) async {
+    final lang = recipientLang.isNotEmpty
+        ? recipientLang
+        : (await ProfileApi.fetchById(recipientId))?.language ?? '';
+    await PushDispatcher.notify(
+      recipientUid: recipientId,
+      title: senderName.isEmpty
+          ? AppStrings.tIn(lang, 'push_new_message')
+          : senderName,
+      body: imageBody ? AppStrings.tIn(lang, 'push_photo') : body,
+      type: 'message',
+      data: {'conversationId': conversationId, 'senderId': senderId},
+    );
   }
 
   /// Upload [bytes] as a chat image and insert an image message. The file
@@ -372,6 +402,7 @@ abstract final class ChatApi {
     required String recipientId,
     required Uint8List bytes,
     String contentType = 'image/jpeg',
+    String recipientLang = '',
   }) async {
     if (bytes.isEmpty) throw ArgumentError('image vide');
     final ext = contentType.endsWith('png') ? 'png' : 'jpg';
@@ -398,15 +429,14 @@ abstract final class ChatApi {
       'language': '',
       'image_url': url,
     });
-    unawaited(
-      PushDispatcher.notify(
-        recipientUid: recipientId,
-        title: senderName.isEmpty ? 'Nouveau message' : senderName,
-        body: '📷 Photo',
-        type: 'message',
-        data: {'conversationId': conversationId, 'senderId': senderId},
-      ),
-    );
+    unawaited(_notifyMessage(
+      recipientId: recipientId,
+      recipientLang: recipientLang,
+      senderName: senderName,
+      conversationId: conversationId,
+      senderId: senderId,
+      imageBody: true,
+    ));
     pokeMissions();
   }
 

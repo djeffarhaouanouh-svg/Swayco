@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_strings.dart';
 import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
@@ -289,10 +290,14 @@ abstract final class FriendshipApi {
     try {
       final myProfile = await ProfileApi.fetchById(meId);
       final myName = myProfile?.displayName.trim() ?? '';
+      final peer = await ProfileApi.fetchById(peerId);
+      final lang = peer?.language ?? '';
       await PushDispatcher.notify(
         recipientUid: peerId,
-        title: myName.isEmpty ? 'Nouvelle demande' : myName,
-        body: 'veut être ami',
+        title: myName.isEmpty
+            ? AppStrings.tIn(lang, 'push_friend_request_title')
+            : myName,
+        body: AppStrings.tIn(lang, 'push_friend_request_body'),
         type: 'friend_request',
         data: {'requesterId': meId},
       );

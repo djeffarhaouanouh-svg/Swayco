@@ -428,6 +428,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         body: body,
         language: _myLang,
+        recipientLang: _peer?.language ?? '',
       );
       Analytics.track(
         'message_sent',
@@ -536,13 +537,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       return;
     }
     final whenLabel = _formatWhen(when);
+    // Push lands on the peer → localise into THEIR language.
+    final lang = _peer?.language ?? '';
     final caller = _myName.trim().isEmpty
-        ? AppStrings.t('call_locked_peer_fallback')
+        ? AppStrings.tIn(lang, 'call_locked_peer_fallback')
         : _myName.trim();
     unawaited(PushDispatcher.notify(
       recipientUid: widget.peerDeviceId,
-      title: AppStrings.t('schedule_push_title', args: {'name': caller}),
-      body: AppStrings.t('schedule_push_body', args: {'when': whenLabel}),
+      title: AppStrings.tIn(lang, 'schedule_push_title', args: {'name': caller}),
+      body: AppStrings.tIn(lang, 'schedule_push_body', args: {'when': whenLabel}),
       type: 'call_scheduled',
       data: {'fromId': _myId, 'whenIso': when.toUtc().toIso8601String()},
     ));
@@ -620,6 +623,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         recipientId: widget.peerDeviceId,
         bytes: bytes,
         contentType: isPng ? 'image/png' : 'image/jpeg',
+        recipientLang: _peer?.language ?? '',
       );
       Analytics.track(
         'message_sent',

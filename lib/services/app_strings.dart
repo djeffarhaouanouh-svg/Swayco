@@ -30,6 +30,20 @@ abstract final class AppStrings {
     return out;
   }
 
+  /// Like [t], but for an EXPLICIT language [bcp47] instead of the active UI
+  /// language. Used to localise PUSH notifications into the RECIPIENT's
+  /// language — the sender's UI language is irrelevant to whoever receives
+  /// the notification. Same fallback chain: requested → English → French → key.
+  static String tIn(String bcp47, String key, {Map<String, String>? args}) {
+    final code = _normalize(bcp47);
+    final raw =
+        _maps[code]?[key] ?? _maps['en']?[key] ?? _maps['fr']?[key] ?? key;
+    if (args == null || args.isEmpty) return raw;
+    var out = raw;
+    args.forEach((k, v) => out = out.replaceAll('{$k}', v));
+    return out;
+  }
+
   static String _normalize(String code) {
     final t = code.trim().toLowerCase();
     if (t.isEmpty) return '';
@@ -92,6 +106,15 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} propose un appel',
     'schedule_push_body': 'Appel prévu le {when}',
     'schedule_confirmed': 'Appel planifié le {when} ✅',
+    // ── Push notification labels (localised into the RECIPIENT's language) ──
+    'push_new_message': 'Nouveau message',
+    'push_photo': '📷 Photo',
+    'push_friend_request_title': 'Nouvelle demande',
+    'push_friend_request_body': 'veut être ami',
+    'push_incoming_call_title': 'Appel entrant',
+    'push_incoming_call_body': '📞 Appel entrant',
+    'push_like_title': 'Nouveau like ❤',
+    'push_like_body': 'a aimé ton profil ❤',
     'paywall_headline': 'Activez votre abonnement\net parlez sans limite',
     'paywall_subtitle':
         'Parlez toutes les langues, sans barrière. Traduction vocale en temps réel.',
@@ -638,6 +661,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} suggests a call',
     'schedule_push_body': 'Call planned for {when}',
     'schedule_confirmed': 'Call scheduled for {when} ✅',
+    'push_new_message': 'New message',
+    'push_photo': '📷 Photo',
+    'push_friend_request_title': 'New request',
+    'push_friend_request_body': 'wants to be friends',
+    'push_incoming_call_title': 'Incoming call',
+    'push_incoming_call_body': '📞 Incoming call',
+    'push_like_title': 'New like ❤',
+    'push_like_body': 'liked your profile ❤',
     'paywall_headline': 'Activate your subscription\nand talk without limits',
     'paywall_subtitle':
         'Speak every language, no barriers. Real-time voice translation.',
@@ -1174,6 +1205,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} propone una llamada',
     'schedule_push_body': 'Llamada prevista para el {when}',
     'schedule_confirmed': 'Llamada programada para el {when} ✅',
+    'push_new_message': 'Nuevo mensaje',
+    'push_photo': '📷 Foto',
+    'push_friend_request_title': 'Nueva solicitud',
+    'push_friend_request_body': 'quiere ser tu amigo',
+    'push_incoming_call_title': 'Llamada entrante',
+    'push_incoming_call_body': '📞 Llamada entrante',
+    'push_like_title': 'Nuevo me gusta ❤',
+    'push_like_body': 'le gustó tu perfil ❤',
     'paywall_headline': 'Activa tu suscripción\ny habla sin límites',
     'paywall_subtitle':
         'Habla todos los idiomas, sin barreras. Traducción de voz en tiempo real.',
@@ -1705,6 +1744,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} schlägt einen Anruf vor',
     'schedule_push_body': 'Anruf geplant für {when}',
     'schedule_confirmed': 'Anruf geplant für {when} ✅',
+    'push_new_message': 'Neue Nachricht',
+    'push_photo': '📷 Foto',
+    'push_friend_request_title': 'Neue Anfrage',
+    'push_friend_request_body': 'möchte mit dir befreundet sein',
+    'push_incoming_call_title': 'Eingehender Anruf',
+    'push_incoming_call_body': '📞 Eingehender Anruf',
+    'push_like_title': 'Neues Like ❤',
+    'push_like_body': 'gefällt dein Profil ❤',
     'paywall_headline': 'Aktiviere dein Abo\nund sprich ohne Grenzen',
     'paywall_subtitle':
         'Sprich jede Sprache, ohne Barrieren. Sprachübersetzung in Echtzeit.',
@@ -2241,6 +2288,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} propone una chiamata',
     'schedule_push_body': 'Chiamata prevista per il {when}',
     'schedule_confirmed': 'Chiamata pianificata per il {when} ✅',
+    'push_new_message': 'Nuovo messaggio',
+    'push_photo': '📷 Foto',
+    'push_friend_request_title': 'Nuova richiesta',
+    'push_friend_request_body': 'vuole essere tuo amico',
+    'push_incoming_call_title': 'Chiamata in arrivo',
+    'push_incoming_call_body': '📞 Chiamata in arrivo',
+    'push_like_title': 'Nuovo like ❤',
+    'push_like_body': 'ha messo like al tuo profilo ❤',
     'paywall_headline': 'Attiva il tuo abbonamento\ne parla senza limiti',
     'paywall_subtitle':
         'Parla ogni lingua, senza barriere. Traduzione vocale in tempo reale.',
@@ -2771,6 +2826,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} sugere uma chamada',
     'schedule_push_body': 'Chamada marcada para {when}',
     'schedule_confirmed': 'Chamada agendada para {when} ✅',
+    'push_new_message': 'Nova mensagem',
+    'push_photo': '📷 Foto',
+    'push_friend_request_title': 'Novo pedido',
+    'push_friend_request_body': 'quer ser teu amigo',
+    'push_incoming_call_title': 'Chamada recebida',
+    'push_incoming_call_body': '📞 Chamada recebida',
+    'push_like_title': 'Novo gosto ❤',
+    'push_like_body': 'gostou do teu perfil ❤',
     'paywall_headline': 'Ative a sua subscrição\ne fale sem limites',
     'paywall_subtitle':
         'Fale todos os idiomas, sem barreiras. Tradução de voz em tempo real.',
@@ -3301,6 +3364,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} stelt een gesprek voor',
     'schedule_push_body': 'Gesprek gepland voor {when}',
     'schedule_confirmed': 'Gesprek gepland voor {when} ✅',
+    'push_new_message': 'Nieuw bericht',
+    'push_photo': '📷 Foto',
+    'push_friend_request_title': 'Nieuw verzoek',
+    'push_friend_request_body': 'wil bevriend zijn',
+    'push_incoming_call_title': 'Inkomende oproep',
+    'push_incoming_call_body': '📞 Inkomende oproep',
+    'push_like_title': 'Nieuwe like ❤',
+    'push_like_body': 'vindt je profiel leuk ❤',
     'paywall_headline': 'Activeer je abonnement\nen praat zonder grenzen',
     'paywall_subtitle':
         'Spreek elke taal, zonder barrières. Spraakvertaling in realtime.',
@@ -3827,6 +3898,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} يقترح مكالمة',
     'schedule_push_body': 'مكالمة مقرّرة في {when}',
     'schedule_confirmed': 'تمت جدولة المكالمة في {when} ✅',
+    'push_new_message': 'رسالة جديدة',
+    'push_photo': '📷 صورة',
+    'push_friend_request_title': 'طلب جديد',
+    'push_friend_request_body': 'يريد أن يكون صديقك',
+    'push_incoming_call_title': 'مكالمة واردة',
+    'push_incoming_call_body': '📞 مكالمة واردة',
+    'push_like_title': 'إعجاب جديد ❤',
+    'push_like_body': 'أعجِب بملفك ❤',
     'paywall_headline': 'فعّل اشتراكك\nوتحدّث بلا حدود',
     'paywall_subtitle': 'تحدث بكل اللغات، بلا حواجز. ترجمة صوتية فورية.',
     'paywall_social_proof': 'يثق بنا أكثر من 10٬000 مستخدم',
@@ -4339,6 +4418,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} предлагает созвон',
     'schedule_push_body': 'Звонок запланирован на {when}',
     'schedule_confirmed': 'Звонок запланирован на {when} ✅',
+    'push_new_message': 'Новое сообщение',
+    'push_photo': '📷 Фото',
+    'push_friend_request_title': 'Новый запрос',
+    'push_friend_request_body': 'хочет дружить',
+    'push_incoming_call_title': 'Входящий звонок',
+    'push_incoming_call_body': '📞 Входящий звонок',
+    'push_like_title': 'Новый лайк ❤',
+    'push_like_body': 'оценил(а) твой профиль ❤',
     'paywall_headline': 'Активируйте подписку\nи говорите без границ',
     'paywall_subtitle':
         'Говорите на любом языке без барьеров. Голосовой перевод в реальном времени.',
@@ -4865,6 +4952,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} 想约个通话',
     'schedule_push_body': '通话已约定在 {when}',
     'schedule_confirmed': '通话已安排在 {when} ✅',
+    'push_new_message': '新消息',
+    'push_photo': '📷 照片',
+    'push_friend_request_title': '新的好友请求',
+    'push_friend_request_body': '想加你为好友',
+    'push_incoming_call_title': '来电',
+    'push_incoming_call_body': '📞 来电',
+    'push_like_title': '新的喜欢 ❤',
+    'push_like_body': '赞了你的资料 ❤',
     'paywall_headline': '开通订阅\n畅聊无限制',
     'paywall_subtitle': '畅说每种语言，毫无障碍。实时语音翻译。',
     'paywall_social_proof': '超过 10,000 名用户信赖我们',
@@ -5334,6 +5429,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} が通話を提案しています',
     'schedule_push_body': '{when} に通話予定',
     'schedule_confirmed': '{when} に通話を予約しました ✅',
+    'push_new_message': '新しいメッセージ',
+    'push_photo': '📷 写真',
+    'push_friend_request_title': '新しいリクエスト',
+    'push_friend_request_body': '友だちになりたいそうです',
+    'push_incoming_call_title': '着信',
+    'push_incoming_call_body': '📞 着信',
+    'push_like_title': '新しいいいね ❤',
+    'push_like_body': 'あなたのプロフィールにいいねしました ❤',
     'paywall_headline': 'サブスクを開始して\n制限なく話そう',
     'paywall_subtitle': 'あらゆる言語を、壁なく話せる。リアルタイム音声翻訳。',
     'paywall_social_proof': '10,000人以上のユーザーに利用されています',
@@ -5812,6 +5915,14 @@ abstract final class AppStrings {
     'schedule_push_title': '{name} 님이 통화를 제안해요',
     'schedule_push_body': '{when}에 통화 예정',
     'schedule_confirmed': '{when}에 통화를 예약했어요 ✅',
+    'push_new_message': '새 메시지',
+    'push_photo': '📷 사진',
+    'push_friend_request_title': '새 친구 요청',
+    'push_friend_request_body': '친구가 되고 싶어 해요',
+    'push_incoming_call_title': '수신 전화',
+    'push_incoming_call_body': '📞 수신 전화',
+    'push_like_title': '새 좋아요 ❤',
+    'push_like_body': '회원님의 프로필을 좋아해요 ❤',
     'paywall_headline': '구독을 활성화하고\n제한 없이 대화하세요',
     'paywall_subtitle': '모든 언어를 장벽 없이. 실시간 음성 번역.',
     'paywall_social_proof': '10,000명 이상의 사용자가 신뢰합니다',

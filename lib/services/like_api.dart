@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_strings.dart';
 import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
@@ -81,10 +82,14 @@ abstract final class LikeApi {
     try {
       final likerProfile = await ProfileApi.fetchById(likerId);
       final likerName = likerProfile?.displayName.trim() ?? '';
+      final liked = await ProfileApi.fetchById(likedId);
+      final lang = liked?.language ?? '';
       await PushDispatcher.notify(
         recipientUid: likedId,
-        title: likerName.isEmpty ? 'Nouveau like ❤' : likerName,
-        body: 'a aimé ton profil ❤',
+        title: likerName.isEmpty
+            ? AppStrings.tIn(lang, 'push_like_title')
+            : likerName,
+        body: AppStrings.tIn(lang, 'push_like_body'),
         type: 'like',
         data: {'likerId': likerId},
       );
