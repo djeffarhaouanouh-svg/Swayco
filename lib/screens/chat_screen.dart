@@ -599,6 +599,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         onTap: _creatingInvite ? null : _shareCallInvite,
                         creatingInvite: _creatingInvite,
                       ),
+                      // Always keep an empty section at the bottom of the panel
+                      // (down to the nav), even when the list is long.
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
