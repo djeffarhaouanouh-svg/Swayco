@@ -423,9 +423,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                                   ],
                                 ),
                               ),
-                            // Always keep an empty section at the bottom of the
-                            // panel (down to the nav), even when the list is long.
-                            const SizedBox(height: 80),
                           ],
                         ),
                 ),
