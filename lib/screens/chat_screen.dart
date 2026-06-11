@@ -996,23 +996,24 @@ class _WhiteBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Full-width, rounded top corners. Stops just ABOVE the floating nav bar
-    // (bottom margin = nav height + safe-area inset + a small gap) so the mesh
-    // shows through behind the nav and its icons stay legible.
+    // Rounded card on all four corners (like the Discover deck). It stops just
+    // ABOVE the floating nav bar (bottom margin = nav height + safe-area inset
+    // + a small gap) so the mesh fond shows through under the rounded bottom
+    // edge and behind the nav, keeping its icons legible.
     final navReserve =
-        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 14;
+        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
     return Padding(
       padding: EdgeInsets.only(bottom: navReserve),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: Colors.black.withValues(alpha: 0.14),
               blurRadius: 24,
-              offset: const Offset(0, -2),
+              offset: const Offset(0, 6),
             ),
           ],
         ),
