@@ -26,6 +26,7 @@ import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass.dart';
+import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -59,6 +60,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _pollTimer;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
   bool _creatingInvite = false;
+
+  /// Live search filter over the conversation list (name / @handle).
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
 
   /// True when OS notifications are off (never asked or refused). Drives the
   /// recovery banner at the top of the conversation list — the moment where a
@@ -107,6 +112,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     _pollTimer?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -448,19 +454,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
-      body: ColoredBox(
-        color: const Color(0xFF0E0E0E),
-        child: SafeArea(
-          bottom: false,
-          // Fixed "Messages" band at the top; the conversation list scrolls
-          // underneath it (the band stays pinned, it doesn't scroll away).
-          child: Column(
-            children: [
-              _titleBar,
-              Expanded(child: _buildBody()),
-            ],
-          ),
+      backgroundColor: SC.bg,
+      body: MeshBackground(
+        child: Stack(
+          children: [
+            // Same cyan-blue ambient wash as the Discover page, so the
+            // Messages page now sits on the app's mesh fond instead of the
+            // old flat black.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 1.2,
+                    colors: [
+                      SC.meshCyan.withValues(alpha: 0.50),
+                      SC.meshBlue.withValues(alpha: 0.30),
+                      SC.meshNavy.withValues(alpha: 0.22),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              bottom: false,
+              // Fixed "Messages" band at the top; the conversation list scrolls
+              // underneath it (the band stays pinned, it doesn't scroll away).
+              child: Column(
+                children: [
+                  _titleBar,
+                  Expanded(child: _buildBody()),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -501,13 +528,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
+    final online = _onlineFriends;
+    final shown = _shownFriends;
     return RefreshIndicator(
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
       onRefresh: _reload,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Clear the floating nav bar so the invite row stays scrollable.
+        // Clear the floating nav bar so the last row stays scrollable.
         padding: EdgeInsets.fromLTRB(
           16, 4, 16,
           84 + MediaQuery.paddingOf(context).bottom,
@@ -522,21 +551,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     setState(() => _notifBannerDismissed = true),
               ),
             ),
-          // Single glass card holding every conversation row, with a thin
-          // hairline divider between them (inset past the avatar) so each
-          // conversation reads as a distinct entry.
+          // Horizontal "online now" avatar strip — only the friends currently
+          // online, tap an avatar to jump straight into the thread. Hidden
+          // while searching so the results stay front-and-centre.
+          if (_query.trim().isEmpty && online.isNotEmpty) ...[
+            _OnlineStoriesRow(friends: online, onTap: _openThread),
+            const SizedBox(height: 14),
+          ],
+          // Glass search field — filters the conversation list live.
+          _ChatSearchField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          const SizedBox(height: 14),
+          // Single glass card holding the "invite to a call" entry plus every
+          // conversation row, with a thin hairline divider between them (inset
+          // past the avatar) so each entry reads as a distinct line.
           _GlassListCard(
             child: Column(
               children: [
+                // "Invite to a call" now lives as the first row of the
+                // messages section instead of a separate bar below the list.
+                _InviteToCallRow(
+                  onTap: _creatingInvite ? null : _shareCallInvite,
+                  creatingInvite: _creatingInvite,
+                ),
                 // Rows cascade in (fade + slide) on first load.
-                for (final (i, p) in _friends.indexed)
+                for (final (i, p) in shown.indexed)
                   FadeSlideIn(
                     delay: Duration(milliseconds: i * 55),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (i > 0)
-                    Divider(
+                        Divider(
                       height: 1,
                       thickness: 1,
                       // Inset past the avatar on the left and stopping before
@@ -577,11 +624,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          const SizedBox(height: 18),
-          _InviteToCallBar(
-            onInviteToCall: _creatingInvite ? null : _shareCallInvite,
-            creatingInvite: _creatingInvite,
-          ),
+          // Empty search result — keep the page from looking broken.
+          if (shown.isEmpty && _query.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 22),
+              child: Text(
+                AppStrings.t('search_intro_hint'),
+                textAlign: TextAlign.center,
+                style: SCText.preview,
+              ),
+            ),
         ],
       ),
     );
@@ -601,6 +653,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Number of unread inbound messages in [p]'s conversation (0 = none).
   int _unreadCountFor(RemoteProfile p) =>
       _unreadCountByConv[_conversationIdFor(p.id)] ?? 0;
+
+  /// Friends currently online (same reciprocal presence rule as the row's
+  /// green dot) — drives the horizontal "stories" strip at the top.
+  List<RemoteProfile> get _onlineFriends {
+    if (AppSettings.hideOnlineLocal.value) return const [];
+    final now = DateTime.now();
+    return _friends.where((p) {
+      final ls = p.lastSeen;
+      return !p.hideOnlineStatus &&
+          ls != null &&
+          now.difference(ls) < const Duration(minutes: 2);
+    }).toList();
+  }
+
+  /// Conversation list after applying the live search filter (name / handle).
+  List<RemoteProfile> get _shownFriends {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _friends;
+    return _friends.where((p) {
+      return p.displayName.toLowerCase().contains(q) ||
+          p.handle.toLowerCase().contains(q);
+    }).toList();
+  }
 }
 
 class _FriendChatRow extends StatelessWidget {
@@ -1112,81 +1187,219 @@ class _RowCallButton extends StatelessWidget {
   }
 }
 
-/// "Invite to a call" row on the Messages page: a full-width green strip,
-/// the height of a conversation row, that mints a guest invite link (join
-/// a call with no account) and opens the native OS share sheet. Rendered
-/// as the last item of the conversation list, just below the discussions.
-class _InviteToCallBar extends StatelessWidget {
-  const _InviteToCallBar({
-    required this.onInviteToCall,
+/// "Invite to a call" entry — now the first row inside the messages glass
+/// card (instead of a separate bar below the list). It mints a guest invite
+/// link (join a call with no account) and opens the native OS share sheet.
+/// Styled like a conversation row but with a cyan gradient video badge in
+/// place of an avatar so it reads as the primary action of the section.
+class _InviteToCallRow extends StatelessWidget {
+  const _InviteToCallRow({
+    required this.onTap,
     required this.creatingInvite,
   });
 
-  /// Null while a link is being minted — disables the button.
-  final VoidCallback? onInviteToCall;
+  /// Null while a link is being minted — disables the row.
+  final VoidCallback? onTap;
   final bool creatingInvite;
 
   @override
   Widget build(BuildContext context) {
-    // No glass — a solid cyan → blue gradient CTA.
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            colors: [SC.accent, SC.meshBlue],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: SC.accent.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            onTap: onInviteToCall,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (creatingInvite)
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  else
-                    const Icon(Icons.videocam_rounded,
-                        color: Colors.white, size: 20),
-                  const SizedBox(width: 10),
-                  Text(
-                    creatingInvite
-                        ? AppStrings.t('invite_call_creating')
-                        : AppStrings.t('invite_to_call'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              // Cyan gradient badge, same 46 px footprint as a row avatar.
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [SC.accent, SC.meshBlue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: SC.accent.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: creatingInvite
+                    ? const Padding(
+                        padding: EdgeInsets.all(13),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.videocam_rounded,
+                        color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  creatingInvite
+                      ? AppStrings.t('invite_call_creating')
+                      : AppStrings.t('invite_to_call'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SCText.name.copyWith(color: SC.accent),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  color: SC.textMuted, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Horizontal strip of the friends currently online, shown above the search
+/// field on the Messages page. Story-style: a cyan→blue ring around the
+/// avatar with the green presence dot; tapping opens that thread.
+class _OnlineStoriesRow extends StatelessWidget {
+  const _OnlineStoriesRow({required this.friends, required this.onTap});
+
+  final List<RemoteProfile> friends;
+  final void Function(RemoteProfile) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 88,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: friends.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final p = friends[i];
+          final name = p.displayName.isNotEmpty
+              ? p.displayName
+              : (p.handle.isNotEmpty ? '@${p.handle}' : '');
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onTap(p),
+            child: SizedBox(
+              width: 64,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    children: [
+                      // Gradient ring around the avatar.
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [SC.accent, SC.meshBlue],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: SC.bg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: ProfileAvatar(
+                            displayName: p.displayName,
+                            avatarUrl: p.avatarUrl,
+                            avatarColorHex: p.avatarColor,
+                            size: 50,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 3,
+                        bottom: 3,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: SC.online,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: SC.bg, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SCText.meta.copyWith(color: SC.textSecondary),
                   ),
                 ],
               ),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Glass search field on the Messages page — filters the conversation list
+/// live by name / @handle. Matches the app's Apple-glass card surface.
+class _ChatSearchField extends StatelessWidget {
+  const _ChatSearchField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      borderRadius: BorderRadius.circular(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: SC.textMuted, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: SC.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                hintText: AppStrings.t('search_chercher'),
+                hintStyle: const TextStyle(color: SC.textMuted, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+            ),
           ),
-        ),
+          if (controller.text.isNotEmpty)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                controller.clear();
+                onChanged('');
+              },
+              child: const Icon(Icons.close_rounded,
+                  color: SC.textMuted, size: 18),
+            ),
+        ],
       ),
     );
   }
