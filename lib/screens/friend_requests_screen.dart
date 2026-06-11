@@ -384,43 +384,53 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           },
         ),
     ];
-    // Same as the Messages page: a fixed white panel that fills the zone and
-    // rests FLUSH on the nav bar's body top, so the nav's concave notches hug
-    // its rounded bottom corners (like the Discover deck). Rows scroll inside.
+    // Same as the Messages page: the panel lives inside the page scroll view
+    // so the WHOLE panel moves when you scroll, with a min-height = the zone so
+    // it fills and rests flush on the nav at rest (the concave notches hug its
+    // rounded bottom corners, Discover-style).
     final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.only(top: 26, bottom: navBody),
-      child: ListPanel(
-        child: RefreshIndicator(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fill = constraints.maxHeight - 26 - navBody;
+        return RefreshIndicator(
           color: SC.accent,
           backgroundColor: SC.bubbleIn,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: EdgeInsets.only(top: 26, bottom: navBody),
             children: [
-              if (rows.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 44),
-                  child: _NoRequestsEmpty(),
-                )
-              else
-                for (final (i, row) in rows.indexed)
-                  // Rows ease in (fade + slide) in a quick cascade.
-                  FadeSlideIn(
-                    delay: Duration(milliseconds: i * 55),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (i > 0) _rowDivider,
-                        row,
-                      ],
-                    ),
-                  ),
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
+                child: ListPanel(
+                  child: rows.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 44),
+                          child: _NoRequestsEmpty(),
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final (i, row) in rows.indexed)
+                              // Rows ease in (fade + slide) in a quick cascade.
+                              FadeSlideIn(
+                                delay: Duration(milliseconds: i * 55),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (i > 0) _rowDivider,
+                                    row,
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
+              ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
