@@ -20,8 +20,8 @@ class ListPanel extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        // Dark navy panel.
-        color: const Color(0xFF0E1322),
+        // The original site black.
+        color: const Color(0xFF0E0E0E),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: SC.glassBorder, width: 1),
         // Cyan-blue halo around the panel — the Discover card's glow.
