@@ -23,6 +23,7 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/appear.dart';
+import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -500,9 +501,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // instead of swapping a centred spinner for a populated list
       // (the old behaviour made rows pop in one by one as each
       // request resolved).
-      return _ChatListSkeleton(
-        bottomInset: 84 + MediaQuery.paddingOf(context).bottom,
-      );
+      return const _ChatListSkeleton();
     }
     if (_error != null) {
       return Padding(
@@ -531,11 +530,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         onRefresh: _reload,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          // Clear the floating nav bar so the last row stays scrollable.
-          padding: EdgeInsets.fromLTRB(
-            6, 10, 6,
-            84 + MediaQuery.paddingOf(context).bottom,
-          ),
+          // The white block already stops above the nav, so just a little
+          // breathing room at the bottom of the list.
+          padding: const EdgeInsets.fromLTRB(6, 10, 6, 16),
           children: [
             if (_notifBlocked && !_notifBannerDismissed)
               Padding(
@@ -842,7 +839,7 @@ class _FriendChatRow extends StatelessWidget {
                             ? _formatTime(lastMessage!.createdAt)
                             : '',
                         style: SCText.meta.copyWith(
-                          color: unread ? SC.accentDeep : subGrey,
+                          color: unread ? SC.accent : subGrey,
                         ),
                       ),
                     ],
@@ -911,14 +908,14 @@ class _UnreadBadge extends StatelessWidget {
       height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: SC.accentDeep,
+        color: SC.accent,
         borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
       child: Text(
         count > 99 ? '99+' : '$count',
         style: const TextStyle(
-          color: Colors.white,
+          color: SC.bgDeep,
           fontSize: 12,
           fontWeight: FontWeight.w800,
           height: 1,
@@ -999,13 +996,18 @@ class _WhiteBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Full-width, rounded top corners. Stops just ABOVE the floating nav bar
+    // (bottom margin = nav height + safe-area inset + a small gap) so the mesh
+    // shows through behind the nav and its icons stay legible.
+    final navReserve =
+        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 14;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      padding: EdgeInsets.only(bottom: navReserve),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
@@ -1131,7 +1133,7 @@ class _RowCallButton extends StatelessWidget {
         child: const SizedBox(
           width: 38,
           height: 38,
-          child: Icon(Icons.phone_rounded, color: SC.accentDeep, size: 18),
+          child: Icon(Icons.phone_rounded, color: SC.accent, size: 18),
         ),
       ),
     );
@@ -1203,7 +1205,7 @@ class _InviteToCallRow extends StatelessWidget {
                       : AppStrings.t('invite_to_call'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: SCText.name.copyWith(color: SC.accentDeep),
+                  style: SCText.name.copyWith(color: SC.accent),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1222,9 +1224,7 @@ class _InviteToCallRow extends StatelessWidget {
 /// replaced by shimmering bars. Keeps the page layout stable so the
 /// content doesn't pop in / shift when the data lands.
 class _ChatListSkeleton extends StatefulWidget {
-  const _ChatListSkeleton({required this.bottomInset});
-
-  final double bottomInset;
+  const _ChatListSkeleton();
 
   @override
   State<_ChatListSkeleton> createState() => _ChatListSkeletonState();
@@ -1256,7 +1256,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
     return _WhiteBlock(
       child: ListView(
         physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(6, 10, 6, widget.bottomInset),
+        padding: const EdgeInsets.fromLTRB(6, 10, 6, 16),
         children: [
           AnimatedBuilder(
             animation: _ctrl,
