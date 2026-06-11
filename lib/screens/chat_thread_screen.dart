@@ -479,29 +479,27 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           ? AppStrings.t('ib_hi_noname')
           : AppStrings.t('ib_hi', args: {'name': firstName}),
     );
+    // One opener per interest (up to 3) so the rotating strip has variety.
     final interests = peer?.interests ?? const <String>[];
-    if (interests.isNotEmpty) {
+    for (final interest in interests.take(3)) {
       out.add(
-        AppStrings.t('ib_interest', args: {'interest': interestLabel(interests.first)}),
+        AppStrings.t('ib_interest', args: {'interest': interestLabel(interest)}),
       );
     }
-    final place = (peer?.city.trim().isNotEmpty ?? false)
-        ? peer!.city.trim()
-        : (peer?.country.trim() ?? '');
-    if (place.isNotEmpty) {
-      out.add(AppStrings.t('ib_place', args: {'place': place}));
+    // City only (country already covered by ib_country above).
+    final city = peer?.city.trim() ?? '';
+    if (city.isNotEmpty) {
+      out.add(AppStrings.t('ib_place', args: {'place': city}));
     }
     out.add(AppStrings.t('ib_call'));
     return out;
   }
 
-  /// Tapping a suggestion just pre-fills the composer and reuses the normal
-  /// send path, so the message goes through translation / analytics like any
-  /// hand-typed one.
-  void _sendSuggestion(String text) {
-    if (_sending) return;
+  /// Tapping a suggestion just DROPS it into the composer (cursor at end) — it
+  /// does NOT send. The user edits / sends it themselves like any draft.
+  void _useSuggestion(String text) {
     _inputCtrl.text = text;
-    _send();
+    _inputCtrl.selection = TextSelection.collapsed(offset: text.length);
   }
 
   String _formatWhen(DateTime when) {
@@ -810,7 +808,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         if (!_peerHasReplied)
                           _IceBreakers(
                             suggestions: _iceBreakers(),
-                            onTap: _sendSuggestion,
+                            onTap: _useSuggestion,
                           ),
                         _Composer(
                           controller: _inputCtrl,
@@ -1683,41 +1681,114 @@ const Duration _kMaxVoiceMessage = Duration(seconds: 60);
 /// Replaces the composer when the peer has blocked me — a flat, disabled
 /// notice bar so it's obvious messages can't be sent (they'd go nowhere).
 /// Horizontal strip of tappable ice-breaker suggestions, floated just above
-/// the composer while the thread is empty. Tapping one sends it immediately.
-class _IceBreakers extends StatelessWidget {
+/// the composer until the peer replies. Shows up to [_maxVisible] Apple-glass
+/// bubbles and cycles ONE of them to a fresh suggestion every 5 s (fade), so
+/// the user keeps seeing new openers without the strip overflowing. Tapping a
+/// bubble drops its text into the composer (no auto-send).
+class _IceBreakers extends StatefulWidget {
   const _IceBreakers({required this.suggestions, required this.onTap});
 
+  /// The full pool to rotate through.
   final List<String> suggestions;
   final ValueChanged<String> onTap;
 
   @override
+  State<_IceBreakers> createState() => _IceBreakersState();
+}
+
+class _IceBreakersState extends State<_IceBreakers> {
+  static const int _maxVisible = 3;
+  static const Duration _interval = Duration(seconds: 5);
+
+  /// Pool index shown in each visible slot.
+  List<int> _slots = const [];
+  int _nextPool = 0; // next pool index to bring in
+  int _rotateSlot = 0; // which slot rotates next (round-robin)
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _seed();
+    _timer = Timer.periodic(_interval, (_) => _rotate());
+  }
+
+  @override
+  void didUpdateWidget(covariant _IceBreakers old) {
+    super.didUpdateWidget(old);
+    // Re-seed only when the pool SIZE changes (e.g. the peer profile finished
+    // loading and added country/interest openers) — not on every parent
+    // rebuild, so the rotation isn't reset while the user is reading.
+    if (old.suggestions.length != widget.suggestions.length) _seed();
+  }
+
+  void _seed() {
+    final n = widget.suggestions.length;
+    final count = n < _maxVisible ? n : _maxVisible;
+    _slots = [for (var i = 0; i < count; i++) i];
+    _nextPool = n == 0 ? 0 : count % n;
+    _rotateSlot = 0;
+  }
+
+  void _rotate() {
+    final n = widget.suggestions.length;
+    if (n <= _slots.length) return; // no spare openers to cycle in
+    setState(() {
+      // Bring in the next pool entry that isn't already on screen.
+      var idx = _nextPool;
+      var guard = 0;
+      while (_slots.contains(idx) && guard < n) {
+        idx = (idx + 1) % n;
+        guard++;
+      }
+      _slots[_rotateSlot] = idx;
+      _nextPool = (idx + 1) % n;
+      _rotateSlot = (_rotateSlot + 1) % _slots.length;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (suggestions.isEmpty) return const SizedBox.shrink();
+    if (_slots.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: suggestions.length,
+        itemCount: _slots.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final text = suggestions[i];
+          final text = widget.suggestions[_slots[i]];
           return Center(
-            child: Pressable(
-              onTap: () => onTap(text),
-              bounce: true,
-              // Apple-glass bubble: blur + low-alpha white tint + hairline,
-              // white text. Same language as the header / composer glass.
-              child: GlassContainer(
-                borderRadius: BorderRadius.circular(22),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                child: Text(
-                  text,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              transitionBuilder: (child, anim) =>
+                  FadeTransition(opacity: anim, child: child),
+              child: Pressable(
+                // Key on the text so the switcher cross-fades when this slot
+                // rotates to a new suggestion.
+                key: ValueKey(text),
+                onTap: () => widget.onTap(text),
+                bounce: true,
+                // Apple-glass bubble: blur + low-alpha white tint + hairline,
+                // white text. Same language as the header / composer glass.
+                child: GlassContainer(
+                  borderRadius: BorderRadius.circular(22),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
