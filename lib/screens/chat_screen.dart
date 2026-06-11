@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 import 'package:share_plus/share_plus.dart';
 
 import '../services/analytics.dart';
@@ -17,7 +16,6 @@ import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/notification_client.dart';
-import '../services/platform_glass.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/token_api.dart';
@@ -60,10 +58,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _pollTimer;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
   bool _creatingInvite = false;
-
-  /// Live search filter over the conversation list (name / @handle).
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _query = '';
 
   /// True when OS notifications are off (never asked or refused). Drives the
   /// recovery banner at the top of the conversation list — the moment where a
@@ -112,7 +106,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     _pollTimer?.cancel();
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -528,8 +521,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
-    final online = _onlineFriends;
-    final shown = _shownFriends;
     return RefreshIndicator(
       color: SC.accent,
       backgroundColor: SC.bubbleIn,
@@ -551,38 +542,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     setState(() => _notifBannerDismissed = true),
               ),
             ),
-          // Horizontal "online now" avatar strip — only the friends currently
-          // online, tap an avatar to jump straight into the thread. Hidden
-          // while searching so the results stay front-and-centre.
-          if (_query.trim().isEmpty && online.isNotEmpty) ...[
-            _OnlineStoriesRow(friends: online, onTap: _openThread),
-            const SizedBox(height: 14),
-          ],
-          // Glass search field — filters the conversation list live.
-          _ChatSearchField(
-            controller: _searchCtrl,
-            onChanged: (v) => setState(() => _query = v),
-          ),
-          const SizedBox(height: 14),
-          // Single glass card holding the "invite to a call" entry plus every
-          // conversation row, with a thin hairline divider between them (inset
-          // past the avatar) so each entry reads as a distinct line.
+          // Single white-glass card holding every conversation row, with a thin
+          // hairline divider between them (inset past the avatar) so each entry
+          // reads as a distinct line.
           _GlassListCard(
             child: Column(
               children: [
-                // "Invite to a call" now lives as the first row of the
-                // messages section instead of a separate bar below the list.
-                _InviteToCallRow(
-                  onTap: _creatingInvite ? null : _shareCallInvite,
-                  creatingInvite: _creatingInvite,
-                ),
                 // Rows cascade in (fade + slide) on first load.
-                for (final (i, p) in shown.indexed)
+                for (final (i, p) in _friends.indexed)
                   FadeSlideIn(
                     delay: Duration(milliseconds: i * 55),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (i > 0)
                         Divider(
                       height: 1,
                       thickness: 1,
@@ -591,7 +564,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       // only under the text.
                       indent: 70,
                       endIndent: 150,
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: Colors.black.withValues(alpha: 0.06),
                     ),
                   _FriendChatRow(
                     profile: p,
@@ -624,16 +597,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          // Empty search result — keep the page from looking broken.
-          if (shown.isEmpty && _query.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 22),
-              child: Text(
-                AppStrings.t('search_intro_hint'),
-                textAlign: TextAlign.center,
-                style: SCText.preview,
-              ),
+          const SizedBox(height: 16),
+          // "Invite to a call" — its own section, pinned at the very bottom
+          // of the messages list.
+          _GlassListCard(
+            child: _InviteToCallRow(
+              onTap: _creatingInvite ? null : _shareCallInvite,
+              creatingInvite: _creatingInvite,
             ),
+          ),
         ],
       ),
     );
@@ -653,29 +625,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Number of unread inbound messages in [p]'s conversation (0 = none).
   int _unreadCountFor(RemoteProfile p) =>
       _unreadCountByConv[_conversationIdFor(p.id)] ?? 0;
-
-  /// Friends currently online (same reciprocal presence rule as the row's
-  /// green dot) — drives the horizontal "stories" strip at the top.
-  List<RemoteProfile> get _onlineFriends {
-    if (AppSettings.hideOnlineLocal.value) return const [];
-    final now = DateTime.now();
-    return _friends.where((p) {
-      final ls = p.lastSeen;
-      return !p.hideOnlineStatus &&
-          ls != null &&
-          now.difference(ls) < const Duration(minutes: 2);
-    }).toList();
-  }
-
-  /// Conversation list after applying the live search filter (name / handle).
-  List<RemoteProfile> get _shownFriends {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _friends;
-    return _friends.where((p) {
-      return p.displayName.toLowerCase().contains(q) ||
-          p.handle.toLowerCase().contains(q);
-    }).toList();
-  }
 }
 
 class _FriendChatRow extends StatelessWidget {
@@ -810,13 +759,17 @@ class _FriendChatRow extends StatelessWidget {
             ? '@${profile.handle}'
             : AppStrings.t('chat_no_name'));
 
+    // Dark text on the white messages panel (design ref).
+    const nameDark = Color(0xFF263043);
+    const subGrey = Color(0xFF8A93A6);
+
     final subtitleParts = <InlineSpan>[];
     if (lastMessage != null && lastMessage!.body.isNotEmpty) {
       if (isMine) {
         subtitleParts.add(const TextSpan(
           text: 'Vous : ',
           style: TextStyle(
-            color: SC.textMuted,
+            color: subGrey,
             fontWeight: FontWeight.w500,
           ),
         ));
@@ -827,7 +780,7 @@ class _FriendChatRow extends StatelessWidget {
     }
 
     return Material(
-      color: unread ? SC.accent.withValues(alpha: 0.07) : Colors.transparent,
+      color: unread ? SC.accent.withValues(alpha: 0.10) : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -860,7 +813,7 @@ class _FriendChatRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: SC.online,
                           shape: BoxShape.circle,
-                          border: Border.all(color: SC.bg, width: 2),
+                          border: Border.all(color: Colors.white, width: 2),
                         ),
                       ),
                     ),
@@ -884,6 +837,7 @@ class _FriendChatRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: SCText.name.copyWith(
+                            color: nameDark,
                             fontWeight:
                                 unread ? FontWeight.w800 : FontWeight.w700,
                           ),
@@ -895,7 +849,7 @@ class _FriendChatRow extends StatelessWidget {
                             ? _formatTime(lastMessage!.createdAt)
                             : '',
                         style: SCText.meta.copyWith(
-                          color: unread ? SC.accent : SC.textMuted,
+                          color: unread ? SC.accentDeep : subGrey,
                         ),
                       ),
                     ],
@@ -910,7 +864,7 @@ class _FriendChatRow extends StatelessWidget {
                           softWrap: false,
                           text: TextSpan(
                             style: SCText.preview.copyWith(
-                              color: unread ? SC.textPrimary : SC.textMuted,
+                              color: unread ? nameDark : subGrey,
                               fontWeight:
                                   unread ? FontWeight.w600 : FontWeight.w400,
                             ),
@@ -964,14 +918,14 @@ class _UnreadBadge extends StatelessWidget {
       height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: SC.accent,
+        color: SC.accentDeep,
         borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
       child: Text(
         count > 99 ? '99+' : '$count',
         style: const TextStyle(
-          color: SC.bgDeep,
+          color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w800,
           height: 1,
@@ -1051,25 +1005,13 @@ class _GlassListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (useShaderGlass) {
-      return lg.GlassContainer(
-        useOwnLayer: true,
-        clipBehavior: Clip.antiAlias,
-        padding: const EdgeInsets.all(6),
-        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 24),
-        // Tune blur / thickness / refractiveIndex for more or less refraction.
-        settings: const lg.LiquidGlassSettings(
-          blur: 8,
-          thickness: 16,
-          glassColor: Color(0x14FFFFFF),
-          refractiveIndex: 1.35,
-        ),
-        child: child,
-      );
-    }
+    // White frosted panel (like the design ref). Same near-white surface on
+    // web and native so the list always reads as the bright "white part".
     return GlassContainer(
       borderRadius: BorderRadius.circular(24),
       padding: const EdgeInsets.all(6),
+      color: Colors.white.withValues(alpha: 0.92),
+      border: Colors.white.withValues(alpha: 0.6),
       child: child,
     );
   }
@@ -1175,14 +1117,20 @@ class _RowCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Real glass circle + spring bounce (like the header / photo buttons),
-    // keeping the cyan phone glyph.
-    return GlassIconButton(
-      icon: Icons.phone_rounded,
-      onTap: onTap,
-      size: 38,
-      iconSize: 18,
-      iconColor: SC.accent,
+    // Light cyan-tinted circle so the phone glyph stays visible on the white
+    // messages panel (the glass version vanished white-on-white).
+    return Material(
+      color: SC.accent.withValues(alpha: 0.12),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(Icons.phone_rounded, color: SC.accentDeep, size: 18),
+        ),
+      ),
     );
   }
 }
@@ -1252,154 +1200,15 @@ class _InviteToCallRow extends StatelessWidget {
                       : AppStrings.t('invite_to_call'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: SCText.name.copyWith(color: SC.accent),
+                  style: SCText.name.copyWith(color: SC.accentDeep),
                 ),
               ),
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right_rounded,
-                  color: SC.textMuted, size: 22),
+                  color: Color(0xFF8A93A6), size: 22),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Horizontal strip of the friends currently online, shown above the search
-/// field on the Messages page. Story-style: a cyan→blue ring around the
-/// avatar with the green presence dot; tapping opens that thread.
-class _OnlineStoriesRow extends StatelessWidget {
-  const _OnlineStoriesRow({required this.friends, required this.onTap});
-
-  final List<RemoteProfile> friends;
-  final void Function(RemoteProfile) onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 88,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: friends.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final p = friends[i];
-          final name = p.displayName.isNotEmpty
-              ? p.displayName
-              : (p.handle.isNotEmpty ? '@${p.handle}' : '');
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => onTap(p),
-            child: SizedBox(
-              width: 64,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Stack(
-                    children: [
-                      // Gradient ring around the avatar.
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [SC.accent, SC.meshBlue],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: SC.bg,
-                            shape: BoxShape.circle,
-                          ),
-                          child: ProfileAvatar(
-                            displayName: p.displayName,
-                            avatarUrl: p.avatarUrl,
-                            avatarColorHex: p.avatarColor,
-                            size: 50,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 3,
-                        bottom: 3,
-                        child: Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: SC.online,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: SC.bg, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SCText.meta.copyWith(color: SC.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Glass search field on the Messages page — filters the conversation list
-/// live by name / @handle. Matches the app's Apple-glass card surface.
-class _ChatSearchField extends StatelessWidget {
-  const _ChatSearchField({required this.controller, required this.onChanged});
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassContainer(
-      borderRadius: BorderRadius.circular(18),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          const Icon(Icons.search_rounded, color: SC.textMuted, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: SC.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                hintText: AppStrings.t('search_chercher'),
-                hintStyle: const TextStyle(color: SC.textMuted, fontSize: 14),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 13),
-              ),
-            ),
-          ),
-          if (controller.text.isNotEmpty)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                controller.clear();
-                onChanged('');
-              },
-              child: const Icon(Icons.close_rounded,
-                  color: SC.textMuted, size: 18),
-            ),
-        ],
       ),
     );
   }
@@ -1446,14 +1255,16 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
         GlassContainer(
           borderRadius: BorderRadius.circular(24),
           padding: const EdgeInsets.all(6),
+          color: Colors.white.withValues(alpha: 0.92),
+          border: Colors.white.withValues(alpha: 0.6),
           child: AnimatedBuilder(
             animation: _ctrl,
             builder: (_, _) {
               final t = Curves.easeInOut.transform(_ctrl.value);
-              // 0.10 → 0.18 alpha so the shimmer breathes gently
-              // without strobing the screen.
+              // Dark shimmer on the white skeleton panel so the placeholder
+              // bars stay visible (white-on-white would vanish).
               final shimmer =
-                  Colors.white.withValues(alpha: 0.10 + 0.08 * t);
+                  Colors.black.withValues(alpha: 0.06 + 0.05 * t);
               return Column(
                 children: [
                   for (var i = 0; i < 5; i++)
