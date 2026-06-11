@@ -384,55 +384,43 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           },
         ),
     ];
-    final navReserve =
-        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
-    // The white block FILLS the zone down to just above the nav at rest yet
-    // lives inside the page scroll view, so the whole panel scrolls/moves once
-    // there are enough rows (same as the Messages page).
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fillHeight = constraints.maxHeight - 26 - navReserve;
-        return RefreshIndicator(
+    // Same as the Messages page: a fixed white panel that fills the zone and
+    // rests FLUSH on the nav bar's body top, so the nav's concave notches hug
+    // its rounded bottom corners (like the Discover deck). Rows scroll inside.
+    final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(top: 26, bottom: navBody),
+      child: WhiteBlock(
+        child: RefreshIndicator(
           color: SC.accent,
           backgroundColor: Colors.white,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(top: 26, bottom: navReserve),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: fillHeight > 0 ? fillHeight : 0,
-                ),
-                child: WhiteBlock(
-                  child: rows.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 44),
-                          child: _NoRequestsEmpty(),
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final (i, row) in rows.indexed)
-                              // Rows ease in (fade + slide) in a quick cascade.
-                              FadeSlideIn(
-                                delay: Duration(milliseconds: i * 55),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (i > 0) _rowDivider,
-                                    row,
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                ),
-              ),
+              if (rows.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 44),
+                  child: _NoRequestsEmpty(),
+                )
+              else
+                for (final (i, row) in rows.indexed)
+                  // Rows ease in (fade + slide) in a quick cascade.
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: i * 55),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i > 0) _rowDivider,
+                        row,
+                      ],
+                    ),
+                  ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -469,6 +457,10 @@ class _RequestRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        // Cyan illumination on hover / press (visible on the white panel).
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -536,6 +528,10 @@ class _FollowBackRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        // Cyan illumination on hover / press (visible on the white panel).
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -597,6 +593,10 @@ class _ReactionRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        // Cyan illumination on hover / press (visible on the white panel).
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -656,6 +656,10 @@ class _LikeRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        // Cyan illumination on hover / press (visible on the white panel).
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(

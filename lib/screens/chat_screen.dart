@@ -520,93 +520,80 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
-    // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
-    // white block is the middle layer. It FILLS the zone down to just above the
-    // nav at rest (min-height = available area, like the Discover deck) yet it
-    // lives INSIDE the page scroll view, so the whole panel scrolls/moves once
-    // there are enough rows. Rounded corners let the mesh show above & below.
-    final navReserve =
-        GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fillHeight = constraints.maxHeight - 26 - navReserve;
-        return RefreshIndicator(
+    // LAYER STRUCTURE (exactly like the Discover deck): the mesh fond (built in
+    // build()) sits at the back; the white block FILLS the zone and its bottom
+    // edge rests FLUSH on the nav bar's body top, so the nav's concave notches
+    // hug the panel's rounded bottom corners. The rows scroll inside the panel.
+    final navBody =
+        GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      // Drop a touch below the title; bottom sits flush on the nav (no gap) so
+      // the hug notches wrap the rounded bottom corners.
+      padding: EdgeInsets.only(top: 26, bottom: navBody),
+      child: WhiteBlock(
+        child: RefreshIndicator(
           color: SC.accent,
           backgroundColor: Colors.white,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(top: 26, bottom: navReserve),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: fillHeight > 0 ? fillHeight : 0,
+              if (_notifBlocked && !_notifBannerDismissed)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: _NotifBanner(
+                    onEnable: _onEnableNotifs,
+                    onDismiss: () =>
+                        setState(() => _notifBannerDismissed = true),
+                  ),
                 ),
-                child: WhiteBlock(
+              // Conversation rows — laid on the white block.
+              for (final (i, p) in _friends.indexed)
+                FadeSlideIn(
+                  delay: Duration(milliseconds: i * 55),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_notifBlocked && !_notifBannerDismissed)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                          child: _NotifBanner(
-                            onEnable: _onEnableNotifs,
-                            onDismiss: () =>
-                                setState(() => _notifBannerDismissed = true),
-                          ),
+                      if (i > 0) _rowDivider,
+                      _FriendChatRow(
+                        profile: p,
+                        lastMessage: _latestByConv[_conversationIdFor(p.id)],
+                        isMine: _latestByConv[_conversationIdFor(p.id)]
+                                ?.senderId ==
+                            _myId,
+                        unread: _isUnread(p),
+                        unreadCount: _unreadCountFor(p),
+                        onTap: () => _openThread(p),
+                        onViewProfile: () => _viewProfile(p),
+                        onBlock: () => _blockPeer(p),
+                        onReport: () => _reportPeer(p),
+                        onDeleteConversation: () => _deleteConversation(p),
+                        onCall: () => CallLauncher.startCall(
+                          context,
+                          peerDeviceId: p.id,
+                          translation: widget.translation,
                         ),
-                      // Conversation rows — laid on the white block.
-                      for (final (i, p) in _friends.indexed)
-                        FadeSlideIn(
-                          delay: Duration(milliseconds: i * 55),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (i > 0) _rowDivider,
-                              _FriendChatRow(
-                                profile: p,
-                                lastMessage:
-                                    _latestByConv[_conversationIdFor(p.id)],
-                                isMine: _latestByConv[_conversationIdFor(p.id)]
-                                        ?.senderId ==
-                                    _myId,
-                                unread: _isUnread(p),
-                                unreadCount: _unreadCountFor(p),
-                                onTap: () => _openThread(p),
-                                onViewProfile: () => _viewProfile(p),
-                                onBlock: () => _blockPeer(p),
-                                onReport: () => _reportPeer(p),
-                                onDeleteConversation: () =>
-                                    _deleteConversation(p),
-                                onCall: () => CallLauncher.startCall(
-                                  context,
-                                  peerDeviceId: p.id,
-                                  translation: widget.translation,
-                                ),
-                                onCallVideo: () => CallLauncher.startCall(
-                                  context,
-                                  peerDeviceId: p.id,
-                                  translation: widget.translation,
-                                  startWithCamera: true,
-                                ),
-                              ),
-                            ],
-                          ),
+                        onCallVideo: () => CallLauncher.startCall(
+                          context,
+                          peerDeviceId: p.id,
+                          translation: widget.translation,
+                          startWithCamera: true,
                         ),
-                      _rowDivider,
-                      // "Invite to a call" — last section in the panel.
-                      _InviteToCallRow(
-                        onTap: _creatingInvite ? null : _shareCallInvite,
-                        creatingInvite: _creatingInvite,
                       ),
                     ],
                   ),
                 ),
+              _rowDivider,
+              // "Invite to a call" — last section in the panel.
+              _InviteToCallRow(
+                onTap: _creatingInvite ? null : _shareCallInvite,
+                creatingInvite: _creatingInvite,
               ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -795,6 +782,11 @@ class _FriendChatRow extends StatelessWidget {
         onTap: onTap,
         onLongPress: () => _showRowActions(context),
         borderRadius: BorderRadius.circular(18),
+        // Cyan illumination on hover / press — the dark-theme default overlay
+        // is white and would be invisible on the white panel.
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
@@ -1145,6 +1137,9 @@ class _InviteToCallRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
+        hoverColor: SC.accent.withValues(alpha: 0.07),
+        highlightColor: SC.accent.withValues(alpha: 0.10),
+        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -1233,32 +1228,36 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    // Same white block as the loaded list, with shimmering placeholder rows so
-    // the layout doesn't shift when the data lands.
-    return ListView(
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 26, 0, 16),
-      children: [
-        WhiteBlock(
-          child: AnimatedBuilder(
-            animation: _ctrl,
-            builder: (_, _) {
-              final t = Curves.easeInOut.transform(_ctrl.value);
-              // Dark shimmer on the white panel so the placeholder bars stay
-              // visible (white-on-white would vanish).
-              final shimmer =
-                  Colors.black.withValues(alpha: 0.06 + 0.05 * t);
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < 5; i++)
-                    _SkeletonRow(shimmer: shimmer),
-                ],
-              );
-            },
-          ),
+    // Same filled white panel (flush with the nav) as the loaded list, with
+    // shimmering placeholder rows so the layout doesn't shift when data lands.
+    final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(top: 26, bottom: navBody),
+      child: WhiteBlock(
+        child: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          children: [
+            AnimatedBuilder(
+              animation: _ctrl,
+              builder: (_, _) {
+                final t = Curves.easeInOut.transform(_ctrl.value);
+                // Dark shimmer on the white panel so the placeholder bars stay
+                // visible (white-on-white would vanish).
+                final shimmer =
+                    Colors.black.withValues(alpha: 0.06 + 0.05 * t);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < 5; i++)
+                      _SkeletonRow(shimmer: shimmer),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

@@ -108,6 +108,10 @@ class _RootShellState extends State<RootShell> {
       case 'message':
         NavTab.select(NavTab.chat);
         ChatUnread.markAllSeen();
+      case 'online_broadcast':
+        // "5 Japonaises en ligne" pull notification → open Discover so they
+        // can browse / call whoever is online right now.
+        NavTab.select(NavTab.discover);
       // 'incoming_call' needs no routing — the ring modal is shown by
       // the realtime subscription / poll whatever tab is open.
       // 'live_call' was the broadcast notification from the deleted
@@ -503,9 +507,12 @@ class _RootShellState extends State<RootShell> {
                             // Demandes badge = pending friend requests +
                             // unseen likes / photo-reactions.
                             unreadRequests: pending + activity,
-                            // Only the Discover tab has a card resting on the
-                            // nav that the concave notches should hug.
-                            hugTopCorners: index == NavTab.discover,
+                            // Chat / Discover / Demandes each rest a rounded
+                            // card on the nav whose bottom corners the concave
+                            // notches should hug. Profile has none.
+                            hugTopCorners: index == NavTab.chat ||
+                                index == NavTab.discover ||
+                                index == NavTab.demandes,
                             onSelect: _selectTab,
                           );
                         },
