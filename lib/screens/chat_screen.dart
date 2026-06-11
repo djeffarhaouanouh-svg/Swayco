@@ -1003,7 +1003,7 @@ class _WhiteBlock extends StatelessWidget {
     final navReserve =
         GlassNavBar.height + MediaQuery.paddingOf(context).bottom + 16;
     return Padding(
-      padding: EdgeInsets.only(bottom: navReserve),
+      padding: EdgeInsets.only(top: 14, bottom: navReserve),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
