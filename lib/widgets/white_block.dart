@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// The white rounded panel used on the Messages / Demandes pages.
+/// White-theme variant of the list panel (kept for later — NOT wired in right
+/// now; the live panel is the dark [ListPanel] in list_panel.dart).
 ///
-/// LAYER STRUCTURE: the mesh fond sits at the back; this white block is the
-/// middle layer; the page's rows are laid on top as sections. It is sized to
-/// its content and lives INSIDE the page's scroll view, so the whole panel
-/// moves up/down as you scroll (it is not a fixed pane with an inner scroll).
-/// Full-width, rounded on all four corners like the Discover deck.
+/// Solid white rounded card with the same geometry as [ListPanel] (radius 28,
+/// fills the zone, rests flush on the nav so the hug notches wrap its bottom
+/// corners). Swap `ListPanel` for `WhiteBlock` in chat_screen / friend_requests
+/// to flip Messages + Demandes to the white theme. When using it, also restore
+/// dark text on the rows (name 0xFF263043, sub/time 0xFF8A93A6) and cyan
+/// hover/highlight/splash on the InkWells (white-on-white is invisible).
 class WhiteBlock extends StatelessWidget {
   const WhiteBlock({super.key, required this.child});
 

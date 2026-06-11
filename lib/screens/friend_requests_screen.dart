@@ -17,9 +17,9 @@ import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/list_panel.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/white_block.dart';
 import 'profile_screen.dart';
 
 /// A reaction entry rendered on the Demandes feed — the chat message
@@ -327,13 +327,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 
   /// Hairline divider between sections on the white block — inset past the
   /// avatar on the left, stopping before the action cluster on the right.
-  static const Widget _rowDivider = Divider(
-    height: 1,
-    thickness: 1,
-    indent: 70,
-    endIndent: 24,
-    color: Color(0x14000000),
-  );
+  static Widget get _rowDivider => Divider(
+        height: 1,
+        thickness: 1,
+        indent: 70,
+        endIndent: 24,
+        color: Colors.white.withValues(alpha: 0.08),
+      );
 
   Widget _buildBody() {
     if (_loading) {
@@ -390,10 +390,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(top: 26, bottom: navBody),
-      child: WhiteBlock(
+      child: ListPanel(
         child: RefreshIndicator(
           color: SC.accent,
-          backgroundColor: Colors.white,
+          backgroundColor: SC.bubbleIn,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -457,10 +457,6 @@ class _RequestRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        // Cyan illumination on hover / press (visible on the white panel).
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -478,7 +474,6 @@ class _RequestRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
-                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -528,10 +523,6 @@ class _FollowBackRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        // Cyan illumination on hover / press (visible on the white panel).
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -549,7 +540,6 @@ class _FollowBackRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
-                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -593,10 +583,6 @@ class _ReactionRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        // Cyan illumination on hover / press (visible on the white panel).
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -614,7 +600,6 @@ class _ReactionRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
-                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -656,10 +641,6 @@ class _LikeRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        // Cyan illumination on hover / press (visible on the white panel).
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -677,7 +658,6 @@ class _LikeRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: SCText.body.copyWith(
-                    color: const Color(0xFF263043),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -855,7 +835,7 @@ class _RejectButton extends StatelessWidget {
         onTap: onTap,
         child: const Padding(
           padding: EdgeInsets.all(6),
-          child: Icon(Icons.close_rounded, color: Color(0xFF8A93A6), size: 22),
+          child: Icon(Icons.close_rounded, color: SC.textMuted, size: 22),
         ),
       ),
     );
@@ -894,9 +874,9 @@ class _NoRequestsEmpty extends StatelessWidget {
               AppStrings.t('demandes_empty_title'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF263043),
+                color: SC.textPrimary,
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 8),
@@ -904,7 +884,7 @@ class _NoRequestsEmpty extends StatelessWidget {
               AppStrings.t('demandes_empty_body'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF8A93A6),
+                color: SC.textMuted,
                 fontSize: 13,
                 height: 1.4,
               ),

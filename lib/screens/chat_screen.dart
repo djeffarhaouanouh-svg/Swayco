@@ -23,10 +23,11 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../widgets/appear.dart';
+import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/list_panel.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/white_block.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'call_screen.dart';
@@ -530,10 +531,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Drop a touch below the title; bottom sits flush on the nav (no gap) so
       // the hug notches wrap the rounded bottom corners.
       padding: EdgeInsets.only(top: 26, bottom: navBody),
-      child: WhiteBlock(
+      child: ListPanel(
         child: RefreshIndicator(
           color: SC.accent,
-          backgroundColor: Colors.white,
+          backgroundColor: SC.bubbleIn,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -599,13 +600,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// Hairline divider between sections on the white block — inset past the
   /// avatar on the left, stopping before the time / call cluster on the right.
-  static const Widget _rowDivider = Divider(
-    height: 1,
-    thickness: 1,
-    indent: 70,
-    endIndent: 24,
-    color: Color(0x14000000),
-  );
+  static Widget get _rowDivider => Divider(
+        height: 1,
+        thickness: 1,
+        indent: 70,
+        endIndent: 24,
+        color: Colors.white.withValues(alpha: 0.08),
+      );
 
   /// True when the peer's last message is newer than the last time I
   /// opened the thread (or I've never opened it). Drives the cyan dot.
@@ -755,17 +756,13 @@ class _FriendChatRow extends StatelessWidget {
             ? '@${profile.handle}'
             : AppStrings.t('chat_no_name'));
 
-    // Dark text on the white messages panel (design ref).
-    const nameDark = Color(0xFF263043);
-    const subGrey = Color(0xFF8A93A6);
-
     final subtitleParts = <InlineSpan>[];
     if (lastMessage != null && lastMessage!.body.isNotEmpty) {
       if (isMine) {
         subtitleParts.add(const TextSpan(
           text: 'Vous : ',
           style: TextStyle(
-            color: subGrey,
+            color: SC.textMuted,
             fontWeight: FontWeight.w500,
           ),
         ));
@@ -776,17 +773,12 @@ class _FriendChatRow extends StatelessWidget {
     }
 
     return Material(
-      color: unread ? SC.accent.withValues(alpha: 0.10) : Colors.transparent,
+      color: unread ? SC.accent.withValues(alpha: 0.07) : Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
         onLongPress: () => _showRowActions(context),
         borderRadius: BorderRadius.circular(18),
-        // Cyan illumination on hover / press — the dark-theme default overlay
-        // is white and would be invisible on the white panel.
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
@@ -814,7 +806,7 @@ class _FriendChatRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: SC.online,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: SC.bg, width: 2),
                         ),
                       ),
                     ),
@@ -838,7 +830,6 @@ class _FriendChatRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: SCText.name.copyWith(
-                            color: nameDark,
                             fontWeight:
                                 unread ? FontWeight.w800 : FontWeight.w700,
                           ),
@@ -850,7 +841,7 @@ class _FriendChatRow extends StatelessWidget {
                             ? _formatTime(lastMessage!.createdAt)
                             : '',
                         style: SCText.meta.copyWith(
-                          color: unread ? SC.accent : subGrey,
+                          color: unread ? SC.accent : SC.textMuted,
                         ),
                       ),
                     ],
@@ -865,7 +856,7 @@ class _FriendChatRow extends StatelessWidget {
                           softWrap: false,
                           text: TextSpan(
                             style: SCText.preview.copyWith(
-                              color: unread ? nameDark : subGrey,
+                              color: unread ? SC.textPrimary : SC.textMuted,
                               fontWeight:
                                   unread ? FontWeight.w600 : FontWeight.w400,
                             ),
@@ -1096,20 +1087,14 @@ class _RowCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Light cyan-tinted circle so the phone glyph stays visible on the white
-    // messages panel (the glass version vanished white-on-white).
-    return Material(
-      color: SC.accent.withValues(alpha: 0.12),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const SizedBox(
-          width: 38,
-          height: 38,
-          child: Icon(Icons.phone_rounded, color: SC.accent, size: 18),
-        ),
-      ),
+    // Real glass circle + spring bounce (like the header / photo buttons),
+    // keeping the cyan phone glyph.
+    return GlassIconButton(
+      icon: Icons.phone_rounded,
+      onTap: onTap,
+      size: 38,
+      iconSize: 18,
+      iconColor: SC.accent,
     );
   }
 }
@@ -1137,9 +1122,6 @@ class _InviteToCallRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        hoverColor: SC.accent.withValues(alpha: 0.07),
-        highlightColor: SC.accent.withValues(alpha: 0.10),
-        splashColor: SC.accent.withValues(alpha: 0.14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
@@ -1187,7 +1169,7 @@ class _InviteToCallRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right_rounded,
-                  color: Color(0xFF8A93A6), size: 22),
+                  color: SC.textMuted, size: 22),
             ],
           ),
         ),
@@ -1233,7 +1215,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
     final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(top: 26, bottom: navBody),
-      child: WhiteBlock(
+      child: ListPanel(
         child: ListView(
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1242,10 +1224,9 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
               animation: _ctrl,
               builder: (_, _) {
                 final t = Curves.easeInOut.transform(_ctrl.value);
-                // Dark shimmer on the white panel so the placeholder bars stay
-                // visible (white-on-white would vanish).
+                // 0.10 → 0.18 alpha so the shimmer breathes gently.
                 final shimmer =
-                    Colors.black.withValues(alpha: 0.06 + 0.05 * t);
+                    Colors.white.withValues(alpha: 0.10 + 0.08 * t);
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
