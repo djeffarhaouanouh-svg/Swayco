@@ -491,6 +491,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (city.isNotEmpty) {
       out.add(AppStrings.t('ib_place', args: {'place': city}));
     }
+    // Generic openers — these don't depend on any peer field, so the pool
+    // stays rich (and the 5 s rotation keeps working) even when the peer left
+    // their country / interests / city blank.
+    out.add(AppStrings.t('ib_g1'));
+    out.add(AppStrings.t('ib_g2'));
+    out.add(AppStrings.t('ib_g3'));
+    out.add(AppStrings.t('ib_g4'));
     out.add(AppStrings.t('ib_call'));
     return out;
   }
