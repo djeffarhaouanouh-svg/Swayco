@@ -32,7 +32,11 @@ import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
-import 'translation/openai_realtime_translation.dart';
+// TEST: Grok (xAI) chunk-based translation, swapped in at _getTranslation().
+// The OpenAI pipeline file (openai_realtime_translation.dart) is left intact;
+// `git revert` restores its import + usage here.
+import 'translation/grok_chunk_translation.dart';
+import 'translation/realtime_translation_port.dart';
 import 'widgets/splash_screen_animation.dart';
 
 /// Runs in a dedicated background isolate when a data push lands while the
@@ -191,9 +195,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// Lazy — constructed on first access via [_getTranslation], so
   /// `livekit_client` and `flutter_webrtc` Dart-side warm-up is
   /// deferred until the user actually navigates to a call.
-  OpenAiRealtimeTranslation? _translation;
-  OpenAiRealtimeTranslation _getTranslation() {
-    return _translation ??= OpenAiRealtimeTranslation();
+  // TEST: was `OpenAiRealtimeTranslation` — swapped for the Grok chunk pipeline.
+  // Revert this field + _getTranslation() to OpenAiRealtimeTranslation to restore.
+  RealtimeTranslationPort? _translation;
+  RealtimeTranslationPort _getTranslation() {
+    return _translation ??= GrokChunkTranslation();
   }
   StreamSubscription<AuthState>? _authSub;
 
@@ -221,8 +227,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   void dispose() {
     _authSub?.cancel();
     // Only dispose if we actually constructed it — accessing the field
-    // via the lazy getter here would force a useless construction.
-    _translation?.dispose();
+    // via the lazy getter here would force a useless construction. The port
+    // is an interface; both concrete impls are ChangeNotifiers.
+    final ChangeNotifier? t = _translation as ChangeNotifier?;
+    t?.dispose();
     super.dispose();
   }
 

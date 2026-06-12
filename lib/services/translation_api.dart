@@ -103,6 +103,25 @@ Uri _translationTtsUri() {
   return Uri.parse('$b/translation/tts');
 }
 
+Uri _translationGrokUri() {
+  const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
+  if (fromEnv.isNotEmpty) {
+    final b = fromEnv.replaceAll(RegExp(r'/$'), '');
+    return Uri.parse('$b/translation/grok');
+  }
+  if (kIsWeb) {
+    final o = Uri.base.removeFragment();
+    return Uri(
+      scheme: o.scheme,
+      host: o.host,
+      port: o.hasPort ? o.port : null,
+      path: '/translation/grok',
+    );
+  }
+  final b = resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '');
+  return Uri.parse('$b/translation/grok');
+}
+
 Map<String, dynamic> _decodeObjectMap(String body) {
   final decoded = jsonDecode(body);
   if (decoded is Map) {
@@ -316,6 +335,77 @@ Future<Uint8List?> fetchSpeech({
     if (res.statusCode < 200 || res.statusCode >= 300) return null;
     return res.bodyBytes.isEmpty ? null : res.bodyBytes;
   } catch (_) {
+    return null;
+  }
+}
+
+/// Result of the Grok TEST pipeline: translated speech [audio] (mp3) plus the
+/// recognised [transcript] and [translation] (echoed by the backend headers,
+/// handy for the on-screen debug panel). Any field can be empty/null.
+class GrokTranslationResult {
+  const GrokTranslationResult({this.audio, this.transcript, this.translation});
+  final Uint8List? audio;
+  final String? transcript;
+  final String? translation;
+}
+
+/// TEST: posts one captured utterance ([audioBytes], with [mimeType] / [filename]
+/// matching the recorder's container) to `/translation/grok`, which runs it
+/// fully through Grok (STT → translate → TTS) and returns the spoken
+/// translation as mp3 bytes. Returns null on any error or when the backend
+/// found nothing to say (HTTP 204). Does NOT touch the OpenAI pipeline.
+Future<GrokTranslationResult?> fetchGrokTranslation({
+  required Uint8List audioBytes,
+  required String to,
+  String? from,
+  String voice = 'eve',
+  String filename = 'utt.webm',
+}) async {
+  if (audioBytes.isEmpty) return null;
+  final uri = _translationGrokUri();
+  try {
+    final req = http.MultipartRequest('POST', uri)
+      ..fields['to'] = to
+      ..fields['voice'] = voice;
+    if (from != null && from.isNotEmpty) req.fields['from'] = from;
+    final token = _supabaseAccessToken();
+    if (token != null && token.isNotEmpty) {
+      req.headers['Authorization'] = 'Bearer $token';
+    }
+    // No explicit contentType (avoids the http_parser MediaType dep) — the
+    // backend infers the codec from the filename extension, same as
+    // /messages/voice.
+    req.files.add(http.MultipartFile.fromBytes(
+      'audio',
+      audioBytes,
+      filename: filename,
+    ));
+    final streamed = await req.send();
+    final res = await http.Response.fromStream(streamed);
+    if (res.statusCode == 204) return null; // nothing said
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw TranslationApiException(
+        res.body.length > 300 ? '${res.body.substring(0, 300)}…' : res.body,
+        statusCode: res.statusCode,
+      );
+    }
+    String? decodeHeader(String key) {
+      final v = res.headers[key];
+      if (v == null || v.isEmpty) return null;
+      try {
+        return Uri.decodeComponent(v);
+      } catch (_) {
+        return v;
+      }
+    }
+
+    return GrokTranslationResult(
+      audio: res.bodyBytes.isEmpty ? null : res.bodyBytes,
+      transcript: decodeHeader('x-grok-transcript'),
+      translation: decodeHeader('x-grok-translation'),
+    );
+  } catch (e) {
+    if (e is TranslationApiException) rethrow;
     return null;
   }
 }

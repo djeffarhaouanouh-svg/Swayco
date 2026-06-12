@@ -169,6 +169,20 @@ const ELEVENLABS_TTS_MODEL =
  *  their sample). Defaults to a generic multilingual ElevenLabs voice. */
 const ELEVENLABS_DEFAULT_VOICE_ID =
   (process.env.ELEVENLABS_DEFAULT_VOICE_ID?.trim() || '21m00Tcm4TlvDq8ikWAM');
+// ─── Grok (xAI) — TEST translation pipeline (STT → translate → TTS) ──────
+// Throwaway test path: VAD on the app captures one utterance, posts the audio
+// here, and we run it fully through Grok. OpenAI/ElevenLabs paths are untouched.
+// xAI is OpenAI-compatible for /chat/completions and exposes /v1/stt + /v1/tts.
+const GROK_API_KEY = process.env.GROK_API_KEY?.trim();
+const GROK_BASE = (process.env.GROK_BASE?.trim() || 'https://api.x.ai/v1').replace(/\/$/, '');
+const GROK_STT_MODEL = (process.env.GROK_STT_MODEL?.trim() || 'grok-stt');
+const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-3-mini');
+/** TTS model id — optional; only sent if set (the /v1/tts endpoint accepts
+ *  text/voice_id/language without a model on most accounts). */
+const GROK_TTS_MODEL = process.env.GROK_TTS_MODEL?.trim() || '';
+/** One of: ara, eve, leo, rex, sal. */
+const GROK_TTS_VOICE = (process.env.GROK_TTS_VOICE?.trim() || 'eve');
+
 const { featuresFor, normalizeTier } = require('./tiers');
 /** Hard cap on the multipart audio body. 60s of AAC ≈ ~1MB; we leave
  *  generous headroom for richer codecs / longer clips while still
@@ -423,6 +437,7 @@ app.get('/api', (_req, res) => {
       livekitToken: 'POST /livekit/token',
       translationSession: 'POST /translation/realtime/session',
       translationCalls: 'POST /translation/realtime/calls (SDP relay, Authorization: Bearer ephemeral)',
+      translationGrok: 'POST /translation/grok (TEST: multipart audio → STT/translate/TTS via Grok)',
     },
   });
 });
@@ -899,6 +914,164 @@ app.post('/translation/text', _limText, async (req, res) => {
   } catch (e) {
     console.error('translation text', e);
     return res.status(502).json({ error: 'openai_unreachable' });
+  }
+});
+
+/**
+ * POST /translation/grok  (multipart/form-data)  —  TEST PIPELINE
+ *
+ * Fields:
+ *   audio   — one captured utterance (webm / m4a / mp3 / wav / ogg)
+ *   from?   — BCP-47 source primary subtag (the spoken language)
+ *   to      — BCP-47 target primary subtag (what to speak back)
+ *   voice?  — Grok TTS voice (ara|eve|leo|rex|sal)
+ *
+ * Returns: audio/mpeg (the translated speech).
+ * On STT producing empty text, returns 204 (nothing to speak).
+ *
+ * Runs the whole thing through Grok: STT (/v1/stt) → translate
+ * (/v1/chat/completions) → TTS (/v1/tts). This is a throwaway test path —
+ * the OpenAI realtime pipeline is left in place. The transcript and the
+ * translation are echoed back in the `X-Grok-Transcript` / `X-Grok-Translation`
+ * response headers so the on-screen debug panel can show them.
+ */
+app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req, res) => {
+  if (!GROK_API_KEY) {
+    return res.status(500).json({ error: 'grok_not_configured' });
+  }
+  const file = req.file;
+  if (!file || !file.buffer || file.buffer.length === 0) {
+    return res.status(400).json({ error: 'audio_missing' });
+  }
+  const from = primaryLanguageTag(req.body?.from);
+  const to = primaryLanguageTag(req.body?.to);
+  if (!isReasonableLanguageTag(to)) {
+    return res.status(400).json({ error: 'invalid_target' });
+  }
+  const voice = (() => {
+    const v = typeof req.body?.voice === 'string' ? req.body.voice.trim().toLowerCase() : '';
+    return ['ara', 'eve', 'leo', 'rex', 'sal'].includes(v) ? v : GROK_TTS_VOICE;
+  })();
+
+  const mime = (file.mimetype || '').toLowerCase();
+  const ext = (() => {
+    if (mime.includes('webm')) return 'webm';
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) return 'm4a';
+    return 'webm';
+  })();
+
+  // 1) STT — Grok /v1/stt (multipart). Node 18+ global FormData / Blob.
+  let transcript = '';
+  try {
+    const form = new FormData();
+    form.append('model', GROK_STT_MODEL);
+    if (from) form.append('language', from);
+    form.append('file', new Blob([file.buffer], { type: file.mimetype || 'audio/webm' }), `utt.${ext}`);
+    const r = await fetch(`${GROK_BASE}/stt`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${GROK_API_KEY}` },
+      body: form,
+    });
+    const body = await r.text();
+    if (!r.ok) {
+      console.error('grok stt error', r.status, body.slice(0, 300));
+      return res.status(502).json({ error: 'grok_stt_error', detail: body.slice(0, 300) });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (_) {
+      console.error('grok stt parse', body.slice(0, 200));
+      return res.status(502).json({ error: 'grok_stt_bad_response' });
+    }
+    transcript = typeof parsed.text === 'string' ? parsed.text.trim() : '';
+  } catch (e) {
+    console.error('grok stt throw', e);
+    return res.status(502).json({ error: 'grok_stt_unreachable' });
+  }
+
+  if (!transcript) {
+    // Nothing was said (silence / noise) — no audio to return.
+    return res.status(204).end();
+  }
+
+  // 2) Translate — Grok /v1/chat/completions (OpenAI-compatible).
+  let translated = transcript;
+  if (!from || from !== to) {
+    try {
+      const sys =
+        `You are a translation engine. Translate the user's text into ${to}` +
+        `${from ? ` (it is in ${from})` : ''}. ` +
+        `Reply with the translation ONLY — no quotes, no notes, no language tags.`;
+      const r = await fetch(`${GROK_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${GROK_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: GROK_TRANSLATE_MODEL,
+          messages: [
+            { role: 'system', content: sys },
+            { role: 'user', content: transcript },
+          ],
+          temperature: 0.2,
+        }),
+      });
+      const body = await r.text();
+      if (!r.ok) {
+        console.error('grok translate error', r.status, body.slice(0, 300));
+        return res.status(502).json({ error: 'grok_translate_error', detail: body.slice(0, 300) });
+      }
+      const parsed = JSON.parse(body);
+      let out = parsed?.choices?.[0]?.message?.content ?? '';
+      if (typeof out !== 'string') out = '';
+      out = out.trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+      if (out) translated = out;
+    } catch (e) {
+      console.error('grok translate throw', e);
+      return res.status(502).json({ error: 'grok_translate_unreachable' });
+    }
+  }
+
+  // 3) TTS — Grok /v1/tts → mp3 bytes.
+  try {
+    const ttsBody = { text: translated, voice_id: voice, language: to };
+    if (GROK_TTS_MODEL) ttsBody.model = GROK_TTS_MODEL;
+    const r = await fetch(`${GROK_BASE}/tts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${GROK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ttsBody),
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('grok tts error', r.status, errText.slice(0, 300));
+      return res.status(502).json({ error: 'grok_tts_error', detail: errText.slice(0, 300) });
+    }
+    const audio = Buffer.from(await r.arrayBuffer());
+    if (audio.length === 0) {
+      return res.status(502).json({ error: 'grok_tts_empty' });
+    }
+    track({
+      event: 'grok_test_translation',
+      lang_from: from || undefined,
+      lang_to: to,
+      props: { chars: transcript.length, voice },
+    });
+    // Encode the texts so non-ASCII (accents, CJK) survives HTTP header rules.
+    res.set('X-Grok-Transcript', encodeURIComponent(transcript));
+    res.set('X-Grok-Translation', encodeURIComponent(translated));
+    res.set('Access-Control-Expose-Headers', 'X-Grok-Transcript, X-Grok-Translation');
+    return res.status(200).type('audio/mpeg').send(audio);
+  } catch (e) {
+    console.error('grok tts throw', e);
+    return res.status(502).json({ error: 'grok_tts_unreachable' });
   }
 });
 
