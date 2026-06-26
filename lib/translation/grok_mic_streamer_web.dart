@@ -97,6 +97,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
               onPartial?.call((msg['text'] ?? '').toString());
               break;
             case 'error':
+              _log('backend error: ${msg['error']}');
               onError?.call((msg['error'] ?? 'error').toString());
               break;
           }
