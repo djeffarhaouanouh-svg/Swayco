@@ -21,9 +21,12 @@ abstract class GrokMicStreamer {
   ///   translated; audioB64 is the pre-generated Grok mp3 (base64), may be empty.
   /// - [onPartial]`(text)` — interim transcript (live caption), best-effort.
   /// - [onError]`(code)` — a recoverable pipeline error.
+  /// [captureLocalMic] true = capture MY mic (web: getUserMedia); false =
+  /// capture [localTrack] (e.g. the REMOTE participant's voice).
   Future<void> start({
     required Uri wsUrl,
     MediaStreamTrack? localTrack,
+    bool captureLocalMic = true,
     required void Function(String orig, String trans, String lang, String audioB64)
         onTranslation,
     void Function(String partial)? onPartial,

@@ -51,6 +51,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   Future<void> start({
     required Uri wsUrl,
     Object? localTrack,
+    bool captureLocalMic = true,
     required void Function(String orig, String trans, String lang, String audioB64)
         onTranslation,
     void Function(String partial)? onPartial,
@@ -58,29 +59,53 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   }) async {
     if (_running) return;
     _running = true;
-    _log('start wsUrl=$wsUrl');
+    _log('start ${captureLocalMic ? "LOCAL-mic" : "REMOTE-track"} wsUrl=$wsUrl');
     try {
-      // Capture MY OWN mic (sender-side). echoCancellation = browser AEC, so we
-      // don't re-transcribe the translated voice coming out of the speaker.
-      final micStream = await web.window.navigator.mediaDevices
-          .getUserMedia(web.MediaStreamConstraints(
-            audio: web.MediaTrackConstraints(
-              echoCancellation: true.toJS,
-              noiseSuppression: true.toJS,
-              autoGainControl: true.toJS,
-            ),
-          ))
-          .toDart;
-      _micStream = micStream;
-      final audioTracks = micStream.getAudioTracks().toDart;
-      if (audioTracks.isEmpty) {
-        _log('getUserMedia returned no audio track');
-        onError?.call('no_mic');
-        _running = false;
-        return;
+      final web.MediaStreamTrack micTrack;
+      if (captureLocalMic) {
+        // Capture MY OWN mic. echoCancellation = browser AEC, so we don't
+        // re-transcribe the translated voice coming out of the speaker.
+        final micStream = await web.window.navigator.mediaDevices
+            .getUserMedia(web.MediaStreamConstraints(
+              audio: web.MediaTrackConstraints(
+                echoCancellation: true.toJS,
+                noiseSuppression: true.toJS,
+                autoGainControl: true.toJS,
+              ),
+            ))
+            .toDart;
+        _micStream = micStream;
+        final audioTracks = micStream.getAudioTracks().toDart;
+        if (audioTracks.isEmpty) {
+          _log('getUserMedia returned no audio track');
+          onError?.call('no_mic');
+          _running = false;
+          return;
+        }
+        micTrack = audioTracks.first;
+        _log('local mic acquired (AEC)');
+      } else {
+        // Capture the passed track (the REMOTE voice). Clone it so we never
+        // stop the track LiveKit is playing.
+        web.MediaStreamTrack? jsTrack;
+        try {
+          final dynamic dyn = localTrack;
+          jsTrack = dyn?.jsTrack as web.MediaStreamTrack?;
+        } catch (_) {
+          jsTrack = null;
+        }
+        if (jsTrack == null) {
+          _log('no remote track to capture');
+          onError?.call('no_remote_track');
+          _running = false;
+          return;
+        }
+        micTrack = jsTrack.clone();
+        final s = web.MediaStream();
+        s.addTrack(micTrack);
+        _micStream = s;
+        _log('remote track cloned for capture');
       }
-      final micTrack = audioTracks.first;
-      _log('local mic acquired (AEC)');
 
       // Backend WebSocket.
       final ws = web.WebSocket(wsUrl.toString());

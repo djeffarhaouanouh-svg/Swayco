@@ -22,6 +22,7 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
   Future<void> start({
     required Uri wsUrl,
     dynamic localTrack,
+    bool captureLocalMic = true,
     required void Function(String orig, String trans, String lang, String audioB64)
         onTranslation,
     void Function(String partial)? onPartial,
