@@ -17,6 +17,7 @@ import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
+import '../services/call_audio.dart';
 import '../services/call_alert.dart';
 import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
@@ -880,11 +881,16 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _playTranslatedAudio(String audioB64) async {
     try {
       final bytes = base64Decode(audioB64);
-      if (bytes.isNotEmpty && mounted) {
-        await _ttsPlayer.stop();
-        await _ttsPlayer.play(BytesSource(bytes));
-        debugPrint('[grok-rt] played Grok audio ${bytes.length}b');
+      if (bytes.isEmpty || !mounted) return;
+      // On web, play through the gesture-unlocked element (WebKit autoplay).
+      if (kIsWeb) {
+        final ok = await playTranslatedMp3(bytes);
+        debugPrint('[grok-rt] web play ok=$ok ${bytes.length}b');
+        if (ok) return;
       }
+      await _ttsPlayer.stop();
+      await _ttsPlayer.play(BytesSource(bytes));
+      debugPrint('[grok-rt] played Grok audio ${bytes.length}b');
     } catch (e) {
       debugPrint('[grok-rt] play Grok audio FAILED: $e');
     }

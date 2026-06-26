@@ -12,6 +12,7 @@ import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/app_navigator.dart';
+import '../services/call_audio.dart';
 import '../services/incoming_call_api.dart';
 import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
@@ -637,7 +638,10 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
           // button. Keeps the explicit Accept / Decline buttons below
           // for users who want to refuse.
           InkWell(
-            onTap: () => Navigator.of(context).pop(true),
+            onTap: () {
+              armCallAudio(); // unlock WebKit audio inside this gesture
+              Navigator.of(context).pop(true);
+            },
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
               child: Column(
@@ -685,7 +689,10 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                   icon: Icons.call,
                   label: AppStrings.t('accept'),
                   color: SC.accent,
-                  onTap: () => Navigator.of(context).pop(true),
+                  onTap: () {
+              armCallAudio(); // unlock WebKit audio inside this gesture
+              Navigator.of(context).pop(true);
+            },
                 ),
               ],
             ),
