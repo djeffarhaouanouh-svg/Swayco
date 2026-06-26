@@ -2052,7 +2052,7 @@ function attachGrokSttWs(server) {
     // Upstream xAI realtime STT socket.
     const params = new URLSearchParams({
       sample_rate: String(sampleRate),
-      encoding: 'pcm_s16le',
+      encoding: 'pcm', // xAI: pcm | mulaw | alaw (pcm = signed 16-bit LE)
       endpointing: '300', // ms of silence before an utterance is closed
     });
     if (from) params.set('language', from);
