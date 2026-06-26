@@ -270,7 +270,17 @@ class GrokRealtimeTranslation extends ChangeNotifier
     final room = _room;
     final route = _route;
     if (room != null && audioB64.isNotEmpty && audioB64.length <= _maxAudioB64) {
-      final payload = jsonEncode({'voiceOnly': true, 'lang': lang, 'audio': audioB64});
+      // Include orig/trans for BACKWARD COMPAT: a native iOS app on an OLD build
+      // has no `voiceOnly` branch — it reads orig/trans and speaks `trans` via
+      // /translation/tts (Grok voice). New web clients see voiceOnly=true, play
+      // the attached audio, and skip the subtitle.
+      final payload = jsonEncode({
+        'voiceOnly': true,
+        'orig': orig,
+        'trans': trans,
+        'lang': lang,
+        'audio': audioB64,
+      });
       unawaited(
         room.localParticipant
             ?.publishData(
