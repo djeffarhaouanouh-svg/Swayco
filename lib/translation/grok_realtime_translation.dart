@@ -252,10 +252,12 @@ class GrokRealtimeTranslation extends ChangeNotifier
       await _player.setVolume(_volume);
       await _player.play(BytesSource(bytes, mimeType: 'audio/mpeg'));
       _played++;
+      debugPrint('[grok-rt] PLAYING Grok audio ${bytes.length}b locally');
       // _speaking cleared by onPlayerComplete.
     } catch (e) {
       _speaking = false;
       _lastError = 'play: $e';
+      debugPrint('[grok-rt] LOCAL PLAY FAILED: $e');
       notifyListeners();
     }
   }
