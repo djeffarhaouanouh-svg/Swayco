@@ -32,6 +32,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
 
   bool _running = false;
   bool _wsOpen = false;
+  int _frames = 0;
 
   static const int _outRate = 16000;
 
@@ -125,6 +126,12 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       // zero-gain node keeps it running WITHOUT monitoring the mic to speakers.
       final ctx = web.AudioContext();
       _ctx = ctx;
+      // Browsers start an AudioContext "suspended" without a user gesture; a
+      // suspended context never fires onaudioprocess, so no PCM is ever sent.
+      // Resume it explicitly (this runs during an active call = user gesture).
+      try {
+        await ctx.resume().toDart;
+      } catch (_) {}
       final src = ctx.createMediaStreamSource(stream);
       _src = src;
       final proc = ctx.createScriptProcessor(4096, 1, 1);
@@ -143,12 +150,23 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
             _ws?.send(pcm.toJS);
           } catch (_) {}
         }
+        // Level meter (~every 2.5s) — level ~0 means silence / suspended
+        // context / muted track; a non-zero level means real sound is flowing.
+        _frames++;
+        if (_frames % 30 == 0) {
+          var sum = 0.0;
+          for (var i = 0; i < input.length; i++) {
+            sum += input[i] * input[i];
+          }
+          final level = input.isEmpty ? 0.0 : sum / input.length;
+          _log('pcm frames=$_frames level=${level.toStringAsFixed(5)}');
+        }
       }).toJS;
 
       src.connect(proc);
       proc.connect(muteGain);
       muteGain.connect(ctx.destination);
-      _log('audio graph up, inRate=$inRate → ${_outRate}Hz');
+      _log('audio graph up, inRate=$inRate state=${ctx.state}');
     } catch (e) {
       _log('start FAILED: $e');
       onError?.call('start_failed: $e');
