@@ -98,6 +98,8 @@ class GrokRealtimeTranslation extends ChangeNotifier
     await detach();
     _room = room;
     _route = route;
+    debugPrint('[grok-rt] attach configured=${route.isConfigured} '
+        'route=${route.sourceBcp47}->${route.targetBcp47}');
     if (!route.isConfigured) return;
 
     // Sender-side route: from = my spoken language, to = the peer's language.

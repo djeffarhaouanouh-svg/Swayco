@@ -8,6 +8,10 @@ import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _WebGrokMicStreamer();
 
+/// Logs to the browser console (visible even in a release web build, unlike
+/// stripped debugPrint) so the pipeline can be diagnosed from DevTools.
+void _log(String m) => web.console.log('[grok-rt] $m'.toJS);
+
 /// Web realtime mic streamer. Captures the local mic via `getUserMedia` with
 /// `echoCancellation` (so the browser cancels the LiveKit playback echo — no
 /// feedback loop), downsamples to PCM16 16 kHz with a ScriptProcessor, and
@@ -44,6 +48,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   }) async {
     if (_running) return;
     _running = true;
+    _log('start wsUrl=$wsUrl');
     try {
       // 1) Local mic WITH browser AEC — this is what kills the loudspeaker echo.
       final audioConstraints = web.MediaTrackConstraints(
@@ -55,6 +60,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           .getUserMedia(web.MediaStreamConstraints(audio: audioConstraints))
           .toDart;
       _stream = stream;
+      _log('mic acquired (AEC)');
 
       // 2) Backend WebSocket.
       final ws = web.WebSocket(wsUrl.toString());
@@ -62,12 +68,15 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       _ws = ws;
       ws.onopen = ((web.Event _) {
         _wsOpen = true;
+        _log('ws OPEN');
       }).toJS;
       ws.onerror = ((web.Event _) {
+        _log('ws ERROR');
         onError?.call('ws_error');
       }).toJS;
       ws.onclose = ((web.CloseEvent _) {
         _wsOpen = false;
+        _log('ws CLOSE');
       }).toJS;
       ws.onmessage = ((web.MessageEvent e) {
         final data = e.data;
@@ -75,6 +84,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         try {
           final msg =
               jsonDecode((data as JSString).toDart) as Map<String, dynamic>;
+          _log('msg ${msg['type']}');
           switch (msg['type']) {
             case 'translation':
               onTranslation(
@@ -123,7 +133,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       src.connect(proc);
       proc.connect(muteGain);
       muteGain.connect(ctx.destination);
+      _log('audio graph up, inRate=$inRate → ${_outRate}Hz');
     } catch (e) {
+      _log('start FAILED: $e');
       onError?.call('start_failed: $e');
       await stop();
     }
