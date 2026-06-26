@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+import '../services/call_audio.dart';
 import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _WebGrokMicStreamer();
@@ -38,8 +39,14 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   bool _running = false;
   bool _wsOpen = false;
   int _frames = 0;
+  bool _captureLocalMic = true;
+  int _lastVoiceMs = 0;
 
   static const int _outRate = 16000;
+  // VAD: mean-square level above which we consider it speech. Low threshold +
+  // generous hangover so we never clip the start/middle of a phrase.
+  static const double _vadThreshold = 0.0002;
+  static const int _vadHangoverMs = 1200;
 
   @override
   bool get isRunning => _running;
@@ -59,6 +66,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   }) async {
     if (_running) return;
     _running = true;
+    _captureLocalMic = captureLocalMic;
     _log('start ${captureLocalMic ? "LOCAL-mic" : "REMOTE-track"} wsUrl=$wsUrl');
     try {
       final web.MediaStreamTrack micTrack;
@@ -190,20 +198,32 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         );
         audio.close();
         if (_wsOpen && n > 0) {
-          final pcm = _downsampleToPcm16(f32, inRate, _outRate);
-          if (pcm.isNotEmpty) {
-            try {
-              _ws?.send(pcm.toJS);
-            } catch (_) {}
+          // VAD level (mean square).
+          var sum = 0.0;
+          for (var i = 0; i < n; i++) {
+            sum += f32[i] * f32[i];
+          }
+          final level = sum / n;
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          if (level > _vadThreshold) _lastVoiceMs = nowMs;
+          final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
+          // Half-duplex: never send MY mic while a translation is playing out
+          // the speaker — otherwise we re-capture & re-translate our own audio
+          // (the "device answers itself" loop).
+          final pausedByPlayback = _captureLocalMic && isTranslationPlaying;
+
+          if (voiceActive && !pausedByPlayback) {
+            final pcm = _downsampleToPcm16(f32, inRate, _outRate);
+            if (pcm.isNotEmpty) {
+              try {
+                _ws?.send(pcm.toJS);
+              } catch (_) {}
+            }
           }
           _frames++;
           if (_frames % 100 == 0) {
-            var sum = 0.0;
-            for (var i = 0; i < f32.length; i++) {
-              sum += f32[i] * f32[i];
-            }
-            final level = f32.isEmpty ? 0.0 : sum / f32.length;
-            _log('pcm frames=$_frames inRate=$inRate level=${level.toStringAsFixed(5)}');
+            _log('pcm frames=$_frames level=${level.toStringAsFixed(5)} '
+                'voice=$voiceActive pause=$pausedByPlayback');
           }
         }
       } catch (e) {

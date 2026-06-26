@@ -4,3 +4,5 @@ import 'dart:typed_data';
 void armCallAudio() {}
 
 Future<bool> playTranslatedMp3(Uint8List bytes) async => false;
+
+bool get isTranslationPlaying => false;

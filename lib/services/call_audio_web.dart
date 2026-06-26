@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -10,6 +11,26 @@ import 'package:web/web.dart' as web;
 
 web.AudioContext? _ctx;
 web.HTMLAudioElement? _el;
+
+// True while a translation is playing out the speaker. The mic streamer reads
+// this to PAUSE sending (half-duplex) so we don't re-capture & re-translate our
+// own playback (the "device answers itself" feedback loop).
+bool _playing = false;
+Timer? _clearTimer;
+bool get isTranslationPlaying => _playing;
+
+void _markPlaying() {
+  _playing = true;
+  _clearTimer?.cancel();
+  // Safety: clear even if 'ended' never fires.
+  _clearTimer = Timer(const Duration(seconds: 8), () => _playing = false);
+}
+
+void _scheduleClear() {
+  _clearTimer?.cancel();
+  // Hangover so the speaker tail isn't re-captured.
+  _clearTimer = Timer(const Duration(milliseconds: 500), () => _playing = false);
+}
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.
 const String _silentWav =
@@ -47,9 +68,12 @@ Future<bool> playTranslatedMp3(Uint8List bytes) async {
     final url = web.URL.createObjectURL(blob);
     el.muted = false;
     el.src = url;
+    el.onended = ((web.Event _) => _scheduleClear()).toJS;
+    _markPlaying();
     await el.play().toDart;
     return true;
   } catch (_) {
+    _scheduleClear();
     return false;
   }
 }

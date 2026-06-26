@@ -10,3 +10,7 @@ void armCallAudio() => impl.armCallAudio();
 /// Play an mp3 through the unlocked web element. Returns false on native / on
 /// failure, so the caller falls back to audioplayers.
 Future<bool> playTranslatedMp3(Uint8List bytes) => impl.playTranslatedMp3(bytes);
+
+/// True while a translation is playing (web). Lets the mic streamer go
+/// half-duplex so it doesn't re-capture our own playback.
+bool get isTranslationPlaying => impl.isTranslationPlaying;

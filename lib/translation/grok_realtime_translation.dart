@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
+import '../services/call_audio.dart';
 import '../services/translation_api.dart';
 import 'grok_mic_streamer_base.dart';
 import 'grok_mic_streamer_io.dart'
@@ -249,6 +251,16 @@ class GrokRealtimeTranslation extends ChangeNotifier
     try {
       final bytes = base64Decode(audioB64);
       if (bytes.isEmpty) return;
+      // Web: play through the gesture-unlocked element (also drives the
+      // half-duplex flag so the mic streamer pauses while this plays).
+      if (kIsWeb) {
+        final ok = await playTranslatedMp3(bytes);
+        debugPrint('[grok-rt] RECV web play ok=$ok ${bytes.length}b');
+        if (ok) {
+          _played++;
+          return;
+        }
+      }
       _speaking = true;
       notifyListeners();
       await _player.setVolume(_volume);
