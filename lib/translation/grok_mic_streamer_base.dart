@@ -17,13 +17,15 @@ abstract class GrokMicStreamer {
   /// via `getUserMedia` and may ignore it.
   ///
   /// Callbacks fire on the main isolate:
-  /// - [onTranslation]`(orig, trans, lang)` — one utterance finalised + translated.
+  /// - [onTranslation]`(orig, trans, lang, audioB64)` — one segment finalised +
+  ///   translated; audioB64 is the pre-generated Grok mp3 (base64), may be empty.
   /// - [onPartial]`(text)` — interim transcript (live caption), best-effort.
   /// - [onError]`(code)` — a recoverable pipeline error.
   Future<void> start({
     required Uri wsUrl,
     MediaStreamTrack? localTrack,
-    required void Function(String orig, String trans, String lang) onTranslation,
+    required void Function(String orig, String trans, String lang, String audioB64)
+        onTranslation,
     void Function(String partial)? onPartial,
     void Function(String error)? onError,
   });

@@ -46,8 +46,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   @override
   Future<void> start({
     required Uri wsUrl,
-    Object? localTrack, // web captures its own AEC'd mic; track is unused here
-    required void Function(String orig, String trans, String lang) onTranslation,
+    Object? localTrack,
+    required void Function(String orig, String trans, String lang, String audioB64)
+        onTranslation,
     void Function(String partial)? onPartial,
     void Function(String error)? onError,
   }) async {
@@ -114,6 +115,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
                 (msg['orig'] ?? '').toString(),
                 (msg['trans'] ?? '').toString(),
                 (msg['lang'] ?? '').toString(),
+                (msg['audio'] ?? '').toString(),
               );
               break;
             case 'partial':

@@ -853,11 +853,31 @@ class _CallScreenState extends State<CallScreen> {
       final orig = m['orig']?.toString() ?? '';
       final trans = m['trans']?.toString() ?? '';
       final lang = m['lang']?.toString() ?? '';
+      final audioB64 = m['audio']?.toString() ?? '';
       if (orig.isEmpty && trans.isEmpty) return;
       _pushCaption(orig: orig, trans: trans, mine: false);
-      if (trans.isNotEmpty) unawaited(_speak(trans, lang));
+      if (audioB64.isNotEmpty) {
+        // Pre-generated Grok voice from the sender's realtime pipeline — play
+        // it directly (no re-synthesis, no device-voice fallback).
+        unawaited(_playTranslatedAudio(audioB64));
+      } else if (trans.isNotEmpty) {
+        unawaited(_speak(trans, lang));
+      }
     } catch (_) {
       // Ignore malformed packets / other topics.
+    }
+  }
+
+  /// Play base64 mp3 (Grok TTS) forwarded by the sender over the data channel.
+  Future<void> _playTranslatedAudio(String audioB64) async {
+    try {
+      final bytes = base64Decode(audioB64);
+      if (bytes.isNotEmpty && mounted) {
+        await _ttsPlayer.stop();
+        await _ttsPlayer.play(BytesSource(bytes));
+      }
+    } catch (_) {
+      // Best-effort — the caption is already shown.
     }
   }
 
