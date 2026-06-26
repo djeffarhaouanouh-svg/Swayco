@@ -108,7 +108,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final msg =
               jsonDecode((data as JSString).toDart) as Map<String, dynamic>;
           _log('msg ${msg['type']}: '
-              '${(msg['trans'] ?? msg['text'] ?? '').toString()}');
+              '${(msg['trans'] ?? msg['text'] ?? '').toString()} '
+              '(audio=${(msg['audio'] ?? '').toString().length}b)');
           switch (msg['type']) {
             case 'translation':
               onTranslation(

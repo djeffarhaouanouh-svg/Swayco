@@ -855,6 +855,7 @@ class _CallScreenState extends State<CallScreen> {
       final lang = m['lang']?.toString() ?? '';
       final audioB64 = m['audio']?.toString() ?? '';
       if (orig.isEmpty && trans.isEmpty) return;
+      debugPrint('[grok-rt] recv caption trans="$trans" audio=${audioB64.length}b');
       _pushCaption(orig: orig, trans: trans, mine: false);
       if (audioB64.isNotEmpty) {
         // Pre-generated Grok voice from the sender's realtime pipeline — play
@@ -875,9 +876,10 @@ class _CallScreenState extends State<CallScreen> {
       if (bytes.isNotEmpty && mounted) {
         await _ttsPlayer.stop();
         await _ttsPlayer.play(BytesSource(bytes));
+        debugPrint('[grok-rt] played Grok audio ${bytes.length}b');
       }
-    } catch (_) {
-      // Best-effort — the caption is already shown.
+    } catch (e) {
+      debugPrint('[grok-rt] play Grok audio FAILED: $e');
     }
   }
 
@@ -887,6 +889,7 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _speak(String text, String lang) async {
     try {
       final bytes = await fetchSpeech(text: text, lang: lang);
+      debugPrint('[grok-rt] /translation/tts -> ${bytes?.length ?? -1} bytes');
       if (bytes != null && bytes.isNotEmpty && mounted) {
         await _ttsPlayer.stop();
         await _ttsPlayer.play(BytesSource(bytes));
