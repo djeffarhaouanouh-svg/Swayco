@@ -29,6 +29,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   web.MediaStreamAudioSourceNode? _src;
   web.ScriptProcessorNode? _proc;
   web.GainNode? _muteGain;
+  web.MediaStreamTrack? _clonedTrack;
 
   bool _running = false;
   bool _wsOpen = false;
@@ -72,9 +73,16 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         _running = false;
         return;
       }
+      // CLONE the track. A MediaStreamTrack already consumed by LiveKit's own
+      // Web Audio graph delivers SILENCE when fed into a second
+      // createMediaStreamSource (Chromium). A clone is an independent track
+      // sharing the same mic source — it carries real audio, and stopping it at
+      // teardown does NOT affect LiveKit's original (call audio stays intact).
+      final clone = jsTrack.clone();
+      _clonedTrack = clone;
       final stream = web.MediaStream();
-      stream.addTrack(jsTrack);
-      _log('reusing LiveKit mic track (read-only)');
+      stream.addTrack(clone);
+      _log('cloned LiveKit mic track for capture');
 
       // 2) Backend WebSocket.
       final ws = web.WebSocket(wsUrl.toString());
@@ -221,8 +229,12 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         ws.close();
       }
     } catch (_) {}
-    // Do NOT stop the track — it's LiveKit's live call mic. We only drop our
-    // wrapper stream reference; stopping it would mute the call.
+    // Stop only OUR clone — never LiveKit's original track (that would mute the
+    // call). The clone shares the mic source but is an independent handle.
+    try {
+      _clonedTrack?.stop();
+    } catch (_) {}
+    _clonedTrack = null;
     _proc = null;
     _src = null;
     _muteGain = null;
