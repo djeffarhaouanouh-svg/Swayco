@@ -114,24 +114,8 @@ class GrokRealtimeTranslation extends ChangeNotifier
       }
     });
 
-    // SEND: my mic → peer.
-    final sendStreamer = createGrokMicStreamer();
-    _sendStreamer = sendStreamer;
-    try {
-      await sendStreamer.start(
-        wsUrl: grokSttWsUri(from: route.sourceBcp47, to: route.targetBcp47),
-        captureLocalMic: true,
-        onTranslation: _onSendTranslation,
-        onError: (code) {
-          _lastError = 'send:$code';
-          notifyListeners();
-        },
-      );
-    } catch (e) {
-      _lastError = 'send:$e';
-    }
-
-    // RECV: remote voice → local playback (bound when the track appears).
+    // RECV FIRST — this is the translation I HEAR. It must NOT be blocked by the
+    // SEND's getUserMedia (which can be slow). Bound when the remote track appears.
     _listener = room.createListener()
       ..on<TrackSubscribedEvent>((e) {
         if (e.track is RemoteAudioTrack) _rebindRemote();
@@ -148,6 +132,27 @@ class GrokRealtimeTranslation extends ChangeNotifier
         }
       });
     _rebindRemote();
+
+    // SEND: my mic → peer. Fire-and-forget so a slow/failed getUserMedia never
+    // blocks the RECV playback above.
+    final sendStreamer = createGrokMicStreamer();
+    _sendStreamer = sendStreamer;
+    unawaited(
+      sendStreamer
+          .start(
+            wsUrl: grokSttWsUri(from: route.sourceBcp47, to: route.targetBcp47),
+            captureLocalMic: true,
+            onTranslation: _onSendTranslation,
+            onError: (code) {
+              _lastError = 'send:$code';
+              notifyListeners();
+            },
+          )
+          .catchError((Object e) {
+            _lastError = 'send:$e';
+            notifyListeners();
+          }),
+    );
     notifyListeners();
   }
 
@@ -249,9 +254,11 @@ class GrokRealtimeTranslation extends ChangeNotifier
       await _player.setVolume(_volume);
       await _player.play(BytesSource(bytes, mimeType: 'audio/mpeg'));
       _played++;
+      debugPrint('[grok-rt] RECV played ${bytes.length}b locally');
     } catch (e) {
       _speaking = false;
       _lastError = 'play:$e';
+      debugPrint('[grok-rt] RECV play FAILED: $e');
       notifyListeners();
     }
   }
