@@ -24,14 +24,15 @@ extension type _CopyOpts._(JSObject _) implements JSObject {
   external factory _CopyOpts({int planeIndex, String format});
 }
 
-/// Web realtime mic streamer. Reads the LOCAL mic via `MediaStreamTrackProcessor`
-/// (WebCodecs) — direct frame access that does NOT suffer the Web Audio
-/// `createMediaStreamSource` silence bug on WebRTC tracks (which gave level=0).
-/// We clone LiveKit's track (read-only, never stops the original), pull AudioData
-/// frames, downsample to PCM16 16 kHz, and stream them to the backend Grok STT WS.
+/// Web realtime mic streamer, SENDER-side. Captures MY OWN mic via a dedicated
+/// `getUserMedia` (echoCancellation = browser AEC, so it doesn't re-capture the
+/// loudspeaker), reads frames via `MediaStreamTrackProcessor` (WebCodecs — avoids
+/// the Web Audio silence bug), downsamples to PCM16 16 kHz, and streams to the
+/// backend Grok STT WS. We stop ONLY our own getUserMedia track at teardown, so
+/// LiveKit's call mic is untouched.
 class _WebGrokMicStreamer implements GrokMicStreamer {
   web.WebSocket? _ws;
-  web.MediaStreamTrack? _clonedTrack;
+  web.MediaStream? _micStream;
   web.ReadableStreamDefaultReader? _reader;
 
   bool _running = false;
@@ -59,21 +60,27 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     _running = true;
     _log('start wsUrl=$wsUrl');
     try {
-      web.MediaStreamTrack? jsTrack;
-      try {
-        final dynamic dyn = localTrack;
-        jsTrack = dyn?.jsTrack as web.MediaStreamTrack?;
-      } catch (_) {
-        jsTrack = null;
-      }
-      if (jsTrack == null) {
-        _log('no LiveKit local track — aborting');
-        onError?.call('no_local_track');
+      // Capture MY OWN mic (sender-side). echoCancellation = browser AEC, so we
+      // don't re-transcribe the translated voice coming out of the speaker.
+      final micStream = await web.window.navigator.mediaDevices
+          .getUserMedia(web.MediaStreamConstraints(
+            audio: web.MediaTrackConstraints(
+              echoCancellation: true.toJS,
+              noiseSuppression: true.toJS,
+              autoGainControl: true.toJS,
+            ),
+          ))
+          .toDart;
+      _micStream = micStream;
+      final audioTracks = micStream.getAudioTracks().toDart;
+      if (audioTracks.isEmpty) {
+        _log('getUserMedia returned no audio track');
+        onError?.call('no_mic');
         _running = false;
         return;
       }
-      final clone = jsTrack.clone();
-      _clonedTrack = clone;
+      final micTrack = audioTracks.first;
+      _log('local mic acquired (AEC)');
 
       // Backend WebSocket.
       final ws = web.WebSocket(wsUrl.toString());
@@ -120,9 +127,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         } catch (_) {}
       }).toJS;
 
-      // Pull audio frames directly from the track.
+      // Pull audio frames directly from my mic track.
       final processor = web.MediaStreamTrackProcessor(
-          web.MediaStreamTrackProcessorInit(track: clone));
+          web.MediaStreamTrackProcessorInit(track: micTrack));
       final reader =
           processor.readable.getReader() as web.ReadableStreamDefaultReader;
       _reader = reader;
@@ -217,11 +224,16 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         ws.close();
       }
     } catch (_) {}
-    // Stop our clone only — never LiveKit's original (would mute the call).
+    // Stop ONLY our own getUserMedia mic — never LiveKit's call mic.
     try {
-      _clonedTrack?.stop();
+      final tracks = _micStream?.getTracks().toDart;
+      if (tracks != null) {
+        for (final t in tracks) {
+          t.stop();
+        }
+      }
     } catch (_) {}
-    _clonedTrack = null;
+    _micStream = null;
     _ws = null;
   }
 }
