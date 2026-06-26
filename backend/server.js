@@ -2100,6 +2100,7 @@ function attachGrokSttWs(server) {
       pending.length = 0;
     });
 
+    let lastFinalText = '';
     upstream.on('message', async (data) => {
       let evt;
       try {
@@ -2107,20 +2108,31 @@ function attachGrokSttWs(server) {
       } catch (_) {
         return;
       }
-      // Live captions: forward any non-final transcript text as-is (cheap).
-      const isUtteranceFinal =
-        (evt.type === 'transcript.partial' && evt.speech_final === true) ||
+      if (evt.type === 'transcript.partial' || evt.type === 'transcript.done') {
+        console.log(
+          'grok stt evt', evt.type,
+          'is_final=', evt.is_final, 'speech_final=', evt.speech_final,
+          'text=', (typeof evt.text === 'string' ? evt.text : '').slice(0, 60),
+        );
+      }
+      // Translate on each FINAL segment. With the call mic always live,
+      // speech_final (silence-based) may never fire — so we key off is_final
+      // (a locked ~3s segment) as well as the closing transcript.done. Dedup
+      // so the same locked segment isn't translated twice.
+      const isFinalSegment =
+        (evt.type === 'transcript.partial' && evt.is_final === true) ||
         evt.type === 'transcript.done';
-      if (!isUtteranceFinal) {
+      if (!isFinalSegment) {
         if (evt.type === 'transcript.partial' && typeof evt.text === 'string') {
           sendCtl({ type: 'partial', text: evt.text });
         }
         return;
       }
       const transcript = (typeof evt.text === 'string' ? evt.text : '').trim();
-      if (!transcript) return;
+      if (!transcript || transcript === lastFinalText) return;
+      lastFinalText = transcript;
 
-      // Utterance closed → translate + TTS, then hand the result back.
+      // Segment finalised → translate + TTS, then hand the result back.
       const tr = await grokTranslateText({ transcript, from, to });
       if (tr.error) return sendCtl({ type: 'error', error: tr.error });
       const sp = await grokSynthesizeSpeech({ text: tr.translated, voice, lang: to });
