@@ -850,10 +850,17 @@ class _CallScreenState extends State<CallScreen> {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
+      final audioB64 = m['audio']?.toString() ?? '';
+      // Voice-only translation (realtime pipeline): play the Grok mp3, NO
+      // subtitle. This is the spoken call translation, not the typed chat.
+      if (m['voiceOnly'] == true) {
+        debugPrint('[grok-rt] recv voice audio=${audioB64.length}b');
+        if (audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
+        return;
+      }
       final orig = m['orig']?.toString() ?? '';
       final trans = m['trans']?.toString() ?? '';
       final lang = m['lang']?.toString() ?? '';
-      final audioB64 = m['audio']?.toString() ?? '';
       if (orig.isEmpty && trans.isEmpty) return;
       debugPrint('[grok-rt] recv caption trans="$trans" audio=${audioB64.length}b');
       _pushCaption(orig: orig, trans: trans, mine: false);

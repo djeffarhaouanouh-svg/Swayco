@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:typed_data';
@@ -8,28 +9,30 @@ import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _WebGrokMicStreamer();
 
-/// Logs to the browser console (visible even in a release web build, unlike
-/// stripped debugPrint) so the pipeline can be diagnosed from DevTools.
 void _log(String m) => web.console.log('[grok-rt] $m'.toJS);
 
-/// Web realtime mic streamer. REUSES the mic track LiveKit already captured
-/// (read-only, via Web Audio) — it never opens a 2nd getUserMedia. A 2nd
-/// getUserMedia steals/reconfigures the call mic and kills the original call
-/// audio (learned the hard way). Since we only READ LiveKit's track and never
-/// stop it, the worst case is "no translation", never "broken call audio".
-/// The track is already AEC'd (LiveKit captures with echoCancellation), so no
-/// loudspeaker feedback loop. Downsamples to PCM16 16 kHz with a ScriptProcessor
-/// and streams 16-bit frames over a WebSocket to the backend Grok STT proxy.
-///
-/// ScriptProcessorNode is deprecated but self-contained (an AudioWorklet would
-/// need a separately served JS module). Fine for the web test path.
+// ── Minimal WebCodecs AudioData bindings (web 1.1.1 doesn't expose them) ──
+extension type _AudioData(JSObject _) implements JSObject {
+  external int get numberOfFrames;
+  external num get sampleRate;
+  external int allocationSize(_CopyOpts options);
+  external void copyTo(JSAny destination, _CopyOpts options);
+  external void close();
+}
+
+extension type _CopyOpts._(JSObject _) implements JSObject {
+  external factory _CopyOpts({int planeIndex, String format});
+}
+
+/// Web realtime mic streamer. Reads the LOCAL mic via `MediaStreamTrackProcessor`
+/// (WebCodecs) — direct frame access that does NOT suffer the Web Audio
+/// `createMediaStreamSource` silence bug on WebRTC tracks (which gave level=0).
+/// We clone LiveKit's track (read-only, never stops the original), pull AudioData
+/// frames, downsample to PCM16 16 kHz, and stream them to the backend Grok STT WS.
 class _WebGrokMicStreamer implements GrokMicStreamer {
   web.WebSocket? _ws;
-  web.AudioContext? _ctx;
-  web.MediaStreamAudioSourceNode? _src;
-  web.ScriptProcessorNode? _proc;
-  web.GainNode? _muteGain;
   web.MediaStreamTrack? _clonedTrack;
+  web.ReadableStreamDefaultReader? _reader;
 
   bool _running = false;
   bool _wsOpen = false;
@@ -56,11 +59,6 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     _running = true;
     _log('start wsUrl=$wsUrl');
     try {
-      // 1) REUSE LiveKit's existing local mic track — never a 2nd getUserMedia.
-      // localTrack is a flutter_webrtc MediaStreamTrack; on web it's a
-      // MediaStreamTrackWeb exposing the underlying JS track via `.jsTrack`.
-      // We wrap it in our own MediaStream just to feed Web Audio; we only READ
-      // it and never stop it (LiveKit still owns it).
       web.MediaStreamTrack? jsTrack;
       try {
         final dynamic dyn = localTrack;
@@ -69,23 +67,15 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         jsTrack = null;
       }
       if (jsTrack == null) {
-        _log('no LiveKit local track — aborting (refusing to open a 2nd mic)');
+        _log('no LiveKit local track — aborting');
         onError?.call('no_local_track');
         _running = false;
         return;
       }
-      // CLONE the track. A MediaStreamTrack already consumed by LiveKit's own
-      // Web Audio graph delivers SILENCE when fed into a second
-      // createMediaStreamSource (Chromium). A clone is an independent track
-      // sharing the same mic source — it carries real audio, and stopping it at
-      // teardown does NOT affect LiveKit's original (call audio stays intact).
       final clone = jsTrack.clone();
       _clonedTrack = clone;
-      final stream = web.MediaStream();
-      stream.addTrack(clone);
-      _log('cloned LiveKit mic track for capture');
 
-      // 2) Backend WebSocket.
+      // Backend WebSocket.
       final ws = web.WebSocket(wsUrl.toString());
       ws.binaryType = 'arraybuffer';
       _ws = ws;
@@ -127,57 +117,17 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
               onError?.call((msg['error'] ?? 'error').toString());
               break;
           }
-        } catch (_) {
-          // Ignore malformed frames.
-        }
+        } catch (_) {}
       }).toJS;
 
-      // 3) Audio graph: mic → processor → muted gain → destination.
-      // The processor must be connected to the graph to fire; routing through a
-      // zero-gain node keeps it running WITHOUT monitoring the mic to speakers.
-      final ctx = web.AudioContext();
-      _ctx = ctx;
-      // Browsers start an AudioContext "suspended" without a user gesture; a
-      // suspended context never fires onaudioprocess, so no PCM is ever sent.
-      // Resume it explicitly (this runs during an active call = user gesture).
-      try {
-        await ctx.resume().toDart;
-      } catch (_) {}
-      final src = ctx.createMediaStreamSource(stream);
-      _src = src;
-      final proc = ctx.createScriptProcessor(4096, 1, 1);
-      _proc = proc;
-      final muteGain = ctx.createGain();
-      muteGain.gain.value = 0;
-      _muteGain = muteGain;
-
-      final inRate = ctx.sampleRate; // usually 48000
-      proc.onaudioprocess = ((web.AudioProcessingEvent ev) {
-        if (!_wsOpen) return;
-        final input = ev.inputBuffer.getChannelData(0).toDart;
-        final pcm = _downsampleToPcm16(input, inRate, _outRate);
-        if (pcm.isNotEmpty) {
-          try {
-            _ws?.send(pcm.toJS);
-          } catch (_) {}
-        }
-        // Level meter (~every 2.5s) — level ~0 means silence / suspended
-        // context / muted track; a non-zero level means real sound is flowing.
-        _frames++;
-        if (_frames % 30 == 0) {
-          var sum = 0.0;
-          for (var i = 0; i < input.length; i++) {
-            sum += input[i] * input[i];
-          }
-          final level = input.isEmpty ? 0.0 : sum / input.length;
-          _log('pcm frames=$_frames level=${level.toStringAsFixed(5)}');
-        }
-      }).toJS;
-
-      src.connect(proc);
-      proc.connect(muteGain);
-      muteGain.connect(ctx.destination);
-      _log('audio graph up, inRate=$inRate state=${ctx.state}');
+      // Pull audio frames directly from the track.
+      final processor = web.MediaStreamTrackProcessor(
+          web.MediaStreamTrackProcessorInit(track: clone));
+      final reader =
+          processor.readable.getReader() as web.ReadableStreamDefaultReader;
+      _reader = reader;
+      _log('MediaStreamTrackProcessor reader started');
+      unawaited(_pump(reader));
     } catch (e) {
       _log('start FAILED: $e');
       onError?.call('start_failed: $e');
@@ -185,9 +135,52 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     }
   }
 
-  /// Float32 [-1,1] → Int16 PCM, nearest-neighbour downsampled to [outRate].
-  /// Browsers are little-endian, matching xAI's expected `pcm_s16le`.
-  Int16List _downsampleToPcm16(Float32List input, num inRate, int outRate) {
+  Future<void> _pump(web.ReadableStreamDefaultReader reader) async {
+    while (_running) {
+      web.ReadableStreamReadResult result;
+      try {
+        result = await reader.read().toDart;
+      } catch (e) {
+        _log('reader.read failed: $e');
+        break;
+      }
+      if (result.done) break;
+      final value = result.value;
+      if (value == null) continue;
+      try {
+        final audio = _AudioData(value as JSObject);
+        final inRate = audio.sampleRate.toInt();
+        final n = audio.numberOfFrames;
+        final f32 = Float32List(n);
+        audio.copyTo(
+          f32.toJS,
+          _CopyOpts(planeIndex: 0, format: 'f32-planar'),
+        );
+        audio.close();
+        if (_wsOpen && n > 0) {
+          final pcm = _downsampleToPcm16(f32, inRate, _outRate);
+          if (pcm.isNotEmpty) {
+            try {
+              _ws?.send(pcm.toJS);
+            } catch (_) {}
+          }
+          _frames++;
+          if (_frames % 100 == 0) {
+            var sum = 0.0;
+            for (var i = 0; i < f32.length; i++) {
+              sum += f32[i] * f32[i];
+            }
+            final level = f32.isEmpty ? 0.0 : sum / f32.length;
+            _log('pcm frames=$_frames inRate=$inRate level=${level.toStringAsFixed(5)}');
+          }
+        }
+      } catch (e) {
+        _log('frame process failed: $e');
+      }
+    }
+  }
+
+  Int16List _downsampleToPcm16(Float32List input, int inRate, int outRate) {
     int toI16(double s) {
       final c = s.clamp(-1.0, 1.0);
       return (c < 0 ? c * 32768 : c * 32767).round();
@@ -214,34 +207,21 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     _running = false;
     _wsOpen = false;
     try {
-      _proc?.disconnect();
+      await _reader?.cancel('stop'.toJS).toDart;
     } catch (_) {}
-    try {
-      _src?.disconnect();
-    } catch (_) {}
-    try {
-      _muteGain?.disconnect();
-    } catch (_) {}
-    try {
-      await _ctx?.close().toDart;
-    } catch (_) {}
+    _reader = null;
     try {
       final ws = _ws;
-      if (ws != null && ws.readyState == 1 /* OPEN */) {
+      if (ws != null && ws.readyState == 1) {
         ws.send('{"type":"audio.done"}'.toJS);
         ws.close();
       }
     } catch (_) {}
-    // Stop only OUR clone — never LiveKit's original track (that would mute the
-    // call). The clone shares the mic source but is an independent handle.
+    // Stop our clone only — never LiveKit's original (would mute the call).
     try {
       _clonedTrack?.stop();
     } catch (_) {}
     _clonedTrack = null;
-    _proc = null;
-    _src = null;
-    _muteGain = null;
-    _ctx = null;
     _ws = null;
   }
 }

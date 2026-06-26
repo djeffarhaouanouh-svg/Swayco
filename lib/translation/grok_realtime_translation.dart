@@ -137,27 +137,26 @@ class GrokRealtimeTranslation extends ChangeNotifier
     return null;
   }
 
-  /// Max base64 audio we attach to a data-channel message. Above this we send
-  /// text only (the receiver re-synthesizes), to stay within the reliable data
-  /// channel's practical packet size. ~48 KB b64 ≈ ~36 KB mp3 ≈ a few seconds.
-  static const int _maxAudioB64 = 48000;
+  static const int _maxAudioB64 = 60000;
 
-  /// One segment finalised + translated → push to the peer over the data
-  /// channel. We attach the pre-generated Grok mp3 ([audioB64]) so the peer
-  /// plays the real Grok voice directly; if it's too big for the channel we
-  /// send text only and the peer falls back to /translation/tts.
+  /// One segment finalised + translated → push the Grok VOICE to the peer.
+  /// VOICE-ONLY: we send {voiceOnly, lang, audio} (no orig/trans text), so the
+  /// peer just PLAYS the Grok mp3 and shows NO subtitle. Same topic, but the
+  /// receiver's `voiceOnly` branch skips `_pushCaption`.
   void _onTranslation(String orig, String trans, String lang, String audioB64) {
     _lastTranscript = orig;
     _lastTranslation = trans;
     _lastError = null;
     final room = _room;
     final route = _route;
-    if (room != null && trans.isNotEmpty) {
-      final map = <String, dynamic>{'orig': orig, 'trans': trans, 'lang': lang};
-      if (audioB64.isNotEmpty && audioB64.length <= _maxAudioB64) {
-        map['audio'] = audioB64;
-      }
-      final payload = jsonEncode(map);
+    if (room != null &&
+        audioB64.isNotEmpty &&
+        audioB64.length <= _maxAudioB64) {
+      final payload = jsonEncode({
+        'voiceOnly': true,
+        'lang': lang,
+        'audio': audioB64,
+      });
       unawaited(
         room.localParticipant
             ?.publishData(
