@@ -998,6 +998,36 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
 }
 
 /**
+ * POST /translation/tts  (application/json)
+ * Body: { text, lang?, voice? }  →  audio/mpeg (Grok TTS).
+ *
+ * Used by the app's fetchSpeech() to speak an incoming translated caption in a
+ * REAL (Grok) voice instead of the device's built-in TTS. Without this route
+ * the app gets a 404 and falls back to flutter_tts (the robotic device voice).
+ * The app sends OpenAI-style voice names (e.g. "alloy"); anything not a valid
+ * Grok voice is mapped to the default.
+ */
+app.post('/translation/tts', _limText, async (req, res) => {
+  if (!GROK_API_KEY) {
+    return res.status(500).json({ error: 'grok_not_configured' });
+  }
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  if (!text) {
+    return res.status(400).json({ error: 'text_missing' });
+  }
+  const lang = primaryLanguageTag(req.body?.lang);
+  const v = typeof req.body?.voice === 'string' ? req.body.voice.trim().toLowerCase() : '';
+  const voice = ['ara', 'eve', 'leo', 'rex', 'sal'].includes(v) ? v : GROK_TTS_VOICE;
+  const sp = await grokSynthesizeSpeech({ text, voice, lang });
+  if (sp.error) {
+    return res
+      .status(sp.status)
+      .json({ error: sp.error, ...(sp.detail ? { detail: sp.detail } : {}) });
+  }
+  return res.status(200).type('audio/mpeg').send(sp.audio);
+});
+
+/**
  * POST /translation/grok  (multipart/form-data)  —  TEST PIPELINE
  *
  * Fields:
