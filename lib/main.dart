@@ -36,7 +36,7 @@ import 'theme/swayco_theme.dart';
 // The OpenAI pipeline file (openai_realtime_translation.dart) is left intact;
 // `git revert` restores its import + usage here.
 import 'translation/grok_chunk_translation.dart';
-import 'translation/grok_realtime_translation.dart';
+import 'translation/grok_chunk_sender_translation.dart';
 import 'translation/realtime_translation_port.dart';
 import 'widgets/splash_screen_animation.dart';
 
@@ -197,13 +197,15 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// `livekit_client` and `flutter_webrtc` Dart-side warm-up is
   /// deferred until the user actually navigates to a call.
   // TEST: was `OpenAiRealtimeTranslation` — swapped for the Grok pipeline.
-  // Web uses the sender-side realtime local-mic pipeline (GrokRealtimeTranslation,
-  // streams LiveKit's existing mic to xAI realtime STT — both directions); native
-  // keeps the chunk pipeline until the native LiveKit-track capture lands.
+  // Web uses the sender-side CHUNK pipeline (GrokChunkSenderTranslation): records
+  // my local mic with the proven MediaRecorder, POSTs to /translation/grok, and
+  // forwards the Grok voice to the peer (both directions). The Web Audio streaming
+  // capture gave silence (level=0), so we reuse the capture that actually works.
+  // Native keeps the receiver-side chunk pipeline for now.
   RealtimeTranslationPort? _translation;
   RealtimeTranslationPort _getTranslation() {
     final RealtimeTranslationPort created =
-        kIsWeb ? GrokRealtimeTranslation() : GrokChunkTranslation();
+        kIsWeb ? GrokChunkSenderTranslation() : GrokChunkTranslation();
     return _translation ??= created;
   }
   StreamSubscription<AuthState>? _authSub;
