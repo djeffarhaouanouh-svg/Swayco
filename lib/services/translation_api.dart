@@ -122,6 +122,43 @@ Uri _translationGrokUri() {
   return Uri.parse('$b/translation/grok');
 }
 
+/// Realtime STT WebSocket URI: `ws(s)://<backend>/translation/grok/stt`
+/// Sender-side route: [from] = my spoken language, [to] = the peer's language
+/// (the language we translate INTO and speak to them). Mirrors the resolution
+/// of [_translationGrokUri] but swaps the scheme to ws/wss.
+Uri grokSttWsUri({
+  required String from,
+  required String to,
+  String voice = 'eve',
+}) {
+  final query = <String, String>{
+    if (from.isNotEmpty) 'from': from,
+    'to': to,
+    'voice': voice,
+    'sample_rate': '16000',
+  };
+  String wsScheme(String httpScheme) => httpScheme == 'https' ? 'wss' : 'ws';
+  Uri build(String scheme, String host, int? port) => Uri(
+        scheme: wsScheme(scheme),
+        host: host,
+        port: port,
+        path: '/translation/grok/stt',
+        queryParameters: query,
+      );
+
+  const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
+  if (fromEnv.isNotEmpty) {
+    final u = Uri.parse(fromEnv.replaceAll(RegExp(r'/$'), ''));
+    return build(u.scheme, u.host, u.hasPort ? u.port : null);
+  }
+  if (kIsWeb) {
+    final o = Uri.base.removeFragment();
+    return build(o.scheme, o.host, o.hasPort ? o.port : null);
+  }
+  final u = Uri.parse(resolvedTokenApiBase().replaceAll(RegExp(r'/$'), ''));
+  return build(u.scheme, u.host, u.hasPort ? u.port : null);
+}
+
 Map<String, dynamic> _decodeObjectMap(String body) {
   final decoded = jsonDecode(body);
   if (decoded is Map) {

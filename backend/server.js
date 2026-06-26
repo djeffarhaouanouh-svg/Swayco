@@ -175,13 +175,18 @@ const ELEVENLABS_DEFAULT_VOICE_ID =
 // xAI is OpenAI-compatible for /chat/completions and exposes /v1/stt + /v1/tts.
 const GROK_API_KEY = process.env.GROK_API_KEY?.trim();
 const GROK_BASE = (process.env.GROK_BASE?.trim() || 'https://api.x.ai/v1').replace(/\/$/, '');
-const GROK_STT_MODEL = (process.env.GROK_STT_MODEL?.trim() || 'grok-stt');
-const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-3-mini');
+// Valid chat model ids (June 2026): grok-4.3, grok-4.20-*. `grok-3-mini`
+// no longer exists → a bad default here 404s the translate step (502 to app).
+const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-4.3');
 /** TTS model id — optional; only sent if set (the /v1/tts endpoint accepts
  *  text/voice_id/language without a model on most accounts). */
 const GROK_TTS_MODEL = process.env.GROK_TTS_MODEL?.trim() || '';
 /** One of: ara, eve, leo, rex, sal. */
 const GROK_TTS_VOICE = (process.env.GROK_TTS_VOICE?.trim() || 'eve');
+/** Realtime STT WebSocket base — derived from GROK_BASE (https→wss) unless
+ *  overridden. e.g. https://api.x.ai/v1 → wss://api.x.ai/v1 (endpoint: /stt). */
+const GROK_WS_BASE =
+  (process.env.GROK_WS_BASE?.trim() || GROK_BASE.replace(/^http/i, 'ws'));
 
 const { featuresFor, normalizeTier } = require('./tiers');
 /** Hard cap on the multipart audio body. 60s of AAC ≈ ~1MB; we leave
@@ -918,6 +923,81 @@ app.post('/translation/text', _limText, async (req, res) => {
 });
 
 /**
+ * Translate one transcript through Grok (/v1/chat/completions, OpenAI-compatible).
+ * Returns { translated } on success, or { error, status, detail? } on failure.
+ * When `from` is known and equals `to`, the transcript is returned unchanged.
+ * Shared by the POST /translation/grok route and the realtime STT WebSocket.
+ */
+async function grokTranslateText({ transcript, from, to }) {
+  if (from && from === to) return { translated: transcript };
+  try {
+    const sys =
+      `You are a translation engine. Translate the user's text into ${to}` +
+      `${from ? ` (it is in ${from})` : ''}. ` +
+      `Reply with the translation ONLY — no quotes, no notes, no language tags.`;
+    const r = await fetch(`${GROK_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${GROK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: GROK_TRANSLATE_MODEL,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: transcript },
+        ],
+        temperature: 0.2,
+      }),
+    });
+    const body = await r.text();
+    if (!r.ok) {
+      console.error('grok translate error', r.status, body.slice(0, 300));
+      return { error: 'grok_translate_error', status: 502, detail: body.slice(0, 300) };
+    }
+    const parsed = JSON.parse(body);
+    let out = parsed?.choices?.[0]?.message?.content ?? '';
+    if (typeof out !== 'string') out = '';
+    out = out.trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+    return { translated: out || transcript };
+  } catch (e) {
+    console.error('grok translate throw', e);
+    return { error: 'grok_translate_unreachable', status: 502 };
+  }
+}
+
+/**
+ * Synthesize speech through Grok (/v1/tts → mp3). Returns { audio: Buffer } on
+ * success, or { error, status, detail? } on failure. Shared by the POST route
+ * and the realtime STT WebSocket.
+ */
+async function grokSynthesizeSpeech({ text, voice, lang }) {
+  try {
+    const ttsBody = { text, voice_id: voice, language: lang };
+    if (GROK_TTS_MODEL) ttsBody.model = GROK_TTS_MODEL;
+    const r = await fetch(`${GROK_BASE}/tts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${GROK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ttsBody),
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('grok tts error', r.status, errText.slice(0, 300));
+      return { error: 'grok_tts_error', status: 502, detail: errText.slice(0, 300) };
+    }
+    const audio = Buffer.from(await r.arrayBuffer());
+    if (audio.length === 0) return { error: 'grok_tts_empty', status: 502 };
+    return { audio };
+  } catch (e) {
+    console.error('grok tts throw', e);
+    return { error: 'grok_tts_unreachable', status: 502 };
+  }
+}
+
+/**
  * POST /translation/grok  (multipart/form-data)  —  TEST PIPELINE
  *
  * Fields:
@@ -964,11 +1044,12 @@ app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req
   })();
 
   // 1) STT — Grok /v1/stt (multipart). Node 18+ global FormData / Blob.
+  // Per the official docs the endpoint takes ONLY `file` (language is
+  // auto-detected, no model id) — sending extra fields gets the request
+  // rejected, so we keep it to the single file part.
   let transcript = '';
   try {
     const form = new FormData();
-    form.append('model', GROK_STT_MODEL);
-    if (from) form.append('language', from);
     form.append('file', new Blob([file.buffer], { type: file.mimetype || 'audio/webm' }), `utt.${ext}`);
     const r = await fetch(`${GROK_BASE}/stt`, {
       method: 'POST',
@@ -999,65 +1080,23 @@ app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req
   }
 
   // 2) Translate — Grok /v1/chat/completions (OpenAI-compatible).
-  let translated = transcript;
-  if (!from || from !== to) {
-    try {
-      const sys =
-        `You are a translation engine. Translate the user's text into ${to}` +
-        `${from ? ` (it is in ${from})` : ''}. ` +
-        `Reply with the translation ONLY — no quotes, no notes, no language tags.`;
-      const r = await fetch(`${GROK_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${GROK_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: GROK_TRANSLATE_MODEL,
-          messages: [
-            { role: 'system', content: sys },
-            { role: 'user', content: transcript },
-          ],
-          temperature: 0.2,
-        }),
-      });
-      const body = await r.text();
-      if (!r.ok) {
-        console.error('grok translate error', r.status, body.slice(0, 300));
-        return res.status(502).json({ error: 'grok_translate_error', detail: body.slice(0, 300) });
-      }
-      const parsed = JSON.parse(body);
-      let out = parsed?.choices?.[0]?.message?.content ?? '';
-      if (typeof out !== 'string') out = '';
-      out = out.trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
-      if (out) translated = out;
-    } catch (e) {
-      console.error('grok translate throw', e);
-      return res.status(502).json({ error: 'grok_translate_unreachable' });
-    }
+  const tr = await grokTranslateText({ transcript, from, to });
+  if (tr.error) {
+    return res
+      .status(tr.status)
+      .json({ error: tr.error, ...(tr.detail ? { detail: tr.detail } : {}) });
   }
+  const translated = tr.translated;
 
   // 3) TTS — Grok /v1/tts → mp3 bytes.
-  try {
-    const ttsBody = { text: translated, voice_id: voice, language: to };
-    if (GROK_TTS_MODEL) ttsBody.model = GROK_TTS_MODEL;
-    const r = await fetch(`${GROK_BASE}/tts`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${GROK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(ttsBody),
-    });
-    if (!r.ok) {
-      const errText = await r.text();
-      console.error('grok tts error', r.status, errText.slice(0, 300));
-      return res.status(502).json({ error: 'grok_tts_error', detail: errText.slice(0, 300) });
+  {
+    const sp = await grokSynthesizeSpeech({ text: translated, voice, lang: to });
+    if (sp.error) {
+      return res
+        .status(sp.status)
+        .json({ error: sp.error, ...(sp.detail ? { detail: sp.detail } : {}) });
     }
-    const audio = Buffer.from(await r.arrayBuffer());
-    if (audio.length === 0) {
-      return res.status(502).json({ error: 'grok_tts_empty' });
-    }
+    const audio = sp.audio;
     track({
       event: 'grok_test_translation',
       lang_from: from || undefined,
@@ -1069,9 +1108,6 @@ app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req
     res.set('X-Grok-Translation', encodeURIComponent(translated));
     res.set('Access-Control-Expose-Headers', 'X-Grok-Transcript, X-Grok-Translation');
     return res.status(200).type('audio/mpeg').send(audio);
-  } catch (e) {
-    console.error('grok tts throw', e);
-    return res.status(502).json({ error: 'grok_tts_unreachable' });
   }
 });
 
@@ -1970,12 +2006,162 @@ if (hasWebUi) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+// ─── Grok realtime STT — WebSocket proxy ───────────────────────────────────
+// The app streams its OWN microphone PCM16 (16 kHz, 100 ms frames) to us; we
+// relay it to xAI's realtime STT WebSocket (the API key stays server-side, as
+// xAI requires), and on each utterance-final transcript we translate + TTS and
+// push the result back. The app then forwards that translation to the peer over
+// the LiveKit data channel. STT runs on the LOCAL outgoing mic, never the
+// remote track — that is what makes this native-direct (no PCM tap on a remote
+// WebRTC stream). Shares grokTranslateText / grokSynthesizeSpeech with the POST
+// path. Endpoint: wss://<host>/translation/grok/stt?from=fr&to=ja&voice=eve
+const { WebSocketServer, WebSocket: WsClient } = require('ws');
+
+const GROK_STT_SAMPLE_RATES = [8000, 16000, 22050, 24000, 44100, 48000];
+
+function attachGrokSttWs(server) {
+  const wss = new WebSocketServer({ server, path: '/translation/grok/stt' });
+
+  wss.on('connection', (client, req) => {
+    const sendCtl = (obj) => {
+      if (client.readyState === WsClient.OPEN) client.send(JSON.stringify(obj));
+    };
+    if (!GROK_API_KEY) {
+      sendCtl({ type: 'error', error: 'grok_not_configured' });
+      client.close();
+      return;
+    }
+
+    const url = new URL(req.url, 'http://localhost');
+    const from = primaryLanguageTag(url.searchParams.get('from') || '');
+    const to = primaryLanguageTag(url.searchParams.get('to') || '');
+    const voice = (() => {
+      const v = (url.searchParams.get('voice') || '').trim().toLowerCase();
+      return ['ara', 'eve', 'leo', 'rex', 'sal'].includes(v) ? v : GROK_TTS_VOICE;
+    })();
+    const sampleRate = (() => {
+      const n = Number(url.searchParams.get('sample_rate'));
+      return GROK_STT_SAMPLE_RATES.includes(n) ? n : 16000;
+    })();
+    if (!isReasonableLanguageTag(to)) {
+      sendCtl({ type: 'error', error: 'invalid_target' });
+      client.close();
+      return;
+    }
+
+    // Upstream xAI realtime STT socket.
+    const params = new URLSearchParams({
+      sample_rate: String(sampleRate),
+      encoding: 'pcm', // xAI: pcm | mulaw | alaw (pcm = signed 16-bit LE)
+      endpointing: '300', // ms of silence before an utterance is closed
+    });
+    if (from) params.set('language', from);
+    const upstream = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${GROK_API_KEY}` },
+    });
+
+    let upstreamOpen = false;
+    let closing = false;
+    const pending = []; // PCM frames buffered until the upstream socket opens
+
+    upstream.on('open', () => {
+      upstreamOpen = true;
+      for (const buf of pending) upstream.send(buf);
+      pending.length = 0;
+    });
+
+    upstream.on('message', async (data) => {
+      let evt;
+      try {
+        evt = JSON.parse(data.toString());
+      } catch (_) {
+        return;
+      }
+      // Live captions: forward any non-final transcript text as-is (cheap).
+      const isUtteranceFinal =
+        (evt.type === 'transcript.partial' && evt.speech_final === true) ||
+        evt.type === 'transcript.done';
+      if (!isUtteranceFinal) {
+        if (evt.type === 'transcript.partial' && typeof evt.text === 'string') {
+          sendCtl({ type: 'partial', text: evt.text });
+        }
+        return;
+      }
+      const transcript = (typeof evt.text === 'string' ? evt.text : '').trim();
+      if (!transcript) return;
+
+      // Utterance closed → translate + TTS, then hand the result back.
+      const tr = await grokTranslateText({ transcript, from, to });
+      if (tr.error) return sendCtl({ type: 'error', error: tr.error });
+      const sp = await grokSynthesizeSpeech({ text: tr.translated, voice, lang: to });
+      if (sp.error) return sendCtl({ type: 'error', error: sp.error });
+      track({
+        event: 'grok_stt_translation',
+        lang_from: from || undefined,
+        lang_to: to,
+        props: { chars: transcript.length, voice },
+      });
+      sendCtl({
+        type: 'translation',
+        orig: transcript,
+        trans: tr.translated,
+        lang: to,
+        audio: sp.audio.toString('base64'),
+      });
+    });
+
+    upstream.on('error', (e) => {
+      console.error('grok stt ws upstream error', e?.message || e);
+      sendCtl({ type: 'error', error: 'grok_stt_unreachable' });
+    });
+    upstream.on('close', () => {
+      if (!closing && client.readyState === WsClient.OPEN) client.close();
+    });
+
+    // App → us. Binary frames are raw PCM; text frames are control messages.
+    client.on('message', (data, isBinary) => {
+      if (isBinary) {
+        if (upstreamOpen) upstream.send(data);
+        else pending.push(data);
+        return;
+      }
+      let msg;
+      try {
+        msg = JSON.parse(data.toString());
+      } catch (_) {
+        return;
+      }
+      if (msg.type === 'audio.done' && upstream.readyState === WsClient.OPEN) {
+        upstream.send(JSON.stringify({ type: 'audio.done' }));
+      }
+    });
+
+    client.on('close', () => {
+      closing = true;
+      try {
+        if (upstream.readyState === WsClient.OPEN) {
+          upstream.send(JSON.stringify({ type: 'audio.done' }));
+        }
+        upstream.close();
+      } catch (_) {}
+    });
+    client.on('error', () => {
+      try {
+        upstream.close();
+      } catch (_) {}
+    });
+  });
+
+  return wss;
+}
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(
     `Listening on http://0.0.0.0:${PORT} (web UI: ${hasWebUi ? 'yes' : 'no'})`,
   );
 });
+attachGrokSttWs(server);
 
 // In-process per-market scheduler for the "X en ligne" broadcast. Zero-dep:
 // every minute, for each market, it checks the market's LOCAL hour (DST-correct)
