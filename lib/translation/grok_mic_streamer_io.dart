@@ -1,22 +1,37 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:record/record.dart';
+
 import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _IoGrokMicStreamer();
 
-/// Native stub. The realtime local-mic pipeline is **web-first**: native needs
-/// option "b" (fork the stream LiveKit already captured + AEC-processed, via a
-/// platform channel if `livekit_client` doesn't expose the local mic PCM). An
-/// independent `record` stream (option "a") is a dead end on native — no AEC, so
-/// it would re-transcribe the loudspeaker output into a feedback loop.
-///
-/// Until that lands, native keeps the existing chunk pipeline; this streamer
-/// reports "unsupported" so the port can fall back / surface it in diagnostics
-/// instead of pretending to run.
+/// Native (iOS/Android) realtime mic streamer, SENDER-side. Captures MY local
+/// mic with `record` (PCM16 16 kHz stream, system AEC via echoCancel), opens a
+/// WebSocket to the backend Grok STT proxy, streams the PCM, and surfaces
+/// translations. Native can't tap the REMOTE WebRTC track, so this is the only
+/// realtime path on iOS/Android — and it's enough: each phone sends its own
+/// translated voice to the peer, who just plays it.
 class _IoGrokMicStreamer implements GrokMicStreamer {
-  @override
-  bool get isRunning => false;
+  final AudioRecorder _rec = AudioRecorder();
+  WebSocket? _ws;
+  StreamSubscription<Uint8List>? _audioSub;
+  bool _running = false;
+  bool _wsOpen = false;
+  int _lastVoiceMs = 0;
+
+  // VAD (mean-square) — low threshold + generous hangover so phrases aren't clipped.
+  static const double _vadThreshold = 0.0002;
+  static const int _vadHangoverMs = 1200;
 
   @override
-  bool get isStreaming => false;
+  bool get isRunning => _running;
+
+  @override
+  bool get isStreaming => _running && _wsOpen;
 
   @override
   Future<void> start({
@@ -28,9 +43,105 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
     void Function(String partial)? onPartial,
     void Function(String error)? onError,
   }) async {
-    onError?.call('native_unsupported');
+    if (_running) return;
+    // Native captures ONLY the local mic; the remote-track path doesn't exist.
+    if (!captureLocalMic) {
+      onError?.call('native_no_remote_capture');
+      return;
+    }
+    _running = true;
+    try {
+      if (!await _rec.hasPermission()) {
+        onError?.call('no_mic_permission');
+        _running = false;
+        return;
+      }
+      final ws = await WebSocket.connect(wsUrl.toString());
+      _ws = ws;
+      _wsOpen = true;
+      ws.listen(
+        (data) {
+          if (data is! String) return;
+          try {
+            final msg = jsonDecode(data) as Map<String, dynamic>;
+            switch (msg['type']) {
+              case 'translation':
+                onTranslation(
+                  (msg['orig'] ?? '').toString(),
+                  (msg['trans'] ?? '').toString(),
+                  (msg['lang'] ?? '').toString(),
+                  (msg['audio'] ?? '').toString(),
+                );
+                break;
+              case 'partial':
+                onPartial?.call((msg['text'] ?? '').toString());
+                break;
+              case 'error':
+                onError?.call((msg['error'] ?? 'error').toString());
+                break;
+            }
+          } catch (_) {}
+        },
+        onError: (_) {
+          _wsOpen = false;
+          onError?.call('ws_error');
+        },
+        onDone: () => _wsOpen = false,
+        cancelOnError: true,
+      );
+
+      final stream = await _rec.startStream(const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        echoCancel: true,
+        noiseSuppress: true,
+        autoGain: true,
+      ));
+      _audioSub = stream.listen((bytes) {
+        if (!_wsOpen) return;
+        final level = _meanSquare(bytes);
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        if (level > _vadThreshold) _lastVoiceMs = nowMs;
+        if (nowMs - _lastVoiceMs < _vadHangoverMs) {
+          try {
+            _ws?.add(bytes);
+          } catch (_) {}
+        }
+      });
+    } catch (e) {
+      onError?.call('start_failed: $e');
+      await stop();
+    }
+  }
+
+  double _meanSquare(Uint8List bytes) {
+    final n = bytes.length ~/ 2;
+    if (n == 0) return 0;
+    final bd = ByteData.sublistView(bytes);
+    var sum = 0.0;
+    for (var i = 0; i < n; i++) {
+      final s = bd.getInt16(i * 2, Endian.little) / 32768.0;
+      sum += s * s;
+    }
+    return sum / n;
   }
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    _running = false;
+    _wsOpen = false;
+    await _audioSub?.cancel();
+    _audioSub = null;
+    try {
+      await _rec.stop();
+    } catch (_) {}
+    try {
+      _ws?.add('{"type":"audio.done"}');
+    } catch (_) {}
+    try {
+      await _ws?.close();
+    } catch (_) {}
+    _ws = null;
+  }
 }

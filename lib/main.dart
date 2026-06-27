@@ -32,10 +32,8 @@ import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
-// TEST: Grok (xAI) chunk-based translation, swapped in at _getTranslation().
-// The OpenAI pipeline file (openai_realtime_translation.dart) is left intact;
-// `git revert` restores its import + usage here.
-import 'translation/grok_chunk_translation.dart';
+// Grok realtime translation (web + native). OpenAI and chunk pipelines are
+// left intact in the tree for store builds / revert.
 import 'translation/grok_realtime_translation.dart';
 import 'translation/realtime_translation_port.dart';
 import 'widgets/splash_screen_animation.dart';
@@ -203,8 +201,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   // subtitle). Native keeps the receiver-side chunk pipeline for now.
   RealtimeTranslationPort? _translation;
   RealtimeTranslationPort _getTranslation() {
-    final RealtimeTranslationPort created =
-        kIsWeb ? GrokRealtimeTranslation() : GrokChunkTranslation();
+    // Grok realtime on web AND native: each phone captures its OWN mic (web:
+    // getUserMedia; native: record → PCM16 WS) and forwards the translated Grok
+    // voice to the peer, who plays it. Native can't tap the remote track, but it
+    // doesn't need to — the peer sends its own translation.
+    final RealtimeTranslationPort created = GrokRealtimeTranslation();
     return _translation ??= created;
   }
   StreamSubscription<AuthState>? _authSub;

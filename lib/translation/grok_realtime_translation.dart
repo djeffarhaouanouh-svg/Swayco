@@ -116,24 +116,28 @@ class GrokRealtimeTranslation extends ChangeNotifier
       }
     });
 
-    // RECV FIRST — this is the translation I HEAR. It must NOT be blocked by the
-    // SEND's getUserMedia (which can be slow). Bound when the remote track appears.
-    _listener = room.createListener()
-      ..on<TrackSubscribedEvent>((e) {
-        if (e.track is RemoteAudioTrack) _rebindRemote();
-      })
-      ..on<TrackUnsubscribedEvent>((e) {
-        if (e.track is RemoteAudioTrack) _rebindRemote();
-      })
-      ..on<ParticipantDisconnectedEvent>((_) {
-        if (_room?.remoteParticipants.isEmpty ?? true) {
-          unawaited(_stopRecv());
-          _recvTrack = null;
-          _boundSid = null;
-          notifyListeners();
-        }
-      });
-    _rebindRemote();
+    // RECV — capture the remote voice & play it locally. WEB ONLY: native can't
+    // tap the remote WebRTC track (MediaStreamTrackProcessor is web-only), and
+    // it doesn't need to — the peer sends its own translation, which we play via
+    // call_screen. So on native we run SEND only.
+    if (kIsWeb) {
+      _listener = room.createListener()
+        ..on<TrackSubscribedEvent>((e) {
+          if (e.track is RemoteAudioTrack) _rebindRemote();
+        })
+        ..on<TrackUnsubscribedEvent>((e) {
+          if (e.track is RemoteAudioTrack) _rebindRemote();
+        })
+        ..on<ParticipantDisconnectedEvent>((_) {
+          if (_room?.remoteParticipants.isEmpty ?? true) {
+            unawaited(_stopRecv());
+            _recvTrack = null;
+            _boundSid = null;
+            notifyListeners();
+          }
+        });
+      _rebindRemote();
+    }
 
     // SEND: my mic → peer. Fire-and-forget so a slow/failed getUserMedia never
     // blocks the RECV playback above.
