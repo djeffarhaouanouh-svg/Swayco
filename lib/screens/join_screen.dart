@@ -9,6 +9,7 @@ import '../services/friendship_api.dart';
 import '../services/languages.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
+import '../services/call_audio.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
@@ -136,6 +137,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _startCallWith(RemoteProfile peer) async {
+    armCallAudio();       // unlock web <audio> element (WebKit gesture)
+    armSpeechSynthesis(); // unlock speechSynthesis / FlutterTts (iOS Safari)
     if (_dialingPeerId != null) return;
     if (_myName.isEmpty || _mySourceLang.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

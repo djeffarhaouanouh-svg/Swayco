@@ -632,7 +632,8 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
           // for users who want to refuse.
           InkWell(
             onTap: () {
-              armCallAudio(); // unlock WebKit audio inside this gesture
+              armCallAudio();
+              armSpeechSynthesis();
               Navigator.of(context).pop(true);
             },
             child: Padding(
@@ -683,7 +684,8 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                   label: AppStrings.t('accept'),
                   color: SC.accent,
                   onTap: () {
-              armCallAudio(); // unlock WebKit audio inside this gesture
+              armCallAudio();
+              armSpeechSynthesis();
               Navigator.of(context).pop(true);
             },
                 ),

@@ -7,6 +7,10 @@ import 'call_audio_stub.dart'
 /// us play incoming translations. No-op on native.
 void armCallAudio() => impl.armCallAudio();
 
+/// Unlock speechSynthesis (FlutterTts web) inside a user-gesture so iOS
+/// Safari allows subsequent non-gesture TTS calls.
+void armSpeechSynthesis() => impl.armSpeechSynthesis();
+
 /// Play an mp3 through the unlocked web element. Returns false on native / on
 /// failure, so the caller falls back to audioplayers.
 Future<bool> playTranslatedMp3(Uint8List bytes) => impl.playTranslatedMp3(bytes);
