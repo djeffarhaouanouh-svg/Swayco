@@ -297,6 +297,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
             .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (localProfile != null && localProfile.sourceLang.isNotEmpty) {
           AppStrings.setFromCode(localProfile.sourceLang);
+          if (!kIsWeb) {
+            unawaited(KokoroService.instance
+                .ensureLanguageInstalled(localProfile.sourceLang));
+          }
         }
       } catch (e) {
         debugPrint('loadProfile failed: $e');
@@ -439,6 +443,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       final lang = remoteLang.isNotEmpty ? remoteLang : profile.sourceLang;
       if (lang.trim().isNotEmpty) {
         AppStrings.setFromCode(lang);
+        if (!kIsWeb) {
+          unawaited(KokoroService.instance.ensureLanguageInstalled(lang));
+        }
         // Keep the local cache in step so the next cold boot restores in the
         // account's language immediately (no stale-language flash).
         if (lang != profile.sourceLang) {
