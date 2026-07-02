@@ -750,7 +750,13 @@ class _CallScreenState extends State<CallScreen> {
     if (room == null) return;
     final next = !_micOn;
     await room.localParticipant?.setMicrophoneEnabled(next);
-    setSendMuted(!next); // mic off → SEND stops streaming, breaks echo loop
+    setSendMuted(!next);
+    if (next) {
+      // Unmuting: immediately clear the TTS gate so SEND resumes at once.
+      // Without this, a TTS that started while the mic was muted would keep
+      // blocking SEND until its timer fires (up to 15 s).
+      markTranslationDone();
+    }
     if (mounted) setState(() => _micOn = next);
   }
 
