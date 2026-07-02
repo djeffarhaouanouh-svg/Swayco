@@ -51,10 +51,13 @@ class GrokRealtimeTranslation extends ChangeNotifier
   int _sent = 0;
   String? _lastSent;
   String? _lastError;
-  // Dedup: prevent publishing the same translation twice within 3 s (Grok can
-  // emit multiple translation events for the same utterance as it streams).
+  // Dedup: prevent publishing the same translation twice within 3 s.
   String _lastSentTrans = '';
   int _lastSentMs = 0;
+  // Delta: Grok accumulates the full session context and re-sends the growing
+  // translation each time. Track the last full backend text so we publish
+  // only the new portion (delta) instead of the entire accumulated string.
+  String _lastBackendTrans = '';
 
   @override
   Listenable? get translationListenable => this;
@@ -158,6 +161,9 @@ class GrokRealtimeTranslation extends ChangeNotifier
   Future<void> detach() async {
     await _stopSend();
     _speaking = false;
+    _lastBackendTrans = '';
+    _lastSentTrans = '';
+    _lastSentMs = 0;
     try {
       await _player.stop();
     } catch (_) {}
@@ -181,35 +187,49 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onSendTranslation(String orig, String trans, String lang, String audioB64) {
     _lastSent = trans;
     _lastError = null;
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    // Grok can emit multiple translation events for the same utterance.
-    // Publish only when the text actually changed or >3 s have elapsed.
-    if (trans == _lastSentTrans && nowMs - _lastSentMs < 3000) {
+
+    // Delta: Grok re-sends the FULL accumulated session translation each time.
+    // Only publish the portion that is new relative to the last backend response
+    // so the peer doesn't hear the same phrase repeated.
+    String transToSend;
+    if (_lastBackendTrans.isNotEmpty && trans.startsWith(_lastBackendTrans)) {
+      transToSend = trans.substring(_lastBackendTrans.length).trim();
+    } else {
+      transToSend = trans;
+    }
+    _lastBackendTrans = trans;
+
+    if (transToSend.isEmpty) {
       notifyListeners();
       return;
     }
-    _lastSentTrans = trans;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    // Dedup: same delta within 3 s → skip.
+    if (transToSend == _lastSentTrans && nowMs - _lastSentMs < 3000) {
+      notifyListeners();
+      return;
+    }
+    _lastSentTrans = transToSend;
     _lastSentMs = nowMs;
+
     final room = _room;
     final route = _route;
-    if (room != null && trans.isNotEmpty) {
+    if (room != null && transToSend.isNotEmpty) {
       final Map<String, dynamic> payload;
       if (audioB64.isNotEmpty && audioB64.length <= _maxAudioB64) {
-        // Web path: Grok TTS audio included.
-        // Also carries orig/trans for backward-compat with older native builds.
         payload = {
           'voiceOnly': true,
           'orig': orig,
-          'trans': trans,
+          'trans': transToSend,
           'lang': lang,
           'audio': audioB64,
         };
       } else {
-        // Native Kokoro path: no TTS audio — receiver synthesises locally.
         payload = {
           'kokoro': true,
           'orig': orig,
-          'trans': trans,
+          'trans': transToSend,
           'lang': lang,
         };
       }

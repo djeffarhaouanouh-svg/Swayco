@@ -86,8 +86,13 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   bool _captureLocalMic = true;
   int _lastVoiceMs = 0;
   // TTS playback detection — queried live from browser, never stuck.
+  int _startMs = 0;       // set when start() runs; used for arm-utterance grace
   int _lastTtsSpeakingMs = 0;
   static const int _ttsDoneHangoverMs = 400;
+  // armSpeechSynthesis() calls speak() with a silent utterance to unlock iOS
+  // Safari — that keeps speechSynthesis.speaking=true for up to ~3 s on device.
+  // We ignore speaking=true for the first 3 s so SEND is not blocked at startup.
+  static const int _armGracePeriodMs = 3000;
 
   static const int _outRate = 16000;
   // VAD: mean-square level above which we consider it speech. Low threshold +
@@ -113,6 +118,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   }) async {
     if (_running) return;
     _running = true;
+    _startMs = DateTime.now().millisecondsSinceEpoch;
     _captureLocalMic = captureLocalMic;
     _log('start ${captureLocalMic ? "LOCAL-mic" : "REMOTE-track"} wsUrl=$wsUrl');
     try {
@@ -234,19 +240,25 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   /// Falls back to the isTranslationPlaying flag for <audio>-element TTS.
   /// Adds a short hangover after speech ends so the speaker tail fades first.
   bool _isTtsPlaying() {
-    try {
-      final ss = _globalSpeechSynthesis;
-      if (ss != null && _SpeechSynthSpeakingExt(ss).speaking) {
-        _lastTtsSpeakingMs = DateTime.now().millisecondsSinceEpoch;
-        return true;
-      }
-    } catch (_) {}
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    // Skip the speechSynthesis check for the first 3 s after start.
+    // armSpeechSynthesis() speaks a silent unlock utterance on iOS which
+    // keeps speaking=true for ~2-3 s, blocking SEND before any real TTS.
+    final pastArmGrace = nowMs - _startMs > _armGracePeriodMs;
+    if (pastArmGrace) {
+      try {
+        final ss = _globalSpeechSynthesis;
+        if (ss != null && _SpeechSynthSpeakingExt(ss).speaking) {
+          _lastTtsSpeakingMs = nowMs;
+          return true;
+        }
+      } catch (_) {}
+    }
     if (isTranslationPlaying) {
-      _lastTtsSpeakingMs = DateTime.now().millisecondsSinceEpoch;
+      _lastTtsSpeakingMs = nowMs;
       return true;
     }
-    return DateTime.now().millisecondsSinceEpoch - _lastTtsSpeakingMs <
-        _ttsDoneHangoverMs;
+    return nowMs - _lastTtsSpeakingMs < _ttsDoneHangoverMs;
   }
 
   Future<void> _pump(web.ReadableStreamDefaultReader reader) async {
