@@ -772,7 +772,10 @@ class _CallScreenState extends State<CallScreen> {
       }
       if (m['voiceOnly'] == true) {
         final audioB64 = m['audio']?.toString() ?? '';
-        if (!kIsWeb && audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
+        DebugOverlay.log('caption voiceOnly audio=${audioB64.length}b web=$kIsWeb');
+        // On web: play via <audio> element so browser AEC can cancel the echo.
+        // On native: audioplayers handles it.
+        if (audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
         return;
       }
     } catch (_) {}
