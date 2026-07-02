@@ -129,6 +129,10 @@ class GrokRealtimeTranslation extends ChangeNotifier
     // from degraded WebRTC audio capture.
 
     // SEND: my mic → peer (all platforms).
+    // Pass the LiveKit local audio track so the web streamer can clone it
+    // instead of opening a 2nd getUserMedia on the same device.
+    final localAudioTrack =
+        room.localParticipant?.audioTrackPublications.firstOrNull?.track;
     final sendStreamer = createGrokMicStreamer();
     _sendStreamer = sendStreamer;
     unawaited(
@@ -137,11 +141,9 @@ class GrokRealtimeTranslation extends ChangeNotifier
             wsUrl: grokSttWsUri(
               from: route.sourceBcp47,
               to: route.targetBcp47,
-              // Text-only from backend on all platforms: web uses FlutterTts,
-              // native uses Kokoro. Keeps the WS stable even if Grok TTS credits
-              // are exhausted.
               kokoroTts: true,
             ),
+            localTrack: localAudioTrack,
             captureLocalMic: true,
             onTranslation: _onSendTranslation,
             onError: (code) {

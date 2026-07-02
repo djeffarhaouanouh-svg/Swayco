@@ -110,25 +110,60 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     try {
       final web.MediaStreamTrack micTrack;
       if (captureLocalMic) {
-        final micStream = await web.window.navigator.mediaDevices
-            .getUserMedia(web.MediaStreamConstraints(
-              audio: web.MediaTrackConstraints(
-                echoCancellation: true.toJS,
-                noiseSuppression: true.toJS,
-                autoGainControl: true.toJS,
-              ),
-            ))
-            .toDart;
-        _micStream = micStream;
-        final audioTracks = micStream.getAudioTracks().toDart;
-        if (audioTracks.isEmpty) {
-          _log('getUserMedia returned no audio track');
-          onError?.call('no_mic');
-          _running = false;
-          return;
+        // Prefer cloning the LiveKit track already open on this device.
+        // A 2nd getUserMedia can cause AEC-reference mismatch and OS conflicts.
+        // The clone shares the hardware source but is independent: we apply
+        // STT-optimised constraints (AEC off, NS on, AGC on) without touching
+        // the LiveKit call track.
+        web.MediaStreamTrack? lkMst;
+        if (localTrack != null) {
+          try {
+            lkMst = (localTrack as dynamic).mediaStreamTrack
+                as web.MediaStreamTrack?;
+          } catch (_) {}
         }
-        micTrack = audioTracks.first;
-        _log('local mic acquired (AEC)');
+
+        if (lkMst != null) {
+          micTrack = lkMst.clone();
+          final s = web.MediaStream();
+          s.addTrack(micTrack);
+          _micStream = s;
+          // AEC off: without the speaker-playback reference the echo canceller
+          // distorts the ASR signal. NS + AGC normalise levels instead.
+          try {
+            await micTrack
+                .applyConstraints(web.MediaTrackConstraints(
+                  echoCancellation: false.toJS,
+                  noiseSuppression: true.toJS,
+                  autoGainControl: true.toJS,
+                ))
+                .toDart;
+          } catch (_) {
+            _log('applyConstraints skipped — browser default kept');
+          }
+          _log('LiveKit track cloned for STT (AEC off, NS on, AGC on)');
+        } else {
+          // Fallback: LiveKit track not yet published — own getUserMedia.
+          final micStream = await web.window.navigator.mediaDevices
+              .getUserMedia(web.MediaStreamConstraints(
+                audio: web.MediaTrackConstraints(
+                  echoCancellation: false.toJS,
+                  noiseSuppression: true.toJS,
+                  autoGainControl: true.toJS,
+                ),
+              ))
+              .toDart;
+          _micStream = micStream;
+          final audioTracks = micStream.getAudioTracks().toDart;
+          if (audioTracks.isEmpty) {
+            _log('getUserMedia returned no audio track');
+            onError?.call('no_mic');
+            _running = false;
+            return;
+          }
+          micTrack = audioTracks.first;
+          _log('getUserMedia local mic (AEC off, NS on, AGC on)');
+        }
       } else {
         web.MediaStreamTrack? jsTrack;
         try {
