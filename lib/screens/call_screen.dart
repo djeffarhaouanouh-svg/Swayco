@@ -748,6 +748,7 @@ class _CallScreenState extends State<CallScreen> {
     if (room == null) return;
     final next = !_micOn;
     await room.localParticipant?.setMicrophoneEnabled(next);
+    setSendMuted(!next); // mic off → SEND stops streaming, breaks echo loop
     if (mounted) setState(() => _micOn = next);
   }
 

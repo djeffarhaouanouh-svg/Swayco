@@ -19,6 +19,11 @@ bool _playing = false;
 Timer? _clearTimer;
 bool get isTranslationPlaying => _playing;
 
+// True when the user has muted their mic — SEND should not stream audio.
+bool _sendMuted = false;
+bool get isSendMuted => _sendMuted;
+void setSendMuted(bool v) => _sendMuted = v;
+
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
   _clearTimer?.cancel();

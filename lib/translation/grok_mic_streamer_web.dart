@@ -251,7 +251,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           // Half-duplex: never send MY mic while a translation is playing out
           // the speaker — otherwise we re-capture & re-translate our own audio
           // (the "device answers itself" loop).
-          final pausedByPlayback = _captureLocalMic && isTranslationPlaying;
+          final pausedByPlayback = _captureLocalMic && (isTranslationPlaying || isSendMuted);
 
           if (voiceActive && !pausedByPlayback) {
             final pcm = _downsampleToPcm16(f32, inRate, _outRate);
@@ -329,7 +329,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final nowMs = DateTime.now().millisecondsSinceEpoch;
           if (level > _vadThreshold) _lastVoiceMs = nowMs;
           final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
-          final pausedByPlayback = _captureLocalMic && isTranslationPlaying;
+          final pausedByPlayback = _captureLocalMic && (isTranslationPlaying || isSendMuted);
           if (voiceActive && !pausedByPlayback) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {

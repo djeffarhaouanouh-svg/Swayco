@@ -22,3 +22,7 @@ bool get isTranslationPlaying => impl.isTranslationPlaying;
 void markTranslationPlaying({int textLength = 0}) =>
     impl.markTranslationPlaying(textLength: textLength);
 void markTranslationDone() => impl.markTranslationDone();
+
+/// Sync the mic mute state to SEND — when mic is off, SEND stops streaming.
+bool get isSendMuted => impl.isSendMuted;
+void setSendMuted(bool v) => impl.setSendMuted(v);
