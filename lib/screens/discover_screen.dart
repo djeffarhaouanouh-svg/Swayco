@@ -4,13 +4,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
 import '../services/analytics.dart';
-import '../services/platform_glass.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
-import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/interests.dart';
@@ -25,7 +22,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/mesh_background.dart';
-import '../widgets/emoji_burst.dart';
 import '../widgets/missions_ring.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
@@ -42,7 +38,6 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
-
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
   void _rebuildCards() {
@@ -58,16 +53,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  Map<String, Set<String>> _myReactionsByPhoto = const {};
-  Set<String> _directMessagedPeers = <String>{};
-
-  // Tinder deck: current top-card index.
   int _currentIndex = 0;
-
-  // Exposed so action buttons can trigger programmatic swipes.
   final _stackKey = GlobalKey<_TinderCardStackState>();
 
-  // ── Search state ────────────────────────────────────────────────────────────
+  // ── Search ──────────────────────────────────────────────────────────────────
   bool _searchExpanded = false;
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
@@ -93,14 +82,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (_myId.isEmpty || !isSupabaseReady) return;
     try {
       final mine = await FriendshipApi.fetchMine(_myId);
-      final reactions = await ChatApi.fetchMyOutgoingPhotoReactions(_myId);
-      final messaged = await ChatApi.fetchMyDiscoverMessagedPeers(_myId);
       if (!mounted) return;
-      setState(() {
-        _myFriendships = mine;
-        _myReactionsByPhoto = reactions;
-        _directMessagedPeers = messaged;
-      });
+      setState(() => _myFriendships = mine);
     } catch (_) {}
   }
 
@@ -117,19 +100,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     try {
       final results = await Future.wait(<Future<Object>>[
         FriendshipApi.fetchMine(id),
-        ChatApi.fetchMyOutgoingPhotoReactions(id),
-        ChatApi.fetchMyDiscoverMessagedPeers(id),
         ProfileApi.fetchDiscoverFeed(myId: id),
         UserPrefs.loadDiscoverCursor(),
       ]).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
         _myFriendships = results[0] as List<Friendship>;
-        _myReactionsByPhoto = results[1] as Map<String, Set<String>>;
-        _directMessagedPeers = results[2] as Set<String>;
-        _profiles = results[3] as List<RemoteProfile>;
+        _profiles = results[1] as List<RemoteProfile>;
         _rebuildCards();
-        _restoreCursor(results[4] as String);
+        _restoreCursor(results[2] as String);
         _feedLoading = false;
       });
       AppBoot.markHomeReady();
@@ -264,197 +243,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return status;
   }
 
-  Future<void> _cancelFriendRequest(RemoteProfile peer) async {
-    final (status, friendship) = FriendshipApi.statusWith(
-      _myId,
-      peer.id,
-      _myFriendships,
-    );
-    if (status != FriendshipStatus.pendingOutgoing || friendship == null) {
-      return;
-    }
-    final previous = _myFriendships;
-    setState(() {
-      _myFriendships =
-          _myFriendships.where((f) => f.id != friendship.id).toList();
-    });
-    try {
-      await FriendshipApi.remove(friendship.id);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _myFriendships = previous);
-    }
-  }
-
-  Future<void> _toggleFriendRequest(RemoteProfile peer) async {
-    if (_statusFor(peer) == FriendshipStatus.pendingOutgoing) {
-      await _cancelFriendRequest(peer);
-    } else {
-      await _sendFriendRequest(peer);
-    }
-  }
-
-  // ── Emoji reactions ─────────────────────────────────────────────────────────
-
-  Future<void> _toggleEmojiReaction(
-    RemoteProfile peer,
-    String photo,
-    String emoji,
-  ) async {
-    if (photo.isEmpty) return;
-    final wasReacted = _myReactionsByPhoto[photo]?.contains(emoji) ?? false;
-    if (wasReacted) {
-      await _unsendEmojiReaction(peer, photo, emoji);
-    } else {
-      await _sendEmojiReaction(peer, photo, emoji);
-    }
-  }
-
-  Future<void> _sendEmojiReaction(
-    RemoteProfile peer,
-    String photo,
-    String emoji,
-  ) async {
-    final next = Map<String, Set<String>>.from(_myReactionsByPhoto);
-    final current = Set<String>.from(next[photo] ?? const <String>{});
-    current.add(emoji);
-    next[photo] = current;
-    setState(() => _myReactionsByPhoto = next);
-    await _sendQuickMessage(
-      peer,
-      body: emoji,
-      snack: '$emoji envoyé à ${peer.displayName}',
-      discoverPhoto: photo,
-      type: 'reaction',
-    );
-  }
-
-  Future<void> _unsendEmojiReaction(
-    RemoteProfile peer,
-    String photo,
-    String emoji,
-  ) async {
-    final previous = _myReactionsByPhoto;
-    final next = Map<String, Set<String>>.from(previous);
-    final current = Set<String>.from(next[photo] ?? const <String>{});
-    current.remove(emoji);
-    if (current.isEmpty) {
-      next.remove(photo);
-    } else {
-      next[photo] = current;
-    }
-    setState(() => _myReactionsByPhoto = next);
-    try {
-      await ChatApi.deleteMyReaction(
-        meId: _myId,
-        peerId: peer.id,
-        emoji: emoji,
-        photoUrl: photo,
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _myReactionsByPhoto = previous);
-    }
-  }
-
-  Future<void> _sendQuickMessage(
-    RemoteProfile peer, {
-    required String body,
-    required String snack,
-    String discoverPhoto = '',
-    String type = 'text',
-  }) async {
-    if (_myId.isEmpty || peer.id.isEmpty) return;
-    try {
-      final local = await UserPrefs.loadProfile();
-      final myProfile =
-          isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
-      final myName = (myProfile?.displayName.trim().isNotEmpty == true)
-          ? myProfile!.displayName
-          : (local?.firstName.trim() ?? '');
-      final myLang = (myProfile?.language.trim().isNotEmpty == true)
-          ? myProfile!.language
-          : (local?.sourceLang ?? '');
-      final ids = [_myId, peer.id]..sort();
-      final convId = 'dm-${ids[0]}-${ids[1]}';
-      await ChatApi.sendMessage(
-        conversationId: convId,
-        senderId: _myId,
-        senderName: myName,
-        recipientId: peer.id,
-        body: body,
-        language: myLang,
-        discoverPhoto: discoverPhoto,
-      );
-      Analytics.track('message_sent', props: {'source': 'discover', 'type': type});
-      if (!mounted) return;
-      _showAddedSnack(snack);
-    } catch (e) {
-      if (!mounted) return;
-      _showAddedSnack('Envoi échoué : $e', isError: true);
-    }
-  }
-
-  Future<void> _sendDirectMessage(
-    RemoteProfile peer,
-    String photoUrl,
-    String text,
-  ) async {
-    final body = text.trim();
-    if (body.isEmpty || _myId.isEmpty || peer.id.isEmpty) return;
-    if (_directMessagedPeers.contains(peer.id)) return;
-    setState(() => _directMessagedPeers = {..._directMessagedPeers, peer.id});
-    await _sendQuickMessage(
-      peer,
-      body: body,
-      snack: 'Message envoyé à ${peer.displayName}',
-      discoverPhoto: photoUrl.isEmpty ? peer.id : photoUrl,
-    );
-  }
-
-  void _showAddedSnack(String text, {bool isError = false}) {
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final liftFromBottom =
-        GlassNavBar.height + safeBottom + _kActionBarHeight + 16.0;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            text,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: isError ? const Color(0xFF4A1A22) : SC.bubbleIn,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
-            side: const BorderSide(color: SC.glassBorder),
-          ),
-          margin: EdgeInsets.fromLTRB(24, 0, 24, liftFromBottom),
-        ),
-      );
-  }
-
-  Future<void> _reset() async {
-    if (_myId.isEmpty) return;
-    setState(() {
-      _feedLoading = true;
-      _currentIndex = 0;
-    });
-    final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
-    if (!mounted) return;
-    setState(() {
-      _profiles = feed;
-      _rebuildCards();
-      _feedLoading = false;
-    });
-  }
-
-  // ── Tinder swipe logic ──────────────────────────────────────────────────────
+  // ── Swipe logic ─────────────────────────────────────────────────────────────
 
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
     if (isRight) {
@@ -468,12 +257,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
+  void _onActionUndo() {
+    if (_cards.isEmpty) return;
+    setState(() {
+      _currentIndex = (_currentIndex - 1 + _cards.length) % _cards.length;
+    });
+  }
+
   void _onActionSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);
   void _onActionSwipeRight() => _stackKey.currentState?.triggerSwipe(true);
 
   // ── Build ───────────────────────────────────────────────────────────────────
 
-  static const double _kActionBarHeight = 88.0;
+  static const double _kActionBarHeight = 100.0;
 
   @override
   Widget build(BuildContext context) {
@@ -488,16 +284,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       body: MeshBackground(
         child: Stack(
           children: [
-            // Cyan-blue ambient wash
+            // Ambient gradient
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     radius: 1.2,
                     colors: [
-                      SC.meshCyan.withValues(alpha: 0.50),
-                      SC.meshBlue.withValues(alpha: 0.30),
-                      SC.meshNavy.withValues(alpha: 0.22),
+                      SC.meshCyan.withValues(alpha: 0.40),
+                      SC.meshBlue.withValues(alpha: 0.25),
+                      SC.meshNavy.withValues(alpha: 0.18),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),
@@ -506,19 +302,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
             // Card deck
             Positioned(
-              left: 0,
-              right: 0,
+              left: 12,
+              right: 12,
               top: deckTop,
               bottom: deckBottom,
               child: _feedLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: SC.accent),
                     )
-                  : GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () => FocusScope.of(context).unfocus(),
-                      child: _buildTinderStack(),
-                    ),
+                  : _buildTinderStack(),
             ),
             // Top bar
             Positioned(
@@ -536,17 +328,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
             // Online badge
             Positioned(
-              top: deckTop + 10,
-              left: 20,
+              top: deckTop + 14,
+              left: 28,
               child: const _OnlineBadge(),
             ),
-            // Tinder action buttons (X / ❤️)
+            // Tinder action buttons
             Positioned(
               left: 0,
               right: 0,
               bottom: GlassNavBar.height + safeBottom,
               height: _kActionBarHeight,
               child: _SwipeActionBar(
+                onUndo: _onActionUndo,
                 onSwipeLeft: _onActionSwipeLeft,
                 onSwipeRight: _onActionSwipeRight,
               ),
@@ -588,14 +381,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       key: _stackKey,
       cards: _cards,
       currentIndex: _currentIndex,
-      myReactionsByPhoto: _myReactionsByPhoto,
-      directMessagedPeers: _directMessagedPeers,
-      statusFor: _statusFor,
       onSwiped: _onCardSwiped,
-      onSendEmoji: _toggleEmojiReaction,
-      onSendMessage: _sendDirectMessage,
-      onToggleFriend: _toggleFriendRequest,
     );
+  }
+
+  Future<void> _reset() async {
+    if (_myId.isEmpty) return;
+    setState(() {
+      _feedLoading = true;
+      _currentIndex = 0;
+    });
+    final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
+    if (!mounted) return;
+    setState(() {
+      _profiles = feed;
+      _rebuildCards();
+      _feedLoading = false;
+    });
   }
 }
 
@@ -608,35 +410,19 @@ class _TinderCardStack extends StatefulWidget {
     super.key,
     required this.cards,
     required this.currentIndex,
-    required this.myReactionsByPhoto,
-    required this.directMessagedPeers,
-    required this.statusFor,
     required this.onSwiped,
-    required this.onSendEmoji,
-    required this.onSendMessage,
-    required this.onToggleFriend,
   });
 
   final List<({RemoteProfile profile, List<String> photos})> cards;
   final int currentIndex;
-  final Map<String, Set<String>> myReactionsByPhoto;
-  final Set<String> directMessagedPeers;
-  final FriendshipStatus Function(RemoteProfile) statusFor;
   final void Function(bool isRight, RemoteProfile profile) onSwiped;
-  final void Function(RemoteProfile, String photo, String emoji) onSendEmoji;
-  final Future<void> Function(RemoteProfile, String photoUrl, String text) onSendMessage;
-  final void Function(RemoteProfile) onToggleFriend;
 
   @override
   State<_TinderCardStack> createState() => _TinderCardStackState();
 }
 
 class _TinderCardStackState extends State<_TinderCardStack> {
-  // Recreated on each index change so the GlobalKey cleanly binds to the
-  // new top card state after the old one is disposed.
   GlobalKey<_DraggableCardState> _topCardKey = GlobalKey<_DraggableCardState>();
-
-  // Progress [0, 1] broadcast to the second card for its scale animation.
   final _swipeProgress = ValueNotifier<double>(0.0);
 
   @override
@@ -667,15 +453,15 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 
     return Stack(
       children: [
-        // Third card (deepest, smallest)
+        // Third card — deepest, smallest
         if (n >= 3)
           _StackCard(
             key: ValueKey('back_${(i + 2) % n}'),
             scale: 0.88,
-            translateY: 22,
-            child: _buildCardContent(cards[(i + 2) % n], interactive: false),
+            translateY: 20,
+            child: _buildCard(cards[(i + 2) % n]),
           ),
-        // Second card — scales toward 1.0 as top card is dragged
+        // Second card — scales toward 1.0 as top card moves
         if (n >= 2)
           ValueListenableBuilder<double>(
             valueListenable: _swipeProgress,
@@ -684,71 +470,51 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               return _StackCard(
                 key: ValueKey('mid_${(i + 1) % n}'),
                 scale: 0.94 + 0.06 * t,
-                translateY: 12.0 - 12.0 * t,
-                child: _buildCardContent(cards[(i + 1) % n], interactive: false),
+                translateY: 10.0 - 10.0 * t,
+                child: _buildCard(cards[(i + 1) % n]),
               );
             },
           ),
-        // Top card (draggable)
+        // Top card — interactive
         KeyedSubtree(
           key: ValueKey('top_$i'),
           child: _DraggableCard(
             key: _topCardKey,
-            onSwiped: (isRight) =>
-                widget.onSwiped(isRight, cards[i].profile),
+            onSwiped: (isRight) => widget.onSwiped(isRight, cards[i].profile),
             onDragProgress: (p) => _swipeProgress.value = p,
-            child: _buildCardContent(cards[i]),
+            child: _buildCard(cards[i]),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCardContent(
-    ({RemoteProfile profile, List<String> photos}) card, {
-    bool interactive = true,
-  }) {
-    final profile = card.profile;
-    final photos = card.photos;
-    final firstPhoto = photos.isNotEmpty ? photos.first : '';
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: SizedBox.expand(
-          child: _ProfileCard(
-            key: ValueKey('card_${profile.id}_$interactive'),
-            profile: profile,
-            photos: photos,
-            onAdd: () => widget.onToggleFriend(profile),
-            pendingOutgoing:
-                widget.statusFor(profile) == FriendshipStatus.pendingOutgoing,
-            reactionsByPhoto: widget.myReactionsByPhoto,
-            onSendEmoji: interactive
-                ? (photo, emoji) => widget.onSendEmoji(profile, photo, emoji)
-                : null,
-            alreadyMessaged: widget.directMessagedPeers.contains(profile.id),
-            onSendMessage: interactive
-                ? (text) => widget.onSendMessage(profile, firstPhoto, text)
-                : null,
-          ),
-        ),
+  Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
+    return SizedBox.expand(
+      child: _TinderCard(
+        key: ValueKey(card.profile.id),
+        profile: card.profile,
+        photoUrl: card.photos.isNotEmpty ? card.photos.first : '',
       ),
     );
   }
 }
 
-// Simple non-interactive background card with transform.
+// ══════════════════════════════════════════════════════════════════════════════
+// Background stack card helper
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _StackCard extends StatelessWidget {
   const _StackCard({
     super.key,
-    required this.child,
     required this.scale,
     required this.translateY,
+    required this.child,
   });
 
-  final Widget child;
   final double scale;
   final double translateY;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -763,7 +529,7 @@ class _StackCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Draggable top card — handles swipe gesture + animations
+// Draggable top card — gesture + animations
 // ══════════════════════════════════════════════════════════════════════════════
 
 const double _kSwipeThreshold = 100.0;
@@ -861,20 +627,24 @@ class _DraggableCardState extends State<_DraggableCard>
   void _flyOff(bool right) {
     _isFlyingOff = true;
     final target = Offset(right ? 900.0 : -900.0, _pos.dy - 40);
-    _animateTo(target, const Duration(milliseconds: 280), Curves.easeIn,
+    _animateTo(target, const Duration(milliseconds: 300), Curves.easeIn,
         onDone: () {
       if (mounted) widget.onSwiped(right);
     });
   }
 
   void _springBack() {
-    _animateTo(Offset.zero, const Duration(milliseconds: 550), Curves.elasticOut,
-        onDone: () {
-      if (mounted) {
-        setState(() => _pos = Offset.zero);
-        widget.onDragProgress(0.0);
-      }
-    });
+    _animateTo(
+      Offset.zero,
+      const Duration(milliseconds: 550),
+      Curves.elasticOut,
+      onDone: () {
+        if (mounted) {
+          setState(() => _pos = Offset.zero);
+          widget.onDragProgress(0.0);
+        }
+      },
+    );
   }
 
   void programmaticSwipe(bool isRight) {
@@ -882,7 +652,7 @@ class _DraggableCardState extends State<_DraggableCard>
     _flyOff(isRight);
   }
 
-  double get _rotation => (_pos.dx / 280.0) * 0.22; // max ~12.5°
+  double get _rotation => (_pos.dx / 300.0) * 0.22;
 
   @override
   Widget build(BuildContext context) {
@@ -901,25 +671,25 @@ class _DraggableCardState extends State<_DraggableCard>
               widget.child,
               if (likeOpacity > 0.01)
                 Positioned(
-                  top: 36,
-                  left: 24,
+                  top: 48,
+                  left: 28,
                   child: Opacity(
                     opacity: likeOpacity,
                     child: const _SwipeStamp(
                       text: 'LIKE',
-                      color: Color(0xFF22C55E),
+                      color: Color(0xFF3DCA72),
                     ),
                   ),
                 ),
               if (nopeOpacity > 0.01)
                 Positioned(
-                  top: 36,
-                  right: 24,
+                  top: 48,
+                  right: 28,
                   child: Opacity(
                     opacity: nopeOpacity,
                     child: const _SwipeStamp(
                       text: 'NOPE',
-                      color: Color(0xFFFF3B5C),
+                      color: Color(0xFFFF4458),
                     ),
                   ),
                 ),
@@ -932,7 +702,7 @@ class _DraggableCardState extends State<_DraggableCard>
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// LIKE / NOPE stamp overlay
+// LIKE / NOPE stamp (Tinder style)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SwipeStamp extends StatelessWidget {
@@ -942,24 +712,22 @@ class _SwipeStamp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Counter-rotate slightly so the stamp stays readable as the card tilts.
-    final angle = text == 'LIKE' ? -0.3 : 0.3;
+    final angle = text == 'LIKE' ? -0.28 : 0.28;
     return Transform.rotate(
       angle: angle,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color, width: 3.5),
+          border: Border.all(color: color, width: 4),
         ),
         child: Text(
           text,
           style: TextStyle(
             color: color,
-            fontSize: 34,
+            fontSize: 36,
             fontWeight: FontWeight.w900,
             letterSpacing: 3,
-            shadows: [Shadow(color: color.withValues(alpha: 0.3), blurRadius: 8)],
           ),
         ),
       ),
@@ -968,15 +736,17 @@ class _SwipeStamp extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Action buttons bar (X / ❤️)
+// Tinder-style 5-button action bar
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SwipeActionBar extends StatelessWidget {
   const _SwipeActionBar({
+    required this.onUndo,
     required this.onSwipeLeft,
     required this.onSwipeRight,
   });
 
+  final VoidCallback onUndo;
   final VoidCallback onSwipeLeft;
   final VoidCallback onSwipeRight;
 
@@ -987,27 +757,43 @@ class _SwipeActionBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _ActionButton(
-          onTap: onSwipeLeft,
-          size: 62,
-          color: const Color(0xFFFF3B5C),
-          icon: Icons.close_rounded,
-          iconSize: 30,
+          onTap: onUndo,
+          size: 52,
+          color: const Color(0xFFF5A623),
+          icon: Icons.replay_rounded,
+          iconSize: 24,
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: 18),
+        _ActionButton(
+          onTap: onSwipeLeft,
+          size: 68,
+          color: const Color(0xFFFF4458),
+          icon: Icons.close_rounded,
+          iconSize: 34,
+        ),
+        const SizedBox(width: 18),
+        _ActionButton(
+          onTap: onSwipeRight,
+          size: 54,
+          color: const Color(0xFF22D3EE),
+          icon: Icons.star_rounded,
+          iconSize: 28,
+        ),
+        const SizedBox(width: 18),
+        _ActionButton(
+          onTap: onSwipeRight,
+          size: 68,
+          color: const Color(0xFF3DCA72),
+          icon: Icons.favorite_rounded,
+          iconSize: 34,
+        ),
+        const SizedBox(width: 18),
         _ActionButton(
           onTap: onSwipeRight,
           size: 52,
-          color: const Color(0xFF3B82F6),
-          icon: Icons.star_rounded,
+          color: const Color(0xFFA855F7),
+          icon: Icons.bolt_rounded,
           iconSize: 26,
-        ),
-        const SizedBox(width: 20),
-        _ActionButton(
-          onTap: onSwipeRight,
-          size: 62,
-          color: const Color(0xFF22C55E),
-          icon: Icons.favorite_rounded,
-          iconSize: 30,
         ),
       ],
     );
@@ -1038,21 +824,271 @@ class _ActionButton extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: SC.bubbleIn,
+          color: Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: color.withValues(alpha: 0.35),
-            width: 1.5,
-          ),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.22),
+              color: Colors.black.withValues(alpha: 0.18),
               blurRadius: 14,
-              spreadRadius: 1,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Icon(icon, color: color, size: iconSize),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tinder-style card — full-bleed photo, gradient, name + interests
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _TinderCard extends StatelessWidget {
+  const _TinderCard({
+    super.key,
+    required this.profile,
+    required this.photoUrl,
+  });
+
+  final RemoteProfile profile;
+  final String photoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final flag = (profile.city.trim().isNotEmpty
+            ? countryFlagFor(profile.country)
+            : null) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
+    final online = !profile.hideOnlineStatus &&
+        profile.lastSeen != null &&
+        DateTime.now().difference(profile.lastSeen!) <
+            const Duration(minutes: 2);
+    final locationLabel = [profile.city.trim(), profile.country.trim()]
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Photo (or dark fallback)
+          const ColoredBox(color: Color(0xFF1A1A2E)),
+          if (photoUrl.isNotEmpty)
+            Image.network(
+              photoUrl,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          // Bottom gradient — starts mid-card, full black at bottom
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.55),
+                    Colors.black.withValues(alpha: 0.90),
+                  ],
+                  stops: const [0.0, 0.45, 0.72, 1.0],
+                ),
+              ),
+            ),
+          ),
+          // Info at bottom-left
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 22,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Name + flag + online dot
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                ProfileScreen(userId: profile.id),
+                          ),
+                        ),
+                        child: Text(
+                          profile.displayName.isEmpty
+                              ? '—'
+                              : profile.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            shadows: [
+                              Shadow(
+                                color: Color(0x66000000),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (flag.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Text(flag, style: const TextStyle(fontSize: 26)),
+                    ],
+                    if (online) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 11,
+                        height: 11,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF22C55E)
+                                  .withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // Location
+                if (locationLabel.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.place_outlined,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          locationLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.80),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // Interests section
+                if (profile.interests.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  // "Interests" header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.apps_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.70),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        AppStrings.t('interests_label'),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final tag in profile.interests.take(4))
+                        _InterestChip(label: interestLabel(tag)),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // ℹ button — opens full profile page
+          Positioned(
+            bottom: 22,
+            right: 20,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => ProfileScreen(userId: profile.id),
+                ),
+              ),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.20),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.50),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InterestChip extends StatelessWidget {
+  const _InterestChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.17),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.40),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1213,10 +1249,8 @@ class _DiscoverHeader extends StatelessWidget {
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOut,
                         width: expanded
-                            ? (MediaQuery.sizeOf(context).width - 135).clamp(
-                                180.0,
-                                250.0,
-                              )
+                            ? (MediaQuery.sizeOf(context).width - 135)
+                                .clamp(180.0, 250.0)
                             : null,
                         padding: EdgeInsets.symmetric(
                           horizontal: expanded ? 16 : 10,
@@ -1264,8 +1298,8 @@ class _DiscoverHeader extends StatelessWidget {
                                       border: InputBorder.none,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
+                                        vertical: 8,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1300,7 +1334,6 @@ class _DiscoverHeader extends StatelessWidget {
 
 class _BottomHugClipper extends CustomClipper<Path> {
   const _BottomHugClipper(this.radius);
-
   final double radius;
 
   @override
@@ -1331,7 +1364,6 @@ class _BottomHugClipper extends CustomClipper<Path> {
 
 class _TypewriterTitle extends StatefulWidget {
   const _TypewriterTitle({required this.text, required this.style});
-
   final String text;
   final TextStyle style;
 
@@ -1540,7 +1572,10 @@ class _SearchResultRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             onTap: onAdd,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 7,
+              ),
               child: Text(
                 AppStrings.t('add_friend_short'),
                 style: const TextStyle(
@@ -1576,675 +1611,6 @@ class _StatusPill extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Profile card
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _ProfileCard extends StatefulWidget {
-  const _ProfileCard({
-    super.key,
-    required this.profile,
-    required this.photos,
-    required this.onAdd,
-    this.pendingOutgoing = false,
-    this.onSendEmoji,
-    this.reactionsByPhoto = const {},
-    this.alreadyMessaged = false,
-    this.onSendMessage,
-  });
-
-  final RemoteProfile profile;
-  final List<String> photos;
-  final VoidCallback onAdd;
-  final bool pendingOutgoing;
-  final void Function(String photo, String emoji)? onSendEmoji;
-  final Map<String, Set<String>> reactionsByPhoto;
-  final bool alreadyMessaged;
-  final Future<void> Function(String)? onSendMessage;
-
-  @override
-  State<_ProfileCard> createState() => _ProfileCardState();
-}
-
-class _ProfileCardState extends State<_ProfileCard> {
-  @override
-  Widget build(BuildContext context) {
-    final profile = widget.profile;
-    final photos = widget.photos;
-    final onAdd = widget.onAdd;
-    final pendingOutgoing = widget.pendingOutgoing;
-    final alreadyMessaged = widget.alreadyMessaged;
-    final onSendMessage = widget.onSendMessage;
-    final currentPhoto = photos.isEmpty ? '' : photos.first;
-    final reactedEmojis =
-        widget.reactionsByPhoto[currentPhoto] ?? const <String>{};
-    final sendEmoji = widget.onSendEmoji;
-    final onSendEmoji = sendEmoji == null
-        ? null
-        : (String emoji) => sendEmoji(currentPhoto, emoji);
-
-    final flag =
-        (profile.city.trim().isNotEmpty
-            ? countryFlagFor(profile.country)
-            : null) ??
-        findLanguageByCode(profile.language)?.flag ??
-        '';
-    final locationLabel = [
-      profile.city.trim(),
-      profile.country.trim(),
-    ].where((s) => s.isNotEmpty).join(', ');
-    final online = !profile.hideOnlineStatus &&
-        profile.lastSeen != null &&
-        DateTime.now().difference(profile.lastSeen!) <
-            const Duration(minutes: 2);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
-        boxShadow: [
-          BoxShadow(
-            color: SC.accent.withValues(alpha: 0.55),
-            blurRadius: 48,
-            spreadRadius: 2,
-          ),
-          BoxShadow(
-            color: SC.meshCyan.withValues(alpha: 0.35),
-            blurRadius: 90,
-            offset: const Offset(0, 30),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const ColoredBox(color: SC.bubbleIn),
-            if (currentPhoto.isNotEmpty) _CardPhoto(photoUrl: currentPhoto),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.10),
-                      Colors.black.withValues(alpha: 0.85),
-                    ],
-                    stops: const [0.45, 0.65, 1.0],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 22,
-              right: 22,
-              bottom: 22,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Flexible(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  Navigator.of(context).push<void>(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          ProfileScreen(userId: profile.id),
-                                    ),
-                                  );
-                                },
-                                child: Text(
-                                  profile.displayName.isEmpty
-                                      ? '—'
-                                      : profile.displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: SCText.h1.copyWith(
-                                    fontSize: 32,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (flag.isNotEmpty) ...[
-                              const SizedBox(width: 10),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Text(
-                                  flag,
-                                  style: const TextStyle(fontSize: 22),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (locationLabel.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.place_outlined,
-                                size: 14,
-                                color: Colors.white.withValues(alpha: 0.8),
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  locationLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.85),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (online) ...[
-                          const SizedBox(height: 5),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: SC.online,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                AppStrings.t('online_now'),
-                                style: const TextStyle(
-                                  color: SC.online,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (profile.interests.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final tag in profile.interests.take(3))
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.20),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.35,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    interestLabel(tag),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 14),
-                        if (onSendMessage != null)
-                          if (alreadyMessaged)
-                            const _MessageSentPill()
-                          else
-                            _DirectMessageField(
-                              onSend: onSendMessage,
-                              peerName: profile.displayName,
-                            ),
-                      ],
-                    ),
-                  ),
-                  if (onSendEmoji != null) ...[
-                    const SizedBox(width: 12),
-                    _ReactionRail(
-                      onSendEmoji: onSendEmoji,
-                      reactedEmojis: reactedEmojis,
-                      onAddFriend: onAdd,
-                      pendingOutgoing: pendingOutgoing,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardPhoto extends StatelessWidget {
-  const _CardPhoto({required this.photoUrl});
-
-  final String photoUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.network(
-      photoUrl,
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-      gaplessPlayback: true,
-      errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Reaction rail
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _ReactionRail extends StatelessWidget {
-  const _ReactionRail({
-    this.onSendEmoji,
-    this.reactedEmojis = const <String>{},
-    this.onAddFriend,
-    this.pendingOutgoing = false,
-  });
-
-  final ValueChanged<String>? onSendEmoji;
-  final Set<String> reactedEmojis;
-  final VoidCallback? onAddFriend;
-  final bool pendingOutgoing;
-
-  static const _emojis = <String>['🔥', '😍', '❤️'];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < _emojis.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _ReactionEmojiButton(
-            emoji: _emojis[i],
-            index: i,
-            reacted: reactedEmojis.contains(_emojis[i]),
-            onSend: onSendEmoji == null
-                ? null
-                : () => onSendEmoji!(_emojis[i]),
-          ),
-        ],
-        if (onAddFriend != null) ...[
-          const SizedBox(height: 10),
-          _RailAddFriendButton(
-            pending: pendingOutgoing,
-            onTap: onAddFriend!,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _RailAddFriendButton extends StatelessWidget {
-  const _RailAddFriendButton({required this.pending, required this.onTap});
-  final bool pending;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: pending
-              ? SC.accent.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.35),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: pending ? SC.accent : Colors.white.withValues(alpha: 0.20),
-            width: pending ? 2 : 1,
-          ),
-        ),
-        child: Icon(
-          pending ? Icons.check_rounded : Icons.person_add_alt_1,
-          size: pending ? 24 : 22,
-          color: pending ? SC.accent : Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-class _ReactionEmojiButton extends StatefulWidget {
-  const _ReactionEmojiButton({
-    required this.emoji,
-    required this.reacted,
-    this.onSend,
-    this.index = 0,
-  });
-
-  final String emoji;
-  final int index;
-  final bool reacted;
-  final VoidCallback? onSend;
-
-  @override
-  State<_ReactionEmojiButton> createState() => _ReactionEmojiButtonState();
-}
-
-class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
-    with TickerProviderStateMixin {
-  late final AnimationController _pop = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 380),
-  );
-  late final Animation<double> _popScale = TweenSequence<double>([
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1.0,
-        end: 1.35,
-      ).chain(CurveTween(curve: Curves.easeOut)),
-      weight: 35,
-    ),
-    TweenSequenceItem(
-      tween: Tween<double>(
-        begin: 1.35,
-        end: 1.0,
-      ).chain(CurveTween(curve: Curves.elasticOut)),
-      weight: 65,
-    ),
-  ]).animate(_pop);
-
-  late final AnimationController _breathe = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2500),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _breathe.dispose();
-    _pop.dispose();
-    super.dispose();
-  }
-
-  void _handleTap(BuildContext ctx) {
-    HapticFeedback.lightImpact();
-    _pop.forward(from: 0);
-    if (!widget.reacted) {
-      final box = ctx.findRenderObject() as RenderBox?;
-      if (box != null && box.hasSize) {
-        final pos = box.localToGlobal(box.size.center(Offset.zero));
-        EmojiBurst.show(ctx, position: pos, emoji: widget.emoji);
-      }
-    }
-    widget.onSend!();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Builder(
-      builder: (ctx) {
-        final glyph = Center(
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 160),
-            style: TextStyle(
-              fontSize: widget.reacted ? 24 : 22,
-              color: Colors.white,
-              shadows: const [
-                Shadow(
-                  color: Color(0x66000000),
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-                Shadow(
-                  color: Color(0x99000000),
-                  blurRadius: 2,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            child: AnimatedBuilder(
-              animation: Listenable.merge([_breathe, _pop]),
-              builder: (context, child) => Transform.scale(
-                scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
-                child: child,
-              ),
-              child: widget.emoji == '❤️'
-                  ? Icon(
-                      widget.reacted
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      size: widget.reacted ? 26 : 24,
-                      color: widget.reacted
-                          ? const Color(0xFFFF3B5C)
-                          : Colors.white,
-                    )
-                  : Text(widget.emoji),
-            ),
-          ),
-        );
-
-        final Widget surface = useShaderGlass
-            ? lg.GlassContainer(
-                useOwnLayer: true,
-                clipBehavior: Clip.antiAlias,
-                width: 48,
-                height: 48,
-                shape: const lg.LiquidOval(),
-                settings: lg.LiquidGlassSettings(
-                  blur: 6,
-                  thickness: 12,
-                  glassColor: widget.reacted
-                      ? const Color(0x3322D3EE)
-                      : const Color(0x14FFFFFF),
-                  refractiveIndex: 1.3,
-                  glowIntensity: widget.reacted ? 1.0 : 0.5,
-                ),
-                child: glyph,
-              )
-            : AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: widget.reacted
-                      ? Colors.white.withValues(alpha: 0.18)
-                      : Colors.black.withValues(alpha: 0.35),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(
-                      alpha: widget.reacted ? 0.85 : 0.20,
-                    ),
-                    width: widget.reacted ? 2 : 1,
-                  ),
-                ),
-                child: glyph,
-              );
-
-        return Pressable(
-          behavior: HitTestBehavior.opaque,
-          bounce: true,
-          onTap: widget.onSend == null ? null : () => _handleTap(ctx),
-          child: surface,
-        );
-      },
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Direct message field
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _DirectMessageField extends StatefulWidget {
-  const _DirectMessageField({required this.onSend, this.peerName = ''});
-  final Future<void> Function(String) onSend;
-  final String peerName;
-
-  @override
-  State<_DirectMessageField> createState() => _DirectMessageFieldState();
-}
-
-class _DirectMessageFieldState extends State<_DirectMessageField> {
-  final TextEditingController _ctrl = TextEditingController();
-  final FocusNode _focus = FocusNode();
-  bool _sending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl.addListener(_onChanged);
-    _focus.addListener(_onChanged);
-  }
-
-  void _onChanged() => setState(() {});
-
-  @override
-  void dispose() {
-    _ctrl.removeListener(_onChanged);
-    _focus.removeListener(_onChanged);
-    _focus.dispose();
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty || _sending) return;
-    setState(() => _sending = true);
-    await widget.onSend(text);
-    if (mounted) setState(() => _sending = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasText = _ctrl.text.trim().isNotEmpty;
-    final expanded = _focus.hasFocus || hasText;
-    final firstName = widget.peerName.trim().split(RegExp(r'\s+')).first;
-    final hintText = firstName.isEmpty
-        ? AppStrings.t('discover_message_hint')
-        : AppStrings.t(
-            'discover_message_hint_name',
-            args: {'name': firstName},
-          );
-    return GlassPanel(
-      borderRadius: 24,
-      color: const Color(0x80000000),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        width: expanded ? 270 : 232,
-        padding: EdgeInsets.fromLTRB(14, 3, expanded ? 5 : 16, 3),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _ctrl,
-                focusNode: _focus,
-                enabled: !_sending,
-                minLines: 1,
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                cursorColor: SC.accent,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  isDense: true,
-                  filled: false,
-                  hintText: hintText,
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                onSubmitted: (_) => _send(),
-              ),
-            ),
-            if (expanded) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: (hasText && !_sending) ? _send : null,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: SC.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageSentPill extends StatelessWidget {
-  const _MessageSentPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_rounded, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            AppStrings.t('discover_message_sent'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
