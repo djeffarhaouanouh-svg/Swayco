@@ -128,20 +128,12 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final s = web.MediaStream();
           s.addTrack(micTrack);
           _micStream = s;
-          // AEC off: without the speaker-playback reference the echo canceller
-          // distorts the ASR signal. NS + AGC normalise levels instead.
-          try {
-            await micTrack
-                .applyConstraints(web.MediaTrackConstraints(
-                  echoCancellation: false.toJS,
-                  noiseSuppression: true.toJS,
-                  autoGainControl: true.toJS,
-                ))
-                .toDart;
-          } catch (_) {
-            _log('applyConstraints skipped — browser default kept');
-          }
-          _log('LiveKit track cloned for STT (AEC off, NS on, AGC on)');
+          // Do NOT call applyConstraints on the clone: constraints propagate to
+          // the shared hardware source and would modify the LiveKit call track
+          // (cutting the voice stream to the peer). The clone already inherits
+          // LiveKit's settings (AEC on with proper speaker reference = correct
+          // for STT too, since the browser removes the remote TTS from the signal).
+          _log('LiveKit track cloned for STT (inherited constraints)');
         } else {
           // Fallback: LiveKit track not yet published — own getUserMedia.
           final micStream = await web.window.navigator.mediaDevices
