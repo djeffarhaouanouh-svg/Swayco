@@ -115,11 +115,14 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         // The clone shares the hardware source but is independent: we apply
         // STT-optimised constraints (AEC off, NS on, AGC on) without touching
         // the LiveKit call track.
+        // LiveKit's LocalAudioTrack.mediaStreamTrack returns a flutter_webrtc
+        // MediaStreamTrack, not a web.MediaStreamTrack. One more hop via .jsTrack
+        // gives the underlying JS object.
         web.MediaStreamTrack? lkMst;
         if (localTrack != null) {
           try {
-            lkMst = (localTrack as dynamic).mediaStreamTrack
-                as web.MediaStreamTrack?;
+            final fwMst = (localTrack as dynamic).mediaStreamTrack;
+            lkMst = (fwMst as dynamic).jsTrack as web.MediaStreamTrack?;
           } catch (_) {}
         }
 
@@ -128,20 +131,21 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final s = web.MediaStream();
           s.addTrack(micTrack);
           _micStream = s;
-          // Do NOT call applyConstraints on the clone: constraints propagate to
-          // the shared hardware source and would modify the LiveKit call track
-          // (cutting the voice stream to the peer). The clone already inherits
-          // LiveKit's settings (AEC on with proper speaker reference = correct
-          // for STT too, since the browser removes the remote TTS from the signal).
-          _log('LiveKit track cloned for STT (inherited constraints)');
+          // Clone inherits LiveKit's AudioCaptureOptions:
+          //   AEC on · NS on · AGC OFF
+          // AGC off is critical: with AGC on, any TTS leak captured by the mic
+          // gets amplified each pass until audio runs away (the "son dégueulasse").
+          // Without AGC the leak stays below source level and decays naturally.
+          _log('LiveKit track cloned for STT (AEC on, NS on, AGC off)');
         } else {
-          // Fallback: LiveKit track not yet published — own getUserMedia.
+          // Fallback: LiveKit track not yet published — open own getUserMedia
+          // with the same constraint set as call_screen AudioCaptureOptions.
           final micStream = await web.window.navigator.mediaDevices
               .getUserMedia(web.MediaStreamConstraints(
                 audio: web.MediaTrackConstraints(
-                  echoCancellation: false.toJS,
+                  echoCancellation: true.toJS,
                   noiseSuppression: true.toJS,
-                  autoGainControl: true.toJS,
+                  autoGainControl: false.toJS,
                 ),
               ))
               .toDart;
@@ -154,7 +158,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
             return;
           }
           micTrack = audioTracks.first;
-          _log('getUserMedia local mic (AEC off, NS on, AGC on)');
+          _log('getUserMedia local mic fallback (AEC on, NS on, AGC off)');
         }
       } else {
         web.MediaStreamTrack? jsTrack;
