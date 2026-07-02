@@ -25,6 +25,37 @@ extension type _CopyOpts._(JSObject _) implements JSObject {
   external factory _CopyOpts({int planeIndex, String format});
 }
 
+// ── ScriptProcessorNode fallback for iOS Safari (no MediaStreamTrackProcessor) ──
+extension type _ScriptProcNode(JSObject _) implements JSObject {
+  external set onaudioprocess(JSFunction? cb);
+  external void disconnect();
+}
+
+extension type _AudioProcEvent(JSObject _) implements JSObject {
+  external _AudioBuf get inputBuffer;
+}
+
+extension type _AudioBuf(JSObject _) implements JSObject {
+  external JSFloat32Array getChannelData(int channel);
+  external num get sampleRate;
+}
+
+extension _AudioCtxExt on web.AudioContext {
+  @JS('createScriptProcessor')
+  external _ScriptProcNode createScriptProc(
+      int bufferSize, int numIn, int numOut);
+  @JS('createMediaStreamSource')
+  external JSObject createMsSource(web.MediaStream stream);
+}
+
+extension _JsNodeConnect on JSObject {
+  @JS('connect')
+  external void connectTo(JSObject destination);
+}
+
+@JS('MediaStreamTrackProcessor')
+external JSAny? get _mstpConstructor;
+
 /// Web realtime mic streamer, SENDER-side. Captures MY OWN mic via a dedicated
 /// `getUserMedia` (echoCancellation = browser AEC, so it doesn't re-capture the
 /// loudspeaker), reads frames via `MediaStreamTrackProcessor` (WebCodecs — avoids
@@ -35,6 +66,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   web.WebSocket? _ws;
   web.MediaStream? _micStream;
   web.ReadableStreamDefaultReader? _reader;
+  // ScriptProcessor fallback (iOS Safari)
+  web.AudioContext? _audioCtx;
+  _ScriptProcNode? _scriptProc;
 
   bool _running = false;
   bool _wsOpen = false;
@@ -160,14 +194,21 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         } catch (_) {}
       }).toJS;
 
-      // Pull audio frames directly from my mic track.
-      final processor = web.MediaStreamTrackProcessor(
-          web.MediaStreamTrackProcessorInit(track: micTrack));
-      final reader =
-          processor.readable.getReader() as web.ReadableStreamDefaultReader;
-      _reader = reader;
-      _log('MediaStreamTrackProcessor reader started');
-      unawaited(_pump(reader));
+      // Pull audio frames: prefer MediaStreamTrackProcessor (Chrome/Firefox);
+      // fall back to ScriptProcessorNode for iOS Safari.
+      final bool hasMstp = _mstpConstructor != null;
+      if (hasMstp) {
+        final processor = web.MediaStreamTrackProcessor(
+            web.MediaStreamTrackProcessorInit(track: micTrack));
+        final reader = processor.readable.getReader()
+            as web.ReadableStreamDefaultReader;
+        _reader = reader;
+        _log('MediaStreamTrackProcessor reader started');
+        unawaited(_pump(reader));
+      } else {
+        _log('MediaStreamTrackProcessor unavailable — using ScriptProcessor');
+        _startScriptProcessor(micTrack);
+      }
     } catch (e) {
       _log('start FAILED: $e');
       onError?.call('start_failed: $e');
@@ -254,6 +295,61 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     return out;
   }
 
+  // ── ScriptProcessor fallback (iOS Safari) ──────────────────────────────────
+  void _startScriptProcessor(web.MediaStreamTrack track) {
+    try {
+      final ctx = web.AudioContext();
+      _audioCtx = ctx;
+      final inRate = ctx.sampleRate.toInt();
+
+      final stream = _micStream ?? web.MediaStream();
+      if (_micStream == null) stream.addTrack(track);
+
+      final source = ctx.createMsSource(stream);
+      final proc = ctx.createScriptProc(4096, 1, 1);
+      _scriptProc = proc;
+
+      // connect source → proc → destination (destination needed for callback to fire)
+      source.connectTo(proc);
+      proc.connectTo(ctx.destination as JSObject);
+
+      proc.onaudioprocess = ((JSObject evt) {
+        if (!_running || !_wsOpen) return;
+        try {
+          final e = _AudioProcEvent(evt);
+          final buf = e.inputBuffer;
+          final f32 = buf.getChannelData(0).toDart;
+          final rate = buf.sampleRate.toInt();
+          final n = f32.length;
+          var sum = 0.0;
+          for (var i = 0; i < n; i++) {
+            sum += f32[i] * f32[i];
+          }
+          final level = sum / n;
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          if (level > _vadThreshold) _lastVoiceMs = nowMs;
+          final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
+          final pausedByPlayback = _captureLocalMic && isTranslationPlaying;
+          if (voiceActive && !pausedByPlayback) {
+            final pcm = _downsampleToPcm16(f32, rate, _outRate);
+            if (pcm.isNotEmpty) {
+              try { _ws?.send(pcm.toJS); } catch (_) {}
+            }
+          }
+          _frames++;
+          if (_frames % 100 == 0) {
+            _log('script-proc frames=$_frames level=${level.toStringAsFixed(5)} '
+                'voice=$voiceActive pause=$pausedByPlayback rate=$rate→$inRate');
+          }
+        } catch (_) {}
+      }).toJS;
+
+      _log('ScriptProcessor started inRate=$inRate');
+    } catch (e) {
+      _log('ScriptProcessor FAILED: $e');
+    }
+  }
+
   @override
   Future<void> stop() async {
     _running = false;
@@ -262,6 +358,14 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       await _reader?.cancel('stop'.toJS).toDart;
     } catch (_) {}
     _reader = null;
+    try {
+      _scriptProc?.disconnect();
+      _scriptProc = null;
+    } catch (_) {}
+    try {
+      unawaited(_audioCtx?.close().toDart);
+      _audioCtx = null;
+    } catch (_) {}
     try {
       final ws = _ws;
       if (ws != null && ws.readyState == 1) {
