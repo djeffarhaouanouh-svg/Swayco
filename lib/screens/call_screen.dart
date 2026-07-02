@@ -285,12 +285,21 @@ class _CallScreenState extends State<CallScreen> {
           targetBcp47: remoteLang,
         );
         await widget.translation.attachToRoom(room, route: route);
-        // Pre-warm the TTS engine for our language so the first translation
-        // doesn't stall on a cold setLanguage() call.
-        if (_myOutputLang.isNotEmpty) {
-          unawaited(
-            _deviceTts.setLanguage(_myOutputLang).catchError((_) {}),
-          );
+        // Pre-warm the TTS engine: setLanguage loads the voice, then a
+        // zero-volume silent speak forces the browser to initialise the
+        // synthesis pipeline so the first real translation plays instantly.
+        if (_myOutputLang.isNotEmpty && kIsWeb) {
+          unawaited(() async {
+            try {
+              await _deviceTts.setLanguage(_myOutputLang);
+              await _deviceTts.setVolume(0.0);
+              await _deviceTts.speak(' ');
+              await _deviceTts.stop();
+              await _deviceTts.setVolume(1.0);
+            } catch (_) {}
+          }());
+        } else if (_myOutputLang.isNotEmpty) {
+          unawaited(_deviceTts.setLanguage(_myOutputLang).catchError((_) {}));
         }
       } while (_refreshPending && mounted);
     } finally {

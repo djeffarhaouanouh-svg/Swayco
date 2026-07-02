@@ -2083,26 +2083,46 @@ function attachGrokSttWs(server) {
       return;
     }
 
-    // Upstream xAI realtime STT socket.
+    // Upstream xAI realtime STT socket — with auto-reconnect.
+    // xAI closes the upstream after its own session/utterance limits; we reopen
+    // it transparently without dropping the client connection or losing state.
     const params = new URLSearchParams({
       sample_rate: String(sampleRate),
       encoding: 'pcm', // xAI: pcm | mulaw | alaw (pcm = signed 16-bit LE)
-      endpointing: '500', // ms of silence before an utterance is closed (300 cut mid-sentence, 700 too long for short replies)
+      endpointing: '500',
     });
     if (from) params.set('language', from);
-    const upstream = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${GROK_API_KEY}` },
-    });
 
     let upstreamOpen = false;
     let closing = false;
-    const pending = []; // PCM frames buffered until the upstream socket opens
+    const pending = []; // PCM frames buffered while upstream is (re)connecting
+    let currentUpstream = null;
 
-    upstream.on('open', () => {
-      upstreamOpen = true;
-      for (const buf of pending) upstream.send(buf);
-      pending.length = 0;
-    });
+    function openUpstream() {
+      if (closing) return;
+      const up = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${GROK_API_KEY}` },
+      });
+      currentUpstream = up;
+      up.on('open', () => {
+        upstreamOpen = true;
+        console.log('grok stt upstream OPEN');
+        for (const buf of pending) up.send(buf);
+        pending.length = 0;
+      });
+      up.on('message', handleUpstreamMessage);
+      up.on('error', (e) => {
+        console.error('grok stt ws upstream error', e?.message || e);
+      });
+      up.on('close', () => {
+        upstreamOpen = false;
+        if (!closing) {
+          console.log('grok stt upstream closed by xAI — reconnecting in 1s');
+          setTimeout(openUpstream, 1000);
+        }
+      });
+    }
+    openUpstream();
 
     let lastFinalText = '';
     // Text queued from is_final segments, waiting for transcript.done.
@@ -2153,7 +2173,8 @@ function attachGrokSttWs(server) {
       }
     };
 
-    upstream.on('message', async (data) => {
+    // Named handler so openUpstream() can re-attach it on each new socket.
+    async function handleUpstreamMessage(data) {
       let evt;
       try {
         evt = JSON.parse(data.toString());
@@ -2164,7 +2185,6 @@ function attachGrokSttWs(server) {
       // Stream partials for live captions (no translation yet).
       if (evt.type === 'transcript.partial' && !evt.is_final) {
         if (typeof evt.text === 'string') sendCtl({ type: 'partial', text: evt.text });
-        // Log speech_final so we can verify Smart Turn fires reliably before migrating.
         if (evt.speech_final === true) {
           console.log('grok stt SPEECH_FINAL (non-final partial) text=',
             (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
@@ -2203,21 +2223,16 @@ function attachGrokSttWs(server) {
         const text = (typeof evt.text === 'string' ? evt.text : '').trim();
         translateUtterance(text);
       }
-    });
-
-    upstream.on('error', (e) => {
-      console.error('grok stt ws upstream error', e?.message || e);
-      sendCtl({ type: 'error', error: 'grok_stt_unreachable' });
-    });
-    upstream.on('close', () => {
-      if (!closing && client.readyState === WsClient.OPEN) client.close();
-    });
+    }
 
     // App → us. Binary frames are raw PCM; text frames are control messages.
     client.on('message', (data, isBinary) => {
       if (isBinary) {
-        if (upstreamOpen) upstream.send(data);
-        else pending.push(data);
+        if (upstreamOpen && currentUpstream?.readyState === WsClient.OPEN) {
+          currentUpstream.send(data);
+        } else {
+          pending.push(data);
+        }
         return;
       }
       let msg;
@@ -2226,8 +2241,8 @@ function attachGrokSttWs(server) {
       } catch (_) {
         return;
       }
-      if (msg.type === 'audio.done' && upstream.readyState === WsClient.OPEN) {
-        upstream.send(JSON.stringify({ type: 'audio.done' }));
+      if (msg.type === 'audio.done' && currentUpstream?.readyState === WsClient.OPEN) {
+        currentUpstream.send(JSON.stringify({ type: 'audio.done' }));
       }
     });
 
@@ -2236,10 +2251,10 @@ function attachGrokSttWs(server) {
       clearTimeout(pendingTimer);
       pendingTimer = null;
       try {
-        if (upstream.readyState === WsClient.OPEN) {
-          upstream.send(JSON.stringify({ type: 'audio.done' }));
+        if (currentUpstream?.readyState === WsClient.OPEN) {
+          currentUpstream.send(JSON.stringify({ type: 'audio.done' }));
         }
-        upstream.close();
+        currentUpstream?.close();
       } catch (_) {}
     });
     client.on('error', () => {
