@@ -928,8 +928,8 @@ class _ProfileScreenState extends State<ProfileScreen>
             // is hidden. Re-render it here and route taps back to the shell.
             if (_isViewingOther)
               Positioned(
-                left: 24,
-                right: 24,
+                left: 52,
+                right: 52,
                 bottom: MediaQuery.paddingOf(context).bottom +
                     GlassNavBar.floatBottom,
                 child: ValueListenableBuilder<int>(
