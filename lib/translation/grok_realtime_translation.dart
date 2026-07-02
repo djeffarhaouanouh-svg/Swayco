@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
@@ -47,6 +48,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
   String? _boundSid;
 
   final AudioPlayer _player = AudioPlayer();
+  final FlutterTts _deviceTts = FlutterTts();
   StreamSubscription<void>? _playSub;
   bool _speaking = false;
   double _volume = 1.0;
@@ -157,8 +159,8 @@ class GrokRealtimeTranslation extends ChangeNotifier
             wsUrl: grokSttWsUri(
               from: route.sourceBcp47,
               to: route.targetBcp47,
-              // On native the receiver uses Kokoro local TTS — skip server TTS.
-              kokoroTts: !kIsWeb,
+              // Skip server TTS everywhere: native uses Kokoro, web uses device TTS.
+              kokoroTts: true,
             ),
             captureLocalMic: true,
             onTranslation: _onSendTranslation,
@@ -196,6 +198,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     unawaited(_playSub?.cancel());
     unawaited(detach());
     unawaited(_player.dispose());
+    unawaited(_deviceTts.stop());
     super.dispose();
   }
 
@@ -242,7 +245,11 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _recvStreamer = streamer;
     try {
       await streamer.start(
-        wsUrl: grokSttWsUri(from: route.targetBcp47, to: route.sourceBcp47),
+        wsUrl: grokSttWsUri(
+          from: route.targetBcp47,
+          to: route.sourceBcp47,
+          kokoroTts: true, // no Grok TTS on web RECV — we use device TTS
+        ),
         localTrack: track.mediaStreamTrack,
         captureLocalMic: false,
         onTranslation: _onRecvTranslation,
@@ -260,8 +267,22 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onRecvTranslation(String orig, String trans, String lang, String audioB64) {
     _lastRecv = trans;
     _lastError = null;
-    if (audioB64.isNotEmpty) unawaited(_playMp3B64(audioB64));
+    if (audioB64.isNotEmpty) {
+      unawaited(_playMp3B64(audioB64));
+    } else if (trans.isNotEmpty) {
+      unawaited(_deviceTtsSpeak(trans, lang));
+    }
     notifyListeners();
+  }
+
+  Future<void> _deviceTtsSpeak(String text, String lang) async {
+    try {
+      if (lang.isNotEmpty) {
+        try { await _deviceTts.setLanguage(lang); } catch (_) {}
+      }
+      await _deviceTts.stop();
+      await _deviceTts.speak(text);
+    } catch (_) {}
   }
 
   Future<void> _playMp3B64(String audioB64) async {
