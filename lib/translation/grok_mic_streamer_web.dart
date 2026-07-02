@@ -75,13 +75,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   bool _wsOpen = false;
   int _frames = 0;
   bool _captureLocalMic = true;
-  int _lastVoiceMs = 0;
 
   static const int _outRate = 16000;
-  // VAD: mean-square level above which we consider it speech. Low threshold +
-  // generous hangover so we never clip the start/middle of a phrase.
-  static const double _vadThreshold = 0.0002;
-  static const int _vadHangoverMs = 1200;
 
   @override
   bool get isRunning => _running;
@@ -240,36 +235,17 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           _CopyOpts(planeIndex: 0, format: 'f32-planar'),
         );
         audio.close();
-        if (_wsOpen && n > 0) {
-          // VAD level (mean square).
-          var sum = 0.0;
-          for (var i = 0; i < n; i++) {
-            sum += f32[i] * f32[i];
-          }
-          final level = sum / n;
-          final nowMs = DateTime.now().millisecondsSinceEpoch;
-          if (level > _vadThreshold) _lastVoiceMs = nowMs;
-          final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
-          // Half-duplex: never send MY mic while a translation is playing out
-          // the speaker — otherwise we re-capture & re-translate our own audio
-          // (the "device answers itself" loop).
-          // Half-duplex TTS gate removed — browser AEC (echoCancellation:true)
-          // suppresses speaker output from the mic; no need to pause SEND.
-          // Only the mic-mute button can block SEND.
-          final pausedByPlayback = _captureLocalMic && isSendMuted;
-
-          if (voiceActive && !pausedByPlayback) {
-            final pcm = _downsampleToPcm16(f32, inRate, _outRate);
-            if (pcm.isNotEmpty) {
-              try {
-                _ws?.send(pcm.toJS);
-              } catch (_) {}
-            }
+        // Send all frames continuously — Grok STT handles silence internally.
+        // AEC (echoCancellation:true) suppresses speaker output from the mic.
+        // Only the mic-mute button blocks the stream.
+        if (_wsOpen && n > 0 && !(_captureLocalMic && isSendMuted)) {
+          final pcm = _downsampleToPcm16(f32, inRate, _outRate);
+          if (pcm.isNotEmpty) {
+            try { _ws?.send(pcm.toJS); } catch (_) {}
           }
           _frames++;
-          if (_frames % 100 == 0) {
-            _log('pcm frames=$_frames level=${level.toStringAsFixed(5)} '
-                'voice=$voiceActive pause=$pausedByPlayback');
+          if (_frames % 200 == 0) {
+            _log('pcm frames=$_frames muted=$isSendMuted');
           }
         }
       } catch (e) {
@@ -325,29 +301,15 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final buf = e.inputBuffer;
           final f32 = buf.getChannelData(0).toDart;
           final rate = buf.sampleRate.toInt();
-          final n = f32.length;
-          var sum = 0.0;
-          for (var i = 0; i < n; i++) {
-            sum += f32[i] * f32[i];
-          }
-          final level = sum / n;
-          final nowMs = DateTime.now().millisecondsSinceEpoch;
-          if (level > _vadThreshold) _lastVoiceMs = nowMs;
-          final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
-          // Half-duplex TTS gate removed — browser AEC (echoCancellation:true)
-          // suppresses speaker output from the mic; no need to pause SEND.
-          // Only the mic-mute button can block SEND.
-          final pausedByPlayback = _captureLocalMic && isSendMuted;
-          if (voiceActive && !pausedByPlayback) {
+          if (!(_captureLocalMic && isSendMuted)) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {
               try { _ws?.send(pcm.toJS); } catch (_) {}
             }
           }
           _frames++;
-          if (_frames % 100 == 0) {
-            _log('script-proc frames=$_frames level=${level.toStringAsFixed(5)} '
-                'voice=$voiceActive pause=$pausedByPlayback rate=$rate→$inRate');
+          if (_frames % 200 == 0) {
+            _log('script-proc frames=$_frames muted=$isSendMuted rate=$rate');
           }
         } catch (_) {}
       }).toJS;
