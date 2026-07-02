@@ -25,7 +25,6 @@ import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
 import '../services/kokoro/kokoro_service.dart';
-import '../services/translation_api.dart';
 import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -818,38 +817,13 @@ class _CallScreenState extends State<CallScreen> {
       }
     }
     // Kokoro not ready — fall back to device TTS.
-    unawaited(_speak(text, lang));
-  }
-
-  /// Read an incoming message aloud. Prefer OpenAI TTS (gpt-4o-mini-tts via
-  /// the backend); fall back to the device's built-in voice when the backend
-  /// /translation/tts endpoint isn't available.
-  Future<void> _speak(String text, String lang) async {
     try {
-      final bytes = await fetchSpeech(text: text, lang: lang);
-      debugPrint('[grok-rt] /translation/tts -> ${bytes?.length ?? -1} bytes');
-      if (bytes != null && bytes.isNotEmpty && mounted) {
-        await _ttsPlayer.stop();
-        await _ttsPlayer.play(BytesSource(bytes));
-        return;
-      }
-    } catch (_) {
-      // Fall through to the device voice.
-    }
-    if (!mounted) return;
-    try {
-      // BCP-47 primary subtag (e.g. "fr") — best-effort; if the engine
-      // rejects it, speak() still runs in the default voice.
       if (lang.isNotEmpty) {
-        try {
-          await _deviceTts.setLanguage(lang);
-        } catch (_) {}
+        try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
       await _deviceTts.stop();
       await _deviceTts.speak(text);
-    } catch (_) {
-      // TTS is best-effort — silent on failure.
-    }
+    } catch (_) {}
   }
 
   Future<void> _toggleCam() async {
