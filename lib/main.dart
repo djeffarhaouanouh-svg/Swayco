@@ -28,6 +28,7 @@ import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
+import 'services/kokoro/kokoro_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/user_prefs.dart';
@@ -130,6 +131,12 @@ Future<void> main() async {
       await RevenueCat.init().timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
+    }
+    // Kokoro local TTS: start model download in background so it's ready
+    // before the first call. Native-only; KokoroService.init() is a no-op
+    // on web. ~21 MB first download, then loads the ONNX session (~1–3 s).
+    if (!kIsWeb) {
+      unawaited(KokoroService.instance.init());
     }
     // Seed the hide-online cache so presence renders are correct on
     // the first frame. 2s cap — SharedPreferences must never block.
