@@ -2085,7 +2085,7 @@ function attachGrokSttWs(server) {
     const params = new URLSearchParams({
       sample_rate: String(sampleRate),
       encoding: 'pcm', // xAI: pcm | mulaw | alaw (pcm = signed 16-bit LE)
-      endpointing: '300', // ms of silence before an utterance is closed
+      endpointing: '700', // ms of silence before an utterance is closed (was 300 — too short, cut mid-sentence)
     });
     if (from) params.set('language', from);
     const upstream = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
@@ -2103,43 +2103,22 @@ function attachGrokSttWs(server) {
     });
 
     let lastFinalText = '';
-    upstream.on('message', async (data) => {
-      let evt;
-      try {
-        evt = JSON.parse(data.toString());
-      } catch (_) {
-        return;
-      }
-      if (evt.type === 'transcript.partial' || evt.type === 'transcript.done') {
-        console.log(
-          'grok stt evt', evt.type,
-          'is_final=', evt.is_final, 'speech_final=', evt.speech_final,
-          'text=', (typeof evt.text === 'string' ? evt.text : '').slice(0, 60),
-        );
-      }
-      // Translate on each FINAL segment. With the call mic always live,
-      // speech_final (silence-based) may never fire — so we key off is_final
-      // (a locked ~3s segment) as well as the closing transcript.done. Dedup
-      // so the same locked segment isn't translated twice.
-      const isFinalSegment =
-        (evt.type === 'transcript.partial' && evt.is_final === true) ||
-        evt.type === 'transcript.done';
-      if (!isFinalSegment) {
-        if (evt.type === 'transcript.partial' && typeof evt.text === 'string') {
-          sendCtl({ type: 'partial', text: evt.text });
-        }
-        return;
-      }
-      const transcript = (typeof evt.text === 'string' ? evt.text : '').trim();
+    // Text queued from is_final segments, waiting for transcript.done.
+    let pendingText = '';
+    let pendingTimer = null;
+
+    // Translate a complete utterance. Deduplicates against the last sent text.
+    const translateUtterance = async (text) => {
+      const transcript = (text || '').trim();
       if (!transcript || transcript === lastFinalText) return;
       lastFinalText = transcript;
+      console.log('grok stt → translate', JSON.stringify(transcript.slice(0, 80)));
 
       // Segment finalised → translate, then TTS only when client needs it.
       const tr = await grokTranslateText({ transcript, from, to });
       if (tr.error) return sendCtl({ type: 'error', error: tr.error });
 
       if (kokoroMode) {
-        // Native Kokoro path: send translated text only; app renders audio locally.
         track({
           event: 'grok_stt_translation',
           lang_from: from || undefined,
@@ -2154,7 +2133,6 @@ function attachGrokSttWs(server) {
           audio: '',
         });
       } else {
-        // Web / legacy path: generate Grok TTS and stream the mp3.
         const sp = await grokSynthesizeSpeech({ text: tr.translated, voice, lang: to });
         if (sp.error) return sendCtl({ type: 'error', error: sp.error });
         track({
@@ -2170,6 +2148,48 @@ function attachGrokSttWs(server) {
           lang: to,
           audio: sp.audio.toString('base64'),
         });
+      }
+    };
+
+    upstream.on('message', async (data) => {
+      let evt;
+      try {
+        evt = JSON.parse(data.toString());
+      } catch (_) {
+        return;
+      }
+
+      // Stream partials for live captions (no translation yet).
+      if (evt.type === 'transcript.partial' && !evt.is_final) {
+        if (typeof evt.text === 'string') sendCtl({ type: 'partial', text: evt.text });
+        return;
+      }
+
+      // is_final: a ~3 s locked segment. Save it and arm a safety timer so
+      // continuous speech (no silence > endpointing) still gets translated
+      // after ~4 s. transcript.done (natural pause) cancels the timer and
+      // translates the complete utterance immediately — no split sentences.
+      if (evt.type === 'transcript.partial' && evt.is_final === true) {
+        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        if (!text) return;
+        pendingText = text;
+        clearTimeout(pendingTimer);
+        pendingTimer = setTimeout(() => {
+          const t = pendingText;
+          pendingText = '';
+          pendingTimer = null;
+          translateUtterance(t);
+        }, 4000);
+        return;
+      }
+
+      // transcript.done: natural pause — translate the complete utterance now.
+      if (evt.type === 'transcript.done') {
+        clearTimeout(pendingTimer);
+        pendingTimer = null;
+        pendingText = '';
+        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        translateUtterance(text);
       }
     });
 
@@ -2201,6 +2221,8 @@ function attachGrokSttWs(server) {
 
     client.on('close', () => {
       closing = true;
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
       try {
         if (upstream.readyState === WsClient.OPEN) {
           upstream.send(JSON.stringify({ type: 'audio.done' }));
@@ -2209,6 +2231,8 @@ function attachGrokSttWs(server) {
       } catch (_) {}
     });
     client.on('error', () => {
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
       try {
         upstream.close();
       } catch (_) {}
