@@ -657,6 +657,8 @@ class _CallScreenState extends State<CallScreen> {
       // Call audio plays through the loudspeaker (AudioController's default);
       // users route to earphones/AirPods themselves at the OS level.
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
+      // Reset the global mic-mute flag — it persists across re-attaches.
+      setSendMuted(false);
       if (mounted) {
         setState(() {
           _room = room;
