@@ -51,6 +51,10 @@ class GrokRealtimeTranslation extends ChangeNotifier
   int _sent = 0;
   String? _lastSent;
   String? _lastError;
+  // Dedup: prevent publishing the same translation twice within 3 s (Grok can
+  // emit multiple translation events for the same utterance as it streams).
+  String _lastSentTrans = '';
+  int _lastSentMs = 0;
 
   @override
   Listenable? get translationListenable => this;
@@ -177,6 +181,15 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onSendTranslation(String orig, String trans, String lang, String audioB64) {
     _lastSent = trans;
     _lastError = null;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    // Grok can emit multiple translation events for the same utterance.
+    // Publish only when the text actually changed or >3 s have elapsed.
+    if (trans == _lastSentTrans && nowMs - _lastSentMs < 3000) {
+      notifyListeners();
+      return;
+    }
+    _lastSentTrans = trans;
+    _lastSentMs = nowMs;
     final room = _room;
     final route = _route;
     if (room != null && trans.isNotEmpty) {

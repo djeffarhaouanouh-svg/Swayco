@@ -24,23 +24,19 @@ bool _sendMuted = false;
 bool get isSendMuted => _sendMuted;
 void setSendMuted(bool v) => _sendMuted = v;
 
-// The ScriptProcessor AudioContext registered by grok_mic_streamer_web.
-// Suspending it physically stops audio capture — no flag/timer needed.
-web.AudioContext? _captureCtx;
-void registerCaptureContext(dynamic ctx) {
-  try { _captureCtx = ctx as web.AudioContext; } catch (_) { _captureCtx = null; }
-}
+// No-op — AudioContext.suspend/resume is unreliable on Safari (resume()
+// returns a JSPromise that never resolves, leaving capture dead). Half-duplex
+// is handled by the isTranslationPlaying flag in grok_mic_streamer_web.
+void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
-  _captureCtx?.suspend(); // physically stop mic capture during TTS
   _clearTimer?.cancel();
   final ms = textLength > 0
       ? (textLength * 80 + 1500).clamp(3000, 15000)
       : 10000; // <audio> path: onended fires markTranslationDone() early
   _clearTimer = Timer(Duration(milliseconds: ms), () {
     _playing = false;
-    _captureCtx?.resume();
   });
 }
 
@@ -49,7 +45,6 @@ void markTranslationDone() {
   // 800 ms hangover so the speaker tail dies before mic resumes.
   _clearTimer = Timer(const Duration(milliseconds: 800), () {
     _playing = false;
-    _captureCtx?.resume();
   });
 }
 
