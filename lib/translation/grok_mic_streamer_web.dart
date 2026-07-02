@@ -56,6 +56,16 @@ extension _JsNodeConnect on JSObject {
 @JS('MediaStreamTrackProcessor')
 external JSAny? get _mstpConstructor;
 
+// ── speechSynthesis.speaking — query browser TTS state directly ──────────
+// Using a live query avoids the "stuck flag" problem: no timer can fail to fire.
+@JS('speechSynthesis')
+external JSObject? get _globalSpeechSynthesis;
+
+extension _SpeechSynthSpeakingExt on JSObject {
+  @JS('speaking')
+  external bool get speaking;
+}
+
 /// Web realtime mic streamer, SENDER-side. Captures MY OWN mic via a dedicated
 /// `getUserMedia` (echoCancellation = browser AEC, so it doesn't re-capture the
 /// loudspeaker), reads frames via `MediaStreamTrackProcessor` (WebCodecs — avoids
@@ -75,6 +85,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   int _frames = 0;
   bool _captureLocalMic = true;
   int _lastVoiceMs = 0;
+  // TTS playback detection — queried live from browser, never stuck.
+  int _lastTtsSpeakingMs = 0;
+  static const int _ttsDoneHangoverMs = 400;
 
   static const int _outRate = 16000;
   // VAD: mean-square level above which we consider it speech. Low threshold +
@@ -216,6 +229,26 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     }
   }
 
+  /// Returns true while TTS is audibly playing. Queries the Web Speech API
+  /// directly so the result can never be permanently stuck at true.
+  /// Falls back to the isTranslationPlaying flag for <audio>-element TTS.
+  /// Adds a short hangover after speech ends so the speaker tail fades first.
+  bool _isTtsPlaying() {
+    try {
+      final ss = _globalSpeechSynthesis;
+      if (ss != null && _SpeechSynthSpeakingExt(ss).speaking) {
+        _lastTtsSpeakingMs = DateTime.now().millisecondsSinceEpoch;
+        return true;
+      }
+    } catch (_) {}
+    if (isTranslationPlaying) {
+      _lastTtsSpeakingMs = DateTime.now().millisecondsSinceEpoch;
+      return true;
+    }
+    return DateTime.now().millisecondsSinceEpoch - _lastTtsSpeakingMs <
+        _ttsDoneHangoverMs;
+  }
+
   Future<void> _pump(web.ReadableStreamDefaultReader reader) async {
     while (_running) {
       web.ReadableStreamReadResult result;
@@ -251,7 +284,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           // Half-duplex: never send MY mic while a translation is playing out
           // the speaker — otherwise we re-capture & re-translate our own audio
           // (the "device answers itself" loop).
-          final pausedByPlayback = _captureLocalMic && (isTranslationPlaying || isSendMuted);
+          final pausedByPlayback = _captureLocalMic && (_isTtsPlaying() || isSendMuted);
 
           if (voiceActive && !pausedByPlayback) {
             final pcm = _downsampleToPcm16(f32, inRate, _outRate);
@@ -329,7 +362,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final nowMs = DateTime.now().millisecondsSinceEpoch;
           if (level > _vadThreshold) _lastVoiceMs = nowMs;
           final voiceActive = nowMs - _lastVoiceMs < _vadHangoverMs;
-          final pausedByPlayback = _captureLocalMic && (isTranslationPlaying || isSendMuted);
+          final pausedByPlayback = _captureLocalMic && (_isTtsPlaying() || isSendMuted);
           if (voiceActive && !pausedByPlayback) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {
