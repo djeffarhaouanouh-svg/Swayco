@@ -285,6 +285,13 @@ class _CallScreenState extends State<CallScreen> {
           targetBcp47: remoteLang,
         );
         await widget.translation.attachToRoom(room, route: route);
+        // Pre-warm the TTS engine for our language so the first translation
+        // doesn't stall on a cold setLanguage() call.
+        if (_myOutputLang.isNotEmpty) {
+          unawaited(
+            _deviceTts.setLanguage(_myOutputLang).catchError((_) {}),
+          );
+        }
       } while (_refreshPending && mounted);
     } finally {
       _refreshingTranslation = false;

@@ -33,9 +33,9 @@ void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
   // Don't reset an already-running timer: rapid successive TTS calls would
   // push the gate back indefinitely, blocking the user's mic for too long.
-  // 1500 ms covers the echo-onset window; AEC + AGC-off handle the rest.
+  // 800 ms covers the echo-onset window; AEC + AGC-off handle the rest.
   if (_clearTimer != null) return;
-  _clearTimer = Timer(const Duration(milliseconds: 1500), () {
+  _clearTimer = Timer(const Duration(milliseconds: 800), () {
     _playing = false;
     _clearTimer = null;
   });

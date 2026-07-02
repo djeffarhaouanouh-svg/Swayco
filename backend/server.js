@@ -958,7 +958,9 @@ async function grokTranslateText({ transcript, from, to }) {
     const parsed = JSON.parse(body);
     let out = parsed?.choices?.[0]?.message?.content ?? '';
     if (typeof out !== 'string') out = '';
-    out = out.trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+    out = out.trim().replace(/^[“””’’’]+|[“””’’’]+$/g, ‘’).trim();
+    // Strip Grok confidence markers that leak into translation output (e.g. \confidence{80}).
+    out = out.replace(/\\confidence\{[^}]*\}/gi, ‘’).trim();
     return { translated: out || transcript };
   } catch (e) {
     console.error('grok translate throw', e);
@@ -2085,7 +2087,7 @@ function attachGrokSttWs(server) {
     const params = new URLSearchParams({
       sample_rate: String(sampleRate),
       encoding: 'pcm', // xAI: pcm | mulaw | alaw (pcm = signed 16-bit LE)
-      endpointing: '700', // ms of silence before an utterance is closed (was 300 — too short, cut mid-sentence)
+      endpointing: '500', // ms of silence before an utterance is closed (300 cut mid-sentence, 700 too long for short replies)
     });
     if (from) params.set('language', from);
     const upstream = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
