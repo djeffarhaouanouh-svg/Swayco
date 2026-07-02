@@ -97,6 +97,11 @@ dependencies:
   cupertino_native_plus: ^0.0.11
   liquid_glass_widgets: ^0.15.0
 
+  # Kokoro TTS — 100 % on-device ONNX inference (Android arm64 + iOS arm64).
+  # The ~21 MB quantised model is downloaded once via ModelDownloader and
+  # kept in getApplicationSupportDirectory(); never re-downloaded.
+  onnxruntime: ^1.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

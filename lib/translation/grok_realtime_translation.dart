@@ -154,7 +154,12 @@ class GrokRealtimeTranslation extends ChangeNotifier
     unawaited(
       sendStreamer
           .start(
-            wsUrl: grokSttWsUri(from: route.sourceBcp47, to: route.targetBcp47),
+            wsUrl: grokSttWsUri(
+              from: route.sourceBcp47,
+              to: route.targetBcp47,
+              // On native the receiver uses Kokoro local TTS — skip server TTS.
+              kokoroTts: !kIsWeb,
+            ),
             captureLocalMic: true,
             onTranslation: _onSendTranslation,
             onError: (code) {
@@ -294,20 +299,31 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _lastError = null;
     final room = _room;
     final route = _route;
-    if (room != null && audioB64.isNotEmpty && audioB64.length <= _maxAudioB64) {
-      // Include orig/trans for BACKWARD COMPAT: an iOS app on an older build
-      // without voiceOnly support reads orig/trans and re-synthesizes via TTS.
-      final payload = jsonEncode({
-        'voiceOnly': true,
-        'orig': orig,
-        'trans': trans,
-        'lang': lang,
-        'audio': audioB64,
-      });
+    if (room != null && trans.isNotEmpty) {
+      final Map<String, dynamic> payload;
+      if (audioB64.isNotEmpty && audioB64.length <= _maxAudioB64) {
+        // Web path: Grok TTS audio included.
+        // Also carries orig/trans for backward-compat with older native builds.
+        payload = {
+          'voiceOnly': true,
+          'orig': orig,
+          'trans': trans,
+          'lang': lang,
+          'audio': audioB64,
+        };
+      } else {
+        // Native Kokoro path: no TTS audio — receiver synthesises locally.
+        payload = {
+          'kokoro': true,
+          'orig': orig,
+          'trans': trans,
+          'lang': lang,
+        };
+      }
       unawaited(
         room.localParticipant
             ?.publishData(
-              Uint8List.fromList(utf8.encode(payload)),
+              Uint8List.fromList(utf8.encode(jsonEncode(payload))),
               reliable: true,
               topic: _captionTopic,
             )
@@ -319,7 +335,10 @@ class GrokRealtimeTranslation extends ChangeNotifier
           'translation_sent',
           langFrom: route.sourceBcp47,
           langTo: route.targetBcp47,
-          props: {'phase': 'grok_rt'},
+          props: {
+            'phase': 'grok_rt',
+            'tts': audioB64.isNotEmpty ? 'grok' : 'kokoro',
+          },
         );
       }
     }

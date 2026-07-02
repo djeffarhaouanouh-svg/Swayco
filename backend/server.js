@@ -2065,6 +2065,8 @@ function attachGrokSttWs(server) {
     const url = new URL(req.url, 'http://localhost');
     const from = primaryLanguageTag(url.searchParams.get('from') || '');
     const to = primaryLanguageTag(url.searchParams.get('to') || '');
+    // kokoro=true → native client synthesises locally; skip Grok TTS entirely.
+    const kokoroMode = url.searchParams.get('kokoro') === 'true';
     const voice = (() => {
       const v = (url.searchParams.get('voice') || '').trim().toLowerCase();
       return ['ara', 'eve', 'leo', 'rex', 'sal'].includes(v) ? v : GROK_TTS_VOICE;
@@ -2132,24 +2134,43 @@ function attachGrokSttWs(server) {
       if (!transcript || transcript === lastFinalText) return;
       lastFinalText = transcript;
 
-      // Segment finalised → translate + TTS, then hand the result back.
+      // Segment finalised → translate, then TTS only when client needs it.
       const tr = await grokTranslateText({ transcript, from, to });
       if (tr.error) return sendCtl({ type: 'error', error: tr.error });
-      const sp = await grokSynthesizeSpeech({ text: tr.translated, voice, lang: to });
-      if (sp.error) return sendCtl({ type: 'error', error: sp.error });
-      track({
-        event: 'grok_stt_translation',
-        lang_from: from || undefined,
-        lang_to: to,
-        props: { chars: transcript.length, voice },
-      });
-      sendCtl({
-        type: 'translation',
-        orig: transcript,
-        trans: tr.translated,
-        lang: to,
-        audio: sp.audio.toString('base64'),
-      });
+
+      if (kokoroMode) {
+        // Native Kokoro path: send translated text only; app renders audio locally.
+        track({
+          event: 'grok_stt_translation',
+          lang_from: from || undefined,
+          lang_to: to,
+          props: { chars: transcript.length, tts: 'kokoro' },
+        });
+        sendCtl({
+          type: 'translation',
+          orig: transcript,
+          trans: tr.translated,
+          lang: to,
+          audio: '',
+        });
+      } else {
+        // Web / legacy path: generate Grok TTS and stream the mp3.
+        const sp = await grokSynthesizeSpeech({ text: tr.translated, voice, lang: to });
+        if (sp.error) return sendCtl({ type: 'error', error: sp.error });
+        track({
+          event: 'grok_stt_translation',
+          lang_from: from || undefined,
+          lang_to: to,
+          props: { chars: transcript.length, voice, tts: 'grok' },
+        });
+        sendCtl({
+          type: 'translation',
+          orig: transcript,
+          trans: tr.translated,
+          lang: to,
+          audio: sp.audio.toString('base64'),
+        });
+      }
     });
 
     upstream.on('error', (e) => {

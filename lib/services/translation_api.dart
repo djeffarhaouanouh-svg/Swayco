@@ -130,12 +130,16 @@ Uri grokSttWsUri({
   required String from,
   required String to,
   String voice = 'eve',
+  // When true the backend skips Grok TTS and sends only translated text;
+  // the native app generates audio locally with Kokoro.
+  bool kokoroTts = false,
 }) {
   final query = <String, String>{
     if (from.isNotEmpty) 'from': from,
     'to': to,
     'voice': voice,
     'sample_rate': '16000',
+    if (kokoroTts) 'kokoro': 'true',
   };
   String wsScheme(String httpScheme) => httpScheme == 'https' ? 'wss' : 'ws';
   Uri build(String scheme, String host, int? port) => Uri(

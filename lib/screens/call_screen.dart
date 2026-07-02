@@ -25,6 +25,7 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
+import '../services/kokoro/kokoro_service.dart';
 import '../services/translation_api.dart';
 import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
@@ -857,6 +858,14 @@ class _CallScreenState extends State<CallScreen> {
       // On web, GrokRealtimeTranslation.RECV already captures the peer's
       // WebRTC track and plays the translation locally — skip the data-channel
       // copy to avoid double-play and the speaker-echo feedback loop.
+      // Kokoro native path: sender skipped Grok TTS; we synthesise locally.
+      if (m['kokoro'] == true) {
+        final trans = m['trans']?.toString() ?? '';
+        final lang = m['lang']?.toString() ?? '';
+        debugPrint('[kokoro] recv trans="$trans" lang=$lang');
+        if (!kIsWeb && trans.isNotEmpty) unawaited(_playWithKokoro(trans, lang));
+        return;
+      }
       if (m['voiceOnly'] == true) {
         debugPrint('[grok-rt] recv voice audio=${audioB64.length}b kIsWeb=$kIsWeb');
         if (!kIsWeb && audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
@@ -897,6 +906,24 @@ class _CallScreenState extends State<CallScreen> {
     } catch (e) {
       debugPrint('[grok-rt] play Grok audio FAILED: $e');
     }
+  }
+
+  /// Synthesise [text] locally with Kokoro. Falls back to device TTS if the
+  /// model isn't ready (e.g. still downloading on first run).
+  Future<void> _playWithKokoro(String text, String lang) async {
+    final kokoro = KokoroService.instance;
+    if (kokoro.isReady) {
+      try {
+        final voice = KokoroService.defaultVoiceFor(lang);
+        await kokoro.ensureLanguageInstalled(lang);
+        await kokoro.speak(text: text, languageCode: lang, voice: voice);
+        return;
+      } catch (e) {
+        debugPrint('[kokoro] speak error: $e');
+      }
+    }
+    // Kokoro not ready — fall back to device TTS.
+    unawaited(_speak(text, lang));
   }
 
   /// Read an incoming message aloud. Prefer OpenAI TTS (gpt-4o-mini-tts via

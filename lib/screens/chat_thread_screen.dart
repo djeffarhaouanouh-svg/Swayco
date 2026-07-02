@@ -25,6 +25,7 @@ import '../services/profile_api.dart';
 import '../services/push_dispatcher.dart';
 import '../services/scheduled_call_api.dart';
 import '../services/supabase_service.dart';
+import '../services/kokoro/kokoro_service.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../services/voice_message_api.dart';
@@ -90,10 +91,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _myLang = '';
   String _myGender = '';
 
-  /// `'free' | 'plus' | 'pro' | 'ultra'` — read from my own
-  /// Supabase profile during [_bootstrap]. Gates the /voice/dub CTA
-  /// rendered on incoming voice messages.
-  String _myTier = 'free';
   RemoteProfile? _peer;
   bool _sending = false;
   String? _error;
@@ -335,7 +332,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _myGender = (profile?.gender.trim().isNotEmpty ?? false)
           ? profile!.gender.trim()
           : (mine?.gender.trim() ?? '');
-      _myTier = mine?.subscriptionTier ?? 'free';
       _peer = peer;
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
@@ -879,7 +875,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
     // Top-anchored layout: first (oldest) message at the top, list grows
     // downward, empty space at the bottom when the conversation is short.
-    final canDub = _myTier == 'plus' || _myTier == 'pro' || _myTier == 'ultra';
+    // Kokoro TTS is local — no cloud cost, available to all tiers.
+    const canDub = true;
     return ListView.builder(
       controller: _scrollCtrl,
       // Extra top room when the floating local-time bubble is shown so the
@@ -1474,45 +1471,24 @@ class _DubButton extends StatefulWidget {
 
 class _DubButtonState extends State<_DubButton> {
   bool _loading = false;
-  String? _dubUrl;
-  String? _error;
 
-  Future<void> _generate() async {
-    if (_loading || _dubUrl != null) return;
-    if (widget.translatedText.trim().isEmpty) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _play() async {
+    if (_loading || widget.translatedText.trim().isEmpty) return;
+    setState(() => _loading = true);
     try {
-      final out = await fetchVoiceDub(
-        messageId: widget.messageId,
-        targetLang: widget.targetLang,
+      final kokoro = KokoroService.instance;
+      if (!kokoro.isReady) await kokoro.init();
+      await kokoro.ensureLanguageInstalled(widget.targetLang);
+      await kokoro.speak(
         text: widget.translatedText,
+        languageCode: widget.targetLang,
+        voice: KokoroService.defaultVoiceFor(widget.targetLang),
       );
-      if (!mounted) return;
-      setState(() => _dubUrl = out.audioUrl);
-    } on VoiceDubException catch (e) {
-      if (!mounted) return;
-      String msg;
-      switch (e.code) {
-        case VoiceDubError.upgradeRequired:
-          msg = AppStrings.t('voice_dub_upgrade');
-          break;
-        case VoiceDubError.quotaExceeded:
-          msg = AppStrings.t('voice_dub_quota');
-          break;
-        case VoiceDubError.other:
-          msg = AppStrings.t('voice_dub_failed');
-          break;
-      }
-      setState(() => _error = msg);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (_) {
       if (!mounted) return;
-      final msg = AppStrings.t('voice_dub_failed');
-      setState(() => _error = msg);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('voice_dub_failed'))),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1520,19 +1496,10 @@ class _DubButtonState extends State<_DubButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (_dubUrl != null) {
-      // Once we have a URL, replace the CTA with a full mini-player so
-      // the user can scrub / replay the translated audio just like the
-      // original recording above.
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: _VoicePlayer(audioUrl: _dubUrl!, durationMs: 0),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: InkWell(
-        onTap: _loading ? null : _generate,
+        onTap: _loading ? null : _play,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -1549,14 +1516,10 @@ class _DubButtonState extends State<_DubButton> {
                   ),
                 )
               else
-                const Icon(
-                  Icons.volume_up_outlined,
-                  size: 16,
-                  color: SC.accent,
-                ),
+                const Icon(Icons.volume_up_outlined, size: 16, color: SC.accent),
               const SizedBox(width: 6),
               Text(
-                _error ?? AppStrings.t('voice_dub_listen'),
+                AppStrings.t('voice_dub_listen'),
                 style: const TextStyle(
                   color: SC.accent,
                   fontSize: 12,
