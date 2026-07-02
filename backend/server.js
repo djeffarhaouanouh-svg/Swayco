@@ -2101,10 +2101,6 @@ function attachGrokSttWs(server) {
     let lastFinalText = '';
     let pendingText = '';   // accumulated is_final text, waiting for transcript.done
     let pendingTimer = null;
-    // Text saved when xAI closes mid-utterance, stitched into the next segment
-    // from the new session so the sentence comes out whole.
-    let reconnectContext = '';
-    let reconnectTimer = null;
 
     function openUpstream() {
       if (closing) return;
@@ -2125,23 +2121,8 @@ function attachGrokSttWs(server) {
       up.on('close', () => {
         upstreamOpen = false;
         if (!closing) {
-          // If an utterance was in-flight, save it so the new session can
-          // stitch it to its first segment and produce a complete sentence.
-          if (pendingText) {
-            reconnectContext = pendingText;
-            clearTimeout(pendingTimer);
-            pendingTimer = null;
-            pendingText = '';
-            // Safety: if the new session never produces events (user stopped
-            // speaking during the 1 s gap), translate the saved fragment alone.
-            clearTimeout(reconnectTimer);
-            reconnectTimer = setTimeout(() => {
-              const t = reconnectContext;
-              reconnectContext = '';
-              reconnectTimer = null;
-              if (t) translateUtterance(t);
-            }, 5000);
-          }
+          // Client VAD controls session lifecycle (audio.done on silence);
+          // this reconnect covers network drops and xAI internal limits.
           console.log('grok stt upstream closed by xAI — reconnecting in 1s');
           setTimeout(openUpstream, 1000);
         }
@@ -2212,21 +2193,16 @@ function attachGrokSttWs(server) {
         return;
       }
 
-      // is_final: a ~3 s locked segment.
+      // is_final: a ~3 s locked segment — safety fallback only.
+      // Client VAD sends audio.done on silence so transcript.done is the
+      // normal path; this timer fires only if the client never sends audio.done.
       if (evt.type === 'transcript.partial' && evt.is_final === true) {
         if (evt.speech_final === true) {
           console.log('grok stt SPEECH_FINAL (on is_final) text=',
             (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
         }
-        let text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
         if (!text) return;
-        // Stitch pre-reconnect fragment so the sentence stays whole.
-        if (reconnectContext) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-          text = reconnectContext + ' ' + text;
-          reconnectContext = '';
-        }
         pendingText = text;
         clearTimeout(pendingTimer);
         pendingTimer = setTimeout(() => {
@@ -2238,7 +2214,7 @@ function attachGrokSttWs(server) {
         return;
       }
 
-      // transcript.done: natural pause — translate the complete utterance now.
+      // transcript.done: utterance complete (sent by xAI after audio.done or silence).
       if (evt.type === 'transcript.done') {
         if (evt.speech_final === true) {
           console.log('grok stt SPEECH_FINAL (on transcript.done) text=',
@@ -2247,14 +2223,7 @@ function attachGrokSttWs(server) {
         clearTimeout(pendingTimer);
         pendingTimer = null;
         pendingText = '';
-        let text = (typeof evt.text === 'string' ? evt.text : '').trim();
-        // Stitch pre-reconnect fragment if no is_final came to pick it up.
-        if (reconnectContext) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-          text = text ? reconnectContext + ' ' + text : reconnectContext;
-          reconnectContext = '';
-        }
+        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
         translateUtterance(text);
       }
     }
@@ -2284,8 +2253,6 @@ function attachGrokSttWs(server) {
       closing = true;
       clearTimeout(pendingTimer);
       pendingTimer = null;
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
       try {
         if (currentUpstream?.readyState === WsClient.OPEN) {
           currentUpstream.send(JSON.stringify({ type: 'audio.done' }));
