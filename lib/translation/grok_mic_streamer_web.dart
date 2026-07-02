@@ -293,8 +293,12 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         );
         audio.close();
         // Continuous stream — Grok STT handles silence internally.
-        // AEC suppresses speaker echo. Only mic-mute button blocks SEND.
-        if (_wsOpen && n > 0 && !(_captureLocalMic && isSendMuted)) {
+        // Gate: skip frames while TTS is playing so the clone (AEC calibrated
+        // for WebRTC, not for FlutterTts output) doesn't re-capture and
+        // re-translate our own TTS → feedback loop.
+        if (_wsOpen && n > 0 &&
+            !(_captureLocalMic && isSendMuted) &&
+            !(_captureLocalMic && isTranslationPlaying)) {
           final pcm = _downsampleToPcm16(f32, inRate, _outRate);
           if (pcm.isNotEmpty) {
             try { _ws?.send(pcm.toJS); } catch (_) {}
@@ -356,7 +360,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final buf = e.inputBuffer;
           final f32 = buf.getChannelData(0).toDart;
           final rate = buf.sampleRate.toInt();
-          if (!(_captureLocalMic && isSendMuted)) {
+          if (!(_captureLocalMic && isSendMuted) &&
+              !(_captureLocalMic && isTranslationPlaying)) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {
               try { _ws?.send(pcm.toJS); } catch (_) {}
