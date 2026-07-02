@@ -302,7 +302,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         // cleared immediately in _toggleMic when the user unmutes, so it
         // never permanently blocks SEND.
         if (_wsOpen && n > 0 &&
-            !(_captureLocalMic && isSendMuted)) {
+            !(_captureLocalMic && isSendMuted) &&
+            !(_captureLocalMic && isTranslationPlaying)) {
           final pcm = _downsampleToPcm16(f32, inRate, _outRate);
           if (pcm.isNotEmpty) {
             try { _ws?.send(pcm.toJS); } catch (_) {}
@@ -364,7 +365,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final buf = e.inputBuffer;
           final f32 = buf.getChannelData(0).toDart;
           final rate = buf.sampleRate.toInt();
-          if (!(_captureLocalMic && isSendMuted)) {
+          if (!(_captureLocalMic && isSendMuted) &&
+              !(_captureLocalMic && isTranslationPlaying)) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {
               try { _ws?.send(pcm.toJS); } catch (_) {}
