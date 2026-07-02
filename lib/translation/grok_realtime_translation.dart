@@ -267,22 +267,9 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onRecvTranslation(String orig, String trans, String lang, String audioB64) {
     _lastRecv = trans;
     _lastError = null;
-    if (audioB64.isNotEmpty) {
-      unawaited(_playMp3B64(audioB64));
-    } else if (trans.isNotEmpty) {
-      unawaited(_deviceTtsSpeak(trans, lang));
-    }
+    // On web with kokoro=true, audio is empty: data channel handles TTS playback.
+    if (audioB64.isNotEmpty) unawaited(_playMp3B64(audioB64));
     notifyListeners();
-  }
-
-  Future<void> _deviceTtsSpeak(String text, String lang) async {
-    try {
-      if (lang.isNotEmpty) {
-        try { await _deviceTts.setLanguage(lang); } catch (_) {}
-      }
-      await _deviceTts.stop();
-      await _deviceTts.speak(text);
-    } catch (_) {}
   }
 
   Future<void> _playMp3B64(String audioB64) async {

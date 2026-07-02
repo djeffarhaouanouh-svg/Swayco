@@ -814,8 +814,13 @@ class _CallScreenState extends State<CallScreen> {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
       await _deviceTts.stop();
+      markTranslationPlaying();
+      _deviceTts.setCompletionHandler(markTranslationDone);
+      _deviceTts.setCancelHandler(markTranslationDone);
       await _deviceTts.speak(text);
-    } catch (_) {}
+    } catch (_) {
+      markTranslationDone();
+    }
   }
 
   /// Synthesise [text] locally with Kokoro. Falls back to device TTS if the

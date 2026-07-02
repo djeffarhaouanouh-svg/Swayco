@@ -14,3 +14,6 @@ Future<bool> playTranslatedMp3(Uint8List bytes) => impl.playTranslatedMp3(bytes)
 /// True while a translation is playing (web). Lets the mic streamer go
 /// half-duplex so it doesn't re-capture our own playback.
 bool get isTranslationPlaying => impl.isTranslationPlaying;
+
+void markTranslationPlaying() => impl.markTranslationPlaying();
+void markTranslationDone() => impl.markTranslationDone();

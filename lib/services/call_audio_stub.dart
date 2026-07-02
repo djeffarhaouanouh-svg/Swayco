@@ -6,3 +6,5 @@ void armCallAudio() {}
 Future<bool> playTranslatedMp3(Uint8List bytes) async => false;
 
 bool get isTranslationPlaying => false;
+void markTranslationPlaying() {}
+void markTranslationDone() {}

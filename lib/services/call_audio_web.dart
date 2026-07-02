@@ -19,6 +19,9 @@ bool _playing = false;
 Timer? _clearTimer;
 bool get isTranslationPlaying => _playing;
 
+void markTranslationPlaying() => _markPlaying();
+void markTranslationDone() => _scheduleClear();
+
 void _markPlaying() {
   _playing = true;
   _clearTimer?.cancel();
