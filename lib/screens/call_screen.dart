@@ -759,13 +759,7 @@ class _CallScreenState extends State<CallScreen> {
       if (m['kokoro'] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
-        if (trans.isNotEmpty) {
-          if (kIsWeb) {
-            unawaited(_speakDeviceTts(trans, lang));
-          } else {
-            unawaited(_playWithKokoro(trans, lang));
-          }
-        }
+        if (!kIsWeb && trans.isNotEmpty) unawaited(_playWithKokoro(trans, lang));
         return;
       }
       if (m['voiceOnly'] == true) {
@@ -806,16 +800,6 @@ class _CallScreenState extends State<CallScreen> {
     } catch (e) {
       debugPrint('[grok-rt] play Grok audio FAILED: $e');
     }
-  }
-
-  Future<void> _speakDeviceTts(String text, String lang) async {
-    try {
-      if (lang.isNotEmpty) {
-        try { await _deviceTts.setLanguage(lang); } catch (_) {}
-      }
-      await _deviceTts.stop();
-      await _deviceTts.speak(text);
-    } catch (_) {}
   }
 
   /// Synthesise [text] locally with Kokoro. Falls back to device TTS if the
