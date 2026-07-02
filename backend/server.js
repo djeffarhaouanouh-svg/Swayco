@@ -2098,6 +2098,14 @@ function attachGrokSttWs(server) {
     const pending = []; // PCM frames buffered while upstream is (re)connecting
     let currentUpstream = null;
 
+    let lastFinalText = '';
+    let pendingText = '';   // accumulated is_final text, waiting for transcript.done
+    let pendingTimer = null;
+    // Text saved when xAI closes mid-utterance, stitched into the next segment
+    // from the new session so the sentence comes out whole.
+    let reconnectContext = '';
+    let reconnectTimer = null;
+
     function openUpstream() {
       if (closing) return;
       const up = new WsClient(`${GROK_WS_BASE}/stt?${params.toString()}`, {
@@ -2117,17 +2125,29 @@ function attachGrokSttWs(server) {
       up.on('close', () => {
         upstreamOpen = false;
         if (!closing) {
+          // If an utterance was in-flight, save it so the new session can
+          // stitch it to its first segment and produce a complete sentence.
+          if (pendingText) {
+            reconnectContext = pendingText;
+            clearTimeout(pendingTimer);
+            pendingTimer = null;
+            pendingText = '';
+            // Safety: if the new session never produces events (user stopped
+            // speaking during the 1 s gap), translate the saved fragment alone.
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              const t = reconnectContext;
+              reconnectContext = '';
+              reconnectTimer = null;
+              if (t) translateUtterance(t);
+            }, 5000);
+          }
           console.log('grok stt upstream closed by xAI — reconnecting in 1s');
           setTimeout(openUpstream, 1000);
         }
       });
     }
     openUpstream();
-
-    let lastFinalText = '';
-    // Text queued from is_final segments, waiting for transcript.done.
-    let pendingText = '';
-    let pendingTimer = null;
 
     // Translate a complete utterance. Deduplicates against the last sent text.
     const translateUtterance = async (text) => {
@@ -2198,8 +2218,15 @@ function attachGrokSttWs(server) {
           console.log('grok stt SPEECH_FINAL (on is_final) text=',
             (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
         }
-        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        let text = (typeof evt.text === 'string' ? evt.text : '').trim();
         if (!text) return;
+        // Stitch pre-reconnect fragment so the sentence stays whole.
+        if (reconnectContext) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+          text = reconnectContext + ' ' + text;
+          reconnectContext = '';
+        }
         pendingText = text;
         clearTimeout(pendingTimer);
         pendingTimer = setTimeout(() => {
@@ -2220,7 +2247,14 @@ function attachGrokSttWs(server) {
         clearTimeout(pendingTimer);
         pendingTimer = null;
         pendingText = '';
-        const text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        let text = (typeof evt.text === 'string' ? evt.text : '').trim();
+        // Stitch pre-reconnect fragment if no is_final came to pick it up.
+        if (reconnectContext) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+          text = text ? reconnectContext + ' ' + text : reconnectContext;
+          reconnectContext = '';
+        }
         translateUtterance(text);
       }
     }
@@ -2250,6 +2284,8 @@ function attachGrokSttWs(server) {
       closing = true;
       clearTimeout(pendingTimer);
       pendingTimer = null;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
       try {
         if (currentUpstream?.readyState === WsClient.OPEN) {
           currentUpstream.send(JSON.stringify({ type: 'audio.done' }));
