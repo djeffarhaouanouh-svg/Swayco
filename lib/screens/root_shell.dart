@@ -490,9 +490,10 @@ class _RootShellState extends State<RootShell> {
                       ],
                     ),
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
+                      left: 24,
+                      right: 24,
+                      bottom: MediaQuery.paddingOf(context).bottom +
+                          GlassNavBar.floatBottom,
                       // Rebuild on every pager tick so the highlight pill
                       // glides with the swipe instead of snapping at the end.
                       child: AnimatedBuilder(
@@ -505,15 +506,7 @@ class _RootShellState extends State<RootShell> {
                             selected: index,
                             selectedFraction: frac,
                             unreadChat: unread,
-                            // Demandes badge = pending friend requests +
-                            // unseen likes / photo-reactions.
                             unreadRequests: pending + activity,
-                            // Chat / Discover / Demandes each rest a rounded
-                            // card on the nav whose bottom corners the concave
-                            // notches should hug. Profile has none.
-                            hugTopCorners: index == NavTab.chat ||
-                                index == NavTab.discover ||
-                                index == NavTab.demandes,
                             onSelect: _selectTab,
                           );
                         },

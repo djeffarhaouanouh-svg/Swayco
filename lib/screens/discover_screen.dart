@@ -240,7 +240,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    const navH = GlassNavBar.height;
     const actionH = 92.0;
 
     return Scaffold(
@@ -295,7 +294,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   );
                 },
               ),
-              SizedBox(height: navH + safeBottom),
+              SizedBox(height: GlassNavBar.totalReservedHeight + safeBottom),
             ],
           ),
           // ── Search overlay ────────────────────────────────────────────────

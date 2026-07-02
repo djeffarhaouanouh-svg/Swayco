@@ -928,9 +928,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             // is hidden. Re-render it here and route taps back to the shell.
             if (_isViewingOther)
               Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
+                left: 24,
+                right: 24,
+                bottom: MediaQuery.paddingOf(context).bottom +
+                    GlassNavBar.floatBottom,
                 child: ValueListenableBuilder<int>(
                   valueListenable: NavTab.index,
                   builder: (context, navIndex, _) => ValueListenableBuilder<int>(
@@ -945,8 +946,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onSelect: (i) {
                               NavTab.select(i);
                               if (i == NavTab.chat) ChatUnread.markAllSeen();
-                              // Pop every pushed route so the shell — now on
-                              // tab [i] — is visible underneath.
                               Navigator.of(
                                 context,
                               ).popUntil((route) => route.isFirst);

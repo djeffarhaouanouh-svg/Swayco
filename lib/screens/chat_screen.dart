@@ -528,7 +528,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // notches hug its rounded bottom corners (Discover-style); once the rows
     // overflow that height the panel grows and the whole thing scrolls.
     final navBody =
-        GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
+        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, constraints) {
         final fill = constraints.maxHeight - 26 - navBody;

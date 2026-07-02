@@ -27,11 +27,9 @@ double _navPeakLens(int i, double frac, {double amp = 0.45}) {
   return 1.0 + amp * (1.0 - d);
 }
 
-/// Full-width glass-morphism bottom-nav, flush against the screen bottom,
-/// with a sliding pill that animates between selected tabs. Rendered by
-/// [RootShell] and re-used by screens pushed on top of it (e.g. a peer's
-/// profile) so the bar stays visible. The bar pads its own bottom by the
-/// system safe-area inset, so callers anchor it at `bottom: 0`.
+/// Floating island-style glass nav bar. Rendered by [RootShell] as a centred
+/// pill that floats above the bottom safe area. Callers must reserve
+/// [totalReservedHeight] at the bottom of their content.
 class GlassNavBar extends StatefulWidget {
   const GlassNavBar({
     super.key,
@@ -39,7 +37,7 @@ class GlassNavBar extends StatefulWidget {
     required this.unreadChat,
     required this.unreadRequests,
     required this.onSelect,
-    this.hugTopCorners = false,
+    this.hugTopCorners = false,  // kept for API compat — no longer used
     this.selectedFraction,
   });
 
@@ -47,35 +45,23 @@ class GlassNavBar extends StatefulWidget {
 
   /// Continuous tab position (e.g. 1.4 mid-swipe between tabs 1 and 2). When
   /// provided, the highlight pill tracks it in real time so it glides with
-  /// the page swipe instead of snapping. Null → the pill just animates
-  /// between integer [selected] slots (used by pushed-route nav bars that
-  /// have no pager).
+  /// the page swipe instead of snapping.
   final double? selectedFraction;
   final int unreadChat;
-
-  /// Count of pending friend requests addressed to the local user —
-  /// drives the red badge on the Demandes tab.
   final int unreadRequests;
   final ValueChanged<int> onSelect;
+  final bool hugTopCorners; // no-op with floating design
 
-  /// When true, the bar grows upward by [hugRadius] at its two top corners
-  /// and carves a concave notch into each so it wraps the rounded bottom
-  /// corners of the Discover card resting on it. The icon row stays in the
-  /// same place either way (the notch strip is added above the body), so
-  /// toggling this between tabs never shifts the icons. Off elsewhere.
-  final bool hugTopCorners;
+  /// Height of the pill content area.
+  static const double height = 54;
 
-  /// Height of the bar's content row (excludes the bottom safe-area inset
-  /// and the [hugRadius] notch strip, both padded internally). Exposed so
-  /// the Discover deck can reserve exactly this much space and sit flush
-  /// against the bar's body top edge.
-  static const double height = 56;
+  /// Gap between the pill bottom and the screen safe-area top.
+  static const double floatBottom = 14.0;
 
-  /// Radius of the concave notches carved into the bar's two top corners.
-  /// The bar grows upward by this much at the corners so it wraps snugly
-  /// around the rounded bottom corners of the Discover card sitting on it —
-  /// must match the card's corner radius. Exposed so the card and the
-  /// Discover top bar stay in sync.
+  /// Total vertical space to reserve below content (height + float gap).
+  static const double totalReservedHeight = height + floatBottom;
+
+  // Kept for callers that still reference hugRadius — value unused in layout.
   static const double hugRadius = 28;
 
   @override
@@ -171,9 +157,7 @@ class _GlassNavBarState extends State<GlassNavBar>
     final unreadChat = widget.unreadChat;
     final unreadRequests = widget.unreadRequests;
     final onSelect = widget.onSelect;
-    final hugTopCorners = widget.hugTopCorners;
     const height = GlassNavBar.height;
-    const hugRadius = GlassNavBar.hugRadius;
     final items = <_NavItemData>[
       _NavItemData(
         icon: Icons.chat_bubble_outline,
@@ -199,11 +183,6 @@ class _GlassNavBarState extends State<GlassNavBar>
         label: AppStrings.t('nav_tab3'),
       ),
     ];
-
-    // Pad the bar's own bottom by the system safe-area inset so the glass
-    // fills all the way to the screen edge (behind the home indicator)
-    // while the icons stay above it.
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     // The pill + items row — identical in every rendering path.
     final inner = SizedBox(
@@ -304,94 +283,45 @@ class _GlassNavBarState extends State<GlassNavBar>
           ),
       );
 
-    // Native flat bar → real shader Liquid Glass (single static surface, no
-    // platform view). The Discover "hug" state keeps the BackdropFilter path
-    // (its concave notches can't be a rounded-superellipse), and web keeps the
-    // BackdropFilter design unchanged.
-    if (useShaderGlass && !hugTopCorners) {
+    const radius = BorderRadius.all(Radius.circular(36));
+
+    // Shader Liquid Glass path (iOS native).
+    if (useShaderGlass) {
       return lg.GlassContainer(
         useOwnLayer: true,
         clipBehavior: Clip.antiAlias,
-        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 0),
-        // Tune blur / thickness / refractiveIndex to taste.
+        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 36),
         settings: const lg.LiquidGlassSettings(
-          blur: 10,
+          blur: 12,
           thickness: 14,
-          glassColor: Color(0x12FFFFFF),
-          refractiveIndex: 1.3,
+          glassColor: Color(0x14FFFFFF),
+          refractiveIndex: 1.28,
         ),
-        padding: EdgeInsets.only(bottom: bottomInset * 0.7),
         child: inner,
       );
     }
 
-    final bar = BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          // Plain bar: a hairline top edge. The hugging bar's outline is
-          // defined by the concave notch clip instead, so no border there.
-          border: hugTopCorners
-              ? null
-              : Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-                ),
+    // BackdropFilter glass path (Android / web).
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.13),
+            borderRadius: radius,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1.2,
+            ),
+          ),
+          child: inner,
         ),
-        // Reserve the notch strip on top only when hugging; bottom pad by the
-        // safe-area inset. When hugging, the glass also grows UP by the slice we
-        // trimmed off the bottom (0.3*inset) so its top edge rises back to the
-        // Discover card's bottom and keeps the image covered (no blue gap) —
-        // WITHOUT lowering the icon row, which is anchored by the bottom pad.
-        padding: EdgeInsets.only(
-          top: hugTopCorners ? hugRadius + bottomInset * 0.3 : 0,
-          bottom: bottomInset * 0.7,
-        ),
-        child: inner,
       ),
     );
-
-    // Concave corner notches that hug the Discover card; a plain flat bar on
-    // every other tab. The body height is identical either way.
-    return hugTopCorners
-        ? ClipPath(clipper: const _TopHugClipper(hugRadius), child: bar)
-        : ClipRect(child: bar);
   }
 }
 
-/// Clips a bar into a full-width rectangle whose two TOP corners are carved
-/// out by a concave quarter-circle notch of [radius]. Each notch is the
-/// corner square minus the disc that the resting card's rounded corner
-/// fills, so the bar and the card tile that corner with no gap or overlap.
-class _TopHugClipper extends CustomClipper<Path> {
-  const _TopHugClipper(this.radius);
-
-  final double radius;
-
-  @override
-  Path getClip(Size size) {
-    final r = radius;
-    final w = size.width;
-    final h = size.height;
-    final leftNotch = Path.combine(
-      PathOperation.difference,
-      Path()..addRect(Rect.fromLTRB(0, 0, r, r)),
-      Path()..addOval(Rect.fromCircle(center: Offset(r, 0), radius: r)),
-    );
-    final rightNotch = Path.combine(
-      PathOperation.difference,
-      Path()..addRect(Rect.fromLTRB(w - r, 0, w, r)),
-      Path()..addOval(Rect.fromCircle(center: Offset(w - r, 0), radius: r)),
-    );
-    var path = Path()..addRect(Rect.fromLTRB(0, r, w, h));
-    path = Path.combine(PathOperation.union, path, leftNotch);
-    path = Path.combine(PathOperation.union, path, rightNotch);
-    return path;
-  }
-
-  @override
-  bool shouldReclip(_TopHugClipper oldClipper) => oldClipper.radius != radius;
-}
 
 class _NavItemData {
   const _NavItemData({

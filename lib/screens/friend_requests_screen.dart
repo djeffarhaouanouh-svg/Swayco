@@ -388,7 +388,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     // so the WHOLE panel moves when you scroll, with a min-height = the zone so
     // it fills and rests flush on the nav at rest (the concave notches hug its
     // rounded bottom corners, Discover-style).
-    final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
+    final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, constraints) {
         final fill = constraints.maxHeight - 26 - navBody;

@@ -3,12 +3,6 @@ import 'package:flutter/material.dart';
 import '../theme/swayco_theme.dart';
 
 /// The rounded panel used on the Messages / Demandes pages.
-///
-/// LAYER STRUCTURE: the mesh fond sits at the back; a cyan-blue glow (the same
-/// luminous wash that sits behind the Discover card) haloes the panel; the
-/// panel itself is a SOLID dark navy with the rows on top. Rounded corners
-/// (radius 28 = GlassNavBar.hugRadius) so the nav's concave notches hug its
-/// bottom corners.
 class ListPanel extends StatelessWidget {
   const ListPanel({super.key, required this.child});
 
