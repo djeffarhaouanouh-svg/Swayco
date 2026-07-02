@@ -2164,14 +2164,20 @@ function attachGrokSttWs(server) {
       // Stream partials for live captions (no translation yet).
       if (evt.type === 'transcript.partial' && !evt.is_final) {
         if (typeof evt.text === 'string') sendCtl({ type: 'partial', text: evt.text });
+        // Log speech_final so we can verify Smart Turn fires reliably before migrating.
+        if (evt.speech_final === true) {
+          console.log('grok stt SPEECH_FINAL (non-final partial) text=',
+            (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
+        }
         return;
       }
 
-      // is_final: a ~3 s locked segment. Save it and arm a safety timer so
-      // continuous speech (no silence > endpointing) still gets translated
-      // after ~4 s. transcript.done (natural pause) cancels the timer and
-      // translates the complete utterance immediately — no split sentences.
+      // is_final: a ~3 s locked segment.
       if (evt.type === 'transcript.partial' && evt.is_final === true) {
+        if (evt.speech_final === true) {
+          console.log('grok stt SPEECH_FINAL (on is_final) text=',
+            (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
+        }
         const text = (typeof evt.text === 'string' ? evt.text : '').trim();
         if (!text) return;
         pendingText = text;
@@ -2187,6 +2193,10 @@ function attachGrokSttWs(server) {
 
       // transcript.done: natural pause — translate the complete utterance now.
       if (evt.type === 'transcript.done') {
+        if (evt.speech_final === true) {
+          console.log('grok stt SPEECH_FINAL (on transcript.done) text=',
+            (typeof evt.text === 'string' ? evt.text : '').slice(0, 80));
+        }
         clearTimeout(pendingTimer);
         pendingTimer = null;
         pendingText = '';
