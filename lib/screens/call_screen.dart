@@ -19,7 +19,6 @@ import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_audio.dart';
 import '../services/call_alert.dart';
-import '../services/device_id.dart';
 import '../services/incoming_call_api.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
@@ -31,7 +30,6 @@ import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
 import '../translation/translation_route.dart';
-import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -110,8 +108,6 @@ class _CallScreenState extends State<CallScreen> {
   /// the data that card needs.
   bool _ended = false;
   RemoteProfile? _peerProfile;
-  // My own profile (PDP) — used for the avatars on my in-call chat captions.
-  RemoteProfile? _myProfile;
   Duration? _finalDuration;
 
   /// Wraps the shareable part of the summary card so it can be captured to a
@@ -124,28 +120,13 @@ class _CallScreenState extends State<CallScreen> {
   bool _selfMain = false;
   EventsListener<RoomEvent>? _roomEvents;
 
-  // ── In-call text chat (typed). What I type is translated into the peer's
-  // language and sent over the LiveKit data channel; on their side it shows
-  // as a caption AND is read aloud (OpenAI TTS via the backend). Ephemeral —
-  // nothing is persisted.
   static const String _captionTopic = 'swayco-chat';
-  // In-call captions: never more than [_maxCaptions] on screen, each removed
-  // after [_captionTtl]. The `id` lets a per-caption timer drop the right one.
-  static const int _maxCaptions = 10;
-  static const Duration _captionTtl = Duration(seconds: 10);
-  final List<({int id, String orig, String trans, bool mine})> _captions = [];
-  int _captionSeq = 0;
-  final Map<int, Timer> _captionTimers = {};
-  final TextEditingController _chatCtrl = TextEditingController();
-  final FocusNode _chatFocus = FocusNode();
   final AudioPlayer _ttsPlayer = AudioPlayer();
-  // On-device TTS — the fallback voice when the backend OpenAI /translation/tts
-  // endpoint isn't available (it currently isn't, so this is what speaks).
   final FlutterTts _deviceTts = FlutterTts();
-  // Always translate typed messages into the peer's language. The in-call
-  // toggle was removed; this stays true for the life of the call.
-  final bool _chatTranslate = true;
-  bool _chatSending = false;
+
+  /// Whether the realtime translation pipeline is currently active.
+  /// Toggle via [_toggleTranslation].
+  bool _translationEnabled = true;
 
   /// The remote BCP-47 we have attached the translation pipeline with, so we
   /// only re-attach when it actually changes.
@@ -338,7 +319,6 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
-    unawaited(_loadMyProfile());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
@@ -380,16 +360,6 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {
       // Offline / not found — summary degrades gracefully.
     }
-  }
-
-  /// Best-effort fetch of my own profile (PDP) for the avatar on my in-call
-  /// chat captions. Silent on failure — falls back to an initial-letter tile.
-  Future<void> _loadMyProfile() async {
-    try {
-      final id = await DeviceId.getOrCreate();
-      final p = await ProfileApi.fetchById(id);
-      if (mounted && p != null) setState(() => _myProfile = p);
-    } catch (_) {}
   }
 
   /// The callee declined our ring. As long as they haven't actually
@@ -781,111 +751,36 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() => _micOn = next);
   }
 
-  // ── In-call typed chat ────────────────────────────────────────────────
-
-  /// Add an in-call caption: cap the on-screen list at [_maxCaptions] (drop
-  /// the oldest) and auto-remove this one after [_captionTtl] (10 s).
-  void _pushCaption({
-    required String orig,
-    required String trans,
-    required bool mine,
-  }) {
-    if (!mounted) return;
-    final id = _captionSeq++;
-    setState(() {
-      _captions.add((id: id, orig: orig, trans: trans, mine: mine));
-      while (_captions.length > _maxCaptions) {
-        final removed = _captions.removeAt(0);
-        _captionTimers.remove(removed.id)?.cancel();
-      }
-    });
-    _captionTimers[id] = Timer(_captionTtl, () => _removeCaption(id));
-  }
-
-  void _removeCaption(int id) {
-    _captionTimers.remove(id)?.cancel();
-    if (!mounted) return;
-    setState(() => _captions.removeWhere((c) => c.id == id));
-  }
-
-  /// Type → translate into the peer's language → show my bubble → publish
-  /// to the peer over the data channel (they see the translation and hear it).
-  Future<void> _sendCaption() async {
-    final room = _room;
-    final text = _chatCtrl.text.trim();
-    if (room == null || text.isEmpty || _chatSending) return;
-    setState(() => _chatSending = true);
-    final to = _discoverRemoteLang(room); // peer's spoken language ('' if unknown)
-    var trans = text;
-    if (_chatTranslate && to.isNotEmpty) {
-      trans = await fetchTextTranslation(
-        text: text,
-        to: to,
-        from: widget.mySourceLang,
-      );
-    }
-    if (!mounted) return;
-    setState(() {
-      _chatCtrl.clear();
-      _chatSending = false;
-    });
-    _pushCaption(orig: text, trans: trans, mine: true);
-    Analytics.track(
-      'message_sent',
-      props: {'source': 'live', 'type': 'text'},
-    );
-    try {
-      final payload = jsonEncode({'orig': text, 'trans': trans, 'lang': to});
-      await room.localParticipant?.publishData(
-        Uint8List.fromList(utf8.encode(payload)),
-        reliable: true,
-        topic: _captionTopic,
-      );
-    } catch (_) {
-      // Best-effort — the message still shows on my side.
-    }
-  }
-
-  /// A typed message arrived from the peer: show it (original + translation
-  /// in my language) and read the translation aloud via OpenAI TTS.
+  /// Data channel packet from the peer: Kokoro native or Grok web path.
+  /// Typed-chat has been removed — only translation audio packets are handled.
   void _onCaptionData(DataReceivedEvent e) {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      final audioB64 = m['audio']?.toString() ?? '';
-      // Voice-only translation (realtime pipeline): play the Grok mp3, NO
-      // subtitle. This is the spoken call translation, not the typed chat.
-      // On web, GrokRealtimeTranslation.RECV already captures the peer's
-      // WebRTC track and plays the translation locally — skip the data-channel
-      // copy to avoid double-play and the speaker-echo feedback loop.
-      // Kokoro native path: sender skipped Grok TTS; we synthesise locally.
       if (m['kokoro'] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
-        debugPrint('[kokoro] recv trans="$trans" lang=$lang');
         if (!kIsWeb && trans.isNotEmpty) unawaited(_playWithKokoro(trans, lang));
         return;
       }
       if (m['voiceOnly'] == true) {
-        debugPrint('[grok-rt] recv voice audio=${audioB64.length}b kIsWeb=$kIsWeb');
+        final audioB64 = m['audio']?.toString() ?? '';
         if (!kIsWeb && audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
         return;
       }
-      final orig = m['orig']?.toString() ?? '';
-      final trans = m['trans']?.toString() ?? '';
-      final lang = m['lang']?.toString() ?? '';
-      if (orig.isEmpty && trans.isEmpty) return;
-      debugPrint('[grok-rt] recv caption trans="$trans" audio=${audioB64.length}b');
-      _pushCaption(orig: orig, trans: trans, mine: false);
-      if (audioB64.isNotEmpty) {
-        // Pre-generated Grok voice from the sender's realtime pipeline — play
-        // it directly (no re-synthesis, no device-voice fallback).
-        unawaited(_playTranslatedAudio(audioB64));
-      } else if (trans.isNotEmpty) {
-        unawaited(_speak(trans, lang));
-      }
-    } catch (_) {
-      // Ignore malformed packets / other topics.
+    } catch (_) {}
+  }
+
+  /// Toggle the realtime translation pipeline on / off.
+  Future<void> _toggleTranslation() async {
+    final room = _room;
+    if (room == null) return;
+    if (_translationEnabled) {
+      await widget.translation.detach();
+      if (mounted) setState(() => _translationEnabled = false);
+    } else {
+      await _refreshTranslationBinding(room);
+      if (mounted) setState(() => _translationEnabled = true);
     }
   }
 
@@ -955,109 +850,6 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {
       // TTS is best-effort — silent on failure.
     }
-  }
-
-  /// The in-call chat composer: translate toggle + text field + send.
-  /// The local user's spoken-language label (e.g. "Français"), or null when
-  /// unknown — drives the "speak in X" hint and the composer placeholder.
-  String? get _myLangLabel => findLanguageByCode(widget.mySourceLang)?.label;
-
-  /// In-call composer placeholder — names the user's language, mirroring the
-  /// messages composer ("Écrivez en Français").
-  String get _chatHint {
-    final label = _myLangLabel;
-    return label == null
-        ? AppStrings.t('composer_message_hint')
-        : AppStrings.t('composer_message_hint_lang', args: {'lang': label});
-  }
-
-  /// Typewriter reveal of the placeholder — same effect as the messages
-  /// composer: the hint types itself in once the in-call composer appears.
-  String _typedChatHint = '';
-  Timer? _chatHintTimer;
-  bool _chatHintStarted = false;
-
-  void _animateChatHint() {
-    _chatHintTimer?.cancel();
-    final full = _chatHint;
-    if (!mounted) return;
-    setState(() => _typedChatHint = '');
-    var shown = 0;
-    _chatHintTimer = Timer.periodic(const Duration(milliseconds: 75), (t) {
-      if (!mounted || shown >= full.length) {
-        t.cancel();
-        return;
-      }
-      shown++;
-      setState(() => _typedChatHint = full.substring(0, shown));
-    });
-  }
-
-  Widget _buildChatComposer() {
-    // Type the placeholder in the first time the composer appears.
-    if (!_chatHintStarted) {
-      _chatHintStarted = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _animateChatHint();
-      });
-    }
-    // Frosted glass via GlassPanel (Flutter SHADER glass, NOT the NativeGlass
-    // platform view — that one genuinely swallows touches). Safe now that the
-    // composer Positioned is keyed (b2f3293): the keyboard stays open. The
-    // earlier "keyboard won't open" was the unkeyed-siblings bug, not the glass.
-    return GlassPanel(
-      borderRadius: 26,
-      color: Colors.black.withValues(alpha: 0.35),
-      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-      child: Row(
-        children: [
-          // Translation stays always on (_chatTranslate defaults to true); the
-          // toggle icon was removed so the text field can start hard left and
-          // use the reclaimed space.
-          Expanded(
-            child: TextField(
-              controller: _chatCtrl,
-              focusNode: _chatFocus,
-              minLines: 1,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                hintText: _typedChatHint,
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
-              ),
-              onSubmitted: (_) => _sendCaption(),
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _chatSending ? null : _sendCaption,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: SC.accent,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_upward_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        ],
-        ),
-    );
   }
 
   Future<void> _toggleCam() async {
@@ -1450,13 +1242,6 @@ class _CallScreenState extends State<CallScreen> {
     }
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
-    _chatHintTimer?.cancel();
-    for (final t in _captionTimers.values) {
-      t.cancel();
-    }
-    _captionTimers.clear();
-    _chatCtrl.dispose();
-    _chatFocus.dispose();
     unawaited(_ttsPlayer.dispose());
     unawaited(_deviceTts.stop());
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
@@ -1764,64 +1549,6 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // While the keyboard is open, a full-screen tap layer (below
-                // the composer + control rail, above the video) closes it —
-                // otherwise there's no way to dismiss the keyboard here.
-                if (MediaQuery.viewInsetsOf(context).bottom > 0)
-                  Positioned.fill(
-                    // Keyed so inserting/removing this layer when the keyboard
-                    // toggles never makes Flutter re-map the (same-typed,
-                    // adjacent) composer Positioned's element — that recreated
-                    // the TextField and dropped focus, slamming the keyboard
-                    // shut the instant it opened.
-                    key: const ValueKey('call_kb_dismiss'),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => FocusScope.of(context).unfocus(),
-                    ),
-                  ),
-                // In-call typed chat: recent caption bubbles + the composer,
-                // bottom-left so they clear the control rail on the right.
-                // Lifts with the keyboard.
-                Positioned(
-                  // Stable key: the composer's element must survive the dismiss
-                  // layer being inserted/removed as the keyboard toggles, or
-                  // the TextField is recreated and loses focus.
-                  key: const ValueKey('call_chat_composer'),
-                  left: 8,
-                  // Extra right margin so the bar clears the round control rail
-                  // on the right (it was touching the buttons on phones).
-                  right: 100,
-                  // Lift above the keyboard. The SafeArea already accounts for
-                  // the bottom inset, so only add the keyboard height here.
-                  bottom: MediaQuery.viewInsetsOf(context).bottom + 12,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final c in _captions)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _CaptionBubble(
-                            orig: c.orig,
-                            trans: c.trans,
-                            // My PDP for my lines, the peer's for theirs.
-                            name: c.mine
-                                ? (_myProfile?.displayName ?? widget.displayName)
-                                : (_peerProfile?.displayName ?? ''),
-                            avatarUrl: c.mine
-                                ? (_myProfile?.avatarUrl ?? '')
-                                : (_peerProfile?.avatarUrl ?? ''),
-                            avatarColor: c.mine
-                                ? (_myProfile?.avatarColor ?? '')
-                                : (_peerProfile?.avatarColor ?? ''),
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      _buildChatComposer(),
-                    ],
-                  ),
-                ),
                 // Controls as a vertical rail anchored to the BOTTOM-RIGHT, so
                 // they grow upward from the bottom and never reach the PiP
                 // self-view in the top-right corner.
@@ -1873,6 +1600,17 @@ class _CallScreenState extends State<CallScreen> {
                             label: AppStrings.t('call_language'),
                             background: SC.accent,
                             onTap: _openLanguageSheet,
+                          ),
+                          const SizedBox(height: 12),
+                          _RoundCallButton(
+                            icon: _translationEnabled
+                                ? Icons.hearing_rounded
+                                : Icons.hearing_disabled_rounded,
+                            label: _translationEnabled ? 'Couper trad' : 'Reprendre trad',
+                            background: _translationEnabled
+                                ? SC.accent
+                                : Colors.white24,
+                            onTap: _toggleTranslation,
                           ),
                           const SizedBox(height: 12),
                           _RoundCallButton(
@@ -2025,81 +1763,6 @@ class _RoundCallButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// One in-call typed-chat caption: the sender's PDP, then a translucent
-/// bubble with the original line (bold) and its translation underneath
-/// (italic). Always avatar-left, like the design reference.
-class _CaptionBubble extends StatelessWidget {
-  const _CaptionBubble({
-    required this.orig,
-    required this.trans,
-    required this.name,
-    required this.avatarUrl,
-    required this.avatarColor,
-  });
-
-  final String orig;
-  final String trans;
-  final String name;
-  final String avatarUrl;
-  final String avatarColor;
-
-  @override
-  Widget build(BuildContext context) {
-    // Soft shadow so white text stays readable on the (now transparent)
-    // bubble over the video.
-    const shadows = [Shadow(color: Colors.black, blurRadius: 6)];
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        ProfileAvatar(
-          displayName: name,
-          avatarUrl: avatarUrl,
-          avatarColorHex: avatarColor,
-          size: 30,
-        ),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              // Transparent — just enough to lift the text off the video.
-              color: Colors.black.withValues(alpha: 0.30),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  orig,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    shadows: shadows,
-                  ),
-                ),
-                if (trans.isNotEmpty && trans != orig) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    trans,
-                    style: const TextStyle(
-                      color: Color(0xCCFFFFFF),
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
-                      shadows: shadows,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
