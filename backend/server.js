@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // LiveKit token API + optional Flutter web UI (folder ./web from Docker build).
 
@@ -958,9 +958,9 @@ async function grokTranslateText({ transcript, from, to }) {
     const parsed = JSON.parse(body);
     let out = parsed?.choices?.[0]?.message?.content ?? '';
     if (typeof out !== 'string') out = '';
-    out = out.trim().replace(/^[“””’’’]+|[“””’’’]+$/g, ‘’).trim();
+    out = out.trim().replace(/^[“”’"']+|[“”’"']+$/g, "").trim();
     // Strip Grok confidence markers that leak into translation output (e.g. \confidence{80}).
-    out = out.replace(/\\confidence\{[^}]*\}/gi, ‘’).trim();
+    out = out.replace(/\\confidence\{[^}]*\}/gi, '').trim();
     return { translated: out || transcript };
   } catch (e) {
     console.error('grok translate throw', e);
