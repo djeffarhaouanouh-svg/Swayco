@@ -56,13 +56,10 @@ extension _JsNodeConnect on JSObject {
 @JS('MediaStreamTrackProcessor')
 external JSAny? get _mstpConstructor;
 
-
 /// Web realtime mic streamer, SENDER-side. Captures MY OWN mic via a dedicated
-/// `getUserMedia` (echoCancellation = browser AEC, so it doesn't re-capture the
-/// loudspeaker), reads frames via `MediaStreamTrackProcessor` (WebCodecs — avoids
-/// the Web Audio silence bug), downsamples to PCM16 16 kHz, and streams to the
-/// backend Grok STT WS. We stop ONLY our own getUserMedia track at teardown, so
-/// LiveKit's call mic is untouched.
+/// `getUserMedia` (echoCancellation = browser AEC), downsamples to PCM16 16 kHz,
+/// and streams continuously to the backend Grok STT WS.
+/// Auto-reconnects the WS when it drops (iOS Safari network instability).
 class _WebGrokMicStreamer implements GrokMicStreamer {
   web.WebSocket? _ws;
   web.MediaStream? _micStream;
@@ -76,7 +73,15 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   int _frames = 0;
   bool _captureLocalMic = true;
 
+  // Stored so _openWs() can reconnect without restarting audio capture.
+  Uri? _wsUrl;
+  void Function(String orig, String trans, String lang, String audioB64)?
+      _cbTranslation;
+  void Function(String partial)? _cbPartial;
+  void Function(String error)? _cbError;
+
   static const int _outRate = 16000;
+  static const Duration _reconnectDelay = Duration(seconds: 2);
 
   @override
   bool get isRunning => _running;
@@ -97,12 +102,14 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     if (_running) return;
     _running = true;
     _captureLocalMic = captureLocalMic;
+    _wsUrl = wsUrl;
+    _cbTranslation = onTranslation;
+    _cbPartial = onPartial;
+    _cbError = onError;
     _log('start ${captureLocalMic ? "LOCAL-mic" : "REMOTE-track"} wsUrl=$wsUrl');
     try {
       final web.MediaStreamTrack micTrack;
       if (captureLocalMic) {
-        // Capture MY OWN mic. echoCancellation = browser AEC, so we don't
-        // re-transcribe the translated voice coming out of the speaker.
         final micStream = await web.window.navigator.mediaDevices
             .getUserMedia(web.MediaStreamConstraints(
               audio: web.MediaTrackConstraints(
@@ -123,8 +130,6 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         micTrack = audioTracks.first;
         _log('local mic acquired (AEC)');
       } else {
-        // Capture the passed track (the REMOTE voice). Clone it so we never
-        // stop the track LiveKit is playing.
         web.MediaStreamTrack? jsTrack;
         try {
           final dynamic dyn = localTrack;
@@ -145,50 +150,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         _log('remote track cloned for capture');
       }
 
-      // Backend WebSocket.
-      final ws = web.WebSocket(wsUrl.toString());
-      ws.binaryType = 'arraybuffer';
-      _ws = ws;
-      ws.onopen = ((web.Event _) {
-        _wsOpen = true;
-        _log('ws OPEN');
-      }).toJS;
-      ws.onerror = ((web.Event _) {
-        _log('ws ERROR');
-        onError?.call('ws_error');
-      }).toJS;
-      ws.onclose = ((web.CloseEvent _) {
-        _wsOpen = false;
-        _log('ws CLOSE');
-      }).toJS;
-      ws.onmessage = ((web.MessageEvent e) {
-        final data = e.data;
-        if (data == null || !data.isA<JSString>()) return;
-        try {
-          final msg =
-              jsonDecode((data as JSString).toDart) as Map<String, dynamic>;
-          _log('msg ${msg['type']}: '
-              '${(msg['trans'] ?? msg['text'] ?? '').toString()} '
-              '(audio=${(msg['audio'] ?? '').toString().length}b)');
-          switch (msg['type']) {
-            case 'translation':
-              onTranslation(
-                (msg['orig'] ?? '').toString(),
-                (msg['trans'] ?? '').toString(),
-                (msg['lang'] ?? '').toString(),
-                (msg['audio'] ?? '').toString(),
-              );
-              break;
-            case 'partial':
-              onPartial?.call((msg['text'] ?? '').toString());
-              break;
-            case 'error':
-              _log('backend error: ${msg['error']}');
-              onError?.call((msg['error'] ?? 'error').toString());
-              break;
-          }
-        } catch (_) {}
-      }).toJS;
+      // Open WebSocket (with auto-reconnect on close).
+      _openWs();
 
       // Pull audio frames: prefer MediaStreamTrackProcessor (Chrome/Firefox);
       // fall back to ScriptProcessorNode for iOS Safari.
@@ -212,6 +175,73 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     }
   }
 
+  /// Open (or reopen) the WebSocket. Called once at start and automatically
+  /// after any unexpected close while [_running] is still true.
+  void _openWs() {
+    if (!_running) return;
+    final url = _wsUrl;
+    if (url == null) return;
+
+    try {
+      final ws = web.WebSocket(url.toString());
+      ws.binaryType = 'arraybuffer';
+      _ws = ws;
+
+      ws.onopen = ((web.Event _) {
+        _wsOpen = true;
+        _log('ws OPEN');
+      }).toJS;
+
+      ws.onerror = ((web.Event _) {
+        _log('ws ERROR');
+        // Don't surface transient errors during reconnect cycles —
+        // the onclose handler below will schedule a retry.
+      }).toJS;
+
+      ws.onclose = ((web.CloseEvent ev) {
+        _wsOpen = false;
+        _log('ws CLOSE code=${ev.code}');
+        if (_running) {
+          _log('ws closed unexpectedly — reconnect in ${_reconnectDelay.inSeconds}s');
+          Future.delayed(_reconnectDelay, _openWs);
+        }
+      }).toJS;
+
+      ws.onmessage = ((web.MessageEvent e) {
+        final data = e.data;
+        if (data == null || !data.isA<JSString>()) return;
+        try {
+          final msg =
+              jsonDecode((data as JSString).toDart) as Map<String, dynamic>;
+          _log('msg ${msg['type']}: '
+              '${(msg['trans'] ?? msg['text'] ?? '').toString()} '
+              '(audio=${(msg['audio'] ?? '').toString().length}b)');
+          switch (msg['type']) {
+            case 'translation':
+              _cbTranslation?.call(
+                (msg['orig'] ?? '').toString(),
+                (msg['trans'] ?? '').toString(),
+                (msg['lang'] ?? '').toString(),
+                (msg['audio'] ?? '').toString(),
+              );
+              break;
+            case 'partial':
+              _cbPartial?.call((msg['text'] ?? '').toString());
+              break;
+            case 'error':
+              _log('backend error: ${msg['error']}');
+              _cbError?.call((msg['error'] ?? 'error').toString());
+              break;
+          }
+        } catch (_) {}
+      }).toJS;
+    } catch (e) {
+      _log('_openWs FAILED: $e');
+      if (_running) {
+        Future.delayed(_reconnectDelay, _openWs);
+      }
+    }
+  }
 
   Future<void> _pump(web.ReadableStreamDefaultReader reader) async {
     while (_running) {
@@ -235,9 +265,8 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           _CopyOpts(planeIndex: 0, format: 'f32-planar'),
         );
         audio.close();
-        // Send all frames continuously — Grok STT handles silence internally.
-        // AEC (echoCancellation:true) suppresses speaker output from the mic.
-        // Only the mic-mute button blocks the stream.
+        // Continuous stream — Grok STT handles silence internally.
+        // AEC suppresses speaker echo. Only mic-mute button blocks SEND.
         if (_wsOpen && n > 0 && !(_captureLocalMic && isSendMuted)) {
           final pcm = _downsampleToPcm16(f32, inRate, _outRate);
           if (pcm.isNotEmpty) {
@@ -290,7 +319,6 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       final proc = ctx.createScriptProc(4096, 1, 1);
       _scriptProc = proc;
 
-      // connect source → proc → destination (destination needed for callback to fire)
       source.connectTo(proc);
       proc.connectTo(ctx.destination as JSObject);
 
@@ -343,6 +371,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         ws.close();
       }
     } catch (_) {}
+    _ws = null;
     // Stop ONLY our own getUserMedia mic — never LiveKit's call mic.
     try {
       final tracks = _micStream?.getTracks().toDart;
@@ -353,6 +382,9 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       }
     } catch (_) {}
     _micStream = null;
-    _ws = null;
+    _wsUrl = null;
+    _cbTranslation = null;
+    _cbPartial = null;
+    _cbError = null;
   }
 }
