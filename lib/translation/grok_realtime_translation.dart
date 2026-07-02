@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
+import '../services/call_audio.dart';
 import '../services/translation_api.dart';
 import 'grok_mic_streamer_base.dart';
 import 'grok_mic_streamer_io.dart'
@@ -14,16 +16,22 @@ import 'grok_mic_streamer_io.dart'
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
 
-/// Realtime Grok translation — SEND-only (each device sends its own TTS).
+/// Realtime Grok translation.
 ///
-/// Each participant captures its own mic, streams PCM to the backend Grok STT
-/// proxy, receives the translated audio, and publishes it to the peer via the
-/// LiveKit data channel (topic: swayco-chat, voiceOnly=true). The peer plays
-/// it through call_screen._onCaptionData.
+/// SEND (all platforms): captures MY mic, streams PCM to the backend Grok STT
+/// proxy, and publishes the translated Grok voice to the peer via the LiveKit
+/// data channel (voiceOnly=true). The peer plays it through
+/// call_screen._onCaptionData — but ONLY on native, since on web RECV handles
+/// playback (see below).
 ///
-/// RECV was removed: running a parallel RECV capture on web caused
-/// double-playback and a speaker-echo feedback loop where the sender heard
-/// its own text reflected back as TTS.
+/// RECV (web only): captures the REMOTE participant's WebRTC audio track,
+/// streams it to Grok for translation, and plays the result locally. On
+/// native, the peer's SEND pipeline already sends TTS for us to play via the
+/// data channel, so no RECV is needed.
+///
+/// On web, _onCaptionData skips voiceOnly data-channel packets (RECV handles
+/// playback), which eliminates double-play and the associated speaker-echo
+/// → SEND re-translation feedback loop.
 class GrokRealtimeTranslation extends ChangeNotifier
     implements RealtimeTranslationPort {
   static const String _captionTopic = 'swayco-chat';
@@ -31,18 +39,22 @@ class GrokRealtimeTranslation extends ChangeNotifier
 
   Room? _room;
   TranslationRoute? _route;
+  EventsListener<RoomEvent>? _listener;
 
   GrokMicStreamer? _sendStreamer;
+  GrokMicStreamer? _recvStreamer;
+  RemoteAudioTrack? _recvTrack;
+  String? _boundSid;
 
-  // _player kept for setTranslatedAudioVolume interface compliance; volume
-  // controls the data-channel TTS playback in call_screen instead.
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<void>? _playSub;
   bool _speaking = false;
   double _volume = 1.0;
 
   int _sent = 0;
+  int _played = 0;
   String? _lastSent;
+  String? _lastRecv;
   String? _lastError;
 
   @override
@@ -85,9 +97,11 @@ class GrokRealtimeTranslation extends ChangeNotifier
             : '${route.sourceBcp47}↔${route.targetBcp47}');
     final lines = <String>[
       'Grok RT: send=${_sendStreamer?.isStreaming ?? false} '
-          '• route: $routeLabel • envois: $_sent',
+          'recv=${_recvStreamer?.isStreaming ?? false} • route: $routeLabel • '
+          'envois: $_sent lus: $_played',
     ];
     if (_lastSent != null) lines.add('MOI→: $_lastSent');
+    if (_lastRecv != null) lines.add('→MOI: $_lastRecv');
     if (_lastError != null) lines.add('ERR: $_lastError');
     return lines.join('\n');
   }
@@ -109,12 +123,32 @@ class GrokRealtimeTranslation extends ChangeNotifier
       }
     });
 
-    // RECV is intentionally disabled: every client (iOS + web) already runs a
-    // SEND pipeline that translates its own mic and pushes TTS to the peer via
-    // the data channel. Running RECV in parallel caused double-playback on web
-    // AND a speaker-echo → SEND re-translation feedback loop.
+    // RECV (web only): captures the peer's WebRTC audio track and plays the
+    // Grok translation locally. On native the peer's SEND pipeline already
+    // pushes TTS via the data channel, so no RECV is needed there.
+    // On web, _onCaptionData deliberately skips voiceOnly packets so only
+    // RECV plays the audio — this prevents double-playback and the
+    // speaker-echo → SEND re-translation feedback loop.
+    if (kIsWeb) {
+      _listener = room.createListener()
+        ..on<TrackSubscribedEvent>((e) {
+          if (e.track is RemoteAudioTrack) _rebindRemote();
+        })
+        ..on<TrackUnsubscribedEvent>((e) {
+          if (e.track is RemoteAudioTrack) _rebindRemote();
+        })
+        ..on<ParticipantDisconnectedEvent>((_) {
+          if (_room?.remoteParticipants.isEmpty ?? true) {
+            unawaited(_stopRecv());
+            _recvTrack = null;
+            _boundSid = null;
+            notifyListeners();
+          }
+        });
+      _rebindRemote();
+    }
 
-    // SEND: my mic → peer.
+    // SEND: my mic → peer (all platforms).
     final sendStreamer = createGrokMicStreamer();
     _sendStreamer = sendStreamer;
     unawaited(
@@ -139,10 +173,15 @@ class GrokRealtimeTranslation extends ChangeNotifier
   @override
   Future<void> detach() async {
     await _stopSend();
+    await _stopRecv();
+    _recvTrack = null;
+    _boundSid = null;
     _speaking = false;
     try {
       await _player.stop();
     } catch (_) {}
+    await _listener?.dispose();
+    _listener = null;
     _room = null;
     _route = null;
   }
@@ -153,6 +192,100 @@ class GrokRealtimeTranslation extends ChangeNotifier
     unawaited(detach());
     unawaited(_player.dispose());
     super.dispose();
+  }
+
+  // ─── RECV (remote → local playback, web only) ────────────────────────────
+  void _rebindRemote() {
+    final room = _room;
+    final route = _route;
+    if (room == null || route == null) return;
+    RemoteAudioTrack? pick;
+    String? pickSid;
+    for (final p in room.remoteParticipants.values) {
+      for (final pub in p.audioTrackPublications) {
+        final t = pub.track;
+        if (t is! RemoteAudioTrack) continue;
+        if (t.source == TrackSource.screenShareAudio) continue;
+        pick = t;
+        pickSid = pub.sid;
+        if (t.source == TrackSource.microphone) break;
+      }
+      if (pick != null) break;
+    }
+    if (pick == null) {
+      if (_recvTrack != null) {
+        unawaited(_stopRecv());
+        _recvTrack = null;
+        _boundSid = null;
+        notifyListeners();
+      }
+      return;
+    }
+    if (pickSid == _boundSid && _recvStreamer != null) return;
+    _recvTrack = pick;
+    _boundSid = pickSid;
+    debugPrint('[grok-rt] bound remote track sid=$pickSid');
+    notifyListeners();
+    unawaited(_restartRecv(pick));
+  }
+
+  Future<void> _restartRecv(RemoteAudioTrack track) async {
+    await _stopRecv();
+    final route = _route;
+    if (route == null || !route.isConfigured) return;
+    final streamer = createGrokMicStreamer();
+    _recvStreamer = streamer;
+    try {
+      await streamer.start(
+        wsUrl: grokSttWsUri(from: route.targetBcp47, to: route.sourceBcp47),
+        localTrack: track.mediaStreamTrack,
+        captureLocalMic: false,
+        onTranslation: _onRecvTranslation,
+        onError: (code) {
+          _lastError = 'recv:$code';
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _lastError = 'recv:$e';
+    }
+    notifyListeners();
+  }
+
+  void _onRecvTranslation(String orig, String trans, String lang, String audioB64) {
+    _lastRecv = trans;
+    _lastError = null;
+    if (audioB64.isNotEmpty) unawaited(_playMp3B64(audioB64));
+    notifyListeners();
+  }
+
+  Future<void> _playMp3B64(String audioB64) async {
+    try {
+      final bytes = base64Decode(audioB64);
+      if (bytes.isEmpty) return;
+      // Web: play through the gesture-unlocked element. This also sets
+      // isTranslationPlaying so the SEND streamer pauses (half-duplex),
+      // preventing the speaker-echo → SEND re-translation feedback loop.
+      if (kIsWeb) {
+        final ok = await playTranslatedMp3(bytes);
+        debugPrint('[grok-rt] RECV web play ok=$ok ${bytes.length}b');
+        if (ok) {
+          _played++;
+          return;
+        }
+      }
+      _speaking = true;
+      notifyListeners();
+      await _player.setVolume(_volume);
+      await _player.play(BytesSource(bytes, mimeType: 'audio/mpeg'));
+      _played++;
+      debugPrint('[grok-rt] RECV played ${bytes.length}b locally');
+    } catch (e) {
+      _speaking = false;
+      _lastError = 'play:$e';
+      debugPrint('[grok-rt] RECV play FAILED: $e');
+      notifyListeners();
+    }
   }
 
   // ─── SEND (my mic → peer) ────────────────────────────────────────────────
@@ -196,6 +329,16 @@ class GrokRealtimeTranslation extends ChangeNotifier
   Future<void> _stopSend() async {
     final s = _sendStreamer;
     _sendStreamer = null;
+    if (s != null) {
+      try {
+        await s.stop();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _stopRecv() async {
+    final s = _recvStreamer;
+    _recvStreamer = null;
     if (s != null) {
       try {
         await s.stop();
