@@ -19,5 +19,6 @@ Future<bool> playTranslatedMp3(Uint8List bytes) => impl.playTranslatedMp3(bytes)
 /// half-duplex so it doesn't re-capture our own playback.
 bool get isTranslationPlaying => impl.isTranslationPlaying;
 
-void markTranslationPlaying() => impl.markTranslationPlaying();
+void markTranslationPlaying({int textLength = 0}) =>
+    impl.markTranslationPlaying(textLength: textLength);
 void markTranslationDone() => impl.markTranslationDone();

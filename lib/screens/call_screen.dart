@@ -836,13 +836,10 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _speakDeviceTts(String text, String lang) async {
     DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
-    // Pause SEND mic while TTS plays so the streamer doesn't re-capture and
-    // loop-translate the speaker output. Completion handler clears the flag.
-    markTranslationPlaying();
-    _deviceTts.setCompletionHandler(() {
-      markTranslationDone();
-      DebugOverlay.log('speakDeviceTts DONE');
-    });
+    // Pause SEND mic for estimated speech duration (80ms/char + 1s buffer).
+    // setCompletionHandler fires unreliably on Flutter web, so we use a timer
+    // inside markTranslationPlaying instead of relying on the callback.
+    markTranslationPlaying(textLength: text.length);
     try {
       if (lang.isNotEmpty) {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}

@@ -19,20 +19,20 @@ bool _playing = false;
 Timer? _clearTimer;
 bool get isTranslationPlaying => _playing;
 
-void markTranslationPlaying() => _markPlaying();
-void markTranslationDone() => _scheduleClear();
-
-void _markPlaying() {
+/// Call before TTS speak(). [textLength] is used to estimate how long to
+/// keep the mic paused (80 ms/char + 1 s buffer). The completion handler on
+/// Flutter web fires unreliably, so we use a timer instead of relying on it.
+void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
   _clearTimer?.cancel();
-  // Safety: clear even if 'ended' never fires.
-  _clearTimer = Timer(const Duration(seconds: 8), () => _playing = false);
+  final ms = (textLength * 80 + 1000).clamp(3000, 15000);
+  _clearTimer = Timer(Duration(milliseconds: ms), () => _playing = false);
 }
 
-void _scheduleClear() {
+void markTranslationDone() {
   _clearTimer?.cancel();
-  // Hangover so the speaker tail isn't re-captured.
-  _clearTimer = Timer(const Duration(milliseconds: 500), () => _playing = false);
+  // 800 ms hangover so the speaker tail isn't re-captured.
+  _clearTimer = Timer(const Duration(milliseconds: 800), () => _playing = false);
 }
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.
@@ -96,12 +96,12 @@ Future<bool> playTranslatedMp3(Uint8List bytes) async {
     final url = web.URL.createObjectURL(blob);
     el.muted = false;
     el.src = url;
-    el.onended = ((web.Event _) => _scheduleClear()).toJS;
-    _markPlaying();
+    el.onended = ((web.Event _) => markTranslationDone()).toJS;
+    markTranslationPlaying();
     await el.play().toDart;
     return true;
   } catch (_) {
-    _scheduleClear();
+    markTranslationDone();
     return false;
   }
 }

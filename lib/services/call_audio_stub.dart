@@ -7,5 +7,5 @@ void armSpeechSynthesis() {}
 Future<bool> playTranslatedMp3(Uint8List bytes) async => false;
 
 bool get isTranslationPlaying => false;
-void markTranslationPlaying() {}
+void markTranslationPlaying({int textLength = 0}) {}
 void markTranslationDone() {}
