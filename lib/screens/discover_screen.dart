@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
@@ -40,25 +39,16 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen>
-    with SingleTickerProviderStateMixin {
-  // Real Supabase profiles, hydrated from ProfileApi.fetchDiscoverFeed at
-  // bootstrap. Excludes me and anyone I've blocked / who's blocked me, but
-  // intentionally KEEPS people I follow so their new photos show up here.
+class _DiscoverScreenState extends State<DiscoverScreen> {
   List<RemoteProfile> _profiles = const <RemoteProfile>[];
   bool _feedLoading = true;
 
-  // The feed is one card per PERSON, showing a SINGLE photo (the discover
-  // photo). The rest of the gallery only lives on the profile page.
-  // Rebuilt whenever [_profiles] changes.
   final List<({RemoteProfile profile, List<String> photos})> _cards = [];
 
   void _rebuildCards() {
     _cards.clear();
     for (final p in _profiles) {
       final photos = p.photos.where((u) => u.isNotEmpty).toList();
-      // One photo only: the designated discover photo, falling back to the
-      // first gallery photo, then the avatar.
       final single = p.discoverPhotoUrl.isNotEmpty
           ? p.discoverPhotoUrl
           : (photos.isNotEmpty ? photos.first : p.avatarUrl);
@@ -68,35 +58,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  // photo URL → set of photo-reaction emojis I've already sent on that photo.
-  // Reactions belong to a specific photo now, so the rail renders pre-filled
-  // only for the exact carousel photo I reacted to. Hydrated from the
-  // messages table on bootstrap so it survives restarts / multi-device.
   Map<String, Set<String>> _myReactionsByPhoto = const {};
-
-  // Peers I've already sent a direct intro message to (text area). One message
-  // per PERSON (each card is one person now), hydrated on bootstrap so it
-  // survives restarts; the in-card field collapses to a sent state once the
-  // peer is here.
   Set<String> _directMessagedPeers = <String>{};
 
-  // TikTok-style vertical pager. Swipe up = next profile, swipe down =
-  // previous. Snapping + the slide animation are handled by PageView.
-  // Not final: at bootstrap we swap it for one with the right initialPage so
-  // the deck resumes on the card we left off (see _restoreCursor).
-  PageController _pageController = PageController();
+  // Tinder deck: current top-card index.
+  int _currentIndex = 0;
 
-  // Raw PageView index of the card currently on top. Persisted (as that
-  // person's profile id, via _persistCursor) on every page change so a
-  // restart resumes here instead of snapping back to the first card.
-  int _topIndex = 0;
+  // Exposed so action buttons can trigger programmatic swipes.
+  final _stackKey = GlobalKey<_TinderCardStackState>();
 
-  // Desktop mouse wheel / trackpad scrolls bypass PageView's snap and
-  // can blow through several pages in one gesture. We debounce wheel
-  // ticks here so one tick == one page change regardless of speed.
-  DateTime _lastWheel = DateTime.fromMillisecondsSinceEpoch(0);
-
-  // Inline search state — bar expands, dropdown of matching profiles below.
+  // ── Search state ────────────────────────────────────────────────────────────
   bool _searchExpanded = false;
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
@@ -105,46 +76,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   String _myId = '';
   bool _searching = false;
   List<RemoteProfile> _searchResults = const [];
-  // Friendship rows involving me — used to label each result with its
-  // existing status (pending / accepted) so we don't show "send" twice.
   List<Friendship> _myFriendships = const [];
-
-  // Idle swipe-hint: after [_swipeHintDelay] of inactivity, the deck peeks
-  // the next card up (driven by [_hintCtrl] via [_onHintTick] using
-  // PageController.jumpTo, no rebuild). Any swipe / touch resets it.
-  Timer? _swipeHintTimer;
-  static const _swipeHintDelay = Duration(seconds: 4);
-  late final AnimationController _hintCtrl;
-  // Page offset the nudge started from, restored when it finishes.
-  double _nudgeStart = 0;
-  // True while [_hintCtrl] is actively driving the page peek.
-  bool _nudging = false;
-  // How far the next card peeks up during the nudge.
-  static const double _peek = 34;
 
   @override
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'discover'});
-    _hintCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      reverseDuration: const Duration(milliseconds: 380),
-    )..addListener(_onHintTick);
     _bootstrapSearch();
-    _scheduleSwipeHint();
-    // Web: periodically refresh friendships + likes so a peer accepting
-    // / blocking / liking gets reflected on the Discover cards within
-    // ~10s. The feed itself is not re-fetched (it'd reset the swipe
-    // position) — only the lightweight signal queries.
     _pollTimer = WebPoll.every(
       const Duration(seconds: 10),
       _refreshLiveSignals,
     );
   }
 
-  /// Lightweight refresh: only re-pulls friendship rows + likes I've
-  /// given. Keeps the card stack and `_topIndex` exactly where they are.
   Future<void> _refreshLiveSignals() async {
     if (_myId.isEmpty || !isSupabaseReady) return;
     try {
@@ -157,17 +101,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _myReactionsByPhoto = reactions;
         _directMessagedPeers = messaged;
       });
-    } catch (_) {
-      // Polling errors are non-fatal — next tick will retry.
-    }
+    } catch (_) {}
   }
 
   Future<void> _bootstrapSearch() async {
     final id = await DeviceId.getOrCreate();
     if (!mounted) return;
     setState(() => _myId = id);
-    // Warm the shared missions cache (cheap / cached) so the compact ring in
-    // the Discover header shows the right progress without extra round-trips.
     MissionsService.instance.refresh(id);
     if (!isSupabaseReady || id.isEmpty) {
       setState(() => _feedLoading = false);
@@ -175,11 +115,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       return;
     }
     try {
-      // These six queries are independent — fire them concurrently (was
-      // sequential: six round-trips back-to-back, the main reason the deck
-      // sat on its spinner for seconds). Bounded so a slow / wedged call
-      // can't trap the spinner forever; on timeout we drop into the catch
-      // and show the deck rather than spin indefinitely.
       final results = await Future.wait(<Future<Object>>[
         FriendshipApi.fetchMine(id),
         ChatApi.fetchMyOutgoingPhotoReactions(id),
@@ -198,9 +133,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _feedLoading = false;
       });
       AppBoot.markHomeReady();
-      // Warm the first cards' photos once the deck is laid out.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _precacheAround(_topIndex);
+        if (mounted) _precacheAround(_currentIndex);
       });
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
@@ -208,31 +142,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Resume the deck on the card we were parked on last session. Called from
-  /// the bootstrap setState, while we're still _feedLoading — so the PageView
-  /// isn't built yet and the controller has no clients. Swapping it for one
-  /// with the right initialPage lands us on that person with no visible jump
-  /// to the first card. We match by profile id (not the saved index) so it
-  /// holds up even if the feed comes back reordered.
   void _restoreCursor(String cursorId) {
     if (cursorId.isEmpty || _cards.isEmpty) return;
     final idx = _cards.indexWhere((c) => c.profile.id == cursorId);
-    if (idx <= 0) return; // not found, or already the first card
-    _pageController.dispose();
-    _pageController = PageController(initialPage: idx);
-    _topIndex = idx;
+    if (idx > 0) _currentIndex = idx;
   }
 
-  /// Remember which person is on top so a restart resumes here. Fire-and-forget
-  /// write on every page change; we store the profile id, not the raw index.
   void _persistCursor() {
     if (_cards.isEmpty) return;
-    UserPrefs.saveDiscoverCursor(_cards[_topIndex % _cards.length].profile.id);
+    UserPrefs.saveDiscoverCursor(
+      _cards[_currentIndex % _cards.length].profile.id,
+    );
   }
 
-  /// Warm the image cache for the cards around [index] (the previous one and
-  /// the next five) so a swipe shows the photo instantly instead of waiting
-  /// on the Supabase download. De-duped so a short feed isn't fetched twice.
   void _precacheAround(int index) {
     if (!mounted || _cards.isEmpty) return;
     final n = _cards.length;
@@ -246,75 +168,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Toggle a like on [profileId]. Optimistic local flip + DB write
-  /// through LikeApi; on error roll back so the heart matches the truth.
-
   @override
   void dispose() {
-    _hintCtrl.dispose();
-    _pageController.dispose();
-    _searchDebounce?.cancel();
     _pollTimer?.cancel();
-    _swipeHintTimer?.cancel();
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
 
-  /// (Re)arm the idle swipe-hint countdown — called on first load, on every
-  /// page change, and on any touch. Stops a running nudge, then fires a fresh
-  /// one only once the user has sat still for [_swipeHintDelay].
-  void _scheduleSwipeHint() {
-    _swipeHintTimer?.cancel();
-    _nudging = false;
-    _hintCtrl.stop();
-    _swipeHintTimer = Timer(_swipeHintDelay, _fireSwipeHint);
-  }
-
-  /// Idle nudge: peek the next card up (driven by [_hintCtrl] via
-  /// [_onHintTick] — no setState, so the deck/images never rebuild or blink).
-  /// Re-arms so the nudge repeats every few seconds until the user moves.
-  void _fireSwipeHint() {
-    if (!mounted) return;
-    // Don't peek while the user is writing a message (keyboard up) — it would
-    // make the card jump under the composer.
-    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
-    if (_cards.length > 1 && !_searchExpanded && !keyboardUp) _startNudge();
-    // First peek after _swipeHintDelay (4s); then repeat every 10s.
-    _swipeHintTimer = Timer(const Duration(seconds: 10), _fireSwipeHint);
-  }
-
-  /// Run one peek: forward (card lifts, revealing a sliver of the next card)
-  /// then reverse (settles back). [_onHintTick] mirrors [_hintCtrl] onto the
-  /// PageController so no gap ever opens. Skipped while the user is dragging.
-  void _startNudge() {
-    if (!_pageController.hasClients) return;
-    final pos = _pageController.position;
-    if (pos.isScrollingNotifier.value) return;
-    _nudgeStart = pos.pixels;
-    _nudging = true;
-    _hintCtrl.forward(from: 0).then((_) {
-      if (mounted && _nudging) _hintCtrl.reverse();
-    });
-  }
-
-  /// Mirror [_hintCtrl] onto the page offset so the real next card peeks up
-  /// (no mesh gap).
-  void _onHintTick() {
-    if (!_nudging || !_pageController.hasClients) return;
-    final t = Curves.easeOut.transform(_hintCtrl.value);
-    _pageController.jumpTo(_nudgeStart + t * _peek);
-  }
-
-  /// Any direct touch counts as activity: stop a running nudge and restart
-  /// the idle countdown so the hint doesn't fight the user.
-  void _onUserActivity() => _scheduleSwipeHint();
+  // ── Search ──────────────────────────────────────────────────────────────────
 
   void _expandSearch() {
     setState(() => _searchExpanded = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocus.requestFocus();
-    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _searchFocus.requestFocus(),
+    );
   }
 
   void _collapseSearch() {
@@ -329,9 +198,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   void _onSearchQueryChanged(String value) {
-    // Rebuild so the dropdown's "empty query" / "loading for X" hint
-    // reflects the typed text immediately, before the debounced search
-    // finishes resolving.
     setState(() {});
     _searchDebounce?.cancel();
     _searchDebounce = Timer(
@@ -372,10 +238,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: peer.id)),
     );
-    // Coming back from the profile, the user may have just followed —
-    // refresh so pills reflect reality without waiting for the 10s poll.
     if (mounted) _refreshLiveSignals();
   }
+
+  // ── Friend request ──────────────────────────────────────────────────────────
 
   Future<void> _sendFriendRequest(RemoteProfile peer) async {
     final f = await FriendshipApi.sendRequest(meId: _myId, peerId: peer.id);
@@ -387,8 +253,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (f != null) {
       setState(() => _myFriendships = [..._myFriendships, f]);
     }
-    // No confirmation snackbar — adding is silent so swiping through the
-    // Discover stack isn't interrupted by a toast on every card.
   }
 
   FriendshipStatus _statusFor(RemoteProfile peer) {
@@ -400,9 +264,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     return status;
   }
 
-  /// Cancel my outgoing friend request to [peer] — delete the pending
-  /// friendship row I created. Optimistic local update so the
-  /// "Ajouter" pill flips back instantly; rolls back on error.
   Future<void> _cancelFriendRequest(RemoteProfile peer) async {
     final (status, friendship) = FriendshipApi.statusWith(
       _myId,
@@ -414,9 +275,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
     final previous = _myFriendships;
     setState(() {
-      _myFriendships = _myFriendships
-          .where((f) => f.id != friendship.id)
-          .toList();
+      _myFriendships =
+          _myFriendships.where((f) => f.id != friendship.id).toList();
     });
     try {
       await FriendshipApi.remove(friendship.id);
@@ -426,10 +286,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Hand the "Ajouter" pill behaviour over to the parent so a second
-  /// tap on a card I've already requested cancels that demande instead
-  /// of being a no-op. Status is recomputed from [_myFriendships] each
-  /// tap so the toggle stays in sync after refreshes.
   Future<void> _toggleFriendRequest(RemoteProfile peer) async {
     if (_statusFor(peer) == FriendshipStatus.pendingOutgoing) {
       await _cancelFriendRequest(peer);
@@ -438,10 +294,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Toggle a photo reaction on [peer] — send the emoji if I haven't
-  /// already, delete every matching reaction message I sent otherwise.
-  /// Optimistic local update on both branches so the rail button
-  /// flips immediately; rolls back to the cached set on failure.
+  // ── Emoji reactions ─────────────────────────────────────────────────────────
+
   Future<void> _toggleEmojiReaction(
     RemoteProfile peer,
     String photo,
@@ -456,26 +310,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Sends a one-character reaction message (the tapped emoji) to [peer].
-  /// Reuses the Coucou path so the receiver gets a real chat message
-  /// that opens the thread on their side. Tracks the emoji locally so
-  /// the rail button stays filled when the card is revisited; the
-  /// hydration on bootstrap reads the same set from past messages.
   Future<void> _sendEmojiReaction(
     RemoteProfile peer,
     String photo,
     String emoji,
   ) async {
-    // Optimistic local update (keyed by the photo) so the button stays
-    // filled immediately without waiting for the round-trip.
     final next = Map<String, Set<String>>.from(_myReactionsByPhoto);
     final current = Set<String>.from(next[photo] ?? const <String>{});
     current.add(emoji);
     next[photo] = current;
     setState(() => _myReactionsByPhoto = next);
-    // Stamp the photo URL into discover_photo so the reaction belongs to THIS
-    // photo (intro messages are told apart by their non-emoji body, so this
-    // doesn't collapse the card's message field).
     await _sendQuickMessage(
       peer,
       body: emoji,
@@ -485,9 +329,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
-  /// Undo a previously-sent reaction. Pulls the emoji out of the local
-  /// set, then deletes every matching message I sent so the peer's
-  /// thread / Demandes feed loses the entry too.
   Future<void> _unsendEmojiReaction(
     RemoteProfile peer,
     String photo,
@@ -516,9 +357,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Drop [body] into the deterministic dm-{a}-{b} thread for the local
-  /// user and [peer], same conversation id the chat list uses. Shared by
-  /// the "Ajouter" 👋 pill and the reaction-rail emoji taps.
   Future<void> _sendQuickMessage(
     RemoteProfile peer, {
     required String body,
@@ -529,9 +367,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (_myId.isEmpty || peer.id.isEmpty) return;
     try {
       final local = await UserPrefs.loadProfile();
-      final myProfile = isSupabaseReady
-          ? await ProfileApi.fetchById(_myId)
-          : null;
+      final myProfile =
+          isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
       final myName = (myProfile?.displayName.trim().isNotEmpty == true)
           ? myProfile!.displayName
           : (local?.firstName.trim() ?? '');
@@ -549,10 +386,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         language: myLang,
         discoverPhoto: discoverPhoto,
       );
-      Analytics.track(
-        'message_sent',
-        props: {'source': 'discover', 'type': type},
-      );
+      Analytics.track('message_sent', props: {'source': 'discover', 'type': type});
       if (!mounted) return;
       _showAddedSnack(snack);
     } catch (e) {
@@ -561,12 +395,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
-  /// Send a one-off intro message to [peer] from the Discover card text area.
-  /// One per PERSON: optimistically marks the peer as messaged (the in-card
-  /// field collapses to a sent state) and persists via the real chat message —
-  /// [ChatApi.sendMessage] also fires the push notification to the peer. The
-  /// [photoUrl] is stamped on the message purely to flag it as a Discover
-  /// intro (so it counts towards the per-person hydration).
   Future<void> _sendDirectMessage(
     RemoteProfile peer,
     String photoUrl,
@@ -584,14 +412,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
-  /// Floating glass snackbar lifted above the floating GlassNavBar so
-  /// the message isn't hidden by it. Same Swayco Midnight palette as
-  /// the cards.
   void _showAddedSnack(String text, {bool isError = false}) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // The nav is now flush to the bottom: its height + the safe-area inset.
-    // Lift the snack ~16 px above that so the two never overlap.
-    final liftFromBottom = GlassNavBar.height + safeBottom + 16.0;
+    final liftFromBottom =
+        GlassNavBar.height + safeBottom + _kActionBarHeight + 16.0;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
@@ -616,9 +440,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Future<void> _reset() async {
-    if (_pageController.hasClients) _pageController.jumpToPage(0);
     if (_myId.isEmpty) return;
-    setState(() => _feedLoading = true);
+    setState(() {
+      _feedLoading = true;
+      _currentIndex = 0;
+    });
     final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
     if (!mounted) return;
     setState(() {
@@ -628,25 +454,41 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     });
   }
 
+  // ── Tinder swipe logic ──────────────────────────────────────────────────────
+
+  void _onCardSwiped(bool isRight, RemoteProfile profile) {
+    if (isRight) {
+      HapticFeedback.lightImpact();
+      _sendFriendRequest(profile);
+    }
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % _cards.length;
+      _persistCursor();
+      _precacheAround(_currentIndex);
+    });
+  }
+
+  void _onActionSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);
+  void _onActionSwipeRight() => _stackKey.currentState?.triggerSwipe(true);
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
+  static const double _kActionBarHeight = 88.0;
+
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // The card deck sits strictly between the two bars' bodies. The bars
-    // then grow over these edges with concave notches (see GlassNavBar /
-    // _DiscoverHeader) that hug the card's rounded corners, no gap.
     final deckTop = safeTop + _DiscoverHeader.height;
-    final deckBottom = GlassNavBar.height + safeBottom;
+    final deckBottom = GlassNavBar.height + safeBottom + _kActionBarHeight;
+
     return Scaffold(
       backgroundColor: SC.bg,
-      // Cards extend behind the floating nav bar (rendered by RootShell).
       extendBody: true,
       body: MeshBackground(
         child: Stack(
           children: [
-            // Cyan-blue ambient wash over the mesh: turns the fond behind the
-            // card from flat navy into a cyan-blue glow — brightest right
-            // behind the card, fading to a cyan-navy cast at the edges.
+            // Cyan-blue ambient wash
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -662,8 +504,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 ),
               ),
             ),
-            // The card deck, inset to the gap between the two bar bodies.
-            // Each page is exactly the gap height, so cards slide in flush.
+            // Card deck
             Positioned(
               left: 0,
               right: 0,
@@ -673,20 +514,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ? const Center(
                       child: CircularProgressIndicator(color: SC.accent),
                     )
-                  // Tap anywhere on the deck that isn't the message field or a
-                  // button dismisses the keyboard. translucent so taps on the
-                  // empty photo area still register here; the TextField / the
-                  // action buttons win the gesture arena first, and onTap never
-                  // claims the vertical drag the PageView uses to swipe cards.
                   : GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () => FocusScope.of(context).unfocus(),
-                      child: _buildStack(),
+                      child: _buildTinderStack(),
                     ),
             ),
-            // Full-width frosted-glass top bar — mirrors the bottom nav so
-            // the full-bleed photo runs behind both with no empty strip at
-            // the top. The bar bakes in the safe-area inset itself.
+            // Top bar
             Positioned(
               top: 0,
               left: 0,
@@ -700,17 +534,24 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 onChanged: _onSearchQueryChanged,
               ),
             ),
-            // Live "X en ligne" badge over the card's top-left. Remote-gated
-            // (online_badge_enabled) so it can be killed from the dashboard if
-            // App Review objects — no app update needed.
+            // Online badge
             Positioned(
               top: deckTop + 10,
               left: 20,
               child: const _OnlineBadge(),
             ),
-            // Tap-outside catcher to dismiss the search. Transparent now —
-            // no dark overlay over the card; HitTestBehavior.opaque still
-            // captures the tap so tapping outside closes the search.
+            // Tinder action buttons (X / ❤️)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: GlassNavBar.height + safeBottom,
+              height: _kActionBarHeight,
+              child: _SwipeActionBar(
+                onSwipeLeft: _onActionSwipeLeft,
+                onSwipeRight: _onActionSwipeRight,
+              ),
+            ),
+            // Search dismiss overlay
             if (_searchExpanded)
               Positioned.fill(
                 top: safeTop + 64,
@@ -720,7 +561,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   child: const ColoredBox(color: Colors.transparent),
                 ),
               ),
-            // Search results dropdown — overlays the cards.
+            // Search results dropdown
             if (_searchExpanded)
               Positioned(
                 left: 16,
@@ -741,115 +582,486 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
-  Widget _buildStack() {
-    // Each PageView page renders one profile card sized at 3:4 portrait,
-    // capped at 460 wide on desktop so the photo isn't stretched into
-    // the full width of a 1900-px viewport. PageView handles the
-    // vertical snap + slide animation natively — swipe up reveals the
-    // next profile, swipe down brings the previous one back.
-    //
-    // We add one extra page after the last profile: the "all caught up"
-    // empty state, so the user can scroll into it the same way they
-    // scroll between profiles.
-    return Listener(
-      // Any touch on the deck is activity — stop a running hint nudge and
-      // restart the idle countdown so we never fight the user's gesture.
-      onPointerDown: (_) => _onUserActivity(),
-      // On desktop a trackpad/mouse-wheel scroll can deliver enough
-      // delta to skip several pages before the snap kicks in. We
-      // intercept wheel ticks here and advance/rewind the PageView
-      // by exactly one page, debounced so trackpad streams don't
-      // burn through profiles.
-      onPointerSignal: (event) {
-        if (event is! PointerScrollEvent) return;
-        final dy = event.scrollDelta.dy;
-        if (dy.abs() < 4) return;
-        final now = DateTime.now();
-        if (now.difference(_lastWheel) < const Duration(milliseconds: 220)) {
-          return;
-        }
-        _lastWheel = now;
-        if (dy > 0) {
-          _pageController.nextPage(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-          );
-        } else {
-          _pageController.previousPage(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-          );
-        }
-      },
-      child: PageView.builder(
-        controller: _pageController,
-        scrollDirection: Axis.vertical,
-        // Snappier than the default page physics — a quick flick lands on
-        // the next card in ~half the usual time. ClampingScrollPhysics as
-        // the parent so we don't get the iOS bouncing overscroll, which
-        // was opening a visible gap above the first card / below the
-        // last one. On desktop the parent Listener also rate-limits
-        // wheel scrolling above this physics.
-        physics: const _SnappyPagePhysics(parent: ClampingScrollPhysics()),
-        // Remember the new top card so a restart resumes here, and warm the
-        // upcoming cards' photos so the next swipes are instant.
-        onPageChanged: (i) {
-          _topIndex = i;
-          _persistCursor();
-          _precacheAround(i);
-          _scheduleSwipeHint();
-        },
-        // Unbounded itemCount + modulo on the index = the feed loops
-        // forever: after the last profile the user lands back on the
-        // first one (1 → 2 → 3 → 1 → 2 → 3 …).
-        itemBuilder: (ctx, i) {
-          if (_cards.isEmpty) {
-            return _Empty(onReset: _reset);
-          }
-          // Dart's `%` returns a non-negative result for a positive
-          // divisor, so this also wraps cleanly when the user swipes
-          // backward past the first card. One card == one person.
-          final card = _cards[i % _cards.length];
-          final profile = card.profile;
-          final firstPhoto = card.photos.isNotEmpty ? card.photos.first : '';
-          // The deck is already inset between the two bars (see build), so
-          // the card just fills its page — that keeps consecutive cards
-          // contiguous, sliding in flush with no gap between them.
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: SizedBox.expand(
-                // Keyed by person so each card keeps its own carousel index
-                // as the deck recycles pages.
-                child: _ProfileCard(
-                  key: ValueKey(profile.id),
-                  profile: profile,
-                  photos: card.photos,
-                  onAdd: () => _toggleFriendRequest(profile),
-                  pendingOutgoing:
-                      _statusFor(profile) == FriendshipStatus.pendingOutgoing,
-                  // Reactions belong to the photo currently shown in the
-                  // carousel — the card resolves it and calls back with it.
-                  reactionsByPhoto: _myReactionsByPhoto,
-                  onSendEmoji: (photo, emoji) =>
-                      _toggleEmojiReaction(profile, photo, emoji),
-                  alreadyMessaged: _directMessagedPeers.contains(profile.id),
-                  onSendMessage: (text) =>
-                      _sendDirectMessage(profile, firstPhoto, text),
-                ),
-              ),
-            ),
-          );
-        },
+  Widget _buildTinderStack() {
+    if (_cards.isEmpty) return _Empty(onReset: _reset);
+    return _TinderCardStack(
+      key: _stackKey,
+      cards: _cards,
+      currentIndex: _currentIndex,
+      myReactionsByPhoto: _myReactionsByPhoto,
+      directMessagedPeers: _directMessagedPeers,
+      statusFor: _statusFor,
+      onSwiped: _onCardSwiped,
+      onSendEmoji: _toggleEmojiReaction,
+      onSendMessage: _sendDirectMessage,
+      onToggleFriend: _toggleFriendRequest,
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tinder card stack
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _TinderCardStack extends StatefulWidget {
+  const _TinderCardStack({
+    super.key,
+    required this.cards,
+    required this.currentIndex,
+    required this.myReactionsByPhoto,
+    required this.directMessagedPeers,
+    required this.statusFor,
+    required this.onSwiped,
+    required this.onSendEmoji,
+    required this.onSendMessage,
+    required this.onToggleFriend,
+  });
+
+  final List<({RemoteProfile profile, List<String> photos})> cards;
+  final int currentIndex;
+  final Map<String, Set<String>> myReactionsByPhoto;
+  final Set<String> directMessagedPeers;
+  final FriendshipStatus Function(RemoteProfile) statusFor;
+  final void Function(bool isRight, RemoteProfile profile) onSwiped;
+  final void Function(RemoteProfile, String photo, String emoji) onSendEmoji;
+  final Future<void> Function(RemoteProfile, String photoUrl, String text) onSendMessage;
+  final void Function(RemoteProfile) onToggleFriend;
+
+  @override
+  State<_TinderCardStack> createState() => _TinderCardStackState();
+}
+
+class _TinderCardStackState extends State<_TinderCardStack> {
+  // Recreated on each index change so the GlobalKey cleanly binds to the
+  // new top card state after the old one is disposed.
+  GlobalKey<_DraggableCardState> _topCardKey = GlobalKey<_DraggableCardState>();
+
+  // Progress [0, 1] broadcast to the second card for its scale animation.
+  final _swipeProgress = ValueNotifier<double>(0.0);
+
+  @override
+  void didUpdateWidget(_TinderCardStack old) {
+    super.didUpdateWidget(old);
+    if (old.currentIndex != widget.currentIndex) {
+      _topCardKey = GlobalKey<_DraggableCardState>();
+      _swipeProgress.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _swipeProgress.dispose();
+    super.dispose();
+  }
+
+  void triggerSwipe(bool isRight) {
+    _topCardKey.currentState?.programmaticSwipe(isRight);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = widget.cards;
+    final n = cards.length;
+    if (n == 0) return const SizedBox.shrink();
+    final i = widget.currentIndex % n;
+
+    return Stack(
+      children: [
+        // Third card (deepest, smallest)
+        if (n >= 3)
+          _StackCard(
+            key: ValueKey('back_${(i + 2) % n}'),
+            scale: 0.88,
+            translateY: 22,
+            child: _buildCardContent(cards[(i + 2) % n], interactive: false),
+          ),
+        // Second card — scales toward 1.0 as top card is dragged
+        if (n >= 2)
+          ValueListenableBuilder<double>(
+            valueListenable: _swipeProgress,
+            builder: (_, progress, child) {
+              final t = progress.clamp(0.0, 1.0);
+              return _StackCard(
+                key: ValueKey('mid_${(i + 1) % n}'),
+                scale: 0.94 + 0.06 * t,
+                translateY: 12.0 - 12.0 * t,
+                child: _buildCardContent(cards[(i + 1) % n], interactive: false),
+              );
+            },
+          ),
+        // Top card (draggable)
+        KeyedSubtree(
+          key: ValueKey('top_$i'),
+          child: _DraggableCard(
+            key: _topCardKey,
+            onSwiped: (isRight) =>
+                widget.onSwiped(isRight, cards[i].profile),
+            onDragProgress: (p) => _swipeProgress.value = p,
+            child: _buildCardContent(cards[i]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardContent(
+    ({RemoteProfile profile, List<String> photos}) card, {
+    bool interactive = true,
+  }) {
+    final profile = card.profile;
+    final photos = card.photos;
+    final firstPhoto = photos.isNotEmpty ? photos.first : '';
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SizedBox.expand(
+          child: _ProfileCard(
+            key: ValueKey('card_${profile.id}_$interactive'),
+            profile: profile,
+            photos: photos,
+            onAdd: () => widget.onToggleFriend(profile),
+            pendingOutgoing:
+                widget.statusFor(profile) == FriendshipStatus.pendingOutgoing,
+            reactionsByPhoto: widget.myReactionsByPhoto,
+            onSendEmoji: interactive
+                ? (photo, emoji) => widget.onSendEmoji(profile, photo, emoji)
+                : null,
+            alreadyMessaged: widget.directMessagedPeers.contains(profile.id),
+            onSendMessage: interactive
+                ? (text) => widget.onSendMessage(profile, firstPhoto, text)
+                : null,
+          ),
+        ),
       ),
     );
   }
 }
 
-/// "X en ligne" badge with a pulsing green dot. The count is a random number
-/// inside the remote-config range; the whole badge hides instantly when
-/// `online_badge_enabled` is flipped off in the dashboard (App Review
-/// kill-switch). Drifts gently so it feels alive.
+// Simple non-interactive background card with transform.
+class _StackCard extends StatelessWidget {
+  const _StackCard({
+    super.key,
+    required this.child,
+    required this.scale,
+    required this.translateY,
+  });
+
+  final Widget child;
+  final double scale;
+  final double translateY;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.center,
+      child: Transform.translate(
+        offset: Offset(0, translateY),
+        child: Transform.scale(scale: scale, child: child),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Draggable top card — handles swipe gesture + animations
+// ══════════════════════════════════════════════════════════════════════════════
+
+const double _kSwipeThreshold = 100.0;
+
+class _DraggableCard extends StatefulWidget {
+  const _DraggableCard({
+    super.key,
+    required this.child,
+    required this.onSwiped,
+    required this.onDragProgress,
+  });
+
+  final Widget child;
+  final ValueChanged<bool> onSwiped;
+  final ValueChanged<double> onDragProgress;
+
+  @override
+  State<_DraggableCard> createState() => _DraggableCardState();
+}
+
+class _DraggableCardState extends State<_DraggableCard>
+    with SingleTickerProviderStateMixin {
+  Offset _pos = Offset.zero;
+  bool _isFlyingOff = false;
+
+  late final AnimationController _ctrl = AnimationController(vsync: this);
+  Animation<Offset>? _motion;
+  int _animGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_onTick);
+  }
+
+  void _onTick() {
+    final m = _motion;
+    if (m == null) return;
+    setState(() {
+      _pos = m.value;
+      widget.onDragProgress(
+        (_pos.dx.abs() / _kSwipeThreshold).clamp(0.0, 1.0),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(
+    Offset target,
+    Duration dur,
+    Curve curve, {
+    VoidCallback? onDone,
+  }) {
+    final gen = ++_animGeneration;
+    _motion = Tween<Offset>(begin: _pos, end: target).animate(
+      CurvedAnimation(parent: _ctrl, curve: curve),
+    );
+    _ctrl.duration = dur;
+    _ctrl.value = 0;
+    _ctrl.forward().then((_) {
+      if (mounted &&
+          _animGeneration == gen &&
+          _ctrl.status == AnimationStatus.completed) {
+        onDone?.call();
+      }
+    });
+  }
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_isFlyingOff) return;
+    _ctrl.stop();
+    _motion = null;
+    setState(() {
+      _pos += Offset(d.delta.dx, d.delta.dy * 0.35);
+      widget.onDragProgress(
+        (_pos.dx.abs() / _kSwipeThreshold).clamp(0.0, 1.0),
+      );
+    });
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    if (_isFlyingOff) return;
+    if (_pos.dx.abs() >= _kSwipeThreshold) {
+      _flyOff(_pos.dx > 0);
+    } else {
+      _springBack();
+    }
+  }
+
+  void _flyOff(bool right) {
+    _isFlyingOff = true;
+    final target = Offset(right ? 900.0 : -900.0, _pos.dy - 40);
+    _animateTo(target, const Duration(milliseconds: 280), Curves.easeIn,
+        onDone: () {
+      if (mounted) widget.onSwiped(right);
+    });
+  }
+
+  void _springBack() {
+    _animateTo(Offset.zero, const Duration(milliseconds: 550), Curves.elasticOut,
+        onDone: () {
+      if (mounted) {
+        setState(() => _pos = Offset.zero);
+        widget.onDragProgress(0.0);
+      }
+    });
+  }
+
+  void programmaticSwipe(bool isRight) {
+    if (_isFlyingOff) return;
+    _flyOff(isRight);
+  }
+
+  double get _rotation => (_pos.dx / 280.0) * 0.22; // max ~12.5°
+
+  @override
+  Widget build(BuildContext context) {
+    final likeOpacity = (_pos.dx / 70.0).clamp(0.0, 1.0);
+    final nopeOpacity = (-_pos.dx / 70.0).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      child: Transform.translate(
+        offset: _pos,
+        child: Transform.rotate(
+          angle: _rotation,
+          child: Stack(
+            children: [
+              widget.child,
+              if (likeOpacity > 0.01)
+                Positioned(
+                  top: 36,
+                  left: 24,
+                  child: Opacity(
+                    opacity: likeOpacity,
+                    child: const _SwipeStamp(
+                      text: 'LIKE',
+                      color: Color(0xFF22C55E),
+                    ),
+                  ),
+                ),
+              if (nopeOpacity > 0.01)
+                Positioned(
+                  top: 36,
+                  right: 24,
+                  child: Opacity(
+                    opacity: nopeOpacity,
+                    child: const _SwipeStamp(
+                      text: 'NOPE',
+                      color: Color(0xFFFF3B5C),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIKE / NOPE stamp overlay
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SwipeStamp extends StatelessWidget {
+  const _SwipeStamp({required this.text, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // Counter-rotate slightly so the stamp stays readable as the card tilts.
+    final angle = text == 'LIKE' ? -0.3 : 0.3;
+    return Transform.rotate(
+      angle: angle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color, width: 3.5),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 3,
+            shadows: [Shadow(color: color.withValues(alpha: 0.3), blurRadius: 8)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Action buttons bar (X / ❤️)
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SwipeActionBar extends StatelessWidget {
+  const _SwipeActionBar({
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
+  });
+
+  final VoidCallback onSwipeLeft;
+  final VoidCallback onSwipeRight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _ActionButton(
+          onTap: onSwipeLeft,
+          size: 62,
+          color: const Color(0xFFFF3B5C),
+          icon: Icons.close_rounded,
+          iconSize: 30,
+        ),
+        const SizedBox(width: 20),
+        _ActionButton(
+          onTap: onSwipeRight,
+          size: 52,
+          color: const Color(0xFF3B82F6),
+          icon: Icons.star_rounded,
+          iconSize: 26,
+        ),
+        const SizedBox(width: 20),
+        _ActionButton(
+          onTap: onSwipeRight,
+          size: 62,
+          color: const Color(0xFF22C55E),
+          icon: Icons.favorite_rounded,
+          iconSize: 30,
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.onTap,
+    required this.size,
+    required this.color,
+    required this.icon,
+    required this.iconSize,
+  });
+
+  final VoidCallback onTap;
+  final double size;
+  final Color color;
+  final IconData icon;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      bounce: true,
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: SC.bubbleIn,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.22),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Icon(icon, color: color, size: iconSize),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Online badge
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _OnlineBadge extends StatefulWidget {
   const _OnlineBadge();
 
@@ -900,7 +1112,6 @@ class _OnlineBadgeState extends State<_OnlineBadge> {
   @override
   Widget build(BuildContext context) {
     final count = _count;
-    // No badge when nobody's online (or it's disabled remotely).
     if (count == null || count <= 0) return const SizedBox.shrink();
     return GlassPanel(
       borderRadius: 999,
@@ -938,6 +1149,10 @@ class _OnlineBadgeState extends State<_OnlineBadge> {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Top header bar with search
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader({
     required this.expanded,
@@ -955,28 +1170,17 @@ class _DiscoverHeader extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onSubmittedClose;
 
-  /// Height of the bar's content row (below the safe-area inset, which the
-  /// bar pads itself). Exposed so the Discover card can reserve exactly
-  /// this much space at the top and sit flush against the bar's edge.
   static const double height = 72;
 
   @override
   Widget build(BuildContext context) {
-    // Pad the bar's own top by the system safe-area inset so the glass
-    // fills up to the screen edge (behind the notch / status bar) while
-    // the title + search pill stay below it.
     final topInset = MediaQuery.paddingOf(context).top;
     return ClipPath(
-      // Concave notches at the two bottom corners — the bar grows down by
-      // hugRadius at the edges and curves in, wrapping snugly around the
-      // rounded top corners of the Discover card below it (no gap).
       clipper: const _BottomHugClipper(GlassNavBar.hugRadius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
           color: Colors.white.withValues(alpha: 0.12),
-          // Bottom pad by the notch strip so the title / search stay in the
-          // body above the corner notches; top pad by the safe-area inset.
           padding: EdgeInsets.only(
             top: topInset,
             bottom: GlassNavBar.hugRadius,
@@ -987,28 +1191,17 @@ class _DiscoverHeader extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Row(
                 children: [
-                  // Hidden while the search is open so the field has room and
-                  // never overflows the bar; full size otherwise (same as the
-                  // other page titles), since hiding it removes the need to
-                  // shrink it for long localized titles.
                   if (!expanded)
                     _TypewriterTitle(
                       text: AppStrings.t('discover_title'),
                       style: SCText.h1,
                     ),
                   const Spacer(),
-                  // "X/6" glued left of the ring with a breathing cyan halo —
-                  // shown in both states (the expanded field is capped below to
-                  // leave room so the bar never overflows).
-                  // Sits a touch lower than the title + loupe.
                   Transform.translate(
                     offset: const Offset(0, 2),
                     child: const MissionsScoreRing(),
                   ),
                   const SizedBox(width: 10),
-                  // Search pill: compact button when collapsed, wider TextField
-                  // when expanded — but never full-width. The whole pill is the
-                  // tap target (not just the label) for an easier hit.
                   Pressable(
                     behavior: HitTestBehavior.opaque,
                     bounce: true,
@@ -1019,8 +1212,6 @@ class _DiscoverHeader extends StatelessWidget {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOut,
-                        // Fill most of the bar while typing, but cap it so it
-                        // never overflows the bar on a narrow screen.
                         width: expanded
                             ? (MediaQuery.sizeOf(context).width - 135).clamp(
                                 180.0,
@@ -1032,75 +1223,69 @@ class _DiscoverHeader extends StatelessWidget {
                           vertical: expanded ? 6 : 10,
                         ),
                         child: Row(
-                        mainAxisSize: expanded
-                            ? MainAxisSize.max
-                            : MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.search,
-                            size: 22,
-                            color: SC.textMuted,
-                          ),
-                          if (expanded) const SizedBox(width: 6),
-                          if (expanded)
-                            Expanded(
-                              // Local TextSelectionTheme so the selection halo /
-                              // handles match the Midnight cyan instead of the
-                              // legacy WhatsApp-green accent inherited from the
-                              // global theme.
-                              child: TextSelectionTheme(
-                                data: TextSelectionThemeData(
-                                  cursorColor: SC.accent,
-                                  selectionColor: SC.accent.withValues(
-                                    alpha: 0.35,
+                          mainAxisSize: expanded
+                              ? MainAxisSize.max
+                              : MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.search,
+                              size: 22,
+                              color: SC.textMuted,
+                            ),
+                            if (expanded) const SizedBox(width: 6),
+                            if (expanded)
+                              Expanded(
+                                child: TextSelectionTheme(
+                                  data: TextSelectionThemeData(
+                                    cursorColor: SC.accent,
+                                    selectionColor:
+                                        SC.accent.withValues(alpha: 0.35),
+                                    selectionHandleColor: SC.accent,
                                   ),
-                                  selectionHandleColor: SC.accent,
-                                ),
-                                child: TextField(
-                                  controller: controller,
-                                  focusNode: focusNode,
-                                  onChanged: onChanged,
-                                  textInputAction: TextInputAction.search,
-                                  cursorColor: SC.accent,
-                                  style: const TextStyle(
-                                    color: SC.textPrimary,
-                                    fontSize: 15,
-                                  ),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    hintText: AppStrings.t(
-                                      'search_friend_hint',
-                                    ),
-                                    hintStyle: const TextStyle(
-                                      color: SC.textMuted,
+                                  child: TextField(
+                                    controller: controller,
+                                    focusNode: focusNode,
+                                    onChanged: onChanged,
+                                    textInputAction: TextInputAction.search,
+                                    cursorColor: SC.accent,
+                                    style: const TextStyle(
+                                      color: SC.textPrimary,
                                       fontSize: 15,
                                     ),
-                                    border: InputBorder.none,
-                                    // A little vertical room so the writing zone
-                                    // isn't a cramped thin line — but not bulky.
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 8,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      hintText: AppStrings.t(
+                                        'search_friend_hint',
+                                      ),
+                                      hintStyle: const TextStyle(
+                                        color: SC.textMuted,
+                                        fontSize: 15,
+                                      ),
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          if (expanded)
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: onSubmittedClose,
-                              child: const Padding(
-                                padding: EdgeInsets.only(left: 4),
-                                child: Icon(
-                                  Icons.close,
-                                  size: 18,
-                                  color: SC.textMuted,
+                            if (expanded)
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onSubmittedClose,
+                                child: const Padding(
+                                  padding: EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 18,
+                                    color: SC.textMuted,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                     ),
                   ),
                 ],
@@ -1113,9 +1298,6 @@ class _DiscoverHeader extends StatelessWidget {
   }
 }
 
-/// Mirror of GlassNavBar's top-corner clipper: a full-width rectangle whose
-/// two BOTTOM corners are carved out by a concave notch of [radius], so the
-/// top bar wraps the rounded top corners of the Discover card below it.
 class _BottomHugClipper extends CustomClipper<Path> {
   const _BottomHugClipper(this.radius);
 
@@ -1147,9 +1329,6 @@ class _BottomHugClipper extends CustomClipper<Path> {
       oldClipper.radius != radius;
 }
 
-/// The "Discover" title, revealed one letter at a time. Only mounted while the
-/// search is collapsed, so it re-types every time the search closes and the
-/// title reappears — same typewriter feel as the chat composer placeholder.
 class _TypewriterTitle extends StatefulWidget {
   const _TypewriterTitle({required this.text, required this.style});
 
@@ -1170,8 +1349,6 @@ class _TypewriterTitleState extends State<_TypewriterTitle> {
     _animate();
   }
 
-  /// Reveal [widget.text] one char at a time on a 75 ms tick — matches the
-  /// chat composer's placeholder reveal.
   void _animate() {
     _timer?.cancel();
     final full = widget.text;
@@ -1199,6 +1376,10 @@ class _TypewriterTitleState extends State<_TypewriterTitle> {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Search results panel
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _SearchResultsPanel extends StatelessWidget {
   const _SearchResultsPanel({
     required this.loading,
@@ -1218,7 +1399,6 @@ class _SearchResultsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // No intro hint at all — users figure the search out on their own.
     if (query.isEmpty) return const SizedBox.shrink();
     return Material(
       color: SC.bubbleIn,
@@ -1319,7 +1499,10 @@ class _SearchResultRow extends StatelessWidget {
                   if (profile.handle.isNotEmpty)
                     Text(
                       '@${profile.handle}',
-                      style: const TextStyle(color: SC.textMuted, fontSize: 12),
+                      style: const TextStyle(
+                        color: SC.textMuted,
+                        fontSize: 12,
+                      ),
                     ),
                 ],
               ),
@@ -1359,8 +1542,6 @@ class _SearchResultRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               child: Text(
-                // Reuses the search-result "Ajouter" button label —
-                // localised via the friendship_sent / etc. keys' sibling.
                 AppStrings.t('add_friend_short'),
                 style: const TextStyle(
                   color: Colors.white,
@@ -1400,6 +1581,10 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Profile card
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _ProfileCard extends StatefulWidget {
   const _ProfileCard({
     super.key,
@@ -1414,32 +1599,12 @@ class _ProfileCard extends StatefulWidget {
   });
 
   final RemoteProfile profile;
-
-  /// This person's photos (newest first, max 6) shown as a horizontal
-  /// carousel inside the card. The Discover feed is one card per person.
   final List<String> photos;
-
   final VoidCallback onAdd;
-
-  /// True when I already have a pending outgoing friend request to
-  /// [profile]. Drives the "Ajouter" pill into its "Envoyé" state;
-  /// re-tapping then cancels the request via [onAdd].
   final bool pendingOutgoing;
-
-  /// Fires with the photo URL currently shown + the tapped emoji — the
-  /// reaction belongs to that specific photo.
   final void Function(String photo, String emoji)? onSendEmoji;
-
-  /// Photo URL → emojis I've already sent on it. The rail renders a button
-  /// filled only for the carousel photo currently in view.
   final Map<String, Set<String>> reactionsByPhoto;
-
-  /// True when I've already sent [profile] a direct intro message — the
-  /// in-card text field is replaced by a "message sent" state (one per peer).
   final bool alreadyMessaged;
-
-  /// Send a one-off intro message to [profile] from the in-card text area.
-  /// Null on non-interactive (background-deck) cards.
   final Future<void> Function(String)? onSendMessage;
 
   @override
@@ -1449,15 +1614,12 @@ class _ProfileCard extends StatefulWidget {
 class _ProfileCardState extends State<_ProfileCard> {
   @override
   Widget build(BuildContext context) {
-    // Alias widget fields to locals so the (long) build body below reads
-    // unchanged.
     final profile = widget.profile;
     final photos = widget.photos;
     final onAdd = widget.onAdd;
     final pendingOutgoing = widget.pendingOutgoing;
     final alreadyMessaged = widget.alreadyMessaged;
     final onSendMessage = widget.onSendMessage;
-    // One photo per Discover card now — reactions target it.
     final currentPhoto = photos.isEmpty ? '' : photos.first;
     final reactedEmojis =
         widget.reactionsByPhoto[currentPhoto] ?? const <String>{};
@@ -1465,40 +1627,31 @@ class _ProfileCardState extends State<_ProfileCard> {
     final onSendEmoji = sendEmoji == null
         ? null
         : (String emoji) => sendEmoji(currentPhoto, emoji);
-    // Show the person's COUNTRY flag once they've set a location (the spoken
-    // language doesn't always match the country — a Brazilian speaks
-    // Portuguese but flies 🇧🇷). Falls back to the language flag when there's
-    // no city, as before.
+
     final flag =
         (profile.city.trim().isNotEmpty
             ? countryFlagFor(profile.country)
             : null) ??
         findLanguageByCode(profile.language)?.flag ??
         '';
-    // "Ville, Pays" shown small under the name (either part may be empty).
     final locationLabel = [
       profile.city.trim(),
       profile.country.trim(),
     ].where((s) => s.isNotEmpty).join(', ');
-    // Real presence: active in the last 2 min and not hiding their status.
     final online = !profile.hideOnlineStatus &&
         profile.lastSeen != null &&
         DateTime.now().difference(profile.lastSeen!) <
             const Duration(minutes: 2);
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        // Match the bars' notch radius so the card's rounded corners nest
-        // exactly into the concave notches of the top bar / nav.
         borderRadius: BorderRadius.circular(GlassNavBar.hugRadius),
         boxShadow: [
-          // Bright cyan halo hugging the card on every side — the "effet
-          // lumineux" radiating out from behind it (no offset = even glow).
           BoxShadow(
             color: SC.accent.withValues(alpha: 0.55),
             blurRadius: 48,
             spreadRadius: 2,
           ),
-          // Softer, wider cyan bloom dropping below for depth.
           BoxShadow(
             color: SC.meshCyan.withValues(alpha: 0.35),
             blurRadius: 90,
@@ -1536,13 +1689,11 @@ class _ProfileCardState extends State<_ProfileCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Left side: name + flag + bio + send button stacked vertically.
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Name + flag.
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -1582,7 +1733,6 @@ class _ProfileCardState extends State<_ProfileCard> {
                             ],
                           ],
                         ),
-                        // Location (ville, pays) — small, just under the name.
                         if (locationLabel.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Row(
@@ -1609,7 +1759,6 @@ class _ProfileCardState extends State<_ProfileCard> {
                             ],
                           ),
                         ],
-                        // Green "en ligne" line under the address when active.
                         if (online) ...[
                           const SizedBox(height: 5),
                           Row(
@@ -1635,9 +1784,6 @@ class _ProfileCardState extends State<_ProfileCard> {
                             ],
                           ),
                         ],
-                        // Interests under the name line — replaces the bio.
-                        // Up to 3 frosted pills over the photo, localised for
-                        // display (the stored value stays the French key).
                         if (profile.interests.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           Wrap(
@@ -1672,11 +1818,6 @@ class _ProfileCardState extends State<_ProfileCard> {
                           ),
                         ],
                         const SizedBox(height: 14),
-                        // Friend request now lives in the rail (person-add
-                        // button), so the old "Add" pill is gone — the card
-                        // shows the direct message field here instead.
-                        // Direct intro message — one per photo. Hidden on
-                        // background-deck cards (onSendMessage null).
                         if (onSendMessage != null)
                           if (alreadyMessaged)
                             const _MessageSentPill()
@@ -1688,9 +1829,6 @@ class _ProfileCardState extends State<_ProfileCard> {
                       ],
                     ),
                   ),
-                  // Right rail: reaction emojis (ghosted until tapped).
-                  // Skipped for background-deck instances where interaction
-                  // is off.
                   if (onSendEmoji != null) ...[
                     const SizedBox(width: 12),
                     _ReactionRail(
@@ -1710,9 +1848,6 @@ class _ProfileCardState extends State<_ProfileCard> {
   }
 }
 
-/// The single Discover photo filling a card. The feed now shows one photo
-/// per person (the rest of the gallery lives on the profile page), so this
-/// is just a centre-cropped image — no carousel.
 class _CardPhoto extends StatelessWidget {
   const _CardPhoto({required this.photoUrl});
 
@@ -1723,19 +1858,17 @@ class _CardPhoto extends StatelessWidget {
     return Image.network(
       photoUrl,
       fit: BoxFit.cover,
-      // Centre crop — keeps the subject roughly in the middle of the card
-      // whatever the source aspect ratio.
       alignment: Alignment.center,
-      // Keep the already-decoded frame on screen while the widget rebuilds
-      // (e.g. during a tab swipe) instead of flashing to a blank/black frame.
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => const ColoredBox(color: SC.bubbleIn),
     );
   }
 }
 
-/// Vertical reaction rail rendered on the right side of a profile card —
-/// ghosted "send-a-vibe" emojis, each dim by default and filled when tapped.
+// ══════════════════════════════════════════════════════════════════════════════
+// Reaction rail
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _ReactionRail extends StatelessWidget {
   const _ReactionRail({
     this.onSendEmoji,
@@ -1744,25 +1877,11 @@ class _ReactionRail extends StatelessWidget {
     this.pendingOutgoing = false,
   });
 
-  /// Fires with the tapped emoji string — handed to each
-  /// [_ReactionEmojiButton]. Wired by the parent card to drop the emoji
-  /// into the peer's DM thread, same behaviour as the legacy 👋 Coucou.
   final ValueChanged<String>? onSendEmoji;
-
-  /// Emojis the local user has already sent to this peer — each
-  /// matching button renders pre-filled so the rail survives refreshes.
   final Set<String> reactedEmojis;
-
-  /// Send / cancel a friend request — wired to the person-add button at the
-  /// bottom of the rail. Null on non-interactive cards.
   final VoidCallback? onAddFriend;
-
-  /// True when a friend request to this peer is already pending — the
-  /// person-add button shows its "sent" (accent) state.
   final bool pendingOutgoing;
 
-  // Fixed across all cards so users learn the rail by muscle memory.
-  // Top → bottom: flame, heart-eyes, plain heart (the ✨ star was dropped).
   static const _emojis = <String>['🔥', '😍', '❤️'];
 
   @override
@@ -1776,22 +1895,23 @@ class _ReactionRail extends StatelessWidget {
             emoji: _emojis[i],
             index: i,
             reacted: reactedEmojis.contains(_emojis[i]),
-            onSend: onSendEmoji == null ? null : () => onSendEmoji!(_emojis[i]),
+            onSend: onSendEmoji == null
+                ? null
+                : () => onSendEmoji!(_emojis[i]),
           ),
         ],
-        // Friend-request button at the bottom of the rail.
         if (onAddFriend != null) ...[
           const SizedBox(height: 10),
-          _RailAddFriendButton(pending: pendingOutgoing, onTap: onAddFriend!),
+          _RailAddFriendButton(
+            pending: pendingOutgoing,
+            onTap: onAddFriend!,
+          ),
         ],
       ],
     );
   }
 }
 
-/// Person-add button at the bottom of the reaction rail — sends a friend
-/// request (or cancels a pending one). Matches the 48 px emoji buttons; turns
-/// accent + check when a request is already pending.
 class _RailAddFriendButton extends StatelessWidget {
   const _RailAddFriendButton({required this.pending, required this.onTap});
   final bool pending;
@@ -1826,15 +1946,6 @@ class _RailAddFriendButton extends StatelessWidget {
   }
 }
 
-/// One reaction-rail emoji — mirrors [_LikeHeart] exactly so the rail
-/// feels uniform with the heart at its bottom: same 48 px circle, same
-/// dark glass chip when idle, same accented border when active, same
-/// 160 ms animation. State is local — refreshes when the parent card
-/// rebuilds (e.g. after swiping to a new profile).
-/// One reaction-rail button. State is fully driven by [reacted] —
-/// the parent card hydrates the persisted set from past messages and
-/// updates it optimistically when [onSend] fires, so the fill survives
-/// refreshes and revisits.
 class _ReactionEmojiButton extends StatefulWidget {
   const _ReactionEmojiButton({
     required this.emoji,
@@ -1844,20 +1955,8 @@ class _ReactionEmojiButton extends StatefulWidget {
   });
 
   final String emoji;
-
-  /// Position in the rail — phase-shifts the idle float so the buttons don't
-  /// bob in unison.
   final int index;
-
-  /// True when the local user has already sent this emoji to the peer.
-  /// Drives the filled / unfilled visuals; no local state.
   final bool reacted;
-
-  /// Fires when the user taps the button. The rail wires this to a
-  /// toggle on the parent — first tap drops the emoji into the peer's
-  /// DM thread, a second tap deletes it. Visuals are driven by
-  /// [reacted] so the button reflects the persisted state after the
-  /// parent's optimistic update lands.
   final VoidCallback? onSend;
 
   @override
@@ -1866,7 +1965,6 @@ class _ReactionEmojiButton extends StatefulWidget {
 
 class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     with TickerProviderStateMixin {
-  // Tap pop — a punch up to 1.35 then an elastic settle back to 1.0.
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 380),
@@ -1888,8 +1986,6 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
     ),
   ]).animate(_pop);
 
-  // Idle "breath" — a gentle grow/shrink scale loop (~5s full cycle) so the
-  // emojis feel alive WITHOUT moving up/down.
   late final AnimationController _breathe = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2500),
@@ -1905,7 +2001,6 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
   void _handleTap(BuildContext ctx) {
     HapticFeedback.lightImpact();
     _pop.forward(from: 0);
-    // Spawn a particle burst only on the send branch (about to flip to true).
     if (!widget.reacted) {
       final box = ctx.findRenderObject() as RenderBox?;
       if (box != null && box.hasSize) {
@@ -1918,11 +2013,8 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
 
   @override
   Widget build(BuildContext context) {
-    // Builder so the [GestureDetector] gets its own BuildContext whose
-    // RenderObject is the actual button — used to anchor the emoji burst.
     return Builder(
       builder: (ctx) {
-        // The animated emoji / heart glyph (breath + tap-pop) — KEPT as-is.
         final glyph = Center(
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 160),
@@ -1948,11 +2040,11 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
                 scale: (1.0 + 0.20 * _breathe.value) * _popScale.value,
                 child: child,
               ),
-              // The heart is a real icon: white outline that fills red once
-              // tapped (reacted). The other emojis stay as glyphs.
               child: widget.emoji == '❤️'
                   ? Icon(
-                      widget.reacted ? Icons.favorite : Icons.favorite_border,
+                      widget.reacted
+                          ? Icons.favorite
+                          : Icons.favorite_border,
                       size: widget.reacted ? 26 : 24,
                       color: widget.reacted
                           ? const Color(0xFFFF3B5C)
@@ -1963,8 +2055,6 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
           ),
         );
 
-        // Native: REPLACE the dark circle with a real iOS-26 liquid-glass oval
-        // (no glass-on-glass). Web keeps the previous translucent circle.
         final Widget surface = useShaderGlass
             ? lg.GlassContainer(
                 useOwnLayer: true,
@@ -2002,7 +2092,6 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
                 child: glyph,
               );
 
-        // Bounce on click — KEPT.
         return Pressable(
           behavior: HitTestBehavior.opaque,
           bounce: true,
@@ -2014,17 +2103,15 @@ class _ReactionEmojiButtonState extends State<_ReactionEmojiButton>
   }
 }
 
-/// In-card direct-message field on the Discover card — type a one-off intro
-/// message and send it. One per person: after sending, the parent flips the
-/// card to [_MessageSentPill]. Translucent dark pill with white text so it
-/// reads over the photo.
+// ══════════════════════════════════════════════════════════════════════════════
+// Direct message field
+// ══════════════════════════════════════════════════════════════════════════════
+
 class _DirectMessageField extends StatefulWidget {
   const _DirectMessageField({required this.onSend, this.peerName = ''});
   final Future<void> Function(String) onSend;
-
-  /// The recipient's display name — its first word is woven into the hint
-  /// ("Écris à Sarah…"). Falls back to the generic hint when empty.
   final String peerName;
+
   @override
   State<_DirectMessageField> createState() => _DirectMessageFieldState();
 }
@@ -2037,8 +2124,6 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
   @override
   void initState() {
     super.initState();
-    // Rebuild on text changes AND on focus so the bar expands + reveals the
-    // send arrow when tapped, and shrinks back when idle/empty.
     _ctrl.addListener(_onChanged);
     _focus.addListener(_onChanged);
   }
@@ -2059,94 +2144,84 @@ class _DirectMessageFieldState extends State<_DirectMessageField> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     await widget.onSend(text);
-    // The parent rebuilds this card into _MessageSentPill once the photo is
-    // marked messaged; guard mounted in case it already swapped out.
     if (mounted) setState(() => _sending = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final hasText = _ctrl.text.trim().isNotEmpty;
-    // Expanded once the field is tapped (focused) or has text: full width +
-    // send arrow. Idle & empty: a slightly narrower compact pill, no arrow.
     final expanded = _focus.hasFocus || hasText;
-    // First name only — weave it into the hint ("Écris à Sarah…"); fall back
-    // to the generic hint when the peer has no name.
     final firstName = widget.peerName.trim().split(RegExp(r'\s+')).first;
     final hintText = firstName.isEmpty
         ? AppStrings.t('discover_message_hint')
-        : AppStrings.t('discover_message_hint_name', args: {'name': firstName});
-    // Shader liquid glass (not a platform view) — safe inside the swipeable
-    // Discover deck. Dark tint so the hint reads over a bright photo.
+        : AppStrings.t(
+            'discover_message_hint_name',
+            args: {'name': firstName},
+          );
     return GlassPanel(
       borderRadius: 24,
       color: const Color(0x80000000),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        // Slightly narrower at rest; grows back to the full width on tap.
         width: expanded ? 270 : 232,
         padding: EdgeInsets.fromLTRB(14, 3, expanded ? 5 : 16, 3),
         child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _ctrl,
-              focusNode: _focus,
-              enabled: !_sending,
-              minLines: 1,
-              maxLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                isDense: true,
-                // The app theme fills inputs with navy (bubbleIn) — turn it
-                // OFF here, that navy was the "fond bleu" behind the text.
-                filled: false,
-                hintText: hintText,
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 14,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                enabled: !_sending,
+                minLines: 1,
+                maxLines: 2,
+                textCapitalization: TextCapitalization.sentences,
+                cursorColor: SC.accent,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: false,
+                  hintText: hintText,
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-              onSubmitted: (_) => _send(),
-            ),
-          ),
-          // Send arrow (➤) inside the bar — appears once the field is tapped
-          // or has text.
-          if (expanded) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: (hasText && !_sending) ? _send : null,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: SC.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                onSubmitted: (_) => _send(),
               ),
             ),
+            if (expanded) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: (hasText && !_sending) ? _send : null,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    color: SC.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }
 }
 
-/// Shown in place of [_DirectMessageField] once the intro message was sent.
 class _MessageSentPill extends StatelessWidget {
   const _MessageSentPill();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2175,41 +2250,9 @@ class _MessageSentPill extends StatelessWidget {
   }
 }
 
-/// Page-snap physics with a stiffer spring than Flutter's default, so
-/// a vertical flick lands on the next card faster. Critically damped
-/// (damping ≈ 2·√(mass·stiffness)) so the spring never oscillates
-/// past the target page. The fling velocity itself is also clamped
-/// so a very fast flick still settles on the very next card instead
-/// of zooming through several before the spring catches it.
-class _SnappyPagePhysics extends PageScrollPhysics {
-  const _SnappyPagePhysics({super.parent});
-
-  @override
-  _SnappyPagePhysics applyTo(ScrollPhysics? ancestor) {
-    return _SnappyPagePhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  SpringDescription get spring => const SpringDescription(
-    mass: 0.5,
-    stiffness: 220,
-    // 2 · √(0.5 · 220) ≈ 21 → critically damped, no overshoot.
-    damping: 22,
-  );
-
-  @override
-  Simulation? createBallisticSimulation(
-    ScrollMetrics position,
-    double velocity,
-  ) {
-    // Cap the launch velocity passed to the snap spring so a hard
-    // flick can't carry the offset visually past the next page
-    // before the spring pulls it back. PageScrollPhysics already
-    // limits the *target* to ±1 page; this controls the *path*.
-    final clamped = velocity.clamp(-900.0, 900.0);
-    return super.createBallisticSimulation(position, clamped);
-  }
-}
+// ══════════════════════════════════════════════════════════════════════════════
+// Empty state
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _Empty extends StatelessWidget {
   const _Empty({required this.onReset});
