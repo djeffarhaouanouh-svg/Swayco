@@ -53,7 +53,7 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 54;
+  static const double height = 48;
 
   /// Gap between the pill bottom and the screen safe-area top.
   static const double floatBottom = 14.0;
@@ -209,8 +209,8 @@ class _GlassNavBarState extends State<GlassNavBar>
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutBack,
                   child: Container(
-                    width: slot - 24,
-                    height: height - 16,
+                    width: slot - 18,
+                    height: height - 10,
                     decoration: BoxDecoration(
                       color: Colors.white
                           .withValues(alpha: _dragging ? 0.26 : 0.18),
@@ -416,12 +416,10 @@ class _NavItemState extends State<_NavItem>
                     ? widget.data.selectedIcon
                     : widget.data.icon,
                 key: ValueKey(widget.selected),
-                size: 26,
-                // Colour transition white → cyan accent on selection (the
-                // AnimatedSwitcher cross-fades between the two icons).
+                size: 22,
                 color: widget.selected
-                    ? SC.accent
-                    : Colors.white.withValues(alpha: 0.78),
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.50),
               ),
             ),
           ),
