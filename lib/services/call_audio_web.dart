@@ -31,20 +31,21 @@ void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
-  _clearTimer?.cancel();
-  final ms = textLength > 0
-      ? (textLength * 80 + 1500).clamp(3000, 15000)
-      : 10000; // <audio> path: onended fires markTranslationDone() early
-  _clearTimer = Timer(Duration(milliseconds: ms), () {
+  // Don't reset an already-running timer: rapid successive TTS calls would
+  // push the gate back indefinitely, blocking the user's mic for too long.
+  // 1500 ms covers the echo-onset window; AEC + AGC-off handle the rest.
+  if (_clearTimer != null) return;
+  _clearTimer = Timer(const Duration(milliseconds: 1500), () {
     _playing = false;
+    _clearTimer = null;
   });
 }
 
 void markTranslationDone() {
   _clearTimer?.cancel();
-  // 800 ms hangover so the speaker tail dies before mic resumes.
-  _clearTimer = Timer(const Duration(milliseconds: 800), () {
+  _clearTimer = Timer(const Duration(milliseconds: 400), () {
     _playing = false;
+    _clearTimer = null;
   });
 }
 
