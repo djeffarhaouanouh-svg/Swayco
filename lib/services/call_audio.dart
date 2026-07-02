@@ -26,3 +26,8 @@ void markTranslationDone() => impl.markTranslationDone();
 /// Sync the mic mute state to SEND — when mic is off, SEND stops streaming.
 bool get isSendMuted => impl.isSendMuted;
 void setSendMuted(bool v) => impl.setSendMuted(v);
+
+/// Register the ScriptProcessor AudioContext so markTranslationPlaying can
+/// suspend it (physically stopping capture) during TTS playback.
+// ignore: avoid_dynamic_calls
+void registerCaptureContext(dynamic ctx) => impl.registerCaptureContext(ctx);

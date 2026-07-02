@@ -11,3 +11,4 @@ void markTranslationPlaying({int textLength = 0}) {}
 void markTranslationDone() {}
 bool get isSendMuted => false;
 void setSendMuted(bool v) {}
+void registerCaptureContext(dynamic ctx) {}

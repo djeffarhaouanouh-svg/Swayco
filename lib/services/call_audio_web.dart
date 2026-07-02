@@ -24,21 +24,33 @@ bool _sendMuted = false;
 bool get isSendMuted => _sendMuted;
 void setSendMuted(bool v) => _sendMuted = v;
 
+// The ScriptProcessor AudioContext registered by grok_mic_streamer_web.
+// Suspending it physically stops audio capture — no flag/timer needed.
+web.AudioContext? _captureCtx;
+void registerCaptureContext(dynamic ctx) {
+  try { _captureCtx = ctx as web.AudioContext; } catch (_) { _captureCtx = null; }
+}
+
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
+  _captureCtx?.suspend(); // physically stop mic capture during TTS
   _clearTimer?.cancel();
-  // <audio> path: onended fires markTranslationDone() early — 10 s is just a
-  // safety backstop. FlutterTts fallback: estimate from text length (no onended).
   final ms = textLength > 0
-      ? (textLength * 80 + 1000).clamp(3000, 15000)
-      : 10000;
-  _clearTimer = Timer(Duration(milliseconds: ms), () => _playing = false);
+      ? (textLength * 80 + 1500).clamp(3000, 15000)
+      : 10000; // <audio> path: onended fires markTranslationDone() early
+  _clearTimer = Timer(Duration(milliseconds: ms), () {
+    _playing = false;
+    _captureCtx?.resume();
+  });
 }
 
 void markTranslationDone() {
   _clearTimer?.cancel();
-  // 500 ms hangover so the speaker tail isn't re-captured before mic resumes.
-  _clearTimer = Timer(const Duration(milliseconds: 500), () => _playing = false);
+  // 800 ms hangover so the speaker tail dies before mic resumes.
+  _clearTimer = Timer(const Duration(milliseconds: 800), () {
+    _playing = false;
+    _captureCtx?.resume();
+  });
 }
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.

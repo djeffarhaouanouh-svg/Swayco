@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -131,10 +130,10 @@ class GrokRealtimeTranslation extends ChangeNotifier
             wsUrl: grokSttWsUri(
               from: route.sourceBcp47,
               to: route.targetBcp47,
-              // Web: let backend return audio bytes → play via <audio> element
-              // so browser AEC has the reference and cancels the echo.
-              // Native: text-only, Kokoro synthesises locally.
-              kokoroTts: !kIsWeb,
+              // Text-only from backend on all platforms: web uses FlutterTts,
+              // native uses Kokoro. Keeps the WS stable even if Grok TTS credits
+              // are exhausted.
+              kokoroTts: true,
             ),
             captureLocalMic: true,
             onTranslation: _onSendTranslation,

@@ -300,6 +300,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     try {
       final ctx = web.AudioContext();
       _audioCtx = ctx;
+      registerCaptureContext(ctx); // lets markTranslationPlaying suspend it
       final inRate = ctx.sampleRate.toInt();
 
       final stream = _micStream ?? web.MediaStream();
@@ -365,6 +366,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     try {
       unawaited(_audioCtx?.close().toDart);
       _audioCtx = null;
+      registerCaptureContext(null);
     } catch (_) {}
     try {
       final ws = _ws;
