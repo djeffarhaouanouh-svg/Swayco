@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
+import '../services/debug_overlay.dart';
 
 import '../services/analytics.dart';
 import '../services/call_audio.dart';
@@ -267,6 +268,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onRecvTranslation(String orig, String trans, String lang, String audioB64) {
     _lastRecv = trans;
     _lastError = null;
+    DebugOverlay.log('RECV trans="$trans" lang=$lang audio=${audioB64.length}b');
     if (audioB64.isNotEmpty) {
       unawaited(_playMp3B64(audioB64));
     } else if (trans.isNotEmpty) {
@@ -276,13 +278,17 @@ class GrokRealtimeTranslation extends ChangeNotifier
   }
 
   Future<void> _deviceTtsSpeak(String text, String lang) async {
+    DebugOverlay.log('TTS speak lang=$lang text="$text"');
     try {
       if (lang.isNotEmpty) {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
       await _deviceTts.stop();
       await _deviceTts.speak(text);
-    } catch (_) {}
+      DebugOverlay.log('TTS speak OK');
+    } catch (e) {
+      DebugOverlay.log('TTS speak ERROR: $e');
+    }
   }
 
   Future<void> _playMp3B64(String audioB64) async {

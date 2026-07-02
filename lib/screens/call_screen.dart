@@ -25,6 +25,7 @@ import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
 import '../services/kokoro/kokoro_service.dart';
+import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
 import '../translation/realtime_translation_port.dart';
@@ -759,6 +760,7 @@ class _CallScreenState extends State<CallScreen> {
       if (m['kokoro'] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
+        DebugOverlay.log('caption kokoro trans="$trans" lang=$lang web=$kIsWeb');
         if (trans.isNotEmpty) {
           if (kIsWeb) {
             unawaited(_speakDeviceTts(trans, lang));
@@ -833,13 +835,17 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _speakDeviceTts(String text, String lang) async {
+    DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
     try {
       if (lang.isNotEmpty) {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
       await _deviceTts.stop();
       await _deviceTts.speak(text);
-    } catch (_) {}
+      DebugOverlay.log('speakDeviceTts OK');
+    } catch (e) {
+      DebugOverlay.log('speakDeviceTts ERROR: $e');
+    }
   }
 
   Future<void> _toggleCam() async {

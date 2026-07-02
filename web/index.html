@@ -175,5 +175,15 @@
   -->
   <script src="flutter_bootstrap.js" async=""></script>
 
+  <!-- Eruda mobile console — only loads when ?debug=1 is in the URL.
+       On iPhone: open https://www.swayco.fr/?debug=1 to see JS + Flutter logs. -->
+  <script>
+    if (window.location.search.includes('debug=1') || window.location.hostname === 'localhost') {
+      var _e = document.createElement('script');
+      _e.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      _e.onload = function() { eruda.init(); };
+      document.head.appendChild(_e);
+    }
+  </script>
 
 </body></html>
