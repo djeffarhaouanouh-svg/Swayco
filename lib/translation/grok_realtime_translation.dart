@@ -248,7 +248,9 @@ class GrokRealtimeTranslation extends ChangeNotifier
         wsUrl: grokSttWsUri(
           from: route.targetBcp47,
           to: route.sourceBcp47,
-          kokoroTts: true, // no Grok TTS on web RECV — we use device TTS
+          // No kokoroTts: backend generates MP3 audio → _playMp3B64 →
+          // pre-unlocked <audio> element (works on iOS Safari) and sets
+          // isTranslationPlaying for correct half-duplex mic gating.
         ),
         localTrack: track.mediaStreamTrack,
         captureLocalMic: false,
