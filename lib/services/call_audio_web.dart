@@ -19,20 +19,21 @@ bool _playing = false;
 Timer? _clearTimer;
 bool get isTranslationPlaying => _playing;
 
-/// Call before TTS speak(). [textLength] is used to estimate how long to
-/// keep the mic paused (80 ms/char + 1 s buffer). The completion handler on
-/// Flutter web fires unreliably, so we use a timer instead of relying on it.
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
   _clearTimer?.cancel();
-  final ms = (textLength * 80 + 1000).clamp(3000, 15000);
+  // <audio> path: onended fires markTranslationDone() early — 10 s is just a
+  // safety backstop. FlutterTts fallback: estimate from text length (no onended).
+  final ms = textLength > 0
+      ? (textLength * 80 + 1000).clamp(3000, 15000)
+      : 10000;
   _clearTimer = Timer(Duration(milliseconds: ms), () => _playing = false);
 }
 
 void markTranslationDone() {
   _clearTimer?.cancel();
-  // 800 ms hangover so the speaker tail isn't re-captured.
-  _clearTimer = Timer(const Duration(milliseconds: 800), () => _playing = false);
+  // 500 ms hangover so the speaker tail isn't re-captured before mic resumes.
+  _clearTimer = Timer(const Duration(milliseconds: 500), () => _playing = false);
 }
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.
