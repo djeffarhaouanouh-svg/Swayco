@@ -48,7 +48,9 @@ web.HTMLAudioElement _element() {
 }
 
 // Minimal JS-interop bindings for Web Speech API (speechSynthesis).
+@JS('SpeechSynthesisUtterance')
 extension type _SpeechSynthesisUtterance._(JSObject _) implements JSObject {
+  external factory _SpeechSynthesisUtterance();
   external set volume(num v);
   external set text(String v);
 }
@@ -59,14 +61,11 @@ extension type _SpeechSynthesisObj(JSObject _) implements JSObject {
 @JS('speechSynthesis')
 external JSObject get _speechSynthesisJs;
 
-@JS('new SpeechSynthesisUtterance')
-external _SpeechSynthesisUtterance _newSpeechSynthesisUtterance();
-
 /// Call SYNCHRONOUSLY inside a user-gesture handler so iOS Safari unlocks
 /// speechSynthesis for subsequent non-gesture FlutterTts.speak() calls.
 void armSpeechSynthesis() {
   try {
-    final utt = _newSpeechSynthesisUtterance();
+    final utt = _SpeechSynthesisUtterance();
     utt.volume = 0;
     utt.text = '';
     _SpeechSynthesisObj(_speechSynthesisJs).speak(utt);

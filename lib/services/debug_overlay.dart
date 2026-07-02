@@ -13,16 +13,8 @@ class DebugOverlay extends StatefulWidget {
   static bool _enabled = false;
 
   static void init() {
-    if (kIsWeb) {
-      try {
-        final uri = Uri.base;
-        _enabled = kDebugMode || uri.queryParameters.containsKey('debug');
-      } catch (_) {
-        _enabled = kDebugMode;
-      }
-    } else {
-      _enabled = kDebugMode;
-    }
+    // Always on for web (tap 🐛 to reveal). Native = debug builds only.
+    _enabled = kIsWeb || kDebugMode;
   }
 
   static void log(String msg) {
