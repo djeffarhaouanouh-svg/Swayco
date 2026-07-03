@@ -328,6 +328,10 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    // Guarantee any ring/dial tone is silenced the moment the call screen
+    // opens — covers the Android web case where a Supabase reconnect can
+    // re-fire the incoming-call event after the user has already accepted.
+    CallAlert.stop();
     Analytics.track('screen_view', props: {'screen': 'live'});
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
