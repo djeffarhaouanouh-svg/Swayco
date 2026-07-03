@@ -123,6 +123,7 @@ class _CallScreenState extends State<CallScreen> {
   static const String _captionTopic = 'swayco-chat';
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
+  String _deviceTtsLang = '';
 
   /// Whether the realtime translation pipeline is currently active.
   /// Toggle via [_toggleTranslation].
@@ -866,8 +867,11 @@ class _CallScreenState extends State<CallScreen> {
     DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
     markTranslationPlaying(textLength: text.length);
     try {
-      if (lang.isNotEmpty) {
-        try { await _deviceTts.setLanguage(lang); } catch (_) {}
+      if (lang.isNotEmpty && lang != _deviceTtsLang) {
+        try {
+          await _deviceTts.setLanguage(lang);
+          _deviceTtsLang = lang;
+        } catch (_) {}
       }
       // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
