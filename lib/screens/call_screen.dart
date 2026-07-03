@@ -126,6 +126,8 @@ class _CallScreenState extends State<CallScreen> {
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
+  // Monotonic counter: only the latest _speakDeviceTts call reaches speak().
+  int _ttsSeq = 0;
   // Keepalive: Android/iOS Chrome pauses speechSynthesis after inactivity.
   Timer? _synthKeepAlive;
 
@@ -895,8 +897,12 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _speakDeviceTts(String text, String lang) async {
-    DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
-    markTranslationPlaying(textLength: text.length);
+    // Stamp this call — only the LATEST one proceeds to speak().
+    // Multiple concurrent calls (rapid-fire translations) race on stop()+speak();
+    // the seq guard ensures older calls abort after stop() so they don't queue
+    // behind the newest utterance.
+    final seq = ++_ttsSeq;
+    DebugOverlay.log('speakDeviceTts seq=$seq lang=$lang "${text.substring(0, text.length.clamp(0, 30))}"');
     try {
       if (lang.isNotEmpty && lang != _deviceTtsLang) {
         try {
@@ -904,13 +910,19 @@ class _CallScreenState extends State<CallScreen> {
           _deviceTtsLang = lang;
         } catch (_) {}
       }
-      // stop() clears any queued utterances before playing the latest translation.
+      if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded'); return; }
       await _deviceTts.stop();
-      // Android/iOS Chrome silently pauses speechSynthesis after inactivity or
-      // background — resume() wakes it up so speak() actually produces audio.
+      if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded after stop'); return; }
+      if (kIsWeb) {
+        // Android/iOS Chrome: cancel() needs a tick to flush before speak()
+        // otherwise the new utterance queues behind the cancelled one.
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded after delay'); return; }
+      }
+      markTranslationPlaying(textLength: text.length);
       resumeSpeechSynthesisIfPaused();
       await _deviceTts.speak(text);
-      DebugOverlay.log('speakDeviceTts queued');
+      DebugOverlay.log('speakDeviceTts queued seq=$seq');
     } catch (e) {
       markTranslationDone();
       DebugOverlay.log('speakDeviceTts ERROR: $e');
