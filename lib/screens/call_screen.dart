@@ -329,10 +329,14 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'live'});
+    // The mic gate flag is a global (call_audio_web) that survives across calls.
+    // Force-clear it here so a gate left stuck true by a previous call can never
+    // block SEND on this fresh call ("dead even after re-dialling").
+    markTranslationDone();
     // Half-duplex: reopen the mic the instant our own TTS finishes. The
-    // completion event is the precise "playback ended" signal (the fixed timer
-    // used before was imprecise and blocked the listener too long). markTranslationDone
-    // is a no-op on native (the flag only gates the web mic pump).
+    // completion event is the precise "playback ended" signal; the length-based
+    // timer + 5s hard ceiling in markTranslationPlaying cover the case where it
+    // stops firing. markTranslationDone is a no-op on native.
     _deviceTts.setCompletionHandler(() => markTranslationDone());
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually

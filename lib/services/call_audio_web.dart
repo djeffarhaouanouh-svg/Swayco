@@ -17,6 +17,7 @@ web.HTMLAudioElement? _el;
 // own playback (the "device answers itself" feedback loop).
 bool _playing = false;
 Timer? _clearTimer;
+int _playingSinceMs = 0;
 bool get isTranslationPlaying => _playing;
 
 // True when the user has muted their mic — SEND should not stream audio.
@@ -30,15 +31,27 @@ void setSendMuted(bool v) => _sendMuted = v;
 void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
+  final now = DateTime.now().millisecondsSinceEpoch;
+  if (!_playing) _playingSinceMs = now;
+  // HARD CEILING: never keep the mic gated more than 5s in a row, no matter how
+  // many TTS calls stream in. This is the safety net for when the Web Speech
+  // completion event stops firing after prolonged use (it becomes unreliable —
+  // the "stuck after 2 min, dead even after re-dialling" bug). Without it the
+  // gate sticks true and SEND is blocked forever. Once tripped, the next call
+  // starts a fresh 5s window.
+  if (now - _playingSinceMs > 5000) {
+    _clearTimer?.cancel();
+    _clearTimer = null;
+    _playing = false;
+    return;
+  }
   _playing = true;
-  // The TTS 'completion' event (→ markTranslationDone) normally clears this the
-  // instant playback ends — that is the precise half-duplex signal, like a
-  // walkie-talkie. This timer is ONLY a safety fallback for when the Web Speech
-  // 'end' event never fires. Estimate the utterance duration from its length
-  // (~90 ms/char at speaking rate) and keep a generous ceiling so we never
-  // reopen the mic mid-sentence, which would let the echo back in.
+  // The TTS completion event (→ markTranslationDone) normally clears this the
+  // instant playback ends (precise half-duplex). This timer is the fallback for
+  // when that event doesn't fire: estimate the utterance from its length
+  // (~90 ms/char), capped at the 5s ceiling.
   _clearTimer?.cancel();
-  final estMs = (textLength * 90).clamp(1500, 12000);
+  final estMs = (textLength * 90).clamp(1200, 5000);
   _clearTimer = Timer(Duration(milliseconds: estMs), () {
     _playing = false;
     _clearTimer = null;
