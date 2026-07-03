@@ -273,6 +273,9 @@ class _CallScreenState extends State<CallScreen> {
       do {
         _refreshPending = false;
         final remoteLang = _discoverRemoteLang(room);
+        DebugOverlay.log(
+            'refreshBinding myOut="$_myOutputLang" remoteLang="$remoteLang" '
+            'peers=${room.remoteParticipants.length}');
         // Re-attach when the remote's language OR my chosen output
         // language changed since the last bind.
         if (remoteLang == _attachedRemoteLang &&
