@@ -8,6 +8,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
+import '../services/debug_overlay.dart';
 import '../services/translation_api.dart';
 import 'grok_mic_streamer_base.dart';
 import 'grok_mic_streamer_io.dart'
@@ -189,6 +190,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
   void _onSendTranslation(String orig, String trans, String lang, String audioB64) {
     _lastSent = trans;
     _lastError = null;
+    DebugOverlay.log('onSendTrans orig="${orig.substring(0, orig.length.clamp(0, 40))}" trans="${trans.substring(0, trans.length.clamp(0, 40))}" lang=$lang audio=${audioB64.length}b');
 
     // Delta: Grok re-sends the FULL accumulated session translation each time.
     // Only publish the portion that is new relative to the last backend response
@@ -202,6 +204,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _lastBackendTrans = trans;
 
     if (transToSend.isEmpty) {
+      DebugOverlay.log('delta empty — skip publish');
       notifyListeners();
       return;
     }
@@ -209,6 +212,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     // Dedup: same delta within 3 s → skip.
     if (transToSend == _lastSentTrans && nowMs - _lastSentMs < 3000) {
+      DebugOverlay.log('dedup — same delta <3s, skip');
       notifyListeners();
       return;
     }
@@ -235,6 +239,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
           'lang': lang,
         };
       }
+      DebugOverlay.log('publishData type=${payload.containsKey('kokoro') ? 'kokoro' : 'voiceOnly'} trans="${transToSend.substring(0, transToSend.length.clamp(0, 40))}"');
       unawaited(
         room.localParticipant
             ?.publishData(
@@ -242,7 +247,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
               reliable: true,
               topic: _captionTopic,
             )
-            .catchError((_) {}),
+            .catchError((Object e) => DebugOverlay.log('publishData ERROR: $e')),
       );
       _sent++;
       if (route != null) {

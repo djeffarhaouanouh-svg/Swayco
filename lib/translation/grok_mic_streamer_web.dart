@@ -249,11 +249,14 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
               '(audio=${(msg['audio'] ?? '').toString().length}b)');
           switch (msg['type']) {
             case 'translation':
+              final tr = (msg['trans'] ?? '').toString();
+              final au = (msg['audio'] ?? '').toString();
+              _log('← translation orig="${(msg['orig'] ?? '').toString().substring(0, ((msg['orig'] ?? '').toString().length).clamp(0, 40))}" trans="${tr.substring(0, tr.length.clamp(0, 40))}" audio=${au.length}b');
               _cbTranslation?.call(
                 (msg['orig'] ?? '').toString(),
-                (msg['trans'] ?? '').toString(),
+                tr,
                 (msg['lang'] ?? '').toString(),
-                (msg['audio'] ?? '').toString(),
+                au,
               );
               break;
             case 'partial':
@@ -301,17 +304,22 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         // re-capture and re-translate our own speaker output. The gate is
         // cleared immediately in _toggleMic when the user unmutes, so it
         // never permanently blocks SEND.
-        if (_wsOpen && n > 0 &&
-            !(_captureLocalMic && isSendMuted) &&
-            !(_captureLocalMic && isTranslationPlaying)) {
+        final blocked = !_wsOpen
+            ? 'ws_closed'
+            : (_captureLocalMic && isSendMuted)
+                ? 'send_muted'
+                : (_captureLocalMic && isTranslationPlaying)
+                    ? 'tts_playing'
+                    : null;
+        if (_frames % 200 == 0) {
+          _log('pump frames=$_frames blocked=${blocked ?? "none"} wsOpen=$_wsOpen');
+        }
+        if (blocked == null && n > 0) {
           final pcm = _downsampleToPcm16(f32, inRate, _outRate);
           if (pcm.isNotEmpty) {
             try { _ws?.send(pcm.toJS); } catch (_) {}
           }
           _frames++;
-          if (_frames % 200 == 0) {
-            _log('pcm frames=$_frames muted=$isSendMuted');
-          }
         }
       } catch (e) {
         _log('frame process failed: $e');

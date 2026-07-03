@@ -787,6 +787,7 @@ class _CallScreenState extends State<CallScreen> {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
+      DebugOverlay.log('captionData type=${m['kokoro']==true ? 'kokoro' : m['voiceOnly']==true ? 'voiceOnly' : 'unknown'} trans="${(m['trans']?.toString() ?? '').substring(0, (m['trans']?.toString() ?? '').length.clamp(0,40))}"');
       if (m['kokoro'] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
