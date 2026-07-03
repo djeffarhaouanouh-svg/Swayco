@@ -15,8 +15,6 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
-import '../services/speech_resume.dart'
-    if (dart.library.js_interop) '../services/speech_resume_web.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_audio.dart';
@@ -126,8 +124,6 @@ class _CallScreenState extends State<CallScreen> {
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
-  // Keepalive: Android/iOS Chrome pauses speechSynthesis after inactivity.
-  Timer? _synthKeepAlive;
 
   /// Whether the realtime translation pipeline is currently active.
   /// Toggle via [_toggleTranslation].
@@ -332,26 +328,8 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
-    // Guarantee any ring/dial tone is silenced the moment the call screen
-    // opens — covers the Android web case where a Supabase reconnect can
-    // re-fire the incoming-call event after the user has already accepted.
-    CallAlert.stop();
     Analytics.track('screen_view', props: {'screen': 'live'});
     _start();
-    if (kIsWeb) {
-      // Tickle speechSynthesis every 8 s so Android/iOS Chrome never lets it
-      // drift into the paused state while the user is listening.
-      _synthKeepAlive = Timer.periodic(
-        const Duration(seconds: 8),
-        (_) => resumeSpeechSynthesisIfPaused(),
-      );
-      _deviceTts.setCompletionHandler(
-          () => DebugOverlay.log('tts DONE'));
-      _deviceTts.setErrorHandler(
-          (msg) => DebugOverlay.log('tts ERR: $msg'));
-      _deviceTts.setStartHandler(
-          () => DebugOverlay.log('tts START'));
-    }
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
     _splashTimer = Timer(const Duration(seconds: 5), () {
@@ -602,28 +580,7 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    // RoomOptions sets default audio constraints for every mic enable/disable
-    // cycle (including _toggleMic re-enables):
-    //   • AudioCaptureOptions: EC+NS+AGC on. AGC is safe now that the
-    //     isTranslationPlaying gate blocks the STT mic during TTS, and
-    //     AEC cancels any TTS echo before AGC sees the signal.
-    //   • AudioPublishOptions: Opus 32 kbps (voice-optimised) + DTX.
-    // Native: LiveKit calls NativeAudioManagement.start() on connect →
-    // Android communication mode; iOS AVAudioSession playAndRecord +
-    // voiceChat + Bluetooth via defaultNativeAudioConfigurationFunc.
-    final room = Room(
-      roomOptions: const RoomOptions(
-        defaultAudioCaptureOptions: AudioCaptureOptions(
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        ),
-        defaultAudioPublishOptions: AudioPublishOptions(
-          encoding: AudioEncoding(maxBitrate: 32000),
-          dtx: true,
-        ),
-      ),
-    );
+    final room = Room();
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
@@ -635,7 +592,20 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      // EC + NS on, AGC OFF. Rationale: the translation pipeline plays
+      // a second audio stream on the speakers that the browser's EC
+      // doesn't fully account for, so any captured leak goes back into
+      // LiveKit. AGC then amplifies that leak each loop and the
+      // feedback runs away to infinity. Without AGC the captured leak
+      // stays below its source and decays naturally.
+      await room.localParticipant?.setMicrophoneEnabled(
+        true,
+        audioCaptureOptions: const AudioCaptureOptions(
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+        ),
+      );
       // First attach with whatever remote-lang we already know (often nothing
       // yet). Refreshed dynamically as participants join / metadata arrives.
       await _refreshTranslationBinding(room);
@@ -813,7 +783,6 @@ class _CallScreenState extends State<CallScreen> {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      DebugOverlay.log('captionData type=${m['kokoro']==true ? 'kokoro' : m['voiceOnly']==true ? 'voiceOnly' : 'unknown'} trans="${(m['trans']?.toString() ?? '').substring(0, (m['trans']?.toString() ?? '').length.clamp(0,40))}"');
       if (m['kokoro'] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -906,11 +875,8 @@ class _CallScreenState extends State<CallScreen> {
       }
       // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
-      // Android/iOS Chrome silently pauses speechSynthesis after inactivity or
-      // background — resume() wakes it up so speak() actually produces audio.
-      resumeSpeechSynthesisIfPaused();
       await _deviceTts.speak(text);
-      DebugOverlay.log('speakDeviceTts queued');
+      DebugOverlay.log('speakDeviceTts OK');
     } catch (e) {
       markTranslationDone();
       DebugOverlay.log('speakDeviceTts ERROR: $e');
@@ -1282,7 +1248,6 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
-    _synthKeepAlive?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
     // runs on every exit path (hang-up, peer-left auto-hangup, system
     // back) â€” so the call is counted exactly once with its duration.
