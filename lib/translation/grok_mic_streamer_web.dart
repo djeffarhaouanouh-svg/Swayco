@@ -297,20 +297,22 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         );
         audio.close();
         // Continuous stream — Grok STT handles silence internally.
-        // SEND is gated ONLY by the manual mute (isSendMuted), NEVER by
-        // isTranslationPlaying: when the peer's TTS plays back-to-back, _playing
-        // stays true and would block this side's mic for the whole call. That's
-        // why the LISTENING side (e.g. Android hearing the caller's TTS
-        // non-stop) stopped sending any voice/translation. With AGC off the
-        // residual TTS echo doesn't run away, so no playback gate is needed.
-        if (_wsOpen && n > 0 && !(_captureLocalMic && isSendMuted)) {
+        // Half-duplex: pause SEND while our own TTS plays out the speaker so the
+        // mic doesn't re-capture & re-translate it (the "device answers itself"
+        // echo). isTranslationPlaying is now driven by the TTS's real
+        // start/completion events (not a fixed timer), so it clears the instant
+        // playback ends — the listening side is never blocked longer than the
+        // actual speech. isSendMuted is the manual mute.
+        if (_wsOpen && n > 0 &&
+            !(_captureLocalMic && isSendMuted) &&
+            !(_captureLocalMic && isTranslationPlaying)) {
           final pcm = _downsampleToPcm16(f32, inRate, _outRate);
           if (pcm.isNotEmpty) {
             try { _ws?.send(pcm.toJS); } catch (_) {}
           }
           _frames++;
           if (_frames % 200 == 0) {
-            _log('pcm frames=$_frames muted=$isSendMuted wsOpen=$_wsOpen');
+            _log('pcm frames=$_frames muted=$isSendMuted playing=$isTranslationPlaying');
           }
         }
       } catch (e) {
@@ -365,9 +367,11 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final buf = e.inputBuffer;
           final f32 = buf.getChannelData(0).toDart;
           final rate = buf.sampleRate.toInt();
-          // SEND gated only by manual mute — see _pump: isTranslationPlaying
-          // must not gate here or the listening side's mic stays blocked.
-          if (!(_captureLocalMic && isSendMuted)) {
+          // Half-duplex (see _pump): pause SEND while our own TTS plays so the
+          // mic doesn't re-capture it. isTranslationPlaying clears on the TTS
+          // completion event, so the block lasts only the actual playback.
+          if (!(_captureLocalMic && isSendMuted) &&
+              !(_captureLocalMic && isTranslationPlaying)) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
             if (pcm.isNotEmpty) {
               try { _ws?.send(pcm.toJS); } catch (_) {}

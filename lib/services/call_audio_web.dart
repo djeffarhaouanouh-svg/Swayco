@@ -31,22 +31,27 @@ void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
-  // Don't reset an already-running timer: rapid successive TTS calls would
-  // push the gate back indefinitely, blocking the user's mic for too long.
-  // 800 ms covers the echo-onset window; AEC + AGC-off handle the rest.
-  if (_clearTimer != null) return;
-  _clearTimer = Timer(const Duration(milliseconds: 800), () {
+  // The TTS 'completion' event (→ markTranslationDone) normally clears this the
+  // instant playback ends — that is the precise half-duplex signal, like a
+  // walkie-talkie. This timer is ONLY a safety fallback for when the Web Speech
+  // 'end' event never fires. Estimate the utterance duration from its length
+  // (~90 ms/char at speaking rate) and keep a generous ceiling so we never
+  // reopen the mic mid-sentence, which would let the echo back in.
+  _clearTimer?.cancel();
+  final estMs = (textLength * 90).clamp(1500, 12000);
+  _clearTimer = Timer(Duration(milliseconds: estMs), () {
     _playing = false;
     _clearTimer = null;
   });
 }
 
 void markTranslationDone() {
+  // Immediate: the mic reopens the instant the TTS finishes so the listening
+  // side can reply straight away — no residual block (that lag is what made the
+  // Android side go mute while the caller was still talking).
   _clearTimer?.cancel();
-  _clearTimer = Timer(const Duration(milliseconds: 400), () {
-    _playing = false;
-    _clearTimer = null;
-  });
+  _clearTimer = null;
+  _playing = false;
 }
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.

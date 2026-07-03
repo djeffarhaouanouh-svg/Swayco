@@ -329,6 +329,11 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'live'});
+    // Half-duplex: reopen the mic the instant our own TTS finishes. The
+    // completion event is the precise "playback ended" signal (the fixed timer
+    // used before was imprecise and blocked the listener too long). markTranslationDone
+    // is a no-op on native (the flag only gates the web mic pump).
+    _deviceTts.setCompletionHandler(() => markTranslationDone());
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
@@ -865,7 +870,6 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _speakDeviceTts(String text, String lang) async {
     DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
-    markTranslationPlaying(textLength: text.length);
     try {
       if (lang.isNotEmpty && lang != _deviceTtsLang) {
         try {
@@ -875,6 +879,10 @@ class _CallScreenState extends State<CallScreen> {
       }
       // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
+      // Arm the half-duplex gate AFTER stop() — stop() can fire the previous
+      // utterance's completion handler (→ markTranslationDone), which would
+      // otherwise clear the gate we're setting for this new utterance.
+      markTranslationPlaying(textLength: text.length);
       await _deviceTts.speak(text);
       DebugOverlay.log('speakDeviceTts OK');
     } catch (e) {
