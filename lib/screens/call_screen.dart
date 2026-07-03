@@ -606,9 +606,9 @@ class _CallScreenState extends State<CallScreen> {
 
     // RoomOptions sets default audio constraints for every mic enable/disable
     // cycle (including _toggleMic re-enables):
-    //   • AudioCaptureOptions: EC+NS+AGC on. AGC is safe now that the
-    //     isTranslationPlaying gate blocks the STT mic during TTS, and
-    //     AEC cancels any TTS echo before AGC sees the signal.
+    //   • AudioCaptureOptions: EC+NS on, AGC OFF. AGC on Android Chrome web
+    //     fights the TTS output: it suppresses the mic when TTS plays then
+    //     over-amplifies after → crackling + voice dropouts on the far end.
     //   • AudioPublishOptions: Opus 32 kbps (voice-optimised) + DTX.
     // Native: LiveKit calls NativeAudioManagement.start() on connect →
     // Android communication mode; iOS AVAudioSession playAndRecord +
@@ -618,7 +618,7 @@ class _CallScreenState extends State<CallScreen> {
         defaultAudioCaptureOptions: AudioCaptureOptions(
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
+          autoGainControl: false,
         ),
         defaultAudioPublishOptions: AudioPublishOptions(
           encoding: AudioEncoding(maxBitrate: 32000),
@@ -913,12 +913,6 @@ class _CallScreenState extends State<CallScreen> {
       if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded'); return; }
       await _deviceTts.stop();
       if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded after stop'); return; }
-      if (kIsWeb) {
-        // Android/iOS Chrome: cancel() needs a tick to flush before speak()
-        // otherwise the new utterance queues behind the cancelled one.
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded after delay'); return; }
-      }
       markTranslationPlaying(textLength: text.length);
       resumeSpeechSynthesisIfPaused();
       await _deviceTts.speak(text);
