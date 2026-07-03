@@ -604,28 +604,7 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    // RoomOptions sets default audio constraints for every mic enable/disable
-    // cycle (including _toggleMic re-enables):
-    //   • AudioCaptureOptions: EC+NS on, AGC OFF. AGC on Android Chrome web
-    //     fights the TTS output: it suppresses the mic when TTS plays then
-    //     over-amplifies after → crackling + voice dropouts on the far end.
-    //   • AudioPublishOptions: Opus 32 kbps (voice-optimised) + DTX.
-    // Native: LiveKit calls NativeAudioManagement.start() on connect →
-    // Android communication mode; iOS AVAudioSession playAndRecord +
-    // voiceChat + Bluetooth via defaultNativeAudioConfigurationFunc.
-    final room = Room(
-      roomOptions: const RoomOptions(
-        defaultAudioCaptureOptions: AudioCaptureOptions(
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: false,
-        ),
-        defaultAudioPublishOptions: AudioPublishOptions(
-          encoding: AudioEncoding(maxBitrate: 32000),
-          dtx: true,
-        ),
-      ),
-    );
+    final room = Room();
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
@@ -637,7 +616,18 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      // EC + NS on, AGC OFF — the setup that worked before the audio-quality
+      // experiment. A custom AudioPublishOptions (32 kbps + DTX) broke the
+      // Android outgoing voice: DTX's silence detection clipped speech and the
+      // low bitrate crackled. Back to the SDK default publish (48 kbps, no DTX).
+      await room.localParticipant?.setMicrophoneEnabled(
+        true,
+        audioCaptureOptions: const AudioCaptureOptions(
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+        ),
+      );
       // First attach with whatever remote-lang we already know (often nothing
       // yet). Refreshed dynamically as participants join / metadata arrives.
       await _refreshTranslationBinding(room);
