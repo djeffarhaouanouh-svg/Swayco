@@ -2123,8 +2123,8 @@ function attachGrokSttWs(server) {
         if (!closing) {
           // Client VAD controls session lifecycle (audio.done on silence);
           // this reconnect covers network drops and xAI internal limits.
-          console.log('grok stt upstream closed by xAI — reconnecting in 1s');
-          setTimeout(openUpstream, 1000);
+          console.log('grok stt upstream closed by xAI — reconnecting in 100ms');
+          setTimeout(openUpstream, 100);
         }
       });
     }
