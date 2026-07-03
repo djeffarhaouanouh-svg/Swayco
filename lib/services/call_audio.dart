@@ -11,6 +11,10 @@ void armCallAudio() => impl.armCallAudio();
 /// Safari allows subsequent non-gesture TTS calls.
 void armSpeechSynthesis() => impl.armSpeechSynthesis();
 
+/// Wake speechSynthesis if the browser auto-paused it — call before every
+/// FlutterTts.speak() on web so the TTS actually plays. No-op on native.
+void resumeSpeechSynthesisIfPaused() => impl.resumeSpeechSynthesisIfPaused();
+
 /// Play an mp3 through the unlocked web element. Returns false on native / on
 /// failure, so the caller falls back to audioplayers.
 Future<bool> playTranslatedMp3(Uint8List bytes) => impl.playTranslatedMp3(bytes);

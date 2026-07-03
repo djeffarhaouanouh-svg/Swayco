@@ -17,7 +17,6 @@ web.HTMLAudioElement? _el;
 // own playback (the "device answers itself" feedback loop).
 bool _playing = false;
 Timer? _clearTimer;
-int _playingSinceMs = 0;
 bool get isTranslationPlaying => _playing;
 
 // True when the user has muted their mic — SEND should not stream audio.
@@ -31,40 +30,23 @@ void setSendMuted(bool v) => _sendMuted = v;
 void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
-  final now = DateTime.now().millisecondsSinceEpoch;
-  if (!_playing) _playingSinceMs = now;
-  // HARD CEILING: never keep the mic gated more than 5s in a row, no matter how
-  // many TTS calls stream in. This is the safety net for when the Web Speech
-  // completion event stops firing after prolonged use (it becomes unreliable —
-  // the "stuck after 2 min, dead even after re-dialling" bug). Without it the
-  // gate sticks true and SEND is blocked forever. Once tripped, the next call
-  // starts a fresh 5s window.
-  if (now - _playingSinceMs > 5000) {
-    _clearTimer?.cancel();
-    _clearTimer = null;
-    _playing = false;
-    return;
-  }
   _playing = true;
-  // The TTS completion event (→ markTranslationDone) normally clears this the
-  // instant playback ends (precise half-duplex). This timer is the fallback for
-  // when that event doesn't fire: estimate the utterance from its length
-  // (~90 ms/char), capped at the 5s ceiling.
-  _clearTimer?.cancel();
-  final estMs = (textLength * 90).clamp(1200, 5000);
-  _clearTimer = Timer(Duration(milliseconds: estMs), () {
+  // Don't reset an already-running timer: rapid successive TTS calls would
+  // push the gate back indefinitely, blocking the user's mic for too long.
+  // 800 ms covers the echo-onset window; AEC + AGC-off handle the rest.
+  if (_clearTimer != null) return;
+  _clearTimer = Timer(const Duration(milliseconds: 800), () {
     _playing = false;
     _clearTimer = null;
   });
 }
 
 void markTranslationDone() {
-  // Immediate: the mic reopens the instant the TTS finishes so the listening
-  // side can reply straight away — no residual block (that lag is what made the
-  // Android side go mute while the caller was still talking).
   _clearTimer?.cancel();
-  _clearTimer = null;
-  _playing = false;
+  _clearTimer = Timer(const Duration(milliseconds: 400), () {
+    _playing = false;
+    _clearTimer = null;
+  });
 }
 
 // 44-byte silent WAV — enough to "start" playback inside the gesture.
@@ -88,10 +70,24 @@ extension type _SpeechSynthesisUtterance._(JSObject _) implements JSObject {
 }
 extension type _SpeechSynthesisObj(JSObject _) implements JSObject {
   external void speak(_SpeechSynthesisUtterance u);
+  external void resume();
+  external bool get paused;
 }
 
 @JS('speechSynthesis')
 external JSObject get _speechSynthesisJs;
+
+/// Android/iOS Chrome silently move speechSynthesis into the "paused" state
+/// after inactivity or a tab background. speak() then returns success but
+/// produces no audio AND never fires its 'end' event — that's the "TTS doesn't
+/// play every time" bug, and it also leaves the half-duplex gate stuck (the
+/// end event is what clears it). resume() wakes it up before every speak().
+void resumeSpeechSynthesisIfPaused() {
+  try {
+    final ss = _SpeechSynthesisObj(_speechSynthesisJs);
+    if (ss.paused) ss.resume();
+  } catch (_) {}
+}
 
 /// Call SYNCHRONOUSLY inside a user-gesture handler so iOS Safari unlocks
 /// speechSynthesis for subsequent non-gesture FlutterTts.speak() calls.

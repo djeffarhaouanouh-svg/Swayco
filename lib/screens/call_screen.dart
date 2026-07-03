@@ -329,15 +329,6 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'live'});
-    // The mic gate flag is a global (call_audio_web) that survives across calls.
-    // Force-clear it here so a gate left stuck true by a previous call can never
-    // block SEND on this fresh call ("dead even after re-dialling").
-    markTranslationDone();
-    // Half-duplex: reopen the mic the instant our own TTS finishes. The
-    // completion event is the precise "playback ended" signal; the length-based
-    // timer + 5s hard ceiling in markTranslationPlaying cover the case where it
-    // stops firing. markTranslationDone is a no-op on native.
-    _deviceTts.setCompletionHandler(() => markTranslationDone());
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
     // readable even when the room connects almost instantly.
@@ -874,6 +865,7 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _speakDeviceTts(String text, String lang) async {
     DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
+    markTranslationPlaying(textLength: text.length);
     try {
       if (lang.isNotEmpty && lang != _deviceTtsLang) {
         try {
@@ -883,10 +875,10 @@ class _CallScreenState extends State<CallScreen> {
       }
       // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
-      // Arm the half-duplex gate AFTER stop() — stop() can fire the previous
-      // utterance's completion handler (→ markTranslationDone), which would
-      // otherwise clear the gate we're setting for this new utterance.
-      markTranslationPlaying(textLength: text.length);
+      // Wake speechSynthesis if the browser auto-paused it (mobile Chrome does
+      // this after inactivity) — otherwise speak() plays nothing and the "end"
+      // event never fires, which also leaves the half-duplex gate stuck.
+      resumeSpeechSynthesisIfPaused();
       await _deviceTts.speak(text);
       DebugOverlay.log('speakDeviceTts OK');
     } catch (e) {

@@ -297,12 +297,10 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         );
         audio.close();
         // Continuous stream — Grok STT handles silence internally.
-        // Half-duplex: pause SEND while our own TTS plays out the speaker so the
-        // mic doesn't re-capture & re-translate it (the "device answers itself"
-        // echo). isTranslationPlaying is now driven by the TTS's real
-        // start/completion events (not a fixed timer), so it clears the instant
-        // playback ends — the listening side is never blocked longer than the
-        // actual speech. isSendMuted is the manual mute.
+        // isTranslationPlaying pauses SEND while TTS plays so the mic doesn't
+        // re-capture and re-translate our own speaker output. The gate is
+        // cleared immediately in _toggleMic when the user unmutes, so it
+        // never permanently blocks SEND.
         if (_wsOpen && n > 0 &&
             !(_captureLocalMic && isSendMuted) &&
             !(_captureLocalMic && isTranslationPlaying)) {
@@ -312,7 +310,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           }
           _frames++;
           if (_frames % 200 == 0) {
-            _log('pcm frames=$_frames muted=$isSendMuted playing=$isTranslationPlaying');
+            _log('pcm frames=$_frames muted=$isSendMuted');
           }
         }
       } catch (e) {
@@ -367,9 +365,6 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final buf = e.inputBuffer;
           final f32 = buf.getChannelData(0).toDart;
           final rate = buf.sampleRate.toInt();
-          // Half-duplex (see _pump): pause SEND while our own TTS plays so the
-          // mic doesn't re-capture it. isTranslationPlaying clears on the TTS
-          // completion event, so the block lasts only the actual playback.
           if (!(_captureLocalMic && isSendMuted) &&
               !(_captureLocalMic && isTranslationPlaying)) {
             final pcm = _downsampleToPcm16(f32, rate, _outRate);
