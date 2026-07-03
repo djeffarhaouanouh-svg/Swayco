@@ -6,17 +6,11 @@ import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 
 import '../services/call_audio.dart';
-import '../services/debug_overlay.dart';
 import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _WebGrokMicStreamer();
 
-void _log(String m) {
-  web.console.log('[grok-rt] $m'.toJS);
-  // Mirror to the on-screen 🐛 overlay so SEND-side startup is visible on
-  // mobile (no devtools). This is how we see whether the SEND ever launches.
-  DebugOverlay.log('[send] $m');
-}
+void _log(String m) => web.console.log('[grok-rt] $m'.toJS);
 
 // ── Minimal WebCodecs AudioData bindings (web 1.1.1 doesn't expose them) ──
 extension type _AudioData(JSObject _) implements JSObject {

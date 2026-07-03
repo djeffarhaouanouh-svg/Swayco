@@ -114,11 +114,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _room = room;
     _route = route;
     debugPrint('[grok-rt] attach src=${route.sourceBcp47} tgt=${route.targetBcp47}');
-    DebugOverlay.log('attach src="${route.sourceBcp47}" tgt="${route.targetBcp47}" configured=${route.isConfigured}');
-    if (!route.isConfigured) {
-      DebugOverlay.log('route NOT configured → SEND does NOT start (peer lang unknown)');
-      return;
-    }
+    if (!route.isConfigured) return;
 
     await _player.setReleaseMode(ReleaseMode.stop);
     _playSub = _player.onPlayerComplete.listen((_) {

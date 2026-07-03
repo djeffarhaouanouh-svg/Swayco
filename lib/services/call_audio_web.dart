@@ -31,11 +31,15 @@ void registerCaptureContext(dynamic ctx) {}
 
 void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
-  // Don't reset an already-running timer: rapid successive TTS calls would
-  // push the gate back indefinitely, blocking the user's mic for too long.
-  // 800 ms covers the echo-onset window; AEC + AGC-off handle the rest.
-  if (_clearTimer != null) return;
-  _clearTimer = Timer(const Duration(milliseconds: 800), () {
+  // Gate the mic for roughly the WHOLE TTS playback (~75 ms/char) instead of a
+  // flat 800 ms — otherwise the mic reopens mid-sentence and re-captures the
+  // tail of our own translation (the residual echo). Re-armed on each utterance
+  // so a stream of translations keeps the gate up; a plain Dart timer always
+  // fires, so the gate can never stick (a "stuck" gate was really the far side
+  // muting their own mic, never this timer).
+  _clearTimer?.cancel();
+  final estMs = (textLength * 75).clamp(800, 6000);
+  _clearTimer = Timer(Duration(milliseconds: estMs), () {
     _playing = false;
     _clearTimer = null;
   });
