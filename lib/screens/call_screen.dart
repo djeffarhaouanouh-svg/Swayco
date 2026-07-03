@@ -126,8 +126,6 @@ class _CallScreenState extends State<CallScreen> {
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
-  // Monotonic counter: only the latest _speakDeviceTts call reaches speak().
-  int _ttsSeq = 0;
   // Keepalive: Android/iOS Chrome pauses speechSynthesis after inactivity.
   Timer? _synthKeepAlive;
 
@@ -604,7 +602,28 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    final room = Room();
+    // RoomOptions sets default audio constraints for every mic enable/disable
+    // cycle (including _toggleMic re-enables):
+    //   • AudioCaptureOptions: EC+NS+AGC on. AGC is safe now that the
+    //     isTranslationPlaying gate blocks the STT mic during TTS, and
+    //     AEC cancels any TTS echo before AGC sees the signal.
+    //   • AudioPublishOptions: Opus 32 kbps (voice-optimised) + DTX.
+    // Native: LiveKit calls NativeAudioManagement.start() on connect →
+    // Android communication mode; iOS AVAudioSession playAndRecord +
+    // voiceChat + Bluetooth via defaultNativeAudioConfigurationFunc.
+    final room = Room(
+      roomOptions: const RoomOptions(
+        defaultAudioCaptureOptions: AudioCaptureOptions(
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        ),
+        defaultAudioPublishOptions: AudioPublishOptions(
+          encoding: AudioEncoding(maxBitrate: 32000),
+          dtx: true,
+        ),
+      ),
+    );
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
@@ -616,18 +635,7 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      // EC + NS on, AGC OFF — the setup that worked before the audio-quality
-      // experiment. A custom AudioPublishOptions (32 kbps + DTX) broke the
-      // Android outgoing voice: DTX's silence detection clipped speech and the
-      // low bitrate crackled. Back to the SDK default publish (48 kbps, no DTX).
-      await room.localParticipant?.setMicrophoneEnabled(
-        true,
-        audioCaptureOptions: const AudioCaptureOptions(
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: false,
-        ),
-      );
+      await room.localParticipant?.setMicrophoneEnabled(true);
       // First attach with whatever remote-lang we already know (often nothing
       // yet). Refreshed dynamically as participants join / metadata arrives.
       await _refreshTranslationBinding(room);
@@ -887,12 +895,8 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _speakDeviceTts(String text, String lang) async {
-    // Stamp this call — only the LATEST one proceeds to speak().
-    // Multiple concurrent calls (rapid-fire translations) race on stop()+speak();
-    // the seq guard ensures older calls abort after stop() so they don't queue
-    // behind the newest utterance.
-    final seq = ++_ttsSeq;
-    DebugOverlay.log('speakDeviceTts seq=$seq lang=$lang "${text.substring(0, text.length.clamp(0, 30))}"');
+    DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
+    markTranslationPlaying(textLength: text.length);
     try {
       if (lang.isNotEmpty && lang != _deviceTtsLang) {
         try {
@@ -900,13 +904,13 @@ class _CallScreenState extends State<CallScreen> {
           _deviceTtsLang = lang;
         } catch (_) {}
       }
-      if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded'); return; }
+      // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
-      if (seq != _ttsSeq) { DebugOverlay.log('tts seq=$seq superseded after stop'); return; }
-      markTranslationPlaying(textLength: text.length);
+      // Android/iOS Chrome silently pauses speechSynthesis after inactivity or
+      // background — resume() wakes it up so speak() actually produces audio.
       resumeSpeechSynthesisIfPaused();
       await _deviceTts.speak(text);
-      DebugOverlay.log('speakDeviceTts queued seq=$seq');
+      DebugOverlay.log('speakDeviceTts queued');
     } catch (e) {
       markTranslationDone();
       DebugOverlay.log('speakDeviceTts ERROR: $e');
