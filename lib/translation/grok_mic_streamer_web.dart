@@ -131,12 +131,11 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final s = web.MediaStream();
           s.addTrack(micTrack);
           _micStream = s;
-          // Clone inherits LiveKit's AudioCaptureOptions:
-          //   AEC on · NS on · AGC OFF
-          // AGC off is critical: with AGC on, any TTS leak captured by the mic
-          // gets amplified each pass until audio runs away (the "son dégueulasse").
-          // Without AGC the leak stays below source level and decays naturally.
-          _log('LiveKit track cloned for STT (AEC on, NS on, AGC off)');
+          // Clone inherits LiveKit's AudioCaptureOptions (AEC on, NS on, AGC on).
+          // AGC is safe because the isTranslationPlaying gate blocks PCM from
+          // reaching the STT backend while TTS is playing, so any TTS leak that
+          // AGC might amplify is never forwarded.
+          _log('LiveKit track cloned for STT (AEC on, NS on, AGC on)');
         } else {
           // Fallback: LiveKit track not yet published — open own getUserMedia
           // with the same constraint set as call_screen AudioCaptureOptions.
