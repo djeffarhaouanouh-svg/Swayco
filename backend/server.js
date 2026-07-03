@@ -177,7 +177,7 @@ const GROK_API_KEY = process.env.GROK_API_KEY?.trim();
 const GROK_BASE = (process.env.GROK_BASE?.trim() || 'https://api.x.ai/v1').replace(/\/$/, '');
 // Valid chat model ids (June 2026): grok-4.3, grok-4.20-*. `grok-3-mini`
 // no longer exists → a bad default here 404s the translate step (502 to app).
-const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-4.3');
+const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-4.20-0309-non-reasoning');
 /** TTS model id — optional; only sent if set (the /v1/tts endpoint accepts
  *  text/voice_id/language without a model on most accounts). */
 const GROK_TTS_MODEL = process.env.GROK_TTS_MODEL?.trim() || '';
