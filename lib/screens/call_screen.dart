@@ -580,7 +580,26 @@ class _CallScreenState extends State<CallScreen> {
       await Permission.bluetoothConnect.request();
     }
 
-    final room = Room();
+    // Voice-call audio config (per spec): EC + NS + AGC on, Opus @ 32 kbps, DTX
+    // (SDK default). AGC is safe now that the mic gate covers the FULL TTS
+    // playback: the mic is closed while our own translation plays, so AGC can't
+    // amplify a captured TTS leak into a runaway echo. highPassFilter cuts the
+    // low-frequency wind/rumble the AGC would otherwise boost at idle.
+    // Jitter buffer is adaptive (LiveKit default); communication audio mode +
+    // Bluetooth routing come from LiveKit's NativeAudioManagement on native.
+    final room = Room(
+      roomOptions: const RoomOptions(
+        defaultAudioCaptureOptions: AudioCaptureOptions(
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          highPassFilter: true,
+        ),
+        defaultAudioPublishOptions: AudioPublishOptions(
+          encoding: AudioEncoding(maxBitrate: 32000),
+        ),
+      ),
+    );
     try {
       await room.connect(widget.wsUrl, widget.jwt);
       // For the callee, the caller is already in the room at connect
@@ -592,20 +611,7 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      // EC + NS on, AGC OFF. Rationale: the translation pipeline plays
-      // a second audio stream on the speakers that the browser's EC
-      // doesn't fully account for, so any captured leak goes back into
-      // LiveKit. AGC then amplifies that leak each loop and the
-      // feedback runs away to infinity. Without AGC the captured leak
-      // stays below its source and decays naturally.
-      await room.localParticipant?.setMicrophoneEnabled(
-        true,
-        audioCaptureOptions: const AudioCaptureOptions(
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: false,
-        ),
-      );
+      await room.localParticipant?.setMicrophoneEnabled(true);
       // First attach with whatever remote-lang we already know (often nothing
       // yet). Refreshed dynamically as participants join / metadata arrives.
       await _refreshTranslationBinding(room);

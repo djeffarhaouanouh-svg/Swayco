@@ -131,12 +131,10 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           final s = web.MediaStream();
           s.addTrack(micTrack);
           _micStream = s;
-          // Clone inherits LiveKit's AudioCaptureOptions:
-          //   AEC on · NS on · AGC OFF
-          // AGC off is critical: with AGC on, any TTS leak captured by the mic
-          // gets amplified each pass until audio runs away (the "son dégueulasse").
-          // Without AGC the leak stays below source level and decays naturally.
-          _log('LiveKit track cloned for STT (AEC on, NS on, AGC off)');
+          // Clone inherits LiveKit's AudioCaptureOptions (AEC + NS + AGC on).
+          // AGC is safe: the mic gate closes SEND for the whole TTS playback, so
+          // AGC never amplifies a captured TTS leak into a runaway loop.
+          _log('LiveKit track cloned for STT (AEC on, NS on, AGC on)');
         } else {
           // Fallback: LiveKit track not yet published — open own getUserMedia
           // with the same constraint set as call_screen AudioCaptureOptions.
@@ -145,7 +143,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
                 audio: web.MediaTrackConstraints(
                   echoCancellation: true.toJS,
                   noiseSuppression: true.toJS,
-                  autoGainControl: false.toJS,
+                  autoGainControl: true.toJS,
                 ),
               ))
               .toDart;
@@ -158,7 +156,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
             return;
           }
           micTrack = audioTracks.first;
-          _log('getUserMedia local mic fallback (AEC on, NS on, AGC off)');
+          _log('getUserMedia local mic fallback (AEC on, NS on, AGC on)');
         }
       } else {
         web.MediaStreamTrack? jsTrack;
@@ -355,8 +353,16 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
       final proc = ctx.createScriptProc(4096, 1, 1);
       _scriptProc = proc;
 
+      // WebKit only fires onaudioprocess when the ScriptProcessor is connected
+      // to the destination — but connecting it DIRECTLY plays the raw mic out
+      // the loudspeaker (a constant larsen/hiss, the "grésillement at idle").
+      // Route through a muted gain node so the callback still fires but nothing
+      // is ever played out.
+      final muteGain = ctx.createGain();
+      muteGain.gain.value = 0;
       source.connectTo(proc);
-      proc.connectTo(ctx.destination as JSObject);
+      proc.connectTo(muteGain as JSObject);
+      (muteGain as JSObject).connectTo(ctx.destination as JSObject);
 
       proc.onaudioprocess = ((JSObject evt) {
         if (!_running || !_wsOpen) return;
