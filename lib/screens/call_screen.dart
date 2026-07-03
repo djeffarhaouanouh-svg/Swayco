@@ -869,9 +869,8 @@ class _CallScreenState extends State<CallScreen> {
       if (lang.isNotEmpty) {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
-      // stop() clears any queued utterances; fire-and-forget so speak() starts
-      // immediately without waiting for the cancel confirmation.
-      unawaited(_deviceTts.stop());
+      // stop() clears any queued utterances before playing the latest translation.
+      await _deviceTts.stop();
       await _deviceTts.speak(text);
       DebugOverlay.log('speakDeviceTts OK');
     } catch (e) {
