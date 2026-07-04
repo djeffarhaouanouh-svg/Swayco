@@ -16,7 +16,6 @@ class ListPanel extends StatelessWidget {
       decoration: BoxDecoration(
         // The original site black.
         color: const Color(0xFF0E0E0E),
-        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: SC.glassBorder, width: 1),
         // Soft neutral drop shadow — classic black look, no blue glow.
         boxShadow: [
