@@ -25,7 +25,6 @@ import '../translation/realtime_translation_port.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/list_panel.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -518,7 +517,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             children: [
               ConstrainedBox(
                 constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
-                child: ListPanel(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1210,7 +1210,8 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
           children: [
             ConstrainedBox(
               constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
-              child: ListPanel(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: AnimatedBuilder(
                   animation: _ctrl,
                   builder: (_, _) {
