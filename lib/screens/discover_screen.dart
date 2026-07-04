@@ -241,66 +241,85 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
+    // Card descend jusqu'au bas de la nav bar — les boutons flottent dessus
+    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom;
+    // Boutons positionnés dans la zone basse de la card (sur son gradient)
+    final btnBottom = cardBottom + 8;
+    final tabBarH = safeTop + _TopTabBar.height;
 
     return Scaffold(
       backgroundColor: Colors.black,
       extendBody: true,
       body: Stack(
         children: [
-          // ── Main layout ───────────────────────────────────────────────────
-          Column(
-            children: [
-              SizedBox(height: safeTop),
-              _TopTabBar(
-                tabs: _tabs,
-                activeIndex: _activeTab,
-                onTabSelected: (i) => setState(() => _activeTab = i),
-                onSearch: _openSearch,
-                onSettings: () {},
-              ),
-              // Card area
-              Expanded(
-                child: _feedLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : _cards.isEmpty
-                        ? _Empty(onReset: _reset)
-                        : _TinderCardStack(
-                            key: _stackKey,
-                            cards: _cards,
-                            currentIndex: _currentIndex,
-                            onSwiped: _onCardSwiped,
-                          ),
-              ),
-              // Action buttons
-              _SwipeActionBar(
-                height: actionH,
-                onUndo: _onActionUndo,
-                onNope: _onSwipeLeft,
-                onSuperLike: _onSwipeRight,
-                onLike: _onSwipeRight,
-                onMessage: () {
-                  if (_cards.isEmpty) return;
-                  Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ProfileScreen(
-                        userId: _cards[_currentIndex % _cards.length].profile.id,
-                      ),
+          // ── Card plein écran — de top:0 jusqu'à la nav bar ───────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: cardBottom,
+            child: _feedLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
                     ),
-                  );
-                },
-              ),
-              SizedBox(height: GlassNavBar.totalReservedHeight + safeBottom + 16),
-            ],
+                  )
+                : _cards.isEmpty
+                    ? _Empty(onReset: _reset)
+                    : _TinderCardStack(
+                        key: _stackKey,
+                        cards: _cards,
+                        currentIndex: _currentIndex,
+                        onSwiped: _onCardSwiped,
+                      ),
           ),
+
+          // ── Top bar — flotte sur la card ──────────────────────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _TopTabBar(
+              tabs: _tabs,
+              activeIndex: _activeTab,
+              onTabSelected: (i) => setState(() => _activeTab = i),
+              onSearch: _openSearch,
+              onSettings: () {},
+              topInset: safeTop,
+            ),
+          ),
+
+          // ── Boutons action — sur le gradient sombre de la card ────────────
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: btnBottom,
+            height: actionH,
+            child: _SwipeActionBar(
+              height: actionH,
+              onUndo: _onActionUndo,
+              onNope: _onSwipeLeft,
+              onSuperLike: _onSwipeRight,
+              onLike: _onSwipeRight,
+              onMessage: () {
+                if (_cards.isEmpty) return;
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProfileScreen(
+                      userId:
+                          _cards[_currentIndex % _cards.length].profile.id,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
           // ── Search overlay ────────────────────────────────────────────────
           if (_searchExpanded) ...[
             Positioned.fill(
-              top: safeTop + _TopTabBar.height,
+              top: tabBarH,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _closeSearch,
@@ -310,7 +329,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             Positioned(
               left: 12,
               right: 12,
-              top: safeTop + _TopTabBar.height + 8,
+              top: tabBarH + 8,
               child: _SearchOverlay(
                 controller: _searchCtrl,
                 focusNode: _searchFocus,
@@ -342,6 +361,7 @@ class _TopTabBar extends StatelessWidget {
     required this.onTabSelected,
     required this.onSearch,
     required this.onSettings,
+    this.topInset = 0,
   });
 
   final List<String> tabs;
@@ -349,7 +369,9 @@ class _TopTabBar extends StatelessWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback onSearch;
   final VoidCallback onSettings;
+  final double topInset;
 
+  // Content height (excluding safe-area top inset)
   static const double height = 52.0;
 
   @override
@@ -358,9 +380,9 @@ class _TopTabBar extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
-          height: height,
+          height: height + topInset,
           color: Colors.black.withValues(alpha: 0.55),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
           child: Row(
             children: [
               // Settings / filter icon
@@ -503,9 +525,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     if (n == 0) return const SizedBox.shrink();
     final i = widget.currentIndex % n;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Stack(
+    return Stack(
         children: [
           // Back card (3rd)
           if (n >= 3)
@@ -537,8 +557,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
@@ -799,13 +818,11 @@ class _TinderCardState extends State<_TinderCard> {
         p.lastSeen != null &&
         DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Photo ──────────────────────────────────────────────────────────
-          const ColoredBox(color: Color(0xFF111111)),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // ── Photo ──────────────────────────────────────────────────────────
+        const ColoredBox(color: Color(0xFF111111)),
           if (currentUrl.isNotEmpty)
             Image.network(
               currentUrl,
@@ -843,7 +860,7 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Bottom gradient ─────────────────────────────────────────────
+          // ── Gradients haut + bas ────────────────────────────────────────
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -851,12 +868,15 @@ class _TinderCardState extends State<_TinderCard> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
+                    // haut : couvre la top bar (dark → transparent)
+                    Colors.black.withValues(alpha: 0.62),
+                    Colors.black.withValues(alpha: 0.20),
                     Colors.transparent,
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.50),
-                    Colors.black.withValues(alpha: 0.92),
+                    // bas : couvre nom + intérêts + boutons
+                    Colors.black.withValues(alpha: 0.55),
+                    Colors.black.withValues(alpha: 0.95),
                   ],
-                  stops: const [0.0, 0.42, 0.68, 1.0],
+                  stops: const [0.0, 0.12, 0.38, 0.62, 1.0],
                 ),
               ),
             ),
@@ -1003,8 +1023,7 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
