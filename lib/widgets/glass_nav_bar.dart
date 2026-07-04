@@ -53,7 +53,7 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 52;
+  static const double height = 64;
 
   /// Gap between the pill bottom and the screen safe-area top.
   static const double floatBottom = 16.0;
@@ -210,7 +210,7 @@ class _GlassNavBarState extends State<GlassNavBar>
                   curve: Curves.easeOutBack,
                   child: Container(
                     width: slot - 24,
-                    height: height - 16,
+                    height: height - 14,
                     decoration: BoxDecoration(
                       color: Colors.white
                           .withValues(alpha: _dragging ? 0.26 : 0.18),
@@ -398,32 +398,50 @@ class _NavItemState extends State<_NavItem>
   Widget build(BuildContext context) {
     // Real spring (physics) bounce on press; the pop adds the grow-then-shrink
     // on selection; the swipe lens magnifies as the pill nears.
+    final color = widget.selected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.50);
     return SpringPress(
       onTap: widget.onTap,
       child: Center(
-        child: _badged(
-          AnimatedBuilder(
-            animation: _popScale,
-            builder: (context, child) => Transform.scale(
-              // Swipe lens × selection pop.
-              scale: widget.magnify * _popScale.value,
-              child: child,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _badged(
+              AnimatedBuilder(
+                animation: _popScale,
+                builder: (context, child) => Transform.scale(
+                  // Swipe lens × selection pop.
+                  scale: widget.magnify * _popScale.value,
+                  child: child,
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    widget.selected
+                        ? widget.data.selectedIcon
+                        : widget.data.icon,
+                    key: ValueKey(widget.selected),
+                    size: 24,
+                    color: color,
+                  ),
+                ),
+              ),
+              widget.data.badge,
             ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                widget.selected
-                    ? widget.data.selectedIcon
-                    : widget.data.icon,
-                key: ValueKey(widget.selected),
-                size: 26,
-                color: widget.selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.50),
+            const SizedBox(height: 3),
+            Text(
+              widget.data.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
-          ),
-          widget.data.badge,
+          ],
         ),
       ),
     );
