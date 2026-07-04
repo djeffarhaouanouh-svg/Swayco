@@ -53,7 +53,7 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 64;
+  static const double height = 52;
 
   /// Gap between the pill bottom and the screen safe-area top.
   static const double floatBottom = 16.0;
@@ -210,10 +210,14 @@ class _GlassNavBarState extends State<GlassNavBar>
                   curve: Curves.easeOutBack,
                   child: Container(
                     width: slot - 24,
-                    height: height - 14,
+                    height: height - 16,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: _dragging ? 1.0 : 0.96),
+                      color: Colors.white
+                          .withValues(alpha: _dragging ? 0.26 : 0.18),
                       borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.28),
+                      ),
                     ),
                   ),
                 ),
@@ -279,14 +283,14 @@ class _GlassNavBarState extends State<GlassNavBar>
           ),
       );
 
-    const radius = BorderRadius.all(Radius.circular(26));
+    const radius = BorderRadius.all(Radius.circular(36));
 
     // Shader Liquid Glass path (iOS native).
     if (useShaderGlass) {
       return lg.GlassContainer(
         useOwnLayer: true,
         clipBehavior: Clip.antiAlias,
-        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 26),
+        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 36),
         settings: const lg.LiquidGlassSettings(
           blur: 12,
           thickness: 14,
@@ -394,50 +398,32 @@ class _NavItemState extends State<_NavItem>
   Widget build(BuildContext context) {
     // Real spring (physics) bounce on press; the pop adds the grow-then-shrink
     // on selection; the swipe lens magnifies as the pill nears.
-    // Selected item sits on the solid white pill → dark icon/label for
-    // contrast; unselected items sit on the dark bar → plain white.
-    final color = widget.selected ? const Color(0xFF15151A) : Colors.white;
     return SpringPress(
       onTap: widget.onTap,
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _badged(
-              AnimatedBuilder(
-                animation: _popScale,
-                builder: (context, child) => Transform.scale(
-                  // Swipe lens × selection pop.
-                  scale: widget.magnify * _popScale.value,
-                  child: child,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    widget.selected
-                        ? widget.data.selectedIcon
-                        : widget.data.icon,
-                    key: ValueKey(widget.selected),
-                    size: 24,
-                    color: color,
-                  ),
-                ),
-              ),
-              widget.data.badge,
+        child: _badged(
+          AnimatedBuilder(
+            animation: _popScale,
+            builder: (context, child) => Transform.scale(
+              // Swipe lens × selection pop.
+              scale: widget.magnify * _popScale.value,
+              child: child,
             ),
-            const SizedBox(height: 3),
-            Text(
-              widget.data.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                widget.selected
+                    ? widget.data.selectedIcon
+                    : widget.data.icon,
+                key: ValueKey(widget.selected),
+                size: 26,
+                color: widget.selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.50),
               ),
             ),
-          ],
+          ),
+          widget.data.badge,
         ),
       ),
     );

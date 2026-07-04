@@ -486,8 +486,8 @@ class _RootShellState extends State<RootShell> {
                       ],
                     ),
                     Positioned(
-                      left: 0,
-                      right: 0,
+                      left: 52,
+                      right: 52,
                       bottom: MediaQuery.paddingOf(context).bottom +
                           GlassNavBar.floatBottom,
                       // Rebuild on every pager tick so the highlight pill
