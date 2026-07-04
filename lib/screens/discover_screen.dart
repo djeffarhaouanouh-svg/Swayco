@@ -900,29 +900,50 @@ class _TinderCardState extends State<_TinderCard> {
             right: 0,
             bottom: 0,
             child: IgnorePointer(
-              child: ClipRect(
-                child: BackdropFilter(
-                  // Le blur capte bien la photo (plus de ShaderMask qui
-                  // l'isolait). Le voile est un DÉGRADÉ : transparent en haut
-                  // (bord doux) -> sombre en bas (bien visible).
-                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                  child: Container(
-                    // Le flou démarre JUSTE SOUS le prénom (~108 px du bas) et
-                    // descend jusqu'en bas — il ne couvre que les boutons.
-                    height: 105,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.5, 1.0],
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.06),
-                          Colors.black.withValues(alpha: 0.16),
-                        ],
+              child: SizedBox(
+                height: 130,
+                child: Stack(
+                  children: [
+                    // Flou PROGRESSIF : couches empilées, légères en haut et de
+                    // plus en plus fortes vers le bas. Comme le ShaderMask
+                    // casse un BackdropFilter, c'est la seule façon d'obtenir un
+                    // début de flou qui fond au lieu d'un bord net.
+                    for (final (h, b) in const [
+                      (130.0, 3.0),
+                      (100.0, 7.0),
+                      (70.0, 13.0),
+                      (42.0, 20.0),
+                    ])
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: h,
+                        child: ClipRect(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: b, sigmaY: b),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
+                    // Voile sombre en dégradé (léger), transparent en haut.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0.0, 0.5, 1.0],
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.06),
+                              Colors.black.withValues(alpha: 0.16),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
