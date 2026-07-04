@@ -252,12 +252,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card — de top:0 jusqu'au-dessus des boutons action ──────────
+          // ── Card — sous la top bar, pleine hauteur, coins arrondis ──────
           Positioned(
-            top: 0,
+            top: tabBarH,
             left: 0,
             right: 0,
-            bottom: cardBottom,
+            bottom: 0,
             child: _feedLoading
                 ? const Center(
                     child: CircularProgressIndicator(
@@ -562,10 +562,13 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
     return SizedBox.expand(
-      child: _TinderCard(
-        key: ValueKey(card.profile.id),
-        profile: card.profile,
-        photos: card.photos,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: _TinderCard(
+          key: ValueKey(card.profile.id),
+          profile: card.profile,
+          photos: card.photos,
+        ),
       ),
     );
   }
@@ -819,6 +822,10 @@ class _TinderCardState extends State<_TinderCard> {
     final online = !p.hideOnlineStatus &&
         p.lastSeen != null &&
         DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
+    // Card now reaches the very bottom of the screen: everything anchored to
+    // its bottom must clear the floating nav bar + action-button row.
+    final navReserved =
+        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -861,52 +868,41 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Gradient haut (top bar readability) ────────────────────────
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: Container(
-              height: 140,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.60),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Gradient bas — fondu progressif transparent → sombre ────────
+          // ── Scrim bas — fondu easé sur la photo, puis charbon uni sous
+          //    le nom / les boutons / la nav (structure de la ref Tinder) ──
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: IgnorePointer(
-              child: Container(
-                height: 420,
-                decoration: BoxDecoration(
-                  // Tinder-style scrim: eased fade high on the photo, then
-                  // solid charcoal (not pure black) behind name/chips/buttons.
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF18181B).withValues(alpha: 0.0),
-                      const Color(0xFF18181B).withValues(alpha: 0.0),
-                      const Color(0xFF18181B).withValues(alpha: 0.08),
-                      const Color(0xFF18181B).withValues(alpha: 0.22),
-                      const Color(0xFF18181B).withValues(alpha: 0.45),
-                      const Color(0xFF18181B).withValues(alpha: 0.70),
-                      const Color(0xFF18181B).withValues(alpha: 0.88),
-                      const Color(0xFF18181B),
-                      const Color(0xFF18181B),
-                    ],
-                    stops: const [
-                      0.0, 0.12, 0.28, 0.42, 0.54, 0.64, 0.72, 0.78, 1.0,
-                    ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 320,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          const Color(0xFF18181B).withValues(alpha: 0.0),
+                          const Color(0xFF18181B).withValues(alpha: 0.06),
+                          const Color(0xFF18181B).withValues(alpha: 0.16),
+                          const Color(0xFF18181B).withValues(alpha: 0.32),
+                          const Color(0xFF18181B).withValues(alpha: 0.52),
+                          const Color(0xFF18181B).withValues(alpha: 0.72),
+                          const Color(0xFF18181B).withValues(alpha: 0.88),
+                          const Color(0xFF18181B),
+                        ],
+                        stops: const [
+                          0.0, 0.15, 0.30, 0.45, 0.60, 0.74, 0.87, 1.0,
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  Container(
+                    height: navReserved + 100,
+                    color: const Color(0xFF18181B),
+                  ),
+                ],
               ),
             ),
           ),
@@ -915,7 +911,7 @@ class _TinderCardState extends State<_TinderCard> {
           Positioned(
             left: 16,
             right: 56,
-            bottom: 108,
+            bottom: navReserved + 108,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1027,7 +1023,7 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Info button ─────────────────────────────────────────────────
           Positioned(
             right: 14,
-            bottom: 112,
+            bottom: navReserved + 112,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push<void>(
