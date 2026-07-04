@@ -376,14 +376,11 @@ class _TopTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          height: height + topInset,
-          color: Colors.transparent,
-          padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
-          child: Row(
+    // No blur — readability comes from the card's top gradient behind it.
+    return Container(
+      height: height + topInset,
+      padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
+      child: Row(
             children: [
               // Settings / filter icon
               GestureDetector(
@@ -436,9 +433,7 @@ class _TopTabBar extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 }
 
@@ -869,13 +864,15 @@ class _TinderCardState extends State<_TinderCard> {
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
               child: Container(
-                height: 140,
+                height: 220,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.22, 0.45],
                     colors: [
-                      Colors.black.withValues(alpha: 0.60),
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.20),
                       Colors.transparent,
                     ],
                   ),
@@ -885,7 +882,9 @@ class _TinderCardState extends State<_TinderCard> {
           ),
 
 
-          // ── Verre dépoli au bas de la carte (des intérêts jusqu'en bas) ──
+          // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
+          // Le verre dépoli enveloppe le bloc infos : court quand il n'y a
+          // que le prénom, plus haut dès qu'il y a des centres d'intérêt.
           Positioned(
             left: 0,
             right: 0,
@@ -894,24 +893,15 @@ class _TinderCardState extends State<_TinderCard> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                 child: Container(
-                  height: 180,
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.20),
                   ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Bottom info (au-dessus des boutons d'action) ────────────────
-          Positioned(
-            left: 16,
-            right: 56,
-            bottom: 108,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
+                  padding: const EdgeInsets.only(
+                      left: 16, right: 56, top: 14, bottom: 108),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                 // Name + flag + online dot
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1013,6 +1003,9 @@ class _TinderCardState extends State<_TinderCard> {
                   ),
                 ],
               ],
+                  ),
+                ),
+              ),
             ),
           ),
 
