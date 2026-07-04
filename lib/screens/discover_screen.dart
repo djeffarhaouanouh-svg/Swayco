@@ -599,6 +599,10 @@ class _StackCard extends StatelessWidget {
 
 const double _kThreshold = 90.0;
 
+const List<String> _kMockInterests = [
+  'Musique', 'Voyage', 'Sport', 'Cuisine', 'Cinéma', 'Photo',
+];
+
 class _DraggableCard extends StatefulWidget {
   const _DraggableCard({
     super.key,
@@ -817,6 +821,7 @@ class _TinderCardState extends State<_TinderCard> {
     final online = !p.hideOnlineStatus &&
         p.lastSeen != null &&
         DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
+    final displayInterests = p.interests.isNotEmpty ? p.interests : _kMockInterests;
 
     return Stack(
       fit: StackFit.expand,
@@ -909,6 +914,11 @@ class _TinderCardState extends State<_TinderCard> {
                         ),
                       ),
                     ),
+                    if (p.isPro) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.verified_rounded,
+                          color: Color(0xFF60A5FA), size: 22),
+                    ],
                     if (flag.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       Text(flag, style: const TextStyle(fontSize: 22)),
@@ -956,36 +966,38 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Interests
-                if (p.interests.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.apps_rounded, size: 13,
-                          color: Colors.white.withValues(alpha: 0.65)),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Intérêts',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.70),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                        ),
+                // Interests (mock fallback when profile has none)
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.apps_rounded, size: 13,
+                        color: Colors.white.withValues(alpha: 0.65)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Centres d\'intérêt',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.70),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      for (final tag in p.interests.take(5))
-                        _InterestChip(label: interestLabel(tag)),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final tag in displayInterests.take(6))
+                      _InterestChip(
+                        label: p.interests.isNotEmpty
+                            ? interestLabel(tag)
+                            : tag,
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1070,18 +1082,24 @@ class _InterestChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ),
     );
