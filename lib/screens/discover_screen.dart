@@ -241,10 +241,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    // Card descend jusqu'au bas de la nav bar — les boutons flottent dessus
-    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom;
-    // Boutons positionnés dans la zone basse de la card (sur son gradient)
-    final btnBottom = cardBottom + 8;
+    final navBottom = GlassNavBar.totalReservedHeight + safeBottom;
+    // Buttons sit just above the nav bar
+    final btnBottom = navBottom + 8;
+    // Card stops above the action buttons (8px breathing room)
+    final cardBottom = btnBottom + actionH + 8;
     final tabBarH = safeTop + _TopTabBar.height;
 
     return Scaffold(
@@ -252,7 +253,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card plein écran — de top:0 jusqu'à la nav bar ───────────────
+          // ── Card — de top:0 jusqu'au-dessus des boutons action ──────────
           Positioned(
             top: 0,
             left: 0,
@@ -868,15 +869,15 @@ class _TinderCardState extends State<_TinderCard> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    // haut : couvre la top bar (dark → transparent)
+                    // haut : fondu dark → transparent (symétrique du bas)
                     Colors.black.withValues(alpha: 0.62),
                     Colors.black.withValues(alpha: 0.20),
                     Colors.transparent,
-                    // bas : couvre nom + intérêts + boutons
-                    Colors.black.withValues(alpha: 0.55),
-                    Colors.black.withValues(alpha: 0.95),
+                    // bas : fondu transparent → noir opaque (même logique que haut)
+                    Colors.black.withValues(alpha: 0.50),
+                    Colors.black,
                   ],
-                  stops: const [0.0, 0.12, 0.38, 0.62, 1.0],
+                  stops: const [0.0, 0.12, 0.40, 0.68, 1.0],
                 ),
               ),
             ),
