@@ -1121,7 +1121,7 @@ class _InviteToCallRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [SC.accent, SC.accentDeep],
+                    colors: [SC.accent, SC.meshBlue],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
