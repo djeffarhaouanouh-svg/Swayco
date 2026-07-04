@@ -1207,28 +1207,72 @@ class _GlassButton extends StatelessWidget {
     return Pressable(
       bounce: true,
       onTap: onTap,
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.10),
-              border: Border.all(
-                color: color.withValues(alpha: 0.60),
-                width: 1.8,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.22),
-                  blurRadius: 14,
-                  spreadRadius: 1,
-                ),
-              ],
+      child: DecoratedBox(
+        // Depth + coloured glow sit OUTSIDE the clip so they aren't cut off.
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.28),
+              blurRadius: 18,
+              spreadRadius: 1,
             ),
-            child: Icon(icon, color: color, size: iconSize),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // Glossy body — brighter top-left, darker bottom-right.
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.28),
+                    Colors.white.withValues(alpha: 0.08),
+                    Colors.white.withValues(alpha: 0.03),
+                  ],
+                  stops: const [0.0, 0.55, 1.0],
+                ),
+                // Bright rim — the Apple liquid-glass edge light.
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.40),
+                  width: 1.2,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Specular highlight: a soft white sheen up top-left.
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          center: const Alignment(-0.35, -0.65),
+                          radius: 0.95,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.45),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                          stops: const [0.0, 0.6],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Icon(icon, color: color, size: iconSize),
+                ],
+              ),
+            ),
           ),
         ),
       ),
