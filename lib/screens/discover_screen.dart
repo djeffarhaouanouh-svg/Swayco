@@ -869,14 +869,43 @@ class _TinderCardState extends State<_TinderCard> {
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
               child: Container(
-                height: 140,
+                height: 170,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.60),
+                      Colors.black.withValues(alpha: 0.70),
                       Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── Gradient bas — fondu easé vers le sombre au pied de la carte ─
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: 320,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF18181B).withValues(alpha: 0.0),
+                      const Color(0xFF18181B).withValues(alpha: 0.06),
+                      const Color(0xFF18181B).withValues(alpha: 0.16),
+                      const Color(0xFF18181B).withValues(alpha: 0.32),
+                      const Color(0xFF18181B).withValues(alpha: 0.52),
+                      const Color(0xFF18181B).withValues(alpha: 0.72),
+                      const Color(0xFF18181B).withValues(alpha: 0.88),
+                      const Color(0xFF18181B),
+                    ],
+                    stops: const [
+                      0.0, 0.15, 0.30, 0.45, 0.60, 0.74, 0.87, 1.0,
                     ],
                   ),
                 ),
