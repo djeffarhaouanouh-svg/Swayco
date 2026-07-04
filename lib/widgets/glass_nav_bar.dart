@@ -53,7 +53,7 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 66;
+  static const double height = 52;
 
   /// Gap between the pill bottom and the screen safe-area top.
   static const double floatBottom = 16.0;
