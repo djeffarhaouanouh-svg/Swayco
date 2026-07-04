@@ -241,9 +241,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    // Card lifted one extra nav-height above the nav bar — action buttons
+    // Card lifted one nav-bar height above the nav bar — action buttons
     // float on top
-    final cardBottom = GlassNavBar.totalReservedHeight * 2 + safeBottom;
+    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom;
     // Buttons just above the nav bar, overlaid on the card's bottom gradient
     final btnBottom = cardBottom + 8;
     final tabBarH = safeTop + _TopTabBar.height;
@@ -885,34 +885,6 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Gradient bas — fondu easé vers le sombre au pied de la carte ─
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: 320,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF18181B).withValues(alpha: 0.0),
-                      const Color(0xFF18181B).withValues(alpha: 0.06),
-                      const Color(0xFF18181B).withValues(alpha: 0.16),
-                      const Color(0xFF18181B).withValues(alpha: 0.32),
-                      const Color(0xFF18181B).withValues(alpha: 0.52),
-                      const Color(0xFF18181B).withValues(alpha: 0.72),
-                      const Color(0xFF18181B).withValues(alpha: 0.88),
-                      const Color(0xFF18181B),
-                    ],
-                    stops: const [
-                      0.0, 0.15, 0.30, 0.45, 0.60, 0.74, 0.87, 1.0,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
 
           // ── Bottom info (au-dessus des boutons d'action) ────────────────
           Positioned(
