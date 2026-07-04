@@ -895,26 +895,22 @@ class _TinderCardState extends State<_TinderCard> {
           // Verre dépoli décoratif au bas de la carte : il FOND en douceur
           // vers le haut (masque dégradé, pas de bord net) et reste concentré
           // en bas. Il est derrière le texte, qui lui reste net.
-          // 1. Dégradé noir progressif TRÈS LONG (~300 px) — c'est lui qui
-          //    fait ~80 % du rendu Tinder. Transparent en haut, sombre en bas.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
+          // 1. Dégradé noir sur TOUTE la carte — transparent jusqu'à 55 %,
+          //    puis montée du sombre concentrée dans le bas (rendu Tinder).
+          Positioned.fill(
             child: IgnorePointer(
-              child: Container(
-                height: 300,
-                decoration: const BoxDecoration(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: [0.00, 0.35, 0.65, 0.85, 1.00],
+                    stops: const [0.00, 0.55, 0.70, 0.82, 1.00],
                     colors: [
-                      Color(0x00000000),
-                      Color(0x14000000), // ~0.08
-                      Color(0x40000000), // 0.25
-                      Color(0x82000000), // ~0.51
-                      Color(0xCC000000), // 0.80
+                      Colors.transparent,
+                      Colors.transparent,
+                      const Color(0x12000000),
+                      const Color(0x50000000),
+                      const Color(0xCC000000),
                     ],
                   ),
                 ),
