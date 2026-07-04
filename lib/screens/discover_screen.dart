@@ -828,7 +828,7 @@ class _TinderCardState extends State<_TinderCard> {
             Image.network(
               currentUrl,
               fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+              alignment: const Alignment(0, -0.6),
               gaplessPlayback: true,
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
