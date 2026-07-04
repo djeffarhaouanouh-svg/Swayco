@@ -252,12 +252,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card — sous la top bar, pleine hauteur, coins arrondis ──────
+          // ── Card — de top:0 à la nav, coins arrondis, fin nette ─────────
           Positioned(
-            top: tabBarH,
+            top: 0,
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: cardBottom,
             child: _feedLoading
                 ? const Center(
                     child: CircularProgressIndicator(
@@ -822,10 +822,6 @@ class _TinderCardState extends State<_TinderCard> {
     final online = !p.hideOnlineStatus &&
         p.lastSeen != null &&
         DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
-    // Card now reaches the very bottom of the screen: everything anchored to
-    // its bottom must clear the floating nav bar + action-button row.
-    final navReserved =
-        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -868,41 +864,22 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Scrim bas — fondu easé sur la photo, puis charbon uni sous
-          //    le nom / les boutons / la nav (structure de la ref Tinder) ──
+          // ── Gradient haut (top bar readability) ────────────────────────
           Positioned(
-            bottom: 0, left: 0, right: 0,
+            top: 0, left: 0, right: 0,
             child: IgnorePointer(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 320,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0xFF18181B).withValues(alpha: 0.0),
-                          const Color(0xFF18181B).withValues(alpha: 0.06),
-                          const Color(0xFF18181B).withValues(alpha: 0.16),
-                          const Color(0xFF18181B).withValues(alpha: 0.32),
-                          const Color(0xFF18181B).withValues(alpha: 0.52),
-                          const Color(0xFF18181B).withValues(alpha: 0.72),
-                          const Color(0xFF18181B).withValues(alpha: 0.88),
-                          const Color(0xFF18181B),
-                        ],
-                        stops: const [
-                          0.0, 0.15, 0.30, 0.45, 0.60, 0.74, 0.87, 1.0,
-                        ],
-                      ),
-                    ),
+              child: Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.60),
+                      Colors.transparent,
+                    ],
                   ),
-                  Container(
-                    height: navReserved + 100,
-                    color: const Color(0xFF18181B),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -911,7 +888,7 @@ class _TinderCardState extends State<_TinderCard> {
           Positioned(
             left: 16,
             right: 56,
-            bottom: navReserved + 108,
+            bottom: 108,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1023,7 +1000,7 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Info button ─────────────────────────────────────────────────
           Positioned(
             right: 14,
-            bottom: navReserved + 112,
+            bottom: 112,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push<void>(
