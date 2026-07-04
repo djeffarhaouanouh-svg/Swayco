@@ -859,22 +859,16 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Gradient haut (top bar readability) ────────────────────────
+          // ── Blur haut (derrière les onglets) ───────────────────────────
           Positioned(
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
-              child: Container(
-                height: 220,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.22, 0.45],
-                    colors: [
-                      Colors.black.withValues(alpha: 0.55),
-                      Colors.black.withValues(alpha: 0.20),
-                      Colors.transparent,
-                    ],
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    height: 90,
+                    color: Colors.black.withValues(alpha: 0.15),
                   ),
                 ),
               ),
@@ -883,25 +877,46 @@ class _TinderCardState extends State<_TinderCard> {
 
 
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
-          // Le verre dépoli enveloppe le bloc infos : court quand il n'y a
-          // que le prénom, plus haut dès qu'il y a des centres d'intérêt.
+          // Verre dépoli décoratif au bas de la carte : il FOND en douceur
+          // vers le haut (masque dégradé, pas de bord net) et reste concentré
+          // en bas. Il est derrière le texte, qui lui reste net.
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.20),
+            child: IgnorePointer(
+              child: SizedBox(
+                height: 200,
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (rect) => const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.white],
+                    stops: [0.0, 0.55],
+                  ).createShader(rect),
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.14),
+                      ),
+                    ),
                   ),
-                  padding: const EdgeInsets.only(
-                      left: 16, right: 56, top: 14, bottom: 108),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                ),
+              ),
+            ),
+          ),
+
+          // ── Bottom info (net, par-dessus le verre dépoli) ────────────────
+          Positioned(
+            left: 16,
+            right: 56,
+            bottom: 108,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 // Name + flag + online dot
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1003,9 +1018,6 @@ class _TinderCardState extends State<_TinderCard> {
                   ),
                 ],
               ],
-                  ),
-                ),
-              ),
             ),
           ),
 
