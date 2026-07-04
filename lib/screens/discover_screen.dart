@@ -879,16 +879,24 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Gradient bas (transparent → noir, photo visible derrière) ──
+          // ── Effet verre dépoli bas — blur + fondu sombre ───────────────
           Positioned(
             bottom: 0, left: 0, right: 0,
-            child: Container(
-              height: 260,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black],
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(
+                  height: 260,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.72),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
