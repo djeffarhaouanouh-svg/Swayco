@@ -904,13 +904,14 @@ class _TinderCardState extends State<_TinderCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.00, 0.55, 0.70, 0.82, 1.00],
+                    stops: const [0.00, 0.30, 0.55, 0.75, 0.90, 1.00],
                     colors: [
                       Colors.transparent,
-                      Colors.transparent,
-                      const Color(0x12000000),
-                      const Color(0x50000000),
-                      const Color(0xCC000000),
+                      const Color(0x0A000000), // ~0.04 — très léger dès le haut
+                      const Color(0x1A000000), // ~0.10
+                      const Color(0x40000000), // 0.25
+                      const Color(0x80000000), // 0.50
+                      const Color(0xCC000000), // 0.80 — sombre en bas
                     ],
                   ),
                 ),
