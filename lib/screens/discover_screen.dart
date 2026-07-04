@@ -241,9 +241,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    // Card lifted one nav-bar height above the nav bar — action buttons
-    // float on top
-    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom;
+    // Card lifted above the nav bar — action buttons float on top
+    final cardBottom = GlassNavBar.totalReservedHeight + 40 + safeBottom;
     // Buttons just above the nav bar, overlaid on the card's bottom gradient
     final btnBottom = cardBottom + 8;
     final tabBarH = safeTop + _TopTabBar.height;
