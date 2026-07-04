@@ -888,12 +888,12 @@ class _TinderCardState extends State<_TinderCard> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
+                  colors: const [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.45),
+                    Colors.transparent,
                     Colors.black,
                   ],
-                  stops: const [0.0, 0.5, 1.0],
+                  stops: const [0.0, 0.4, 1.0],
                 ),
               ),
             ),
