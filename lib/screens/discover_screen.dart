@@ -907,11 +907,11 @@ class _TinderCardState extends State<_TinderCard> {
                     stops: const [0.00, 0.30, 0.55, 0.75, 0.90, 1.00],
                     colors: [
                       Colors.transparent,
-                      const Color(0x0A000000), // ~0.04 — très léger dès le haut
-                      const Color(0x1A000000), // ~0.10
-                      const Color(0x40000000), // 0.25
-                      const Color(0x80000000), // 0.50
-                      const Color(0xCC000000), // 0.80 — sombre en bas
+                      const Color(0x05000000), // ~0.02 — à peine perceptible
+                      const Color(0x0F000000), // ~0.06
+                      const Color(0x26000000), // ~0.15
+                      const Color(0x54000000), // ~0.33
+                      const Color(0x99000000), // 0.60 — sombre en bas
                     ],
                   ),
                 ),
