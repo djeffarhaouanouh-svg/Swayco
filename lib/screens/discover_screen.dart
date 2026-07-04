@@ -886,23 +886,24 @@ class _TinderCardState extends State<_TinderCard> {
             right: 0,
             bottom: 0,
             child: IgnorePointer(
-              child: SizedBox(
-                height: 240,
-                child: ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  // Transparent en haut -> plein à 35 % : le frost est bien
-                  // présent derrière les infos et fond doucement au-dessus.
-                  shaderCallback: (rect) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.white],
-                    stops: [0.0, 0.35],
-                  ).createShader(rect),
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.18),
+              child: ClipRect(
+                child: BackdropFilter(
+                  // Le blur capte bien la photo (plus de ShaderMask qui
+                  // l'isolait). Le voile est un DÉGRADÉ : transparent en haut
+                  // (bord doux) -> sombre en bas (bien visible).
+                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Container(
+                    height: 230,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.45, 1.0],
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.18),
+                          Colors.black.withValues(alpha: 0.40),
+                        ],
                       ),
                     ),
                   ),
