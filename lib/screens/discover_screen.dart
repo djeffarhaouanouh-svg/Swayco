@@ -378,10 +378,10 @@ class _TopTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           height: height + topInset,
-          color: Colors.black.withValues(alpha: 0.55),
+          color: Colors.transparent,
           padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
           child: Row(
             children: [
@@ -599,9 +599,6 @@ class _StackCard extends StatelessWidget {
 
 const double _kThreshold = 90.0;
 
-const List<String> _kMockInterests = [
-  'Musique', 'Voyage', 'Sport', 'Cuisine', 'Cinéma', 'Photo',
-];
 
 class _DraggableCard extends StatefulWidget {
   const _DraggableCard({
@@ -821,8 +818,6 @@ class _TinderCardState extends State<_TinderCard> {
     final online = !p.hideOnlineStatus &&
         p.lastSeen != null &&
         DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
-    final displayInterests = p.interests.isNotEmpty ? p.interests : _kMockInterests;
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -966,38 +961,36 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Interests (mock fallback when profile has none)
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.apps_rounded, size: 13,
-                        color: Colors.white.withValues(alpha: 0.65)),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Centres d\'intérêt',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
+                // Interests — real data from profile.interests (Supabase)
+                if (p.interests.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.apps_rounded, size: 13,
+                          color: Colors.white.withValues(alpha: 0.65)),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Centres d\'intérêt',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.70),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    for (final tag in displayInterests.take(6))
-                      _InterestChip(
-                        label: p.interests.isNotEmpty
-                            ? interestLabel(tag)
-                            : tag,
-                      ),
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      for (final tag in p.interests.take(6))
+                        _InterestChip(label: interestLabel(tag)),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
