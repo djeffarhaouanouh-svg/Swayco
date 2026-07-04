@@ -557,12 +557,26 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
     return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: _TinderCard(
-          key: ValueKey(card.profile.id),
-          profile: card.profile,
-          photos: card.photos,
+      child: DecoratedBox(
+        // Légère ombre portée sous la carte (décolle le bas de la carte).
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 22,
+              spreadRadius: -2,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: _TinderCard(
+            key: ValueKey(card.profile.id),
+            profile: card.profile,
+            photos: card.photos,
+          ),
         ),
       ),
     );
@@ -1009,6 +1023,9 @@ class _TinderCardState extends State<_TinderCard> {
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
+                          shadows: const [
+                            Shadow(color: Color(0x55000000), blurRadius: 6),
+                          ],
                         ),
                       ),
                     ],
@@ -1107,22 +1124,35 @@ class _InterestChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20),
+    return DecoratedBox(
+      // Légère ombre derrière chaque chip d'intérêt.
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.30),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ),
