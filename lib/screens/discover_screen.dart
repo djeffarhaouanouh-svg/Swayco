@@ -248,7 +248,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final tabBarH = safeTop + _TopTabBar.height;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF18181B),
       extendBody: true,
       body: Stack(
         children: [
@@ -887,20 +887,20 @@ class _TinderCardState extends State<_TinderCard> {
                 height: 420,
                 decoration: BoxDecoration(
                   // Tinder-style scrim: eased fade high on the photo, then
-                  // SOLID black behind the name/chips/buttons zone.
+                  // solid charcoal (not pure black) behind name/chips/buttons.
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.0),
-                      Colors.black.withValues(alpha: 0.0),
-                      Colors.black.withValues(alpha: 0.08),
-                      Colors.black.withValues(alpha: 0.22),
-                      Colors.black.withValues(alpha: 0.45),
-                      Colors.black.withValues(alpha: 0.70),
-                      Colors.black.withValues(alpha: 0.88),
-                      Colors.black,
-                      Colors.black,
+                      const Color(0xFF18181B).withValues(alpha: 0.0),
+                      const Color(0xFF18181B).withValues(alpha: 0.0),
+                      const Color(0xFF18181B).withValues(alpha: 0.08),
+                      const Color(0xFF18181B).withValues(alpha: 0.22),
+                      const Color(0xFF18181B).withValues(alpha: 0.45),
+                      const Color(0xFF18181B).withValues(alpha: 0.70),
+                      const Color(0xFF18181B).withValues(alpha: 0.88),
+                      const Color(0xFF18181B),
+                      const Color(0xFF18181B),
                     ],
                     stops: const [
                       0.0, 0.12, 0.28, 0.42, 0.54, 0.64, 0.72, 0.78, 1.0,
