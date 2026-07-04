@@ -893,9 +893,9 @@ class _TinderCardState extends State<_TinderCard> {
                   // (bord doux) -> sombre en bas (bien visible).
                   filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                   child: Container(
-                    // Plus courte : le flou commence au niveau des intérêts,
-                    // pas dans les cheveux. Voile plus léger qu'avant.
-                    height: 165,
+                    // Le flou démarre JUSTE SOUS le prénom (~108 px du bas) et
+                    // descend jusqu'en bas — il ne couvre que les boutons.
+                    height: 105,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
@@ -903,8 +903,8 @@ class _TinderCardState extends State<_TinderCard> {
                         stops: const [0.0, 0.5, 1.0],
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.10),
-                          Colors.black.withValues(alpha: 0.26),
+                          Colors.black.withValues(alpha: 0.06),
+                          Colors.black.withValues(alpha: 0.16),
                         ],
                       ),
                     ),
