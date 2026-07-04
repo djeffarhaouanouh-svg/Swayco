@@ -486,10 +486,11 @@ class _RootShellState extends State<RootShell> {
                         for (final p in pages) _KeepAlivePage(child: p),
                       ],
                     ),
-                    // iOS → Apple's native liquid-glass tab bar, flush to the
-                    // bottom edge, edge-to-edge. Every other platform keeps the
+                    // Apple-style tab bar flush to the bottom edge on iOS (real
+                    // native UIKit bar) AND on web (Flutter recreation, since a
+                    // browser can't host a native UITabBar). Android keeps the
                     // app's own floating glass pill.
-                    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS)
                       Positioned(
                         left: 0,
                         right: 0,
