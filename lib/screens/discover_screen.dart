@@ -895,6 +895,8 @@ class _TinderCardState extends State<_TinderCard> {
           // Verre dépoli décoratif au bas de la carte : il FOND en douceur
           // vers le haut (masque dégradé, pas de bord net) et reste concentré
           // en bas. Il est derrière le texte, qui lui reste net.
+          // 1. BackdropFilter UNIQUE — child vide, remonte à ~260 px (bien
+          //    au-dessus de la barre) pour une transition imperceptible.
           Positioned(
             left: 0,
             right: 0,
@@ -903,21 +905,32 @@ class _TinderCardState extends State<_TinderCard> {
               child: ClipRect(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                  child: Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.25, 0.6, 1.0],
-                        colors: [
-                          Colors.black.withValues(alpha: 0.00),
-                          Colors.black.withValues(alpha: 0.06),
-                          Colors.black.withValues(alpha: 0.14),
-                          Colors.black.withValues(alpha: 0.22),
-                        ],
-                      ),
-                    ),
+                  child: const SizedBox(height: 260, width: double.infinity),
+                ),
+              ),
+            ),
+          ),
+
+          // 2. Dégradé INDÉPENDANT (jamais dans le child du BackdropFilter).
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: 260,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.00, 0.20, 0.45, 0.70, 1.00],
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x08000000),
+                      Color(0x20000000),
+                      Color(0x50000000),
+                      Color(0x80000000),
+                    ],
                   ),
                 ),
               ),
