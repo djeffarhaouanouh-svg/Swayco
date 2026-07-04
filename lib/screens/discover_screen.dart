@@ -882,18 +882,27 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Gradient bas — fondu progressif transparent → sombre ────────
           Positioned(
             bottom: 0, left: 0, right: 0,
-            child: Container(
-              height: 280,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: const [
-                    Colors.transparent,
-                    Colors.transparent,
-                    Colors.black,
-                  ],
-                  stops: const [0.0, 0.4, 1.0],
+            child: IgnorePointer(
+              child: Container(
+                height: 320,
+                decoration: BoxDecoration(
+                  // Eased scrim — a linear ramp to black reads as a hard band;
+                  // these stops approximate a smoothstep curve like Tinder's.
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.0),
+                      Colors.black.withValues(alpha: 0.0),
+                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.16),
+                      Colors.black.withValues(alpha: 0.32),
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.80),
+                      Colors.black,
+                    ],
+                    stops: const [0.0, 0.30, 0.44, 0.56, 0.67, 0.78, 0.89, 1.0],
+                  ),
                 ),
               ),
             ),
