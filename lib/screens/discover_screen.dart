@@ -859,7 +859,7 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Blur haut (derrière les onglets) ───────────────────────────
+          // ── Blur haut — EXACTEMENT au niveau des onglets (pas plus bas) ──
           Positioned(
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
@@ -867,7 +867,8 @@ class _TinderCardState extends State<_TinderCard> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
-                    height: 90,
+                    height: MediaQuery.paddingOf(context).top +
+                        _TopTabBar.height,
                     color: Colors.black.withValues(alpha: 0.15),
                   ),
                 ),
@@ -886,20 +887,22 @@ class _TinderCardState extends State<_TinderCard> {
             bottom: 0,
             child: IgnorePointer(
               child: SizedBox(
-                height: 200,
+                height: 240,
                 child: ShaderMask(
                   blendMode: BlendMode.dstIn,
+                  // Transparent en haut -> plein à 35 % : le frost est bien
+                  // présent derrière les infos et fond doucement au-dessus.
                   shaderCallback: (rect) => const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [Colors.transparent, Colors.white],
-                    stops: [0.0, 0.55],
+                    stops: [0.0, 0.35],
                   ).createShader(rect),
                   child: ClipRect(
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                       child: Container(
-                        color: Colors.black.withValues(alpha: 0.14),
+                        color: Colors.black.withValues(alpha: 0.18),
                       ),
                     ),
                   ),
