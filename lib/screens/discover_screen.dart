@@ -893,16 +893,18 @@ class _TinderCardState extends State<_TinderCard> {
                   // (bord doux) -> sombre en bas (bien visible).
                   filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                   child: Container(
-                    height: 230,
+                    // Plus courte : le flou commence au niveau des intérêts,
+                    // pas dans les cheveux. Voile plus léger qu'avant.
+                    height: 165,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.45, 1.0],
+                        stops: const [0.0, 0.5, 1.0],
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.18),
-                          Colors.black.withValues(alpha: 0.40),
+                          Colors.black.withValues(alpha: 0.10),
+                          Colors.black.withValues(alpha: 0.26),
                         ],
                       ),
                     ),
