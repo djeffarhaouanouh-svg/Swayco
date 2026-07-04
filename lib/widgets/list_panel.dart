@@ -18,17 +18,13 @@ class ListPanel extends StatelessWidget {
         color: const Color(0xFF0E0E0E),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: SC.glassBorder, width: 1),
-        // Cyan-blue halo around the panel — the Discover card's glow.
+        // Soft neutral drop shadow — classic black look, no blue glow.
         boxShadow: [
           BoxShadow(
-            color: SC.meshCyan.withValues(alpha: 0.45),
-            blurRadius: 44,
-            spreadRadius: -6,
-          ),
-          BoxShadow(
-            color: SC.meshBlue.withValues(alpha: 0.30),
-            blurRadius: 90,
-            spreadRadius: 2,
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 32,
+            spreadRadius: -8,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

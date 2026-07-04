@@ -26,7 +26,6 @@ import '../widgets/appear.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/list_panel.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -449,39 +448,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
-        child: Stack(
+      // Classic flat black, matching the conversation thread — no blue mesh.
+      backgroundColor: const Color(0xFF0E0E0E),
+      body: SafeArea(
+        bottom: false,
+        // Fixed "Messages" band at the top; the conversation list scrolls
+        // underneath it (the band stays pinned, it doesn't scroll away).
+        child: Column(
           children: [
-            // Same cyan-blue ambient wash as the Discover page, so the
-            // Messages page now sits on the app's mesh fond instead of the
-            // old flat black.
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    radius: 1.2,
-                    colors: [
-                      SC.meshCyan.withValues(alpha: 0.50),
-                      SC.meshBlue.withValues(alpha: 0.30),
-                      SC.meshNavy.withValues(alpha: 0.22),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-              ),
-            ),
-            SafeArea(
-              bottom: false,
-              // Fixed "Messages" band at the top; the conversation list scrolls
-              // underneath it (the band stays pinned, it doesn't scroll away).
-              child: Column(
-                children: [
-                  _titleBar,
-                  Expanded(child: _buildBody()),
-                ],
-              ),
-            ),
+            _titleBar,
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
@@ -1145,7 +1121,7 @@ class _InviteToCallRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [SC.accent, SC.meshBlue],
+                    colors: [SC.accent, SC.accentDeep],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
