@@ -869,13 +869,13 @@ class _TinderCardState extends State<_TinderCard> {
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
               child: Container(
-                height: 170,
+                height: 140,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.70),
+                      Colors.black.withValues(alpha: 0.60),
                       Colors.transparent,
                     ],
                   ),
