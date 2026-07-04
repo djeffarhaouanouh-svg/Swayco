@@ -885,6 +885,24 @@ class _TinderCardState extends State<_TinderCard> {
           ),
 
 
+          // ── Verre dépoli au bas de la carte (des intérêts jusqu'en bas) ──
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.20),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ── Bottom info (au-dessus des boutons d'action) ────────────────
           Positioned(
             left: 16,
