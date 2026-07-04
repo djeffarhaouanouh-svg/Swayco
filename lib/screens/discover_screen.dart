@@ -873,11 +873,11 @@ class _TinderCardState extends State<_TinderCard> {
                     Colors.black.withValues(alpha: 0.62),
                     Colors.black.withValues(alpha: 0.20),
                     Colors.transparent,
-                    // bas : fondu transparent → noir opaque (même logique que haut)
-                    Colors.black.withValues(alpha: 0.50),
-                    Colors.black,
+                    // bas : fondu transparent → sombre translucide (photo encore visible)
+                    Colors.black.withValues(alpha: 0.55),
+                    Colors.black.withValues(alpha: 0.78),
                   ],
-                  stops: const [0.0, 0.12, 0.40, 0.68, 1.0],
+                  stops: const [0.0, 0.12, 0.40, 0.65, 1.0],
                 ),
               ),
             ),
