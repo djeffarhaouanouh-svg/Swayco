@@ -212,12 +212,8 @@ class _GlassNavBarState extends State<GlassNavBar>
                     width: slot - 24,
                     height: height - 14,
                     decoration: BoxDecoration(
-                      color: Colors.white
-                          .withValues(alpha: _dragging ? 0.26 : 0.18),
+                      color: Colors.white.withValues(alpha: _dragging ? 1.0 : 0.96),
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
-                      ),
                     ),
                   ),
                 ),
@@ -283,14 +279,14 @@ class _GlassNavBarState extends State<GlassNavBar>
           ),
       );
 
-    const radius = BorderRadius.all(Radius.circular(36));
+    const radius = BorderRadius.all(Radius.circular(26));
 
     // Shader Liquid Glass path (iOS native).
     if (useShaderGlass) {
       return lg.GlassContainer(
         useOwnLayer: true,
         clipBehavior: Clip.antiAlias,
-        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 36),
+        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 26),
         settings: const lg.LiquidGlassSettings(
           blur: 12,
           thickness: 14,
@@ -398,9 +394,9 @@ class _NavItemState extends State<_NavItem>
   Widget build(BuildContext context) {
     // Real spring (physics) bounce on press; the pop adds the grow-then-shrink
     // on selection; the swipe lens magnifies as the pill nears.
-    final color = widget.selected
-        ? Colors.white
-        : Colors.white.withValues(alpha: 0.50);
+    // Selected item sits on the solid white pill → dark icon/label for
+    // contrast; unselected items sit on the dark bar → plain white.
+    final color = widget.selected ? const Color(0xFF15151A) : Colors.white;
     return SpringPress(
       onTap: widget.onTap,
       child: Center(
