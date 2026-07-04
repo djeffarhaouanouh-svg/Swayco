@@ -241,11 +241,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    final navBottom = GlassNavBar.totalReservedHeight + safeBottom;
-    // Buttons sit just above the nav bar
-    final btnBottom = navBottom + 8;
-    // Card stops above the action buttons (8px breathing room)
-    final cardBottom = btnBottom + actionH + 8;
+    // Card extends all the way to the nav bar — action buttons float on top
+    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom;
+    // Buttons just above the nav bar, overlaid on the card's bottom gradient
+    final btnBottom = cardBottom + 8;
     final tabBarH = safeTop + _TopTabBar.height;
 
     return Scaffold(
@@ -865,33 +864,44 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Gradients haut + bas ────────────────────────────────────────
-          Positioned.fill(
-            child: DecoratedBox(
+          // ── Gradient haut (top bar readability) ────────────────────────
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              height: 140,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    // haut : fondu dark → transparent (symétrique du bas)
-                    Colors.black.withValues(alpha: 0.62),
-                    Colors.black.withValues(alpha: 0.20),
+                    Colors.black.withValues(alpha: 0.60),
                     Colors.transparent,
-                    // bas : fondu transparent → sombre translucide (photo encore visible)
-                    Colors.black.withValues(alpha: 0.55),
-                    Colors.black.withValues(alpha: 0.78),
                   ],
-                  stops: const [0.0, 0.12, 0.40, 0.65, 1.0],
                 ),
               ),
             ),
           ),
 
-          // ── Bottom info ─────────────────────────────────────────────────
+          // ── Gradient bas (transparent → noir, photo visible derrière) ──
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Container(
+              height: 260,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Bottom info (au-dessus des boutons d'action) ────────────────
           Positioned(
             left: 16,
             right: 56,
-            bottom: 18,
+            bottom: 108,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1016,7 +1026,7 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Info button ─────────────────────────────────────────────────
           Positioned(
             right: 14,
-            bottom: 20,
+            bottom: 112,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push<void>(
