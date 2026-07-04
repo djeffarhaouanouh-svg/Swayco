@@ -890,10 +890,10 @@ class _TinderCardState extends State<_TinderCard> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.black.withValues(alpha: 0.75),
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.black,
                   ],
-                  stops: const [0.0, 0.45, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -1000,8 +1000,8 @@ class _TinderCardState extends State<_TinderCard> {
                   ),
                   const SizedBox(height: 7),
                   Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       for (final tag in p.interests.take(6))
                         _InterestChip(label: interestLabel(tag)),
