@@ -600,6 +600,10 @@ class _StackCard extends StatelessWidget {
 
 const double _kThreshold = 90.0;
 
+const List<String> _kMockInterests = [
+  'Musique', 'Voyage', 'Sport', 'Cuisine', 'Cinéma', 'Photo',
+];
+
 
 class _DraggableCard extends StatefulWidget {
   const _DraggableCard({
@@ -962,36 +966,49 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Interests — real data from profile.interests (Supabase)
-                if (p.interests.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
+                // Interests — Supabase data, fallback to mock when empty
+                Builder(builder: (_) {
+                  final tags = p.interests.isNotEmpty
+                      ? p.interests
+                      : _kMockInterests;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.apps_rounded, size: 13,
-                          color: Colors.white.withValues(alpha: 0.65)),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Centres d\'intérêt',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.70),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.apps_rounded, size: 13,
+                              color: Colors.white.withValues(alpha: 0.65)),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Centres d\'intérêt',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.70),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 7,
+                        children: [
+                          for (final tag in tags.take(6))
+                            _InterestChip(
+                              label: p.interests.isNotEmpty
+                                  ? interestLabel(tag)
+                                  : tag,
+                            ),
+                        ],
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 7),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      for (final tag in p.interests.take(6))
-                        _InterestChip(label: interestLabel(tag)),
-                    ],
-                  ),
-                ],
+                  );
+                }),
               ],
             ),
           ),
