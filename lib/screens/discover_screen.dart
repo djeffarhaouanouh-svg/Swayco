@@ -294,7 +294,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   );
                 },
               ),
-              SizedBox(height: GlassNavBar.totalReservedHeight + safeBottom),
+              SizedBox(height: GlassNavBar.totalReservedHeight + safeBottom + 16),
             ],
           ),
           // ── Search overlay ────────────────────────────────────────────────
