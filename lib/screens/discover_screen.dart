@@ -884,24 +884,27 @@ class _TinderCardState extends State<_TinderCard> {
             bottom: 0, left: 0, right: 0,
             child: IgnorePointer(
               child: Container(
-                height: 320,
+                height: 420,
                 decoration: BoxDecoration(
-                  // Eased scrim — a linear ramp to black reads as a hard band;
-                  // these stops approximate a smoothstep curve like Tinder's.
+                  // Tinder-style scrim: eased fade high on the photo, then
+                  // SOLID black behind the name/chips/buttons zone.
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.black.withValues(alpha: 0.0),
                       Colors.black.withValues(alpha: 0.0),
-                      Colors.black.withValues(alpha: 0.06),
-                      Colors.black.withValues(alpha: 0.16),
-                      Colors.black.withValues(alpha: 0.32),
-                      Colors.black.withValues(alpha: 0.55),
-                      Colors.black.withValues(alpha: 0.80),
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.22),
+                      Colors.black.withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.72),
+                      Colors.black.withValues(alpha: 0.92),
+                      Colors.black,
                       Colors.black,
                     ],
-                    stops: const [0.0, 0.30, 0.44, 0.56, 0.67, 0.78, 0.89, 1.0],
+                    stops: const [
+                      0.0, 0.14, 0.24, 0.33, 0.41, 0.47, 0.52, 0.58, 1.0,
+                    ],
                   ),
                 ),
               ),
