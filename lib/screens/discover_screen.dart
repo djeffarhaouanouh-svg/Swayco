@@ -241,8 +241,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    // Card lifted above the nav bar — action buttons float on top
-    final cardBottom = GlassNavBar.totalReservedHeight + 28 + safeBottom;
+    // Photo quasi plein écran : à peine décollée de la nav (moins "carte").
+    final cardBottom = GlassNavBar.totalReservedHeight + 8 + safeBottom;
     // Buttons just above the nav bar, overlaid on the card's bottom gradient
     final btnBottom = cardBottom + 8;
     final tabBarH = safeTop + _TopTabBar.height;
@@ -556,27 +556,14 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
+    // Plein écran immersif : plus d'ombre "carte flottante", rayon léger.
     return SizedBox.expand(
-      child: DecoratedBox(
-        // Légère ombre portée sous la carte (décolle le bas de la carte).
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 22,
-              spreadRadius: -2,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: _TinderCard(
-            key: ValueKey(card.profile.id),
-            profile: card.profile,
-            photos: card.photos,
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: _TinderCard(
+          key: ValueKey(card.profile.id),
+          profile: card.profile,
+          photos: card.photos,
         ),
       ),
     );
@@ -904,14 +891,14 @@ class _TinderCardState extends State<_TinderCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.00, 0.30, 0.55, 0.75, 0.90, 1.00],
+                    // Invisible sur les ~68 % du haut, puis montée douce du
+                    // noir uniquement sur le bas (comme Tinder).
+                    stops: const [0.00, 0.68, 0.84, 1.00],
                     colors: [
                       Colors.transparent,
-                      const Color(0x05000000), // ~0.02 — à peine perceptible
-                      const Color(0x0F000000), // ~0.06
-                      const Color(0x26000000), // ~0.15
-                      const Color(0x54000000), // ~0.33
-                      const Color(0x99000000), // 0.60 — sombre en bas
+                      Colors.transparent,
+                      const Color(0x33000000), // 0.20
+                      const Color(0x66000000), // 0.40 — la photo reste visible
                     ],
                   ),
                 ),
@@ -935,11 +922,11 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Bottom info (net, par-dessus le verre dépoli) ────────────────
+          // ── Bottom info (net, posé directement sur la photo) ─────────────
           Positioned(
-            left: 16,
+            left: 12,
             right: 56,
-            bottom: 108,
+            bottom: 104,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -955,10 +942,10 @@ class _TinderCardState extends State<_TinderCard> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          shadows: [Shadow(color: Color(0x55000000), blurRadius: 8)],
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.4,
+                          shadows: [Shadow(color: Color(0x66000000), blurRadius: 10)],
                         ),
                       ),
                     ),
@@ -1051,10 +1038,10 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Info button ─────────────────────────────────────────────────
+          // ── Info button — plus petit et plus discret ────────────────────
           Positioned(
             right: 14,
-            bottom: 112,
+            bottom: 108,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push<void>(
@@ -1066,18 +1053,18 @@ class _TinderCardState extends State<_TinderCard> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
+                      color: Colors.white.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.45),
-                        width: 1.2,
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 1,
                       ),
                     ),
                     child: const Icon(Icons.keyboard_arrow_up_rounded,
-                        color: Colors.white, size: 22),
+                        color: Colors.white, size: 19),
                   ),
                 ),
               ),
