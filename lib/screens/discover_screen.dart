@@ -252,6 +252,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
+          // TEST_DEPLOY_CLAUDE — bandeau de vérification déploiement, à retirer.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                color: Colors.red,
+                height: 60,
+                alignment: Alignment.center,
+                child: const Text(
+                  'TEST_DEPLOY_CLAUDE',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ),
           // ── Card — flotte sous le header (coins arrondis bien visibles) ──
           Positioned(
             top: tabBarH + 8,
