@@ -1185,40 +1185,40 @@ class _SwipeActionBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _GlassButton(
-            size: 50,
-            iconSize: 22,
+            size: 46,
+            iconSize: 20,
             icon: Icons.replay_rounded,
             color: const Color(0xFFFBBF24),
             onTap: onUndo,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           _GlassButton(
-            size: 64,
-            iconSize: 30,
+            size: 58,
+            iconSize: 27,
             icon: Icons.close_rounded,
             color: const Color(0xFFFF4458),
             onTap: onNope,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           _GlassButton(
-            size: 52,
-            iconSize: 24,
+            size: 48,
+            iconSize: 22,
             icon: Icons.star_rounded,
             color: const Color(0xFF38BDF8),
             onTap: onSuperLike,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           _GlassButton(
-            size: 64,
-            iconSize: 30,
+            size: 58,
+            iconSize: 27,
             icon: Icons.favorite_rounded,
             color: const Color(0xFF3DCA72),
             onTap: onLike,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           _GlassButton(
-            size: 50,
-            iconSize: 22,
+            size: 46,
+            iconSize: 20,
             icon: Icons.send_rounded,
             color: const Color(0xFF22D3EE),
             onTap: onMessage,
@@ -1254,15 +1254,15 @@ class _GlassButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
+            // Ombres plus discrètes — effet léger/premium.
             BoxShadow(
-              color: color.withValues(alpha: 0.28),
-              blurRadius: 18,
-              spreadRadius: 1,
+              color: color.withValues(alpha: 0.16),
+              blurRadius: 12,
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -1285,10 +1285,10 @@ class _GlassButton extends StatelessWidget {
                   ],
                   stops: const [0.0, 0.55, 1.0],
                 ),
-                // Bright rim — the Apple liquid-glass edge light.
+                // Contour plus fin — liseré discret.
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.40),
-                  width: 1.2,
+                  color: Colors.white.withValues(alpha: 0.32),
+                  width: 0.8,
                 ),
               ),
               child: Stack(
