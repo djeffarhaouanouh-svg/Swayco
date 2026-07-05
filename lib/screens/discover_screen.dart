@@ -839,22 +839,36 @@ class _TinderCardState extends State<_TinderCard> {
           // Dégradé noir LISSE sur toute la carte (comme Tinder) — aucun
           // rectangle, aucun blur : transparent en haut, fondu progressif
           // jusqu'au noir en bas où reposent nom + boutons.
-          Positioned.fill(
+          // Effet verre Apple (frosted glass) au bas de la carte, à la place
+          // du dégradé noir : blur + frost translucide + liseré haut.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    // Fondu bien visible : commence plus haut et s'assombrit
-                    // franchement vers le bas de la carte.
-                    stops: const [0.00, 0.40, 0.70, 1.00],
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      const Color(0x82000000), // ~0.51
-                      const Color(0xF7000000), // ~0.97 — noir quasi plein
-                    ],
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Container(
+                    height: 128,
+                    decoration: BoxDecoration(
+                      // Frost translucide : transparent en haut (bord doux) ->
+                      // léger voile blanc + soupçon de noir pour la lisibilité.
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.35, 1.0],
+                        colors: [
+                          Colors.white.withValues(alpha: 0.00),
+                          Colors.white.withValues(alpha: 0.08),
+                          Colors.white.withValues(alpha: 0.14),
+                        ],
+                      ),
+                      // Liseré lumineux en haut — l'arête du verre Apple.
+                      border: const Border(
+                        top: BorderSide(color: Color(0x33FFFFFF), width: 1),
+                      ),
+                    ),
                   ),
                 ),
               ),
