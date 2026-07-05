@@ -252,26 +252,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // TEST_DEPLOY_CLAUDE — bandeau de vérification déploiement, à retirer.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Container(
-                color: Colors.red,
-                height: 60,
-                alignment: Alignment.center,
-                child: const Text(
-                  'TEST_DEPLOY_CLAUDE',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900),
-                ),
-              ),
-            ),
-          ),
           // ── Card — flotte sous le header (coins arrondis bien visibles) ──
           Positioned(
             top: tabBarH + 8,
@@ -840,18 +820,6 @@ class _TinderCardState extends State<_TinderCard> {
               right: 8,
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
-
-          // ── Header NOIR PLEIN (comme Tinder) : la photo commence dessous ─
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: MediaQuery.paddingOf(context).top + _TopTabBar.height,
-                color: Colors.black,
-              ),
-            ),
-          ),
-
 
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
           // Verre dépoli décoratif au bas de la carte : il FOND en douceur
