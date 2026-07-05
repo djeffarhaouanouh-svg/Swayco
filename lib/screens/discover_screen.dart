@@ -881,9 +881,9 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
           // Verre dépoli décoratif au bas de la carte : il FOND en douceur
           // vers le haut (masque dégradé, pas de bord net) et reste concentré
-          // en bas. Il est derrière le texte, qui lui reste net.
-          // 1. Dégradé noir sur TOUTE la carte — transparent jusqu'à 55 %,
-          //    puis montée du sombre concentrée dans le bas (rendu Tinder).
+          // Dégradé noir LISSE sur toute la carte (comme Tinder) — aucun
+          // rectangle, aucun blur : transparent en haut, fondu progressif
+          // jusqu'au noir en bas où reposent nom + boutons.
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -891,32 +891,14 @@ class _TinderCardState extends State<_TinderCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    // Invisible sur les ~68 % du haut, puis montée douce du
-                    // noir uniquement sur le bas (comme Tinder).
-                    stops: const [0.00, 0.68, 0.84, 1.00],
+                    stops: const [0.00, 0.50, 0.78, 1.00],
                     colors: [
                       Colors.transparent,
                       Colors.transparent,
-                      const Color(0x33000000), // 0.20
-                      const Color(0x66000000), // 0.40 — la photo reste visible
+                      const Color(0x59000000), // ~0.35
+                      const Color(0xC2000000), // ~0.76 — noir doux en bas
                     ],
                   ),
-                ),
-              ),
-            ),
-          ),
-
-          // 2. Blur TRÈS LÉGER (sigma 9) uniquement derrière les boutons
-          //    (bas ~120 px) — les ~20 % restants. Pas de grosse plaque.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-                  child: const SizedBox(height: 120, width: double.infinity),
                 ),
               ),
             ),
