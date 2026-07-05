@@ -382,13 +382,18 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Settings / filter icon
+              // Swayco logo (remplace l'icône réglages) — marque blanche.
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Icon(Icons.tune_rounded, color: Colors.white, size: 24),
+                  child: Image(
+                    image: AssetImage('assets/icon-fg-transparent.png'),
+                    width: 26,
+                    height: 26,
+                    filterQuality: FilterQuality.medium,
+                  ),
                 ),
               ),
               // Tab pills (scrollable in case overflow)
