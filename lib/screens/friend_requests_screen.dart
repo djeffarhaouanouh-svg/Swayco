@@ -18,7 +18,6 @@ import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/list_panel.dart';
-import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
@@ -283,42 +282,20 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
-        child: Stack(
+      // Full black — plus de mesh bleu.
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: [
-            // Same cyan-blue ambient wash as the Discover / Messages pages.
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    radius: 1.2,
-                    colors: [
-                      SC.meshCyan.withValues(alpha: 0.50),
-                      SC.meshBlue.withValues(alpha: 0.30),
-                      SC.meshNavy.withValues(alpha: 0.22),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
               ),
             ),
-            SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child:
-                          Text(AppStrings.t('demandes_title'), style: SCText.h1),
-                    ),
-                  ),
-                  Expanded(child: _buildBody()),
-                ],
-              ),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
