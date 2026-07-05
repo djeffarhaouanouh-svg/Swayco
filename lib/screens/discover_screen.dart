@@ -241,14 +241,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const actionH = 92.0;
-    // Photo quasi plein écran : à peine décollée de la nav (moins "carte").
-    final cardBottom = GlassNavBar.totalReservedHeight + 8 + safeBottom;
-    // Buttons just above the nav bar, overlaid on the card's bottom gradient
-    final btnBottom = cardBottom + 8;
+    // Boutons SOUS la carte, posés sur le fond noir (juste au-dessus de la nav).
+    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 10;
+    // La carte (photo arrondie) s'arrête AU-DESSUS des boutons.
+    final cardBottom = btnBottom + actionH + 14;
     final tabBarH = safeTop + _TopTabBar.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF18181B),
+      backgroundColor: Colors.black,
       extendBody: true,
       body: Stack(
         children: [
@@ -382,24 +382,27 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Swayco logo (remplace l'icône réglages) — teinté marque.
+              // Wordmark swayco.ai — ".ai" en cyan, comme la page Live.
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: ShaderMask(
-                    blendMode: BlendMode.srcATop,
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF22D3EE), Color(0xFF4ADE80)],
-                    ).createShader(rect),
-                    child: const Image(
-                      image: AssetImage('assets/icon-fg-transparent.png'),
-                      width: 26,
-                      height: 26,
-                      filterQuality: FilterQuality.medium,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'swayco'),
+                        TextSpan(
+                          text: '.ai',
+                          style: TextStyle(color: Color(0xFF22D3EE)),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
@@ -514,12 +517,15 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Photo full-bleed (bord à bord, comme Tinder) : plus de carte flottante.
+    // Carte photo arrondie qui flotte sur le fond noir de la page.
     return SizedBox.expand(
-      child: _TinderCard(
-        key: ValueKey(card.profile.id),
-        profile: card.profile,
-        photos: card.photos,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: _TinderCard(
+          key: ValueKey(card.profile.id),
+          profile: card.profile,
+          photos: card.photos,
+        ),
       ),
     );
   }
@@ -840,12 +846,14 @@ class _TinderCardState extends State<_TinderCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.00, 0.55, 0.80, 1.00],
+                    // Fondu bien visible : commence plus haut et s'assombrit
+                    // franchement vers le bas de la carte.
+                    stops: const [0.00, 0.40, 0.70, 1.00],
                     colors: [
                       Colors.transparent,
                       Colors.transparent,
-                      const Color(0x66000000), // ~0.40
-                      const Color(0xF2000000), // ~0.95 — noir quasi plein
+                      const Color(0x82000000), // ~0.51
+                      const Color(0xF7000000), // ~0.97 — noir quasi plein
                     ],
                   ),
                 ),
@@ -853,11 +861,11 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Bottom info (net, posé directement sur la photo) ─────────────
+          // ── Bottom info (net, en bas de la carte photo) ──────────────────
           Positioned(
-            left: 12,
+            left: 14,
             right: 56,
-            bottom: 104,
+            bottom: 20,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -972,7 +980,7 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Info button — plus petit et plus discret ────────────────────
           Positioned(
             right: 14,
-            bottom: 108,
+            bottom: 24,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push<void>(
