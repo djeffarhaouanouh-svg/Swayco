@@ -404,27 +404,8 @@ class _TopTabBar extends StatelessWidget {
                   ),
                 ),
               ),
-              // Tab pills (scrollable in case overflow)
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var i = 0; i < tabs.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 6),
-                          _TabPill(
-                            label: tabs[i],
-                            active: i == activeIndex,
-                            onTap: () => onTabSelected(i),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              // Onglets retirés — logo à gauche, actions à droite.
+              const Spacer(),
               // Search icon
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -447,42 +428,6 @@ class _TopTabBar extends StatelessWidget {
             ],
           ),
         );
-  }
-}
-
-class _TabPill extends StatelessWidget {
-  const _TabPill({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? Colors.black : Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -870,28 +815,13 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Blur + scrim haut — lisibilité du logo/onglets sur photo claire ─
+          // ── Header NOIR PLEIN (comme Tinder) : la photo commence dessous ─
           Positioned(
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    height: MediaQuery.paddingOf(context).top +
-                        _TopTabBar.height,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.45),
-                          Colors.black.withValues(alpha: 0.10),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              child: Container(
+                height: MediaQuery.paddingOf(context).top + _TopTabBar.height,
+                color: Colors.black,
               ),
             ),
           ),
