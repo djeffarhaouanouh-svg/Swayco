@@ -642,29 +642,57 @@ class _DraggableCardState extends State<_DraggableCard>
     _flyOff(right);
   }
 
+  // Position au pointer-down, pour savoir si le geste a vraiment dépassé le
+  // seuil de drag. Tant que ce n'est pas le cas, on ne bouge pas la carte et
+  // on laisse le tap (changement de photo) passer sans concurrence dans
+  // l'arène de gestes — un simple GestureDetector(onPan...) "gagne" sur le
+  // moindre micro-mouvement (souris web ~1px) et avale tous les taps.
+  Offset? _dragOrigin;
+  bool _dragEngaged = false;
+  static const double _kDragEngageSlop = 6.0;
+
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
     final likeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
     final nopeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
 
-    return GestureDetector(
-      onPanUpdate: (d) {
+    return Listener(
+      onPointerDown: (e) {
+        _dragOrigin = e.position;
+        _dragEngaged = false;
+      },
+      onPointerMove: (e) {
         if (_flying) return;
-        _ctrl.stop();
-        _anim = null;
+        final origin = _dragOrigin;
+        if (!_dragEngaged) {
+          if (origin == null ||
+              (e.position - origin).distance < _kDragEngageSlop) {
+            return; // micro-mouvement : pas encore un drag, laisse le tap gagner
+          }
+          _dragEngaged = true;
+          _ctrl.stop();
+          _anim = null;
+        }
         setState(() {
-          _pos += Offset(d.delta.dx, d.delta.dy * 0.3);
+          _pos += Offset(e.delta.dx, e.delta.dy * 0.3);
           widget.onProgress((_pos.dx.abs() / _kThreshold).clamp(0.0, 1.0));
         });
       },
-      onPanEnd: (_) {
-        if (_flying) return;
+      onPointerUp: (_) {
+        final wasEngaged = _dragEngaged;
+        _dragEngaged = false;
+        _dragOrigin = null;
+        if (!wasEngaged || _flying) return;
         if (_pos.dx.abs() >= _kThreshold) {
           _flyOff(_pos.dx > 0);
         } else {
           _springBack();
         }
+      },
+      onPointerCancel: (_) {
+        _dragEngaged = false;
+        _dragOrigin = null;
       },
       child: Transform.translate(
         offset: _pos,
@@ -812,13 +840,15 @@ class _TinderCardState extends State<_TinderCard> {
               ],
             ),
 
-          // ── Photo dots ─────────────────────────────────────────────────
+          // ── Photo dots — petits, centrés en haut ────────────────────────
           if (photos.length > 1)
             Positioned(
-              top: 8,
-              left: 8,
-              right: 8,
-              child: _PhotoDots(count: photos.length, active: _photoIndex),
+              top: 10,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _PhotoDots(count: photos.length, active: _photoIndex),
+              ),
             ),
 
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
@@ -992,19 +1022,19 @@ class _PhotoDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < count; i++) ...[
           if (i > 0) const SizedBox(width: 3),
-          Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: 3,
-              decoration: BoxDecoration(
-                color: i == active
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(2),
-              ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 18,
+            height: 2.5,
+            decoration: BoxDecoration(
+              color: i == active
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.38),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
         ],
