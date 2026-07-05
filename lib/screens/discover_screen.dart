@@ -252,9 +252,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card — de top:0 à la nav, coins arrondis, fin nette ─────────
+          // ── Card — démarre SOUS le header noir (coins arrondis visibles) ─
           Positioned(
-            top: 0,
+            top: tabBarH,
             left: 0,
             right: 0,
             bottom: cardBottom,
