@@ -252,11 +252,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card — démarre SOUS le header noir (coins arrondis visibles) ─
+          // ── Card — flotte sous le header (coins arrondis bien visibles) ──
           Positioned(
-            top: tabBarH,
-            left: 0,
-            right: 0,
+            top: tabBarH + 8,
+            left: 8,
+            right: 8,
             bottom: cardBottom,
             child: _feedLoading
                 ? const Center(
@@ -520,7 +520,7 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     // Carte photo arrondie qui flotte sur le fond noir de la page.
     return SizedBox.expand(
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: _TinderCard(
           key: ValueKey(card.profile.id),
           profile: card.profile,
