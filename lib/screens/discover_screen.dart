@@ -1191,20 +1191,20 @@ class _GlassButton extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                // Glossy body — brighter top-left, darker bottom-right.
-                gradient: LinearGradient(
+                // Corps verre CYAN — glossy top-left -> plus sombre en bas.
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withValues(alpha: 0.28),
-                    Colors.white.withValues(alpha: 0.08),
-                    Colors.white.withValues(alpha: 0.03),
+                    Color(0x7022D3EE), // cyan ~0.44
+                    Color(0x3322D3EE), // cyan ~0.20
+                    Color(0x1F22D3EE), // cyan ~0.12
                   ],
-                  stops: const [0.0, 0.55, 1.0],
+                  stops: [0.0, 0.55, 1.0],
                 ),
-                // Contour plus fin — liseré discret.
+                // Liseré cyan discret.
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.32),
+                  color: const Color(0x8022D3EE),
                   width: 0.8,
                 ),
               ),
