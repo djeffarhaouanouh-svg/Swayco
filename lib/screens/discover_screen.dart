@@ -382,17 +382,25 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Swayco logo (remplace l'icône réglages) — marque blanche.
+              // Swayco logo (remplace l'icône réglages) — teinté marque.
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Image(
-                    image: AssetImage('assets/icon-fg-transparent.png'),
-                    width: 26,
-                    height: 26,
-                    filterQuality: FilterQuality.medium,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcATop,
+                    shaderCallback: (rect) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF22D3EE), Color(0xFF4ADE80)],
+                    ).createShader(rect),
+                    child: const Image(
+                      image: AssetImage('assets/icon-fg-transparent.png'),
+                      width: 26,
+                      height: 26,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
                 ),
               ),
@@ -862,7 +870,7 @@ class _TinderCardState extends State<_TinderCard> {
               child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
-          // ── Blur haut — EXACTEMENT au niveau des onglets (pas plus bas) ──
+          // ── Blur + scrim haut — lisibilité du logo/onglets sur photo claire ─
           Positioned(
             top: 0, left: 0, right: 0,
             child: IgnorePointer(
@@ -872,7 +880,16 @@ class _TinderCardState extends State<_TinderCard> {
                   child: Container(
                     height: MediaQuery.paddingOf(context).top +
                         _TopTabBar.height,
-                    color: Colors.black.withValues(alpha: 0.15),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.45),
+                          Colors.black.withValues(alpha: 0.10),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
