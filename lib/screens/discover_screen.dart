@@ -556,15 +556,12 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Plein écran immersif : plus d'ombre "carte flottante", rayon léger.
+    // Photo full-bleed (bord à bord, comme Tinder) : plus de carte flottante.
     return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: _TinderCard(
-          key: ValueKey(card.profile.id),
-          profile: card.profile,
-          photos: card.photos,
-        ),
+      child: _TinderCard(
+        key: ValueKey(card.profile.id),
+        profile: card.profile,
+        photos: card.photos,
       ),
     );
   }
