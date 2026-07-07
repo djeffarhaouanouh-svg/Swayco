@@ -989,15 +989,35 @@ class _CallScreenState extends State<CallScreen> {
     if (widget.isCaller && !_hadRemote && outId != null && outId.isNotEmpty) {
       unawaited(IncomingCallApi.broadcastCancel(callId: outId));
     }
-    await widget.translation.detach();
-    await _roomEvents?.dispose();
+    // Bounded: on iOS a WebRTC/CallKit teardown can hang (same class of
+    // unbounded-await bug already fixed on the join path) — without a
+    // timeout here, the user gets stuck on a spinner and has to force-quit
+    // the app to get back in. Best-effort cleanup; the UI always recovers.
+    try {
+      await widget.translation.detach().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[hangup] translation.detach timed out/failed: $e');
+    }
+    try {
+      await _roomEvents?.dispose().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[hangup] roomEvents.dispose timed out/failed: $e');
+    }
     _roomEvents = null;
     final r = _room;
     _room = null;
     if (r != null) {
       r.removeListener(_onRoomChanged);
-      await r.disconnect();
-      await r.dispose();
+      try {
+        await r.disconnect().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('[hangup] room.disconnect timed out/failed: $e');
+      }
+      try {
+        await r.dispose().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('[hangup] room.dispose timed out/failed: $e');
+      }
     }
     // If the call actually connected, show the black "call ended" summary
     // (PDP + flag + minutes + share) instead of popping straight back. A call
