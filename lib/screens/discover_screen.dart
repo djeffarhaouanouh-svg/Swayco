@@ -17,6 +17,8 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
+import '../widgets/flag_border.dart';
+import '../widgets/flag_gradients.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -517,16 +519,25 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Carte photo arrondie qui flotte sur le fond noir de la page.
+    // Carte photo arrondie qui flotte sur le fond noir de la page, cerclée
+    // d'un liseré aux couleurs du drapeau de la langue parlée par le profil.
+    final tinderCard = _TinderCard(
+      key: ValueKey(card.profile.id),
+      profile: card.profile,
+      photos: card.photos,
+    );
+    final country = flagCountryForLanguage(card.profile.language);
     return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: _TinderCard(
-          key: ValueKey(card.profile.id),
-          profile: card.profile,
-          photos: card.photos,
-        ),
-      ),
+      child: country != null
+          ? FlagBorder(
+              country: country,
+              radius: 24,
+              child: tinderCard,
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: tinderCard,
+            ),
     );
   }
 }
