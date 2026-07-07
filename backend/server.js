@@ -328,8 +328,13 @@ setInterval(() => {
 const _limTight = rateLimit({ name: 'ai', windowMs: 60000, max: 30 });
 const _limText = rateLimit({ name: 'text', windowMs: 60000, max: 90 });
 const _limClone = rateLimit({ name: 'clone', windowMs: 60000, max: 6 });
-// Cheaper endpoints (tokens, invites, push) — looser caps.
+// Cheaper endpoints (invites, push) — looser caps.
 const _limLite = rateLimit({ name: 'lite', windowMs: 60000, max: 120 });
+// LiveKit token minting: zero OpenAI/ElevenLabs cost, and shared-IP
+// households (two testers/devices on the same wifi) legitimately burst this
+// on retries/reconnects — give it its own high ceiling instead of sharing
+// the "lite" bucket with invite/notify traffic.
+const _limToken = rateLimit({ name: 'token', windowMs: 60000, max: 600 });
 
 const app = express();
 app.use(cors());
@@ -454,7 +459,7 @@ app.get('/api', (_req, res) => {
  * - sourceLang: this participant's spoken language (BCP-47). Translate the remote participant's speech into this language for this participant to hear.
  * - targetLang: the remote participant's spoken language (BCP-47). Translate this participant's speech into this language for the remote participant to hear.
  */
-app.post('/livekit/token', _limLite, async (req, res) => {
+app.post('/livekit/token', _limToken, async (req, res) => {
   try {
     assertEnv();
   } catch (e) {
