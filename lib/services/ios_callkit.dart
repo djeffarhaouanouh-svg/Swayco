@@ -51,9 +51,37 @@ abstract final class IosCallKit {
             break;
         }
       });
+      // Cold-launch race: `onEvent` is a plain EventChannel broadcast stream
+      // — it does NOT replay events sent before we subscribed. When the app
+      // was fully killed, tapping "Accept" on the native CallKit screen
+      // launches the app AND fulfills the CXAnswerCallAction natively
+      // (AppDelegate.onAccept) well before Dart reaches this `.listen()`
+      // call, so the accept event is silently dropped and the app never
+      // joins — it just sits there while CallKit shows a live "connected"
+      // call. `activeCalls()` reflects the native CallKit state directly
+      // (not the event stream), so any call already marked `isAccepted` at
+      // this point was missed by the listener above; replay it manually.
+      unawaited(_replayMissedAccepts(onAccept));
     }
     // Catch the token if PushKit registered it before we subscribed.
     await _registerToken(userId);
+  }
+
+  /// One-shot catch-up for the cold-launch race described in [start]: reads
+  /// CallKit's own active-call list and fires [onAccept] for anything
+  /// already marked accepted that our listener couldn't have seen. Best
+  /// effort — swallow platform-channel errors, never block startup on it.
+  static Future<void> _replayMissedAccepts(CallKitAction onAccept) async {
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      for (final c in calls) {
+        if (c.isAccepted && c.id.isNotEmpty) {
+          onAccept(c.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('IosCallKit._replayMissedAccepts failed: $e');
+    }
   }
 
   static Future<void> _registerToken(String userId, {int attempts = 8}) async {
