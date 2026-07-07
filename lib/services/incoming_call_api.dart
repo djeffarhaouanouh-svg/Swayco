@@ -276,6 +276,41 @@ abstract final class IncomingCallApi {
     return channel;
   }
 
+  /// Caller-side: tell the callee we gave up on ring [callId] BEFORE they
+  /// answered (hung up while waiting, or the ring timed out) so their phone
+  /// stops ringing immediately instead of waiting out its local ~30 s
+  /// dialog / CallKit timeout. Symmetric to [broadcastDecline]. Best-effort
+  /// — `sendBroadcastMessage` REST-falls-back when the channel isn't joined.
+  static Future<void> broadcastCancel({required String callId}) async {
+    if (!isSupabaseReady || callId.isEmpty) return;
+    try {
+      final channel = _c.channel('call-cancel:$callId');
+      await channel.sendBroadcastMessage(
+        event: 'cancelled',
+        payload: const {},
+      );
+      await _c.removeChannel(channel);
+    } catch (e) {
+      debugPrint('IncomingCallApi.broadcastCancel failed: $e');
+    }
+  }
+
+  /// Callee-side counterpart to [broadcastCancel]: subscribe to the per-call
+  /// channel and fire [onCancelled] when the caller cancels the ring
+  /// [callId] before pickup. Returns the channel so the callee can remove it
+  /// once the ring UI closes.
+  static RealtimeChannel subscribeCancel({
+    required String callId,
+    required void Function() onCancelled,
+  }) {
+    final channel = _c.channel('call-cancel:$callId').onBroadcast(
+          event: 'cancelled',
+          callback: (_) => onCancelled(),
+        );
+    channel.subscribe();
+    return channel;
+  }
+
   /// Subscribe to incoming-call rows for [calleeId]. The returned channel
   /// must be `unsubscribe()`d when the listener tears down (e.g. on sign
   /// out). [onCall] fires for every fresh INSERT.

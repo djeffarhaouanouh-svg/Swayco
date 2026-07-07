@@ -193,15 +193,31 @@ class _RootShellState extends State<RootShell> {
     // Web only: vibrate + flash the tab title until the user answers /
     // dismisses. No-op on native (handled by the OS already).
     CallAlert.start(callerName: callerName);
+    // Caller-cancel: if the caller hangs up before we answer, close this
+    // ring dialog immediately instead of leaving it ringing until the local
+    // 30 s timeout. Mirrors the callee→caller decline broadcast.
+    BuildContext? dialogCtx;
+    final cancelCh = IncomingCallApi.subscribeCancel(
+      callId: call.id,
+      onCancelled: () {
+        final c = dialogCtx;
+        if (c != null && c.mounted) Navigator.of(c).pop(false);
+      },
+    );
     final accepted = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _IncomingCallDialog(
-        callerName: callerName,
-        callerAvatarUrl: caller?.avatarUrl,
-        callerAvatarColor: caller?.avatarColor,
-      ),
+      builder: (ctx) {
+        dialogCtx = ctx;
+        return _IncomingCallDialog(
+          callerName: callerName,
+          callerAvatarUrl: caller?.avatarUrl,
+          callerAvatarColor: caller?.avatarColor,
+        );
+      },
     );
+    dialogCtx = null;
+    unawaited(Supabase.instance.client.removeChannel(cancelCh));
     CallAlert.stop();
     _ringingDialogOpen = false;
     // Either side of the answer collapses the row so the caller knows.

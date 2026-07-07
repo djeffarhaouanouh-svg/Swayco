@@ -980,6 +980,15 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _hangUp() async {
+    // Caller giving up before the callee ever joined: tell their device to
+    // stop ringing NOW (symmetric to the callee's decline broadcast), else
+    // their phone rings on until a local ~30 s timeout. Covers manual
+    // hang-up while waiting, ring-timeout, and the already-declined case
+    // (harmless there — the callee is already gone).
+    final outId = widget.outgoingCallId;
+    if (widget.isCaller && !_hadRemote && outId != null && outId.isNotEmpty) {
+      unawaited(IncomingCallApi.broadcastCancel(callId: outId));
+    }
     await widget.translation.detach();
     await _roomEvents?.dispose();
     _roomEvents = null;
