@@ -803,7 +803,15 @@ abstract final class ProfileApi {
   /// weekly credit-refill check so the rest of the app doesn't have to.
   static Future<RemoteProfile?> fetchById(String id) async {
     if (!isSupabaseReady || id.isEmpty) return null;
-    final row = await _c.from('profiles').select().eq('id', id).maybeSingle();
+    // Bounded: an unbounded await here left the iOS CallKit "Accept" path
+    // (resolveMyIdentity → fetchById) hanging forever when networking was
+    // still coming back up right after a cold launch from a killed app.
+    final row = await _c
+        .from('profiles')
+        .select()
+        .eq('id', id)
+        .maybeSingle()
+        .timeout(const Duration(seconds: 10));
     if (row == null) return null;
     final p = RemoteProfile.fromMap(Map<String, dynamic>.from(row));
     final refilled = await _maybeRefillCredits(p);

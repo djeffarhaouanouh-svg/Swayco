@@ -203,11 +203,17 @@ abstract final class IncomingCallApi {
   static Future<IncomingCall?> fetchById(String callId) async {
     if (!isSupabaseReady || callId.isEmpty) return null;
     try {
+      // Bounded: this sits on the iOS CallKit "accept" fallback path (when
+      // the native push payload didn't carry the room name) — an unbounded
+      // await here left CallKit "connected" with the app never landing on
+      // the call screen if networking was still flaky right after a
+      // cold-launch wake.
       final row = await _c
           .from('incoming_calls')
           .select()
           .eq('id', callId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
       if (row == null) return null;
       return IncomingCall.fromMap(Map<String, dynamic>.from(row));
     } catch (e) {

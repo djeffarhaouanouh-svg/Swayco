@@ -83,19 +83,29 @@ Future<LiveKitTokenResponse> fetchLiveKitToken({
   // from `participant.metadata` to know what language to translate FROM.
   // inviteSig / inviteExp are only set for guest-call rooms (`guest-*`):
   // the backend rejects those rooms unless the signature is valid.
-  final res = await http.post(
-    uri,
-    headers: const {'Content-Type': 'application/json'},
-    body: jsonEncode({
-      'roomName': roomName,
-      'identity': identity,
-      'displayName': displayName,
-      'sourceLang': sourceLang,
-      'targetLang': targetLang,
-      if (inviteSig.isNotEmpty) 'inviteSig': inviteSig,
-      if (inviteExp.isNotEmpty) 'inviteExp': inviteExp,
-    }),
-  );
+  // No timeout here used to mean a flaky connection (e.g. right after an
+  // iOS cold-launch from a killed-app VoIP push, before networking is fully
+  // back up) left this `await` hanging forever — the CallKit "Accept" path
+  // never threw, so it never fell through to end the call or show an error;
+  // it just spun. Bound it so the caller's catch always fires eventually.
+  final res = await http
+      .post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'roomName': roomName,
+          'identity': identity,
+          'displayName': displayName,
+          'sourceLang': sourceLang,
+          'targetLang': targetLang,
+          if (inviteSig.isNotEmpty) 'inviteSig': inviteSig,
+          if (inviteExp.isNotEmpty) 'inviteExp': inviteExp,
+        }),
+      )
+      .timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => throw TokenApiException('livekit/token timed out'),
+      );
   if (res.statusCode != 200) {
     throw TokenApiException(res.body, statusCode: res.statusCode);
   }
