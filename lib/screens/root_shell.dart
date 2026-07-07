@@ -294,6 +294,14 @@ class _RootShellState extends State<RootShell> {
   /// in-call screen.
   Future<void> _onCallKitAccept(String callId) async {
     if (callId.isEmpty) return;
+    // Idempotency guard: on a cold launch, IosCallKit can fire this twice
+    // for the same call — once from the replayed `activeCalls()` catch-up
+    // and once from the `onEvent` stream if the native accept event still
+    // lands after we've subscribed (a real race, not hypothetical). Without
+    // this check both fired concurrently, joining the same room from two
+    // separate Room() instances at once — which is what surfaced as a
+    // ConcurrentModificationError deep in the LiveKit connect path.
+    if (_handledCallIds.contains(callId)) return;
     // Don't let the realtime poll re-open the in-app dialog for the same
     // call we're already answering.
     _handledCallIds.add(callId);
@@ -332,6 +340,7 @@ class _RootShellState extends State<RootShell> {
   /// the caller so their waiting screen stops ringing.
   Future<void> _onCallKitDecline(String callId) async {
     if (callId.isEmpty) return;
+    if (_handledCallIds.contains(callId)) return;
     _handledCallIds.add(callId);
     await IncomingCallApi.broadcastDecline(callId: callId);
     await IncomingCallApi.cancel(callId: callId);
