@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_service.dart';
 import 'supabase_service.dart';
+import 'user_prefs.dart';
 
 /// Translation credits. UI-side we expose these as "crédits" where
 /// 1 crédit = 60 s of translated call, so the per-tier numbers read
@@ -414,11 +416,17 @@ abstract final class ProfileApi {
   /// Write-through: insert or update my profile row keyed by [deviceId].
   /// Safe to call repeatedly — uses upsert on the primary key. Records the
   /// outcome in [lastSync] so the Profile screen can surface failures.
+  /// [insertOnly] → create the row ONLY if it's absent, never touching an
+  /// existing one (`ignoreDuplicates`). Use it for the "guarantee a profile
+  /// row exists so FKs resolve" self-heal: it's safe on a shared account
+  /// (two devices, one profile) because it can't clobber a language / name
+  /// the OTHER device set — it simply no-ops when the row already exists.
   static Future<void> upsertMyProfile({
     required String deviceId,
     required String displayName,
     required String language,
     String gender = '',
+    bool insertOnly = false,
   }) async {
     final now = DateTime.now();
     if (!isSupabaseReady) {
@@ -456,7 +464,9 @@ abstract final class ProfileApi {
       if (g == 'm' || g == 'f' || g == 'x') {
         row['gender'] = g;
       }
-      await _c.from('profiles').upsert(row, onConflict: 'id');
+      await _c
+          .from('profiles')
+          .upsert(row, onConflict: 'id', ignoreDuplicates: insertOnly);
       lastSync = ProfileSyncStatus(attemptedAt: now, ok: true);
     } catch (e) {
       lastSync = ProfileSyncStatus(
@@ -466,6 +476,44 @@ abstract final class ProfileApi {
       );
       debugPrint('ProfileApi.upsertMyProfile failed: $e');
     }
+  }
+
+  /// Whether this launch already guaranteed the caller's `profiles` row.
+  static bool _profileRowEnsured = false;
+
+  /// Guarantee the signed-in user has a `profiles` row before any action
+  /// that FK-references it (send a message, friend request, ring a call).
+  ///
+  /// This is the self-heal for the "insert violates messages_sender_fkey /
+  /// friendships_requester_fkey — key not present in profiles" crash: the
+  /// boot-time profile sync can be skipped when the remote read failed
+  /// (flaky DNS / offline at launch), leaving the account with an auth
+  /// session but no profiles row. Every send site calls this first so the
+  /// FK target always exists.
+  ///
+  /// - insert-only (never clobbers a row the other device wrote — shared
+  ///   account safe),
+  /// - cached per launch so it costs at most one round-trip per session,
+  /// - no-op when Supabase is down, unauthenticated, or local prefs have no
+  ///   name yet (an empty display_name would violate the NOT NULL column).
+  static Future<void> ensureMyProfileRow() async {
+    if (_profileRowEnsured) return;
+    if (!isSupabaseReady || !AuthService.isAuthenticated) return;
+    final uid = AuthService.currentUserId;
+    if (uid.isEmpty) return;
+    final local = await UserPrefs.loadProfile();
+    final name = local?.firstName.trim() ?? '';
+    if (name.isEmpty) return;
+    await upsertMyProfile(
+      deviceId: uid,
+      displayName: name,
+      language: local?.sourceLang.trim() ?? '',
+      gender: local?.gender ?? '',
+      insertOnly: true,
+    );
+    // Only latch success — a failed write (network blip) should retry on the
+    // next action instead of staying silently un-healed for the session.
+    if (lastSync?.ok == true) _profileRowEnsured = true;
   }
 
   /// Upload [bytes] as the user's avatar to Supabase Storage and write the

@@ -24,8 +24,11 @@ abstract final class CallCreditGate {
   /// real call on a transient network blip (the server is the final
   /// authority). Mirrors the "never clobber on a failed read" rule.
   static bool canPlaceCall(RemoteProfile? p) {
-    if (p == null) return true;
-    return p.isUltraPlus || p.creditsSeconds > 0;
+    // Launch/testing: calls are UNLIMITED — never gate placing one on the
+    // credit balance. To restore the paywall, return
+    // `p == null || p.isUltraPlus || p.creditsSeconds > 0` here AND flip
+    // UsageTracker._kDisabled back to `false`.
+    return true;
   }
 
   /// Modal shown when a credit-less user taps a call button. Offers two

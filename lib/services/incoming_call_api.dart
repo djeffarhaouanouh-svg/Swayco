@@ -109,6 +109,9 @@ abstract final class IncomingCallApi {
       );
     }
     try {
+      // The ring row FK-references my profiles row; self-heal it first so a
+      // launch that skipped the profile sync doesn't 23503 here too.
+      await ProfileApi.ensureMyProfileRow();
       final inserted = await _c
           .from('incoming_calls')
           .insert({

@@ -22,7 +22,11 @@ abstract final class UsageTracker {
   /// Production: `false`. Each call deducts seconds against the user's
   /// credit balance via the SECURITY DEFINER RPC the implementation
   /// flushes to every [_tickSeconds] tick.
-  static const bool _kDisabled = false;
+  // Launch/testing: calls + translation are UNLIMITED for everyone. Forces
+  // "infinite credits" so the call screen never cuts translation and nothing
+  // is debited. To restore the 15-min-free-then-paid model, flip this back to
+  // `false` AND revert CallCreditGate.canPlaceCall's unconditional `true`.
+  static const bool _kDisabled = true;
 
   /// Public mirror so callers (CallScreen) can also skip their own
   /// credit gates when tracking is off.

@@ -480,6 +480,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         );
       }
     }
+    // Belt-and-suspenders: the language-sync upsert above is skipped when the
+    // remote profile read failed (offline / flaky DNS at launch), which used
+    // to leave the account with an auth session but NO profiles row — every
+    // later message / friend-request / call-ring then crashed on the FK
+    // (23503 "key not present in table profiles"). Guarantee the row exists
+    // now, insert-only so a shared account's language is never clobbered.
+    unawaited(ProfileApi.ensureMyProfileRow());
     // Once the profile row exists, fire the deferred referral
     // attribution captured at boot. Best-effort — failure is silent so
     // a flaky network never blocks the user from entering the app.

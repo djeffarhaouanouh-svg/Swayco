@@ -207,6 +207,11 @@ abstract final class FriendshipApi {
     if (!isSupabaseReady) return null;
     if (meId.isEmpty || peerId.isEmpty || meId == peerId) return null;
 
+    // Guarantee my own `profiles` row exists first — the insert below FK-
+    // references it (friendships_requester_fkey), and a boot-time sync
+    // skipped on a flaky launch would otherwise crash with 23503.
+    await ProfileApi.ensureMyProfileRow();
+
     // 1. Same-direction row → idempotent.
     final sameDir = await _c
         .from('friendships')
@@ -250,6 +255,10 @@ abstract final class FriendshipApi {
   }) async {
     if (!isSupabaseReady) return null;
     if (meId.isEmpty || peerId.isEmpty || meId == peerId) return null;
+
+    // Same as sendRequest: the accepted-edge insert FK-references my
+    // profiles row, so self-heal it before touching the table.
+    await ProfileApi.ensureMyProfileRow();
 
     final sameDir = await _c
         .from('friendships')

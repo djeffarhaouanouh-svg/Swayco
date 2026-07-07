@@ -339,6 +339,10 @@ abstract final class ChatApi {
     String discoverPhoto = '',
     String recipientLang = '',
   }) async {
+    // The insert FK-references my profiles row (messages_sender_fkey); make
+    // sure it exists first, else a launch that skipped the profile sync
+    // crashes with 23503 "key not present in table profiles".
+    await ProfileApi.ensureMyProfileRow();
     await _client.from('messages').insert({
       'conversation_id': conversationId,
       'sender': senderId,
@@ -418,6 +422,8 @@ abstract final class ChatApi {
           ),
         );
     final url = _client.storage.from('avatars').getPublicUrl(path);
+    // Self-heal my profiles row before the FK-bound insert (see sendMessage).
+    await ProfileApi.ensureMyProfileRow();
     await _client.from('messages').insert({
       'conversation_id': conversationId,
       'sender': senderId,
