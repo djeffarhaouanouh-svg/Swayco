@@ -5,7 +5,6 @@ import 'dart:typed_data';
 
 import 'package:record/record.dart';
 
-import '../services/call_audio.dart';
 import 'grok_mic_streamer_base.dart';
 
 GrokMicStreamer createGrokMicStreamer() => _IoGrokMicStreamer();
@@ -101,13 +100,6 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
       ));
       _audioSub = stream.listen((bytes) {
         if (!_wsOpen) return;
-        // Muting only stopped the real LiveKit voice track — this capture is
-        // a separate mic tap for the STT pipeline, so it kept streaming
-        // ambient noise to Grok while "muted", which then hallucinated
-        // phrases from it and spoke them to the peer. Gate on isSendMuted
-        // only (never isTranslationPlaying here — that gate was already
-        // tried and reverted elsewhere for sticking the mic after unmute).
-        if (isSendMuted) return;
         final level = _meanSquare(bytes);
         final nowMs = DateTime.now().millisecondsSinceEpoch;
         if (level > _vadThreshold) _lastVoiceMs = nowMs;
