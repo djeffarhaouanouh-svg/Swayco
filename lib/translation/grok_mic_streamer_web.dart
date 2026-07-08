@@ -181,18 +181,6 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
         _log('remote track cloned for capture');
       }
 
-      // Abort if stop() ran during the async mic acquisition above (a
-      // re-attach superseding this streamer). Otherwise this superseded
-      // instance would still open its socket + pump, stacking a second STT
-      // session — the cause of the same utterance being translated N times
-      // back-to-back (N parallel sessions, N "upstream OPEN" in the logs).
-      if (!_running) {
-        try {
-          micTrack.stop();
-        } catch (_) {}
-        return;
-      }
-
       // Open WebSocket (with auto-reconnect on close).
       _openWs();
 
