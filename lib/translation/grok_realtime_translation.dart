@@ -55,13 +55,6 @@ class GrokRealtimeTranslation extends ChangeNotifier
   // Dedup: prevent publishing the same translation twice within 3 s.
   String _lastSentTrans = '';
   int _lastSentMs = 0;
-  // Whitespace-normalized form of the last sent text, compared over a wider
-  // window than _lastSentTrans. Grok re-finalizing the same spoken utterance
-  // (VAD re-scoring a pause) can hand back the same phrase with a trailing
-  // space added/dropped ("bien?" vs "bien ?" in French) — that broke both
-  // the delta startsWith() below and the exact-match dedup, so the same
-  // sentence got re-published and re-spoken by the peer 2-3x in a row.
-  String _lastSentNormalized = '';
   // Delta: Grok accumulates the full session context and re-sends the growing
   // translation each time. Track the last full backend text so we publish
   // only the new portion (delta) instead of the entire accumulated string.
@@ -173,7 +166,6 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _speaking = false;
     _lastBackendTrans = '';
     _lastSentTrans = '';
-    _lastSentNormalized = '';
     _lastSentMs = 0;
     try {
       await _player.stop();
@@ -224,20 +216,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
       notifyListeners();
       return;
     }
-    // Wider, whitespace-insensitive dedup: catches the re-finalization case
-    // above where the delta computation didn't collapse to empty because
-    // the repeated phrase differed from _lastBackendTrans by whitespace
-    // only, so transToSend became the whole phrase again instead of ''.
-    final normalized = transToSend.replaceAll(RegExp(r'\s+'), '');
-    if (normalized.isNotEmpty &&
-        normalized == _lastSentNormalized &&
-        nowMs - _lastSentMs < 8000) {
-      DebugOverlay.log('dedup — same delta (normalized) <8s, skip');
-      notifyListeners();
-      return;
-    }
     _lastSentTrans = transToSend;
-    _lastSentNormalized = normalized;
     _lastSentMs = nowMs;
 
     final room = _room;
