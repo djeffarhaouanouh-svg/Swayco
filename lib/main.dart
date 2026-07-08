@@ -95,75 +95,56 @@ Future<void> main() async {
       debugPrint('PlatformDispatcher error: $e');
       return true;
     };
-    // These four don't depend on each other — Supabase keys, Firebase, and
-    // RevenueCat are independent SDK inits, and AppSettings is a local prefs
-    // read. Running them in series here used to add up to ~27s in the worst
-    // case before runApp() — and every second of that delays reaching
-    // RootShell → IosCallKit.start(), which is exactly the window an iOS
-    // CallKit "Accept" from a killed app has to be caught (see
-    // IosCallKit._replayMissedAccepts). Parallel, the wait is bounded by the
-    // SLOWEST of the four instead of their sum.
-    await Future.wait<void>([
-      // Supabase keys come from --dart-define at build time. 15s cap so a
-      // reviewer device on a bad network still boots — the earlier 5s cap
-      // was actively harmful (it cut Hive session recovery mid-flight and
-      // left the singleton with an uninitialised `client`).
-      () async {
-        try {
-          await initSupabase().timeout(const Duration(seconds: 15));
-        } catch (e) {
-          debugPrint('Supabase init slow/failed: $e');
-        }
-      }(),
-      // Native push (FCM). Best-effort — a missing google-services on a
-      // dev build shouldn't crash the app.
-      () async {
-        if (kIsWeb) return;
-        try {
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          ).timeout(const Duration(seconds: 5));
-          // WhatsApp-style incoming calls + chat banners. The background
-          // isolate handler rings full-screen on a data-only call push even
-          // when the app is killed; foreground pushes are shown inline (the
-          // OS suppresses the tray banner while the app is open).
-          FirebaseMessaging.onBackgroundMessage(
-            _firebaseMessagingBackgroundHandler,
-          );
-          FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        } catch (e) {
-          debugPrint('Firebase init slow/failed: $e');
-        }
-      }(),
-      // RevenueCat (in-app subscriptions on iOS/Android). No-op on web, which
-      // keeps the Stripe checkout. Best-effort — a store hiccup mustn't gate
-      // boot. Configures anonymously here (no appUserId tied to the Supabase
-      // session yet), so it has no ordering dependency on Supabase init.
-      () async {
-        try {
-          await RevenueCat.init().timeout(const Duration(seconds: 5));
-        } catch (e) {
-          debugPrint('RevenueCat init slow/failed: $e');
-        }
-      }(),
-      // Seed the hide-online cache so presence renders are correct on
-      // the first frame. 2s cap — SharedPreferences must never block.
-      () async {
-        try {
-          await AppSettings.hydrate().timeout(const Duration(seconds: 2));
-        } catch (e) {
-          debugPrint('AppSettings hydrate slow/failed: $e');
-        }
-      }(),
-    ]);
+    // Supabase keys come from --dart-define at build time. 15s cap so a
+    // reviewer device on a bad network still boots — the earlier 5s cap
+    // was actively harmful (it cut Hive session recovery mid-flight and
+    // left the singleton with an uninitialised `client`).
+    try {
+      await initSupabase().timeout(const Duration(seconds: 15));
+    } catch (e) {
+      debugPrint('Supabase init slow/failed: $e');
+    }
     // Remote config (kill-switches / tunables like the online badge) —
     // best-effort, non-blocking; widgets rebuild via RemoteConfig.version.
     unawaited(RemoteConfig.load());
+    // Native push (FCM). Best-effort — a missing google-services on a
+    // dev build shouldn't crash the app.
+    if (!kIsWeb) {
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(const Duration(seconds: 5));
+        // WhatsApp-style incoming calls + chat banners. The background
+        // isolate handler rings full-screen on a data-only call push even
+        // when the app is killed; foreground pushes are shown inline (the
+        // OS suppresses the tray banner while the app is open).
+        FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler,
+        );
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      } catch (e) {
+        debugPrint('Firebase init slow/failed: $e');
+      }
+    }
+    // RevenueCat (in-app subscriptions on iOS/Android). No-op on web, which
+    // keeps the Stripe checkout. Best-effort — a store hiccup mustn't gate boot.
+    try {
+      await RevenueCat.init().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('RevenueCat init slow/failed: $e');
+    }
     // Kokoro local TTS: start model download in background so it's ready
     // before the first call. Native-only; KokoroService.init() is a no-op
     // on web. ~21 MB first download, then loads the ONNX session (~1–3 s).
     if (!kIsWeb) {
       unawaited(KokoroService.instance.init());
+    }
+    // Seed the hide-online cache so presence renders are correct on
+    // the first frame. 2s cap — SharedPreferences must never block.
+    try {
+      await AppSettings.hydrate().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('AppSettings hydrate slow/failed: $e');
     }
     // Analytics for the admin dashboard. Wrapped because a flaky
     // PlatformDispatcher.locale read on a niche device shouldn't gate
