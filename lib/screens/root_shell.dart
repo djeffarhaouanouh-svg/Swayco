@@ -61,6 +61,15 @@ class _RootShellState extends State<RootShell> {
   /// same ring. Cleared lazily; bounded by call rate so it won't blow up.
   final Set<String> _handledCallIds = {};
 
+  /// True from the moment a call join STARTS until its CallScreen is popped.
+  /// A hard gate against stacking call screens: no matter how many times a
+  /// join is triggered (CallKit accept event + cold-launch replay, the poll,
+  /// the realtime channel, or a caller that re-rings with fresh call ids),
+  /// only ONE CallScreen can ever be on the stack. This is what stops the
+  /// "several call pages to close" pile-up — each extra join is dropped while
+  /// one is already in flight or on screen.
+  bool _callScreenActive = false;
+
   /// Guards the one-shot coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
 
@@ -234,6 +243,15 @@ class _RootShellState extends State<RootShell> {
   }
 
   Future<void> _joinCallRoom(IncomingCall call) async {
+    // One call screen at a time. If a join is already in flight or a
+    // CallScreen is already up, drop this one — otherwise every re-triggered
+    // join (accept event + replay, poll, realtime, caller re-ring) pushes
+    // another screen and they stack up.
+    if (_callScreenActive) {
+      debugPrint('[call] join ignored — a call screen is already active');
+      return;
+    }
+    _callScreenActive = true;
     try {
       // Resolve my name + spoken language the SAME robust way the caller does
       // (local prefs → Supabase fallback). The old raw profile fetch could
@@ -284,6 +302,11 @@ class _RootShellState extends State<RootShell> {
           content: Text(AppStrings.t('cant_join_call', args: {'msg': '$e'})),
         ),
       );
+    } finally {
+      // Released only once the CallScreen has been popped (the await above
+      // completes on pop) or the join failed — so the next incoming call can
+      // open a fresh screen.
+      _callScreenActive = false;
     }
   }
 
