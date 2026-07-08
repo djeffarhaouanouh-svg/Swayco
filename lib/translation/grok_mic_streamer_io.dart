@@ -57,6 +57,18 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
         return;
       }
       final ws = await WebSocket.connect(wsUrl.toString());
+      // Abort if we were stop()'d during the async connect above. Without
+      // this, a streamer superseded by a re-attach (detach → stop while this
+      // connect was still pending) would still go on to open its socket and
+      // start a SECOND capture — a zombie session. Stacking a few of those
+      // is exactly why the same utterance got translated N times back-to-back
+      // (N parallel STT sessions on one call, N "upstream OPEN" in the logs).
+      if (!_running) {
+        try {
+          await ws.close();
+        } catch (_) {}
+        return;
+      }
       _ws = ws;
       _wsOpen = true;
       ws.listen(
@@ -98,6 +110,15 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
         noiseSuppress: true,
         autoGain: true,
       ));
+      // Same abort-on-supersede guard as after connect above: if stop() ran
+      // while startStream() was pending, don't wire up a capture that a newer
+      // streamer has already replaced.
+      if (!_running) {
+        try {
+          await _rec.stop();
+        } catch (_) {}
+        return;
+      }
       _audioSub = stream.listen((bytes) {
         if (!_wsOpen) return;
         final level = _meanSquare(bytes);
