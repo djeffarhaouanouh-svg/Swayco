@@ -677,6 +677,13 @@ class TtsPlayer {
     }
   }
 
+  /// Fires when the current utterance has finished playing.
+  ///
+  /// [speak] returns as soon as playback *starts* — audioplayers' `play()` does
+  /// not await the end of the clip. Callers that need to know when the speaker
+  /// actually goes quiet (the in-call half-duplex gate) listen here.
+  Stream<void> get onPlaybackComplete => _player.onPlayerComplete;
+
   Future<void> stop() async {
     try {
       await _player.stop();

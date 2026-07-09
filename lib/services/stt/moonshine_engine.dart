@@ -15,7 +15,11 @@ import 'stt_engine_native.dart';
 /// KV-cached decoder would be asymptotically faster, but utterances here are
 /// VAD-clipped to a few seconds (tens of tokens) and the uncached graph avoids
 /// threading a dozen past_key_values tensors through dart:ffi by hand.
-class MoonshineEngine implements SttEngine {
+///
+/// A clip engine, not a streaming one — the encoder attends over the whole
+/// segment. It therefore inherits [SttEngine]'s no-op streaming members (hence
+/// `extends`, not `implements`) and is driven by the caller's VAD.
+class MoonshineEngine extends SttEngine {
   OrtSession? _encoder;
   OrtSession? _decoder;
   MoonshineTokenizer? _tok;

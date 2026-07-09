@@ -1,0 +1,34 @@
+// libvosk — built by scripts/build_libvosk_ios.sh into ios/Frameworks/libvosk.a
+//
+// VoskEngine resolves its symbols at runtime through DynamicLibrary.process(),
+// so nothing in Dart or Swift references vosk_* at link time. That takes TWO
+// flags, not one, and getting only the first is a green build that crashes with
+// "Failed to lookup symbol" on the first call:
+//
+//   -force_load  pulls every member of the archive in. Needed on its own account
+//                because OpenFST registers its FST types from global
+//                constructors that nothing references either; without it those
+//                objects are never pulled and model loading fails at runtime.
+//
+//   -u _vosk_*   marks each entry point as a dead-strip ROOT. The Runner target
+//                builds with DEAD_CODE_STRIPPING=YES, and dead-stripping runs
+//                *after* -force_load: the objects get loaded, then every vosk_*
+//                function is removed as unreachable from _main. Verified: with
+//                -force_load alone the binary keeps Kaldi's static initialisers
+//                and drops all ten API symbols.
+//
+// Keep this list in sync with the lookupFunction calls in
+// lib/services/stt/vosk_engine.dart, and re-check the APP binary — not the
+// archive — after building:
+//
+//   nm -gU build/ios/iphoneos/Runner.app/Runner | grep vosk_model_new
+//
+// -lc++        : Kaldi/OpenFST are C++; Runner is otherwise ObjC/Swift.
+// Accelerate   : Kaldi's BLAS/LAPACK (makefiles/ios.mk links it).
+//
+// Included from Debug.xcconfig and Release.xcconfig, the base configs of the
+// Runner target only (RunnerTests has none).
+
+VOSK_KEEP = -u _vosk_model_new -u _vosk_model_free -u _vosk_recognizer_new -u _vosk_recognizer_accept_waveform_f -u _vosk_recognizer_result -u _vosk_recognizer_partial_result -u _vosk_recognizer_final_result -u _vosk_recognizer_reset -u _vosk_recognizer_free -u _vosk_set_log_level
+
+VOSK_LDFLAGS = -force_load $(SRCROOT)/Frameworks/libvosk.a $(VOSK_KEEP) -lc++ -framework Accelerate

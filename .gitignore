@@ -93,3 +93,7 @@ xxxx/
 
 # libvosk binaries — fetched by scripts/fetch_libvosk_android.sh (16 MB)
 android/app/src/main/jniLibs/
+
+# libvosk for iOS — built by scripts/build_libvosk_ios.sh (large static lib)
+build/libvosk-ios/
+ios/Frameworks/libvosk.a

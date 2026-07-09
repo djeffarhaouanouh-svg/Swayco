@@ -81,6 +81,31 @@ class SttService {
     }
   }
 
+  /// True when the loaded engine consumes frames and endpoints utterances
+  /// itself (Vosk). False for a clip engine the caller must segment (Moonshine).
+  bool get isStreaming => _engine?.isStreaming ?? false;
+
+  /// Feed one frame to a streaming engine. 16 kHz mono, samples in [-1, 1].
+  Future<SttChunk> acceptFrame(Float32List samples16k) async {
+    final engine = _engine;
+    if (kIsWeb || engine == null || !engine.isReady) return SttChunk.empty;
+    return engine.acceptFrame(samples16k);
+  }
+
+  /// Close the utterance in progress and return it.
+  Future<String> flush() async {
+    final engine = _engine;
+    if (kIsWeb || engine == null || !engine.isReady) return '';
+    return engine.flush();
+  }
+
+  /// Drop decoder state for audio we deliberately discarded.
+  Future<void> reset() async {
+    final engine = _engine;
+    if (kIsWeb || engine == null || !engine.isReady) return;
+    return engine.reset();
+  }
+
   /// Transcribe one VAD-clipped utterance. 16 kHz mono, samples in [-1, 1].
   /// Returns '' when the model isn't ready or nothing was recognised.
   Future<String> transcribe(Float32List samples16k) async {

@@ -126,6 +126,10 @@ class KokoroService {
     }
   }
 
+  /// Fires when a [speak] utterance finishes playing. [speak] itself returns at
+  /// playback *start*, so this is the only signal for "the speaker is quiet now".
+  Stream<void> get onPlaybackComplete => _player.onPlaybackComplete;
+
   Future<void> stop() async {
     if (kIsWeb) return;
     await _player.stop();

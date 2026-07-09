@@ -847,20 +847,36 @@ class _CallScreenState extends State<CallScreen> {
       try {
         final voice = KokoroService.defaultVoiceFor(lang);
         await kokoro.ensureLanguageInstalled(lang);
-        await kokoro.speak(text: text, languageCode: lang, voice: voice);
+        // Half-duplex: hold the mic shut for the window this plays out the
+        // loudspeaker, or our own STT transcribes it and ships it back to the
+        // peer. Subscribe before speak(): a short clip can finish before we
+        // reach the await, and `.first` on a completion already missed hangs.
+        final done = kokoro.onPlaybackComplete.first;
+        markTranslationPlaying(textLength: text.length);
+        try {
+          await kokoro.speak(text: text, languageCode: lang, voice: voice);
+          // speak() returns at playback START, not end.
+          await done.timeout(const Duration(seconds: 15));
+        } finally {
+          markTranslationDone();
+        }
         return;
       } catch (e) {
         debugPrint('[kokoro] speak error: $e');
       }
     }
-    // Kokoro not ready — fall back to device TTS.
+    // Kokoro not ready — fall back to device TTS. flutter_tts speak() also
+    // returns early, so here the gate's safety timer is what covers playback.
     try {
       if (lang.isNotEmpty) {
         try { await _deviceTts.setLanguage(lang); } catch (_) {}
       }
+      markTranslationPlaying(textLength: text.length);
       await _deviceTts.stop();
       await _deviceTts.speak(text);
-    } catch (_) {}
+    } catch (_) {
+      markTranslationDone();
+    }
   }
 
   Future<void> _speakDeviceTts(String text, String lang) async {

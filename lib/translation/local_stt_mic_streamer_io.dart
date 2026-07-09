@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:record/record.dart';
 
+import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
 import '../services/stt/stt_service.dart';
 import '../services/translation_api.dart';
@@ -43,13 +44,25 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   Object? _localTrack;
   void Function(String partial)? _onPartial;
 
-  /// Accumulates the current utterance's samples in [-1, 1].
+  /// Accumulates the current utterance's samples in [-1, 1]. Clip engines only:
+  /// a streaming engine holds this state inside its own decoder.
   final List<double> _utterance = [];
   int _lastVoiceMs = 0;
 
-  // VAD (mean-square). Same threshold as the x.ai streamer; the hangover is
-  // shorter because it now decides when to *decode*, not merely when to send —
-  // 1.2 s of trailing silence would show up directly as latency.
+  /// True while the mute / half-duplex gate is dropping audio. Edge-triggered so
+  /// we reset the streaming decoder once on entry, not on every dropped frame.
+  bool _gated = false;
+
+  // VAD (mean-square).
+  //
+  // For a STREAMING engine (Vosk) this no longer segments anything — Kaldi's own
+  // endpointer does, via accept_waveform's return value. All it still does is
+  // decide when the mic has been quiet long enough to release (doze), which is
+  // purely a battery concern.
+  //
+  // For a CLIP engine (Moonshine) it is load-bearing: it is what decides when to
+  // decode. The hangover is shorter than the x.ai streamer's 1.2 s because that
+  // trailing silence would show up directly as latency.
   static const double _vadThreshold = 0.0002;
   static const int _silenceFlushMs = 700;
 
@@ -192,6 +205,11 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     if (_dozing) return;
     _dozing = true;
     _utterance.clear();
+    // 20 s of silence: a streaming decoder endpointed long ago, but reset so no
+    // stale hypothesis survives the gap until wake().
+    if (SttService.instance.isStreaming && _modelReady) {
+      await SttService.instance.reset();
+    }
     await _audioSub?.cancel();
     _audioSub = null;
     try {
@@ -219,6 +237,40 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError,
   ) {
+    // Two reasons to throw this buffer away rather than transcribe it:
+    //
+    //  isSendMuted        — the user muted. Muting the LiveKit track only
+    //                       silences the raw voice; this is a separate
+    //                       AudioRecorder, so without this the peer keeps
+    //                       hearing the translation of everything they say.
+    //  isTranslationPlaying — a translation is coming out of our own
+    //                       loudspeaker. AEC alone has not proven enough here:
+    //                       the TTS speaks the language our STT is listening
+    //                       for, so any residual echo transcribes cleanly and
+    //                       gets sent back to the peer, who answers it. Costs
+    //                       barge-in: you cannot interrupt a translation.
+    //
+    // Keep _lastVoiceMs fresh rather than just returning: it stops us flushing
+    // the half-captured utterance we were holding, and it stops the doze timer.
+    // Dozing here would be a trap — wake() is driven by LiveKit's
+    // ActiveSpeakersChangedEvent, which never fires while its mic is disabled,
+    // so a doze that began during mute would never be woken.
+    if (isSendMuted || isTranslationPlaying) {
+      if (!_gated) {
+        _gated = true;
+        _utterance.clear();
+        // A streaming decoder is holding a half-decoded phrase. Drop it: the
+        // words spoken over our own TTS are the barge-in we already gave up,
+        // and letting them survive would splice them onto the next utterance.
+        if (SttService.instance.isStreaming && _modelReady) {
+          unawaited(SttService.instance.reset());
+        }
+      }
+      _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
+      return;
+    }
+    _gated = false;
+
     final samples = _toFloat32(bytes);
     if (samples.isEmpty) return;
 
@@ -226,6 +278,15 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final voiced = level > _vadThreshold;
     if (voiced) _lastVoiceMs = nowMs;
+
+    // Streaming engine: hand every frame straight to the decoder. It endpoints
+    // for itself, so nothing here segments; the VAD survives only to decide
+    // when the mic has been quiet long enough to release.
+    if (SttService.instance.isStreaming) {
+      if (_modelReady) unawaited(_feed(samples, onTranslation, onError));
+      if (nowMs - _lastVoiceMs >= _dozeAfterMs) unawaited(_doze());
+      return;
+    }
 
     // Buffer through the hangover window so trailing consonants aren't clipped;
     // outside it, silence is discarded rather than padding the utterance.
@@ -263,6 +324,26 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     unawaited(_recognizeAndTranslate(samples, onTranslation, onError));
   }
 
+  /// Streaming path: one frame in, partials out, and a finished utterance
+  /// whenever Kaldi's endpointer closes one.
+  Future<void> _feed(
+    Float32List samples,
+    void Function(String, String, String, String) onTranslation,
+    void Function(String)? onError,
+  ) async {
+    try {
+      final chunk = await SttService.instance.acceptFrame(samples);
+      if (chunk.partial.isNotEmpty) _onPartial?.call(chunk.partial);
+      if (chunk.hasFinal) {
+        DebugOverlay.log('stt final="${chunk.finalText}"');
+        await _translateAndSend(chunk.finalText, onTranslation);
+      }
+    } catch (e) {
+      onError?.call('stt:$e');
+    }
+  }
+
+  /// Clip path (Moonshine): decode the whole VAD-clipped utterance at once.
   Future<void> _recognizeAndTranslate(
     Float32List samples,
     void Function(String, String, String, String) onTranslation,
@@ -272,20 +353,30 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       final orig = await SttService.instance.transcribe(samples);
       if (orig.trim().isEmpty) return;
       DebugOverlay.log('stt orig="$orig"');
-
-      final trans = await fetchTextTranslation(
-        text: orig,
-        from: _sourceLang,
-        to: _targetLang,
-      );
-      if (trans.trim().isEmpty) return;
-
-      // audioB64 empty: no TTS is generated here. The peer receives the text as
-      // a `kokoro` packet and synthesises it locally, in its own language.
-      onTranslation(orig, trans, _targetLang, '');
+      await _translateAndSend(orig, onTranslation);
     } catch (e) {
       onError?.call('stt:$e');
     }
+  }
+
+  Future<void> _translateAndSend(
+    String orig,
+    void Function(String, String, String, String) onTranslation,
+  ) async {
+    final trans = await fetchTextTranslation(
+      text: orig,
+      from: _sourceLang,
+      to: _targetLang,
+    );
+    if (trans.trim().isEmpty) return;
+
+    // The round trip spans hundreds of ms. An utterance that closed just before
+    // the user hit mute must not surface after it.
+    if (isSendMuted) return;
+
+    // audioB64 empty: no TTS is generated here. The peer receives the text as
+    // a `kokoro` packet and synthesises it locally, in its own language.
+    onTranslation(orig, trans, _targetLang, '');
   }
 
   Float32List _toFloat32(Uint8List bytes) {
@@ -309,9 +400,18 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
   @override
   Future<void> stop() async {
+    // The engine outlives this streamer (SttService caches the loaded model),
+    // so leave its decoder clean for the next call rather than letting the last
+    // half-utterance of this one prefix it.
+    if (_modelReady && SttService.instance.isStreaming) {
+      try {
+        await SttService.instance.reset();
+      } catch (_) {}
+    }
     _running = false;
     _modelReady = false;
     _dozing = false;
+    _gated = false;
     _utterance.clear();
     _onTranslation = null;
     _onError = null;

@@ -1,1 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+#include "Vosk.xcconfig"
+
+// $(inherited) keeps the Pods-Runner flags included above — dropping it would
+// unlink every CocoaPods dependency.
+OTHER_LDFLAGS = $(inherited) $(VOSK_LDFLAGS)

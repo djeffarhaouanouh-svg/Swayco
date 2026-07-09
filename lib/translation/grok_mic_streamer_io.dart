@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:record/record.dart';
 
+import '../services/call_audio.dart';
 import 'grok_mic_streamer_base.dart';
 import 'local_stt_mic_streamer_io.dart';
 
@@ -125,6 +126,11 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
       ));
       _audioSub = stream.listen((bytes) {
         if (!_wsOpen) return;
+        // Mute stops the translation, not just the LiveKit voice track; the
+        // half-duplex gate keeps our own TTS out of the transcript. Same two
+        // guards the on-device streamer applies — this path must not be the
+        // hole they leak through when the fallback kicks in.
+        if (isSendMuted || isTranslationPlaying) return;
         final level = _meanSquare(bytes);
         final nowMs = DateTime.now().millisecondsSinceEpoch;
         if (level > _vadThreshold) _lastVoiceMs = nowMs;
