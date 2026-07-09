@@ -59,11 +59,29 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   /// SECOND capture of a mic LiveKit already holds, which is exactly the kind of
   /// failure that shows up as a silent, well-behaved stream of zeroes.
   int _frames = 0;
+
+  /// Last partial we surfaced, so we don't log or re-emit an unchanged one.
   String _lastPartial = '';
 
-  /// `flush` is destructive; the VAD backstop and the half-duplex gate can both
-  /// reach for it on the same frame.
-  bool _flushing = false;
+  /// True while the decoder holds an un-closed hypothesis. Separate from
+  /// [_lastPartial] on purpose: that one is display state, this one is the
+  /// backstop's trigger, and conflating them made a stale partial re-arm a
+  /// flush that then returned "" from an already-finalised recognizer.
+  bool _hasPending = false;
+
+  /// Every operation that touches the recognizer runs through this chain.
+  /// `acceptFrame` and `flush` mutate the same native decoder, and both used to
+  /// be fired unawaited from the audio callback — so they interleaved across
+  /// their await points. Networked translation deliberately stays OFF the chain:
+  /// awaiting an HTTP round trip here stalled the next utterance's flush, which
+  /// is exactly why only the first sentence of a pair was ever sent.
+  Future<void> _sttChain = Future.value();
+
+  void _serialize(Future<void> Function() op) {
+    _sttChain = _sttChain
+        .then((_) => op())
+        .catchError((Object e) => DebugOverlay.log('stt op error: $e'));
+  }
 
   // VAD (mean-square).
   //
@@ -224,8 +242,10 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     if (_dozing) return;
     _dozing = true;
     _utterance.clear();
-    // 20 s of silence: a streaming decoder endpointed long ago, but reset so no
-    // stale hypothesis survives the gap until wake().
+    // 20 s of silence: the VAD backstop flushed long ago, so nothing is lost by
+    // resetting — but do it so no stale hypothesis survives the gap until wake().
+    _hasPending = false;
+    _lastPartial = '';
     if (SttService.instance.isStreaming && _modelReady) {
       await SttService.instance.reset();
     }
@@ -279,17 +299,18 @@ class LocalSttMicStreamer implements GrokMicStreamer {
         _gated = true;
         _utterance.clear();
         if (SttService.instance.isStreaming && _modelReady) {
-          if (isSendMuted) {
-            // Muted: whatever is half-decoded was said in confidence. Drop it.
-            DebugOverlay.log('stt gate: muted — dropping partial');
-            unawaited(SttService.instance.reset());
-          } else {
-            // A translation just started playing. The words already in the
-            // decoder were spoken BEFORE it did, so they are legitimate —
-            // resetting here is what silently ate them.
-            DebugOverlay.log('stt gate: tts playing — flushing partial');
-            unawaited(_flushAndSend(onTranslation));
-          }
+          // Either way, whatever the decoder holds was spoken BEFORE the gate
+          // closed — before the mute was pressed, before our own TTS started.
+          // Those words were said out loud, on purpose, to be heard. Flush and
+          // send them. Resetting here is what silently ate the last sentence
+          // before every mute.
+          //
+          // `force` is needed for the mute case: _translateAndSend otherwise
+          // refuses to publish anything while isSendMuted, which is the right
+          // rule for audio captured *after* the press, not before it.
+          DebugOverlay.log(
+              'stt gate (${isSendMuted ? "muted" : "tts"}) — flushing what was already said');
+          _serialize(() => _flushAndSend(onTranslation, force: true));
         }
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
@@ -320,13 +341,15 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     // whenever it fires first, which is the common case mid-conversation.
     if (SttService.instance.isStreaming) {
       if (_modelReady) {
-        unawaited(_feed(samples, onTranslation, onError));
+        _serialize(() => _feed(samples, onTranslation, onError));
 
-        final pendingSilence =
-            _lastPartial.isNotEmpty && !voiced && nowMs - _lastVoiceMs >= _silenceFlushMs;
-        if (pendingSilence && !_flushing) {
+        if (_hasPending && !voiced && nowMs - _lastVoiceMs >= _silenceFlushMs) {
+          // Claim it here, synchronously, before the flush is even queued: two
+          // frames arriving back-to-back in silence would otherwise both queue a
+          // flush, and the second returns "" from a recognizer already finalised.
+          _hasPending = false;
           DebugOverlay.log('stt vad backstop: ${_silenceFlushMs}ms silence, forcing flush');
-          unawaited(_flushAndSend(onTranslation));
+          _serialize(() => _flushAndSend(onTranslation));
         }
       }
       if (nowMs - _lastVoiceMs >= _dozeAfterMs) unawaited(_doze());
@@ -378,15 +401,20 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   ) async {
     try {
       final chunk = await SttService.instance.acceptFrame(samples);
-      if (chunk.partial.isNotEmpty && chunk.partial != _lastPartial) {
-        _lastPartial = chunk.partial;
-        DebugOverlay.log('stt partial="${chunk.partial}"');
-        _onPartial?.call(chunk.partial);
+      if (chunk.partial.isNotEmpty) {
+        _hasPending = true;
+        if (chunk.partial != _lastPartial) {
+          _lastPartial = chunk.partial;
+          DebugOverlay.log('stt partial="${chunk.partial}"');
+          _onPartial?.call(chunk.partial);
+        }
       }
       if (chunk.hasFinal) {
+        _hasPending = false;
         _lastPartial = '';
         DebugOverlay.log('stt final="${chunk.finalText}" → translating');
-        await _translateAndSend(chunk.finalText, onTranslation);
+        // Off the chain: the HTTP round trip must not hold up the next frame.
+        unawaited(_translateAndSend(chunk.finalText, onTranslation, onError));
       }
     } catch (e) {
       onError?.call('stt:$e');
@@ -397,21 +425,16 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   /// the VAD backstop and by the half-duplex gate; guarded because both can fire
   /// on the same frame and `flush` is destructive.
   Future<void> _flushAndSend(
-    void Function(String, String, String, String) onTranslation,
-  ) async {
-    if (_flushing) return;
-    _flushing = true;
-    try {
-      final text = await SttService.instance.flush();
-      _lastPartial = '';
-      if (text.trim().isEmpty) return;
-      DebugOverlay.log('stt flushed="$text" → translating');
-      await _translateAndSend(text, onTranslation);
-    } catch (e) {
-      DebugOverlay.log('stt flush error: $e');
-    } finally {
-      _flushing = false;
-    }
+    void Function(String, String, String, String) onTranslation, {
+    bool force = false,
+  }) async {
+    final text = await SttService.instance.flush();
+    _lastPartial = '';
+    _hasPending = false;
+    if (text.trim().isEmpty) return;
+    DebugOverlay.log('stt flushed="$text" → translating');
+    // Off the chain, as in _feed: this awaits the backend.
+    unawaited(_translateAndSend(text, onTranslation, _onError, force: force));
   }
 
   /// Clip path (Moonshine): decode the whole VAD-clipped utterance at once.
@@ -424,29 +447,41 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       final orig = await SttService.instance.transcribe(samples);
       if (orig.trim().isEmpty) return;
       DebugOverlay.log('stt orig="$orig"');
-      await _translateAndSend(orig, onTranslation);
+      await _translateAndSend(orig, onTranslation, onError);
     } catch (e) {
       onError?.call('stt:$e');
     }
   }
 
+  /// [force] publishes even if the mic is muted by the time the backend answers.
+  /// Set it for a flush triggered *by* the mute: those words predate the press.
   Future<void> _translateAndSend(
     String orig,
     void Function(String, String, String, String) onTranslation,
-  ) async {
-    final trans = await fetchTextTranslation(
-      text: orig,
-      from: _sourceLang,
-      to: _targetLang,
-    );
+    void Function(String)? onError, {
+    bool force = false,
+  }) async {
+    final String trans;
+    try {
+      trans = await fetchTextTranslation(
+        text: orig,
+        from: _sourceLang,
+        to: _targetLang,
+      );
+    } catch (e) {
+      DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
+      onError?.call('translate:$e');
+      return;
+    }
     if (trans.trim().isEmpty) {
       DebugOverlay.log('stt translate returned EMPTY ($_sourceLang→$_targetLang)');
       return;
     }
 
-    // The round trip spans hundreds of ms. An utterance that closed just before
-    // the user hit mute must not surface after it.
-    if (isSendMuted) {
+    // Audio captured *after* the mute must never surface. Audio captured before
+    // it must — the user said those words out loud, intending to be heard, and
+    // the round trip merely spans hundreds of ms.
+    if (isSendMuted && !force) {
       DebugOverlay.log('stt drop: muted while translating');
       return;
     }
@@ -490,6 +525,8 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     _modelReady = false;
     _dozing = false;
     _gated = false;
+    _hasPending = false;
+    _lastPartial = '';
     _utterance.clear();
     _onTranslation = null;
     _onError = null;
