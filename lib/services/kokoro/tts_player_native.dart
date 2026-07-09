@@ -604,10 +604,19 @@ class TtsPlayer {
 
       // Tokens: [0, ...ids, 0]  (BOS/EOS = pad token 0)
       final tokens = Int64List.fromList([0, ...ids, 0]);
-      // Style: [1, 1, 256] — take first 256 floats from voice file
-      final styleData = Float32List(256);
-      final count = voice.length < 256 ? voice.length : 256;
-      for (var i = 0; i < count; i++) { styleData[i] = voice[i]; }
+
+      // Style: [1, 1, 256]. The voice file is a [510, 1, 256] table of style
+      // embeddings indexed by *unpadded token count* — Kokoro conditions
+      // prosody on utterance length. Row 0 is the embedding of an empty
+      // sequence, so reading it for every phrase (as this used to) flattens
+      // the prosody of all speech. The table stops at 510 tokens.
+      const styleDim = 256;
+      final rows = voice.length ~/ styleDim;
+      final row = ids.length < rows ? ids.length : rows - 1;
+      final styleData = Float32List(styleDim);
+      for (var i = 0; i < styleDim; i++) {
+        styleData[i] = voice[row * styleDim + i];
+      }
       // Speed: [1]
       final speedData = Float32List.fromList([1.0]);
 

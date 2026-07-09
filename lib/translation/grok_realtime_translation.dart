@@ -129,6 +129,20 @@ class GrokRealtimeTranslation extends ChangeNotifier
     // Running RECV in parallel caused double-playback and bad transcriptions
     // from degraded WebRTC audio capture.
 
+    // After a long silence the on-device streamer releases the mic to spare the
+    // battery, and can no longer hear itself being spoken to. LiveKit keeps
+    // capturing for the call regardless, so its speaker detection is a free
+    // wake signal — the first syllable may be clipped, nothing more.
+    _listener = room.createListener()
+      ..on<ActiveSpeakersChangedEvent>((e) {
+        final streamer = _sendStreamer;
+        if (streamer == null || !streamer.isDozing) return;
+        final me = room.localParticipant;
+        if (me != null && e.speakers.any((s) => s.identity == me.identity)) {
+          unawaited(streamer.wake());
+        }
+      });
+
     // SEND: my mic → peer (all platforms).
     // Pass the LiveKit local audio track so the web streamer can clone it
     // instead of opening a 2nd getUserMedia on the same device.
@@ -136,6 +150,21 @@ class GrokRealtimeTranslation extends ChangeNotifier
         room.localParticipant?.audioTrackPublications.firstOrNull?.track;
     final sendStreamer = createGrokMicStreamer();
     _sendStreamer = sendStreamer;
+
+    // The on-device streamer releases the mic after ~20 s of silence. Once it
+    // has, it can no longer hear the user start talking again — so LiveKit's
+    // speaker detection, which never stops, is what wakes it. Costs one event
+    // handler; WebRTC computes the audio levels for the call either way.
+    _listener = room.createListener()
+      ..on<ActiveSpeakersChangedEvent>((e) {
+        final me = room.localParticipant;
+        final streamer = _sendStreamer;
+        if (me == null || streamer == null || !streamer.isDozing) return;
+        if (e.speakers.any((p) => p.sid == me.sid)) {
+          DebugOverlay.log('local speaking — waking STT capture');
+          unawaited(streamer.wake());
+        }
+      });
     unawaited(
       sendStreamer
           .start(
@@ -146,6 +175,9 @@ class GrokRealtimeTranslation extends ChangeNotifier
             ),
             localTrack: localAudioTrack,
             captureLocalMic: true,
+            // Native runs STT on-device and ignores wsUrl; it needs the tags.
+            sourceLang: route.sourceBcp47,
+            targetLang: route.targetBcp47,
             onTranslation: _onSendTranslation,
             onError: (code) {
               _lastError = 'send:$code';
@@ -194,30 +226,32 @@ class GrokRealtimeTranslation extends ChangeNotifier
 
     // Delta: Grok re-sends the FULL accumulated session translation each time.
     // Only publish the portion that is new relative to the last backend response
-    // so the peer doesn't hear the same phrase repeated.
-    String transToSend;
-    if (_lastBackendTrans.isNotEmpty && trans.startsWith(_lastBackendTrans)) {
-      transToSend = trans.substring(_lastBackendTrans.length).trim();
-    } else {
-      transToSend = trans;
-    }
-    _lastBackendTrans = trans;
+    // so the peer doesn't hear the same phrase repeated. The on-device streamer
+    // emits independent utterances, so neither delta nor dedup applies there.
+    final accumulates = _sendStreamer?.accumulatesTranscript ?? false;
+    String transToSend = trans;
+    if (accumulates) {
+      if (_lastBackendTrans.isNotEmpty && trans.startsWith(_lastBackendTrans)) {
+        transToSend = trans.substring(_lastBackendTrans.length).trim();
+      }
+      _lastBackendTrans = trans;
 
-    if (transToSend.isEmpty) {
-      DebugOverlay.log('delta empty — skip publish');
-      notifyListeners();
-      return;
-    }
+      if (transToSend.isEmpty) {
+        DebugOverlay.log('delta empty — skip publish');
+        notifyListeners();
+        return;
+      }
 
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    // Dedup: same delta within 3 s → skip.
-    if (transToSend == _lastSentTrans && nowMs - _lastSentMs < 3000) {
-      DebugOverlay.log('dedup — same delta <3s, skip');
-      notifyListeners();
-      return;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      // Dedup: same delta within 3 s → skip.
+      if (transToSend == _lastSentTrans && nowMs - _lastSentMs < 3000) {
+        DebugOverlay.log('dedup — same delta <3s, skip');
+        notifyListeners();
+        return;
+      }
+      _lastSentTrans = transToSend;
+      _lastSentMs = nowMs;
     }
-    _lastSentTrans = transToSend;
-    _lastSentMs = nowMs;
 
     final room = _room;
     final route = _route;
