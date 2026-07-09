@@ -61,6 +61,16 @@ class _RootShellState extends State<RootShell> {
   /// same ring. Cleared lazily; bounded by call rate so it won't blow up.
   final Set<String> _handledCallIds = {};
 
+  /// Room name of the call currently being joined or already on screen.
+  /// HYPOTHESIS TEST (iOS): on iOS the join is triggered more than once for
+  /// the same call (CallKit accept event + the cold-launch activeCalls()
+  /// replay, and possibly a re-ring), so the device joined the SAME LiveKit
+  /// room several times — each join a separate participant + STT session,
+  /// which is the "someone keeps joining my calls" + repeated-translation
+  /// symptom that web (single in-app join) never shows. While this is set,
+  /// every further join for ANY room is dropped: one call screen at a time.
+  String? _joiningRoom;
+
   /// Guards the one-shot coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
 
@@ -234,6 +244,16 @@ class _RootShellState extends State<RootShell> {
   }
 
   Future<void> _joinCallRoom(IncomingCall call) async {
+    // Drop this join if one is already in flight or a call screen is up —
+    // no matter which path fired it (CallKit accept, activeCalls() replay,
+    // poll, realtime, or a caller re-ring). Without this the same iOS device
+    // joins the room several times over → several participants + STT
+    // sessions from one phone.
+    if (_joiningRoom != null) {
+      debugPrint('[call] join ignored — already joining/in ${_joiningRoom!}');
+      return;
+    }
+    _joiningRoom = call.roomName;
     try {
       // Resolve my name + spoken language the SAME robust way the caller does
       // (local prefs → Supabase fallback). The old raw profile fetch could
@@ -284,6 +304,10 @@ class _RootShellState extends State<RootShell> {
           content: Text(AppStrings.t('cant_join_call', args: {'msg': '$e'})),
         ),
       );
+    } finally {
+      // Released once the CallScreen is popped (the await above returns on
+      // pop) or the join failed — so the next real call can open a screen.
+      _joiningRoom = null;
     }
   }
 
