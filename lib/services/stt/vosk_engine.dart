@@ -175,6 +175,7 @@ class VoskEngine implements SttEngine {
       if (ended == 1) {
         // Endpoint: an utterance closed. `result` consumes it and the
         // recognizer continues cleanly into the next one — no reset needed.
+        DebugOverlay.log('vosk endpoint fired');
         return SttChunk(finalText: _text(lib.recResult(rec), 'text'));
       }
       return SttChunk(partial: _text(lib.recPartial(rec), 'partial'));

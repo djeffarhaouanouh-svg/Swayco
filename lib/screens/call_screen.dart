@@ -273,6 +273,17 @@ class _CallScreenState extends State<CallScreen> {
       do {
         _refreshPending = false;
         final remoteLang = _discoverRemoteLang(room);
+        // A metadata update can momentarily report no language for a peer that
+        // is still in the room (observed: `attach src=en tgt=`). Re-attaching on
+        // that gives an unconfigured route, which tears the pipeline down and
+        // never brings it back. Keep the last known language instead.
+        if (remoteLang.isEmpty &&
+            _attachedRemoteLang.isNotEmpty &&
+            room.remoteParticipants.isNotEmpty) {
+          DebugOverlay.log(
+              'translation: ignoring empty remote lang, keeping $_attachedRemoteLang');
+          continue;
+        }
         // Re-attach when the remote's language OR my chosen output
         // language changed since the last bind.
         if (remoteLang == _attachedRemoteLang &&

@@ -61,6 +61,10 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   int _frames = 0;
   String _lastPartial = '';
 
+  /// `flush` is destructive; the VAD backstop and the half-duplex gate can both
+  /// reach for it on the same frame.
+  bool _flushing = false;
+
   // VAD (mean-square).
   //
   // For a STREAMING engine (Vosk) this no longer segments anything — Kaldi's own
@@ -274,11 +278,18 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       if (!_gated) {
         _gated = true;
         _utterance.clear();
-        // A streaming decoder is holding a half-decoded phrase. Drop it: the
-        // words spoken over our own TTS are the barge-in we already gave up,
-        // and letting them survive would splice them onto the next utterance.
         if (SttService.instance.isStreaming && _modelReady) {
-          unawaited(SttService.instance.reset());
+          if (isSendMuted) {
+            // Muted: whatever is half-decoded was said in confidence. Drop it.
+            DebugOverlay.log('stt gate: muted — dropping partial');
+            unawaited(SttService.instance.reset());
+          } else {
+            // A translation just started playing. The words already in the
+            // decoder were spoken BEFORE it did, so they are legitimate —
+            // resetting here is what silently ate them.
+            DebugOverlay.log('stt gate: tts playing — flushing partial');
+            unawaited(_flushAndSend(onTranslation));
+          }
         }
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
@@ -301,10 +312,23 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     }
 
     // Streaming engine: hand every frame straight to the decoder. It endpoints
-    // for itself, so nothing here segments; the VAD survives only to decide
-    // when the mic has been quiet long enough to release.
+    // for itself — but not always. Observed on device: partials build up
+    // ("bonjour sarah") and accept_waveform never returns 1, so no utterance
+    // ever closes and nothing is ever sent. The VAD therefore stays as a
+    // backstop: if a hypothesis is pending and the mic has been quiet for
+    // _silenceFlushMs, force the close ourselves. Kaldi's endpointer still wins
+    // whenever it fires first, which is the common case mid-conversation.
     if (SttService.instance.isStreaming) {
-      if (_modelReady) unawaited(_feed(samples, onTranslation, onError));
+      if (_modelReady) {
+        unawaited(_feed(samples, onTranslation, onError));
+
+        final pendingSilence =
+            _lastPartial.isNotEmpty && !voiced && nowMs - _lastVoiceMs >= _silenceFlushMs;
+        if (pendingSilence && !_flushing) {
+          DebugOverlay.log('stt vad backstop: ${_silenceFlushMs}ms silence, forcing flush');
+          unawaited(_flushAndSend(onTranslation));
+        }
+      }
       if (nowMs - _lastVoiceMs >= _dozeAfterMs) unawaited(_doze());
       return;
     }
@@ -366,6 +390,27 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       }
     } catch (e) {
       onError?.call('stt:$e');
+    }
+  }
+
+  /// Close the utterance the streaming decoder is holding and ship it. Used by
+  /// the VAD backstop and by the half-duplex gate; guarded because both can fire
+  /// on the same frame and `flush` is destructive.
+  Future<void> _flushAndSend(
+    void Function(String, String, String, String) onTranslation,
+  ) async {
+    if (_flushing) return;
+    _flushing = true;
+    try {
+      final text = await SttService.instance.flush();
+      _lastPartial = '';
+      if (text.trim().isEmpty) return;
+      DebugOverlay.log('stt flushed="$text" → translating');
+      await _translateAndSend(text, onTranslation);
+    } catch (e) {
+      DebugOverlay.log('stt flush error: $e');
+    } finally {
+      _flushing = false;
     }
   }
 
