@@ -29,6 +29,7 @@ import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'services/kokoro/kokoro_service.dart';
+import 'services/stt/stt_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/debug_overlay.dart';
@@ -302,6 +303,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           if (!kIsWeb) {
             unawaited(KokoroService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
+            unawaited(SttService.instance
+                .ensureLanguageInstalled(localProfile.sourceLang));
           }
         }
       } catch (e) {
@@ -447,6 +450,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         AppStrings.setFromCode(lang);
         if (!kIsWeb) {
           unawaited(KokoroService.instance.ensureLanguageInstalled(lang));
+          // STT reads this phone's own mic, so the model we need is the one for
+          // the account's language — the same one Kokoro just installed a voice
+          // for. ~30–60 MB, downloaded once, never during a call.
+          unawaited(SttService.instance.ensureLanguageInstalled(lang));
         }
         // Keep the local cache in step so the next cold boot restores in the
         // account's language immediately (no stale-language flash).

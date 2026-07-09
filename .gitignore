@@ -90,3 +90,6 @@ capture-*.png
 
 # Swayco design handoff reference (Next.js project, not part of the Flutter app)
 xxxx/
+
+# libvosk binaries — fetched by scripts/fetch_libvosk_android.sh (16 MB)
+android/app/src/main/jniLibs/

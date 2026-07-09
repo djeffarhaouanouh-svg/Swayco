@@ -90,10 +90,23 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   bool get isStreaming => _running && _wsOpen;
 
   @override
+  bool get accumulatesTranscript => true;
+
+  // The x.ai path streams continuously; it never releases the mic.
+  @override
+  bool get isDozing => false;
+
+  @override
+  Future<void> wake() async {}
+
+  @override
   Future<void> start({
     required Uri wsUrl,
     Object? localTrack,
     bool captureLocalMic = true,
+    // Web keeps the x.ai path: the langs are already encoded in [wsUrl].
+    String sourceLang = '',
+    String targetLang = '',
     required void Function(String orig, String trans, String lang, String audioB64)
         onTranslation,
     void Function(String partial)? onPartial,

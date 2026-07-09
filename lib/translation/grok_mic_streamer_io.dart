@@ -6,8 +6,21 @@ import 'dart:typed_data';
 import 'package:record/record.dart';
 
 import 'grok_mic_streamer_base.dart';
+import 'local_stt_mic_streamer_io.dart';
 
-GrokMicStreamer createGrokMicStreamer() => _IoGrokMicStreamer();
+/// Native STT now runs on-device (Moonshine / Vosk) — see
+/// [LocalSttMicStreamer]. The x.ai WebSocket path below is kept intact behind
+/// this flag: flip it to true to fall back to the remote proxy.
+const bool kUseXaiSttOnNative = false;
+
+GrokMicStreamer createGrokMicStreamer() =>
+    // ignore: dead_code
+    kUseXaiSttOnNative ? _IoGrokMicStreamer() : LocalSttMicStreamer();
+
+/// The remote x.ai streamer, used as a fallback when the on-device engine
+/// cannot load — no libvosk on this platform, no model for the language, or a
+/// corrupt download. Better a remote transcript than a silently dead call.
+GrokMicStreamer createXaiMicStreamer() => _IoGrokMicStreamer();
 
 /// Native (iOS/Android) realtime mic streamer, SENDER-side. Captures MY local
 /// mic with `record` (PCM16 16 kHz stream, system AEC via echoCancel), opens a
@@ -34,10 +47,22 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
   bool get isStreaming => _running && _wsOpen;
 
   @override
+  bool get accumulatesTranscript => true;
+
+  // The x.ai path streams continuously; it never releases the mic.
+  @override
+  bool get isDozing => false;
+
+  @override
+  Future<void> wake() async {}
+
+  @override
   Future<void> start({
     required Uri wsUrl,
     dynamic localTrack,
     bool captureLocalMic = true,
+    String sourceLang = '',
+    String targetLang = '',
     required void Function(String orig, String trans, String lang, String audioB64)
         onTranslation,
     void Function(String partial)? onPartial,
