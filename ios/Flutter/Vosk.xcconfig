@@ -29,6 +29,18 @@
 // Included from Debug.xcconfig and Release.xcconfig, the base configs of the
 // Runner target only (RunnerTests has none).
 
+// And a THIRD thing, invisible until you archive. `flutter build ios` leaves
+// DEPLOYMENT_POSTPROCESSING=NO, so nothing strips and the symbols are there. The
+// *archive* action turns it on and runs strip with the Xcode default
+// STRIP_STYLE=all, which removes every global symbol and rebuilds the export
+// trie without them (measured: 14755 exports -> 671, __text byte-identical —
+// the code survives, the names do not). dlsym then fails and the App Store build
+// crashes where the dev build worked.
+//
+// `non-global` is `strip -x`: drops local symbols, keeps the globals dlsym reads.
+// Same reasoning as the `strip -S` in scripts/build_libvosk_ios.sh.
+STRIP_STYLE = non-global
+
 VOSK_KEEP = -u _vosk_model_new -u _vosk_model_free -u _vosk_recognizer_new -u _vosk_recognizer_accept_waveform_f -u _vosk_recognizer_result -u _vosk_recognizer_partial_result -u _vosk_recognizer_final_result -u _vosk_recognizer_reset -u _vosk_recognizer_free -u _vosk_set_log_level
 
 VOSK_LDFLAGS = -force_load $(SRCROOT)/Frameworks/libvosk.a $(VOSK_KEEP) -lc++ -framework Accelerate
