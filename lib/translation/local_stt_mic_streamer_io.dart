@@ -7,6 +7,7 @@ import '../services/debug_overlay.dart';
 import '../services/stt/stt_service.dart';
 import '../services/translation_api.dart';
 import 'grok_mic_streamer_base.dart';
+import 'grok_mic_streamer_io.dart' show createXaiMicStreamer;
 
 /// Native (iOS/Android) SENDER-side pipeline, fully on-device for the STT step.
 ///
@@ -27,11 +28,20 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   bool _modelReady = false;
   bool _dozing = false;
 
+  /// Set when on-device STT is unavailable and we hand the call back to the
+  /// remote x.ai pipeline. Every member below then delegates to it.
+  GrokMicStreamer? _fallback;
+
   String _sourceLang = '';
   String _targetLang = '';
   void Function(String orig, String trans, String lang, String audioB64)?
       _onTranslation;
   void Function(String error)? _onError;
+
+  // Retained so the fallback can be started with the arguments we were given.
+  Uri? _wsUrl;
+  Object? _localTrack;
+  void Function(String partial)? _onPartial;
 
   /// Accumulates the current utterance's samples in [-1, 1].
   final List<double> _utterance = [];
@@ -54,16 +64,20 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   static const int _maxUtteranceSamples = _sampleRate * 15;
 
   @override
-  bool get isRunning => _running;
+  bool get isRunning => _fallback?.isRunning ?? _running;
 
   @override
-  bool get isStreaming => _running && _modelReady && !_dozing;
+  bool get isStreaming =>
+      _fallback?.isStreaming ?? (_running && _modelReady && !_dozing);
+
+  /// x.ai re-sends the growing session transcript; the on-device path emits
+  /// independent utterances. The caller reads this per callback, so it tracks
+  /// whichever pipeline is actually live.
+  @override
+  bool get accumulatesTranscript => _fallback?.accumulatesTranscript ?? false;
 
   @override
-  bool get accumulatesTranscript => false;
-
-  @override
-  bool get isDozing => _dozing;
+  bool get isDozing => _fallback?.isDozing ?? _dozing;
 
   @override
   Future<void> start({
@@ -90,6 +104,9 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     _targetLang = targetLang;
     _onTranslation = onTranslation;
     _onError = onError;
+    _onPartial = onPartial;
+    _wsUrl = wsUrl;
+    _localTrack = localTrack;
     _running = true;
 
     try {
@@ -100,18 +117,20 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       }
 
       if (!SttService.supportsLang(sourceLang)) {
-        onError?.call('stt_unsupported_lang:$sourceLang');
-        _running = false;
+        await _startFallback('unsupported_lang:$sourceLang');
         return;
       }
 
       // First call in a language downloads 30–60 MB. Capture starts anyway so
       // the call is never blocked on it; utterances are dropped until ready.
       unawaited(
-        SttService.instance.ensureLanguageInstalled(sourceLang).then((_) {
+        SttService.instance.ensureLanguageInstalled(sourceLang).then((_) async {
           _modelReady = SttService.instance.isReady;
           DebugOverlay.log('stt model ready=$_modelReady lang=$sourceLang');
-          if (!_modelReady) onError?.call('stt_model_unavailable');
+          // Download failed, or the engine could not load — most often libvosk
+          // missing on this platform. Hand the call to x.ai rather than let the
+          // user speak into a pipeline that will never answer.
+          if (!_modelReady) await _startFallback('model_unavailable');
         }),
       );
 
@@ -119,6 +138,37 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     } catch (e) {
       onError?.call('start_failed: $e');
       await stop();
+    }
+  }
+
+  /// Tear down our capture and run the remote x.ai streamer instead.
+  Future<void> _startFallback(String reason) async {
+    if (_fallback != null || !_running) return;
+    DebugOverlay.log('stt fallback → x.ai ($reason)');
+
+    await _audioSub?.cancel();
+    _audioSub = null;
+    _utterance.clear();
+    try {
+      await _rec.stop();
+    } catch (_) {}
+
+    final streamer = createXaiMicStreamer();
+    _fallback = streamer;
+    try {
+      await streamer.start(
+        wsUrl: _wsUrl!,
+        localTrack: _localTrack,
+        captureLocalMic: true,
+        sourceLang: _sourceLang,
+        targetLang: _targetLang,
+        onTranslation: _onTranslation!,
+        onPartial: _onPartial,
+        onError: _onError,
+      );
+    } catch (e) {
+      _fallback = null;
+      _onError?.call('fallback_failed: $e');
     }
   }
 
@@ -152,6 +202,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
   @override
   Future<void> wake() async {
+    if (_fallback != null) return; // x.ai never releases the mic
     if (!_running || !_dozing) return;
     _dozing = false;
     try {
@@ -264,6 +315,14 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     _utterance.clear();
     _onTranslation = null;
     _onError = null;
+    _onPartial = null;
+    final fallback = _fallback;
+    _fallback = null;
+    if (fallback != null) {
+      try {
+        await fallback.stop();
+      } catch (_) {}
+    }
     await _audioSub?.cancel();
     _audioSub = null;
     try {

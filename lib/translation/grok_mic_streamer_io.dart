@@ -17,6 +17,11 @@ GrokMicStreamer createGrokMicStreamer() =>
     // ignore: dead_code
     kUseXaiSttOnNative ? _IoGrokMicStreamer() : LocalSttMicStreamer();
 
+/// The remote x.ai streamer, used as a fallback when the on-device engine
+/// cannot load — no libvosk on this platform, no model for the language, or a
+/// corrupt download. Better a remote transcript than a silently dead call.
+GrokMicStreamer createXaiMicStreamer() => _IoGrokMicStreamer();
+
 /// Native (iOS/Android) realtime mic streamer, SENDER-side. Captures MY local
 /// mic with `record` (PCM16 16 kHz stream, system AEC via echoCancel), opens a
 /// WebSocket to the backend Grok STT proxy, streams the PCM, and surfaces
