@@ -53,6 +53,14 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   /// we reset the streaming decoder once on entry, not on every dropped frame.
   bool _gated = false;
 
+  /// Frames seen since start. The web streamer logs this and it is the first
+  /// thing you want when nothing is transcribed: it separates "the mic gives us
+  /// nothing" from "the recogniser gives us nothing". On iOS `record` opens a
+  /// SECOND capture of a mic LiveKit already holds, which is exactly the kind of
+  /// failure that shows up as a silent, well-behaved stream of zeroes.
+  int _frames = 0;
+  String _lastPartial = '';
+
   // VAD (mean-square).
   //
   // For a STREAMING engine (Vosk) this no longer segments anything — Kaldi's own
@@ -149,6 +157,10 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
       await _startCapture();
     } catch (e) {
+      // record_ios throws here when inputNode.setVoiceProcessingEnabled() is
+      // refused — which is what a clash with WebRTC's own VoiceProcessingIO on
+      // the same mic looks like. Worth its own line: it is not an STT failure.
+      DebugOverlay.log('stt START FAILED: $e');
       onError?.call('start_failed: $e');
       await stop();
     }
@@ -195,8 +207,11 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       noiseSuppress: true,
       autoGain: true,
     ));
+    DebugOverlay.log('stt capture started — 16 kHz pcm16, aec/ns/agc on');
     _audioSub = stream.listen(
       (bytes) => _onPcm(bytes, _onTranslation!, _onError),
+      onError: (Object e) => DebugOverlay.log('stt capture stream error: $e'),
+      onDone: () => DebugOverlay.log('stt capture stream closed'),
     );
   }
 
@@ -279,6 +294,12 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     final voiced = level > _vadThreshold;
     if (voiced) _lastVoiceMs = nowMs;
 
+    if (++_frames % 100 == 0) {
+      DebugOverlay.log('stt pcm frames=$_frames level=${level.toStringAsFixed(6)} '
+          'voiced=$voiced ready=$_modelReady '
+          'streaming=${SttService.instance.isStreaming} dozing=$_dozing');
+    }
+
     // Streaming engine: hand every frame straight to the decoder. It endpoints
     // for itself, so nothing here segments; the VAD survives only to decide
     // when the mic has been quiet long enough to release.
@@ -333,9 +354,14 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   ) async {
     try {
       final chunk = await SttService.instance.acceptFrame(samples);
-      if (chunk.partial.isNotEmpty) _onPartial?.call(chunk.partial);
+      if (chunk.partial.isNotEmpty && chunk.partial != _lastPartial) {
+        _lastPartial = chunk.partial;
+        DebugOverlay.log('stt partial="${chunk.partial}"');
+        _onPartial?.call(chunk.partial);
+      }
       if (chunk.hasFinal) {
-        DebugOverlay.log('stt final="${chunk.finalText}"');
+        _lastPartial = '';
+        DebugOverlay.log('stt final="${chunk.finalText}" → translating');
         await _translateAndSend(chunk.finalText, onTranslation);
       }
     } catch (e) {
@@ -368,11 +394,18 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       from: _sourceLang,
       to: _targetLang,
     );
-    if (trans.trim().isEmpty) return;
+    if (trans.trim().isEmpty) {
+      DebugOverlay.log('stt translate returned EMPTY ($_sourceLang→$_targetLang)');
+      return;
+    }
 
     // The round trip spans hundreds of ms. An utterance that closed just before
     // the user hit mute must not surface after it.
-    if (isSendMuted) return;
+    if (isSendMuted) {
+      DebugOverlay.log('stt drop: muted while translating');
+      return;
+    }
+    DebugOverlay.log('stt send trans="$trans"');
 
     // audioB64 empty: no TTS is generated here. The peer receives the text as
     // a `kokoro` packet and synthesises it locally, in its own language.

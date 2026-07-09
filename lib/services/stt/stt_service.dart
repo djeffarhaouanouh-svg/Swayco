@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../debug_overlay.dart';
 import 'stt_catalogue.dart';
 import 'stt_engine.dart';
 import 'stt_model_downloader.dart';
@@ -61,22 +62,41 @@ class SttService {
   Future<void> _load(String lang, void Function(double)? onProgress) async {
     final spec = specForLang(lang);
     if (spec == null) {
-      debugPrint('[stt] no on-device model for "$lang"');
+      DebugOverlay.log('stt NO on-device model for "$lang"');
       return;
     }
+    DebugOverlay.log(
+        'stt load lang=$lang engine=${spec.kind.name} model=${spec.id} (~${spec.approxMb} MB)');
     try {
-      final dir = await _downloader.ensureModel(spec, onProgress: onProgress);
+      final installed = await SttModelDownloader.isInstalled(spec);
+      DebugOverlay.log('stt model already on disk: $installed');
+
+      // Progress is logged in decade steps: a per-chunk line would drown the
+      // overlay's 120-line buffer before the download finished.
+      var lastPct = -1;
+      final dir = await _downloader.ensureModel(spec, onProgress: (p) {
+        onProgress?.call(p);
+        final pct = (p * 10).floor() * 10;
+        if (pct != lastPct) {
+          lastPct = pct;
+          DebugOverlay.log('stt download ${spec.id} $pct%');
+        }
+      });
+      DebugOverlay.log('stt model dir=${dir.path}');
 
       // Swap only once the new engine is up, so a failed load leaves the
       // previous language working rather than muting the call.
       final engine = createSttEngine(spec.kind);
       await engine.load(dir.path, lang);
+      DebugOverlay.log(
+          'stt engine loaded ready=${engine.isReady} streaming=${engine.isStreaming}');
 
       final old = _engine;
       _engine = engine;
       _loadedLang = lang;
       await old?.dispose();
     } catch (e) {
+      DebugOverlay.log('stt LOAD FAILED "$lang" (${spec.id}): $e');
       debugPrint('[stt] load failed for "$lang" (${spec.id}): $e');
     }
   }

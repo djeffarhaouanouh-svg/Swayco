@@ -849,17 +849,21 @@ class _CallScreenState extends State<CallScreen> {
         await kokoro.ensureLanguageInstalled(lang);
         // Half-duplex: hold the mic shut for the window this plays out the
         // loudspeaker, or our own STT transcribes it and ships it back to the
-        // peer. Subscribe before speak(): a short clip can finish before we
-        // reach the await, and `.first` on a completion already missed hangs.
+        // peer.
+        //
+        // Never *await* the completion event. speak() swallows its own errors
+        // and returns without playing whenever the voice file or model is
+        // missing, in which case onPlayerComplete never fires — awaiting it
+        // wedged this method for 15 s per incoming translation. The gate's
+        // duration-based safety timer is the floor; the event only shortens it.
+        // Subscribe before speak(): a short clip can finish before we get here.
         final done = kokoro.onPlaybackComplete.first;
         markTranslationPlaying(textLength: text.length);
-        try {
-          await kokoro.speak(text: text, languageCode: lang, voice: voice);
-          // speak() returns at playback START, not end.
-          await done.timeout(const Duration(seconds: 15));
-        } finally {
-          markTranslationDone();
-        }
+        unawaited(done
+            .timeout(const Duration(seconds: 15))
+            .then((_) => markTranslationDone())
+            .catchError((_) {/* safety timer reopens the mic */}));
+        await kokoro.speak(text: text, languageCode: lang, voice: voice);
         return;
       } catch (e) {
         debugPrint('[kokoro] speak error: $e');

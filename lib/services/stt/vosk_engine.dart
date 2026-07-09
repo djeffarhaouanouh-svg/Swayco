@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
+import '../debug_overlay.dart';
 import 'stt_engine_native.dart';
 
 // ── libvosk C ABI ────────────────────────────────────────────────────────────
@@ -103,22 +104,44 @@ class VoskEngine implements SttEngine {
 
   @override
   Future<void> load(String modelDir, String lang) async {
-    final lib = _VoskLib.open();
+    // Each step is logged separately: "symbols missing" (iOS link/strip),
+    // "model rejected" (OpenFST type registration, or a truncated download) and
+    // "recognizer refused" are three different bugs with three different fixes,
+    // and from a device you only ever get to see one line.
+    final _VoskLib lib;
+    try {
+      lib = _VoskLib.open();
+      DebugOverlay.log('vosk lib opened, 10 symbols resolved');
+    } catch (e) {
+      DebugOverlay.log('vosk SYMBOL LOOKUP FAILED: $e');
+      rethrow;
+    }
     lib.setLogLevel(-1); // Kaldi is extremely chatty on stdout otherwise.
+
+    final files = Directory(modelDir).existsSync()
+        ? Directory(modelDir).listSync().length
+        : -1;
+    DebugOverlay.log('vosk model dir=$modelDir entries=$files');
+
     final path = modelDir.toNativeUtf8();
     try {
       final model = lib.modelNew(path);
       if (model == nullptr) {
+        DebugOverlay.log('vosk MODEL_NEW returned null — bad dir, or OpenFST '
+            'types never registered (static-lib global ctors)');
         throw StateError('vosk_model_new failed for $modelDir');
       }
+      DebugOverlay.log('vosk model loaded');
       final rec = lib.recNew(model, _sampleRate.toDouble());
       if (rec == nullptr) {
         lib.modelFree(model);
+        DebugOverlay.log('vosk RECOGNIZER_NEW returned null');
         throw StateError('vosk_recognizer_new failed');
       }
       _model = model;
       _rec = rec;
       _lib = lib;
+      DebugOverlay.log('vosk ready — streaming @ $_sampleRate Hz');
     } finally {
       calloc.free(path);
     }

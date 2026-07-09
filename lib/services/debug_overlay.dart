@@ -12,9 +12,16 @@ class DebugOverlay extends StatefulWidget {
   static final ValueNotifier<List<String>> _lines = ValueNotifier([]);
   static bool _enabled = false;
 
+  /// Escape hatch for a signed release you cannot attach a debugger to:
+  ///   flutter build ipa --dart-define=DEBUG_OVERLAY=true
+  /// Without it a TestFlight build discards every log line — exactly when you
+  /// most need them.
+  static const bool _forced = bool.fromEnvironment('DEBUG_OVERLAY');
+
   static void init() {
-    // Always on for web (tap 🐛 to reveal). Native = debug builds only.
-    _enabled = kIsWeb || kDebugMode;
+    // Always on for web (tap 🐛 to reveal). Native = debug builds, or a release
+    // deliberately instrumented with --dart-define=DEBUG_OVERLAY=true.
+    _enabled = kIsWeb || kDebugMode || _forced;
   }
 
   static void log(String msg) {
