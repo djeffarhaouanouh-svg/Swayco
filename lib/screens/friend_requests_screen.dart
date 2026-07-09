@@ -282,8 +282,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Full black — plus de mesh bleu.
-      backgroundColor: Colors.black,
+      // Light grey page — header and footer zones no longer pure black.
+      backgroundColor: const Color(0xFFF2F2F2),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -292,7 +292,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
+                child: Text(
+                  AppStrings.t('demandes_title'),
+                  style: SCText.h1.copyWith(color: Colors.black87),
+                ),
               ),
             ),
             Expanded(child: _buildBody()),
@@ -322,7 +325,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         child: Text(
           _error!,
           style: const TextStyle(
-            color: Color(0xFFFFAB91),
+            color: Color(0xFFD84315),
             height: 1.35,
             fontSize: 13,
           ),
