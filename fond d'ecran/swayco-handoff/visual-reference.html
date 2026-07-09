@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Swayco Reference — Midnight</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  html,body{margin:0;padding:0;background:#1a1f2e;font-family:'DM Sans';color:#fff;}
+  *{box-sizing:border-box;}
+  body{display:flex;gap:24px;padding:24px;}
+
+  .phone{
+    width:390px;height:820px;border-radius:44px;overflow:hidden;position:relative;
+    display:flex;flex-direction:column;
+    box-shadow:0 40px 100px -20px rgba(0,0,0,.5), 0 0 0 12px #0a0e18, 0 0 0 13px #2a3142;
+    background:
+      radial-gradient(circle at 0% 0%,#3b82f6 0%,transparent 50%),
+      radial-gradient(circle at 100% 0%,#7c3aed 0%,transparent 45%),
+      radial-gradient(circle at 100% 100%,#06b6d4 0%,transparent 50%),
+      radial-gradient(circle at 0% 100%,#1e40af 0%,transparent 55%),
+      #0a1024;
+    color:#f5f7ff;
+  }
+  .status{height:46px;display:flex;align-items:center;justify-content:space-between;padding:18px 28px 0;font-size:14px;font-weight:700;flex-shrink:0;}
+  .body{flex:1;display:flex;flex-direction:column;position:relative;}
+  .ico{width:18px;height:18px;}
+
+  .h1{
+    font-family:'Bricolage Grotesque';font-weight:800;font-size:38px;
+    letter-spacing:-.03em;margin:18px 22px 22px;color:#fff;line-height:1;
+  }
+
+  /* GLASS LIST CONTAINER — must wrap message rows */
+  .glass-list{
+    margin:0 16px;
+    background:rgba(255,255,255,.06);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:24px;padding:6px;
+  }
+  .row{display:flex;align-items:center;gap:12px;padding:12px;}
+  .av{
+    width:46px;height:46px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:18px;color:#0a1024;
+    border:1.5px solid rgba(255,255,255,.2);
+  }
+  .av-a{background:linear-gradient(135deg,#60a5fa,#3b82f6);}
+  .av-i{background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;}
+  .av-l{background:linear-gradient(135deg,#67e8f9,#06b6d4);}
+  .meta{flex:1;min-width:0;}
+  .name{font-weight:700;font-size:16px;color:#fff;}
+  .preview{font-size:12px;color:rgba(245,247,255,.65);margin-top:2px;}
+  .time{font-size:11px;color:rgba(245,247,255,.55);font-weight:600;}
+
+  /* GLASS INVITE BUTTON — NOT filled solid */
+  .invite{
+    margin:18px;padding:18px;
+    background:rgba(255,255,255,.1);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:22px;color:#fff;
+    font-weight:800;font-size:17px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+  }
+
+  /* GLASS TAB BAR — pill, white active state */
+  .tabbar{
+    margin:auto 22px 24px;
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:999px;padding:6px;
+    display:flex;justify-content:space-around;
+  }
+  .tab{
+    flex:1;padding:12px;display:flex;align-items:center;justify-content:center;
+    border-radius:999px;color:rgba(245,247,255,.5);
+  }
+  .tab.active{background:#fff;color:#0a1024;}
+
+  /* === DISCOVER === */
+  .disc-h{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 18px;}
+  .disc-h .h1{margin:0;font-size:36px;}
+  .search-pill{
+    display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+    backdrop-filter:blur(20px);font-size:13px;color:rgba(245,247,255,.55);
+  }
+  .card{
+    margin:0 18px;border-radius:30px;overflow:hidden;
+    aspect-ratio:3/4;position:relative;
+    border:1px solid rgba(255,255,255,.15);
+    box-shadow:0 30px 60px -20px rgba(34,211,238,.3);
+    background-image:url('assets/alice.jpg');background-size:cover;background-position:center 22%;
+  }
+  .card::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.6) 100%);}
+  .name-block{position:absolute;left:22px;right:22px;bottom:22px;display:flex;justify-content:space-between;align-items:flex-end;color:#fff;z-index:1;}
+  .nm{font-family:'Bricolage Grotesque';font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+  .nm small{display:block;font-size:13px;font-weight:500;opacity:.85;margin-top:4px;}
+  .send-pill{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#0a1024;padding:11px 20px;border-radius:999px;font-weight:800;font-size:14px;margin-top:10px;}
+  .heart-btn{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.14);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;color:#fff;}
+
+  /* === CHAT === */
+  .header{
+    display:flex;align-items:center;gap:12px;
+    padding:10px 12px;margin:8px 14px 0;
+    background:rgba(255,255,255,.06);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:22px;
+  }
+  .icon-btn{
+    width:38px;height:38px;border-radius:50%;
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center;color:#f5f7ff;
+  }
+  .avatar-sm{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#67e8f9,#06b6d4);display:flex;align-items:center;justify-content:center;color:#0a1024;font-weight:900;font-size:15px;border:1.5px solid rgba(255,255,255,.2);}
+  .hname{font-family:'Bricolage Grotesque';font-weight:700;font-size:20px;color:#fff;line-height:1.1;}
+  .hstatus{font-size:11px;color:#22d3ee;display:flex;align-items:center;gap:5px;margin-top:2px;font-weight:600;}
+  .dot-online{display:inline-block;width:6px;height:6px;border-radius:50%;background:#22d3ee;box-shadow:0 0 6px #22d3ee;}
+
+  .messages{flex:1;overflow-y:auto;padding:18px 16px 8px;display:flex;flex-direction:column;gap:10px;}
+  .bubble{max-width:78%;padding:12px 16px 10px;border-radius:20px;box-shadow:0 6px 14px -4px rgba(0,0,0,.4);}
+  .bubble .who{font-size:12px;font-weight:700;color:#22d3ee;margin-bottom:2px;}
+  .bubble .text{font-size:15.5px;color:#f5f7fa;font-weight:500;line-height:1.3;}
+  .bubble .time-b{font-size:10.5px;color:rgba(245,247,250,.45);font-weight:500;text-align:right;margin-top:4px;}
+  .in{align-self:flex-start;background:#1a2138;border:1px solid rgba(255,255,255,.06);border-top-left-radius:8px;}
+  .out{align-self:flex-end;background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid rgba(34,211,238,.4);border-top-right-radius:8px;}
+  .out .text{color:#fff;}
+  .out .time-b{color:rgba(255,255,255,.7);}
+  .bubble.continued{margin-top:-6px;}
+  .bubble.continued .who{display:none;}
+
+  .input-wrap{
+    margin:6px 14px 16px;padding:6px 8px 6px 14px;
+    background:rgba(255,255,255,.06);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:30px;display:flex;align-items:center;gap:10px;
+  }
+  .input{flex:1;font-size:15px;color:rgba(226,232,240,.5);padding:8px 4px;}
+  .mic{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#0891b2);box-shadow:0 6px 16px -4px rgba(34,211,238,.5);display:flex;align-items:center;justify-content:center;color:#fff;}
+  .toggle{width:34px;height:20px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);position:relative;}
+  .toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#94a3b8;}
+</style>
+</head>
+<body>
+
+<!-- ============ MESSAGES ============ -->
+<div class="phone" id="screen-messages">
+  <div class="status">
+    <span>9:41</span>
+    <span style="display:flex;gap:6px;align-items:center;">
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="currentColor"><rect x="0" y="6" width="3" height="4" rx="1"/><rect x="5" y="4" width="3" height="6" rx="1"/><rect x="10" y="2" width="3" height="8" rx="1"/><rect x="15" y="0" width="3" height="10" rx="1"/></svg>
+      <svg width="24" height="12" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="20" height="10" rx="2.5"/><rect x="3" y="3" width="14" height="6" rx="1" fill="currentColor"/></svg>
+    </span>
+  </div>
+  <div class="body">
+    <h1 class="h1">Messages</h1>
+    <div class="glass-list">
+      <div class="row">
+        <div class="av av-a">A</div>
+        <div class="meta"><div class="name">Alice</div><div class="preview">Vous : 👋</div></div>
+        <div class="time">hier</div>
+      </div>
+      <div class="row">
+        <div class="av av-i">I</div>
+        <div class="meta"><div class="name">Ines</div><div class="preview">Vous : 👋</div></div>
+        <div class="time">jeu</div>
+      </div>
+      <div class="row">
+        <div class="av av-l">L</div>
+        <div class="meta"><div class="name">Lenny</div><div class="preview">Vous : yeeees bro</div></div>
+        <div class="time">17/05</div>
+      </div>
+    </div>
+    <div class="invite">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      Invite to a call
+    </div>
+    <div class="tabbar">
+      <div class="tab active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="tab"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="tab"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCOVER ============ -->
+<div class="phone" id="screen-discover">
+  <div class="status">
+    <span>9:41</span>
+    <span style="display:flex;gap:6px;align-items:center;">
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="currentColor"><rect x="0" y="6" width="3" height="4" rx="1"/><rect x="5" y="4" width="3" height="6" rx="1"/><rect x="10" y="2" width="3" height="8" rx="1"/><rect x="15" y="0" width="3" height="10" rx="1"/></svg>
+      <svg width="24" height="12" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="20" height="10" rx="2.5"/><rect x="3" y="3" width="14" height="6" rx="1" fill="currentColor"/></svg>
+    </span>
+  </div>
+  <div class="body">
+    <div class="disc-h">
+      <h1 class="h1">Discover</h1>
+      <div class="search-pill">
+        <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search
+      </div>
+    </div>
+    <div class="card">
+      <div class="name-block">
+        <div>
+          <div class="nm">Alice<small>22 · Paris 🇫🇷</small></div>
+          <div class="send-pill">Send 👋</div>
+        </div>
+        <div class="heart-btn">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tab"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="tab active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="tab"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CHAT ============ -->
+<div class="phone" id="screen-chat">
+  <div class="status">
+    <span>9:41</span>
+    <span style="display:flex;gap:6px;align-items:center;">
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="currentColor"><rect x="0" y="6" width="3" height="4" rx="1"/><rect x="5" y="4" width="3" height="6" rx="1"/><rect x="10" y="2" width="3" height="8" rx="1"/><rect x="15" y="0" width="3" height="10" rx="1"/></svg>
+      <svg width="24" height="12" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="20" height="10" rx="2.5"/><rect x="3" y="3" width="14" height="6" rx="1" fill="currentColor"/></svg>
+    </span>
+  </div>
+  <div class="header">
+    <div class="icon-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></div>
+    <div class="avatar-sm">L</div>
+    <div style="flex:1;">
+      <div class="hname">Lenny</div>
+      <div class="hstatus"><span class="dot-online"></span>en ligne</div>
+    </div>
+    <div class="icon-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+    <div class="icon-btn" style="margin-left:8px;"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div>
+  </div>
+  <div class="messages">
+    <div class="bubble in"><div class="who">Lenny</div><div class="text">Y'a quoi?</div><div class="time-b">05:48</div></div>
+    <div class="bubble in"><div class="who">Lenny</div><div class="text">Oui</div><div class="time-b">05:56</div></div>
+    <div class="bubble in continued"><div class="text">Oui</div><div class="time-b">05:56</div></div>
+    <div class="bubble in"><div class="who">Lenny</div><div class="text">Coucou</div><div class="time-b">06:12</div></div>
+    <div class="bubble in continued"><div class="text">Coucou</div><div class="time-b">06:12</div></div>
+    <div class="bubble in"><div class="who">Lenny</div><div class="text">Slt</div><div class="time-b">06:27</div></div>
+    <div class="bubble in continued"><div class="text">Slt</div><div class="time-b">06:32</div></div>
+    <div class="bubble out"><div class="text">yeeees bro</div><div class="time-b">06:37</div></div>
+  </div>
+  <div class="input-wrap">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
+    <div class="toggle"></div>
+    <div class="input">Message</div>
+    <div class="mic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>
+  </div>
+</div>
+
+</body>
+</html>

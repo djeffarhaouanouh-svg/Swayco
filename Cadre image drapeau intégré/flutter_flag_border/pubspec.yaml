@@ -1,0 +1,14 @@
+name: flag_border_kit
+description: Contour drapeau (design « 2a ») — liseré dégradé + lueur, pour cartes de rencontre internationale.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
