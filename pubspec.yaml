@@ -162,10 +162,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/demo_profile.png
-    - assets/test-splashscreen.png
-    # Swayco Midnight ambient background — used by MeshBackground.
-    - assets/mesh_midnight_bg.png
     # Illustration shown in the "add your photo" profile tip dialog.
     - assets/add-picture.png
     # Transparent logo mark — shown on the "call ended" summary card.
