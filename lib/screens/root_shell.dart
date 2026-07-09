@@ -260,12 +260,32 @@ class _RootShellState extends State<RootShell> {
       // mint a token with an empty sourceLang, leaving the OTHER side unable
       // to translate me — half of the "translation only reaches one person".
       final me = await CallLauncher.resolveMyIdentity();
-      final token = await fetchLiveKitToken(
-        roomName: call.roomName,
-        identity: 'u${DateTime.now().millisecondsSinceEpoch}',
-        displayName: me.name,
-        sourceLang: me.sourceLang,
-      );
+      // Cold-launch retry: when the app is woken from a killed/backgrounded
+      // state by a CallKit accept, iOS networking often isn't ready yet, so
+      // the very first POST /livekit/token stalls and hits the 12s timeout
+      // ("Can't join the call: livekit/token timed out"). The endpoint itself
+      // is a few-ms local JWT mint — a timeout is always the request not
+      // getting out, never the server being slow — so retry a couple of times
+      // while the network wakes up instead of failing the whole answer.
+      LiveKitTokenResponse? token;
+      Object? lastErr;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          token = await fetchLiveKitToken(
+            roomName: call.roomName,
+            identity: 'u${DateTime.now().millisecondsSinceEpoch}',
+            displayName: me.name,
+            sourceLang: me.sourceLang,
+          );
+          break;
+        } catch (e) {
+          lastErr = e;
+          debugPrint('[call] token attempt ${attempt + 1} failed: $e');
+          await Future<void>.delayed(const Duration(milliseconds: 1200));
+        }
+      }
+      if (token == null) throw lastErr ?? Exception('token_unavailable');
+      final tok = token;
       // Navigate via the global navigator key, not `context`: on an iOS
       // CallKit accept this runs from a native event while the app may still
       // be backgrounded — or cold-launching from a killed state, where the
@@ -283,9 +303,9 @@ class _RootShellState extends State<RootShell> {
       await nav.push<void>(
         MaterialPageRoute<void>(
           builder: (_) => CallScreen(
-            wsUrl: token.url,
-            jwt: token.token,
-            roomName: token.roomName,
+            wsUrl: tok.url,
+            jwt: tok.token,
+            roomName: tok.roomName,
             displayName: me.name,
             mySourceLang: me.sourceLang,
             translation: widget.translation,
