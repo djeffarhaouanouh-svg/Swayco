@@ -3,8 +3,8 @@
 /// The app ships only the engines; models are downloaded on demand — see
 /// [AsrService.ensureLanguageInstalled]. Two engines:
 ///
-/// - **The neural engine** (ONNX Runtime, already a dependency for Local TTS) —
-///   `en`, `ja`, `zh`, `ko`, `ar`.
+/// - **The neural engine** (Moonshine v2 on sherpa-onnx, the same runtime the
+///   on-device TTS uses) — `en`, `ja`, `zh`, `ko`, `ar`.
 /// - **Vosk** (libvosk via dart:ffi) — `fr`, `ru`, `es`, `it`, `pt`, `de`, `nl`.
 ///
 /// STT runs on the phone's OWN outgoing mic, so a device only ever downloads
@@ -41,20 +41,22 @@ class NeuralAsrSpec extends AsrModelSpec {
 
   final String repo;
 
-  /// Path inside [repo]. Empty for the upstream `onnx-community/*` repos, which
-  /// hold a single model at the root. Our own `swayco-stt-models` repo keeps one
-  /// folder per model (ko, ar — exported by `scripts/export_neural_asr_onnx.sh`,
-  /// since UsefulSensors publishes those two as PyTorch only).
+  /// Folder inside [repo] holding this language's Moonshine v2 files
+  /// (`moonshine-v2-<lang>/`), all re-hosted on our own `swayco-stt-models`
+  /// repo: sherpa's Moonshine v2 loader wants `encoder` + `mergedDecoder` +
+  /// `tokens.txt`, and the `tokens.txt` is produced offline from each model's
+  /// tokenizer by `sherpa-onnx/scripts/moonshine/v2/generate_tokens.py`.
   final String subdir;
 
   @override
   AsrEngineKind get kind => AsrEngineKind.neural;
 
-  static const encoderFile = 'onnx/encoder_model_quantized.onnx';
-  static const decoderFile = 'onnx/decoder_model_quantized.onnx';
-  static const tokenizerFile = 'tokenizer.json';
+  static const encoderFile = 'encoder.onnx';
+  static const mergedDecoderFile = 'decoder_merged.onnx';
+  static const tokensFile = 'tokens.txt';
 
-  List<String> get files => const [encoderFile, decoderFile, tokenizerFile];
+  List<String> get files =>
+      const [encoderFile, mergedDecoderFile, tokensFile];
 
   String urlFor(String file) {
     final path = subdir.isEmpty ? file : '$subdir/$file';
@@ -78,36 +80,39 @@ class LatticeAsrSpec extends AsrModelSpec {
 
 const _specs = <AsrModelSpec>[
   NeuralAsrSpec(
-    id: 'moonshine-tiny-en',
+    id: 'moonshine-v2-en',
     langs: ['en'],
     approxMb: 50,
-    repo: 'onnx-community/moonshine-tiny-ONNX',
+    repo: 'djeffar/swayco-stt-models',
+    subdir: 'moonshine-v2-en',
   ),
   NeuralAsrSpec(
-    id: 'moonshine-tiny-ja',
+    id: 'moonshine-v2-ja',
     langs: ['ja'],
     approxMb: 50,
-    repo: 'onnx-community/moonshine-tiny-ja-ONNX',
+    repo: 'djeffar/swayco-stt-models',
+    subdir: 'moonshine-v2-ja',
   ),
   NeuralAsrSpec(
-    id: 'moonshine-tiny-zh',
+    id: 'moonshine-v2-zh',
     langs: ['zh'],
     approxMb: 50,
-    repo: 'onnx-community/moonshine-tiny-zh-ONNX',
+    repo: 'djeffar/swayco-stt-models',
+    subdir: 'moonshine-v2-zh',
   ),
   NeuralAsrSpec(
-    id: 'moonshine-tiny-ko',
+    id: 'moonshine-v2-ko',
     langs: ['ko'],
     approxMb: 50,
     repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-tiny-ko',
+    subdir: 'moonshine-v2-ko',
   ),
   NeuralAsrSpec(
-    id: 'moonshine-tiny-ar',
+    id: 'moonshine-v2-ar',
     langs: ['ar'],
     approxMb: 50,
     repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-tiny-ar',
+    subdir: 'moonshine-v2-ar',
   ),
   LatticeAsrSpec(id: 'vosk-model-small-fr-0.22', langs: ['fr'], approxMb: 41),
   LatticeAsrSpec(id: 'vosk-model-small-ru-0.22', langs: ['ru'], approxMb: 45),

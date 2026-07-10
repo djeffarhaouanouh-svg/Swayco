@@ -33,6 +33,26 @@ class AsrModelDownloader {
     return File('${dir.path}/$_completeMarker').exists();
   }
 
+  /// Deletes every installed model except [keep].
+  ///
+  /// STT reads this phone's own outgoing mic, so exactly one language is ever
+  /// needed. Called after a successful language swap so switching fr → en → es
+  /// leaves one model on disk instead of accumulating a directory per language.
+  static Future<void> pruneExcept(AsrModelSpec keep) async {
+    final base = await sttDir();
+    if (!await base.exists()) return;
+    await for (final entry in base.list()) {
+      if (entry is! Directory) continue;
+      if (entry.path.split(RegExp(r'[\\/]')).last == keep.id) continue;
+      try {
+        await entry.delete(recursive: true);
+      } catch (_) {
+        // A model still mmap'd by a live ONNX session can refuse deletion on
+        // Windows; skip it — the next prune after dispose will collect it.
+      }
+    }
+  }
+
   Future<Directory> ensureModel(
     AsrModelSpec spec, {
     void Function(double)? onProgress,

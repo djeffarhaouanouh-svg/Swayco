@@ -95,6 +95,11 @@ class AsrService {
       _engine = engine;
       _loadedLang = lang;
       await old?.dispose();
+
+      // Now that the new model is live and the old engine is disposed, drop
+      // every other language's files so switching languages doesn't accumulate
+      // one model directory per language ever used.
+      await AsrModelDownloader.pruneExcept(spec);
     } catch (e) {
       DebugOverlay.log('stt LOAD FAILED "$lang" (${spec.id}): $e');
       debugPrint('[stt] load failed for "$lang" (${spec.id}): $e');

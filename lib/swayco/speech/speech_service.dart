@@ -1,13 +1,17 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'model_downloader.dart';
-import 'tts_player.dart';
-import 'voice_downloader.dart';
+import 'sherpa_tts_engine.dart';
+import 'tts_bundle_downloader.dart';
+import 'tts_catalogue.dart';
 
-/// Local TTS — 100 % local inference via ONNX Runtime.
+/// On-device TTS — 100 % local inference via sherpa-onnx `OfflineTts`.
+///
+/// One runtime, many engines: Kokoro and Piper/VITS are selected per language
+/// by [ttsSpecForLang] (see tts_catalogue). The app ships only the runtime; the
+/// model bundle for the peer's language is downloaded on first use and cached.
+/// STT reads the phone's OWN mic, TTS speaks the PEER's language — so a device
+/// installs exactly one voice bundle.
 ///
 /// Usage:
 /// ```dart
@@ -16,154 +20,144 @@ import 'voice_downloader.dart';
 /// await SpeechService.instance.speak(
 ///   text: translatedText,
 ///   languageCode: 'fr',
-///   voice: 'ff_siwis',
+///   voice: SpeechService.defaultVoiceFor('fr'),
 /// );
 /// ```
 class SpeechService {
   SpeechService._();
   static final instance = SpeechService._();
 
-  final _modelDl = ModelDownloader();
-  final _voiceDl = VoiceDownloader();
-  final _player = TtsPlayer();
+  final _downloader = TtsBundleDownloader();
+  final _engine = SherpaTtsEngine();
 
-  bool _modelReady = false;
-  bool _initializing = false;
+  TtsModelSpec? _loadedSpec;
+  String? _loadedLang;
+  Future<void>? _loading;
 
-  static const _prefKeyDownloadedVoices = 'speech_downloaded_voices';
-  static const _prefKeySelectedVoice = 'speech_selected_voice';
   static const _prefKeySelectedLang = 'speech_selected_lang';
-
-  /// Pre-rename spellings. An installed app carries its voice inventory under
-  /// these; without the copy below every user would silently re-download the
-  /// whole voice set on first launch after the upgrade.
-  static const _legacyPrefKeys = <String, String>{
-    'kokoro_downloaded_voices': _prefKeyDownloadedVoices,
-    'kokoro_selected_voice': _prefKeySelectedVoice,
-    'kokoro_selected_lang': _prefKeySelectedLang,
-  };
-
-  /// Copies any legacy key onto its new name, once. Leaves the legacy value in
-  /// place so a downgrade to a store build still finds it.
-  static Future<void> _migratePrefs(SharedPreferences prefs) async {
-    for (final entry in _legacyPrefKeys.entries) {
-      if (!prefs.containsKey(entry.key) || prefs.containsKey(entry.value)) {
-        continue;
-      }
-      final value = prefs.get(entry.key);
-      if (value is List<String>) {
-        await prefs.setStringList(entry.value, value);
-      } else if (value is String) {
-        await prefs.setString(entry.value, value);
-      }
-    }
-  }
+  static const _prefKeySelectedVoice = 'speech_selected_voice';
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
-  /// Call once at app start (e.g. in main() after runApp).
-  /// Downloads the model if absent, then loads the ONNX session.
-  /// Safe to call multiple times — idempotent.
+  /// Call once at app start. Restores the previously installed language so the
+  /// first call is not cold. Idempotent; a no-op on web.
   Future<void> init({void Function(double)? onProgress}) async {
-    if (kIsWeb) return; // the local TTS engine runs on native only
-    if (_modelReady || _initializing) return;
-    _initializing = true;
+    if (kIsWeb) return;
     try {
-      final file = await _modelDl.ensureModel(onProgress: onProgress);
-      await _player.loadModel(file.path);
-      _modelReady = true;
-
-      // Restore previously installed voices
       final prefs = await SharedPreferences.getInstance();
-      await _migratePrefs(prefs);
-      final downloaded =
-          prefs.getStringList(_prefKeyDownloadedVoices) ?? [];
-      for (final voice in downloaded) {
-        await _ensureVoiceFile(voice);
+      final lang = prefs.getString(_prefKeySelectedLang);
+      if (lang != null && ttsSpecForLang(lang) != null) {
+        await ensureLanguageInstalled(lang, onProgress: onProgress);
       }
     } catch (e) {
       debugPrint('[speech] init error: $e');
-    } finally {
-      _initializing = false;
     }
   }
 
-  bool get isReady => _modelReady && _player.isReady;
+  bool get isReady => _engine.isReady;
 
   // ── Language / voice management ────────────────────────────────────────────
 
-  /// Returns the default the local TTS engine voice name for [langCode].
+  /// Legacy shim: callers pass this back into [speak]'s `voice` argument, which
+  /// is now ignored (the speaker index comes from the language's spec). Kept so
+  /// existing call sites compile unchanged.
   static String defaultVoiceFor(String langCode) =>
-      VoiceDownloader.defaultVoiceFor(langCode);
+      ttsSpecForLang(langCode)?.id ?? '';
 
-  /// Ensures the voice file for [langCode] is present on disk.
-  /// Shows download progress via [onProgress] (0.0 → 1.0).
+  /// Downloads (if absent), extracts and configures the model for [langCode].
+  ///
+  /// Idempotent, and safe to call concurrently: a second call while the first is
+  /// still loading awaits the same future instead of building a second engine.
   Future<void> ensureLanguageInstalled(
     String langCode, {
     void Function(double)? onProgress,
-  }) async {
-    if (kIsWeb) return;
-    final voice = defaultVoiceFor(langCode);
-    await _ensureVoiceFile(voice, onProgress: onProgress);
-
-    // Persist installed voices list
-    final prefs = await SharedPreferences.getInstance();
-    final downloaded =
-        prefs.getStringList(_prefKeyDownloadedVoices)?.toSet() ?? {};
-    downloaded.add(voice);
-    await prefs.setStringList(
-        _prefKeyDownloadedVoices, downloaded.toList());
-    await prefs.setString(_prefKeySelectedLang, langCode);
-    await prefs.setString(_prefKeySelectedVoice, voice);
+  }) {
+    if (kIsWeb) return Future.value();
+    final lang = normalizeLang(langCode);
+    if (_loadedLang == lang && isReady) return Future.value();
+    return _loading ??= _load(lang, onProgress).whenComplete(() {
+      _loading = null;
+    });
   }
 
-  /// Whether [langCode]'s voice file is already on disk.
+  Future<void> _load(String lang, void Function(double)? onProgress) async {
+    final spec = ttsSpecForLang(lang);
+    if (spec == null) {
+      debugPrint('[speech] no on-device voice for "$lang"');
+      return;
+    }
+    try {
+      final dir = await _downloader.ensureBundle(spec, onProgress: onProgress);
+      String p(String rel) => '${dir.path}/$rel';
+
+      final model = SherpaTtsModel(
+        kind: spec.engine,
+        model: p(spec.modelFile),
+        tokens: p(spec.tokensFile),
+        dataDir: spec.dataDir.isEmpty ? '' : p(spec.dataDir),
+        voices: spec.voicesFile.isEmpty ? '' : p(spec.voicesFile),
+        lexicon: spec.lexiconFiles.map(p).join(','),
+        lang: spec.lang,
+      );
+
+      await _engine.configure(model);
+      _loadedSpec = spec;
+      _loadedLang = lang;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefKeySelectedLang, lang);
+      await prefs.setString(_prefKeySelectedVoice, spec.id);
+
+      // The new voice is configured; drop every other bundle so calling peers
+      // in different languages doesn't accumulate one bundle per language.
+      await TtsBundleDownloader.pruneExcept(spec);
+    } catch (e) {
+      debugPrint('[speech] load failed for "$lang" (${spec.id}): $e');
+    }
+  }
+
+  /// Whether [langCode]'s bundle is already on disk (no network needed).
   Future<bool> isLanguageInstalled(String langCode) async {
     if (kIsWeb) return false;
-    final voice = defaultVoiceFor(langCode);
-    final dir = await VoiceDownloader.voicesDir();
-    return File('${dir.path}/$voice.bin').exists();
+    final spec = ttsSpecForLang(langCode);
+    if (spec == null) return false;
+    return TtsBundleDownloader.isInstalled(spec);
   }
 
   // ── Synthesis ──────────────────────────────────────────────────────────────
 
-  /// Synthesise [text] and play it locally.
-  /// Falls back silently if the model or voice is not ready.
+  /// Synthesise [text] and play it locally. Falls back silently if the engine
+  /// for [languageCode] is not ready. [voice] is accepted for API compatibility
+  /// but ignored — the speaker index is fixed by the language's spec.
   Future<void> speak({
     required String text,
     required String languageCode,
-    required String voice,
+    String voice = '',
   }) async {
     if (kIsWeb || !isReady) return;
     if (text.trim().isEmpty) return;
+    final spec = _loadedSpec;
+    if (spec == null) return;
     try {
-      final voicePath = await _voiceFilePath(voice);
-      if (voicePath == null) {
-        // Voice not yet downloaded — try to grab it now
-        await _ensureVoiceFile(voice);
-        final path = await _voiceFilePath(voice);
-        if (path == null) return;
-        await _player.speak(text, languageCode, path);
-      } else {
-        await _player.speak(text, languageCode, voicePath);
-      }
+      await _engine.speak(text, sid: spec.sid, speed: spec.speed);
     } catch (e) {
       debugPrint('[speech] speak error: $e');
     }
   }
 
-  /// Fires when a [speak] utterance finishes playing. [speak] itself returns at
-  /// playback *start*, so this is the only signal for "the speaker is quiet now".
-  Stream<void> get onPlaybackComplete => _player.onPlaybackComplete;
+  /// Fires when a [speak] utterance finishes playing. [speak] returns at
+  /// playback *start*, so this is the only signal for "the speaker is quiet".
+  Stream<void> get onPlaybackComplete => _engine.onPlaybackComplete;
 
   Future<void> stop() async {
     if (kIsWeb) return;
-    await _player.stop();
+    await _engine.stop();
   }
 
   Future<void> dispose() async {
-    await _player.dispose();
-    _modelReady = false;
+    await _engine.dispose();
+    _loadedSpec = null;
+    _loadedLang = null;
   }
 
   // ── Preferences restore ────────────────────────────────────────────────────
@@ -176,25 +170,5 @@ class SpeechService {
   Future<String?> savedLang() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_prefKeySelectedLang);
-  }
-
-  // ── Internal ───────────────────────────────────────────────────────────────
-
-  Future<void> _ensureVoiceFile(
-    String voiceName, {
-    void Function(double)? onProgress,
-  }) async {
-    try {
-      await _voiceDl.ensureVoice(voiceName, onProgress: onProgress);
-    } catch (e) {
-      debugPrint('[speech] voice download error ($voiceName): $e');
-    }
-  }
-
-  Future<String?> _voiceFilePath(String voiceName) async {
-    final dir = await VoiceDownloader.voicesDir();
-    final file = File('${dir.path}/$voiceName.bin');
-    if (await file.exists()) return file.path;
-    return null;
   }
 }

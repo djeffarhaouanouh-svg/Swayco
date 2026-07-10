@@ -97,14 +97,18 @@ dependencies:
   cupertino_native_plus: ^0.0.11
   liquid_glass_widgets: ^0.15.0
 
-  # Local TTS — 100 % on-device ONNX inference (Android arm64 + iOS arm64).
-  # The ~21 MB quantised model is downloaded once via ModelDownloader and
-  # kept in getApplicationSupportDirectory(); never re-downloaded.
-  onnxruntime: ^1.4.0
+  # sherpa_onnx — the single ONNX Runtime the app consolidates on. Drives both
+  # on-device TTS (OfflineTts: Kokoro + Piper/VITS, espeak-ng inside each model
+  # bundle) and on-device neural STT (OfflineRecognizer: Moonshine v2). It
+  # statically links its own runtime, so it must be the ONLY ONNX Runtime in the
+  # app — a second one (e.g. the gtbluesky `onnxruntime` we removed) makes iOS
+  # fail to link on duplicate symbols. Models stay download-on-demand.
+  sherpa_onnx: ^1.13.4
 
-  # On-device STT (lib/swayco/asr): the neural engine runs on the onnxruntime
-  # above; the lattice engine is bound directly with dart:ffi against its native
-  # library (no plugin — the only published one is Android-only, unmaintained).
+  # On-device STT (lib/swayco/asr): the neural engine (Moonshine) runs on
+  # sherpa_onnx above; the lattice engine (Vosk) is bound directly with dart:ffi
+  # against its native library (no plugin — the only published one is
+  # Android-only, unmaintained).
   ffi: ^2.1.3
   # The lattice engine ships its language models as zip archives.
   archive: ^4.0.7
