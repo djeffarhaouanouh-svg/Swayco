@@ -6,30 +6,30 @@ import 'dart:typed_data';
 import 'package:record/record.dart';
 
 import '../services/call_audio.dart';
-import 'grok_mic_streamer_base.dart';
-import 'local_stt_mic_streamer_io.dart';
+import 'sway_mic_streamer_base.dart';
+import 'sway_local_mic_streamer_io.dart';
 
-/// Native STT now runs on-device (Moonshine / Vosk) — see
-/// [LocalSttMicStreamer]. The x.ai WebSocket path below is kept intact behind
+/// Native STT now runs on-device (neural / lattice) — see
+/// [LocalSttMicStreamer]. The the cloud engine WebSocket path below is kept intact behind
 /// this flag: flip it to true to fall back to the remote proxy.
-const bool kUseXaiSttOnNative = false;
+const bool kUseCloudSttOnNative = false;
 
-GrokMicStreamer createGrokMicStreamer() =>
+SwayMicStreamer createSwayMicStreamer() =>
     // ignore: dead_code
-    kUseXaiSttOnNative ? _IoGrokMicStreamer() : LocalSttMicStreamer();
+    kUseCloudSttOnNative ? _IoSwayMicStreamer() : LocalSttMicStreamer();
 
-/// The remote x.ai streamer, used as a fallback when the on-device engine
+/// The remote the cloud engine streamer, used as a fallback when the on-device engine
 /// cannot load — no libvosk on this platform, no model for the language, or a
 /// corrupt download. Better a remote transcript than a silently dead call.
-GrokMicStreamer createXaiMicStreamer() => _IoGrokMicStreamer();
+SwayMicStreamer createCloudMicStreamer() => _IoSwayMicStreamer();
 
 /// Native (iOS/Android) realtime mic streamer, SENDER-side. Captures MY local
 /// mic with `record` (PCM16 16 kHz stream, system AEC via echoCancel), opens a
-/// WebSocket to the backend Grok STT proxy, streams the PCM, and surfaces
+/// WebSocket to the backend the cloud engine STT proxy, streams the PCM, and surfaces
 /// translations. Native can't tap the REMOTE WebRTC track, so this is the only
 /// realtime path on iOS/Android — and it's enough: each phone sends its own
 /// translated voice to the peer, who just plays it.
-class _IoGrokMicStreamer implements GrokMicStreamer {
+class _IoSwayMicStreamer implements SwayMicStreamer {
   final AudioRecorder _rec = AudioRecorder();
   WebSocket? _ws;
   StreamSubscription<Uint8List>? _audioSub;
@@ -50,7 +50,7 @@ class _IoGrokMicStreamer implements GrokMicStreamer {
   @override
   bool get accumulatesTranscript => true;
 
-  // The x.ai path streams continuously; it never releases the mic.
+  // The the cloud engine path streams continuously; it never releases the mic.
   @override
   bool get isDozing => false;
 

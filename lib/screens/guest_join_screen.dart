@@ -7,7 +7,7 @@ import '../services/guest_invite_api.dart';
 import '../services/languages.dart';
 import '../services/token_api.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import 'call_screen.dart';
 
 /// Landing screen for an invite link (`/c/<room>?t=â€¦&e=â€¦`). The guest enters

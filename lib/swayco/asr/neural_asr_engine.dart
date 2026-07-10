@@ -3,13 +3,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:onnxruntime/onnxruntime.dart';
 
-import 'moonshine_tokenizer.dart';
-import 'stt_engine_native.dart';
+import 'neural_asr_tokenizer.dart';
+import 'asr_engine_native.dart';
 
-/// Moonshine ASR on ONNX Runtime — the same runtime Kokoro TTS already uses,
+/// The neural ASR on ONNX Runtime — the same runtime Local TTS already uses,
 /// so no second native library enters the build.
 ///
-/// Moonshine takes the raw 16 kHz waveform (no mel front-end) through an
+/// It takes the raw 16 kHz waveform (no mel front-end) through an
 /// encoder, then greedily decodes tokens conditioned on the encoder states.
 /// We run the **uncached** decoder and re-feed the whole prefix each step. A
 /// KV-cached decoder would be asymptotically faster, but utterances here are
@@ -17,15 +17,15 @@ import 'stt_engine_native.dart';
 /// threading a dozen past_key_values tensors through dart:ffi by hand.
 ///
 /// A clip engine, not a streaming one — the encoder attends over the whole
-/// segment. It therefore inherits [SttEngine]'s no-op streaming members (hence
+/// segment. It therefore inherits [AsrEngine]'s no-op streaming members (hence
 /// `extends`, not `implements`) and is driven by the caller's VAD.
-class MoonshineEngine extends SttEngine {
+class NeuralAsrEngine extends AsrEngine {
   OrtSession? _encoder;
   OrtSession? _decoder;
-  MoonshineTokenizer? _tok;
+  NeuralAsrTokenizer? _tok;
   bool _busy = false;
 
-  /// Moonshine's decoder starts on `<s>` and stops on `</s>`.
+  /// The neural decoder starts on `<s>` and stops on `</s>`.
   static const _bosTokenId = 1;
   static const _eosTokenId = 2;
 
@@ -40,7 +40,7 @@ class MoonshineEngine extends SttEngine {
         File('$modelDir/encoder_model_quantized.onnx'), opts);
     _decoder = OrtSession.fromFile(
         File('$modelDir/decoder_model_quantized.onnx'), opts);
-    _tok = await MoonshineTokenizer.load('$modelDir/tokenizer.json');
+    _tok = await NeuralAsrTokenizer.load('$modelDir/tokenizer.json');
   }
 
   @override
@@ -67,7 +67,7 @@ class MoonshineEngine extends SttEngine {
 
       // Graph signatures differ by provenance: the onnx-community exports
       // (en/ja/zh) take the waveform alone, while an optimum re-export
-      // (ko/ar, scripts/export_moonshine_onnx.sh) also declares an
+      // (ko/ar, scripts/export_neural_asr_onnx.sh) also declares an
       // attention_mask. Feed a mask only when the graph asks for one —
       // passing an undeclared input makes ORT throw.
       final encInputs = <String, OrtValue>{'input_values': audio};
@@ -138,7 +138,7 @@ class MoonshineEngine extends SttEngine {
 
       return tok.decode(ids.skip(1));
     } catch (e) {
-      debugPrint('[moonshine] transcribe error: $e');
+      debugPrint('[neural-asr] transcribe error: $e');
       return '';
     } finally {
       for (final t in tensors) {

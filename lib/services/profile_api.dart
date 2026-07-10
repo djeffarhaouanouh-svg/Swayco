@@ -157,7 +157,7 @@ class RemoteProfile {
   /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
   bool get canDubAudio => isPlus;
 
-  /// ElevenLabs voice id from the user's own Instant Voice Clone.
+  /// the voice provider voice id from the user's own Instant Voice Clone.
   /// Populated by /voice/enroll. Empty until enrolled. Only ever
   /// non-empty for Ultra subscribers — the backend gates enrolment on
   /// tier so this field stays empty for everyone else.

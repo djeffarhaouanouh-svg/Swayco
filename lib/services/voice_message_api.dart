@@ -42,7 +42,7 @@ Uri _backendUri(String path) {
 }
 
 /// Upload a recorded voice message to the backend. The backend stores the
-/// audio in Supabase Storage, runs Speech-to-Text via ElevenLabs Scribe,
+/// audio in Supabase Storage, runs Speech-to-Text on the cloud transcriber,
 /// inserts a row in `messages` and pushes the recipient. Returns the
 /// inserted message so the UI can render it immediately without waiting
 /// for the realtime stream.
@@ -50,7 +50,7 @@ Uri _backendUri(String path) {
 /// [audioBytes] — the raw recording (typically m4a/aac on mobile, webm on web).
 /// [mimeType]   — content-type of [audioBytes], e.g. `audio/m4a`, `audio/webm`.
 /// [durationMs] — client-measured length of the recording in ms (capped at 120 s).
-/// [hintLanguage] — optional BCP-47 primary subtag. When provided, Scribe
+/// [hintLanguage] — optional BCP-47 primary subtag. When provided, the transcriber
 /// skips its auto-detection pass which trims a few hundred ms of latency.
 Future<ChatMessage> uploadVoiceMessage({
   required Uint8List audioBytes,
@@ -119,7 +119,7 @@ Future<ChatMessage> uploadVoiceMessage({
 
 /// Outcome of a /voice/dub request — the public URL of the rendered
 /// mp3 and a flag telling the UI whether the result came out of the
-/// server-side cache (true → instant, no ElevenLabs bill).
+/// server-side cache (true → instant, no provider bill).
 class VoiceDubResult {
   const VoiceDubResult({required this.audioUrl, required this.cached});
   final String audioUrl;
@@ -148,7 +148,7 @@ class VoiceDubException implements Exception {
 
 /// Ask the backend to render an audio doubling of [messageId] in
 /// [targetLang] using the already-translated [text]. The client passes
-/// the translation in so the backend doesn't have to re-bill gpt-4.1
+/// the translation in so the backend doesn't have to re-bill the text engine
 /// for text we already have on-screen.
 ///
 /// Returns the public URL of the rendered mp3 (cached after the first
@@ -230,7 +230,7 @@ class VoiceEnrollException implements Exception {
 }
 
 /// Send a ~30-60 s audio sample to the backend, which forwards it to
-/// ElevenLabs Instant Voice Cloning and stores the returned voice_id
+/// the provider’s instant voice cloning and stores the returned voice_id
 /// onto `profiles.elevenlabs_voice_id`. After this succeeds, the
 /// caller's outgoing voice messages will be dubbed in their own voice
 /// the next time an Ultra listener hits /voice/dub on them.

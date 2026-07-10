@@ -21,7 +21,7 @@ import '../services/supabase_service.dart';
 import '../services/token_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';

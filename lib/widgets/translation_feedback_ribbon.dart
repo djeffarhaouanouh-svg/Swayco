@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 
 /// In-call feedback so translation *feels* responsive (progress, chip, pulse when remote talks).
 class TranslationFeedbackRibbon extends StatelessWidget {

@@ -7,23 +7,23 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
 import '../services/translation_api.dart';
-import 'grok_utterance_recorder_base.dart';
-import 'grok_utterance_recorder_io.dart'
-    if (dart.library.js_interop) 'grok_utterance_recorder_web.dart';
+import 'sway_utterance_recorder_base.dart';
+import 'sway_utterance_recorder_io.dart'
+    if (dart.library.js_interop) 'sway_utterance_recorder_web.dart';
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
 
-/// Sender-side Grok translation, chunk-based — the PROVEN capture path.
+/// Sender-side the cloud engine translation, chunk-based — the PROVEN capture path.
 ///
-/// Mirrors [GrokChunkTranslation] but records the LOCAL mic (what I say) using
-/// the same `MediaRecorder`-backed [GrokUtteranceRecorder] that already captures
+/// Mirrors [SwayChunkTranslation] but records the LOCAL mic (what I say) using
+/// the same `MediaRecorder`-backed [SwayUtteranceRecorder] that already captures
 /// reliably (Web Audio streaming gave silence — level=0). VAD = LiveKit
 /// active-speaker for the LOCAL participant. On each utterance we POST the clip
-/// to `/translation/grok` (Grok STT → translate → TTS), then PUSH {orig, trans,
+/// to `/translation/voice` (the cloud engine STT → translate → TTS), then PUSH {orig, trans,
 /// lang, audio} to the peer over the data channel; the peer displays it and
-/// plays the Grok mp3 directly (call_screen `_onCaptionData`). Both phones run
+/// plays the cloud mp3 directly (call_screen `_onCaptionData`). Both phones run
 /// this, so both directions are translated.
-class GrokChunkSenderTranslation extends ChangeNotifier
+class SwayChunkSenderTranslation extends ChangeNotifier
     implements RealtimeTranslationPort {
   /// Must match call_screen's `_captionTopic`.
   static const String _captionTopic = 'swayco-chat';
@@ -36,7 +36,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
   LocalAudioTrack? _recordTrack;
   String? _boundSid;
 
-  GrokUtteranceRecorder? _recorder;
+  SwayUtteranceRecorder? _recorder;
 
   bool _localHot = false;
   bool _attached = false;
@@ -95,7 +95,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     final trk = _recordTrack != null ? 'OUI' : 'NON';
     final state = _recording ? 'enregistre' : (_inFlight > 0 ? 'envoi…' : 'prêt');
     final lines = <String>[
-      'Grok SND(TEST): $state • micro: $trk • route: $routeLabel • envois: $_sent',
+      'Stream SND(TEST): $state • micro: $trk • route: $routeLabel • envois: $_sent',
     ];
     if (_lastTranscript != null) lines.add('STT: $_lastTranscript');
     if (_lastTranslation != null) lines.add('TRAD: $_lastTranslation');
@@ -110,7 +110,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     _room = room;
     _route = route;
     _attached = true;
-    debugPrint('[grok-snd] attach configured=${route.isConfigured} '
+    debugPrint('[sway-snd] attach configured=${route.isConfigured} '
         '${route.sourceBcp47}->${route.targetBcp47}');
     if (!route.isConfigured) return;
 
@@ -175,7 +175,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     if (pickSid == _boundSid && _recordTrack != null) return;
     _recordTrack = pick;
     _boundSid = pickSid;
-    debugPrint('[grok-snd] bound local mic track sid=$pickSid');
+    debugPrint('[sway-snd] bound local mic track sid=$pickSid');
     notifyListeners();
   }
 
@@ -210,12 +210,12 @@ class GrokChunkSenderTranslation extends ChangeNotifier
   }
 
   Future<void> _startUtterance(LocalAudioTrack track) async {
-    final rec = createGrokRecorder();
+    final rec = createSwayRecorder();
     try {
       await rec.start(track.mediaStreamTrack);
     } catch (e) {
       _lastError = _short('rec.start', e);
-      debugPrint('[grok-snd] recorder start failed: $e');
+      debugPrint('[sway-snd] recorder start failed: $e');
       try {
         await rec.dispose();
       } catch (_) {}
@@ -229,7 +229,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     _maxTimer = Timer(_maxUtterance, () {
       if (_recording) _finalizeUtterance();
     });
-    debugPrint('[grok-snd] recording started');
+    debugPrint('[sway-snd] recording started');
     notifyListeners();
   }
 
@@ -251,7 +251,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     final tooShort = startedAt != null &&
         DateTime.now().difference(startedAt) < _minUtterance;
     final bytes = await rec.stopAndRead();
-    debugPrint('[grok-snd] utterance bytes=${bytes?.length ?? -1} tooShort=$tooShort');
+    debugPrint('[sway-snd] utterance bytes=${bytes?.length ?? -1} tooShort=$tooShort');
     if (tooShort || bytes == null || bytes.length < _minBytes) {
       return;
     }
@@ -274,7 +274,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     }
   }
 
-  /// POST the clip → Grok (STT/translate/TTS) → push {orig, trans, lang, audio}
+  /// POST the clip → the cloud engine (STT/translate/TTS) → push {orig, trans, lang, audio}
   /// to the peer. Sender-side route: from = my language, to = the peer's.
   Future<void> _sendAndForward(Uint8List bytes, String filename) async {
     final route = _route;
@@ -284,7 +284,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
     _sent++;
     notifyListeners();
     try {
-      final result = await fetchGrokTranslation(
+      final result = await fetchVoiceTranslation(
         audioBytes: bytes,
         to: route.targetBcp47,
         from: route.sourceBcp47,
@@ -308,7 +308,7 @@ class GrokChunkSenderTranslation extends ChangeNotifier
         final b64 = base64Encode(audio);
         if (b64.length <= _maxAudioB64) map['audio'] = b64;
       }
-      debugPrint('[grok-snd] forward orig="$orig" trans="$trans" '
+      debugPrint('[sway-snd] forward orig="$orig" trans="$trans" '
           'audio=${(map['audio'] as String?)?.length ?? 0}b');
       await room.localParticipant?.publishData(
         Uint8List.fromList(utf8.encode(jsonEncode(map))),
@@ -322,9 +322,9 @@ class GrokChunkSenderTranslation extends ChangeNotifier
         props: {'phase': 'grok_snd'},
       );
     } on TranslationApiException catch (e) {
-      _lastError = _short('grok', e);
+      _lastError = _short('stream', e);
     } catch (e) {
-      _lastError = _short('grok', e);
+      _lastError = _short('stream', e);
     } finally {
       _inFlight--;
       notifyListeners();

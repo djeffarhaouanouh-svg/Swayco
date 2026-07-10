@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
-import 'stt_catalogue.dart';
+import 'asr_catalogue.dart';
 
-/// Web stub — ONNX Runtime and libvosk both need dart:ffi. [SttService] guards
+/// Web stub — ONNX Runtime and libvosk both need dart:ffi. [AsrService] guards
 /// every call with `if (kIsWeb)`, so these are never invoked at runtime.
 class SttChunk {
   const SttChunk({this.partial = '', this.finalText = ''});
@@ -12,7 +12,7 @@ class SttChunk {
   bool get hasFinal => finalText.trim().isNotEmpty;
 }
 
-abstract class SttEngine {
+abstract class AsrEngine {
   Future<void> load(String modelDir, String lang);
   bool get isReady;
   bool get isStreaming => false;
@@ -23,5 +23,5 @@ abstract class SttEngine {
   Future<void> dispose();
 }
 
-SttEngine createSttEngine(SttEngineKind kind) =>
+AsrEngine createAsrEngine(AsrEngineKind kind) =>
     throw UnsupportedError('On-device STT is unavailable on web');

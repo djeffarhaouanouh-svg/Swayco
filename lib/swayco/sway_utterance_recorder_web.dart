@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web/web.dart' as web;
 
-import 'grok_utterance_recorder_base.dart';
+import 'sway_utterance_recorder_base.dart';
 
-GrokUtteranceRecorder createGrokRecorder() => _WebUtteranceRecorder();
+SwayUtteranceRecorder createSwayRecorder() => _WebUtteranceRecorder();
 
 /// Picks the best MediaRecorder audio container the browser actually supports.
 /// Chrome → webm/opus; Safari → mp4 (it rejects webm). Returns the mime and a
@@ -26,7 +26,7 @@ GrokUtteranceRecorder createGrokRecorder() => _WebUtteranceRecorder();
   return (mime: 'audio/webm', ext: 'webm');
 }
 
-class _WebUtteranceRecorder implements GrokUtteranceRecorder {
+class _WebUtteranceRecorder implements SwayUtteranceRecorder {
   MediaRecorder? _rec;
   MediaStream? _stream;
   String _ext = 'webm';
@@ -45,7 +45,7 @@ class _WebUtteranceRecorder implements GrokUtteranceRecorder {
     // Clone so disposing our temp stream later never touches the source the
     // remote/LiveKit is still using.
     final clone = await track.clone();
-    _stream = await createLocalMediaStream('grok_utt_src');
+    _stream = await createLocalMediaStream('sway_utt_src');
     await _stream!.addTrack(clone);
     _rec = MediaRecorder();
     // No onDataChunk → the wrapper assembles every slice into one Blob and
@@ -70,7 +70,7 @@ class _WebUtteranceRecorder implements GrokUtteranceRecorder {
           } catch (_) {}
         }
       } catch (e) {
-        debugPrint('Grok recorder(web): stop failed: $e');
+        debugPrint('recorder(web): stop failed: $e');
       }
     }
     await _disposeStream();
@@ -84,7 +84,7 @@ class _WebUtteranceRecorder implements GrokUtteranceRecorder {
       final bytes = buf.toDart.asUint8List();
       return bytes.isEmpty ? null : bytes;
     } catch (e) {
-      debugPrint('Grok recorder(web): blob read failed: $e');
+      debugPrint('recorder(web): blob read failed: $e');
       return null;
     }
   }

@@ -24,12 +24,13 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
-import '../services/kokoro/kokoro_service.dart';
+import '../swayco/speech/speech_service.dart';
+import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
-import '../translation/translation_route.dart';
+import '../swayco/realtime_translation_port.dart';
+import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import 'paywall_screen.dart';
@@ -148,9 +149,9 @@ class _CallScreenState extends State<CallScreen> {
 
   late final AudioController _audio = AudioController(translation: widget.translation);
   bool _lastTranslationSpeaking = false;
-  /// Accumulates real translation-live time (runs only while the OpenAI
+  /// Accumulates real translation-live time (runs only while the live engine
   /// pipeline is live). Reported as `translation_ms` on the call_ended
-  /// analytics event so the admin can cost OpenAI Realtime against actual
+  /// analytics event so the admin can cost the live engine against actual
   /// translation time rather than whole-call time.
   final Stopwatch _translationLive = Stopwatch();
   /// Set to true the first time any RemoteParticipant joins the room.
@@ -207,9 +208,9 @@ class _CallScreenState extends State<CallScreen> {
     _syncUsageMeter();
   }
 
-  /// Translation credits should only burn while the OpenAI pipeline is
+  /// Translation credits should only burn while the live pipeline is
   /// actually live â€” not for the whole call. Pause the meter while
-  /// waiting for the peer / connecting / idle, resume it once OpenAI is
+  /// waiting for the peer / connecting / idle, resume it once the live engine is
   /// connected and translating.
   void _syncUsageMeter() {
     final live = widget.translation.translationFeedbackPhase ==
@@ -440,7 +441,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// Triggered when credits hit 0 mid-call. We detach the translation
-  /// pipeline so the OpenAI session stops billing, but leave the LiveKit
+  /// pipeline so the live session stops billing, but leave the LiveKit
   /// connection alone so people can keep talking (untranslated). Then
   /// surface the "Invite 3 amis = +30 min" dialog so the user has a
   /// concrete way to earn more time without forcing them to upgrade.
@@ -788,21 +789,21 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() => _micOn = next);
   }
 
-  /// Data channel packet from the peer: Kokoro native or Grok web path.
+  /// Data channel packet from the peer: local-TTS native or streamed web path.
   /// Typed-chat has been removed — only translation audio packets are handled.
   void _onCaptionData(DataReceivedEvent e) {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      if (m['kokoro'] == true) {
+      if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
-        DebugOverlay.log('caption kokoro trans="$trans" lang=$lang web=$kIsWeb');
+        DebugOverlay.log('caption localTts trans="$trans" lang=$lang web=$kIsWeb');
         if (trans.isNotEmpty) {
           if (kIsWeb) {
             unawaited(_speakDeviceTts(trans, lang));
           } else {
-            unawaited(_playWithKokoro(trans, lang));
+            unawaited(_playWithLocalTts(trans, lang));
           }
         }
         return;
@@ -831,7 +832,7 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Play base64 mp3 (Grok TTS) forwarded by the sender over the data channel.
+  /// Play base64 mp3 (cloud TTS) forwarded by the sender over the data channel.
   Future<void> _playTranslatedAudio(String audioB64) async {
     try {
       final bytes = base64Decode(audioB64);
@@ -839,25 +840,25 @@ class _CallScreenState extends State<CallScreen> {
       // On web, play through the gesture-unlocked element (WebKit autoplay).
       if (kIsWeb) {
         final ok = await playTranslatedMp3(bytes);
-        debugPrint('[grok-rt] web play ok=$ok ${bytes.length}b');
+        debugPrint('[sway-rt] web play ok=$ok ${bytes.length}b');
         if (ok) return;
       }
       await _ttsPlayer.stop();
       await _ttsPlayer.play(BytesSource(bytes));
-      debugPrint('[grok-rt] played Grok audio ${bytes.length}b');
+      debugPrint('[sway-rt] played cloud audio ${bytes.length}b');
     } catch (e) {
-      debugPrint('[grok-rt] play Grok audio FAILED: $e');
+      debugPrint('[sway-rt] play cloud audio FAILED: $e');
     }
   }
 
-  /// Synthesise [text] locally with Kokoro. Falls back to device TTS if the
+  /// Synthesise [text] locally with the local TTS engine. Falls back to device TTS if the
   /// model isn't ready (e.g. still downloading on first run).
-  Future<void> _playWithKokoro(String text, String lang) async {
-    final kokoro = KokoroService.instance;
-    if (kokoro.isReady) {
+  Future<void> _playWithLocalTts(String text, String lang) async {
+    final speech = SpeechService.instance;
+    if (speech.isReady) {
       try {
-        final voice = KokoroService.defaultVoiceFor(lang);
-        await kokoro.ensureLanguageInstalled(lang);
+        final voice = SpeechService.defaultVoiceFor(lang);
+        await speech.ensureLanguageInstalled(lang);
         // Half-duplex: hold the mic shut for the window this plays out the
         // loudspeaker, or our own STT transcribes it and ships it back to the
         // peer.
@@ -868,19 +869,19 @@ class _CallScreenState extends State<CallScreen> {
         // wedged this method for 15 s per incoming translation. The gate's
         // duration-based safety timer is the floor; the event only shortens it.
         // Subscribe before speak(): a short clip can finish before we get here.
-        final done = kokoro.onPlaybackComplete.first;
+        final done = speech.onPlaybackComplete.first;
         markTranslationPlaying(textLength: text.length);
         unawaited(done
             .timeout(const Duration(seconds: 15))
             .then((_) => markTranslationDone())
             .catchError((_) {/* safety timer reopens the mic */}));
-        await kokoro.speak(text: text, languageCode: lang, voice: voice);
+        await speech.speak(text: text, languageCode: lang, voice: voice);
         return;
       } catch (e) {
-        debugPrint('[kokoro] speak error: $e');
+        debugPrint('[speech] speak error: $e');
       }
     }
-    // Kokoro not ready — fall back to device TTS. flutter_tts speak() also
+    // the local TTS engine not ready — fall back to device TTS. flutter_tts speak() also
     // returns early, so here the gate's safety timer is what covers playback.
     try {
       if (lang.isNotEmpty) {
@@ -1329,7 +1330,7 @@ class _CallScreenState extends State<CallScreen> {
         props: {
           'kind': _callKind,
           'duration_ms': durMs,
-          // Real translation-live time â€” drives the OpenAI Realtime cost
+          // Real translation-live time â€” drives the live engine cost
           // estimate in the admin dashboard.
           'translation_ms': _translationLive.elapsed.inMilliseconds,
         },

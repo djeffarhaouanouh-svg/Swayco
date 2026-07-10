@@ -7,21 +7,21 @@ import 'model_downloader.dart';
 import 'tts_player.dart';
 import 'voice_downloader.dart';
 
-/// Kokoro TTS — 100 % local inference via ONNX Runtime.
+/// Local TTS — 100 % local inference via ONNX Runtime.
 ///
 /// Usage:
 /// ```dart
-/// await KokoroService.instance.init();
-/// await KokoroService.instance.ensureLanguageInstalled('fr');
-/// await KokoroService.instance.speak(
+/// await SpeechService.instance.init();
+/// await SpeechService.instance.ensureLanguageInstalled('fr');
+/// await SpeechService.instance.speak(
 ///   text: translatedText,
 ///   languageCode: 'fr',
 ///   voice: 'ff_siwis',
 /// );
 /// ```
-class KokoroService {
-  KokoroService._();
-  static final instance = KokoroService._();
+class SpeechService {
+  SpeechService._();
+  static final instance = SpeechService._();
 
   final _modelDl = ModelDownloader();
   final _voiceDl = VoiceDownloader();
@@ -30,9 +30,34 @@ class KokoroService {
   bool _modelReady = false;
   bool _initializing = false;
 
-  static const _prefKeyDownloadedVoices = 'kokoro_downloaded_voices';
-  static const _prefKeySelectedVoice = 'kokoro_selected_voice';
-  static const _prefKeySelectedLang = 'kokoro_selected_lang';
+  static const _prefKeyDownloadedVoices = 'speech_downloaded_voices';
+  static const _prefKeySelectedVoice = 'speech_selected_voice';
+  static const _prefKeySelectedLang = 'speech_selected_lang';
+
+  /// Pre-rename spellings. An installed app carries its voice inventory under
+  /// these; without the copy below every user would silently re-download the
+  /// whole voice set on first launch after the upgrade.
+  static const _legacyPrefKeys = <String, String>{
+    'kokoro_downloaded_voices': _prefKeyDownloadedVoices,
+    'kokoro_selected_voice': _prefKeySelectedVoice,
+    'kokoro_selected_lang': _prefKeySelectedLang,
+  };
+
+  /// Copies any legacy key onto its new name, once. Leaves the legacy value in
+  /// place so a downgrade to a store build still finds it.
+  static Future<void> _migratePrefs(SharedPreferences prefs) async {
+    for (final entry in _legacyPrefKeys.entries) {
+      if (!prefs.containsKey(entry.key) || prefs.containsKey(entry.value)) {
+        continue;
+      }
+      final value = prefs.get(entry.key);
+      if (value is List<String>) {
+        await prefs.setStringList(entry.value, value);
+      } else if (value is String) {
+        await prefs.setString(entry.value, value);
+      }
+    }
+  }
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -40,7 +65,7 @@ class KokoroService {
   /// Downloads the model if absent, then loads the ONNX session.
   /// Safe to call multiple times — idempotent.
   Future<void> init({void Function(double)? onProgress}) async {
-    if (kIsWeb) return; // Kokoro runs on native only
+    if (kIsWeb) return; // the local TTS engine runs on native only
     if (_modelReady || _initializing) return;
     _initializing = true;
     try {
@@ -50,13 +75,14 @@ class KokoroService {
 
       // Restore previously installed voices
       final prefs = await SharedPreferences.getInstance();
+      await _migratePrefs(prefs);
       final downloaded =
           prefs.getStringList(_prefKeyDownloadedVoices) ?? [];
       for (final voice in downloaded) {
         await _ensureVoiceFile(voice);
       }
     } catch (e) {
-      debugPrint('[kokoro] init error: $e');
+      debugPrint('[speech] init error: $e');
     } finally {
       _initializing = false;
     }
@@ -66,7 +92,7 @@ class KokoroService {
 
   // ── Language / voice management ────────────────────────────────────────────
 
-  /// Returns the default Kokoro voice name for [langCode].
+  /// Returns the default the local TTS engine voice name for [langCode].
   static String defaultVoiceFor(String langCode) =>
       VoiceDownloader.defaultVoiceFor(langCode);
 
@@ -122,7 +148,7 @@ class KokoroService {
         await _player.speak(text, languageCode, voicePath);
       }
     } catch (e) {
-      debugPrint('[kokoro] speak error: $e');
+      debugPrint('[speech] speak error: $e');
     }
   }
 
@@ -161,7 +187,7 @@ class KokoroService {
     try {
       await _voiceDl.ensureVoice(voiceName, onProgress: onProgress);
     } catch (e) {
-      debugPrint('[kokoro] voice download error ($voiceName): $e');
+      debugPrint('[speech] voice download error ($voiceName): $e');
     }
   }
 

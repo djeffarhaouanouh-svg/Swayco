@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'grok_utterance_recorder_base.dart';
+import 'sway_utterance_recorder_base.dart';
 
-GrokUtteranceRecorder createGrokRecorder() => _IoUtteranceRecorder();
+SwayUtteranceRecorder createSwayRecorder() => _IoUtteranceRecorder();
 
 /// Native (iOS / Android) recorder — BEST EFFORT. flutter_webrtc's native
 /// `MediaRecorder` is built around a video track + AVAssetWriter; audio-only
@@ -14,7 +14,7 @@ GrokUtteranceRecorder createGrokRecorder() => _IoUtteranceRecorder();
 /// wire it (it works on Android and may work on some iOS builds) and let
 /// [stopAndRead] return null when the file never materialised, so the port can
 /// surface "no bytes" in the debug panel instead of crashing the call.
-class _IoUtteranceRecorder implements GrokUtteranceRecorder {
+class _IoUtteranceRecorder implements SwayUtteranceRecorder {
   MediaRecorder? _rec;
   String? _path;
   bool _recording = false;
@@ -29,7 +29,7 @@ class _IoUtteranceRecorder implements GrokUtteranceRecorder {
   @override
   Future<void> start(MediaStreamTrack track) async {
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/grok_utt_${_seq++}.m4a';
+    final path = '${dir.path}/sway_utt_${_seq++}.m4a';
     // Remove a stale file from a previous utterance with the same name.
     try {
       final f = File(path);
@@ -54,7 +54,7 @@ class _IoUtteranceRecorder implements GrokUtteranceRecorder {
       try {
         await rec.stop();
       } catch (e) {
-        debugPrint('Grok recorder(native): stop failed: $e');
+        debugPrint('recorder(native): stop failed: $e');
       }
     }
     if (path == null) return null;
@@ -67,7 +67,7 @@ class _IoUtteranceRecorder implements GrokUtteranceRecorder {
       } catch (_) {}
       return bytes.isEmpty ? null : bytes;
     } catch (e) {
-      debugPrint('Grok recorder(native): read failed: $e');
+      debugPrint('recorder(native): read failed: $e');
       return null;
     }
   }

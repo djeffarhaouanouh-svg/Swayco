@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 // Append a line to the on-screen debug overlay.
 // Only active when kDebugMode OR when the ?debug=1 URL param is present.
-// Usage: DebugOverlay.log('[grok-rt] something happened');
+// Usage: DebugOverlay.log('[sway-rt] something happened');
 class DebugOverlay extends StatefulWidget {
   const DebugOverlay({super.key, required this.child});
 

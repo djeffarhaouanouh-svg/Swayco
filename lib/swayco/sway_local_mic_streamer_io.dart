@@ -5,24 +5,24 @@ import 'package:record/record.dart';
 
 import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
-import '../services/stt/stt_service.dart';
+import 'asr/asr_service.dart';
 import '../services/translation_api.dart';
-import 'grok_mic_streamer_base.dart';
-import 'grok_mic_streamer_io.dart' show createXaiMicStreamer;
+import 'sway_mic_streamer_base.dart';
+import 'sway_mic_streamer_io.dart' show createCloudMicStreamer;
 
 /// Native (iOS/Android) SENDER-side pipeline, fully on-device for the STT step.
 ///
-/// Replaces the x.ai WebSocket: instead of shipping mic PCM to a remote STT
+/// Replaces the cloud engine WebSocket: instead of shipping mic PCM to a remote STT
 /// proxy, the audio never leaves the phone. Only the recognised **text** goes
 /// out, to the backend text-translation endpoint.
 ///
-///   record (PCM16 16 kHz, system AEC) → VAD segmentation → Moonshine|Vosk
-///     → fetchTextTranslation → onTranslation → peer synthesises with Kokoro
+///   record (PCM16 16 kHz, system AEC) → VAD segmentation → neural|lattice
+///     → fetchTextTranslation → onTranslation → peer synthesises with the local TTS engine
 ///
 /// STT runs on the LOCAL outgoing mic, never the remote track, and that mic is
 /// echo-cancelled — otherwise it would re-capture the translated voice coming
 /// out of the loudspeaker and transcribe it as if the user had spoken it.
-class LocalSttMicStreamer implements GrokMicStreamer {
+class LocalSttMicStreamer implements SwayMicStreamer {
   final AudioRecorder _rec = AudioRecorder();
   StreamSubscription<Uint8List>? _audioSub;
   bool _running = false;
@@ -30,8 +30,8 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   bool _dozing = false;
 
   /// Set when on-device STT is unavailable and we hand the call back to the
-  /// remote x.ai pipeline. Every member below then delegates to it.
-  GrokMicStreamer? _fallback;
+  /// remote the cloud engine pipeline. Every member below then delegates to it.
+  SwayMicStreamer? _fallback;
 
   String _sourceLang = '';
   String _targetLang = '';
@@ -85,13 +85,13 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
   // VAD (mean-square).
   //
-  // For a STREAMING engine (Vosk) this no longer segments anything — Kaldi's own
+  // For a STREAMING engine (lattice) this no longer segments anything — its own
   // endpointer does, via accept_waveform's return value. All it still does is
   // decide when the mic has been quiet long enough to release (doze), which is
   // purely a battery concern.
   //
-  // For a CLIP engine (Moonshine) it is load-bearing: it is what decides when to
-  // decode. The hangover is shorter than the x.ai streamer's 1.2 s because that
+  // For a CLIP engine (neural) it is load-bearing: it is what decides when to
+  // decode. The hangover is shorter than the cloud engine streamer's 1.2 s because that
   // trailing silence would show up directly as latency.
   static const double _vadThreshold = 0.0002;
   static const int _silenceFlushMs = 700;
@@ -113,7 +113,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   bool get isStreaming =>
       _fallback?.isStreaming ?? (_running && _modelReady && !_dozing);
 
-  /// x.ai re-sends the growing session transcript; the on-device path emits
+  /// the cloud engine re-sends the growing session transcript; the on-device path emits
   /// independent utterances. The caller reads this per callback, so it tracks
   /// whichever pipeline is actually live.
   @override
@@ -159,7 +159,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
         return;
       }
 
-      if (!SttService.supportsLang(sourceLang)) {
+      if (!AsrService.supportsLang(sourceLang)) {
         await _startFallback('unsupported_lang:$sourceLang');
         return;
       }
@@ -167,11 +167,11 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       // First call in a language downloads 30–60 MB. Capture starts anyway so
       // the call is never blocked on it; utterances are dropped until ready.
       unawaited(
-        SttService.instance.ensureLanguageInstalled(sourceLang).then((_) async {
-          _modelReady = SttService.instance.isReady;
+        AsrService.instance.ensureLanguageInstalled(sourceLang).then((_) async {
+          _modelReady = AsrService.instance.isReady;
           DebugOverlay.log('stt model ready=$_modelReady lang=$sourceLang');
           // Download failed, or the engine could not load — most often libvosk
-          // missing on this platform. Hand the call to x.ai rather than let the
+          // missing on this platform. Hand the call to the cloud engine rather than let the
           // user speak into a pipeline that will never answer.
           if (!_modelReady) await _startFallback('model_unavailable');
         }),
@@ -188,10 +188,10 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     }
   }
 
-  /// Tear down our capture and run the remote x.ai streamer instead.
+  /// Tear down our capture and run the remote the cloud engine streamer instead.
   Future<void> _startFallback(String reason) async {
     if (_fallback != null || !_running) return;
-    DebugOverlay.log('stt fallback → x.ai ($reason)');
+    DebugOverlay.log('stt fallback → the cloud engine ($reason)');
 
     await _audioSub?.cancel();
     _audioSub = null;
@@ -200,7 +200,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       await _rec.stop();
     } catch (_) {}
 
-    final streamer = createXaiMicStreamer();
+    final streamer = createCloudMicStreamer();
     _fallback = streamer;
     try {
       await streamer.start(
@@ -246,8 +246,8 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     // resetting — but do it so no stale hypothesis survives the gap until wake().
     _hasPending = false;
     _lastPartial = '';
-    if (SttService.instance.isStreaming && _modelReady) {
-      await SttService.instance.reset();
+    if (AsrService.instance.isStreaming && _modelReady) {
+      await AsrService.instance.reset();
     }
     await _audioSub?.cancel();
     _audioSub = null;
@@ -259,7 +259,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
   @override
   Future<void> wake() async {
-    if (_fallback != null) return; // x.ai never releases the mic
+    if (_fallback != null) return; // the cloud engine never releases the mic
     if (!_running || !_dozing) return;
     _dozing = false;
     try {
@@ -298,7 +298,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
       if (!_gated) {
         _gated = true;
         _utterance.clear();
-        if (SttService.instance.isStreaming && _modelReady) {
+        if (AsrService.instance.isStreaming && _modelReady) {
           // Either way, whatever the decoder holds was spoken BEFORE the gate
           // closed — before the mute was pressed, before our own TTS started.
           // Those words were said out loud, on purpose, to be heard. Flush and
@@ -329,7 +329,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     if (++_frames % 100 == 0) {
       DebugOverlay.log('stt pcm frames=$_frames level=${level.toStringAsFixed(6)} '
           'voiced=$voiced ready=$_modelReady '
-          'streaming=${SttService.instance.isStreaming} dozing=$_dozing');
+          'streaming=${AsrService.instance.isStreaming} dozing=$_dozing');
     }
 
     // Streaming engine: hand every frame straight to the decoder. It endpoints
@@ -337,9 +337,9 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     // ("bonjour sarah") and accept_waveform never returns 1, so no utterance
     // ever closes and nothing is ever sent. The VAD therefore stays as a
     // backstop: if a hypothesis is pending and the mic has been quiet for
-    // _silenceFlushMs, force the close ourselves. Kaldi's endpointer still wins
+    // _silenceFlushMs, force the close ourselves. the endpointer still wins
     // whenever it fires first, which is the common case mid-conversation.
-    if (SttService.instance.isStreaming) {
+    if (AsrService.instance.isStreaming) {
       if (_modelReady) {
         _serialize(() => _feed(samples, onTranslation, onError));
 
@@ -393,14 +393,14 @@ class LocalSttMicStreamer implements GrokMicStreamer {
   }
 
   /// Streaming path: one frame in, partials out, and a finished utterance
-  /// whenever Kaldi's endpointer closes one.
+  /// whenever the endpointer closes one.
   Future<void> _feed(
     Float32List samples,
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError,
   ) async {
     try {
-      final chunk = await SttService.instance.acceptFrame(samples);
+      final chunk = await AsrService.instance.acceptFrame(samples);
       if (chunk.partial.isNotEmpty) {
         _hasPending = true;
         if (chunk.partial != _lastPartial) {
@@ -428,7 +428,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     void Function(String, String, String, String) onTranslation, {
     bool force = false,
   }) async {
-    final text = await SttService.instance.flush();
+    final text = await AsrService.instance.flush();
     _lastPartial = '';
     _hasPending = false;
     if (text.trim().isEmpty) return;
@@ -437,14 +437,14 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     unawaited(_translateAndSend(text, onTranslation, _onError, force: force));
   }
 
-  /// Clip path (Moonshine): decode the whole VAD-clipped utterance at once.
+  /// Clip path (neural): decode the whole VAD-clipped utterance at once.
   Future<void> _recognizeAndTranslate(
     Float32List samples,
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError,
   ) async {
     try {
-      final orig = await SttService.instance.transcribe(samples);
+      final orig = await AsrService.instance.transcribe(samples);
       if (orig.trim().isEmpty) return;
       DebugOverlay.log('stt orig="$orig"');
       await _translateAndSend(orig, onTranslation, onError);
@@ -488,7 +488,7 @@ class LocalSttMicStreamer implements GrokMicStreamer {
     DebugOverlay.log('stt send trans="$trans"');
 
     // audioB64 empty: no TTS is generated here. The peer receives the text as
-    // a `kokoro` packet and synthesises it locally, in its own language.
+    // a local-TTS packet and synthesises it locally, in its own language.
     onTranslation(orig, trans, _targetLang, '');
   }
 
@@ -513,12 +513,12 @@ class LocalSttMicStreamer implements GrokMicStreamer {
 
   @override
   Future<void> stop() async {
-    // The engine outlives this streamer (SttService caches the loaded model),
+    // The engine outlives this streamer (AsrService caches the loaded model),
     // so leave its decoder clean for the next call rather than letting the last
     // half-utterance of this one prefix it.
-    if (_modelReady && SttService.instance.isStreaming) {
+    if (_modelReady && AsrService.instance.isStreaming) {
       try {
-        await SttService.instance.reset();
+        await AsrService.instance.reset();
       } catch (_) {}
     }
     _running = false;

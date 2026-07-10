@@ -10,7 +10,7 @@ class VoiceDownloader {
       'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX'
       '/resolve/main/voices';
 
-  // Mapping BCP-47 primary tag → default Kokoro voice name
+  // Mapping BCP-47 primary tag → default the local TTS engine voice name
   static const Map<String, String> _defaultVoices = {
     'en': 'af_heart',
     'fr': 'ff_siwis',
@@ -96,8 +96,8 @@ class VoiceDownloader {
   }
 
   static Future<Directory> voicesDir() async {
-    final kokoroDir = await ModelDownloader.kokoroDir();
-    final dir = Directory('${kokoroDir.path}/voices');
+    final speechDir = await ModelDownloader.speechDir();
+    final dir = Directory('${speechDir.path}/voices');
     await dir.create(recursive: true);
     return dir;
   }

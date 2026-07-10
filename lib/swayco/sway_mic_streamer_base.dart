@@ -1,4 +1,4 @@
-/// Streams the **local** microphone as PCM16 (16 kHz) to the backend Grok STT
+/// Streams the **local** microphone as PCM16 (16 kHz) to the backend cloud STT
 /// WebSocket proxy and surfaces translation results.
 ///
 /// IMPORTANT: STT runs on the LOCAL outgoing mic, never the remote track. The
@@ -7,7 +7,7 @@
 /// as if the local user spoke it (feedback loop). On the web the browser gives
 /// AEC via the `echoCancellation` constraint; native (option "b") must fork the
 /// stream LiveKit already AEC-processed. See the on-disk memory "STT on local mic".
-abstract class GrokMicStreamer {
+abstract class SwayMicStreamer {
   /// Open the WebSocket at [wsUrl] and start streaming mic PCM to it.
   ///
   /// [localTrack] is the LiveKit local audio track (type-erased as Object? to
@@ -17,13 +17,13 @@ abstract class GrokMicStreamer {
   ///
   /// Callbacks fire on the main isolate:
   /// - [onTranslation]`(orig, trans, lang, audioB64)` — one segment finalised +
-  ///   translated; audioB64 is the pre-generated Grok mp3 (base64), may be empty.
+  ///   translated; audioB64 is the pre-generated cloud mp3 (base64), may be empty.
   /// - [onPartial]`(text)` — interim transcript (live caption), best-effort.
   /// - [onError]`(code)` — a recoverable pipeline error.
   /// [captureLocalMic] true = capture MY mic (web: clone LiveKit track or
   /// getUserMedia fallback); false = capture remote participant voice.
   ///
-  /// [sourceLang] / [targetLang] are the route's BCP-47 tags. The x.ai path
+  /// [sourceLang] / [targetLang] are the route's BCP-47 tags. The the cloud engine path
   /// encodes them in [wsUrl] and ignores them; the on-device native path needs
   /// them directly, to pick which STT model to load and which language to
   /// translate into.
@@ -42,7 +42,7 @@ abstract class GrokMicStreamer {
   Future<void> stop();
 
   /// True while the mic has been released after a stretch of silence, to save
-  /// battery. Only the on-device native path dozes; the x.ai paths hold their
+  /// battery. Only the on-device native path dozes; the cloud engine paths hold their
   /// socket open for the whole call.
   bool get isDozing => false;
 
@@ -58,7 +58,7 @@ abstract class GrokMicStreamer {
   bool get isStreaming;
 
   /// True when `onTranslation` reports the whole session transcript so far,
-  /// growing with each callback (x.ai keeps session context and re-sends it).
+  /// growing with each callback (the cloud engine keeps session context and re-sends it).
   /// The caller must then publish only the delta, and dedup repeats.
   ///
   /// False when each callback is one independent, VAD-clipped utterance — the

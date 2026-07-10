@@ -12,7 +12,7 @@ import 'package:livekit_client/src/support/native_audio.dart';
 // ignore: implementation_imports
 import 'package:livekit_client/src/track/audio_management.dart';
 
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import 'livekit_web_audio.dart';
 import 'user_prefs.dart';
 
@@ -83,7 +83,7 @@ class AudioController extends ChangeNotifier {
     // Make LiveKit's own iOS audio-session config use mixWithOthers too, so it
     // doesn't override the AppDelegate's mix config when the call connects.
     // BOTH configurators must agree for iOS to actually mix the two WebRTC
-    // flows (LiveKit original + OpenAI translation) instead of silencing one.
+    // flows (LiveKit original + the live engine translation) instead of silencing one.
     if (!kIsWeb) {
       onConfigureNativeAudio = (AudioTrackState state) async {
         final base = await defaultNativeAudioConfigurationFunc(state);

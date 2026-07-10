@@ -9,7 +9,7 @@
 #
 #   pip install optimum optimum-onnx onnx onnxruntime transformers torch huggingface_hub
 #   hf auth login
-#   ./scripts/export_moonshine_onnx.sh
+#   ./scripts/export_neural_asr_onnx.sh
 #
 # Note: `optimum[exporters]` no longer exists — optimum 2.x moved the ONNX
 # exporter into the separate `optimum-onnx` distribution. `--optimize O2` is

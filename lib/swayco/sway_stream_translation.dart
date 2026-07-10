@@ -10,29 +10,30 @@ import 'package:livekit_client/livekit_client.dart';
 import '../services/analytics.dart';
 import '../services/debug_overlay.dart';
 import '../services/translation_api.dart';
-import 'grok_mic_streamer_base.dart';
-import 'grok_mic_streamer_io.dart'
-    if (dart.library.js_interop) 'grok_mic_streamer_web.dart';
+import 'sway_mic_streamer_base.dart';
+import 'sway_mic_streamer_io.dart'
+    if (dart.library.js_interop) 'sway_mic_streamer_web.dart';
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
+import 'wire_compat.dart';
 
-/// Realtime Grok translation.
+/// Realtime streamed translation.
 ///
-/// SEND (all platforms): captures MY mic, streams PCM to the backend Grok STT
-/// proxy, and publishes the translated Grok voice to the peer via the LiveKit
+/// SEND (all platforms): captures MY mic, streams PCM to the backend cloud STT
+/// proxy, and publishes the translated cloud voice to the peer via the LiveKit
 /// data channel (voiceOnly=true). The peer plays it through
 /// call_screen._onCaptionData — but ONLY on native, since on web RECV handles
 /// playback (see below).
 ///
 /// RECV (web only): captures the REMOTE participant's WebRTC audio track,
-/// streams it to Grok for translation, and plays the result locally. On
+/// streams it to the cloud engine for translation, and plays the result locally. On
 /// native, the peer's SEND pipeline already sends TTS for us to play via the
 /// data channel, so no RECV is needed.
 ///
 /// On web, _onCaptionData skips voiceOnly data-channel packets (RECV handles
 /// playback), which eliminates double-play and the associated speaker-echo
 /// → SEND re-translation feedback loop.
-class GrokRealtimeTranslation extends ChangeNotifier
+class SwayStreamTranslation extends ChangeNotifier
     implements RealtimeTranslationPort {
   static const String _captionTopic = 'swayco-chat';
   static const int _maxAudioB64 = 60000;
@@ -41,7 +42,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
   TranslationRoute? _route;
   EventsListener<RoomEvent>? _listener;
 
-  GrokMicStreamer? _sendStreamer;
+  SwayMicStreamer? _sendStreamer;
 
   final AudioPlayer _player = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
@@ -55,7 +56,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
   // Dedup: prevent publishing the same translation twice within 3 s.
   String _lastSentTrans = '';
   int _lastSentMs = 0;
-  // Delta: Grok accumulates the full session context and re-sends the growing
+  // Delta: the cloud engine accumulates the full session context and re-sends the growing
   // translation each time. Track the last full backend text so we publish
   // only the new portion (delta) instead of the entire accumulated string.
   String _lastBackendTrans = '';
@@ -99,7 +100,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
             ? 'NON-CONFIG'
             : '${route.sourceBcp47}↔${route.targetBcp47}');
     final lines = <String>[
-      'Grok RT: send=${_sendStreamer?.isStreaming ?? false} • route: $routeLabel • '
+      'Stream RT: send=${_sendStreamer?.isStreaming ?? false} • route: $routeLabel • '
           'envois: $_sent',
     ];
     if (_lastSent != null) lines.add('MOI→: $_lastSent');
@@ -113,7 +114,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     await detach();
     _room = room;
     _route = route;
-    debugPrint('[grok-rt] attach src=${route.sourceBcp47} tgt=${route.targetBcp47}');
+    debugPrint('[sway-rt] attach src=${route.sourceBcp47} tgt=${route.targetBcp47}');
     if (!route.isConfigured) return;
 
     await _player.setReleaseMode(ReleaseMode.stop);
@@ -125,7 +126,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     });
 
     // RECV disabled: the remote peer's SEND pipeline delivers translations
-    // via the data channel (kokoro packet → _onCaptionData → speakDeviceTts).
+    // via the data channel (speech packet → _onCaptionData → speakDeviceTts).
     // Running RECV in parallel caused double-playback and bad transcriptions
     // from degraded WebRTC audio capture.
 
@@ -148,7 +149,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     // instead of opening a 2nd getUserMedia on the same device.
     final localAudioTrack =
         room.localParticipant?.audioTrackPublications.firstOrNull?.track;
-    final sendStreamer = createGrokMicStreamer();
+    final sendStreamer = createSwayMicStreamer();
     _sendStreamer = sendStreamer;
 
     // The on-device streamer releases the mic after ~20 s of silence. Once it
@@ -168,10 +169,10 @@ class GrokRealtimeTranslation extends ChangeNotifier
     unawaited(
       sendStreamer
           .start(
-            wsUrl: grokSttWsUri(
+            wsUrl: voiceSttWsUri(
               from: route.sourceBcp47,
               to: route.targetBcp47,
-              kokoroTts: true,
+              localTts: true,
             ),
             localTrack: localAudioTrack,
             captureLocalMic: true,
@@ -224,7 +225,7 @@ class GrokRealtimeTranslation extends ChangeNotifier
     _lastError = null;
     DebugOverlay.log('onSendTrans orig="${orig.substring(0, orig.length.clamp(0, 40))}" trans="${trans.substring(0, trans.length.clamp(0, 40))}" lang=$lang audio=${audioB64.length}b');
 
-    // Delta: Grok re-sends the FULL accumulated session translation each time.
+    // Delta: the cloud engine re-sends the FULL accumulated session translation each time.
     // Only publish the portion that is new relative to the last backend response
     // so the peer doesn't hear the same phrase repeated. The on-device streamer
     // emits independent utterances, so neither delta nor dedup applies there.
@@ -267,13 +268,14 @@ class GrokRealtimeTranslation extends ChangeNotifier
         };
       } else {
         payload = {
-          'kokoro': true,
+          kLocalTtsFlag: true,
+          kLegacyLocalTtsFlag: true,
           'orig': orig,
           'trans': transToSend,
           'lang': lang,
         };
       }
-      DebugOverlay.log('publishData type=${payload.containsKey('kokoro') ? 'kokoro' : 'voiceOnly'} trans="${transToSend.substring(0, transToSend.length.clamp(0, 40))}"');
+      DebugOverlay.log('publishData type=${payload.containsKey(kLocalTtsFlag) ? 'localTts' : 'voiceOnly'} trans="${transToSend.substring(0, transToSend.length.clamp(0, 40))}"');
       unawaited(
         room.localParticipant
             ?.publishData(
@@ -290,8 +292,8 @@ class GrokRealtimeTranslation extends ChangeNotifier
           langFrom: route.sourceBcp47,
           langTo: route.targetBcp47,
           props: {
-            'phase': 'grok_rt',
-            'tts': audioB64.isNotEmpty ? 'grok' : 'kokoro',
+            'phase': 'sway_rt',
+            'tts': audioB64.isNotEmpty ? 'cloud' : 'local',
           },
         );
       }

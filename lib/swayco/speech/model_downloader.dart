@@ -10,7 +10,7 @@ class ModelDownloader {
   static const _fileName = 'model.onnx';
 
   Future<File> ensureModel({void Function(double)? onProgress}) async {
-    final dir = await _kokoroDir();
+    final dir = await _speechDir();
     final file = File('${dir.path}/$_fileName');
     if (await file.exists()) return file;
 
@@ -21,11 +21,11 @@ class ModelDownloader {
     return file;
   }
 
-  static Future<Directory> kokoroDir() => _kokoroDir();
+  static Future<Directory> speechDir() => _speechDir();
 
-  static Future<Directory> _kokoroDir() async {
+  static Future<Directory> _speechDir() async {
     final base = await getApplicationSupportDirectory();
-    final dir = Directory('${base.path}/kokoro');
+    final dir = Directory('${base.path}/speech');
     await dir.create(recursive: true);
     return dir;
   }
@@ -38,7 +38,7 @@ class ModelDownloader {
     final req = http.Request('GET', Uri.parse(url));
     final resp = await http.Client().send(req);
     if (resp.statusCode != 200) {
-      throw Exception('Kokoro download HTTP ${resp.statusCode}: $url');
+      throw Exception('the local TTS engine download HTTP ${resp.statusCode}: $url');
     }
     final total = resp.contentLength ?? 0;
     var received = 0;

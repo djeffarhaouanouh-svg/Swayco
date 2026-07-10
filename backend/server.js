@@ -181,6 +181,11 @@ const GROK_TRANSLATE_MODEL = (process.env.GROK_TRANSLATE_MODEL?.trim() || 'grok-
 /** TTS model id — optional; only sent if set (the /v1/tts endpoint accepts
  *  text/voice_id/language without a model on most accounts). */
 const GROK_TTS_MODEL = process.env.GROK_TTS_MODEL?.trim() || '';
+
+// Public names of the utterance pipeline. The client only knows the `voice`
+// spelling; the `grok` ones are answered for app builds already in the stores.
+const VOICE_HTTP_PATHS = ['/translation/voice', '/translation/grok'];
+const VOICE_STT_WS_PATHS = ['/translation/voice/stt', '/translation/grok/stt'];
 /** One of: ara, eve, leo, rex, sal. */
 const GROK_TTS_VOICE = (process.env.GROK_TTS_VOICE?.trim() || 'eve');
 /** Realtime STT WebSocket base — derived from GROK_BASE (https→wss) unless
@@ -447,7 +452,7 @@ app.get('/api', (_req, res) => {
       livekitToken: 'POST /livekit/token',
       translationSession: 'POST /translation/realtime/session',
       translationCalls: 'POST /translation/realtime/calls (SDP relay, Authorization: Bearer ephemeral)',
-      translationGrok: 'POST /translation/grok (TEST: multipart audio → STT/translate/TTS via Grok)',
+      translationVoice: 'POST /translation/voice (multipart audio → STT/translate/TTS)',
     },
   });
 });
@@ -1035,24 +1040,27 @@ app.post('/translation/tts', _limText, async (req, res) => {
 });
 
 /**
- * POST /translation/grok  (multipart/form-data)  —  TEST PIPELINE
+ * POST /translation/voice  (multipart/form-data)
  *
  * Fields:
  *   audio   — one captured utterance (webm / m4a / mp3 / wav / ogg)
  *   from?   — BCP-47 source primary subtag (the spoken language)
  *   to      — BCP-47 target primary subtag (what to speak back)
- *   voice?  — Grok TTS voice (ara|eve|leo|rex|sal)
+ *   voice?  — voice id (ara|eve|leo|rex|sal)
  *
  * Returns: audio/mpeg (the translated speech).
  * On STT producing empty text, returns 204 (nothing to speak).
  *
- * Runs the whole thing through Grok: STT (/v1/stt) → translate
- * (/v1/chat/completions) → TTS (/v1/tts). This is a throwaway test path —
- * the OpenAI realtime pipeline is left in place. The transcript and the
- * translation are echoed back in the `X-Grok-Transcript` / `X-Grok-Translation`
- * response headers so the on-screen debug panel can show them.
+ * Runs one utterance through the cloud STT → translate → TTS chain. The
+ * transcript and the translation are echoed back in the `X-Sway-Transcript` /
+ * `X-Sway-Translation` response headers so the on-screen debug panel can show
+ * them.
+ *
+ * `/translation/grok` is the legacy path: app builds already in the stores call
+ * it and read the `X-Grok-*` headers. Both are answered by this one handler,
+ * and both header sets are sent, until those builds age out.
  */
-app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req, res) => {
+app.post(VOICE_HTTP_PATHS, _limTight, voiceUpload.single('audio'), async (req, res) => {
   if (!GROK_API_KEY) {
     return res.status(500).json({ error: 'grok_not_configured' });
   }
@@ -1141,9 +1149,17 @@ app.post('/translation/grok', _limTight, voiceUpload.single('audio'), async (req
       props: { chars: transcript.length, voice },
     });
     // Encode the texts so non-ASCII (accents, CJK) survives HTTP header rules.
-    res.set('X-Grok-Transcript', encodeURIComponent(transcript));
-    res.set('X-Grok-Translation', encodeURIComponent(translated));
-    res.set('Access-Control-Expose-Headers', 'X-Grok-Transcript, X-Grok-Translation');
+    // `X-Grok-*` duplicates `X-Sway-*` for app builds already in the stores.
+    const encTranscript = encodeURIComponent(transcript);
+    const encTranslation = encodeURIComponent(translated);
+    res.set('X-Sway-Transcript', encTranscript);
+    res.set('X-Sway-Translation', encTranslation);
+    res.set('X-Grok-Transcript', encTranscript);
+    res.set('X-Grok-Translation', encTranslation);
+    res.set(
+      'Access-Control-Expose-Headers',
+      'X-Sway-Transcript, X-Sway-Translation, X-Grok-Transcript, X-Grok-Translation',
+    );
     return res.status(200).type('audio/mpeg').send(audio);
   }
 });
@@ -2043,21 +2059,33 @@ if (hasWebUi) {
   });
 }
 
-// ─── Grok realtime STT — WebSocket proxy ───────────────────────────────────
+// ─── Cloud realtime STT — WebSocket proxy ──────────────────────────────────
 // The app streams its OWN microphone PCM16 (16 kHz, 100 ms frames) to us; we
-// relay it to xAI's realtime STT WebSocket (the API key stays server-side, as
-// xAI requires), and on each utterance-final transcript we translate + TTS and
-// push the result back. The app then forwards that translation to the peer over
-// the LiveKit data channel. STT runs on the LOCAL outgoing mic, never the
-// remote track — that is what makes this native-direct (no PCM tap on a remote
-// WebRTC stream). Shares grokTranslateText / grokSynthesizeSpeech with the POST
-// path. Endpoint: wss://<host>/translation/grok/stt?from=fr&to=ja&voice=eve
+// relay it to the upstream realtime STT WebSocket (the API key stays
+// server-side, as the provider requires), and on each utterance-final
+// transcript we translate + TTS and push the result back. The app then forwards
+// that translation to the peer over the LiveKit data channel. STT runs on the
+// LOCAL outgoing mic, never the remote track — that is what makes this
+// native-direct (no PCM tap on a remote WebRTC stream). Shares the translate /
+// synthesize helpers with the POST path.
+// Endpoint: wss://<host>/translation/voice/stt?from=fr&to=ja&voice=eve
 const { WebSocketServer, WebSocket: WsClient } = require('ws');
 
 const GROK_STT_SAMPLE_RATES = [8000, 16000, 22050, 24000, 44100, 48000];
 
 function attachGrokSttWs(server) {
-  const wss = new WebSocketServer({ server, path: '/translation/grok/stt' });
+  // `noServer` + manual upgrade routing: a `ws` server bound with `path`
+  // destroys every upgrade that misses its path, so two of them on one HTTP
+  // server would fight. One server, both paths, legacy builds keep working.
+  const wss = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (req, socket, head) => {
+    const path = (req.url || '').split('?')[0];
+    if (!VOICE_STT_WS_PATHS.includes(path)) {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  });
 
   wss.on('connection', (client, req) => {
     const sendCtl = (obj) => {
@@ -2072,8 +2100,11 @@ function attachGrokSttWs(server) {
     const url = new URL(req.url, 'http://localhost');
     const from = primaryLanguageTag(url.searchParams.get('from') || '');
     const to = primaryLanguageTag(url.searchParams.get('to') || '');
-    // kokoro=true → native client synthesises locally; skip Grok TTS entirely.
-    const kokoroMode = url.searchParams.get('kokoro') === 'true';
+    // local_tts=true → native client synthesises locally; skip cloud TTS. The
+    // `kokoro` spelling is what app builds already in the stores send.
+    const localTtsMode =
+      url.searchParams.get('local_tts') === 'true' ||
+      url.searchParams.get('kokoro') === 'true';
     const voice = (() => {
       const v = (url.searchParams.get('voice') || '').trim().toLowerCase();
       return ['ara', 'eve', 'leo', 'rex', 'sal'].includes(v) ? v : GROK_TTS_VOICE;
@@ -2146,12 +2177,12 @@ function attachGrokSttWs(server) {
       const tr = await grokTranslateText({ transcript, from, to });
       if (tr.error) return sendCtl({ type: 'error', error: tr.error });
 
-      if (kokoroMode) {
+      if (localTtsMode) {
         track({
           event: 'grok_stt_translation',
           lang_from: from || undefined,
           lang_to: to,
-          props: { chars: transcript.length, tts: 'kokoro' },
+          props: { chars: transcript.length, tts: 'local' },
         });
         sendCtl({
           type: 'translation',

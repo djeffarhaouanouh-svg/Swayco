@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// Decode-only detokenizer for Moonshine, built from the `tokenizer.json`
+/// Decode-only detokenizer for the neural engine, built from the `tokenizer.json`
 /// shipped alongside the ONNX graphs.
 ///
 /// We never encode — the model consumes audio, not text — so only the
 /// id → piece direction is needed.
 ///
-/// Moonshine uses a SentencePiece-style BPE (`tokenizer.json` declares the
+/// It uses a SentencePiece-style BPE (`tokenizer.json` declares the
 /// decoder sequence Replace(`▁` → space) → ByteFallback → Fuse → Strip):
 /// - `▁` prefixes a word boundary;
 /// - any character the vocabulary lacks was split into `<0xNN>` byte tokens,
@@ -15,16 +15,16 @@ import 'dart:io';
 ///   Japanese, Chinese, Korean and Arabic text survives a 32 k Latin-ish
 ///   vocabulary, so the fusing is not optional.
 ///
-/// It is *not* GPT-2 byte-level BPE, despite a lone `Ġ` sitting in the vocab.
-class MoonshineTokenizer {
-  MoonshineTokenizer._(this._pieces, this._specialIds);
+/// It is *not* byte-level BPE, despite a lone `Ġ` sitting in the vocab.
+class NeuralAsrTokenizer {
+  NeuralAsrTokenizer._(this._pieces, this._specialIds);
 
   final List<String> _pieces;
   final Set<int> _specialIds;
 
   static final _byteToken = RegExp(r'^<0x([0-9A-Fa-f]{2})>$');
 
-  static Future<MoonshineTokenizer> load(String tokenizerJsonPath) async {
+  static Future<NeuralAsrTokenizer> load(String tokenizerJsonPath) async {
     final json = jsonDecode(await File(tokenizerJsonPath).readAsString())
         as Map<String, dynamic>;
 
@@ -47,7 +47,7 @@ class MoonshineTokenizer {
       if (m['special'] == true) specials.add(m['id'] as int);
     }
 
-    return MoonshineTokenizer._(pieces, specials);
+    return NeuralAsrTokenizer._(pieces, specials);
   }
 
   /// Ids the greedy loop must never emit as text.

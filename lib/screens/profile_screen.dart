@@ -963,7 +963,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 /// Compact translation-credits indicator. Anxiety-by-stopwatch was the
-/// number one piece of OpenAI's UX feedback on this surface, so the
+/// number one piece of the live engine's UX feedback on this surface, so the
 /// card no longer renders the giant "X min remaining" + lifetime grid.
 /// Instead it shows:
 ///   - one line of "X crédits restants" in the active tier's unit,
@@ -3644,7 +3644,7 @@ class _GhostIconButton extends StatelessWidget {
 /// "Voix clonée ✓" state once the backend confirms.
 ///
 /// Tap to start recording → tap again to send → spinner while
-/// ElevenLabs processes → state updates. Re-enrolment is supported
+/// the voice provider processes → state updates. Re-enrolment is supported
 /// (record again to overwrite the stored voice_id; backend deletes the
 /// previous one to free the slot).
 // ignore: unused_element  — temporarily not rendered (see profile build),
@@ -3679,7 +3679,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
   /// a successful enrol and the parent's profile refetch landing.
   bool _justEnrolled = false;
 
-  /// Recommended sample length for ElevenLabs IVC. Below 20 s the
+  /// Recommended sample length for the cloning provider. Below 20 s the
   /// clone quality drops sharply; above 60 s we hit the cap of the
   /// per-recording quota and stop automatically.
   static const Duration _maxSample = Duration(seconds: 60);
@@ -3716,7 +3716,7 @@ class _VoiceCloneCardState extends State<_VoiceCloneCard> {
       final path = await _recordingPath();
       // Higher bitrate than chat messages: IVC quality is sensitive to
       // compression artefacts. AAC 96 kbit/s mono 22 kHz is a good
-      // compromise that ElevenLabs handles cleanly.
+      // compromise that the voice provider handles cleanly.
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,

@@ -28,17 +28,17 @@ import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
-import 'services/kokoro/kokoro_service.dart';
-import 'services/stt/stt_service.dart';
+import 'swayco/speech/speech_service.dart';
+import 'swayco/asr/asr_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/debug_overlay.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
-// Grok realtime translation (web + native). OpenAI and chunk pipelines are
+// Streamed realtime translation (web + native). The live engine and chunk pipelines are
 // left intact in the tree for store builds / revert.
-import 'translation/grok_realtime_translation.dart';
-import 'translation/realtime_translation_port.dart';
+import 'swayco/sway_stream_translation.dart';
+import 'swayco/realtime_translation_port.dart';
 import 'widgets/splash_screen_animation.dart';
 
 /// Runs in a dedicated background isolate when a data push lands while the
@@ -134,11 +134,11 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
     }
-    // Kokoro local TTS: start model download in background so it's ready
-    // before the first call. Native-only; KokoroService.init() is a no-op
+    // Local TTS: start model download in background so it's ready
+    // before the first call. Native-only; SpeechService.init() is a no-op
     // on web. ~21 MB first download, then loads the ONNX session (~1–3 s).
     if (!kIsWeb) {
-      unawaited(KokoroService.instance.init());
+      unawaited(SpeechService.instance.init());
     }
     // Seed the hide-online cache so presence renders are correct on
     // the first frame. 2s cap — SharedPreferences must never block.
@@ -204,18 +204,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   /// Lazy — constructed on first access via [_getTranslation], so
   /// `livekit_client` and `flutter_webrtc` Dart-side warm-up is
   /// deferred until the user actually navigates to a call.
-  // TEST: was `OpenAiRealtimeTranslation` — swapped for the Grok pipeline.
-  // Web uses the realtime STT pipeline (GrokRealtimeTranslation): streams my
-  // local mic to xAI realtime STT via MediaStreamTrackProcessor (Web Audio gave
-  // level=0), translates, and pushes the Grok VOICE to the peer voice-only (no
+  // TEST: was `SwayLiveTranslation` — swapped for the streamed pipeline.
+  // Web uses the realtime STT pipeline (SwayStreamTranslation): streams my
+  // local mic to cloud realtime STT via MediaStreamTrackProcessor (Web Audio gave
+  // level=0), translates, and pushes the cloud voice to the peer voice-only (no
   // subtitle). Native keeps the receiver-side chunk pipeline for now.
   RealtimeTranslationPort? _translation;
   RealtimeTranslationPort _getTranslation() {
-    // Grok realtime on web AND native: each phone captures its OWN mic (web:
-    // getUserMedia; native: record → PCM16 WS) and forwards the translated Grok
+    // Streamed realtime on web AND native: each phone captures its OWN mic (web:
+    // getUserMedia; native: record → PCM16 WS) and forwards the translated cloud voice
     // voice to the peer, who plays it. Native can't tap the remote track, but it
     // doesn't need to — the peer sends its own translation.
-    final RealtimeTranslationPort created = GrokRealtimeTranslation();
+    final RealtimeTranslationPort created = SwayStreamTranslation();
     return _translation ??= created;
   }
   StreamSubscription<AuthState>? _authSub;
@@ -301,9 +301,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         if (localProfile != null && localProfile.sourceLang.isNotEmpty) {
           AppStrings.setFromCode(localProfile.sourceLang);
           if (!kIsWeb) {
-            unawaited(KokoroService.instance
+            unawaited(SpeechService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
-            unawaited(SttService.instance
+            unawaited(AsrService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
           }
         }
@@ -449,11 +449,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       if (lang.trim().isNotEmpty) {
         AppStrings.setFromCode(lang);
         if (!kIsWeb) {
-          unawaited(KokoroService.instance.ensureLanguageInstalled(lang));
+          unawaited(SpeechService.instance.ensureLanguageInstalled(lang));
           // STT reads this phone's own mic, so the model we need is the one for
-          // the account's language — the same one Kokoro just installed a voice
+          // the account's language — the same one the local TTS engine just installed a voice
           // for. ~30–60 MB, downloaded once, never during a call.
-          unawaited(SttService.instance.ensureLanguageInstalled(lang));
+          unawaited(AsrService.instance.ensureLanguageInstalled(lang));
         }
         // Keep the local cache in step so the next cold boot restores in the
         // account's language immediately (no stale-language flash).

@@ -103,11 +103,11 @@ Uri _translationTtsUri() {
   return Uri.parse('$b/translation/tts');
 }
 
-Uri _translationGrokUri() {
+Uri _translationVoiceUri() {
   const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
   if (fromEnv.isNotEmpty) {
     final b = fromEnv.replaceAll(RegExp(r'/$'), '');
-    return Uri.parse('$b/translation/grok');
+    return Uri.parse('$b/translation/voice');
   }
   if (kIsWeb) {
     final o = Uri.base.removeFragment();
@@ -115,38 +115,38 @@ Uri _translationGrokUri() {
       scheme: o.scheme,
       host: o.host,
       port: o.hasPort ? o.port : null,
-      path: '/translation/grok',
+      path: '/translation/voice',
     );
   }
   final b = resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '');
-  return Uri.parse('$b/translation/grok');
+  return Uri.parse('$b/translation/voice');
 }
 
-/// Realtime STT WebSocket URI: `ws(s)://<backend>/translation/grok/stt`
+/// Realtime STT WebSocket URI: `ws(s)://<backend>/translation/voice/stt`
 /// Sender-side route: [from] = my spoken language, [to] = the peer's language
 /// (the language we translate INTO and speak to them). Mirrors the resolution
-/// of [_translationGrokUri] but swaps the scheme to ws/wss.
-Uri grokSttWsUri({
+/// of [_translationVoiceUri] but swaps the scheme to ws/wss.
+Uri voiceSttWsUri({
   required String from,
   required String to,
   String voice = 'eve',
-  // When true the backend skips Grok TTS and sends only translated text;
-  // the native app generates audio locally with Kokoro.
-  bool kokoroTts = false,
+  // When true the backend skips cloud TTS and sends only translated text;
+  // the native app generates audio locally with the local TTS engine.
+  bool localTts = false,
 }) {
   final query = <String, String>{
     if (from.isNotEmpty) 'from': from,
     'to': to,
     'voice': voice,
     'sample_rate': '16000',
-    if (kokoroTts) 'kokoro': 'true',
+    if (localTts) 'local_tts': 'true',
   };
   String wsScheme(String httpScheme) => httpScheme == 'https' ? 'wss' : 'ws';
   Uri build(String scheme, String host, int? port) => Uri(
         scheme: wsScheme(scheme),
         host: host,
         port: port,
-        path: '/translation/grok/stt',
+        path: '/translation/voice/stt',
         queryParameters: query,
       );
 
@@ -171,7 +171,7 @@ Map<String, dynamic> _decodeObjectMap(String body) {
   throw FormatException('response is not a JSON object');
 }
 
-/// Extract [expires_at] from OpenAI `client_secrets` response (seconds or ms since epoch).
+/// Extract [expires_at] from the live engine `client_secrets` response (seconds or ms since epoch).
 DateTime? pickSessionExpiresAt(Map<String, dynamic> j) {
   num? n;
   final cs = j['client_secret'];
@@ -199,7 +199,7 @@ DateTime? pickSessionExpiresAt(Map<String, dynamic> j) {
   return DateTime.fromMillisecondsSinceEpoch((v * 1000).toInt());
 }
 
-/// Extract ephemeral client secret from OpenAI `client_secrets` JSON (shapes vary).
+/// Extract ephemeral client secret from the live engine `client_secrets` JSON (shapes vary).
 String? pickClientSecret(Map<String, dynamic> j) {
   final cs = j['client_secret'];
   if (cs is String && cs.isNotEmpty) return cs;
@@ -310,7 +310,7 @@ class TranslationContext {
 }
 
 /// Context-aware chat-message translation via the backend
-/// (`/translation/text` → OpenAI gpt-4.1 with conversation history and
+/// (`/translation/text`, which prompts the text engine with conversation history and
 /// speaker profiles). Returns the translated string; falls back to the
 /// original [text] on any error so the UI never goes blank.
 Future<String> fetchTextTranslation({
@@ -351,8 +351,8 @@ Future<String> fetchTextTranslation({
   }
 }
 
-/// Text-to-speech via the backend (`/translation/tts` → OpenAI
-/// gpt-4o-mini-tts). POSTs the text (+ optional BCP-47 [lang] and [voice])
+/// Text-to-speech via the backend (`/translation/tts`, which drives the cloud
+/// voice engine). POSTs the text (+ optional BCP-47 [lang] and [voice])
 /// and returns the spoken audio bytes (mp3), or null on any error so the
 /// caller can silently skip playback. The backend is expected to return the
 /// raw audio body (Content-Type audio/mpeg).
@@ -380,22 +380,22 @@ Future<Uint8List?> fetchSpeech({
   }
 }
 
-/// Result of the Grok TEST pipeline: translated speech [audio] (mp3) plus the
+/// Result of the cloud engine TEST pipeline: translated speech [audio] (mp3) plus the
 /// recognised [transcript] and [translation] (echoed by the backend headers,
 /// handy for the on-screen debug panel). Any field can be empty/null.
-class GrokTranslationResult {
-  const GrokTranslationResult({this.audio, this.transcript, this.translation});
+class SwayTranslationResult {
+  const SwayTranslationResult({this.audio, this.transcript, this.translation});
   final Uint8List? audio;
   final String? transcript;
   final String? translation;
 }
 
-/// TEST: posts one captured utterance ([audioBytes], with [mimeType] / [filename]
-/// matching the recorder's container) to `/translation/grok`, which runs it
-/// fully through Grok (STT → translate → TTS) and returns the spoken
+/// Posts one captured utterance ([audioBytes], with [mimeType] / [filename]
+/// matching the recorder's container) to `/translation/voice`, which runs it
+/// fully through the cloud engine (STT → translate → TTS) and returns the spoken
 /// translation as mp3 bytes. Returns null on any error or when the backend
-/// found nothing to say (HTTP 204). Does NOT touch the OpenAI pipeline.
-Future<GrokTranslationResult?> fetchGrokTranslation({
+/// found nothing to say (HTTP 204). Does NOT touch the live pipeline.
+Future<SwayTranslationResult?> fetchVoiceTranslation({
   required Uint8List audioBytes,
   required String to,
   String? from,
@@ -403,7 +403,7 @@ Future<GrokTranslationResult?> fetchGrokTranslation({
   String filename = 'utt.webm',
 }) async {
   if (audioBytes.isEmpty) return null;
-  final uri = _translationGrokUri();
+  final uri = _translationVoiceUri();
   try {
     final req = http.MultipartRequest('POST', uri)
       ..fields['to'] = to
@@ -440,10 +440,15 @@ Future<GrokTranslationResult?> fetchGrokTranslation({
       }
     }
 
-    return GrokTranslationResult(
+    // `x-grok-*` is the legacy spelling: fall back to it so a client shipped
+    // ahead of the backend deploy still surfaces the debug transcript.
+    String? header(String name, String legacy) =>
+        decodeHeader(name) ?? decodeHeader(legacy);
+
+    return SwayTranslationResult(
       audio: res.bodyBytes.isEmpty ? null : res.bodyBytes,
-      transcript: decodeHeader('x-grok-transcript'),
-      translation: decodeHeader('x-grok-translation'),
+      transcript: header('x-sway-transcript', 'x-grok-transcript'),
+      translation: header('x-sway-translation', 'x-grok-translation'),
     );
   } catch (e) {
     if (e is TranslationApiException) rethrow;

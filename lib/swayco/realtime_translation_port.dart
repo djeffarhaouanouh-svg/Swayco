@@ -10,14 +10,14 @@ enum TranslationFeedbackPhase {
   standby,
   /// Fetching token, SDP, or WebRTC connecting.
   working,
-  /// OpenAI path connected and receiving media.
+  /// the live engine path connected and receiving media.
   live,
 }
 
 /// Abstraction for bidirectional realtime speech translation.
 ///
 /// Next steps (server-side recommended):
-/// - Create ephemeral OpenAI Realtime sessions in `backend` (never ship API keys in Flutter).
+/// - Create ephemeral the live engine sessions in `backend` (never ship API keys in Flutter).
 /// - Stream microphone audio to your bridge; receive translated audio or text.
 /// - Optionally mix translated audio or publish via a second LiveKit track / data channel.
 abstract class RealtimeTranslationPort {
@@ -32,7 +32,7 @@ abstract class RealtimeTranslationPort {
   /// [ListenableBuilder] so hidden WebRTC playback rebuilds.
   Listenable? get translationListenable => null;
 
-  /// e.g. tiny [RTCVideoView] for translated remote audio (OpenAI path).
+  /// e.g. tiny [RTCVideoView] for translated remote audio (the live engine path).
   Widget? buildTranslationAudioOverlay() => null;
 
   /// Shown in-call for immediate feedback (progress, chips).
@@ -53,7 +53,7 @@ abstract class RealtimeTranslationPort {
   /// Short, human-readable status of the translation audio pipeline, surfaced
   /// in an on-screen debug panel. The user builds on a remote Mac and has no
   /// way to read device logs, so the phone itself must show whether the
-  /// OpenAI connection is up and whether the translated track is playing.
+  /// the live engine connection is up and whether the translated track is playing.
   String get translationDiagnostics => '';
 }
 

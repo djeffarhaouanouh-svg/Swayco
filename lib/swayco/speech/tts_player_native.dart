@@ -7,8 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'voice_downloader.dart';
 
-// ─────────────────────────── Kokoro vocabulary ───────────────────────────────
-// Mirrors hexgrad/kokoro tokenize.py.  Characters absent from the map are
+// ─────────────────────────── the local TTS engine vocabulary ───────────────────────────────
+// Mirrors hexgrad/speech tokenize.py.  Characters absent from the map are
 // silently dropped, so the tokenizer is safe with any phonemizer output.
 
 const _kPunct = ';:,.!?¡¿—…"«»“” ';
@@ -59,7 +59,7 @@ String _phonemize(String text, String langCode) {
 
 // ── English ───────────────────────────────────────────────────────────────────
 // Common words table + digraph substitutions. Vowels are left as ASCII letters
-// (they're in the Kokoro vocab); only consonant clusters and function words are
+// (they're in the local TTS engine vocab); only consonant clusters and function words are
 // phonemized to IPA for better accuracy.
 
 const _enWords = <String, String>{
@@ -584,7 +584,7 @@ class TtsPlayer {
     String voicePath,
   ) async {
     final session = _session;
-    if (session == null) throw StateError('Kokoro model not loaded');
+    if (session == null) throw StateError('the local TTS engine model not loaded');
     if (_inferring) return; // Drop if already speaking
     _inferring = true;
 
@@ -606,7 +606,7 @@ class TtsPlayer {
       final tokens = Int64List.fromList([0, ...ids, 0]);
 
       // Style: [1, 1, 256]. The voice file is a [510, 1, 256] table of style
-      // embeddings indexed by *unpadded token count* — Kokoro conditions
+      // embeddings indexed by *unpadded token count* — the local TTS engine conditions
       // prosody on utterance length. Row 0 is the embedding of an empty
       // sequence, so reading it for every phrase (as this used to) flattens
       // the prosody of all speech. The table stops at 510 tokens.
@@ -667,7 +667,7 @@ class TtsPlayer {
       // Write WAV to a temp file and play
       final wav = _float32ToWav(samples, _sampleRate);
       final tmp = await getTemporaryDirectory();
-      final wavFile = File('${tmp.path}/kokoro_out.wav');
+      final wavFile = File('${tmp.path}/speech_out.wav');
       await wavFile.writeAsBytes(wav);
 
       await _player.stop();

@@ -6,11 +6,11 @@ import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 
 import '../services/call_audio.dart';
-import 'grok_mic_streamer_base.dart';
+import 'sway_mic_streamer_base.dart';
 
-GrokMicStreamer createGrokMicStreamer() => _WebGrokMicStreamer();
+SwayMicStreamer createSwayMicStreamer() => _WebSwayMicStreamer();
 
-void _log(String m) => web.console.log('[grok-rt] $m'.toJS);
+void _log(String m) => web.console.log('[sway-rt] $m'.toJS);
 
 // ── Minimal WebCodecs AudioData bindings (web 1.1.1 doesn't expose them) ──
 extension type _AudioData(JSObject _) implements JSObject {
@@ -58,9 +58,9 @@ external JSAny? get _mstpConstructor;
 
 /// Web realtime mic streamer, SENDER-side. Captures MY OWN mic via a dedicated
 /// `getUserMedia` (echoCancellation = browser AEC), downsamples to PCM16 16 kHz,
-/// and streams continuously to the backend Grok STT WS.
+/// and streams continuously to the backend cloud STT WS.
 /// Auto-reconnects the WS when it drops (iOS Safari network instability).
-class _WebGrokMicStreamer implements GrokMicStreamer {
+class _WebSwayMicStreamer implements SwayMicStreamer {
   web.WebSocket? _ws;
   web.MediaStream? _micStream;
   web.ReadableStreamDefaultReader? _reader;
@@ -92,7 +92,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
   @override
   bool get accumulatesTranscript => true;
 
-  // The x.ai path streams continuously; it never releases the mic.
+  // The the cloud engine path streams continuously; it never releases the mic.
   @override
   bool get isDozing => false;
 
@@ -104,7 +104,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
     required Uri wsUrl,
     Object? localTrack,
     bool captureLocalMic = true,
-    // Web keeps the x.ai path: the langs are already encoded in [wsUrl].
+    // Web keeps the cloud engine path: the langs are already encoded in [wsUrl].
     String sourceLang = '',
     String targetLang = '',
     required void Function(String orig, String trans, String lang, String audioB64)
@@ -309,7 +309,7 @@ class _WebGrokMicStreamer implements GrokMicStreamer {
           _CopyOpts(planeIndex: 0, format: 'f32-planar'),
         );
         audio.close();
-        // Continuous stream — Grok STT handles silence internally.
+        // Continuous stream — the cloud engine STT handles silence internally.
         // isTranslationPlaying pauses SEND while TTS plays so the mic doesn't
         // re-capture and re-translate our own speaker output. The gate is
         // cleared immediately in _toggleMic when the user unmutes, so it

@@ -12,10 +12,10 @@ import '../services/translation_api.dart';
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
 
-/// Listens to the **remote** LiveKit microphone, runs OpenAI **gpt-realtime-translate**
+/// Listens to the **remote** LiveKit microphone, runs the live translation engine
 /// (WebRTC), and plays translated audio locally in your language ([TranslationRoute.sourceBcp47]).
 ///
-/// Only [TrackSource.microphone] (or unknown-labeled mic) is sent to OpenAI — never
+/// Only [TrackSource.microphone] (or unknown-labeled mic) is sent to the live engine — never
 /// [TrackSource.screenShareAudio], so tab/system capture is not translated (avoids re-feeding
 /// TTS or call audio published as screen-audio).
 ///
@@ -23,8 +23,8 @@ import 'translation_route.dart';
 /// fully remove that playback from **your** mic. Prefer headphones / lower speaker volume
 /// so the remote party does not send leaked translation back into this pipeline.
 ///
-/// Renews the OpenAI side before the ephemeral credential expires and retries on failure.
-class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTranslationPort {
+/// Renews the live engine side before the ephemeral credential expires and retries on failure.
+class SwayLiveTranslation extends ChangeNotifier implements RealtimeTranslationPort {
   Room? _room;
   TranslationRoute? _route;
   EventsListener<RoomEvent>? _listener;
@@ -35,7 +35,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   RTCPeerConnection? _pc;
   RTCVideoRenderer? _renderer;
   MediaStream? _localStream;
-  /// The actual audio MediaStreamTrack arriving from OpenAI. Stored so we
+  /// The actual audio MediaStreamTrack arriving from the live engine. Stored so we
   /// can change its volume via Helper.setVolume() — RTCVideoRenderer's
   /// setVolume is unreliable on Safari/iOS when the renderer view is
   /// hidden/off-screen, but Helper.setVolume targets the track directly.
@@ -46,7 +46,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
   bool _busy = false;
   DateTime? _lastConnectionDropSchedule;
   bool _remoteVoiceHot = false;
-  /// True while OpenAI is actually streaming translated audio out over the
+  /// True while the live engine is actually streaming translated audio out over the
   /// WebRTC connection — bounded by the `output_audio_buffer.started` /
   /// `.stopped` events on the `oai-events` data channel.
   bool _translationSpeaking = false;
@@ -54,7 +54,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
   /// Diagnostics for the on-screen AUDIO DEBUG panel (the user builds on a
   /// remote Mac and cannot read device logs). [_openAttempts] counts how many
-  /// times we tried to open the OpenAI pipeline; [_lastOpenError] is the most
+  /// times we tried to open the live pipeline; [_lastOpenError] is the most
   /// recent failure reason (null once a connection succeeds). These reveal,
   /// on the phone itself, whether the pipeline never tries (route problem) or
   /// tries and throws (and exactly why).
@@ -73,7 +73,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
   // ─── VAD pause/resume ───────────────────────────────────────────────
   /// Polls every [_vadPollInterval] to decide whether the call has been
-  /// silent long enough to tear down the OpenAI pipeline (and stop the
+  /// silent long enough to tear down the live pipeline (and stop the
   /// billing meter). Re-armed by [_onActiveSpeakersChanged] when the
   /// remote starts talking again.
   Timer? _vadIdleTimer;
@@ -159,7 +159,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       routeLabel = '${route.targetBcp47}/${route.sourceBcp47}';
     }
     final err = _lastOpenError;
-    final base = 'OpenAI: $pcLabel • trad recue: $trk • parle: $speaking • '
+    final base = 'the live engine: $pcLabel • trad recue: $trk • parle: $speaking • '
         'orig: $origTracks piste(s) • route: $routeLabel • essais: $_openAttempts$extra';
     return err == null ? base : '$base\nERR: $err';
   }
@@ -185,7 +185,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       try {
         await r.setVolume(clamped);
       } catch (e) {
-        debugPrint('OpenAi translation: renderer.setVolume failed: $e');
+        debugPrint('live translation: renderer.setVolume failed: $e');
       }
     }
     final t = _translatedAudioTrack;
@@ -193,7 +193,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       try {
         await Helper.setVolume(clamped, t);
       } catch (e) {
-        debugPrint('OpenAi translation: Helper.setVolume failed: $e');
+        debugPrint('live translation: Helper.setVolume failed: $e');
       }
     }
   }
@@ -203,7 +203,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     final r = _renderer;
     if (r == null) return null;
     // KEEP THIS IN THE VIEWPORT (1x1 at 0,0), not off-screen. The hidden
-    // RTCVideoView is what plays OpenAI's translated audio; iOS (WebKit on web,
+    // RTCVideoView is what plays the live engine's translated audio; iOS (WebKit on web,
     // and the native platform view) CULLS a fully off-screen view, so its
     // audio never plays — that's the asymmetric "one side hears the
     // translation, the other only the original" bug. Re-applies dc942e7, which
@@ -279,7 +279,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
     // Lost the one-shot renewal timer (e.g. silent early-return in open pipeline).
     if (_refreshTimer == null) {
-      debugPrint('OpenAi translation: watchdog — no refresh timer, re-arming');
+      debugPrint('live translation: watchdog — no refresh timer, re-arming');
       _scheduleNextRefreshRaw(const Duration(seconds: 2));
       return;
     }
@@ -290,7 +290,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       if (cs == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
           cs == RTCPeerConnectionState.RTCPeerConnectionStateClosed ||
           cs == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-        debugPrint('OpenAi translation: watchdog — pc state $cs, forcing refresh');
+        debugPrint('live translation: watchdog — pc state $cs, forcing refresh');
         _scheduleNextRefreshRaw(const Duration(seconds: 2));
       }
     }
@@ -347,7 +347,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     final route = _route;
     if (room == null || route == null || !route.isConfigured) return;
 
-    // Hard gate: never spin up the OpenAI session while we're alone in
+    // Hard gate: never spin up the live session while we're alone in
     // the room. The ephemeral key minted by `fetchTranslationSession`
     // costs even before the first audio frame, so waiting until the
     // remote actually shows up saves us a full session per dial-tone
@@ -371,7 +371,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     if (_pc != null && _boundPublicationSid == pick.sid) return;
     debugPrint(
       '[xlate] remote present (${room.remoteParticipants.length}) → '
-      'activating OpenAI session for sid=${pick.sid}',
+      'activating live session for sid=${pick.sid}',
     );
     unawaited(_bindRemoteAudio(pick.track, pick.sid));
   }
@@ -415,7 +415,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     final hot = e.speakers.any((p) => p is RemoteParticipant);
     if (hot) {
       _lastSpeakerActiveAt = DateTime.now();
-      // Resume the OpenAI pipeline immediately if VAD had paused it on
+      // Resume the live pipeline immediately if VAD had paused it on
       // silence — translation needs to be ready before the speaker has
       // finished their first word.
       if (_pausedForSilence) {
@@ -430,7 +430,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     }
   }
 
-  /// Parse an `oai-events` data-channel message and track whether OpenAI
+  /// Parse an `oai-events` data-channel message and track whether the live engine
   /// is currently emitting translated audio. Over the WebRTC transport the
   /// model signals playback boundaries with `output_audio_buffer.started`
   /// / `.stopped` / `.cleared` — exactly the window during which the
@@ -475,7 +475,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     final silentFor = DateTime.now().difference(_lastSpeakerActiveAt);
     if (silentFor < _silenceThreshold) return;
     debugPrint(
-      '[xlate] VAD pause — silent for ${silentFor.inSeconds}s, tearing down OpenAI to stop billing',
+      '[xlate] VAD pause — silent for ${silentFor.inSeconds}s, tearing down the live engine to stop billing',
     );
     _pausedForSilence = true;
     _cancelScheduledRefresh();
@@ -550,7 +550,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     }
   }
 
-  /// Opens WebRTC to OpenAI; caller must set [_busy] if needed.
+  /// Opens WebRTC to the live engine; caller must set [_busy] if needed.
   Future<void> _openPipelineCore(
     RemoteAudioTrack remote,
     String publicationSid,
@@ -562,7 +562,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
     // Belt-and-braces against any code path that might reach this point
     // while the room is empty (race between detach and a stale refresh
     // timer firing). Without a remote there's nothing to translate, and
-    // we don't want to burn an OpenAI session for nothing.
+    // we don't want to burn an live session for nothing.
     if (roomRef.remoteParticipants.isEmpty) {
       debugPrint('[xlate] refusing to open pipeline — room has no remote');
       return;
@@ -582,7 +582,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
 
     final secret = pickClientSecret(session);
     if (secret == null || secret.isEmpty) {
-      debugPrint('OpenAi translation: no client_secret in session response');
+      debugPrint('live translation: no client_secret in session response');
       throw StateError('missing client_secret');
     }
 
@@ -611,7 +611,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         if (m.isBinary) return;
         final t = m.text;
         if (t.length < 400) {
-          debugPrint('OpenAI translation dc: $t');
+          debugPrint('the live engine translation dc: $t');
         }
         _handleOaiEvent(t);
       };
@@ -620,7 +620,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       // UnimplementedError on native flutter_webrtc — this is the exact reason
       // the translation pipeline NEVER started on the iOS build: it failed here
       // on every attempt, retried every 6s, and the panel stayed "absente".
-      // On native, feed the ORIGINAL remote track straight into the OpenAI PC.
+      // On native, feed the ORIGINAL remote track straight into the live engine PC.
       // Teardown (_stopMedia) only disposes this local stream + closes the PC
       // and never calls track.stop(), so the LiveKit source that the original
       // remote audio also uses is left untouched (no risk of cutting the real
@@ -628,7 +628,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       // the source.
       final MediaStreamTrack srcTrack =
           kIsWeb ? await remote.mediaStreamTrack.clone() : remote.mediaStreamTrack;
-      ms = await createLocalMediaStream('openai_translation_src');
+      ms = await createLocalMediaStream('sway_live_src');
       await ms.addTrack(srcTrack);
       await pc.addTrack(srcTrack, ms);
 
@@ -652,7 +652,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
           unawaited(
             Helper.setVolume(_translatedVolume, _translatedAudioTrack!)
                 .catchError((e) =>
-                    debugPrint('OpenAi translation: Helper.setVolume failed: $e')),
+                    debugPrint('live translation: Helper.setVolume failed: $e')),
           );
         }
         notifyListeners();
@@ -662,7 +662,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       await pc.setLocalDescription(offer);
       final sdp = offer.sdp;
       if (sdp == null || sdp.isEmpty) {
-        debugPrint('OpenAi translation: empty local SDP');
+        debugPrint('live translation: empty local SDP');
         throw StateError('empty local SDP');
       }
 
@@ -688,7 +688,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       notifyListeners();
 
       // Keep LiveKit remote audio audible (original). Translated audio plays from the
-      // OpenAI WebRTC renderer when it arrives — user hears both.
+      // the live engine WebRTC renderer when it arrives — user hears both.
       _scheduleNextRefreshFromSession(session);
     } finally {
       if (renderer != null) {
@@ -728,7 +728,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
         _pc == null &&
         _refreshTimer == null &&
         !_busy) {
-      debugPrint('OpenAi translation: pipeline ended without PC and without timer — retry');
+      debugPrint('live translation: pipeline ended without PC and without timer — retry');
       _scheduleNextRefreshRaw(const Duration(seconds: 4));
     }
   }
@@ -763,7 +763,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       debugPrint('[xlate] refresh START — make-before-break rotation');
       // Capture the CURRENT (old) pipeline but DON'T tear it down yet: it keeps
       // playing translated audio while the replacement comes up, so rotating
-      // the OpenAI session at its ~10-min expiry leaves NO silent gap.
+      // the live session at its ~10-min expiry leaves NO silent gap.
       final oldPc = _pc;
       final oldRenderer = _renderer;
       final oldStream = _localStream;
@@ -811,14 +811,14 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       ..on<TrackUnsubscribedEvent>(_onTrackUnsubscribed)
       ..on<ActiveSpeakersChangedEvent>(_onActiveSpeakersChanged)
       // If the remote disconnects from the room entirely, kill the
-      // OpenAI pipeline immediately — there's nobody left to translate
+      // live pipeline immediately — there's nobody left to translate
       // and we don't want the billing meter to keep ticking until the
       // user manually leaves.
       ..on<ParticipantDisconnectedEvent>((_) {
         if (_room == null) return;
         final remotes = _room!.remoteParticipants;
         if (remotes.isEmpty) {
-          debugPrint('[xlate] last remote left — detaching OpenAI');
+          debugPrint('[xlate] last remote left — detaching the live engine');
           unawaited(detach());
         }
       });
@@ -875,7 +875,7 @@ class OpenAiRealtimeTranslation extends ChangeNotifier implements RealtimeTransl
       await _openPipelineCore(remote, publicationSid, roomRef);
       _lastOpenError = null;
     } catch (e, st) {
-      debugPrint('OpenAi translation failed: $e\n$st');
+      debugPrint('live translation failed: $e\n$st');
       _lastOpenError = _shortError('bind', e);
       Analytics.track(
         'translation_error',

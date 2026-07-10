@@ -25,7 +25,7 @@ import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/missions_ring.dart';
 import '../widgets/profile_avatar.dart';

@@ -1,4 +1,4 @@
-/// Language routing for a future **OpenAI Realtime** (or similar) translation bridge.
+/// Language routing for a future **the live engine** (or similar) translation bridge.
 ///
 /// **Convention (1:1 calls)** — same names as JWT metadata `sourceLang` / `targetLang`:
 /// - [sourceBcp47]: **Your** spoken language (e.g. `fr`). The pipeline should turn the

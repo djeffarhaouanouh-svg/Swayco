@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../screens/call_screen.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import 'call_alert.dart';
 import 'call_credit_gate.dart';
 import 'device_id.dart';

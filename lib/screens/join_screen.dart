@@ -13,7 +13,7 @@ import '../services/call_audio.dart';
 import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import 'call_screen.dart';
 import 'onboarding_screen.dart';
 

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 /// Records ONE utterance off a WebRTC [MediaStreamTrack] (the remote speaker)
-/// and hands the encoded bytes back, for the Grok TEST translation pipeline.
+/// and hands the encoded bytes back, for the cloud engine TEST translation pipeline.
 ///
 /// Two implementations, selected by conditional import:
 ///  - web  → flutter_webrtc `MediaRecorder.startWeb` (works well; Chrome/Safari).
@@ -11,7 +11,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 ///    EFFORT only. iOS' native recorder is video-oriented and audio-only
 ///    capture of a remote track is unreliable, so [stopAndRead] may return null
 ///    there. Surfaced in the on-screen debug panel rather than thrown.
-abstract class GrokUtteranceRecorder {
+abstract class SwayUtteranceRecorder {
   /// Begin capturing [track]. Safe to call once per utterance.
   Future<void> start(MediaStreamTrack track);
 

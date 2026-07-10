@@ -27,7 +27,7 @@ void markTranslationPlaying({int textLength = 0}) {
   _playing = true;
   _clearTimer?.cancel();
   _clearTimer = null;
-  // Backstop: Kokoro's completion event can be missed (playback error, player
+  // Backstop: the local TTS completion event can be missed (playback error, player
   // reset mid-utterance). Without this a lost markTranslationDone would wedge
   // the mic shut for the rest of the call. Sized off the text at a slow speech
   // rate, then bounded.

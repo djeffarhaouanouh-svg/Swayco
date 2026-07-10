@@ -1,5 +1,5 @@
 // Web stub — ONNX Runtime uses dart:ffi which is unavailable on web.
-// KokoroService guards every call with `if (kIsWeb) return;` so these
+// SpeechService guards every call with `if (kIsWeb) return;` so these
 // methods are never actually invoked at runtime.
 
 class TtsPlayer {

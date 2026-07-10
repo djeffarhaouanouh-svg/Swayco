@@ -60,7 +60,7 @@ abstract final class UsageTracker {
   static bool _paused = false;
 
   /// Pause the timer without losing accumulated state. Used by the
-  /// CallScreen when the OpenAI pipeline detaches (peer left, VAD
+  /// CallScreen when the live pipeline detaches (peer left, VAD
   /// silenced, credits hit 0) — we shouldn't keep billing call time
   /// when nothing's being translated.
   static void pause() {

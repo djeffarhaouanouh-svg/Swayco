@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'moonshine_engine.dart';
-import 'stt_catalogue.dart';
-import 'vosk_engine.dart';
+import 'neural_asr_engine.dart';
+import 'asr_catalogue.dart';
+import 'lattice_asr_engine.dart';
 
 /// One step of a streaming engine's output.
 ///
@@ -24,13 +24,13 @@ class SttChunk {
 ///
 /// Two shapes, distinguished by [isStreaming]:
 ///
-///  * **Streaming** (Vosk/Kaldi): feed [acceptFrame] every frame. The engine
+///  * **Streaming** (lattice): feed [acceptFrame] every frame. The engine
 ///    endpoints utterances itself and emits partial hypotheses meanwhile.
-///  * **Clip** (Moonshine): feed [transcribe] one complete utterance. Its
+///  * **Clip** (neural): feed [transcribe] one complete utterance. Its
 ///    encoder attends over the whole segment, so it cannot consume a stream.
 ///
 /// Both do real work synchronously on the calling isolate.
-abstract class SttEngine {
+abstract class AsrEngine {
   /// [modelDir] is the extracted model directory; [lang] the BCP-47 primary tag.
   Future<void> load(String modelDir, String lang);
 
@@ -59,7 +59,7 @@ abstract class SttEngine {
   Future<void> dispose();
 }
 
-SttEngine createSttEngine(SttEngineKind kind) => switch (kind) {
-      SttEngineKind.moonshine => MoonshineEngine(),
-      SttEngineKind.vosk => VoskEngine(),
+AsrEngine createAsrEngine(AsrEngineKind kind) => switch (kind) {
+      AsrEngineKind.neural => NeuralAsrEngine(),
+      AsrEngineKind.lattice => LatticeAsrEngine(),
     };

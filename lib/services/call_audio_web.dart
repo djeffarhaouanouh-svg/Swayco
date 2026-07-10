@@ -112,7 +112,7 @@ void armCallAudio() {
   } catch (_) {}
 }
 
-/// Play an mp3 (Grok TTS) through the unlocked element. Returns false on failure
+/// Play an mp3 (cloud TTS) through the unlocked element. Returns false on failure
 /// so the caller can fall back.
 Future<bool> playTranslatedMp3(Uint8List bytes) async {
   try {

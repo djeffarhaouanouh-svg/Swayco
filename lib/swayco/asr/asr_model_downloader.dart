@@ -4,14 +4,14 @@ import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
-import 'stt_catalogue.dart';
+import 'asr_catalogue.dart';
 
 /// Downloads STT models into `<appSupport>/stt/<spec.id>/`.
 ///
-/// Mirrors the Kokoro downloaders: resumable-by-restart (writes to `.tmp`,
+/// Mirrors the local TTS engine downloaders: resumable-by-restart (writes to `.tmp`,
 /// renames on success), idempotent (an existing complete directory is a no-op),
 /// and reports 0.0 → 1.0 progress.
-class SttModelDownloader {
+class AsrModelDownloader {
   /// Marker written once every file of a spec landed, so a half-finished
   /// download (app killed mid-transfer) is retried instead of loaded.
   static const _completeMarker = '.complete';
@@ -23,18 +23,18 @@ class SttModelDownloader {
     return dir;
   }
 
-  static Future<Directory> modelDir(SttModelSpec spec) async {
+  static Future<Directory> modelDir(AsrModelSpec spec) async {
     final base = await sttDir();
     return Directory('${base.path}/${spec.id}');
   }
 
-  static Future<bool> isInstalled(SttModelSpec spec) async {
+  static Future<bool> isInstalled(AsrModelSpec spec) async {
     final dir = await modelDir(spec);
     return File('${dir.path}/$_completeMarker').exists();
   }
 
   Future<Directory> ensureModel(
-    SttModelSpec spec, {
+    AsrModelSpec spec, {
     void Function(double)? onProgress,
   }) async {
     final dir = await modelDir(spec);
@@ -44,10 +44,10 @@ class SttModelDownloader {
     onProgress?.call(0);
 
     switch (spec) {
-      case MoonshineSpec():
-        await _downloadMoonshine(spec, dir, onProgress);
-      case VoskSpec():
-        await _downloadVosk(spec, dir, onProgress);
+      case NeuralAsrSpec():
+        await _downloadNeural(spec, dir, onProgress);
+      case LatticeAsrSpec():
+        await _downloadLattice(spec, dir, onProgress);
     }
 
     await File('${dir.path}/$_completeMarker').writeAsString('1');
@@ -58,8 +58,8 @@ class SttModelDownloader {
   /// Fetches each graph/tokenizer file, weighting progress by bytes received
   /// against the spec's advertised size (Hugging Face LFS omits Content-Length
   /// on some redirects, so a per-file fraction would stutter).
-  Future<void> _downloadMoonshine(
-    MoonshineSpec spec,
+  Future<void> _downloadNeural(
+    NeuralAsrSpec spec,
     Directory dir,
     void Function(double)? onProgress,
   ) async {
@@ -86,10 +86,10 @@ class SttModelDownloader {
     }
   }
 
-  /// Vosk ships a zip whose single top-level folder is the model id. We flatten
+  /// The lattice engine ships a zip whose single top-level folder is the model id. We flatten
   /// that folder into [dir] so the engine can point libvosk straight at it.
-  Future<void> _downloadVosk(
-    VoskSpec spec,
+  Future<void> _downloadLattice(
+    LatticeAsrSpec spec,
     Directory dir,
     void Function(double)? onProgress,
   ) async {
@@ -105,7 +105,7 @@ class SttModelDownloader {
     final archive = ZipDecoder().decodeBytes(await tmp.readAsBytes());
     for (final entry in archive) {
       if (!entry.isFile) continue;
-      // Strip the leading `vosk-model-small-fr-0.22/` component.
+      // Strip the leading `<model-id>/` component.
       final parts = entry.name.split('/')..removeAt(0);
       if (parts.isEmpty) continue;
       final out = File('${dir.path}/${parts.join('/')}');

@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
-import '../debug_overlay.dart';
-import 'stt_engine_native.dart';
+import '../../services/debug_overlay.dart';
+import 'asr_engine_native.dart';
 
 // ── libvosk C ABI ────────────────────────────────────────────────────────────
 // A direct dart:ffi binding rather than a plugin: `vosk_flutter` last shipped in
@@ -22,7 +22,7 @@ typedef _RecNew = Pointer<Void> Function(Pointer<Void>, double);
 
 /// Returns 1 when the endpointer closed an utterance (read `vosk_recognizer_result`),
 /// 0 while decoding continues, -1 on error. This return value is what lets us
-/// drop our own VAD-based segmentation: Kaldi decides where phrases end.
+/// drop our own VAD-based segmentation: the decoder decides where phrases end.
 typedef _RecAcceptFC = Int32 Function(Pointer<Void>, Pointer<Float>, Int32);
 typedef _RecAcceptF = int Function(Pointer<Void>, Pointer<Float>, int);
 
@@ -39,8 +39,8 @@ typedef _RecFree = void Function(Pointer<Void>);
 typedef _SetLogLevelC = Void Function(Int32);
 typedef _SetLogLevel = void Function(int);
 
-class _VoskLib {
-  _VoskLib(DynamicLibrary lib)
+class _LatticeLib {
+  _LatticeLib(DynamicLibrary lib)
       : modelNew = lib.lookupFunction<_ModelNewC, _ModelNew>('vosk_model_new'),
         modelFree =
             lib.lookupFunction<_ModelFreeC, _ModelFree>('vosk_model_free'),
@@ -73,23 +73,23 @@ class _VoskLib {
 
   /// Android links libvosk.so from `jniLibs`; on iOS the static library is
   /// linked into the app binary, so its symbols live in the process itself.
-  static _VoskLib open() => _VoskLib(
+  static _LatticeLib open() => _LatticeLib(
         Platform.isAndroid
             ? DynamicLibrary.open('libvosk.so')
             : DynamicLibrary.process(),
       );
 }
 
-/// Vosk (Kaldi) streaming ASR for the languages Moonshine does not cover: fr,
+/// Lattice-based streaming ASR for the languages the neural engine does not cover: fr,
 /// ru, es, it, pt, de, nl. Small models, ~30–48 MB each, one per language.
 ///
 /// Streaming: one recognizer lives for the whole call and is fed every frame.
-/// Kaldi's own endpointer says where utterances end, so the caller does not
+/// its own endpointer says where utterances end, so the caller does not
 /// segment. Partial hypotheses come back on every frame in between.
-class VoskEngine implements SttEngine {
+class LatticeAsrEngine implements AsrEngine {
   static const int _sampleRate = 16000;
 
-  _VoskLib? _lib;
+  _LatticeLib? _lib;
   Pointer<Void>? _model;
   Pointer<Void>? _rec;
 
@@ -98,50 +98,50 @@ class VoskEngine implements SttEngine {
   Pointer<Float>? _buf;
   int _bufLen = 0;
 
-  /// accept_waveform is a synchronous Kaldi decode. Overlapping calls would
+  /// accept_waveform is a synchronous native decode. Overlapping calls would
   /// corrupt recognizer state, so drop a frame rather than reenter.
   bool _busy = false;
 
   @override
   Future<void> load(String modelDir, String lang) async {
     // Each step is logged separately: "symbols missing" (iOS link/strip),
-    // "model rejected" (OpenFST type registration, or a truncated download) and
+    // "model rejected" (FST type registration, or a truncated download) and
     // "recognizer refused" are three different bugs with three different fixes,
     // and from a device you only ever get to see one line.
-    final _VoskLib lib;
+    final _LatticeLib lib;
     try {
-      lib = _VoskLib.open();
-      DebugOverlay.log('vosk lib opened, 10 symbols resolved');
+      lib = _LatticeLib.open();
+      DebugOverlay.log('lattice lib opened, 10 symbols resolved');
     } catch (e) {
-      DebugOverlay.log('vosk SYMBOL LOOKUP FAILED: $e');
+      DebugOverlay.log('lattice SYMBOL LOOKUP FAILED: $e');
       rethrow;
     }
-    lib.setLogLevel(-1); // Kaldi is extremely chatty on stdout otherwise.
+    lib.setLogLevel(-1); // the decoder is extremely chatty on stdout otherwise.
 
     final files = Directory(modelDir).existsSync()
         ? Directory(modelDir).listSync().length
         : -1;
-    DebugOverlay.log('vosk model dir=$modelDir entries=$files');
+    DebugOverlay.log('lattice model dir=$modelDir entries=$files');
 
     final path = modelDir.toNativeUtf8();
     try {
       final model = lib.modelNew(path);
       if (model == nullptr) {
-        DebugOverlay.log('vosk MODEL_NEW returned null — bad dir, or OpenFST '
+        DebugOverlay.log('lattice MODEL_NEW returned null — bad dir, or FST '
             'types never registered (static-lib global ctors)');
         throw StateError('vosk_model_new failed for $modelDir');
       }
-      DebugOverlay.log('vosk model loaded');
+      DebugOverlay.log('lattice model loaded');
       final rec = lib.recNew(model, _sampleRate.toDouble());
       if (rec == nullptr) {
         lib.modelFree(model);
-        DebugOverlay.log('vosk RECOGNIZER_NEW returned null');
+        DebugOverlay.log('lattice RECOGNIZER_NEW returned null');
         throw StateError('vosk_recognizer_new failed');
       }
       _model = model;
       _rec = rec;
       _lib = lib;
-      DebugOverlay.log('vosk ready — streaming @ $_sampleRate Hz');
+      DebugOverlay.log('lattice ready — streaming @ $_sampleRate Hz');
     } finally {
       calloc.free(path);
     }
@@ -162,25 +162,25 @@ class VoskEngine implements SttEngine {
     _busy = true;
     try {
       final buf = _ensureBuf(samples16k.length);
-      // Vosk's float API expects samples in [-32768, 32767], not [-1, 1].
+      // The float API expects samples in [-32768, 32767], not [-1, 1].
       for (var i = 0; i < samples16k.length; i++) {
         buf[i] = samples16k[i] * 32768.0;
       }
 
       final ended = lib.recAcceptF(rec, buf, samples16k.length);
       if (ended < 0) {
-        debugPrint('[vosk] accept_waveform error');
+        debugPrint('[lattice-asr] accept_waveform error');
         return SttChunk.empty;
       }
       if (ended == 1) {
         // Endpoint: an utterance closed. `result` consumes it and the
         // recognizer continues cleanly into the next one — no reset needed.
-        DebugOverlay.log('vosk endpoint fired');
+        DebugOverlay.log('lattice endpoint fired');
         return SttChunk(finalText: _text(lib.recResult(rec), 'text'));
       }
       return SttChunk(partial: _text(lib.recPartial(rec), 'partial'));
     } catch (e) {
-      debugPrint('[vosk] acceptFrame error: $e');
+      debugPrint('[lattice-asr] acceptFrame error: $e');
       return SttChunk.empty;
     } finally {
       _busy = false;
@@ -196,7 +196,7 @@ class VoskEngine implements SttEngine {
       // final_result already resets the recognizer internally.
       return _text(lib.recFinal(rec), 'text');
     } catch (e) {
-      debugPrint('[vosk] flush error: $e');
+      debugPrint('[lattice-asr] flush error: $e');
       return '';
     }
   }
@@ -209,7 +209,7 @@ class VoskEngine implements SttEngine {
     try {
       lib.recReset(rec);
     } catch (e) {
-      debugPrint('[vosk] reset error: $e');
+      debugPrint('[lattice-asr] reset error: $e');
     }
   }
 
@@ -232,7 +232,7 @@ class VoskEngine implements SttEngine {
     return grown;
   }
 
-  /// Vosk returns a JSON string owned by the recognizer — do not free it.
+  /// The recognizer returns a JSON string owned by the recognizer — do not free it.
   String _text(Pointer<Utf8> json, String key) {
     if (json == nullptr) return '';
     try {

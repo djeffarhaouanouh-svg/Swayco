@@ -25,13 +25,13 @@ import '../services/profile_api.dart';
 import '../services/push_dispatcher.dart';
 import '../services/scheduled_call_api.dart';
 import '../services/supabase_service.dart';
-import '../services/kokoro/kokoro_service.dart';
+import '../swayco/speech/speech_service.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
-import '../translation/realtime_translation_port.dart';
+import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
@@ -97,7 +97,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   /// When true, replace each foreign-language message body with its
   /// translation into [_myLang]. Translations are cached by message id so we
-  /// only hit OpenAI once per message.
+  /// only hit the live engine once per message.
   // Auto-translate is ON by default for every conversation — foreign messages
   // get translated into the reader's language without them flipping a switch.
   bool _autoTranslate = true;
@@ -875,7 +875,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
     // Top-anchored layout: first (oldest) message at the top, list grows
     // downward, empty space at the bottom when the conversation is short.
-    // Kokoro TTS is local — no cloud cost, available to all tiers.
+    // Local TTS is local — no cloud cost, available to all tiers.
     const canDub = true;
     return ListView.builder(
       controller: _scrollCtrl,
@@ -1476,13 +1476,13 @@ class _DubButtonState extends State<_DubButton> {
     if (_loading || widget.translatedText.trim().isEmpty) return;
     setState(() => _loading = true);
     try {
-      final kokoro = KokoroService.instance;
-      if (!kokoro.isReady) await kokoro.init();
-      await kokoro.ensureLanguageInstalled(widget.targetLang);
-      await kokoro.speak(
+      final speech = SpeechService.instance;
+      if (!speech.isReady) await speech.init();
+      await speech.ensureLanguageInstalled(widget.targetLang);
+      await speech.speak(
         text: widget.translatedText,
         languageCode: widget.targetLang,
-        voice: KokoroService.defaultVoiceFor(widget.targetLang),
+        voice: SpeechService.defaultVoiceFor(widget.targetLang),
       );
     } catch (_) {
       if (!mounted) return;

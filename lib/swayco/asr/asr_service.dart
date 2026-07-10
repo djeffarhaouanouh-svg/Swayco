@@ -1,28 +1,28 @@
 import 'package:flutter/foundation.dart';
 
-import '../debug_overlay.dart';
-import 'stt_catalogue.dart';
-import 'stt_engine.dart';
-import 'stt_model_downloader.dart';
+import '../../services/debug_overlay.dart';
+import 'asr_catalogue.dart';
+import 'asr_engine.dart';
+import 'asr_model_downloader.dart';
 
 /// On-device speech-to-text — 100 % local inference, no audio leaves the phone.
 ///
-/// Deliberately shaped like [KokoroService]: the app ships the engines, the
+/// Deliberately shaped like [SpeechService]: the app ships the engines, the
 /// model for the user's own language is downloaded on first use and cached.
 /// STT reads this phone's OWN outgoing mic, so exactly one language is ever
-/// installed here — the same one Kokoro installs a voice for.
+/// installed here — the same one the local TTS engine installs a voice for.
 ///
 /// ```dart
-/// await SttService.instance.ensureLanguageInstalled('fr');
-/// final text = await SttService.instance.transcribe(samples16k);
+/// await AsrService.instance.ensureLanguageInstalled('fr');
+/// final text = await AsrService.instance.transcribe(samples16k);
 /// ```
-class SttService {
-  SttService._();
-  static final instance = SttService._();
+class AsrService {
+  AsrService._();
+  static final instance = AsrService._();
 
-  final _downloader = SttModelDownloader();
+  final _downloader = AsrModelDownloader();
 
-  SttEngine? _engine;
+  AsrEngine? _engine;
   String? _loadedLang;
   Future<void>? _loading;
 
@@ -39,7 +39,7 @@ class SttService {
     if (kIsWeb) return false;
     final spec = specForLang(langCode);
     if (spec == null) return false;
-    return SttModelDownloader.isInstalled(spec);
+    return AsrModelDownloader.isInstalled(spec);
   }
 
   /// Downloads (if absent) and loads the model for [langCode].
@@ -68,7 +68,7 @@ class SttService {
     DebugOverlay.log(
         'stt load lang=$lang engine=${spec.kind.name} model=${spec.id} (~${spec.approxMb} MB)');
     try {
-      final installed = await SttModelDownloader.isInstalled(spec);
+      final installed = await AsrModelDownloader.isInstalled(spec);
       DebugOverlay.log('stt model already on disk: $installed');
 
       // Progress is logged in decade steps: a per-chunk line would drown the
@@ -86,7 +86,7 @@ class SttService {
 
       // Swap only once the new engine is up, so a failed load leaves the
       // previous language working rather than muting the call.
-      final engine = createSttEngine(spec.kind);
+      final engine = createAsrEngine(spec.kind);
       await engine.load(dir.path, lang);
       DebugOverlay.log(
           'stt engine loaded ready=${engine.isReady} streaming=${engine.isStreaming}');
@@ -102,7 +102,7 @@ class SttService {
   }
 
   /// True when the loaded engine consumes frames and endpoints utterances
-  /// itself (Vosk). False for a clip engine the caller must segment (Moonshine).
+  /// itself (lattice). False for a clip engine the caller must segment (neural).
   bool get isStreaming => _engine?.isStreaming ?? false;
 
   /// Feed one frame to a streaming engine. 16 kHz mono, samples in [-1, 1].

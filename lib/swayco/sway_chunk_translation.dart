@@ -7,24 +7,24 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../services/analytics.dart';
 import '../services/translation_api.dart';
-import 'grok_utterance_recorder_base.dart';
-import 'grok_utterance_recorder_io.dart'
-    if (dart.library.js_interop) 'grok_utterance_recorder_web.dart';
+import 'sway_utterance_recorder_base.dart';
+import 'sway_utterance_recorder_io.dart'
+    if (dart.library.js_interop) 'sway_utterance_recorder_web.dart';
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
 
-/// TEST translation pipeline backed by **Grok (xAI)**, chunk-based instead of
+/// TEST translation pipeline backed by **the cloud engine**, chunk-based instead of
 /// streaming.
 ///
 /// VAD = LiveKit active-speaker events. When the remote starts talking we
 /// record the utterance off their audio track; when they stop (after a short
-/// silence hangover) we POST that one clip to the backend `/translation/grok`,
-/// which runs Grok STT → translate → TTS, and we play the returned speech.
+/// silence hangover) we POST that one clip to the backend `/translation/voice`,
+/// which runs the cloud engine STT → translate → TTS, and we play the returned speech.
 ///
 /// This deliberately mirrors [RealtimeTranslationPort] so it can be swapped in
-/// for `OpenAiRealtimeTranslation` at the wiring point ([main]) with no other
-/// changes — the OpenAI path is left fully intact for an easy revert.
-class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslationPort {
+/// for `SwayLiveTranslation` at the wiring point ([main]) with no other
+/// changes — the live engine path is left fully intact for an easy revert.
+class SwayChunkTranslation extends ChangeNotifier implements RealtimeTranslationPort {
   Room? _room;
   TranslationRoute? _route;
   EventsListener<RoomEvent>? _listener;
@@ -33,7 +33,7 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
   RemoteAudioTrack? _recordTrack;
   String? _boundSid;
 
-  GrokUtteranceRecorder? _recorder;
+  SwayUtteranceRecorder? _recorder;
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<void>? _playSub;
 
@@ -91,7 +91,7 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
     try {
       await _player.setVolume(_volume);
     } catch (e) {
-      debugPrint('Grok translation: setVolume failed: $e');
+      debugPrint('stream translation: setVolume failed: $e');
     }
   }
 
@@ -111,7 +111,7 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
     }
     final trk = _recordTrack != null ? 'OUI' : 'NON';
     final state = _recording ? 'enregistre' : (_inFlight > 0 ? 'envoi…' : 'prêt');
-    final base = 'Grok(TEST): $state • piste: $trk • route: $routeLabel • '
+    final base = 'Stream(TEST): $state • piste: $trk • route: $routeLabel • '
         'parle: ${_speaking ? "oui" : "non"} • envois: $_sent • lus: $_played';
     final lines = <String>[base];
     if (_lastTranscript != null) lines.add('STT: $_lastTranscript');
@@ -259,12 +259,12 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
   }
 
   Future<void> _startUtterance(RemoteAudioTrack track) async {
-    final rec = createGrokRecorder();
+    final rec = createSwayRecorder();
     try {
       await rec.start(track.mediaStreamTrack);
     } catch (e) {
       _lastError = _short('rec.start', e);
-      debugPrint('Grok translation: recorder start failed: $e');
+      debugPrint('stream translation: recorder start failed: $e');
       try {
         await rec.dispose();
       } catch (_) {}
@@ -329,7 +329,7 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
     _sent++;
     notifyListeners();
     try {
-      final result = await fetchGrokTranslation(
+      final result = await fetchVoiceTranslation(
         audioBytes: bytes,
         to: route.sourceBcp47,
         from: route.targetBcp47,
@@ -346,15 +346,15 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
         await _playMp3(audio);
       }
     } on TranslationApiException catch (e) {
-      _lastError = _short('grok', e);
+      _lastError = _short('stream', e);
       Analytics.track(
         'translation_error',
         langFrom: route.targetBcp47,
         langTo: route.sourceBcp47,
-        props: {'phase': 'grok', 'message': e.toString()},
+        props: {'phase': 'stream', 'message': e.toString()},
       );
     } catch (e) {
-      _lastError = _short('grok', e);
+      _lastError = _short('stream', e);
     } finally {
       _inFlight--;
       notifyListeners();
@@ -372,7 +372,7 @@ class GrokChunkTranslation extends ChangeNotifier implements RealtimeTranslation
     } catch (e) {
       _speaking = false;
       _lastError = _short('play', e);
-      debugPrint('Grok translation: playback failed: $e');
+      debugPrint('stream translation: playback failed: $e');
       notifyListeners();
     }
   }
