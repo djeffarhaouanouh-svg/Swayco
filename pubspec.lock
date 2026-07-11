@@ -1289,12 +1289,11 @@ packages:
     source: hosted
     version: "1.13.4"
   sherpa_onnx_ios:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: sherpa_onnx_ios
-      sha256: "9586b7ddae9a11fd10457367ff5e8a153e0993a8c588828bc31f6cf7afbaf2d2"
-      url: "https://pub.dev"
-    source: hosted
+      path: "native/sherpa_onnx_ios_patched"
+      relative: true
+    source: path
     version: "1.13.4"
   sherpa_onnx_linux:
     dependency: transitive
