@@ -103,6 +103,22 @@ abstract final class IosCallKit {
     }
   }
 
+  /// Drop this device's VoIP target for [userId] — call on sign-out. A VoIP
+  /// token identifies the phone, not the account: left behind, the account it
+  /// was registered under keeps ringing this handset, so the next person to
+  /// call that account rings the wrong device (and a caller signed in here can
+  /// even ring themselves).
+  static Future<void> unregisterToken(String userId) async {
+    if (!_isIos || userId.isEmpty) return;
+    try {
+      final token = await FlutterCallkitIncoming.getDevicePushTokenVoIP();
+      if (token == null || token.isEmpty) return;
+      await NotificationApi.deleteByFcm(userId: userId, fcmToken: token);
+    } catch (e) {
+      debugPrint('IosCallKit.unregisterToken failed: $e');
+    }
+  }
+
   /// Read the `extra` payload (callId, roomName, callerId) the VoIP push
   /// carried for [callId], straight from CallKit's active-calls list. Lets
   /// the accept handler get the room without a Supabase round-trip (which

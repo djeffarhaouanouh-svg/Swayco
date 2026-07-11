@@ -99,6 +99,33 @@ function firebaseMessaging() {
  *     data:  { conversationId?, callerId?, …optional extras }
  *   }
  */
+/**
+ * Remove, from a callee's target list, every device that is ALSO registered to
+ * the caller — those are the caller's own phones and ringing them makes the
+ * caller's device show an incoming call from itself. Only meaningful for
+ * `incoming_call`; every other notification type passes straight through.
+ */
+async function withoutCallerDevices(sb, targets, payload) {
+  const callerId = payload.type === 'incoming_call'
+    ? String((payload.data || {}).callerId || '')
+    : '';
+  if (!callerId) return targets;
+
+  const { data: mine, error } = await sb
+    .from('notification_targets')
+    .select('fcm_token, endpoint')
+    .eq('user_id', callerId);
+  // On a lookup failure, ring as before rather than silently dropping a call.
+  if (error || !mine || mine.length === 0) return targets;
+
+  const callerTokens = new Set(mine.map((t) => t.fcm_token).filter(Boolean));
+  const callerEndpoints = new Set(mine.map((t) => t.endpoint).filter(Boolean));
+  return targets.filter(
+    (t) => !(t.fcm_token && callerTokens.has(t.fcm_token))
+        && !(t.endpoint && callerEndpoints.has(t.endpoint)),
+  );
+}
+
 async function notifyUser(recipientUid, payload) {
   const out = { ok: 0, failed: 0, results: [] };
   const sb = supabase();
@@ -111,7 +138,7 @@ async function notifyUser(recipientUid, payload) {
     return out;
   }
 
-  const { data: targets, error } = await sb
+  const { data: allTargets, error } = await sb
     .from('notification_targets')
     .select('*')
     .eq('user_id', recipientUid);
@@ -119,7 +146,18 @@ async function notifyUser(recipientUid, payload) {
     out.results.push({ error: error.message });
     return out;
   }
-  if (!targets || targets.length === 0) {
+  if (!allTargets || allTargets.length === 0) {
+    return out;
+  }
+
+  // A device the CALLER is signed into must never ring for the caller's own
+  // call. Migration 0045 makes a token single-owner, but a device registered
+  // to the callee before that shipped can still linger, and a phone can be
+  // signed into both accounts across a reinstall. Drop any target of the
+  // callee that is also one of the caller's own devices.
+  const targets = await withoutCallerDevices(sb, allTargets, payload);
+  if (targets.length === 0) {
+    out.results.push({ skipped: 'all-targets-belong-to-caller' });
     return out;
   }
 

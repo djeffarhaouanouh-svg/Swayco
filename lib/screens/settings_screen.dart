@@ -10,6 +10,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/block_api.dart';
 import '../services/device_id.dart';
+import '../services/ios_callkit.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
@@ -203,6 +204,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true) return;
     setState(() => _busy = true);
     try {
+      // Push targets are per-DEVICE. Leaving them behind means this handset
+      // keeps ringing for the account we're leaving — including for calls
+      // placed from this very phone by the next account signed in here.
+      final uid = await DeviceId.getOrCreate();
+      await NotificationClient.unregister(uid);
+      await IosCallKit.unregisterToken(uid);
       await AuthService.signOut();
     } catch (e) {
       if (!mounted) return;
@@ -226,6 +233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // 1. Drop the user's push targets so the FCM token / web push
       //    subscription doesn't outlive the account.
       await NotificationClient.unregister(uid);
+      await IosCallKit.unregisterToken(uid);
       // 2. Wipe the legacy local profile copy.
       await ProfileApi.deleteMyProfile(uid);
       // 3. Server-side wipe via the SECURITY DEFINER RPC: deletes the
