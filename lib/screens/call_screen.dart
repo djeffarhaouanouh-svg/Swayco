@@ -264,14 +264,26 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _onTranslationStateChanged() {
-    // Duck the original remote audio for the exact window the translated
-    // audio is playing, so the translation is clearly audible over it.
-    final speaking = widget.translation.translationSpeaking;
-    if (speaking != _lastTranslationSpeaking) {
-      _lastTranslationSpeaking = speaking;
-      _audio.onTranslationSpeaking(speaking);
-    }
+    _syncTranslationSpeaking();
     _syncUsageMeter();
+  }
+
+  /// Silence the peer's real voice for exactly the window a translation is
+  /// audible, from EITHER source.
+  ///
+  /// [RealtimeTranslationPort.translationSpeaking] only ever covers the cloud
+  /// mp3 player, so on the local-TTS path — the default on mobile — nothing was
+  /// ducking anything: the peer kept talking underneath their own translation
+  /// and the two voices piled up. [ttsSpeaking] is the missing half.
+  ///
+  /// Nothing upstream is touched: the peer keeps speaking, keeps transcribing
+  /// and keeps sending; we only stop *playing* their voice out of this speaker,
+  /// and our own mic goes on capturing.
+  void _syncTranslationSpeaking() {
+    final speaking = ttsSpeaking.value || widget.translation.translationSpeaking;
+    if (speaking == _lastTranslationSpeaking) return;
+    _lastTranslationSpeaking = speaking;
+    _audio.onTranslationSpeaking(speaking);
   }
 
   /// Translation credits should only burn while the live pipeline is
@@ -418,6 +430,7 @@ class _CallScreenState extends State<CallScreen> {
     });
     unawaited(_loadPeerProfile());
     _wireDeviceTtsSignal();
+    ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
@@ -1465,6 +1478,7 @@ class _CallScreenState extends State<CallScreen> {
     _audio.dispose();
     unawaited(_ttsPlayer.dispose());
     unawaited(_deviceTts.stop());
+    ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
