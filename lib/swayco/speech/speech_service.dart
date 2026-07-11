@@ -90,14 +90,13 @@ class SpeechService {
       final dir = await _downloader.ensureBundle(spec, onProgress: onProgress);
       String p(String rel) => '${dir.path}/$rel';
 
+      // All catalogue entries are VITS (Piper/mimic3) now, so no Kokoro voices
+      // file / lexicon / lang hint is needed — the model + tokens + espeak data
+      // are enough.
       final model = SherpaTtsModel(
-        kind: spec.engine,
         model: p(spec.modelFile),
         tokens: p(spec.tokensFile),
         dataDir: spec.dataDir.isEmpty ? '' : p(spec.dataDir),
-        voices: spec.voicesFile.isEmpty ? '' : p(spec.voicesFile),
-        lexicon: spec.lexiconFiles.map(p).join(','),
-        lang: spec.lang,
       );
 
       await _engine.configure(model);
