@@ -884,14 +884,18 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Synthesise [text] locally with the local TTS engine. Falls back to device TTS if the
-  /// model isn't ready (e.g. still downloading on first run).
+  /// Synthesise [text] locally.
+  ///
+  /// The sherpa voice is used only when it is *already loaded for this exact
+  /// language* — that is the account language, installed at boot. Everything
+  /// else, in particular a language picked mid-call with the language button,
+  /// goes to the device's own OS voice: the phone already ships dozens of
+  /// languages, and a live call cannot wait on a 60 MB download.
   Future<void> _playWithLocalTts(String text, String lang) async {
     final speech = SpeechService.instance;
-    if (speech.isReady) {
+    if (speech.isLoadedFor(lang)) {
       try {
         final voice = SpeechService.defaultVoiceFor(lang);
-        await speech.ensureLanguageInstalled(lang);
         // Half-duplex: hold the mic shut for the window this plays out the
         // loudspeaker, or our own STT transcribes it and ships it back to the
         // peer.
@@ -914,11 +918,15 @@ class _CallScreenState extends State<CallScreen> {
         debugPrint('[speech] speak error: $e');
       }
     }
-    // the local TTS engine not ready — fall back to device TTS. flutter_tts speak() also
-    // returns early, so here the gate's safety timer is what covers playback.
+    // No sherpa voice loaded for this language — speak it with the OS voice.
+    // flutter_tts speak() also returns early, so here the gate's safety timer is
+    // what covers playback.
     try {
-      if (lang.isNotEmpty) {
-        try { await _deviceTts.setLanguage(lang); } catch (_) {}
+      if (lang.isNotEmpty && lang != _deviceTtsLang) {
+        try {
+          await _deviceTts.setLanguage(lang);
+          _deviceTtsLang = lang;
+        } catch (_) {}
       }
       markTranslationPlaying(textLength: text.length);
       await _deviceTts.stop();
@@ -1035,8 +1043,9 @@ class _CallScreenState extends State<CallScreen> {
   /// Our own pipeline is untouched — we keep transcribing our mic in our real
   /// spoken language and translating for the peer. What changes is on THEIR
   /// phone: [_announceOutputLang] tells them to translate into [code], and their
-  /// [_onCaptionData] re-binds their route to it. All we do locally is load the
-  /// voice that will speak what they send back.
+  /// [_onCaptionData] re-binds their route to it. All we do locally is point the
+  /// device voice at the new language — nothing is downloaded: the language is
+  /// picked mid-call, so it has to speak now, not after a 60 MB bundle lands.
   Future<void> _changeOutputLanguage(String code) async {
     if (code.isEmpty || code == _myOutputLang) return;
     setState(() => _myOutputLang = code);
@@ -1044,13 +1053,8 @@ class _CallScreenState extends State<CallScreen> {
     final room = _room;
     if (room != null) _announceOutputLang(room);
 
-    if (kIsWeb) {
-      unawaited(_deviceTts.setLanguage(code).catchError((_) {}));
-    } else {
-      // Pull the voice now rather than on the first incoming utterance, which
-      // would otherwise fall back to the OS voice while it downloads.
-      unawaited(SpeechService.instance.ensureLanguageInstalled(code));
-    }
+    _deviceTtsLang = code;
+    unawaited(_deviceTts.setLanguage(code).catchError((_) {}));
   }
 
   /// Tell the peer which language to translate into for us.

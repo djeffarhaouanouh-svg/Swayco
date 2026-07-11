@@ -85,6 +85,16 @@ class SpeechService {
 
   bool get isReady => _useJa ? _jaEngine.isReady : _engine.isReady;
 
+  /// Whether the engine is loaded *and* loaded for [langCode] — i.e. this voice
+  /// can speak right now, with no download.
+  ///
+  /// The in-call language button lets the user hear the peer in a language other
+  /// than their account one. That pick must speak immediately, so it goes to the
+  /// device's own OS voice instead of pulling a 60 MB bundle mid-call; only the
+  /// account language (installed at boot) is served from here.
+  bool isLoadedFor(String langCode) =>
+      isReady && _loadedLang == normalizeLang(langCode);
+
   // ── Language / voice management ────────────────────────────────────────────
 
   /// Legacy shim: callers pass this back into [speak]'s `voice` argument, which
