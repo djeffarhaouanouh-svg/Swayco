@@ -6,16 +6,12 @@
 /// - **The neural engine** (Moonshine v2 on sherpa-onnx, the same runtime the
 ///   on-device TTS uses) — `en`, `ja`, `zh`, `ko`, `ar`.
 /// - **Vosk** (libvosk via dart:ffi) — `fr`, `ru`, `es`, `it`, `pt`, `de`, `nl`.
-/// - **Whisper base int8** (sherpa-onnx `OfflineRecognizer`) — the universal
-///   fallback: one model, 99 languages, for every language the two above do not
-///   cover. Bigger (~152 MB) and autoregressive (slower) than the dedicated
-///   models, so [specForLang] only reaches it once the per-language specs miss.
 ///
 /// STT runs on the phone's OWN outgoing mic, so a device only ever downloads
-/// the model for its user's language — one model, 30–150 MB.
+/// the model for its user's language — one model, 30–60 MB.
 library;
 
-enum AsrEngineKind { neural, lattice, whisper }
+enum AsrEngineKind { neural, lattice }
 
 sealed class AsrModelSpec {
   const AsrModelSpec({
@@ -66,45 +62,6 @@ class NeuralAsrSpec extends AsrModelSpec {
     final path = subdir.isEmpty ? file : '$subdir/$file';
     return 'https://huggingface.co/$repo/resolve/main/$path';
   }
-}
-
-/// Whisper: encoder + decoder + tokens, fetched file by file from the sherpa
-/// author's Hugging Face repo and stored under canonical names so the engine
-/// does not have to know which Whisper size it got.
-///
-/// Only the `int8` graphs are fetched (the repo also holds fp32, twice the
-/// size): base int8 is ~152 MB on disk, which is the whole point of picking
-/// `base` — one model for the 87 languages that have no dedicated spec.
-class WhisperAsrSpec extends AsrModelSpec {
-  const WhisperAsrSpec({
-    required super.id,
-    required super.langs,
-    required super.approxMb,
-    required this.repo,
-    required this.size,
-  });
-
-  final String repo;
-
-  /// `tiny` | `base` | `small` … — the prefix the release files carry.
-  final String size;
-
-  @override
-  AsrEngineKind get kind => AsrEngineKind.whisper;
-
-  static const encoderFile = 'encoder.int8.onnx';
-  static const decoderFile = 'decoder.int8.onnx';
-  static const tokensFile = 'tokens.txt';
-
-  /// Remote file name → the name it is saved under in the model dir.
-  Map<String, String> get files => {
-        '$size-encoder.int8.onnx': encoderFile,
-        '$size-decoder.int8.onnx': decoderFile,
-        '$size-tokens.txt': tokensFile,
-      };
-
-  String urlFor(String remoteFile) =>
-      'https://huggingface.co/$repo/resolve/main/$remoteFile';
 }
 
 /// Lattice: one zip per language, expanded into `<appSupport>/stt/<id>/`.
@@ -164,41 +121,7 @@ const _specs = <AsrModelSpec>[
   LatticeAsrSpec(id: 'vosk-model-small-pt-0.3', langs: ['pt'], approxMb: 31),
   LatticeAsrSpec(id: 'vosk-model-small-de-0.15', langs: ['de'], approxMb: 45),
   LatticeAsrSpec(id: 'vosk-model-small-nl-0.22', langs: ['nl'], approxMb: 39),
-
-  // LAST on purpose: [specForLang] scans in order, so every language above keeps
-  // its dedicated (smaller, faster) model and Whisper only serves the rest.
-  WhisperAsrSpec(
-    id: 'whisper-base',
-    langs: _whisperLangs,
-    approxMb: 152,
-    repo: 'csukuangfj/sherpa-onnx-whisper-base',
-    size: 'base',
-  ),
 ];
-
-/// The 99 languages Whisper decodes, in the app's own codes.
-///
-/// `fil` is ours, not Whisper's — it decodes Tagalog as `tl`; [whisperLangCode]
-/// does the translation. The languages already served by Moonshine or Vosk are
-/// deliberately left in: a language never reaches this spec (they are matched
-/// first), but listing them keeps [supportedLangs] honest.
-const _whisperLangs = <String>[
-  'en', 'zh', 'de', 'es', 'ru', 'ko', 'fr', 'ja', 'pt', 'tr', 'pl', 'ca', 'nl',
-  'ar', 'sv', 'it', 'id', 'hi', 'fi', 'vi', 'he', 'uk', 'el', 'ms', 'cs', 'ro',
-  'da', 'hu', 'ta', 'no', 'th', 'ur', 'hr', 'bg', 'lt', 'la', 'mi', 'ml', 'cy',
-  'sk', 'te', 'fa', 'lv', 'bn', 'sr', 'az', 'sl', 'kn', 'et', 'mk', 'br', 'eu',
-  'is', 'hy', 'ne', 'mn', 'bs', 'kk', 'sq', 'sw', 'gl', 'mr', 'pa', 'si', 'km',
-  'sn', 'yo', 'so', 'af', 'oc', 'ka', 'be', 'tg', 'sd', 'gu', 'am', 'yi', 'lo',
-  'uz', 'fo', 'ht', 'ps', 'tk', 'nn', 'mt', 'sa', 'lb', 'my', 'bo', 'tl', 'mg',
-  'as', 'tt', 'haw', 'ln', 'ha', 'ba', 'jw', 'su',
-  'fil', // → decoded as 'tl'
-];
-
-/// The code Whisper itself expects for one of our language codes.
-String whisperLangCode(String langCode) {
-  final lc = normalizeLang(langCode);
-  return lc == 'fil' ? 'tl' : lc;
-}
 
 String normalizeLang(String langCode) =>
     langCode.toLowerCase().split(RegExp(r'[-_]')).first;

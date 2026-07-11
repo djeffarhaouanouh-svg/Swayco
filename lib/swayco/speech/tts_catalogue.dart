@@ -80,29 +80,6 @@ TtsModelSpec _piper(String voice, List<String> langs, {int mb = 64}) {
   );
 }
 
-/// A sherpa MMS bundle (Meta MMS-TTS, converted by sherpa): still plain VITS, so
-/// the same engine — but its frontend is a *character* frontend over the native
-/// script, not espeak-ng. There is therefore no `espeak-ng-data/` in the bundle
-/// and `dataDir` must stay empty (SpeechService passes '' through untouched).
-///
-/// Only used where no Piper voice exists. Bigger (~103 MB, fp32 only — no int8 /
-/// fp16 variants are published) and lower quality than Piper.
-///
-/// sherpa refuses MMS models flagged `is_uroman` (it has no romaniser), so the
-/// only usable ones are those whose vocab is over their own script. All the
-/// languages here are in that set.
-TtsModelSpec _mms(String iso3, List<String> langs, {int mb = 103}) {
-  final id = 'vits-mms-$iso3';
-  return TtsModelSpec(
-    id: id,
-    langs: langs,
-    approxMb: mb,
-    bundleUrl: '$_sherpaTts/$id.tar.bz2',
-    modelFile: 'model.onnx',
-    dataDir: '',
-  );
-}
-
 const _mimic3Ko = 'vits-mimic3-ko_KO-kss_low';
 
 final List<TtsModelSpec> _specs = <TtsModelSpec>[
@@ -121,10 +98,6 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   _piper('ar_JO-kareem-medium', ['ar']),
   _piper('hi_IN-pratham-medium', ['hi']),
   _piper('zh_CN-huayan-medium', ['zh']),
-
-  // Thai → MMS: no Piper voice exists. Thai is unspaced and the MMS frontend is
-  // per-character over Thai script, so no word segmenter is needed.
-  _mms('tha', ['th']),
 
   // Korean → mimic3 (also a plain VITS/espeak model, already sherpa-ready).
   const TtsModelSpec(
