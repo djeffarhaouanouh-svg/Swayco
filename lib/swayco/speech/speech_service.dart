@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ja_tts_engine.dart';
 import 'sherpa_tts_engine.dart';
 import 'tts_bundle_downloader.dart';
 import 'tts_catalogue.dart';
@@ -29,10 +32,36 @@ class SpeechService {
 
   final _downloader = TtsBundleDownloader();
   final _engine = SherpaTtsEngine();
+  final _jaEngine = JaTtsEngine();
+
+  /// Whether the currently loaded voice is Japanese (→ [_jaEngine]).
+  bool _useJa = false;
 
   TtsModelSpec? _loadedSpec;
   String? _loadedLang;
   Future<void>? _loading;
+
+  /// Playback-complete events, merged from both engines.
+  ///
+  /// The in-call half-duplex gate subscribes to this to reopen the mic as soon
+  /// as an utterance stops playing (see `call_screen._playWithLocalTts`). Losing
+  /// an event does not open the mic early — the gate's safety timer is the floor
+  /// — but it holds the mic shut for the whole 15 s window, so the wiring must
+  /// be as unconditional as the old direct `_engine.onPlaybackComplete` was:
+  ///   * wired on first *subscription*, not inside `_load`, so it is live even
+  ///     if no voice ever loads;
+  ///   * both engines forwarded unconditionally (never filtered on [_useJa] —
+  ///     only one engine is ever configured, so the idle one never fires, and a
+  ///     language switch mid-utterance must not swallow the event).
+  final _playbackComplete = StreamController<void>.broadcast();
+  bool _playbackWired = false;
+
+  void _wirePlayback() {
+    if (_playbackWired) return;
+    _playbackWired = true;
+    _engine.onPlaybackComplete.listen((_) => _playbackComplete.add(null));
+    _jaEngine.onPlaybackComplete.listen((_) => _playbackComplete.add(null));
+  }
 
   static const _prefKeySelectedLang = 'speech_selected_lang';
   static const _prefKeySelectedVoice = 'speech_selected_voice';
@@ -54,7 +83,7 @@ class SpeechService {
     }
   }
 
-  bool get isReady => _engine.isReady;
+  bool get isReady => _useJa ? _jaEngine.isReady : _engine.isReady;
 
   // ── Language / voice management ────────────────────────────────────────────
 
@@ -87,19 +116,29 @@ class SpeechService {
       return;
     }
     try {
+      _wirePlayback();
       final dir = await _downloader.ensureBundle(spec, onProgress: onProgress);
       String p(String rel) => '${dir.path}/$rel';
 
-      // All catalogue entries are VITS (Piper/mimic3) now, so no Kokoro voices
-      // file / lexicon / lang hint is needed — the model + tokens + espeak data
-      // are enough.
-      final model = SherpaTtsModel(
-        model: p(spec.modelFile),
-        tokens: p(spec.tokensFile),
-        dataDir: spec.dataDir.isEmpty ? '' : p(spec.dataDir),
-      );
-
-      await _engine.configure(model);
+      if (spec.isJapanese) {
+        // Native OpenJTalk reading + phonemizer + patched sherpa external-tokens.
+        await _jaEngine.configure(JaTtsModel(
+          model: p(spec.modelFile),
+          tokens: p(spec.tokensFile),
+          lexicon: p(spec.lexiconFile),
+          dictDir: p(spec.openjtalkDictDir),
+        ));
+        _useJa = true;
+      } else {
+        // All other catalogue entries are VITS (Piper/mimic3): model + tokens +
+        // espeak data are enough.
+        await _engine.configure(SherpaTtsModel(
+          model: p(spec.modelFile),
+          tokens: p(spec.tokensFile),
+          dataDir: spec.dataDir.isEmpty ? '' : p(spec.dataDir),
+        ));
+        _useJa = false;
+      }
       _loadedSpec = spec;
       _loadedLang = lang;
 
@@ -138,7 +177,11 @@ class SpeechService {
     final spec = _loadedSpec;
     if (spec == null) return;
     try {
-      await _engine.speak(text, sid: spec.sid, speed: spec.speed);
+      if (_useJa) {
+        await _jaEngine.speak(text, sid: spec.sid, speed: spec.speed);
+      } else {
+        await _engine.speak(text, sid: spec.sid, speed: spec.speed);
+      }
     } catch (e) {
       debugPrint('[speech] speak error: $e');
     }
@@ -146,15 +189,23 @@ class SpeechService {
 
   /// Fires when a [speak] utterance finishes playing. [speak] returns at
   /// playback *start*, so this is the only signal for "the speaker is quiet".
-  Stream<void> get onPlaybackComplete => _engine.onPlaybackComplete;
+  /// Wiring happens here, on first subscription, so the stream is live even when
+  /// no voice has been loaded (the half-duplex gate subscribes before speaking).
+  Stream<void> get onPlaybackComplete {
+    _wirePlayback();
+    return _playbackComplete.stream;
+  }
 
   Future<void> stop() async {
     if (kIsWeb) return;
     await _engine.stop();
+    await _jaEngine.stop();
   }
 
   Future<void> dispose() async {
     await _engine.dispose();
+    await _jaEngine.dispose();
+    await _playbackComplete.close();
     _loadedSpec = null;
     _loadedLang = null;
   }

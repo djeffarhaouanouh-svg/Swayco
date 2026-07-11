@@ -113,6 +113,18 @@ dependencies:
   # The lattice engine ships its language models as zip archives.
   archive: ^4.0.7
 
+# iOS + macOS: use the sherpa_onnx plugin patched with the ja external-tokens API
+# (SherpaOnnxOfflineTtsGenerateFromTokens) and shipping the OpenJTalk reading lib
+# alongside it — that pair is what makes the Japanese voice run on the app's
+# SINGLE ONNX Runtime (see native/sherpa_ja_patch + native/ja_openjtalk).
+# The native binaries are git-ignored; regenerate them with each override's
+# setup.sh / build_ios.sh. Android still uses the stock plugin (no ja voice yet).
+dependency_overrides:
+  sherpa_onnx_macos:
+    path: native/sherpa_onnx_macos_patched
+  sherpa_onnx_ios:
+    path: native/sherpa_onnx_ios_patched
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

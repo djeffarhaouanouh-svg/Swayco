@@ -1,0 +1,55 @@
+PODS:
+  - flutter_local_notifications (0.0.1):
+    - FlutterMacOS
+  - flutter_tts (0.0.1):
+    - FlutterMacOS
+  - flutter_webrtc (1.4.0):
+    - FlutterMacOS
+    - WebRTC-SDK (= 144.7559.01)
+  - FlutterMacOS (1.0.0)
+  - livekit_client (2.7.0):
+    - flutter_webrtc
+    - FlutterMacOS
+    - WebRTC-SDK (= 144.7559.01)
+  - sherpa_onnx_macos (1.13.4):
+    - FlutterMacOS
+  - WebRTC-SDK (144.7559.01)
+
+DEPENDENCIES:
+  - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
+  - flutter_tts (from `Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos`)
+  - flutter_webrtc (from `Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - livekit_client (from `Flutter/ephemeral/.symlinks/plugins/livekit_client/macos`)
+  - sherpa_onnx_macos (from `Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos`)
+
+SPEC REPOS:
+  trunk:
+    - WebRTC-SDK
+
+EXTERNAL SOURCES:
+  flutter_local_notifications:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos
+  flutter_tts:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos
+  flutter_webrtc:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  livekit_client:
+    :path: Flutter/ephemeral/.symlinks/plugins/livekit_client/macos
+  sherpa_onnx_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/sherpa_onnx_macos/macos
+
+SPEC CHECKSUMS:
+  flutter_local_notifications: 13862b132e32eb858dea558a86d45d08daeacfe7
+  flutter_tts: ae915565cc6948444b513acc8ee021993281e027
+  flutter_webrtc: f1fb1a00c6080461bb2bc6caa5b93d07ddb68466
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  livekit_client: 3e024a31e364d4a2e0deda1b3908e93933dbf6dc
+  sherpa_onnx_macos: e648c8a9f1a02ec1d7e2788a2963bc86e67e2dd7
+  WebRTC-SDK: ab9b5319e458c2bfebdc92b3600740da35d5630d
+
+PODFILE CHECKSUM: 346bfb2deb41d4a6ebd6f6799f92188bde2d246f
+
+COCOAPODS: 1.16.2

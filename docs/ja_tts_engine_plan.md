@@ -74,18 +74,60 @@ with no ORT) = one ONNX Runtime total.** iOS links cleanly.
   → symbol ids) is the reference to reimplement in the native frontend. Match its
   `tokens.txt` / symbol order exactly, or the model mispronounces.
 
+## Phase 0 — RESULT (DONE, gate PASSED) — and what it changes
+
+Executed on desktop: reproduced MeloTTS's Japanese g2p faithfully, ran
+`onnx_exports/ja/model.onnx` on plain `onnxruntime`, synthesised 10 stress
+phrases, listened → **voice quality validated, proceed.** Samples committed under
+`docs/ja_tts_phase0_samples/`. Repro harness: `scratchpad/ja_tts_phase0/`.
+
+Four findings that **refine** the phases below (they make the frontend simpler
+than first assumed):
+
+1. **Tones are all zero.** The export has `num_ja_tones = 1`; the g2p sets every
+   tone to 0 and `metadata.json tone_start = 6` just shifts them to a constant 6.
+   → **No pitch-accent frontend is needed.** OpenJTalk is needed only for the
+   *reading* (kanji→kana), not for accent. The `(int64 tones[])` fed to the model
+   is simply `[6,6,…]` blank-interleaved with 0.
+
+2. **The reference frontend is kakasi + a BERT tokenizer, NOT pyopenjtalk** — and
+   kakasi mis-reads context-dependent kanji (今日→コンニチ not キョウ, 人→ニン not
+   ヒト, drops 々). OpenJTalk reads all of these correctly. → The native frontend
+   **must use OpenJTalk/mecab for the reading**; do not replicate kakasi.
+
+3. **No word segmenter is needed for phonemisation.** MeloTTS applies
+   `kata2phoneme` per BERT-token; verified that running it over the *whole*
+   katakana reading gives identical token ids on every test case. → The native
+   frontend is just: OpenJTalk reading → `kata2phoneme` → ids. No tokenizer.
+
+4. **The export already dropped BERT.** ONNX inputs are only
+   `x, x_lengths, tones, sid, noise_scale, length_scale, noise_scale_w`
+   (44100 Hz). Infer params used: `noise_scale=0.6, noise_scale_w=0.8,
+   length_scale=1.0, sid=0`.
+
+**Already built (pure Dart, verified):** the deterministic half of the frontend —
+`lib/swayco/speech/ja_phonemizer.dart` (`kata2phoneme` + token/tone assembly +
+`ー`→vowel normalisation `expandChoonpu`), proven bit-for-bit against the Python
+reference by `test/ja_phonemizer_test.dart` (goldens in `test/data/`). The only
+remaining piece of the frontend is the **native OpenJTalk reading step** that
+turns arbitrary Japanese into the katakana this phonemizer consumes.
+
+⚠️ **chōonpu contract:** OpenJTalk emits long vowels as `ー`, which MeloTTS's table
+silently drops. The reading must pass through `expandChoonpu` (or emit
+kakasi-style vowel kana) before phonemising, or long vowels vanish.
+
 ## Phases (do them in order; each is a gate)
 
-**Phase 0 — Prove the audio on desktop FIRST (cheap, do before any native work).**
-Reproduce MeloTTS's Japanese g2p (pyopenjtalk) → feed `onnx_exports/ja/model.onnx`
-via plain `onnxruntime` in Python → write a WAV → listen. If Japanese is
-intelligible and natural, the model+g2p combo is validated and worth the native
-build. If not, stop here. (This is the equivalent of the Moonshine CLI gate.)
+**Phase 0 — Prove the audio on desktop FIRST.** ✅ DONE — see result above.
 
-**Phase 1 — Native OpenJTalk frontend.** Build open_jtalk + mecab for iOS (arm64)
-and Android (arm64-v8a + others). Package the dictionary (unidic/naist-jdic,
-~download-on-demand with the model, NOT in the binary). FFI-bind
-`text → tokens[] + tones[]` in Dart. Verify it matches the Phase-0 phoneme output.
+**Phase 1 — Native OpenJTalk *reading* frontend.** Build open_jtalk + mecab for iOS
+(arm64) and Android (arm64-v8a + others). Package the dictionary (open_jtalk
+naist-jdic, ~download-on-demand with the model, NOT in the binary). FFI-bind
+**`text → katakana reading`** only (accent/tones not needed — finding #1). Feed
+that reading through `expandChoonpu` + `phonemizeKatakana` (already implemented in
+`ja_phonemizer.dart`) to get `tokens[]`; `tones[]` is a constant. Verify the ids
+match the Phase-0 goldens. NB: pyopenjtalk's C core is `open_jtalk`; the reading
+we need is exactly `pyopenjtalk.g2p(text, kana=True)`.
 
 **Phase 2 — Patch + build sherpa from source** with the external-tokens VITS
 entry point (see architecture above). Wire the Dart binding. Confirm the app still
