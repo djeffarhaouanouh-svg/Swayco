@@ -297,20 +297,38 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     if (isSendMuted || isTranslationPlaying) {
       if (!_gated) {
         _gated = true;
-        _utterance.clear();
-        if (AsrService.instance.isStreaming && _modelReady) {
-          // Either way, whatever the decoder holds was spoken BEFORE the gate
-          // closed — before the mute was pressed, before our own TTS started.
-          // Those words were said out loud, on purpose, to be heard. Flush and
-          // send them. Resetting here is what silently ate the last sentence
-          // before every mute.
-          //
-          // `force` is needed for the mute case: _translateAndSend otherwise
-          // refuses to publish anything while isSendMuted, which is the right
-          // rule for audio captured *after* the press, not before it.
-          DebugOverlay.log(
-              'stt gate (${isSendMuted ? "muted" : "tts"}) — flushing what was already said');
+        // Whatever the recogniser is holding was spoken BEFORE the gate closed —
+        // before the mute was pressed, before our own TTS started. Those words
+        // were said out loud, on purpose, to be heard: publish them instead of
+        // dropping them. `force` is what lets them through, since
+        // _translateAndSend otherwise refuses to publish while isSendMuted —
+        // the right rule for audio captured *after* the press, not before it.
+        //
+        // Both engine shapes need this. Only the streaming one was handled
+        // before, so muting mid-sentence silently ate the phrase on every
+        // clip-engine language (en, ja, zh, ko, ar).
+        final gate = isSendMuted ? 'muted' : 'tts';
+        if (!_modelReady) {
+          _utterance.clear();
+        } else if (AsrService.instance.isStreaming) {
+          // Streaming (lattice): the words live in the native decoder.
+          _utterance.clear();
+          DebugOverlay.log('stt gate ($gate) — flushing what was already said');
           _serialize(() => _flushAndSend(onTranslation, force: true));
+        } else if (_utterance.length >= _minUtteranceSamples) {
+          // Clip (neural): the words sit in our own buffer. Decode and send it.
+          final pending = Float32List.fromList(_utterance);
+          _utterance.clear();
+          DebugOverlay.log('stt gate ($gate) — decoding what was already said');
+          unawaited(_recognizeAndTranslate(
+            pending,
+            onTranslation,
+            _onError,
+            force: true,
+          ));
+        } else {
+          // Too short to be speech — nothing worth publishing.
+          _utterance.clear();
         }
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
@@ -438,16 +456,20 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   }
 
   /// Clip path (neural): decode the whole VAD-clipped utterance at once.
+  ///
+  /// [force] publishes even though the gate has since closed — set it for the
+  /// utterance the mute press itself interrupted (see the gate in [_onPcm]).
   Future<void> _recognizeAndTranslate(
     Float32List samples,
     void Function(String, String, String, String) onTranslation,
-    void Function(String)? onError,
-  ) async {
+    void Function(String)? onError, {
+    bool force = false,
+  }) async {
     try {
       final orig = await AsrService.instance.transcribe(samples);
       if (orig.trim().isEmpty) return;
       DebugOverlay.log('stt orig="$orig"');
-      await _translateAndSend(orig, onTranslation, onError);
+      await _translateAndSend(orig, onTranslation, onError, force: force);
     } catch (e) {
       onError?.call('stt:$e');
     }
