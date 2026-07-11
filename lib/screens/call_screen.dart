@@ -130,6 +130,35 @@ class _CallScreenState extends State<CallScreen> {
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
 
+  /// Base codes (`fr`, `en`, …) the OS voice can actually speak on THIS phone,
+  /// from `getLanguages` — a Samsung and a Xiaomi do not ship the same set, so
+  /// it can only be known at runtime.
+  ///
+  /// Drives the in-call picker: a language the device cannot say is shown
+  /// disabled, because the pick is served by the OS voice with no download. Left
+  /// empty until the probe answers, and empty means "no constraint" — never grey
+  /// the whole list out on a device whose engine failed to enumerate.
+  Set<String> _deviceVoiceLangs = const {};
+
+  /// Ask the OS which languages it can speak. `getLanguages` returns BCP-47 tags
+  /// (`fr-FR`, `en-US`, …); the picker works in base codes.
+  Future<void> _loadDeviceVoiceLangs() async {
+    try {
+      final raw = await _deviceTts.getLanguages;
+      if (raw is! List) return;
+      final langs = <String>{
+        for (final t in raw)
+          if (t != null)
+            t.toString().toLowerCase().split(RegExp(r'[-_]')).first,
+      }..removeWhere((s) => s.isEmpty);
+      if (!mounted || langs.isEmpty) return;
+      DebugOverlay.log('device voices: ${langs.length} langs');
+      setState(() => _deviceVoiceLangs = langs);
+    } catch (e) {
+      debugPrint('[speech] getLanguages failed: $e');
+    }
+  }
+
   /// Whether the realtime translation pipeline is currently active.
   /// Toggle via [_toggleTranslation].
   bool _translationEnabled = true;
@@ -367,6 +396,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
@@ -1030,6 +1060,7 @@ class _CallScreenState extends State<CallScreen> {
       ),
       builder: (ctx) => _OutputLanguageSheet(
         currentCode: _myOutputLang,
+        deviceVoiceLangs: _deviceVoiceLangs,
         onSelected: (code) {
           Navigator.of(ctx).pop();
           _changeOutputLanguage(code);
@@ -1934,19 +1965,31 @@ class _RoundCallButton extends StatelessWidget {
 /// it — see [_CallScreenState._changeOutputLanguage].
 ///
 /// A language this phone has no voice for is shown disabled rather than hidden:
-/// picking it would leave the peer's translation arriving as text we cannot
-/// speak. On web the browser always has a voice, so nothing is disabled there.
+/// the pick is spoken by the OS voice, so picking one the OS cannot say would
+/// land the peer's translation as text nobody reads out.
+///
+/// The account language stays selectable even when the OS lacks it — its sherpa
+/// bundle is installed and speaks it. On web the browser always has a voice.
 class _OutputLanguageSheet extends StatelessWidget {
   const _OutputLanguageSheet({
     required this.currentCode,
+    required this.deviceVoiceLangs,
     required this.onSelected,
   });
 
   final String currentCode;
+
+  /// Base codes the OS voice can speak here. Empty = the probe has not answered
+  /// (or failed), in which case nothing is disabled — better a language that
+  /// might not speak than a picker that greys out everything.
+  final Set<String> deviceVoiceLangs;
   final ValueChanged<String> onSelected;
 
-  static bool _canSpeak(String code) =>
-      kIsWeb || SpeechService.defaultVoiceFor(code).isNotEmpty;
+  bool _canSpeak(String code) =>
+      kIsWeb ||
+      deviceVoiceLangs.isEmpty ||
+      deviceVoiceLangs.contains(code) ||
+      SpeechService.instance.isLoadedFor(code);
 
   @override
   Widget build(BuildContext context) {
