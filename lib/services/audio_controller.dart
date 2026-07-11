@@ -208,7 +208,10 @@ class AudioController extends ChangeNotifier {
   // both remote tracks play through one audio session and the duck is driven by
   // Helper.setVolume on the original track.
   static const double _duckedLevel = 0.10;
-  static const Duration _duckReleaseDelay = Duration(milliseconds: 1400);
+  // How long the duck holds after the translation stops, so the gaps between
+  // two translated sentences don't make the volume flap. 1400 ms kept the real
+  // voice under water well after the translation was over.
+  static const Duration _duckReleaseDelay = Duration(milliseconds: 700);
 
   Future<void> _applyTranslatedVolume(double v) async {
     try {
