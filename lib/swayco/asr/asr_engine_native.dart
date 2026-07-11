@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'neural_asr_engine.dart';
 import 'asr_catalogue.dart';
 import 'lattice_asr_engine.dart';
+import 'whisper_asr_engine.dart';
 
 /// One step of a streaming engine's output.
 ///
@@ -62,4 +63,5 @@ abstract class AsrEngine {
 AsrEngine createAsrEngine(AsrEngineKind kind) => switch (kind) {
       AsrEngineKind.neural => NeuralAsrEngine(),
       AsrEngineKind.lattice => LatticeAsrEngine(),
+      AsrEngineKind.whisper => WhisperAsrEngine(),
     };

@@ -68,6 +68,8 @@ class AsrModelDownloader {
         await _downloadNeural(spec, dir, onProgress);
       case LatticeAsrSpec():
         await _downloadLattice(spec, dir, onProgress);
+      case WhisperAsrSpec():
+        await _downloadWhisper(spec, dir, onProgress);
     }
 
     await File('${dir.path}/$_completeMarker').writeAsString('1');
@@ -97,6 +99,35 @@ class AsrModelDownloader {
       final tmp = File('${dest.path}.tmp');
       receivedTotal += await _downloadTo(
         spec.urlFor(file),
+        tmp,
+        onBytes: (n) => onProgress?.call(
+          ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),
+        ),
+      );
+      await tmp.rename(dest.path);
+    }
+  }
+
+  /// Same file-by-file fetch as [_downloadNeural], but the release names carry
+  /// the Whisper size (`base-encoder.int8.onnx`) and the engine wants canonical
+  /// ones, so each file is saved under `spec.files`'s local name.
+  Future<void> _downloadWhisper(
+    WhisperAsrSpec spec,
+    Directory dir,
+    void Function(double)? onProgress,
+  ) async {
+    final totalBytes = spec.approxMb * 1024 * 1024;
+    var receivedTotal = 0;
+
+    for (final entry in spec.files.entries) {
+      final dest = File('${dir.path}/${entry.value}');
+      if (await dest.exists()) {
+        receivedTotal += await dest.length();
+        continue;
+      }
+      final tmp = File('${dest.path}.tmp');
+      receivedTotal += await _downloadTo(
+        spec.urlFor(entry.key),
         tmp,
         onBytes: (n) => onProgress?.call(
           ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),
