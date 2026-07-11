@@ -198,7 +198,7 @@ class AudioController extends ChangeNotifier {
   }
 
   // While the translation is actually speaking, duck the original remote voice
-  // to 10% (never to zero — the real voice is the point of the product) and
+  // to 5% (never to zero — the real voice is the point of the product) and
   // restore it [_duckReleaseDelay] after. The listener hears the real voice
   // first, then it drops far UNDER the translation so the two don't pile up —
   // but a trace of the original stays there. 25% was not enough separation: the
@@ -207,7 +207,7 @@ class AudioController extends ChangeNotifier {
   // Same on web and native: livekit_client shares one flutter_webrtc engine, so
   // both remote tracks play through one audio session and the duck is driven by
   // Helper.setVolume on the original track.
-  static const double _duckedLevel = 0.10;
+  static const double _duckedLevel = 0.05;
   // How long the duck holds after the translation stops, so the gaps between
   // two translated sentences don't make the volume flap. 1400 ms kept the real
   // voice under water well after the translation was over.
