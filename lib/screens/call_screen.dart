@@ -130,6 +130,27 @@ class _CallScreenState extends State<CallScreen> {
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
 
+  /// True exactly while a translation is being SPOKEN, whichever engine speaks
+  /// it — the sherpa voice or the device (`flutter_tts`) one.
+  ///
+  /// This is NOT [isTranslationPlaying]: that flag is an 800 ms anti-echo gate
+  /// that self-clears on a timer whether the voice is still talking or not, and
+  /// the mic gate is built on it. This one tracks real playback, from the
+  /// engines' own start/complete events, and drives nothing on the audio path —
+  /// so wiring it cannot wedge the mic the way a completion-event gate does.
+  final ValueNotifier<bool> ttsSpeaking = ValueNotifier<bool>(false);
+
+  /// Ties [ttsSpeaking] to the device engine's own events. `flutter_tts` had no
+  /// handlers at all, so nothing knew when an OS voice started or stopped — and
+  /// since the in-call language button now speaks through it, that was every
+  /// utterance in a language other than the account one.
+  void _wireDeviceTtsSignal() {
+    _deviceTts.setStartHandler(() => ttsSpeaking.value = true);
+    _deviceTts.setCompletionHandler(() => ttsSpeaking.value = false);
+    _deviceTts.setCancelHandler(() => ttsSpeaking.value = false);
+    _deviceTts.setErrorHandler((_) => ttsSpeaking.value = false);
+  }
+
   /// Base codes (`fr`, `en`, …) the OS voice can actually speak on THIS phone,
   /// from `getLanguages` — a Samsung and a Xiaomi do not ship the same set, so
   /// it can only be known at runtime.
@@ -396,6 +417,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    _wireDeviceTtsSignal();
     unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
@@ -938,13 +960,19 @@ class _CallScreenState extends State<CallScreen> {
         // Subscribe before speak(): a short clip can finish before we get here.
         final done = speech.onPlaybackComplete.first;
         markTranslationPlaying(textLength: text.length);
+        // Sherpa's half of [ttsSpeaking]. The same 15 s timeout that covers the
+        // gate covers the signal: speak() returns without playing when the model
+        // is missing, and then no completion event ever comes.
+        ttsSpeaking.value = true;
         unawaited(done
             .timeout(const Duration(seconds: 15))
             .then((_) => markTranslationDone())
-            .catchError((_) {/* safety timer reopens the mic */}));
+            .catchError((_) {/* safety timer reopens the mic */})
+            .whenComplete(() => ttsSpeaking.value = false));
         await speech.speak(text: text, languageCode: lang, voice: voice);
         return;
       } catch (e) {
+        ttsSpeaking.value = false;
         debugPrint('[speech] speak error: $e');
       }
     }
@@ -1437,6 +1465,7 @@ class _CallScreenState extends State<CallScreen> {
     _audio.dispose();
     unawaited(_ttsPlayer.dispose());
     unawaited(_deviceTts.stop());
+    ttsSpeaking.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
