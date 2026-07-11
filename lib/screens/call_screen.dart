@@ -122,6 +122,10 @@ class _CallScreenState extends State<CallScreen> {
   EventsListener<RoomEvent>? _roomEvents;
 
   static const String _captionTopic = 'swayco-chat';
+
+  /// Data-channel key carrying "the language I want to hear you in". Sent by the
+  /// LISTENER, acted on by the SPEAKER — translation runs on the speaker's side.
+  static const String _kListenLangKey = 'listenLang';
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
@@ -130,18 +134,30 @@ class _CallScreenState extends State<CallScreen> {
   /// Toggle via [_toggleTranslation].
   bool _translationEnabled = true;
 
-  /// The remote BCP-47 we have attached the translation pipeline with, so we
-  /// only re-attach when it actually changes.
-  String _attachedRemoteLang = '';
-  /// The local output language the pipeline is currently attached with â€”
-  /// tracked alongside [_attachedRemoteLang] so a mid-call language change
-  /// also triggers a re-attach.
-  String _attachedMyLang = '';
-  /// The language the local user currently *hears* the remote translated
-  /// into. Starts at the user's own language; changeable mid-call via the
-  /// language button. Local-only â€” it is never written to LiveKit
-  /// metadata, so the remote participant is completely unaffected.
+  /// The target BCP-47 the translation pipeline is currently attached with, so
+  /// we only re-attach when it actually changes.
+  String _attachedTargetLang = '';
+
+  /// The language the local user currently *hears* the remote translated into.
+  /// Starts at the user's own language; changeable mid-call via the language
+  /// button.
+  ///
+  /// Translation happens on the SPEAKER's side — this phone transcribes its own
+  /// mic, translates into the language the *peer* wants, and ships the text over
+  /// the data channel for the peer to speak. So changing this does nothing
+  /// locally: it is broadcast to the peer ([_kListenLangKey]), and it is THEIR
+  /// pipeline that starts translating into it. The only local effect is which
+  /// voice speaks the text they send back.
   late String _myOutputLang = widget.mySourceLang;
+
+  /// The language the REMOTE user wants to hear us in — i.e. our translation
+  /// target. Defaults to their account language (read from their LiveKit
+  /// metadata) and is overridden the moment they tap their own language button.
+  String _peerListenLang = '';
+
+  /// The output language we last announced to the peer, so a re-announce on
+  /// their (re)connect doesn't republish on every metadata event.
+  String _announcedOutputLang = '';
   bool _refreshingTranslation = false;
   /// Set when an event arrives while a refresh is in flight; we re-run once
   /// the in-flight call completes so the latest state is reflected.
@@ -273,29 +289,32 @@ class _CallScreenState extends State<CallScreen> {
     try {
       do {
         _refreshPending = false;
-        final remoteLang = _discoverRemoteLang(room);
+        // We translate for the PEER, so the target is what the peer asked to
+        // hear ([_peerListenLang], set by their language button) and otherwise
+        // their account language from metadata.
+        final target = _peerListenLang.isNotEmpty
+            ? _peerListenLang
+            : _discoverRemoteLang(room);
         // A metadata update can momentarily report no language for a peer that
         // is still in the room (observed: `attach src=en tgt=`). Re-attaching on
         // that gives an unconfigured route, which tears the pipeline down and
         // never brings it back. Keep the last known language instead.
-        if (remoteLang.isEmpty &&
-            _attachedRemoteLang.isNotEmpty &&
+        if (target.isEmpty &&
+            _attachedTargetLang.isNotEmpty &&
             room.remoteParticipants.isNotEmpty) {
           DebugOverlay.log(
-              'translation: ignoring empty remote lang, keeping $_attachedRemoteLang');
+              'translation: ignoring empty remote lang, keeping $_attachedTargetLang');
           continue;
         }
-        // Re-attach when the remote's language OR my chosen output
-        // language changed since the last bind.
-        if (remoteLang == _attachedRemoteLang &&
-            _myOutputLang == _attachedMyLang) {
-          continue;
-        }
-        _attachedRemoteLang = remoteLang;
-        _attachedMyLang = _myOutputLang;
+        // The peer may have joined after we picked a language — re-announce so
+        // they translate into it rather than into our account language.
+        _announceOutputLang(room);
+        if (target == _attachedTargetLang) continue;
+        _attachedTargetLang = target;
         final route = TranslationRoute(
-          sourceBcp47: _myOutputLang,
-          targetBcp47: remoteLang,
+          // Our mic, our real spoken language — never the language we listen in.
+          sourceBcp47: widget.mySourceLang,
+          targetBcp47: target,
         );
         await widget.translation.attachToRoom(room, route: route);
         // Pre-warm the TTS engine: setLanguage loads the voice, then a
@@ -701,7 +720,7 @@ class _CallScreenState extends State<CallScreen> {
         'call_started',
         roomName: widget.roomName,
         langFrom: widget.mySourceLang,
-        langTo: _attachedRemoteLang,
+        langTo: _attachedTargetLang,
         props: {'kind': _callKind},
       );
     } catch (e) {
@@ -789,12 +808,26 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() => _micOn = next);
   }
 
-  /// Data channel packet from the peer: local-TTS native or streamed web path.
-  /// Typed-chat has been removed — only translation audio packets are handled.
+  /// Data channel packet from the peer: local-TTS native or streamed web path,
+  /// plus the peer's listening-language announcements.
   void _onCaptionData(DataReceivedEvent e) {
     if (e.topic != _captionTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
+      // The peer tapped their language button: they want to hear us in this
+      // language from now on, so it becomes our translation target. A peer on an
+      // older build never sends this and keeps being served their account
+      // language from metadata.
+      final listen = m[_kListenLangKey]?.toString() ?? '';
+      if (listen.isNotEmpty) {
+        DebugOverlay.log('peer listens in $listen');
+        if (listen != _peerListenLang) {
+          _peerListenLang = listen;
+          final room = _room;
+          if (room != null) unawaited(_refreshTranslationBinding(room));
+        }
+        return;
+      }
       if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -998,17 +1031,46 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   /// Change the language the local user hears the remote translated into.
-  /// Local-only: it rebuilds our incoming translation pipeline with a new
-  /// output language. The remote participant is not affected â€” we never
-  /// touch our LiveKit metadata, so they keep translating our speech from
-  /// our real spoken language.
+  ///
+  /// Our own pipeline is untouched — we keep transcribing our mic in our real
+  /// spoken language and translating for the peer. What changes is on THEIR
+  /// phone: [_announceOutputLang] tells them to translate into [code], and their
+  /// [_onCaptionData] re-binds their route to it. All we do locally is load the
+  /// voice that will speak what they send back.
   Future<void> _changeOutputLanguage(String code) async {
     if (code.isEmpty || code == _myOutputLang) return;
     setState(() => _myOutputLang = code);
+
     final room = _room;
-    if (room != null) {
-      await _refreshTranslationBinding(room);
+    if (room != null) _announceOutputLang(room);
+
+    if (kIsWeb) {
+      unawaited(_deviceTts.setLanguage(code).catchError((_) {}));
+    } else {
+      // Pull the voice now rather than on the first incoming utterance, which
+      // would otherwise fall back to the OS voice while it downloads.
+      unawaited(SpeechService.instance.ensureLanguageInstalled(code));
     }
+  }
+
+  /// Tell the peer which language to translate into for us.
+  ///
+  /// Idempotent: only publishes when the announced value actually changed, so
+  /// the re-announce on every participant/metadata event costs nothing.
+  void _announceOutputLang(Room room) {
+    if (_myOutputLang.isEmpty || _myOutputLang == _announcedOutputLang) return;
+    if (room.remoteParticipants.isEmpty) return;
+    _announcedOutputLang = _myOutputLang;
+    DebugOverlay.log('announce listenLang=$_myOutputLang');
+    unawaited(room.localParticipant
+        ?.publishData(
+          Uint8List.fromList(
+            utf8.encode(jsonEncode({_kListenLangKey: _myOutputLang})),
+          ),
+          reliable: true,
+          topic: _captionTopic,
+        )
+        .catchError((_) {}));
   }
 
   Future<void> _hangUp() async {
@@ -1326,7 +1388,7 @@ class _CallScreenState extends State<CallScreen> {
         'call_ended',
         roomName: widget.roomName,
         langFrom: widget.mySourceLang,
-        langTo: _attachedRemoteLang,
+        langTo: _attachedTargetLang,
         props: {
           'kind': _callKind,
           'duration_ms': durMs,
@@ -1864,8 +1926,12 @@ class _RoundCallButton extends StatelessWidget {
 }
 
 /// Bottom sheet to change the language the local user hears the remote
-/// translated into. Picking a language only re-routes our own incoming
-/// translation pipeline â€” the remote side is untouched.
+/// translated into. The pick is broadcast to the peer, who then translates into
+/// it — see [_CallScreenState._changeOutputLanguage].
+///
+/// A language this phone has no voice for is shown disabled rather than hidden:
+/// picking it would leave the peer's translation arriving as text we cannot
+/// speak. On web the browser always has a voice, so nothing is disabled there.
 class _OutputLanguageSheet extends StatelessWidget {
   const _OutputLanguageSheet({
     required this.currentCode,
@@ -1874,6 +1940,9 @@ class _OutputLanguageSheet extends StatelessWidget {
 
   final String currentCode;
   final ValueChanged<String> onSelected;
+
+  static bool _canSpeak(String code) =>
+      kIsWeb || SpeechService.defaultVoiceFor(code).isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -1923,6 +1992,7 @@ class _OutputLanguageSheet extends StatelessWidget {
                     _LanguageRow(
                       lang: lang,
                       selected: lang.code == current,
+                      available: _canSpeak(lang.code),
                       onTap: () => onSelected(lang.code),
                     ),
                 ],
@@ -1940,10 +2010,12 @@ class _LanguageRow extends StatelessWidget {
     required this.lang,
     required this.selected,
     required this.onTap,
+    this.available = true,
   });
 
   final AppLanguage lang;
   final bool selected;
+  final bool available;
   final VoidCallback onTap;
 
   @override
@@ -1951,29 +2023,37 @@ class _LanguageRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: available ? onTap : null,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          child: Row(
-            children: [
-              Text(lang.flag, style: const TextStyle(fontSize: 24)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  lang.label,
-                  style: TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight:
-                        selected ? FontWeight.w700 : FontWeight.w500,
+        child: Opacity(
+          opacity: available ? 1 : 0.38,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Row(
+              children: [
+                Text(lang.flag, style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    lang.label,
+                    style: TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 15,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-              if (selected)
-                const Icon(Icons.check_rounded,
-                    color: SC.accent, size: 20),
-            ],
+                if (!available)
+                  Text(
+                    AppStrings.t('call_language_unavailable'),
+                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
+                  )
+                else if (selected)
+                  const Icon(Icons.check_rounded,
+                      color: SC.accent, size: 20),
+              ],
+            ),
           ),
         ),
       ),

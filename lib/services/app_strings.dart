@@ -428,6 +428,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Langue que j’entends',
     'call_output_language_hint':
         'Change la langue dans laquelle tu entends l’autre personne. Ça ne change rien pour elle.',
+    'call_language_unavailable': 'Indisponible',
     'composer_message_hint': 'Message',
     'composer_message_hint_lang': 'Écrivez en {lang}',
     // Profile
@@ -981,6 +982,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Language I hear',
     'call_output_language_hint':
         "Changes the language you hear the other person in. It doesn't change anything for them.",
+    'call_language_unavailable': 'Unavailable',
     'composer_message_hint': 'Message',
     'composer_message_hint_lang': 'Write in {lang}',
     'profile_default_title': 'Profile',
@@ -1495,6 +1497,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Idioma que escucho',
     'call_output_language_hint':
         'Cambia el idioma en el que escuchas a la otra persona. No cambia nada para ella.',
+    'call_language_unavailable': 'No disponible',
     'composer_message_hint': 'Mensaje',
     'composer_message_hint_lang': 'Escribe en {lang}',
     'profile_default_title': 'Perfil',
@@ -1965,6 +1968,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Sprache, die ich höre',
     'call_output_language_hint':
         'Ändert die Sprache, in der du die andere Person hörst. Für sie ändert sich nichts.',
+    'call_language_unavailable': 'Nicht verfügbar',
     'composer_message_hint': 'Nachricht',
     'composer_message_hint_lang': 'Schreib auf {lang}',
     'profile_default_title': 'Profil',
@@ -2513,6 +2517,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Lingua che sento',
     'call_output_language_hint':
         'Cambia la lingua in cui senti l’altra persona. Per lei non cambia nulla.',
+    'call_language_unavailable': 'Non disponibile',
     'composer_message_hint': 'Messaggio',
     'composer_message_hint_lang': 'Scrivi in {lang}',
     'profile_default_title': 'Profilo',
@@ -3057,6 +3062,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Idioma que ouço',
     'call_output_language_hint':
         'Muda o idioma em que ouves a outra pessoa. Não muda nada para ela.',
+    'call_language_unavailable': 'Indisponível',
     'composer_message_hint': 'Mensagem',
     'composer_message_hint_lang': 'Escreve em {lang}',
     'profile_default_title': 'Perfil',
@@ -3603,6 +3609,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Taal die ik hoor',
     'call_output_language_hint':
         'Verandert de taal waarin je de ander hoort. Voor de ander verandert er niets.',
+    'call_language_unavailable': 'Niet beschikbaar',
     'composer_message_hint': 'Bericht',
     'composer_message_hint_lang': 'Schrijf in het {lang}',
     'profile_default_title': 'Profiel',
@@ -4135,6 +4142,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'اللغة التي أسمعها',
     'call_output_language_hint':
         'يغيّر اللغة التي تسمع بها الشخص الآخر. لا يتغيّر شيء بالنسبة له.',
+    'call_language_unavailable': 'غير متاح',
     'composer_message_hint': 'رسالة',
     'composer_message_hint_lang': 'اكتب بـ {lang}',
     'profile_default_title': 'الملف الشخصي',
@@ -4668,6 +4676,7 @@ abstract final class AppStrings {
     'call_output_language_title': 'Язык, который я слышу',
     'call_output_language_hint':
         'Меняет язык, на котором вы слышите собеседника. Для него ничего не меняется.',
+    'call_language_unavailable': 'Недоступно',
     'composer_message_hint': 'Сообщение',
     'composer_message_hint_lang': 'Пишите на {lang}',
     'profile_default_title': 'Профиль',
@@ -5189,6 +5198,7 @@ abstract final class AppStrings {
     'call_language': '语言',
     'call_output_language_title': '我听到的语言',
     'call_output_language_hint': '更改你听到对方时所用的语言。对方不受影响。',
+    'call_language_unavailable': '不可用',
     'composer_message_hint': '消息',
     'composer_message_hint_lang': '用{lang}输入',
     'profile_default_title': '个人资料',
@@ -5674,6 +5684,7 @@ abstract final class AppStrings {
     'call_language': '言語',
     'call_output_language_title': '自分が聞く言語',
     'call_output_language_hint': '相手の声が聞こえる言語を変更します。相手側には影響しません。',
+    'call_language_unavailable': '利用できません',
     'composer_message_hint': 'メッセージ',
     'composer_message_hint_lang': '{lang}で入力',
     'profile_default_title': 'プロフィール',
@@ -6165,6 +6176,7 @@ abstract final class AppStrings {
     'call_language': '언어',
     'call_output_language_title': '내가 듣는 언어',
     'call_output_language_hint': '상대방의 말이 들리는 언어를 바꿉니다. 상대방에게는 영향이 없습니다.',
+    'call_language_unavailable': '사용 불가',
     'composer_message_hint': '메시지',
     'composer_message_hint_lang': '{lang}로 입력',
     'profile_default_title': '프로필',
