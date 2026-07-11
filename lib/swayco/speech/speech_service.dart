@@ -41,20 +41,26 @@ class SpeechService {
   String? _loadedLang;
   Future<void>? _loading;
 
-  /// Playback-complete events from whichever engine is active. Both engines'
-  /// players are merged so the in-call half-duplex gate hears the right one.
+  /// Playback-complete events, merged from both engines.
+  ///
+  /// The in-call half-duplex gate subscribes to this to reopen the mic as soon
+  /// as an utterance stops playing (see `call_screen._playWithLocalTts`). Losing
+  /// an event does not open the mic early — the gate's safety timer is the floor
+  /// — but it holds the mic shut for the whole 15 s window, so the wiring must
+  /// be as unconditional as the old direct `_engine.onPlaybackComplete` was:
+  ///   * wired on first *subscription*, not inside `_load`, so it is live even
+  ///     if no voice ever loads;
+  ///   * both engines forwarded unconditionally (never filtered on [_useJa] —
+  ///     only one engine is ever configured, so the idle one never fires, and a
+  ///     language switch mid-utterance must not swallow the event).
   final _playbackComplete = StreamController<void>.broadcast();
   bool _playbackWired = false;
 
   void _wirePlayback() {
     if (_playbackWired) return;
     _playbackWired = true;
-    _engine.onPlaybackComplete.listen((_) {
-      if (!_useJa) _playbackComplete.add(null);
-    });
-    _jaEngine.onPlaybackComplete.listen((_) {
-      if (_useJa) _playbackComplete.add(null);
-    });
+    _engine.onPlaybackComplete.listen((_) => _playbackComplete.add(null));
+    _jaEngine.onPlaybackComplete.listen((_) => _playbackComplete.add(null));
   }
 
   static const _prefKeySelectedLang = 'speech_selected_lang';
@@ -183,7 +189,12 @@ class SpeechService {
 
   /// Fires when a [speak] utterance finishes playing. [speak] returns at
   /// playback *start*, so this is the only signal for "the speaker is quiet".
-  Stream<void> get onPlaybackComplete => _playbackComplete.stream;
+  /// Wiring happens here, on first subscription, so the stream is live even when
+  /// no voice has been loaded (the half-duplex gate subscribes before speaking).
+  Stream<void> get onPlaybackComplete {
+    _wirePlayback();
+    return _playbackComplete.stream;
+  }
 
   Future<void> stop() async {
     if (kIsWeb) return;
