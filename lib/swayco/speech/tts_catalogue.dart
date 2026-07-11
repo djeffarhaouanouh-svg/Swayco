@@ -14,15 +14,13 @@
 /// bundle follows the confirmed layout `<voice>.onnx` + `tokens.txt` +
 /// `espeak-ng-data/`.
 ///
-/// ⚠️ Japanese has NO on-device voice here, on purpose. sherpa cannot phonemise
-/// Japanese: it has no word segmenter (mecab) and no kanji→reading, so it splits
-/// text character-by-character and crashes on kanji — verified in a CLI test of
-/// the melo-onnx lexicon model. Every quality ja model (piper-plus, VOICEVOX,
-/// Style-BERT-VITS2, MeloTTS) needs openjtalk/mecab, which sherpa doesn't have.
-/// So ja is simply absent from this catalogue → `ttsSpecForLang('ja')` is null →
-/// call_screen falls back to the OS native voice (iOS AVSpeechSynthesizer, which
-/// handles Japanese well). A dedicated openjtalk-based ja engine is a post-launch
-/// project — see project memory.
+/// Japanese is the exception: sherpa cannot phonemise it (no mecab / kanji
+/// reading — it char-splits and crashes on kanji). It has its own on-device
+/// engine ([JaTtsEngine]): native OpenJTalk reading + a Dart phonemizer + a
+/// patched sherpa "external tokens" path, all on the app's single ONNX Runtime.
+/// Its catalogue entry carries `isJapanese = true` so [SpeechService] routes it
+/// to that engine instead of the stock sherpa VITS path. See
+/// `docs/ja_tts_engine_plan.md`.
 library;
 
 const _sherpaTts =
@@ -39,6 +37,9 @@ class TtsModelSpec {
     this.dataDir = 'espeak-ng-data',
     this.sid = 0,
     this.speed = 1.0,
+    this.isJapanese = false,
+    this.lexiconFile = 'lexicon.txt',
+    this.openjtalkDictDir = 'open_jtalk_dic_utf_8-1.11',
   });
 
   /// Directory name under `<appSupport>/tts/`.
@@ -56,6 +57,14 @@ class TtsModelSpec {
 
   final int sid;
   final double speed;
+
+  /// Japanese is the one language not on the sherpa g2p path: it uses
+  /// [JaTtsEngine] (native OpenJTalk reading + phonemizer + patched sherpa
+  /// external-tokens) instead of the stock sherpa VITS engine. When true,
+  /// [lexiconFile] and [openjtalkDictDir] are used and [dataDir] is ignored.
+  final bool isJapanese;
+  final String lexiconFile;
+  final String openjtalkDictDir;
 }
 
 /// A sherpa Piper bundle: id is the release asset name, the model file inside is
@@ -99,8 +108,25 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
     modelFile: 'ko_KO-kss_low.onnx',
   ),
 
-  // Japanese → intentionally absent (OS native voice fallback). See class doc.
+  // Japanese → dedicated on-device engine (see docs/ja_tts_engine_plan.md):
+  // native OpenJTalk reading + phonemizer + patched sherpa external-tokens, on
+  // the app's single ORT. Bundle carries the fp16 model, tokens.txt, lexicon.txt
+  // and the OpenJTalk dictionary. ~110 MB (model ~87 MB + dict ~23 MB).
+  const TtsModelSpec(
+    id: 'ja-melo-openjtalk',
+    langs: ['ja'],
+    approxMb: 110,
+    bundleUrl: '$_djeffarTts/ja-melo-openjtalk.tar.bz2',
+    modelFile: 'model.fp16.onnx',
+    isJapanese: true,
+  ),
 ];
+
+/// Re-hosted bundles under the project's own Hugging Face (currently just the
+/// Japanese voice, which is assembled from the MeloTTS-ONNX export + OpenJTalk
+/// dict rather than a sherpa release).
+const _djeffarTts =
+    'https://huggingface.co/djeffar/swayco-tts/resolve/main';
 
 String normalizeLang(String langCode) =>
     langCode.toLowerCase().split(RegExp(r'[-_]')).first;

@@ -118,6 +118,7 @@ class JaTtsEngine {
 
       final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
+      await tmp.create(recursive: true);
       final wavFile = File('${tmp.path}/ja_speech_out.wav');
       await wavFile.writeAsBytes(wav);
 
