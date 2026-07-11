@@ -126,6 +126,10 @@ class _CallScreenState extends State<CallScreen> {
   /// Data-channel key carrying "the language I want to hear you in". Sent by the
   /// LISTENER, acted on by the SPEAKER — translation runs on the speaker's side.
   static const String _kListenLangKey = 'listenLang';
+
+  /// Data-channel key carrying "translation is on/off". Shared state: either side
+  /// can cut it, and both pipelines stop — see [_toggleTranslation].
+  static const String _kTranslationOnKey = 'xlateOn';
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
@@ -180,9 +184,16 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Whether the realtime translation pipeline is currently active.
-  /// Toggle via [_toggleTranslation].
+  /// Whether WE want to hear the peer translated. Toggle via
+  /// [_toggleTranslation]; purely our own ear — the peer keeps hearing us
+  /// translated unless they cut it on their side.
   bool _translationEnabled = true;
+
+  /// Whether the PEER wants to hear us translated. False once they cut it on
+  /// their side, and then our pipeline stops — we are the one who translates our
+  /// voice into their language. Assumed true until they say otherwise (a peer on
+  /// an older build never sends the key).
+  bool _peerWantsTranslation = true;
 
   /// The target BCP-47 the translation pipeline is currently attached with, so
   /// we only re-attach when it actually changes.
@@ -893,6 +904,17 @@ class _CallScreenState extends State<CallScreen> {
         }
         return;
       }
+      // The peer cut (or restored) translation on THEIR side: stop translating
+      // for them. Our own ear is not affected.
+      final xlateOn = m[_kTranslationOnKey];
+      if (xlateOn is bool) {
+        DebugOverlay.log('peer wants translation: $xlateOn');
+        unawaited(_applyPeerWantsTranslation(xlateOn));
+        return;
+      }
+      // Translation is off: a packet still in flight from a peer on an older
+      // build must not speak over the conversation.
+      if (!_translationEnabled) return;
       if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -917,16 +939,55 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
-  /// Toggle the realtime translation pipeline on / off.
+  /// Cut translation FOR ME — the peer is free to keep hearing theirs.
+  ///
+  /// Each side owns its own ear. But translation runs on the SPEAKER's side, so
+  /// "I don't want to hear translations" is not something we can honour alone:
+  /// it is a request to the peer to stop translating *for us*. Same shape as the
+  /// language button — sent by the listener, acted on by the speaker.
+  ///
+  /// Our own pipeline keeps running: we go on translating our voice for the
+  /// peer, who still hears us translated unless THEY cut it on their side.
   Future<void> _toggleTranslation() async {
+    final want = !_translationEnabled;
     final room = _room;
     if (room == null) return;
-    if (_translationEnabled) {
-      await widget.translation.detach();
-      if (mounted) setState(() => _translationEnabled = false);
-    } else {
+    setState(() => _translationEnabled = want);
+
+    unawaited(room.localParticipant
+        ?.publishData(
+          Uint8List.fromList(
+            utf8.encode(jsonEncode({_kTranslationOnKey: want})),
+          ),
+          reliable: true,
+          topic: _captionTopic,
+        )
+        .catchError((_) {}));
+
+    if (!want) {
+      // Whatever the voice is mid-sentence on is no longer wanted, and the
+      // peer's ducked voice has to come straight back up.
+      await SpeechService.instance.stop();
+      unawaited(_deviceTts.stop());
+      ttsSpeaking.value = false;
+    }
+  }
+
+  /// The peer asked us to stop (or resume) translating for them: it is OUR
+  /// pipeline that has to stop, since we are the one who translates our own
+  /// voice into their language. What we hear is untouched.
+  Future<void> _applyPeerWantsTranslation(bool wants) async {
+    if (wants == _peerWantsTranslation) return;
+    _peerWantsTranslation = wants;
+    final room = _room;
+    if (room == null) return;
+    if (wants) {
+      // _attachedTargetLang still holds the route we tore down; clear it or the
+      // "nothing changed" early-out would skip the re-attach entirely.
+      _attachedTargetLang = '';
       await _refreshTranslationBinding(room);
-      if (mounted) setState(() => _translationEnabled = true);
+    } else {
+      await widget.translation.detach();
     }
   }
 
@@ -1842,7 +1903,9 @@ class _CallScreenState extends State<CallScreen> {
                             icon: _translationEnabled
                                 ? Icons.hearing_rounded
                                 : Icons.hearing_disabled_rounded,
-                            label: _translationEnabled ? 'Couper trad' : 'Reprendre trad',
+                            label: AppStrings.t(_translationEnabled
+                                ? 'call_translation_cut'
+                                : 'call_translation_resume'),
                             background: _translationEnabled
                                 ? SC.accent
                                 : Colors.white24,
