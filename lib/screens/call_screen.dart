@@ -2072,10 +2072,12 @@ class _RoundCallButton extends StatelessWidget {
 ///
 /// A language this phone has no voice for is shown disabled rather than hidden:
 /// the pick is spoken by the OS voice, so picking one the OS cannot say would
-/// land the peer's translation as text nobody reads out.
+/// land the peer's translation as text nobody reads out. That matters now the
+/// picker carries 17 languages — plenty of phones ship no Ukrainian or Hindi
+/// voice.
 ///
 /// The account language stays selectable even when the OS lacks it — its sherpa
-/// bundle is installed and speaks it. On web the browser always has a voice.
+/// bundle is installed and speaks it.
 class _OutputLanguageSheet extends StatelessWidget {
   const _OutputLanguageSheet({
     required this.currentCode,
@@ -2092,7 +2094,6 @@ class _OutputLanguageSheet extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   bool _canSpeak(String code) =>
-      kIsWeb ||
       deviceVoiceLangs.isEmpty ||
       deviceVoiceLangs.contains(code) ||
       SpeechService.instance.isLoadedFor(code);

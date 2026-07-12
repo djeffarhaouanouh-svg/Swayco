@@ -5,10 +5,15 @@
 ///
 /// - **The neural engine** (Moonshine v2 on sherpa-onnx, the same runtime the
 ///   on-device TTS uses) — `en`, `ja`, `zh`, `ko`, `ar`.
-/// - **Vosk** (libvosk via dart:ffi) — `fr`, `ru`, `es`, `it`, `pt`, `de`, `nl`.
+/// - **Vosk** (libvosk via dart:ffi) — `fr`, `ru`, `es`, `it`, `pt`, `de`, `nl`,
+///   `pl`, `tr`, `uk`, `hi`.
+///
+/// Every language here also has a voice in [tts_catalogue] — the two lists must
+/// stay in step, since a language that can only be heard (or only spoken) breaks
+/// one direction of a call. `supportedLanguages` is their intersection.
 ///
 /// STT runs on the phone's OWN outgoing mic, so a device only ever downloads
-/// the model for its user's language — one model, 30–60 MB.
+/// the model for its user's language — one model, 30–140 MB.
 library;
 
 enum AsrEngineKind { neural, lattice }
@@ -121,6 +126,13 @@ const _specs = <AsrModelSpec>[
   LatticeAsrSpec(id: 'vosk-model-small-pt-0.3', langs: ['pt'], approxMb: 31),
   LatticeAsrSpec(id: 'vosk-model-small-de-0.15', langs: ['de'], approxMb: 45),
   LatticeAsrSpec(id: 'vosk-model-small-nl-0.22', langs: ['nl'], approxMb: 39),
+  // Languages that already had a Piper voice but no way to be heard. Swedish is
+  // deliberately absent: Vosk's only "small" Swedish model is 289 MB, 6x the
+  // others — too heavy to hand a user at onboarding.
+  LatticeAsrSpec(id: 'vosk-model-small-pl-0.22', langs: ['pl'], approxMb: 50),
+  LatticeAsrSpec(id: 'vosk-model-small-tr-0.3', langs: ['tr'], approxMb: 35),
+  LatticeAsrSpec(id: 'vosk-model-small-uk-v3-small', langs: ['uk'], approxMb: 137),
+  LatticeAsrSpec(id: 'vosk-model-small-hi-0.22', langs: ['hi'], approxMb: 42),
 ];
 
 String normalizeLang(String langCode) =>
