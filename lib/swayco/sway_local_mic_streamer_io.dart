@@ -95,9 +95,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   sherpa.VoiceActivityDetector? _silero;
   static bool _sherpaBindingsReady = false;
 
-  /// Silence that closes a phrase. Straight latency: nothing can be transcribed
-  /// before it has elapsed.
-  static const double _silenceSeconds = 0.3;
+  /// Silence that closes a phrase. Straight latency — nothing can be transcribed
+  /// before it has elapsed — so the temptation is to make it small.
+  ///
+  /// 300 ms was too small, and it cost more than it saved: it is shorter than the
+  /// pauses inside a normal sentence (a breath, a hesitation, the gap before a
+  /// word you are still looking for), so phrases were being cut in half. Whisper
+  /// then got short, context-free fragments — precisely what it hallucinates on.
+  /// The chopped phrases and the invented ones were the same bug.
+  ///
+  /// 700 ms is what the old energy-VAD pipeline used, tuned on real calls.
+  static const double _silenceSeconds = 0.7;
 
   /// A phrase this long is cut and sent whether or not the speaker paused —
   /// without it, a monologue would never reach the recogniser.
