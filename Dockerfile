@@ -13,6 +13,10 @@ ARG SUPABASE_PUBLISHABLE_KEY=""
 
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./
+# pubspec.yaml carries `path:` overrides for the patched sherpa_onnx iOS/macOS
+# plugins. `pub get` resolves them even for a web build, so the directories have
+# to be present or it fails with "could not find package sherpa_onnx_ios".
+COPY native ./native
 RUN flutter pub get
 
 COPY analysis_options.yaml ./

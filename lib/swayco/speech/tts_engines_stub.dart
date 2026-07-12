@@ -1,0 +1,47 @@
+/// Web: on-device TTS does not exist (sherpa-onnx is `dart:ffi`). The browser
+/// speaks with the Web Speech API instead — see `call_screen._speakDeviceTts`.
+///
+/// These stubs exist only so [SpeechService] compiles for the web. Every one of
+/// its methods already returns early on `kIsWeb`, so nothing here is ever
+/// reached; they must simply match the native API shape.
+class SherpaTtsModel {
+  const SherpaTtsModel({
+    required this.model,
+    required this.tokens,
+    required this.dataDir,
+  });
+  final String model;
+  final String tokens;
+  final String dataDir;
+}
+
+class JaTtsModel {
+  const JaTtsModel({
+    required this.model,
+    required this.tokens,
+    required this.lexicon,
+    required this.dictDir,
+  });
+  final String model;
+  final String tokens;
+  final String lexicon;
+  final String dictDir;
+}
+
+class SherpaTtsEngine {
+  bool get isReady => false;
+  Stream<void> get onPlaybackComplete => const Stream<void>.empty();
+  Future<void> configure(SherpaTtsModel m) async {}
+  Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {}
+  Future<void> stop() async {}
+  Future<void> dispose() async {}
+}
+
+class JaTtsEngine {
+  bool get isReady => false;
+  Stream<void> get onPlaybackComplete => const Stream<void>.empty();
+  Future<void> configure(JaTtsModel m) async {}
+  Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {}
+  Future<void> stop() async {}
+  Future<void> dispose() async {}
+}

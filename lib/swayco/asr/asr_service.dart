@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../services/debug_overlay.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine.dart';
-import 'asr_model_downloader.dart';
+import 'asr_downloader.dart';
 
 /// On-device speech-to-text — 100 % local inference, no audio leaves the phone.
 ///

@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ja_tts_engine.dart';
-import 'sherpa_tts_engine.dart';
-import 'tts_bundle_downloader.dart';
+// Via the web-safe facades: the engines are dart:ffi and the downloader is
+// dart:io, neither of which exists on the web. The kIsWeb guards below are not
+// enough on their own — an import is resolved at compile time.
+import 'tts_downloader.dart';
+import 'tts_engines.dart';
 import 'tts_catalogue.dart';
 
 /// On-device TTS — 100 % local inference via sherpa-onnx `OfflineTts`.
