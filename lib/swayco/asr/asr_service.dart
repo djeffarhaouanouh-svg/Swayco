@@ -34,6 +34,11 @@ class AsrService {
   static bool supportsLang(String langCode) =>
       specForLang(langCode) != null;
 
+  /// How big the download is, in MB — shown to the user before they commit to
+  /// it. 0 when the language has no on-device model.
+  static int downloadSizeMb(String langCode) =>
+      specForLang(langCode)?.approxMb ?? 0;
+
   /// Whether [langCode]'s model is already on disk (no network needed).
   static Future<bool> isLanguageInstalled(String langCode) async {
     if (kIsWeb) return false;
