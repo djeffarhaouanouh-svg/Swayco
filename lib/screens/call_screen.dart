@@ -1029,10 +1029,22 @@ class _CallScreenState extends State<CallScreen> {
       }
       markTranslationPlaying(textLength: text.length);
       await _deviceTts.stop();
+      await _applyTranslatedVolumeToDeviceTts();
       await _deviceTts.speak(text);
     } catch (_) {
       markTranslationDone();
     }
+  }
+
+  /// The "translated voice volume" slider used to reach only the audioplayers
+  /// element that plays a cloud mp3 — a path neither the device voice nor the
+  /// old Piper one ever took, so the slider silently did nothing. Now that every
+  /// translation is spoken by flutter_tts, the volume has to be handed to it,
+  /// before each utterance (the engine forgets it across a stop()).
+  Future<void> _applyTranslatedVolumeToDeviceTts() async {
+    try {
+      await _deviceTts.setVolume(_audio.translatedVolume.clamp(0.0, 1.0));
+    } catch (_) {}
   }
 
   Future<void> _speakDeviceTts(String text, String lang) async {
@@ -1047,6 +1059,7 @@ class _CallScreenState extends State<CallScreen> {
       }
       // stop() clears any queued utterances before playing the latest translation.
       await _deviceTts.stop();
+      await _applyTranslatedVolumeToDeviceTts();
       // Wake speechSynthesis if the browser auto-paused it (mobile Chrome does
       // this after inactivity) — otherwise speak() plays nothing and the "end"
       // event never fires, which also leaves the half-duplex gate stuck.
