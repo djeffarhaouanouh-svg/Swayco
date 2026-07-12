@@ -28,6 +28,23 @@ class AsrModelDownloader {
     return Directory('${base.path}/${spec.id}');
   }
 
+  /// Silero VAD (~2 MB) — the segmenter, not a model of any one language. It
+  /// lives beside the language models rather than inside one, because it is
+  /// shared and must survive [pruneExcept] wiping the others on a language
+  /// switch. Returns the on-disk path.
+  static Future<String> ensureSileroVad() async {
+    final base = await sttDir();
+    final dest = File('${base.path}/silero_vad.onnx');
+    if (await dest.exists() && await dest.length() > 0) return dest.path;
+    final tmp = File('${dest.path}.tmp');
+    await AsrModelDownloader()._downloadTo(
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx',
+      tmp,
+    );
+    await tmp.rename(dest.path);
+    return dest.path;
+  }
+
   static Future<bool> isInstalled(AsrModelSpec spec) async {
     final dir = await modelDir(spec);
     return File('${dir.path}/$_completeMarker').exists();
@@ -68,6 +85,8 @@ class AsrModelDownloader {
         await _downloadNeural(spec, dir, onProgress);
       case LatticeAsrSpec():
         await _downloadLattice(spec, dir, onProgress);
+      case WhisperAsrSpec():
+        await _downloadWhisper(spec, dir, onProgress);
     }
 
     await File('${dir.path}/$_completeMarker').writeAsString('1');
@@ -97,6 +116,36 @@ class AsrModelDownloader {
       final tmp = File('${dest.path}.tmp');
       receivedTotal += await _downloadTo(
         spec.urlFor(file),
+        tmp,
+        onBytes: (n) => onProgress?.call(
+          ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),
+        ),
+      );
+      await tmp.rename(dest.path);
+    }
+  }
+
+  /// Same file-by-file fetch as [_downloadNeural], but the release names carry
+  /// the Whisper size (`small-encoder.int8.onnx`) and the engine wants canonical
+  /// ones, so each file is saved under the local name [WhisperAsrSpec.files]
+  /// gives it.
+  Future<void> _downloadWhisper(
+    WhisperAsrSpec spec,
+    Directory dir,
+    void Function(double)? onProgress,
+  ) async {
+    final totalBytes = spec.approxMb * 1024 * 1024;
+    var receivedTotal = 0;
+
+    for (final entry in spec.files.entries) {
+      final dest = File('${dir.path}/${entry.value}');
+      if (await dest.exists()) {
+        receivedTotal += await dest.length();
+        continue;
+      }
+      final tmp = File('${dest.path}.tmp');
+      receivedTotal += await _downloadTo(
+        spec.urlFor(entry.key),
         tmp,
         onBytes: (n) => onProgress?.call(
           ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),

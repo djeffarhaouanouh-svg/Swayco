@@ -603,6 +603,35 @@ class _ProfileScreenState extends State<ProfileScreen>
     final trimmed = name.trim();
     // Ignore an empty name — a profile must keep one.
     if (trimmed.isEmpty) return;
+    // No-op when the name is unchanged: don't spend a cooldown on a re-save.
+    if (trimmed == (_remote?.displayName ?? '')) return;
+
+    // Rate-limit renames to once every [profileNameChangeCooldown] (like social
+    // networks). The DB trigger (migration 0044) is the real guard; this is the
+    // friendly front door that tells the user how long is left instead of
+    // letting the save fail with a generic error.
+    final changedAt = _remote?.nameChangedAt;
+    if (changedAt != null) {
+      final elapsed = DateTime.now().difference(changedAt);
+      if (elapsed < profileNameChangeCooldown) {
+        final remaining = profileNameChangeCooldown - elapsed;
+        final daysLeft = (remaining.inDays + 1)
+            .clamp(1, profileNameChangeCooldown.inDays);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppStrings.t(
+                'name_change_cooldown',
+                args: {'days': '$daysLeft'},
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     final saved = await ProfileApi.updateMyName(
       userId: _deviceId,
       name: trimmed,
@@ -615,7 +644,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     if (!mounted || _remote == null) return;
-    setState(() => _remote = _remote!.copyWith(displayName: saved));
+    // Reflect the new cooldown locally so it takes effect without a reload.
+    setState(
+      () => _remote = _remote!.copyWith(
+        displayName: saved,
+        nameChangedAt: DateTime.now(),
+      ),
+    );
   }
 
   Future<void> _saveBio(String bio) async {

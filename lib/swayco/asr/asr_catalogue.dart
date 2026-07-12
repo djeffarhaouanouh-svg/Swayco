@@ -1,22 +1,24 @@
 /// Which on-device STT model serves which language.
 ///
 /// The app ships only the engines; models are downloaded on demand — see
-/// [AsrService.ensureLanguageInstalled]. Two engines:
+/// [AsrService.ensureLanguageInstalled].
 ///
-/// - **The neural engine** (Moonshine v2 on sherpa-onnx, the same runtime the
-///   on-device TTS uses) — `en`, `ja`, `zh`, `ko`, `ar`.
-/// - **Vosk** (libvosk via dart:ffi) — `fr`, `ru`, `es`, `it`, `pt`, `de`, `nl`,
-///   `pl`, `tr`, `uk`, `hi`.
+/// - **Whisper small int8** (sherpa-onnx `OfflineRecognizer`) — 99 languages,
+///   ~357 MB. Listed FIRST, so it now serves every language.
+/// - **Moonshine v2** (sherpa-onnx) and **Vosk** (libvosk via dart:ffi) are the
+///   smaller, faster per-language models that used to serve the 16 languages
+///   they cover. They are kept, but unreachable while Whisper leads the list —
+///   move the Whisper entry back to the END to restore them.
 ///
-/// Every language here also has a voice in [tts_catalogue] — the two lists must
-/// stay in step, since a language that can only be heard (or only spoken) breaks
-/// one direction of a call. `supportedLanguages` is their intersection.
+/// Speaking is no longer paired with hearing: translations are spoken by the
+/// device's own OS voice (`flutter_tts`), so there is no TTS catalogue to keep
+/// this one in step with.
 ///
 /// STT runs on the phone's OWN outgoing mic, so a device only ever downloads
-/// the model for its user's language — one model, 30–140 MB.
+/// the model for its user's language.
 library;
 
-enum AsrEngineKind { neural, lattice }
+enum AsrEngineKind { neural, lattice, whisper }
 
 sealed class AsrModelSpec {
   const AsrModelSpec({
@@ -69,6 +71,46 @@ class NeuralAsrSpec extends AsrModelSpec {
   }
 }
 
+/// Whisper: encoder + decoder + tokens, fetched file by file from the sherpa
+/// author's Hugging Face repo and stored under canonical names, so the engine
+/// never has to know which Whisper size it got.
+///
+/// Only the `int8` graphs are fetched — the repo also holds fp32, at twice the
+/// size. `small` is ~357 MB on disk. Switch [size] (and [repo], [approxMb]) to
+/// `base` to trade accuracy for a third of the download and roughly twice the
+/// speed.
+class WhisperAsrSpec extends AsrModelSpec {
+  const WhisperAsrSpec({
+    required super.id,
+    required super.langs,
+    required super.approxMb,
+    required this.repo,
+    required this.size,
+  });
+
+  final String repo;
+
+  /// `tiny` | `base` | `small` … — the prefix the release files carry.
+  final String size;
+
+  @override
+  AsrEngineKind get kind => AsrEngineKind.whisper;
+
+  static const encoderFile = 'encoder.int8.onnx';
+  static const decoderFile = 'decoder.int8.onnx';
+  static const tokensFile = 'tokens.txt';
+
+  /// Remote file name → the name it is saved under in the model dir.
+  Map<String, String> get files => {
+        '$size-encoder.int8.onnx': encoderFile,
+        '$size-decoder.int8.onnx': decoderFile,
+        '$size-tokens.txt': tokensFile,
+      };
+
+  String urlFor(String remoteFile) =>
+      'https://huggingface.co/$repo/resolve/main/$remoteFile';
+}
+
 /// Lattice: one zip per language, expanded into `<appSupport>/stt/<id>/`.
 class LatticeAsrSpec extends AsrModelSpec {
   const LatticeAsrSpec({
@@ -84,6 +126,18 @@ class LatticeAsrSpec extends AsrModelSpec {
 }
 
 const _specs = <AsrModelSpec>[
+  // FIRST on purpose: [specForLang] scans in order, so Whisper now serves every
+  // language and the per-language models below are never reached. They are left
+  // in place so that putting this entry back at the END restores the old
+  // behaviour — Moonshine/Vosk for the 16 languages they cover, Whisper for the
+  // rest — in one line.
+  WhisperAsrSpec(
+    id: 'whisper-small',
+    langs: _whisperLangs,
+    approxMb: 357,
+    repo: 'csukuangfj/sherpa-onnx-whisper-small',
+    size: 'small',
+  ),
   NeuralAsrSpec(
     id: 'moonshine-v2-en',
     langs: ['en'],
@@ -134,6 +188,28 @@ const _specs = <AsrModelSpec>[
   LatticeAsrSpec(id: 'vosk-model-small-uk-v3-small', langs: ['uk'], approxMb: 137),
   LatticeAsrSpec(id: 'vosk-model-small-hi-0.22', langs: ['hi'], approxMb: 42),
 ];
+
+/// The 99 languages Whisper decodes, in the app's own codes.
+///
+/// `fil` is ours, not Whisper's — it decodes Tagalog as `tl`, which
+/// [whisperLangCode] translates.
+const _whisperLangs = <String>[
+  'en', 'zh', 'de', 'es', 'ru', 'ko', 'fr', 'ja', 'pt', 'tr', 'pl', 'ca', 'nl',
+  'ar', 'sv', 'it', 'id', 'hi', 'fi', 'vi', 'he', 'uk', 'el', 'ms', 'cs', 'ro',
+  'da', 'hu', 'ta', 'no', 'th', 'ur', 'hr', 'bg', 'lt', 'la', 'mi', 'ml', 'cy',
+  'sk', 'te', 'fa', 'lv', 'bn', 'sr', 'az', 'sl', 'kn', 'et', 'mk', 'br', 'eu',
+  'is', 'hy', 'ne', 'mn', 'bs', 'kk', 'sq', 'sw', 'gl', 'mr', 'pa', 'si', 'km',
+  'sn', 'yo', 'so', 'af', 'oc', 'ka', 'be', 'tg', 'sd', 'gu', 'am', 'yi', 'lo',
+  'uz', 'fo', 'ht', 'ps', 'tk', 'nn', 'mt', 'sa', 'lb', 'my', 'bo', 'tl', 'mg',
+  'as', 'tt', 'haw', 'ln', 'ha', 'ba', 'jw', 'su',
+  'fil', // → decoded as 'tl'
+];
+
+/// The code Whisper itself expects for one of our language codes.
+String whisperLangCode(String langCode) {
+  final lc = normalizeLang(langCode);
+  return lc == 'fil' ? 'tl' : lc;
+}
 
 String normalizeLang(String langCode) =>
     langCode.toLowerCase().split(RegExp(r'[-_]')).first;

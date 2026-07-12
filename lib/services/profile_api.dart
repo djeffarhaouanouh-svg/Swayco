@@ -59,6 +59,7 @@ class RemoteProfile {
     this.lifetimeCallSeconds = 0,
     this.proExpiresAt,
     this.lastSeen,
+    this.nameChangedAt,
     this.referralCode = '',
   });
 
@@ -187,6 +188,12 @@ class RemoteProfile {
   /// [hideOnlineStatus] on the client.
   final DateTime? lastSeen;
 
+  /// When the user last changed their [displayName]. Null on legacy rows and
+  /// before the first change. Drives the 14-day rename cooldown
+  /// ([profileNameChangeCooldown]) enforced client-side for UX and by a DB
+  /// trigger (migration 0044) as the real, un-bypassable guard.
+  final DateTime? nameChangedAt;
+
   /// Short URL-safe slug appended to share links as `?ref=<code>` so a
   /// new sign-up can be attributed back to whoever sent the invite.
   /// Server-assigned at profile insert (see migration 0028); empty
@@ -276,6 +283,7 @@ class RemoteProfile {
     lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
     proExpiresAt: _parseDate(m['pro_expires_at']),
     lastSeen: _parseDate(m['last_seen']),
+    nameChangedAt: _parseDate(m['display_name_changed_at']),
     referralCode: m['referral_code']?.toString() ?? '',
   );
 
@@ -308,6 +316,7 @@ class RemoteProfile {
     int? lifetimeCallSeconds,
     DateTime? proExpiresAt,
     DateTime? lastSeen,
+    DateTime? nameChangedAt,
     String? referralCode,
   }) => RemoteProfile(
     id: id,
@@ -335,6 +344,7 @@ class RemoteProfile {
     lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
     proExpiresAt: proExpiresAt ?? this.proExpiresAt,
     lastSeen: lastSeen ?? this.lastSeen,
+    nameChangedAt: nameChangedAt ?? this.nameChangedAt,
     referralCode: referralCode ?? this.referralCode,
   );
 }
@@ -346,6 +356,12 @@ const int profileBioMaxLength = 80;
 /// Maximum number of characters allowed in a display name. Matches the
 /// clamp applied when deriving the handle in [ProfileApi._deriveHandle].
 const int profileNameMaxLength = 24;
+
+/// How long a user must wait between display-name ("prénom") changes, the way
+/// social networks throttle handle/name churn to curb impersonation. Enforced
+/// client-side ([_saveName] in profile_screen) for UX and by a DB trigger
+/// (migration 0044) as the real guard. Mirrored in the SQL `interval '14 days'`.
+const Duration profileNameChangeCooldown = Duration(days: 14);
 
 /// Maximum number of emojis a user can pin to their profile. Kept small so
 /// the "Emojis" section stays a single tidy row across phone widths.

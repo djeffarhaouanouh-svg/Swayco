@@ -28,7 +28,6 @@ import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
-import 'swayco/speech/speech_service.dart';
 import 'swayco/asr/asr_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
@@ -134,12 +133,9 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
     }
-    // Local TTS: start model download in background so it's ready
-    // before the first call. Native-only; SpeechService.init() is a no-op
-    // on web. ~21 MB first download, then loads the ONNX session (~1–3 s).
-    if (!kIsWeb) {
-      unawaited(SpeechService.instance.init());
-    }
+    // TTS needs no warm-up any more: translations are spoken by the device's own
+    // voice (flutter_tts), which is already installed. The Piper/sherpa bundles
+    // this used to pre-download are gone.
     // Seed the hide-online cache so presence renders are correct on
     // the first frame. 2s cap — SharedPreferences must never block.
     try {
@@ -301,8 +297,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         if (localProfile != null && localProfile.sourceLang.isNotEmpty) {
           AppStrings.setFromCode(localProfile.sourceLang);
           if (!kIsWeb) {
-            unawaited(SpeechService.instance
-                .ensureLanguageInstalled(localProfile.sourceLang));
             unawaited(AsrService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
           }
@@ -449,10 +443,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       if (lang.trim().isNotEmpty) {
         AppStrings.setFromCode(lang);
         if (!kIsWeb) {
-          unawaited(SpeechService.instance.ensureLanguageInstalled(lang));
           // STT reads this phone's own mic, so the model we need is the one for
-          // the account's language — the same one the local TTS engine just installed a voice
-          // for. ~30–60 MB, downloaded once, never during a call.
+          // the account's language. Downloaded once, never during a call.
           unawaited(AsrService.instance.ensureLanguageInstalled(lang));
         }
         // Keep the local cache in step so the next cold boot restores in the

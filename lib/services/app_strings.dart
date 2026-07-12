@@ -436,6 +436,8 @@ abstract final class AppStrings {
     // Profile
     'profile_default_title': 'Profil',
     'delete_photo_q': 'Supprimer la photo ?',
+    'name_change_cooldown':
+        'Tu pourras changer de prénom dans {days} j.',
     'delete_photo_body':
         'Ta photo Discover sera retirée. Tu pourras en uploader une nouvelle à tout moment.',
     'bio_editor_title': 'Ta présentation',
@@ -991,6 +993,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Write in {lang}',
     'profile_default_title': 'Profile',
     'delete_photo_q': 'Delete photo?',
+    'name_change_cooldown':
+        'You can change your name again in {days} day(s).',
     'delete_photo_body':
         'Your Discover photo will be removed. You can upload a new one at any time.',
     'bio_editor_title': 'Your bio',
@@ -1508,6 +1512,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Escribe en {lang}',
     'profile_default_title': 'Perfil',
     'delete_photo_q': '¿Eliminar la foto?',
+    'name_change_cooldown':
+        'Podrás cambiar tu nombre en {days} día(s).',
     'delete_photo_body':
         'Tu foto de Discover será eliminada. Podrás subir una nueva en cualquier momento.',
     'bio_editor_title': 'Tu presentación',
@@ -1981,6 +1987,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Schreib auf {lang}',
     'profile_default_title': 'Profil',
     'delete_photo_q': 'Foto löschen?',
+    'name_change_cooldown':
+        'Du kannst deinen Namen in {days} Tag(en) wieder ändern.',
     'delete_photo_body':
         'Dein Discover-Foto wird entfernt. Du kannst jederzeit ein neues hochladen.',
     'bio_editor_title': 'Deine Vorstellung',
@@ -2532,6 +2540,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Scrivi in {lang}',
     'profile_default_title': 'Profilo',
     'delete_photo_q': 'Eliminare la foto?',
+    'name_change_cooldown':
+        'Potrai cambiare nome tra {days} giorno/i.',
     'delete_photo_body':
         'La tua foto Discover sarà rimossa. Puoi caricarne una nuova in qualsiasi momento.',
     'bio_editor_title': 'La tua presentazione',
@@ -3079,6 +3089,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Escreve em {lang}',
     'profile_default_title': 'Perfil',
     'delete_photo_q': 'Excluir a foto?',
+    'name_change_cooldown':
+        'Você poderá mudar seu nome em {days} dia(s).',
     'delete_photo_body':
         'Sua foto Discover será removida. Você pode enviar uma nova a qualquer momento.',
     'bio_editor_title': 'Sua apresentação',
@@ -3628,6 +3640,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Schrijf in het {lang}',
     'profile_default_title': 'Profiel',
     'delete_photo_q': 'Foto verwijderen?',
+    'name_change_cooldown':
+        'Je kunt je naam over {days} dag(en) opnieuw wijzigen.',
     'delete_photo_body':
         'Je Discover-foto wordt verwijderd. Je kunt op elk moment een nieuwe uploaden.',
     'bio_editor_title': 'Jouw bio',
@@ -4163,6 +4177,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'اكتب بـ {lang}',
     'profile_default_title': 'الملف الشخصي',
     'delete_photo_q': 'حذف الصورة؟',
+    'name_change_cooldown':
+        'يمكنك تغيير اسمك بعد {days} يوم.',
     'delete_photo_body':
         'سيتم إزالة صورة Discover الخاصة بك. يمكنك تحميل صورة جديدة في أي وقت.',
     'bio_editor_title': 'نبذة عنك',
@@ -4699,6 +4715,8 @@ abstract final class AppStrings {
     'composer_message_hint_lang': 'Пишите на {lang}',
     'profile_default_title': 'Профиль',
     'delete_photo_q': 'Удалить фото?',
+    'name_change_cooldown':
+        'Изменить имя можно через {days} дн.',
     'delete_photo_body':
         'Твоё фото Discover будет удалено. Ты можешь загрузить новое в любой момент.',
     'bio_editor_title': 'О себе',
@@ -5223,6 +5241,7 @@ abstract final class AppStrings {
     'composer_message_hint_lang': '用{lang}输入',
     'profile_default_title': '个人资料',
     'delete_photo_q': '删除照片？',
+    'name_change_cooldown': '{days} 天后可再次修改名字。',
     'delete_photo_body': '你的 Discover 照片将被删除。你可以随时上传新的。',
     'bio_editor_title': '你的简介',
     'incoming_someone': '某人',
@@ -5711,6 +5730,7 @@ abstract final class AppStrings {
     'composer_message_hint_lang': '{lang}で入力',
     'profile_default_title': 'プロフィール',
     'delete_photo_q': '写真を削除しますか？',
+    'name_change_cooldown': '名前は {days} 日後に変更できます。',
     'delete_photo_body': 'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
     'bio_editor_title': '自己紹介',
     'incoming_someone': '誰か',
@@ -6205,6 +6225,7 @@ abstract final class AppStrings {
     'composer_message_hint_lang': '{lang}로 입력',
     'profile_default_title': '프로필',
     'delete_photo_q': '사진을 삭제하시겠습니까?',
+    'name_change_cooldown': '{days}일 후에 이름을 다시 변경할 수 있습니다.',
     'delete_photo_body': 'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',
     'bio_editor_title': '자기소개',
     'incoming_someone': '누군가',

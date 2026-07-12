@@ -25,7 +25,7 @@ import '../services/profile_api.dart';
 import '../services/push_dispatcher.dart';
 import '../services/scheduled_call_api.dart';
 import '../services/supabase_service.dart';
-import '../swayco/speech/speech_service.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../services/voice_message_api.dart';
@@ -1476,14 +1476,12 @@ class _DubButtonState extends State<_DubButton> {
     if (_loading || widget.translatedText.trim().isEmpty) return;
     setState(() => _loading = true);
     try {
-      final speech = SpeechService.instance;
-      if (!speech.isReady) await speech.init();
-      await speech.ensureLanguageInstalled(widget.targetLang);
-      await speech.speak(
-        text: widget.translatedText,
-        languageCode: widget.targetLang,
-        voice: SpeechService.defaultVoiceFor(widget.targetLang),
-      );
+      // The device's own voice. This used to load a Piper bundle through
+      // SpeechService — a ~60 MB download for a button that reads one message
+      // aloud.
+      final tts = FlutterTts();
+      await tts.setLanguage(widget.targetLang);
+      await tts.speak(widget.translatedText);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

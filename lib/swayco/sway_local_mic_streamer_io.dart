@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:record/record.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
+import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import '../services/translation_api.dart';
 import 'sway_mic_streamer_base.dart';
@@ -27,7 +29,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   StreamSubscription<Uint8List>? _audioSub;
   bool _running = false;
   bool _modelReady = false;
-  bool _dozing = false;
+
 
   /// Set when on-device STT is unavailable and we hand the call back to the
   /// remote the cloud engine pipeline. Every member below then delegates to it.
@@ -44,9 +46,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   Object? _localTrack;
   void Function(String partial)? _onPartial;
 
-  /// Accumulates the current utterance's samples in [-1, 1]. Clip engines only:
-  /// a streaming engine holds this state inside its own decoder.
-  final List<double> _utterance = [];
+  /// Last frame that carried voice. The STREAMING engine's backstop only —
+  /// Silero holds its own state for the clip engines.
   int _lastVoiceMs = 0;
 
   /// True while the mute / half-duplex gate is dropping audio. Edge-triggered so
@@ -83,35 +84,43 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         .catchError((Object e) => DebugOverlay.log('stt op error: $e'));
   }
 
-  // VAD (mean-square).
-  //
-  // For a STREAMING engine (lattice) this no longer segments anything — its own
-  // endpointer does, via accept_waveform's return value. All it still does is
-  // decide when the mic has been quiet long enough to release (doze), which is
-  // purely a battery concern.
-  //
-  // For a CLIP engine (neural) it is load-bearing: it is what decides when to
-  // decode. The hangover is shorter than the cloud engine streamer's 1.2 s because that
-  // trailing silence would show up directly as latency.
+  /// Silero VAD (sherpa-onnx) — what decides where a phrase begins and ends for
+  /// a CLIP engine (Whisper, Moonshine). It replaced a mean-square energy
+  /// threshold, which fired on doors, keyboards and breath, and could not tell
+  /// speech from noise of the same loudness.
+  ///
+  /// It does its own min-speech and max-speech bounding, so the old
+  /// `_minUtteranceSamples` / `_maxUtteranceSamples` guards are gone with it.
+  sherpa.VoiceActivityDetector? _silero;
+  static bool _sherpaBindingsReady = false;
+
+  /// Silence that closes a phrase. Straight latency: nothing can be transcribed
+  /// before it has elapsed.
+  static const double _silenceSeconds = 0.3;
+
+  /// A phrase this long is cut and sent whether or not the speaker paused —
+  /// without it, a monologue would never reach the recogniser.
+  static const double _maxSpeechSeconds = 15.0;
+
+  /// Shorter than this is a cough, a click, a chair.
+  static const double _minSpeechSeconds = 0.25;
+
+  /// Silero's speech probability threshold (0..1). sherpa's own default.
+  static const double _sileroThreshold = 0.5;
+
+  // Kept for the STREAMING engine (Vosk) only, whose endpointer sometimes never
+  // fires: if a hypothesis is pending and the mic has been quiet this long, we
+  // force the close ourselves. Unused by the clip engines, which Silero segments.
   static const double _vadThreshold = 0.0002;
   static const int _silenceFlushMs = 700;
 
-  /// After this much unbroken silence, release the microphone entirely. LiveKit
-  /// is already capturing it for the call itself, so ours is a second, redundant
-  /// capture that would otherwise convert and scan every buffer for minutes on
-  /// end. [wake] restarts it on LiveKit's own speech signal.
-  static const int _dozeAfterMs = 20000;
-
   static const int _sampleRate = 16000;
-  static const int _minUtteranceSamples = _sampleRate ~/ 3; // ~333 ms
-  static const int _maxUtteranceSamples = _sampleRate * 15;
 
   @override
   bool get isRunning => _fallback?.isRunning ?? _running;
 
   @override
-  bool get isStreaming =>
-      _fallback?.isStreaming ?? (_running && _modelReady && !_dozing);
+  bool get isStreaming => _fallback?.isStreaming ?? (_running && _modelReady);
 
   /// the cloud engine re-sends the growing session transcript; the on-device path emits
   /// independent utterances. The caller reads this per callback, so it tracks
@@ -119,8 +128,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   @override
   bool get accumulatesTranscript => _fallback?.accumulatesTranscript ?? false;
 
+  /// The mic now stays open for the whole call — dozing (releasing it after 20 s
+  /// of silence, to spare the battery) is gone. It cost the first syllable of
+  /// every phrase that woke it, and Silero is cheap enough to run continuously.
   @override
-  bool get isDozing => _fallback?.isDozing ?? _dozing;
+  bool get isDozing => _fallback?.isDozing ?? false;
 
   @override
   Future<void> start({
@@ -164,8 +176,14 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         return;
       }
 
-      // First call in a language downloads 30–60 MB. Capture starts anyway so
-      // the call is never blocked on it; utterances are dropped until ready.
+      // Silero (~2 MB) is fetched once and shared by every language. Without it
+      // a clip engine has nothing to tell it where a phrase ends, so it would
+      // never transcribe anything — hence the fallback.
+      unawaited(_startSilero());
+
+      // First call in a language downloads the model (Whisper small: ~357 MB).
+      // Capture starts anyway so the call is never blocked on it; utterances are
+      // dropped until ready.
       unawaited(
         AsrService.instance.ensureLanguageInstalled(sourceLang).then((_) async {
           _modelReady = AsrService.instance.isReady;
@@ -188,6 +206,39 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
   }
 
+  /// Download Silero once and build the detector. Its buffer holds
+  /// [_maxSpeechSeconds] plus a margin, so a long phrase is never truncated by
+  /// the ring buffer before the VAD itself cuts it.
+  Future<void> _startSilero() async {
+    try {
+      final model = await AsrModelDownloader.ensureSileroVad();
+      if (!_running || _silero != null) return;
+      if (!_sherpaBindingsReady) {
+        sherpa.initBindings();
+        _sherpaBindingsReady = true;
+      }
+      _silero = sherpa.VoiceActivityDetector(
+        config: sherpa.VadModelConfig(
+          sileroVad: sherpa.SileroVadModelConfig(
+            model: model,
+            threshold: _sileroThreshold,
+            minSilenceDuration: _silenceSeconds,
+            minSpeechDuration: _minSpeechSeconds,
+            maxSpeechDuration: _maxSpeechSeconds,
+          ),
+          sampleRate: _sampleRate,
+          debug: false,
+        ),
+        bufferSizeInSeconds: _maxSpeechSeconds + 5,
+      );
+      DebugOverlay.log('stt silero VAD ready — '
+          '${(_silenceSeconds * 1000).round()}ms silence closes a phrase');
+    } catch (e) {
+      DebugOverlay.log('stt silero FAILED: $e');
+      await _startFallback('vad_unavailable');
+    }
+  }
+
   /// Tear down our capture and run the remote the cloud engine streamer instead.
   Future<void> _startFallback(String reason) async {
     if (_fallback != null || !_running) return;
@@ -195,7 +246,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
     await _audioSub?.cancel();
     _audioSub = null;
-    _utterance.clear();
+    _freeSilero();
     try {
       await _rec.stop();
     } catch (_) {}
@@ -237,39 +288,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     );
   }
 
-  /// Release the mic after [_dozeAfterMs] of silence. Only [wake] revives it.
-  Future<void> _doze() async {
-    if (_dozing) return;
-    _dozing = true;
-    _utterance.clear();
-    // 20 s of silence: the VAD backstop flushed long ago, so nothing is lost by
-    // resetting — but do it so no stale hypothesis survives the gap until wake().
-    _hasPending = false;
-    _lastPartial = '';
-    if (AsrService.instance.isStreaming && _modelReady) {
-      await AsrService.instance.reset();
-    }
-    await _audioSub?.cancel();
-    _audioSub = null;
-    try {
-      await _rec.stop();
-    } catch (_) {}
-    DebugOverlay.log('stt dozing — mic released after ${_dozeAfterMs ~/ 1000}s silence');
-  }
-
+  /// The mic no longer dozes — it stays open for the whole call, so there is
+  /// nothing to wake. Kept to satisfy [SwayMicStreamer]; the caller only ever
+  /// calls it when [isDozing], which is now always false.
   @override
-  Future<void> wake() async {
-    if (_fallback != null) return; // the cloud engine never releases the mic
-    if (!_running || !_dozing) return;
-    _dozing = false;
-    try {
-      await _startCapture();
-      DebugOverlay.log('stt woke — capture resumed');
-    } catch (e) {
-      _dozing = true;
-      _onError?.call('wake_failed: $e');
-    }
-  }
+  Future<void> wake() async {}
 
   void _onPcm(
     Uint8List bytes,
@@ -289,125 +312,111 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     //                       gets sent back to the peer, who answers it. Costs
     //                       barge-in: you cannot interrupt a translation.
     //
-    // Keep _lastVoiceMs fresh rather than just returning: it stops us flushing
-    // the half-captured utterance we were holding, and it stops the doze timer.
-    // Dozing here would be a trap — wake() is driven by LiveKit's
-    // ActiveSpeakersChangedEvent, which never fires while its mic is disabled,
-    // so a doze that began during mute would never be woken.
+    // The gate is EDGE-triggered: on the closing edge, whatever Silero is
+    // already holding was spoken BEFORE the gate shut — before the mute was
+    // pressed, before our own TTS started. Those words were said out loud, on
+    // purpose, to be heard, so they are flushed and published with `force`
+    // (which is what gets them past the mute re-check in _translateAndSend).
+    // Everything captured after the edge is simply not fed to the VAD.
     if (isSendMuted || isTranslationPlaying) {
       if (!_gated) {
         _gated = true;
-        // Whatever the recogniser is holding was spoken BEFORE the gate closed —
-        // before the mute was pressed, before our own TTS started. Those words
-        // were said out loud, on purpose, to be heard: publish them instead of
-        // dropping them. `force` is what lets them through, since
-        // _translateAndSend otherwise refuses to publish while isSendMuted —
-        // the right rule for audio captured *after* the press, not before it.
-        //
-        // Both engine shapes need this. Only the streaming one was handled
-        // before, so muting mid-sentence silently ate the phrase on every
-        // clip-engine language (en, ja, zh, ko, ar).
         final gate = isSendMuted ? 'muted' : 'tts';
+        DebugOverlay.log('stt gate CLOSED ($gate)');
         if (!_modelReady) {
-          _utterance.clear();
+          _silero?.reset();
         } else if (AsrService.instance.isStreaming) {
-          // Streaming (lattice): the words live in the native decoder.
-          _utterance.clear();
-          DebugOverlay.log('stt gate ($gate) — flushing what was already said');
+          DebugOverlay.log('stt gate — flushing what was already said');
           _serialize(() => _flushAndSend(onTranslation, force: true));
-        } else if (_utterance.length >= _minUtteranceSamples) {
-          // Clip (neural): the words sit in our own buffer. Decode and send it.
-          final pending = Float32List.fromList(_utterance);
-          _utterance.clear();
-          DebugOverlay.log('stt gate ($gate) — decoding what was already said');
-          unawaited(_recognizeAndTranslate(
-            pending,
-            onTranslation,
-            _onError,
-            force: true,
-          ));
         } else {
-          // Too short to be speech — nothing worth publishing.
-          _utterance.clear();
+          _flushSilero(onTranslation, force: true);
         }
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
       return;
     }
-    _gated = false;
+    if (_gated) {
+      _gated = false;
+      DebugOverlay.log('stt gate OPEN');
+      // Silero kept scoring nothing while the gate was shut; drop whatever half
+      // state it holds so the next phrase starts clean.
+      _silero?.reset();
+    }
 
     final samples = _toFloat32(bytes);
     if (samples.isEmpty) return;
 
-    final level = _meanSquare(samples);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final voiced = level > _vadThreshold;
-    if (voiced) _lastVoiceMs = nowMs;
 
-    if (++_frames % 100 == 0) {
-      DebugOverlay.log('stt pcm frames=$_frames level=${level.toStringAsFixed(6)} '
-          'voiced=$voiced ready=$_modelReady '
-          'streaming=${AsrService.instance.isStreaming} dozing=$_dozing');
-    }
-
-    // Streaming engine: hand every frame straight to the decoder. It endpoints
-    // for itself — but not always. Observed on device: partials build up
-    // ("bonjour sarah") and accept_waveform never returns 1, so no utterance
-    // ever closes and nothing is ever sent. The VAD therefore stays as a
-    // backstop: if a hypothesis is pending and the mic has been quiet for
-    // _silenceFlushMs, force the close ourselves. the endpointer still wins
-    // whenever it fires first, which is the common case mid-conversation.
+    // Streaming engine (Vosk): it endpoints for itself — but not always.
+    // Observed on device: partials build up and accept_waveform never returns 1,
+    // so no utterance ever closes. The old mean-square VAD stays as its backstop.
+    // Whisper is a clip engine, so this branch is unreachable today.
     if (AsrService.instance.isStreaming) {
+      final voiced = _meanSquare(samples) > _vadThreshold;
+      if (voiced) _lastVoiceMs = nowMs;
       if (_modelReady) {
         _serialize(() => _feed(samples, onTranslation, onError));
-
         if (_hasPending && !voiced && nowMs - _lastVoiceMs >= _silenceFlushMs) {
-          // Claim it here, synchronously, before the flush is even queued: two
-          // frames arriving back-to-back in silence would otherwise both queue a
-          // flush, and the second returns "" from a recognizer already finalised.
+          // Claim it synchronously, before the flush is even queued: two silent
+          // frames back to back would otherwise both queue one, and the second
+          // returns "" from a recognizer already finalised.
           _hasPending = false;
           DebugOverlay.log('stt vad backstop: ${_silenceFlushMs}ms silence, forcing flush');
           _serialize(() => _flushAndSend(onTranslation));
         }
       }
-      if (nowMs - _lastVoiceMs >= _dozeAfterMs) unawaited(_doze());
       return;
     }
 
-    // Buffer through the hangover window so trailing consonants aren't clipped;
-    // outside it, silence is discarded rather than padding the utterance.
-    if (voiced || nowMs - _lastVoiceMs < _silenceFlushMs) {
-      _utterance.addAll(samples);
-    }
+    // Clip engine (Whisper): Silero decides where phrases start and end. It
+    // keeps its own pre-roll, so the first syllable is never clipped — which the
+    // mean-square VAD, firing only once the level was already up, used to eat.
+    final vad = _silero;
+    if (vad == null) return; // still downloading — nothing to segment with
 
-    final speechEnded = _utterance.isNotEmpty &&
-        !voiced &&
-        nowMs - _lastVoiceMs >= _silenceFlushMs;
-    if (speechEnded || _utterance.length >= _maxUtteranceSamples) {
-      _flush(onTranslation, onError);
-      return;
+    vad.acceptWaveform(samples);
+    if (++_frames % 100 == 0) {
+      DebugOverlay.log('stt pcm frames=$_frames speaking=${vad.isDetected()} '
+          'ready=$_modelReady');
     }
+    _drainSilero(onTranslation, onError);
+  }
 
-    // Nothing pending and nobody has spoken for a while: stop burning CPU on a
-    // capture LiveKit is already doing for the call.
-    if (_utterance.isEmpty && nowMs - _lastVoiceMs >= _dozeAfterMs) {
-      unawaited(_doze());
+  /// Hand every phrase Silero has closed to the recogniser.
+  void _drainSilero(
+    void Function(String, String, String, String) onTranslation,
+    void Function(String)? onError, {
+    bool force = false,
+  }) {
+    final vad = _silero;
+    if (vad == null) return;
+    while (!vad.isEmpty()) {
+      final segment = vad.front();
+      vad.pop();
+      if (!_modelReady) continue; // model still downloading — drop the phrase
+      final ms = (segment.samples.length / _sampleRate * 1000).round();
+      DebugOverlay.log('stt phrase ${ms}ms → transcribing');
+      unawaited(_recognizeAndTranslate(
+        segment.samples,
+        onTranslation,
+        onError,
+        force: force,
+      ));
     }
   }
 
-  void _flush(
-    void Function(String, String, String, String) onTranslation,
-    void Function(String)? onError,
-  ) {
-    if (_utterance.length < _minUtteranceSamples) {
-      _utterance.clear();
-      return;
-    }
-    final samples = Float32List.fromList(_utterance);
-    _utterance.clear();
-    if (!_modelReady) return;
-
-    unawaited(_recognizeAndTranslate(samples, onTranslation, onError));
+  /// Close whatever phrase Silero is mid-way through and send it. Used on the
+  /// gate's closing edge, so the sentence a mute press interrupts still lands.
+  void _flushSilero(
+    void Function(String, String, String, String) onTranslation, {
+    bool force = false,
+  }) {
+    final vad = _silero;
+    if (vad == null) return;
+    vad.flush();
+    _drainSilero(onTranslation, _onError, force: force);
+    vad.reset();
   }
 
   /// Streaming path: one frame in, partials out, and a finished utterance
@@ -533,6 +542,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     return sum / samples.length;
   }
 
+  /// Silero is native memory — it has to be freed by hand, and never used again
+  /// after (a second free, or a use-after-free, takes the whole app down).
+  void _freeSilero() {
+    final vad = _silero;
+    _silero = null;
+    try {
+      vad?.free();
+    } catch (_) {}
+  }
+
   @override
   Future<void> stop() async {
     // The engine outlives this streamer (AsrService caches the loaded model),
@@ -545,11 +564,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
     _running = false;
     _modelReady = false;
-    _dozing = false;
     _gated = false;
     _hasPending = false;
     _lastPartial = '';
-    _utterance.clear();
+    _freeSilero();
     _onTranslation = null;
     _onError = null;
     _onPartial = null;

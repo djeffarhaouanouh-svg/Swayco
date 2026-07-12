@@ -24,7 +24,6 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
-import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
@@ -967,7 +966,6 @@ class _CallScreenState extends State<CallScreen> {
     if (!want) {
       // Whatever the voice is mid-sentence on is no longer wanted, and the
       // peer's ducked voice has to come straight back up.
-      await SpeechService.instance.stop();
       unawaited(_deviceTts.stop());
       ttsSpeaking.value = false;
     }
@@ -1010,49 +1008,18 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Synthesise [text] locally.
+  /// Speak [text] with the device's own OS voice (`flutter_tts`).
   ///
-  /// The sherpa voice is used only when it is *already loaded for this exact
-  /// language* — that is the account language, installed at boot. Everything
-  /// else, in particular a language picked mid-call with the language button,
-  /// goes to the device's own OS voice: the phone already ships dozens of
-  /// languages, and a live call cannot wait on a 60 MB download.
+  /// This used to prefer a Piper/VITS voice running on sherpa-onnx, downloaded
+  /// per language (~60–110 MB a bundle) and kept in sync with a catalogue. That
+  /// whole machinery is gone: the phone already ships dozens of languages, they
+  /// need no download, and they start speaking instantly. `ttsSpeaking` is now
+  /// driven entirely by flutter_tts's own start/completion handlers.
+  ///
+  /// flutter_tts's speak() can return without playing (missing voice), so no
+  /// completion event is ever guaranteed — the mic gate's own safety timer is
+  /// what reopens the mic, never an awaited event.
   Future<void> _playWithLocalTts(String text, String lang) async {
-    final speech = SpeechService.instance;
-    if (speech.isLoadedFor(lang)) {
-      try {
-        final voice = SpeechService.defaultVoiceFor(lang);
-        // Half-duplex: hold the mic shut for the window this plays out the
-        // loudspeaker, or our own STT transcribes it and ships it back to the
-        // peer.
-        //
-        // Never *await* the completion event. speak() swallows its own errors
-        // and returns without playing whenever the voice file or model is
-        // missing, in which case onPlayerComplete never fires — awaiting it
-        // wedged this method for 15 s per incoming translation. The gate's
-        // duration-based safety timer is the floor; the event only shortens it.
-        // Subscribe before speak(): a short clip can finish before we get here.
-        final done = speech.onPlaybackComplete.first;
-        markTranslationPlaying(textLength: text.length);
-        // Sherpa's half of [ttsSpeaking]. The same 15 s timeout that covers the
-        // gate covers the signal: speak() returns without playing when the model
-        // is missing, and then no completion event ever comes.
-        ttsSpeaking.value = true;
-        unawaited(done
-            .timeout(const Duration(seconds: 15))
-            .then((_) => markTranslationDone())
-            .catchError((_) {/* safety timer reopens the mic */})
-            .whenComplete(() => ttsSpeaking.value = false));
-        await speech.speak(text: text, languageCode: lang, voice: voice);
-        return;
-      } catch (e) {
-        ttsSpeaking.value = false;
-        debugPrint('[speech] speak error: $e');
-      }
-    }
-    // No sherpa voice loaded for this language — speak it with the OS voice.
-    // flutter_tts speak() also returns early, so here the gate's safety timer is
-    // what covers playback.
     try {
       if (lang.isNotEmpty && lang != _deviceTtsLang) {
         try {
@@ -2094,9 +2061,7 @@ class _OutputLanguageSheet extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   bool _canSpeak(String code) =>
-      deviceVoiceLangs.isEmpty ||
-      deviceVoiceLangs.contains(code) ||
-      SpeechService.instance.isLoadedFor(code);
+      deviceVoiceLangs.isEmpty || deviceVoiceLangs.contains(code);
 
   @override
   Widget build(BuildContext context) {
