@@ -278,11 +278,24 @@ class _VadWhisperStreamer implements SwayMicStreamer {
   void _onSegment(Float32List samples) {
     if (!_running || samples.isEmpty) return;
 
-    // Only isSendMuted gates SEND. Never gate on isTranslationPlaying: when
-    // translations arrive back to back that flag stays true and the mic would
-    // stay dead for the rest of the call.
-    if (isSendMuted) {
-      _log('segment dropped — mic muted');
+    // Two reasons to throw a segment away rather than translate it:
+    //
+    //  isSendMuted          — the user muted.
+    //  isTranslationPlaying — a translation is coming out of our own speaker.
+    //                         AEC alone is not enough: the TTS speaks the very
+    //                         language our STT listens for, so residual echo
+    //                         transcribes cleanly and we send the peer their own
+    //                         translation back. The native pipeline gates on this
+    //                         for exactly that reason.
+    //
+    // This flag cannot stick: it clears itself 800 ms after playback (see
+    // call_audio_web.dart), and a second translation will not re-arm a timer
+    // that is already running. The standing "never gate SEND on
+    // isTranslationPlaying" rule was about the STREAMING path, where cloud TTS
+    // arrived continuously and held the flag up for the rest of the call. Here
+    // segments are discrete, so the gate is bounded by construction.
+    if (isSendMuted || isTranslationPlaying) {
+      _log('segment dropped — ${isSendMuted ? 'mic muted' : 'our speaker is playing a translation'}');
       return;
     }
 
@@ -305,6 +318,12 @@ class _VadWhisperStreamer implements SwayMicStreamer {
       final roundTrip = DateTime.now().difference(sentAt).inMilliseconds;
       if (res == null) {
         _log('segment #$seq → nothing (silence, or backend refused)');
+        return;
+      }
+      // Muted while the backend was answering: these words predate the press,
+      // but the user has since asked not to be heard. Native drops them too.
+      if (isSendMuted) {
+        _log('segment #$seq dropped — muted while translating');
         return;
       }
       // Latency the peer actually feels: 300 ms of VAD redemption, plus the
