@@ -29,7 +29,10 @@ void setSendMuted(bool v) => _sendMuted = v;
 // is handled by the isTranslationPlaying flag in grok_mic_streamer_web.
 void registerCaptureContext(dynamic ctx) {}
 
+void _mark(String m) => web.console.log('[speaker] $m'.toJS);
+
 void markTranslationPlaying({int textLength = 0}) {
+  if (!_playing) _mark('▶ TRANSLATION PLAYING — mic gate CLOSED ($textLength chars)');
   _playing = true;
   // Don't reset an already-running timer: rapid successive TTS calls would
   // push the gate back indefinitely, blocking the user's mic for too long.
@@ -38,14 +41,17 @@ void markTranslationPlaying({int textLength = 0}) {
   _clearTimer = Timer(const Duration(milliseconds: 800), () {
     _playing = false;
     _clearTimer = null;
+    _mark('■ gate OPEN again (800 ms timer — playback may still be going)');
   });
 }
 
 void markTranslationDone() {
+  _mark('⏸ translation finished — gate opens in 400 ms');
   _clearTimer?.cancel();
   _clearTimer = Timer(const Duration(milliseconds: 400), () {
     _playing = false;
     _clearTimer = null;
+    _mark('■ gate OPEN again');
   });
 }
 

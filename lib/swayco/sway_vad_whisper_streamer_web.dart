@@ -103,6 +103,10 @@ class _VadWhisperStreamer implements SwayMicStreamer {
   double _peak = 0;
   int _frames = 0;
 
+  /// Set when the current phrase began while our own speaker was playing a
+  /// translation — i.e. it is echo, and must not be sent back to the peer.
+  bool _tainted = false;
+
   String _from = '';
   String _to = '';
   void Function(String orig, String trans, String lang, String audioB64)?
@@ -194,7 +198,16 @@ class _VadWhisperStreamer implements SwayMicStreamer {
             // below in hand.
             positiveSpeechThreshold: 0.3,
             negativeSpeechThreshold: 0.25,
-            onSpeechStart: (() => _log('speech start')).toJS,
+            // The anti-echo gate is decided HERE, at the first syllable — not
+            // when the phrase ends. Echo starts while our speaker is talking;
+            // your own next sentence starts after it has stopped. Judging at the
+            // end instead threw away a whole 3 s phrase whenever a translation
+            // happened to still be playing as you finished it, which is what
+            // "I can't talk any more while the translation plays" was.
+            onSpeechStart: (() {
+              _tainted = isTranslationPlaying;
+              _log('speech start${_tainted ? ' — DURING playback, will drop as echo' : ''}');
+            }).toJS,
             onVADMisfire: (() {
               _log('misfire — speech shorter than 200ms, dropped '
                   '(peak score ${_peak.toStringAsFixed(2)})');
@@ -280,22 +293,21 @@ class _VadWhisperStreamer implements SwayMicStreamer {
 
     // Two reasons to throw a segment away rather than translate it:
     //
-    //  isSendMuted          — the user muted.
-    //  isTranslationPlaying — a translation is coming out of our own speaker.
-    //                         AEC alone is not enough: the TTS speaks the very
-    //                         language our STT listens for, so residual echo
-    //                         transcribes cleanly and we send the peer their own
-    //                         translation back. The native pipeline gates on this
-    //                         for exactly that reason.
+    //  isSendMuted — the user muted.
+    //  _tainted    — the phrase STARTED while a translation was coming out of
+    //                our own speaker, so it is our own playback echoing back.
+    //                AEC alone is not enough: the TTS speaks the very language
+    //                our STT listens for, so the residue transcribes cleanly and
+    //                we would send the peer their own translation back. Native
+    //                gates on this for exactly that reason.
     //
-    // This flag cannot stick: it clears itself 800 ms after playback (see
-    // call_audio_web.dart), and a second translation will not re-arm a timer
-    // that is already running. The standing "never gate SEND on
-    // isTranslationPlaying" rule was about the STREAMING path, where cloud TTS
-    // arrived continuously and held the flag up for the rest of the call. Here
-    // segments are discrete, so the gate is bounded by construction.
-    if (isSendMuted || isTranslationPlaying) {
-      _log('segment dropped — ${isSendMuted ? 'mic muted' : 'our speaker is playing a translation'}');
+    // Judged at the phrase's START (see onSpeechStart), never at its end: a
+    // phrase you begin after the speaker falls quiet must survive, even if the
+    // next translation starts playing while you are still talking.
+    final tainted = _tainted;
+    _tainted = false;
+    if (isSendMuted || tainted) {
+      _log('segment dropped — ${isSendMuted ? 'mic muted' : 'echo of our own speaker'}');
       return;
     }
 
