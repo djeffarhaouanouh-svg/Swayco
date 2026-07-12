@@ -35,7 +35,14 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'it', flag: '🇮🇹', label: 'Italiano'),
   AppLanguage(code: 'pt', flag: '🇵🇹', label: 'Português'),
   AppLanguage(code: 'nl', flag: '🇳🇱', label: 'Nederlands'),
-  AppLanguage(code: 'ar', flag: '🇸🇦', label: 'العربية'),
+  // Standard Arabic, explicitly. Both models are fus'ha-centric: Moonshine's ar
+  // training mix is Egyptian + Gulf + MSA with ZERO Maghrebi hours, and the
+  // ar_JO Piper voice is MSA read by a Jordanian speaker. A Moroccan or Algerian
+  // speaking their dialect into it gets ~85-90% WER (Casablanca, EMNLP 2024) —
+  // and Whisper-family models hallucinate rather than fail, so the peer would
+  // hear confident nonsense. Naming the variety is the honest minimum until a
+  // Darija model exists.
+  AppLanguage(code: 'ar', flag: '🇸🇦', label: 'العربية الفصحى'),
   AppLanguage(code: 'ru', flag: '🇷🇺', label: 'Русский'),
   AppLanguage(code: 'zh', flag: '🇨🇳', label: '中文'),
   AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
