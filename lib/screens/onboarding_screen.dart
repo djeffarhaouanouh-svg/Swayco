@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import '../widgets/stt_download_dialog.dart';
+import '../swayco/asr/asr_service.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
@@ -251,15 +253,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
       }
     }
-    if (!mounted) return;
-    // The speech model is downloaded HERE, with the user watching, rather than
-    // silently during their first call — where its absence just looks like the
-    // translation is broken. Declining only postpones it: the call path fetches
-    // it on first use anyway.
-    if (!kIsWeb && !widget.editing) {
-      await showSttDownloadDialog(context, langCode: _selectedLang!);
-      if (!mounted) return;
+    // Start pulling the speech model the moment the language is committed, so it
+    // is on disk before the first call instead of downloading during it. Fire
+    // and forget: it must never hold up the end of onboarding, and the call path
+    // awaits the same future if it is still in flight.
+    if (!kIsWeb) {
+      unawaited(AsrService.instance.ensureLanguageInstalled(_selectedLang!));
     }
+    if (!mounted) return;
     widget.onCompleted();
   }
 
