@@ -61,12 +61,18 @@ extension type _MicVad(JSObject _) implements JSObject {
   external void pause();
 }
 
+/// `{ isSpeech, notSpeech }` — Silero's per-frame verdict, 0..1.
+extension type _VadProbs(JSObject _) implements JSObject {
+  external double get isSpeech;
+}
+
 extension type _MicVadOptions._(JSObject _) implements JSObject {
   external factory _MicVadOptions({
     JSFunction getStream,
     JSFunction onSpeechStart,
     JSFunction onSpeechEnd,
     JSFunction onVADMisfire,
+    JSFunction onFrameProcessed,
     String model,
     double positiveSpeechThreshold,
     double negativeSpeechThreshold,
@@ -91,6 +97,11 @@ class _VadWhisperStreamer implements SwayMicStreamer {
   bool _running = false;
   bool _ready = false;
   int _segments = 0;
+
+  /// Silero diagnostics: highest score seen since the last report, and the
+  /// frame counter that paces those reports.
+  double _peak = 0;
+  int _frames = 0;
 
   String _from = '';
   String _to = '';
@@ -173,13 +184,33 @@ class _VadWhisperStreamer implements SwayMicStreamer {
             // buffer is always there.
             preSpeechPadMs: 500,
             // Shorter than this is a cough, a click, a chair.
-            minSpeechMs: 250,
-            // Stricter than the 0.3/0.25 defaults: a call has speaker bleed and
-            // room noise, and every false positive costs a Whisper round-trip.
-            positiveSpeechThreshold: 0.5,
-            negativeSpeechThreshold: 0.35,
+            minSpeechMs: 200,
+            // The library defaults. An earlier 0.5/0.35 — "a call is noisy, and
+            // every false positive costs a Whisper round-trip" — misfired on
+            // EVERY utterance: with AGC off the mic is quiet, Silero's score
+            // hovers near 0.4, so it crossed 0.5 for a frame or two, fell back
+            // under 0.35, and the 300 ms window closed before 200 ms of speech
+            // had accumulated. Tighten these again only with the peak-score log
+            // below in hand.
+            positiveSpeechThreshold: 0.3,
+            negativeSpeechThreshold: 0.25,
             onSpeechStart: (() => _log('speech start')).toJS,
-            onVADMisfire: (() => _log('misfire (too short) — dropped')).toJS,
+            onVADMisfire: (() {
+              _log('misfire — speech shorter than 200ms, dropped '
+                  '(peak score ${_peak.toStringAsFixed(2)})');
+              _peak = 0;
+            }).toJS,
+            // Silero's score on every frame (32 ms). We only surface the peak,
+            // every ~3 s: it is the one number that says whether the thresholds
+            // are wrong or the mic is simply too quiet.
+            onFrameProcessed: ((_VadProbs p, JSFloat32Array _) {
+              if (p.isSpeech > _peak) _peak = p.isSpeech;
+              if (++_frames % 100 == 0) {
+                _log('peak score over last 3s: ${_peak.toStringAsFixed(2)} '
+                    '(speech starts at 0.30)');
+                _peak = 0;
+              }
+            }).toJS,
             onSpeechEnd: ((JSFloat32Array audio) {
               _onSegment(audio.toDart);
             }).toJS,
