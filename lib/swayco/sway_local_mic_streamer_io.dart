@@ -103,11 +103,26 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// without it, a monologue would never reach the recogniser.
   static const double _maxSpeechSeconds = 15.0;
 
-  /// Shorter than this is a cough, a click, a chair.
-  static const double _minSpeechSeconds = 0.25;
+  /// Shorter than this is a cough, a click, a chair — and, crucially, a scrap of
+  /// our own loudspeaker. Raised from 0.25 s: Whisper hallucinates in direct
+  /// proportion to how little speech it is given, and a 250 ms fragment is
+  /// exactly what it captions with subtitle boilerplate.
+  static const double _minSpeechSeconds = 0.4;
 
-  /// Silero's speech probability threshold (0..1). sherpa's own default.
-  static const double _sileroThreshold = 0.5;
+  /// Silero's speech probability threshold (0..1). Above sherpa's 0.5 default:
+  /// every marginal segment that squeaks past becomes a Whisper hallucination
+  /// spoken out loud on the peer's phone, so the cost of a false positive here
+  /// is far higher than the cost of missing a mumbled word.
+  static const double _sileroThreshold = 0.6;
+
+  /// Peak amplitude a segment must reach to be worth transcribing (0..1).
+  ///
+  /// The last line against our own echo. Silero says "this is speech" — and it
+  /// is right, it IS speech: it is the translation coming out of our own
+  /// loudspeaker, and Silero has no idea whose voice it is. But that residue,
+  /// once AEC has had it and with AGC off, is far quieter than someone actually
+  /// talking into the phone. Level is the one thing that still tells them apart.
+  static const double _speechFloor = 0.06;
 
   /// Last transcript we accepted, and when. An identical one inside this window
   /// is our own translation coming back around, not the user saying it twice.
@@ -285,9 +300,14 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       numChannels: 1,
       echoCancel: true,
       noiseSuppress: true,
-      autoGain: true,
+      // AGC OFF. It was on, and it was actively harmful here: what AEC leaves of
+      // the loudspeaker's own output is quiet — and AGC's whole job is to pull
+      // quiet things up. It was handing Silero an amplified echo that looks like
+      // speech, and Whisper captioned it. Without AGC the residue stays under
+      // [_speechFloor] and never reaches the recogniser.
+      autoGain: false,
     ));
-    DebugOverlay.log('stt capture started — 16 kHz pcm16, aec/ns/agc on');
+    DebugOverlay.log('stt capture started — 16 kHz pcm16, aec+ns on, agc OFF');
     _audioSub = stream.listen(
       (bytes) => _onPcm(bytes, _onTranslation!, _onError),
       onError: (Object e) => DebugOverlay.log('stt capture stream error: $e'),
@@ -403,7 +423,19 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       vad.pop();
       if (!_modelReady) continue; // model still downloading — drop the phrase
       final ms = (segment.samples.length / _sampleRate * 1000).round();
-      DebugOverlay.log('stt phrase ${ms}ms → transcribing');
+      final peak = _peak(segment.samples);
+
+      // Too quiet to be someone talking INTO this phone. Silero is not wrong —
+      // it is speech — but it is our own loudspeaker's, and handing it to Whisper
+      // is how the peer ends up hearing sentences nobody said.
+      if (peak < _speechFloor) {
+        DebugOverlay.log('stt phrase ${ms}ms DROPPED — too quiet '
+            '(peak ${peak.toStringAsFixed(3)} < $_speechFloor)');
+        continue;
+      }
+
+      DebugOverlay.log(
+          'stt phrase ${ms}ms peak=${peak.toStringAsFixed(3)} → transcribing');
       unawaited(_recognizeAndTranslate(
         segment.samples,
         onTranslation,
@@ -411,6 +443,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         force: force,
       ));
     }
+  }
+
+  /// Loudest sample in the segment, 0..1.
+  double _peak(Float32List samples) {
+    var m = 0.0;
+    for (final s in samples) {
+      final a = s.abs();
+      if (a > m) m = a;
+    }
+    return m;
   }
 
   /// Close whatever phrase Silero is mid-way through and send it. Used on the

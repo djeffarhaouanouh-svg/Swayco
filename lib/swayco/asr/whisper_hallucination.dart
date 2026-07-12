@@ -66,9 +66,33 @@ bool looksHallucinated(String transcript, {required int durationMs}) {
   }
 
   // Speech runs at roughly 12–20 characters a second. Well past double that and
-  // the decoder is looping, not transcribing — the other classic Whisper failure
-  // ("oui oui oui oui oui…"). Guard against a zero duration.
+  // the decoder is emitting faster than a mouth can move. Guard a zero duration.
   if (durationMs > 0 && t.length > 40 * (durationMs / 1000)) return true;
 
+  if (_isStuckLoop(folded)) return true;
+
   return false;
+}
+
+/// Whisper's decoder gets stuck and repeats one word until it runs out of
+/// budget: "oui, oui, oui, oui, oui, oui…". The character-rate guard above misses
+/// it — a short word repeated eight times over three seconds is a perfectly
+/// human rate — so the repetition itself has to be what gives it away.
+///
+/// A person does repeat themselves ("non, non, non !"), so the bar is set where
+/// insistence ends and a machine begins: four or more of the same word, AND that
+/// word making up most of the sentence.
+bool _isStuckLoop(String folded) {
+  final words = folded
+      .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
+      .where((w) => w.isNotEmpty)
+      .toList();
+  if (words.length < 4) return false;
+
+  final counts = <String, int>{};
+  for (final w in words) {
+    counts[w] = (counts[w] ?? 0) + 1;
+  }
+  final top = counts.values.reduce((a, b) => a > b ? a : b);
+  return top >= 4 && top / words.length >= 0.6;
 }
