@@ -27,6 +27,13 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET?.trim();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
+/**
+ * TEST (web-only, revert with the VAD/Whisper experiment): the non-streaming
+ * STT model behind POST /translation/whisper. The OpenAI API does not serve the
+ * `small` checkpoint — `whisper-1` (large-v2) is the only Whisper it hosts, and
+ * it is what this test measures. Override with WHISPER_MODEL if that changes.
+ */
+const WHISPER_MODEL = process.env.WHISPER_MODEL?.trim() || 'whisper-1';
 /** Set to `1` to enable source-language transcription (slightly more latency / cost). */
 const OPENAI_TRANSLATION_TRANSCRIBE = process.env.OPENAI_TRANSLATION_TRANSCRIBE?.trim() === '1';
 /** Set to `0` to disable input noise reduction (tiny CPU win; noisier mics). */
@@ -1162,6 +1169,89 @@ app.post(VOICE_HTTP_PATHS, _limTight, voiceUpload.single('audio'), async (req, r
     );
     return res.status(200).type('audio/mpeg').send(audio);
   }
+});
+
+/* ─── TEST — non-streaming STT (Silero VAD + Whisper) ──────────────────────
+ *
+ * TEMPORARY, WEB-ONLY EXPERIMENT — revert together with the rest of the test.
+ *
+ * The browser runs Silero VAD on the live mic, clips one utterance at the
+ * 300 ms silence mark, and POSTs it here as a 16 kHz mono WAV. We transcribe
+ * the WHOLE clip in one shot (no streaming, no partials), translate it, and
+ * return text only — the peer speaks it with its device TTS, exactly as the
+ * streaming path already does with `local_tts=true`.
+ *
+ * Fields: `audio` (WAV bytes), `from` / `to` (BCP-47).
+ * Returns: { orig, trans, lang, ms: { stt, translate, total } }
+ *          204 when Whisper heard nothing worth saying.
+ */
+app.post('/translation/whisper', _limTight, voiceUpload.single('audio'), async (req, res) => {
+  if (!OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'openai_not_configured' });
+  }
+  const file = req.file;
+  if (!file || !file.buffer || file.buffer.length === 0) {
+    return res.status(400).json({ error: 'audio_missing' });
+  }
+  const from = primaryLanguageTag(req.body?.from);
+  const to = primaryLanguageTag(req.body?.to);
+  if (!isReasonableLanguageTag(to)) {
+    return res.status(400).json({ error: 'invalid_target' });
+  }
+
+  const t0 = Date.now();
+  let transcript = '';
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([file.buffer], { type: 'audio/wav' }), 'utt.wav');
+    form.append('model', WHISPER_MODEL);
+    // Naming the language skips Whisper's detection pass — faster, and it stops
+    // a short clip being mistaken for another language.
+    if (isReasonableLanguageTag(from)) form.append('language', from);
+    form.append('response_format', 'json');
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: form,
+    });
+    const body = await r.text();
+    if (!r.ok) {
+      console.error('whisper stt error', r.status, body.slice(0, 300));
+      return res.status(502).json({ error: 'whisper_stt_error', detail: body.slice(0, 300) });
+    }
+    transcript = (JSON.parse(body).text || '').trim();
+  } catch (e) {
+    console.error('whisper stt throw', e);
+    return res.status(502).json({ error: 'whisper_stt_unreachable' });
+  }
+  const tStt = Date.now();
+
+  // Fed silence or a cough, Whisper hallucinates a stock phrase ("Sous-titrage
+  // Société Radio-Canada", "Thank you."). The VAD filters most of it; drop
+  // whatever still carries no letters.
+  if (!transcript || !/\p{L}/u.test(transcript)) {
+    return res.status(204).end();
+  }
+
+  const tr = await grokTranslateText({ transcript, from, to });
+  if (tr.error) {
+    return res
+      .status(tr.status)
+      .json({ error: tr.error, ...(tr.detail ? { detail: tr.detail } : {}) });
+  }
+  const tEnd = Date.now();
+
+  console.log(
+    `[whisper-test] "${transcript.slice(0, 60)}" → "${tr.translated.slice(0, 60)}" ` +
+      `stt=${tStt - t0}ms tr=${tEnd - tStt}ms bytes=${file.buffer.length}`,
+  );
+
+  return res.json({
+    orig: transcript,
+    trans: tr.translated,
+    lang: to,
+    ms: { stt: tStt - t0, translate: tEnd - tStt, total: tEnd - t0 },
+  });
 });
 
 /**

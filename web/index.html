@@ -121,6 +121,18 @@
   </style>
   <!-- Lottie player (vendored, offline-safe) for the boot splash above. -->
   <script src="lottie.min.js"></script>
+
+  <!--
+    TEST — non-streaming STT (Silero VAD + Whisper). WEB ONLY, TO BE REVERTED.
+    Silero v5 through @ricky0123/vad-web: it segments the live mic and hands us
+    one clean utterance per phrase, which we send to Whisper. Loaded from the CDN
+    on purpose — a throwaway experiment shouldn't drop ~3 MB of .onnx/.wasm blobs
+    into the repo. Deleting these two tags is most of the revert.
+    Exposes window.vad. Versions pinned: the ORT build and the VAD bundle must
+    agree or the worklet fails to instantiate.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.wasm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/bundle.min.js"></script>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
       try { window.__splashAnim?.destroy(); } catch (e) {}

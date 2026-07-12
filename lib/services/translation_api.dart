@@ -390,6 +390,83 @@ class SwayTranslationResult {
   final String? translation;
 }
 
+/// TEST — non-streaming STT (Silero VAD + Whisper). Web-only; revert with the
+/// rest of the experiment.
+///
+/// One VAD-clipped utterance ([wavBytes], 16 kHz mono PCM16 WAV) → Whisper →
+/// translation. Text only: the peer speaks it with its device TTS, so no audio
+/// comes back. Returns null when the backend heard nothing (HTTP 204) or on any
+/// error — a dropped segment must never tear the call down.
+Future<WhisperTranslationResult?> fetchWhisperTranslation({
+  required Uint8List wavBytes,
+  required String to,
+  String? from,
+}) async {
+  if (wavBytes.isEmpty) return null;
+  final uri = _translationUri('/translation/whisper');
+  try {
+    final req = http.MultipartRequest('POST', uri)..fields['to'] = to;
+    if (from != null && from.isNotEmpty) req.fields['from'] = from;
+    final token = _supabaseAccessToken();
+    if (token != null && token.isNotEmpty) {
+      req.headers['Authorization'] = 'Bearer $token';
+    }
+    req.files.add(
+      http.MultipartFile.fromBytes('audio', wavBytes, filename: 'utt.wav'),
+    );
+    final res = await http.Response.fromStream(await req.send());
+    if (res.statusCode != 200) return null; // 204 = nothing said; 4xx/5xx = drop
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final trans = (body['trans'] ?? '').toString();
+    if (trans.isEmpty) return null;
+    final ms = (body['ms'] as Map?) ?? const {};
+    return WhisperTranslationResult(
+      orig: (body['orig'] ?? '').toString(),
+      trans: trans,
+      lang: (body['lang'] ?? to).toString(),
+      sttMs: (ms['stt'] as num?)?.toInt() ?? 0,
+      translateMs: (ms['translate'] as num?)?.toInt() ?? 0,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+class WhisperTranslationResult {
+  const WhisperTranslationResult({
+    required this.orig,
+    required this.trans,
+    required this.lang,
+    required this.sttMs,
+    required this.translateMs,
+  });
+  final String orig;
+  final String trans;
+  final String lang;
+  final int sttMs;
+  final int translateMs;
+}
+
+/// Same host resolution as the other `_translation*Uri()` builders above, but
+/// takes the path — added for the Whisper test rather than copy-pasting a sixth
+/// identical function.
+Uri _translationUri(String path) {
+  const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
+  if (fromEnv.isNotEmpty) {
+    return Uri.parse('${fromEnv.replaceAll(RegExp(r'/$'), '')}$path');
+  }
+  if (kIsWeb) {
+    final o = Uri.base.removeFragment();
+    return Uri(
+      scheme: o.scheme,
+      host: o.host,
+      port: o.hasPort ? o.port : null,
+      path: path,
+    );
+  }
+  return Uri.parse('${resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '')}$path');
+}
+
 /// Posts one captured utterance ([audioBytes], with [mimeType] / [filename]
 /// matching the recorder's container) to `/translation/voice`, which runs it
 /// fully through the cloud engine (STT → translate → TTS) and returns the spoken

@@ -11,8 +11,11 @@ import '../services/analytics.dart';
 import '../services/debug_overlay.dart';
 import '../services/translation_api.dart';
 import 'sway_mic_streamer_base.dart';
+// TEST — non-streaming STT on web: Silero VAD + Whisper, instead of the
+// continuous PCM-over-WebSocket streamer. Revert = point this back at
+// 'sway_mic_streamer_web.dart' (which is left untouched). Native is unaffected.
 import 'sway_mic_streamer_io.dart'
-    if (dart.library.js_interop) 'sway_mic_streamer_web.dart';
+    if (dart.library.js_interop) 'sway_vad_whisper_streamer_web.dart';
 import 'realtime_translation_port.dart';
 import 'translation_route.dart';
 import 'wire_compat.dart';
