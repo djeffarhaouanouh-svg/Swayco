@@ -8,6 +8,7 @@ import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
+import 'asr/whisper_hallucination.dart';
 import '../services/translation_api.dart';
 import 'sway_mic_streamer_base.dart';
 import 'sway_mic_streamer_io.dart' show createCloudMicStreamer;
@@ -107,6 +108,12 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
   /// Silero's speech probability threshold (0..1). sherpa's own default.
   static const double _sileroThreshold = 0.5;
+
+  /// Last transcript we accepted, and when. An identical one inside this window
+  /// is our own translation coming back around, not the user saying it twice.
+  String _lastOrig = '';
+  int _lastOrigMs = 0;
+  static const int _repeatWindowMs = 8000;
 
   // Kept for the STREAMING engine (Vosk) only, whose endpointer sometimes never
   // fires: if a hypothesis is pending and the mic has been quiet this long, we
@@ -476,8 +483,27 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   }) async {
     try {
       final orig = await AsrService.instance.transcribe(samples);
-      if (orig.trim().isEmpty) return;
-      DebugOverlay.log('stt orig="$orig"');
+      final durationMs = (samples.length / _sampleRate * 1000).round();
+
+      // Whisper captions silence and noise with subtitle boilerplate, and it
+      // does it confidently. Unfiltered, the peer's phone says a sentence nobody
+      // spoke, out loud, mid-conversation.
+      if (looksHallucinated(orig, durationMs: durationMs)) {
+        DebugOverlay.log('stt DROPPED hallucination: "$orig" (${durationMs}ms)');
+        return;
+      }
+
+      // The same sentence twice in a row, seconds apart, is the recogniser
+      // chewing on its own echo — not someone repeating themselves.
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (orig == _lastOrig && nowMs - _lastOrigMs < _repeatWindowMs) {
+        DebugOverlay.log('stt DROPPED repeat: "$orig"');
+        return;
+      }
+      _lastOrig = orig;
+      _lastOrigMs = nowMs;
+
+      DebugOverlay.log('stt orig="$orig" (${durationMs}ms)');
       await _translateAndSend(orig, onTranslation, onError, force: force);
     } catch (e) {
       onError?.call('stt:$e');
