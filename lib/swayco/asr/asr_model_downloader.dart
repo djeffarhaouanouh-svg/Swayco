@@ -16,47 +16,11 @@ class AsrModelDownloader {
   /// download (app killed mid-transfer) is retried instead of loaded.
   static const _completeMarker = '.complete';
 
-  static bool _migrated = false;
-
   static Future<Directory> sttDir() async {
     final base = await getApplicationSupportDirectory();
     final dir = Directory('${base.path}/stt');
     await dir.create(recursive: true);
-    if (!_migrated) {
-      _migrated = true;
-      await _renameLegacyPaths(dir);
-    }
     return dir;
-  }
-
-  /// Moves the model files an earlier build installed onto their current names.
-  ///
-  /// Without this, renaming a model id or a file would read as "not installed"
-  /// and re-pull hundreds of MB over the user's data plan. Best-effort: if a
-  /// rename fails, the download path still produces a working install.
-  static Future<void> _renameLegacyPaths(Directory base) async {
-    Future<void> move(String from, String to) async {
-      try {
-        final src = Directory('${base.path}/$from');
-        final dst = Directory('${base.path}/$to');
-        if (await src.exists() && !await dst.exists()) {
-          await src.rename(dst.path);
-        }
-      } catch (_) {}
-    }
-
-    Future<void> moveFile(String from, String to) async {
-      try {
-        final src = File('${base.path}/$from');
-        final dst = File('${base.path}/$to');
-        if (await src.exists() && !await dst.exists()) {
-          await src.rename(dst.path);
-        }
-      } catch (_) {}
-    }
-
-    await move(kLegacyUniversalModelId, kUniversalModelId);
-    await moveFile(_legacySegmenterFile, _segmenterFile);
   }
 
   static Future<Directory> modelDir(AsrModelSpec spec) async {
@@ -65,7 +29,6 @@ class AsrModelDownloader {
   }
 
   static const _segmenterFile = 'seg.onnx';
-  static const _legacySegmenterFile = 'silero_vad.onnx';
 
   /// The voice-activity segmenter (~2 MB) — not a model of any one language. It
   /// lives beside the language models rather than inside one, because it is
@@ -122,7 +85,7 @@ class AsrModelDownloader {
       case LatticeAsrSpec():
         await _downloadLattice(spec, dir, onProgress);
       case UniversalAsrSpec():
-        await _downloadWhisper(spec, dir, onProgress);
+        await _downloadUniversal(spec, dir, onProgress);
     }
 
     await File('${dir.path}/$_completeMarker').writeAsString('1');
@@ -161,11 +124,10 @@ class AsrModelDownloader {
     }
   }
 
-  /// Same file-by-file fetch as [_downloadNeural], but the release names carry
-  /// the published variant prefix (`small-encoder.int8.onnx`) and the engine wants canonical
-  /// ones, so each file is saved under the local name [UniversalAsrSpec.files]
-  /// gives it.
-  Future<void> _downloadWhisper(
+  /// Same file-by-file fetch as [_downloadNeural]. Our mirror publishes the
+  /// files under the names the engine already wants, so there is nothing to
+  /// remap on the way in.
+  Future<void> _downloadUniversal(
     UniversalAsrSpec spec,
     Directory dir,
     void Function(double)? onProgress,
@@ -173,15 +135,15 @@ class AsrModelDownloader {
     final totalBytes = spec.approxMb * 1024 * 1024;
     var receivedTotal = 0;
 
-    for (final entry in spec.files.entries) {
-      final dest = File('${dir.path}/${entry.value}');
+    for (final file in spec.files) {
+      final dest = File('${dir.path}/$file');
       if (await dest.exists()) {
         receivedTotal += await dest.length();
         continue;
       }
       final tmp = File('${dest.path}.tmp');
       receivedTotal += await _downloadTo(
-        spec.urlFor(entry.key),
+        spec.urlFor(file),
         tmp,
         onBytes: (n) => onProgress?.call(
           ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),

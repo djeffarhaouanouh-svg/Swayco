@@ -34,7 +34,7 @@ import '../services/debug_overlay.dart';
 import '../services/translation_api.dart';
 import 'sway_mic_streamer_base.dart';
 
-SwayMicStreamer createSwayMicStreamer() => _VadWhisperStreamer();
+SwayMicStreamer createSwayMicStreamer() => _VadAsrStreamer();
 
 void _log(String m) {
   web.console.log('[vad-asr] $m'.toJS);
@@ -89,7 +89,7 @@ const String _kVadAssets =
 const String _kOrtAssets =
     'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 
-class _VadWhisperStreamer implements SwayMicStreamer {
+class _VadAsrStreamer implements SwayMicStreamer {
   _MicVad? _vadInstance;
   web.MediaStream? _micStream;
   bool _ownsMicStream = false;

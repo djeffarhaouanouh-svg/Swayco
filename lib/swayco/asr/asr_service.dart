@@ -138,10 +138,24 @@ class AsrService {
 
   /// Transcribe one VAD-clipped utterance. 16 kHz mono, samples in [-1, 1].
   /// Returns '' when the model isn't ready or nothing was recognised.
+  ///
+  /// Logs a real-time factor: decode time over the length of the audio it
+  /// decoded. Unlike a raw duration it needs no remembered baseline — 0.2x means
+  /// a 5 s sentence took 1 s, and the number is comparable across phones,
+  /// sentences and model builds. It is the one figure that says whether STT is
+  /// what makes a call feel slow.
   Future<String> transcribe(Float32List samples16k) async {
     final engine = _engine;
     if (kIsWeb || engine == null || !engine.isReady) return '';
-    return engine.transcribe(samples16k);
+    final started = DateTime.now();
+    final text = await engine.transcribe(samples16k);
+    final decodeMs = DateTime.now().difference(started).inMilliseconds;
+    final audioMs = samples16k.length * 1000 ~/ 16000;
+    if (audioMs > 0) {
+      DebugOverlay.log('stt decode ${decodeMs}ms for ${audioMs}ms audio '
+          '(${(decodeMs / audioMs).toStringAsFixed(2)}x)');
+    }
+    return text;
   }
 
   Future<void> dispose() async {

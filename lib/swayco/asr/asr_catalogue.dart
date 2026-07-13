@@ -20,24 +20,25 @@ library;
 
 enum AsrEngineKind { neural, lattice, universal }
 
-/// On-disk id of the universal model. This is a directory name under
-/// `<appSupport>/stt/`, so it is part of the installed state: an app already on
-/// a phone has 357 MB sitting under [kLegacyUniversalModelId], and changing this
-/// without the rename in [AsrModelDownloader] would silently re-download all of
-/// it over the user's data plan.
-const String kUniversalModelId = 'asr-u1';
-
-/// Pre-rename directory name. Kept only so the migration can find it; delete
-/// once no install can still be carrying it.
-const String kLegacyUniversalModelId = 'whisper-small';
-
-/// Where the voice-activity segmenter is fetched from.
+/// On-disk id of the universal model — a directory name under
+/// `<appSupport>/stt/`, and therefore part of the installed state.
 ///
-/// Every remote source in this file still points at its upstream host, so a
-/// first launch tells anyone watching the network exactly which models the app
-/// runs. Re-host these behind our own domain to close that.
+/// Bumping it is what makes a phone fetch the new weights: the downloader keys
+/// "is it installed?" on this directory, and [AsrService] prunes the others.
+/// `u2` is the re-hosted build whose token-embedding table is stored int8
+/// (244 MB instead of 357 — see [kUniversalRepo]).
+const String kUniversalModelId = 'asr-u2';
+
+/// Our own model mirror. Nothing here names an upstream project or a model
+/// family: a phone's first launch used to announce, to anyone watching the
+/// network, exactly which recogniser the app runs.
+const String kUniversalRepo = 'djeffar/swayco-stt-models';
+
+/// Where the voice-activity segmenter is fetched from — our mirror, like the
+/// rest. It used to be pulled from its upstream release page under its own
+/// name, which announced the VAD to anyone watching a first launch.
 const String kSegmenterUrl =
-    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
+    'https://huggingface.co/$kUniversalRepo/resolve/main/u1/seg.onnx';
 
 sealed class AsrModelSpec {
   const AsrModelSpec({
@@ -90,43 +91,44 @@ class NeuralAsrSpec extends AsrModelSpec {
   }
 }
 
-/// Universal: encoder + decoder + tokens, fetched file by file and stored under
-/// canonical names, so the engine never has to know which variant it got.
+/// Universal: encoder + decoder + tokens, fetched file by file from our own
+/// mirror under [subdir] and kept under the same names on disk.
 ///
-/// Only the quantised graphs are fetched — the source also holds fp32, at twice
-/// the size. The current variant is ~357 MB on disk; [variant] (with [repo] and
-/// [approxMb]) selects a smaller one, trading accuracy for a third of the
-/// download and roughly twice the speed.
+/// The published graphs are quantised twice over. The linear layers are int8,
+/// which is what the upstream export ships. The token-embedding table is int8
+/// too, which it does NOT: upstream leaves it fp32, because their quantiser only
+/// looks at MatMul and an embedding is a Gather. That one table was 152 MB of a
+/// 357 MB download — a third of the model, never compressed. Quantising it
+/// per-row (one scale per token, so the CJK rows keep their range) costs nothing
+/// measurable: it is a lookup table, not arithmetic. 4-bit weights, by contrast,
+/// dropped whole words in ja/zh and ran 25 % slower — do not go there.
 class UniversalAsrSpec extends AsrModelSpec {
   const UniversalAsrSpec({
     required super.id,
     required super.langs,
     required super.approxMb,
     required this.repo,
-    required this.variant,
+    this.subdir = '',
   });
 
   final String repo;
 
-  /// The prefix the published files carry — selects the size of the graphs.
-  final String variant;
+  /// Folder inside [repo] holding this build's files.
+  final String subdir;
 
   @override
   AsrEngineKind get kind => AsrEngineKind.universal;
 
-  static const encoderFile = 'encoder.int8.onnx';
-  static const decoderFile = 'decoder.int8.onnx';
+  static const encoderFile = 'encoder.onnx';
+  static const decoderFile = 'decoder.onnx';
   static const tokensFile = 'tokens.txt';
 
-  /// Remote file name → the name it is saved under in the model dir.
-  Map<String, String> get files => {
-        '$variant-encoder.int8.onnx': encoderFile,
-        '$variant-decoder.int8.onnx': decoderFile,
-        '$variant-tokens.txt': tokensFile,
-      };
+  List<String> get files => const [encoderFile, decoderFile, tokensFile];
 
-  String urlFor(String remoteFile) =>
-      'https://huggingface.co/$repo/resolve/main/$remoteFile';
+  String urlFor(String file) {
+    final path = subdir.isEmpty ? file : '$subdir/$file';
+    return 'https://huggingface.co/$repo/resolve/main/$path';
+  }
 }
 
 /// Lattice: one zip per language, expanded into `<appSupport>/stt/<id>/`.
@@ -152,9 +154,9 @@ const _specs = <AsrModelSpec>[
   UniversalAsrSpec(
     id: kUniversalModelId,
     langs: _universalLangs,
-    approxMb: 357,
-    repo: 'csukuangfj/sherpa-onnx-whisper-small',
-    variant: 'small',
+    approxMb: 244,
+    repo: kUniversalRepo,
+    subdir: 'u1',
   ),
   NeuralAsrSpec(
     id: 'moonshine-v2-en',
