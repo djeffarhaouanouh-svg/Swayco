@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-// Append a line to the on-screen debug overlay.
-// Only active when kDebugMode OR when the ?debug=1 URL param is present.
+// Append a line to the on-screen debug overlay. Active on every build, signed
+// releases included — tap the 🐛 (top right) to reveal the panel. See [init]
+// for what that costs and when to close it back up.
 // Usage: DebugOverlay.log('[sway-rt] something happened');
 class DebugOverlay extends StatefulWidget {
   const DebugOverlay({super.key, required this.child});
@@ -12,16 +12,20 @@ class DebugOverlay extends StatefulWidget {
   static final ValueNotifier<List<String>> _lines = ValueNotifier([]);
   static bool _enabled = false;
 
-  /// Escape hatch for a signed release you cannot attach a debugger to:
-  ///   flutter build ipa --dart-define=DEBUG_OVERLAY=true
-  /// Without it a TestFlight build discards every log line — exactly when you
-  /// most need them.
-  static const bool _forced = bool.fromEnvironment('DEBUG_OVERLAY');
-
   static void init() {
-    // Always on for web (tap 🐛 to reveal). Native = debug builds, or a release
-    // deliberately instrumented with --dart-define=DEBUG_OVERLAY=true.
-    _enabled = kIsWeb || kDebugMode || _forced;
+    // On EVERYWHERE, signed release included — tap 🐛 (top right) to reveal.
+    //
+    // A release IPA is exactly where the interesting failures live: the model
+    // that only fails to load on a real phone, the decode that is only slow on
+    // ARM. Gating this behind `--dart-define=DEBUG_OVERLAY=true` meant
+    // remembering the flag at the one moment you had already forgotten it —
+    // and shipping a build that silently discarded every line you needed.
+    //
+    // The cost is that the 🐛 is visible to whoever is holding the phone. That
+    // is fine while that is only us. BEFORE OPENING TO REAL USERS: put this
+    // back behind `kIsWeb || kDebugMode`, or keep the tap target and drop the
+    // icon.
+    _enabled = true;
   }
 
   static void log(String msg) {
