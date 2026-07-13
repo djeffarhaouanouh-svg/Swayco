@@ -180,15 +180,22 @@ class _VadWhisperStreamer implements SwayMicStreamer {
             // our own output back to them.
             getStream: (() => Future<web.MediaStream>.value(stream).toJS).toJS,
             model: 'v5',
-            // The user asked for 300 ms of silence to close a phrase.
-            redemptionMs: 300,
+            // 700 ms of silence closes a phrase — the same value as native, and
+            // for the same reason. 300 ms was shorter than the pauses INSIDE a
+            // sentence (a breath, a comma, the gap before a word you are still
+            // looking for), so phrases were being cut in half. Whisper then got
+            // context-free fragments, which is both a bad translation and what it
+            // hallucinates on.
+            redemptionMs: 700,
             // Silero needs a few frames to be sure speech started. Without
             // pre-roll the first syllable would be cut, so re-attach the half
             // second that precedes the trigger — the mic is always open, that
             // buffer is always there.
             preSpeechPadMs: 500,
-            // Shorter than this is a cough, a click, a chair.
-            minSpeechMs: 200,
+            // Shorter than this is a cough, a click, a chair — and, crucially, a
+            // scrap of our own loudspeaker. Whisper invents subtitle boilerplate
+            // in direct proportion to how little speech it is handed.
+            minSpeechMs: 400,
             // The library defaults. An earlier 0.5/0.35 — "a call is noisy, and
             // every false positive costs a Whisper round-trip" — misfired on
             // EVERY utterance: with AGC off the mic is quiet, Silero's score
