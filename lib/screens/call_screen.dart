@@ -152,6 +152,71 @@ class _CallScreenState extends State<CallScreen> {
     _deviceTts.setCompletionHandler(() => ttsSpeaking.value = false);
     _deviceTts.setCancelHandler(() => ttsSpeaking.value = false);
     _deviceTts.setErrorHandler((_) => ttsSpeaking.value = false);
+    // Make speak() resolve when the sentence has FINISHED, not when it starts.
+    // Without it the queue below cannot know when to start the next one.
+    unawaited(_deviceTts.awaitSpeakCompletion(true));
+  }
+
+  /// Translations are SPOKEN one after another, never on top of each other.
+  ///
+  /// Every speak used to be preceded by `_deviceTts.stop()`, to clear whatever
+  /// was queued. When the peer sent two translations a few seconds apart — which
+  /// they do, one per phrase — the second one cut the first off mid-sentence. The
+  /// user heard "Merci, il est tôt ici donc…" and then silence: nothing was lost
+  /// in transit, the player killed it.
+  Future<void> _ttsQueue = Future.value();
+
+  /// Bumped by "cut translation" and by leaving the call. An utterance whose
+  /// generation is stale is dropped instead of spoken — otherwise the queue would
+  /// keep reciting sentences the user has just asked to stop hearing.
+  int _ttsGeneration = 0;
+
+  /// Speak [text] after everything already queued. Never interrupts.
+  Future<void> _enqueueSpeak(String text, String lang) {
+    final generation = _ttsGeneration;
+    _ttsQueue = _ttsQueue.then((_) async {
+      if (!mounted || generation != _ttsGeneration) return;
+      await _speakOne(text, lang);
+    }).catchError((Object e) => DebugOverlay.log('tts queue error: $e'));
+    return _ttsQueue;
+  }
+
+  /// One utterance, start to finish. The timeout is the queue's safety net:
+  /// flutter_tts can return without ever playing (a missing voice, a browser that
+  /// suspended speechSynthesis), and then the completion event never comes — which
+  /// would wedge every translation behind it for the rest of the call.
+  Future<void> _speakOne(String text, String lang) async {
+    final tag = _voiceTagFor(lang);
+    DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
+    markTranslationPlaying(textLength: text.length);
+    try {
+      if (tag.isNotEmpty && tag != _deviceTtsLang) {
+        try {
+          await _deviceTts.setLanguage(tag);
+          _deviceTtsLang = tag;
+        } catch (_) {}
+      }
+      await _applyTranslatedVolumeToDeviceTts();
+      // Mobile Chrome auto-pauses speechSynthesis after a stretch of inactivity;
+      // speak() then plays nothing and fires no event.
+      resumeSpeechSynthesisIfPaused();
+      await _deviceTts.speak(text).timeout(const Duration(seconds: 20));
+      DebugOverlay.log('speak done');
+    } catch (e) {
+      DebugOverlay.log('speak FAILED: $e');
+    } finally {
+      markTranslationDone();
+    }
+  }
+
+  /// Drop everything still waiting to be spoken, and silence what is playing.
+  /// Used by "cut translation" and on leaving the call — the only two places a
+  /// translation is genuinely no longer wanted.
+  void _cancelQueuedSpeech() {
+    _ttsGeneration++;
+    unawaited(_deviceTts.stop());
+    ttsSpeaking.value = false;
+    markTranslationDone();
   }
 
   /// Base codes (`fr`, `en`, …) the OS voice can actually speak on THIS phone,
@@ -164,23 +229,47 @@ class _CallScreenState extends State<CallScreen> {
   /// the whole list out on a device whose engine failed to enumerate.
   Set<String> _deviceVoiceLangs = const {};
 
+  /// Base code → the FULL tag the OS actually knows (`ja` → `ja-JP`).
+  ///
+  /// iOS resolves a voice with `AVSpeechSynthesisVoice(language:)`, which wants
+  /// the region: hand it a bare `ja` and it finds nothing, returns nil, and the
+  /// system quietly falls back to its default voice — so the Japanese translation
+  /// was being read out in French. Speak through the tag the device gave us, not
+  /// the base code we derived from it.
+  Map<String, String> _deviceVoiceTags = const {};
+
   /// Ask the OS which languages it can speak. `getLanguages` returns BCP-47 tags
   /// (`fr-FR`, `en-US`, …); the picker works in base codes.
   Future<void> _loadDeviceVoiceLangs() async {
     try {
       final raw = await _deviceTts.getLanguages;
       if (raw is! List) return;
-      final langs = <String>{
-        for (final t in raw)
-          if (t != null)
-            t.toString().toLowerCase().split(RegExp(r'[-_]')).first,
-      }..removeWhere((s) => s.isEmpty);
-      if (!mounted || langs.isEmpty) return;
-      DebugOverlay.log('device voices: ${langs.length} langs');
-      setState(() => _deviceVoiceLangs = langs);
+      final tags = <String, String>{};
+      for (final t in raw) {
+        if (t == null) continue;
+        final full = t.toString().trim();
+        if (full.isEmpty) continue;
+        final base = full.toLowerCase().split(RegExp(r'[-_]')).first;
+        if (base.isEmpty) continue;
+        // First one wins: getLanguages lists the device's own preferred order.
+        tags.putIfAbsent(base, () => full);
+      }
+      if (!mounted || tags.isEmpty) return;
+      DebugOverlay.log('device voices: ${tags.length} langs');
+      setState(() {
+        _deviceVoiceTags = tags;
+        _deviceVoiceLangs = tags.keys.toSet();
+      });
     } catch (e) {
       debugPrint('[speech] getLanguages failed: $e');
     }
+  }
+
+  /// The tag to hand flutter_tts for [lang] — the device's own (`ja-JP`) when we
+  /// know it, the bare code otherwise (the probe may not have answered yet).
+  String _voiceTagFor(String lang) {
+    final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
+    return _deviceVoiceTags[base] ?? lang;
   }
 
   /// Whether WE want to hear the peer translated. Toggle via
@@ -395,7 +484,7 @@ class _CallScreenState extends State<CallScreen> {
         if (_myOutputLang.isNotEmpty && kIsWeb) {
           unawaited(() async {
             try {
-              await _deviceTts.setLanguage(_myOutputLang);
+              await _deviceTts.setLanguage(_voiceTagFor(_myOutputLang));
               await _deviceTts.setVolume(0.0);
               await _deviceTts.speak(' ');
               await _deviceTts.stop();
@@ -403,7 +492,7 @@ class _CallScreenState extends State<CallScreen> {
             } catch (_) {}
           }());
         } else if (_myOutputLang.isNotEmpty) {
-          unawaited(_deviceTts.setLanguage(_myOutputLang).catchError((_) {}));
+          unawaited(_deviceTts.setLanguage(_voiceTagFor(_myOutputLang)).catchError((_) {}));
         }
       } while (_refreshPending && mounted);
     } finally {
@@ -964,10 +1053,9 @@ class _CallScreenState extends State<CallScreen> {
         .catchError((_) {}));
 
     if (!want) {
-      // Whatever the voice is mid-sentence on is no longer wanted, and the
-      // peer's ducked voice has to come straight back up.
-      unawaited(_deviceTts.stop());
-      ttsSpeaking.value = false;
+      // Whatever the voice is mid-sentence on is no longer wanted, and neither is
+      // anything queued behind it. The peer's ducked voice comes straight back up.
+      _cancelQueuedSpeech();
     }
   }
 
@@ -1019,22 +1107,8 @@ class _CallScreenState extends State<CallScreen> {
   /// flutter_tts's speak() can return without playing (missing voice), so no
   /// completion event is ever guaranteed — the mic gate's own safety timer is
   /// what reopens the mic, never an awaited event.
-  Future<void> _playWithLocalTts(String text, String lang) async {
-    try {
-      if (lang.isNotEmpty && lang != _deviceTtsLang) {
-        try {
-          await _deviceTts.setLanguage(lang);
-          _deviceTtsLang = lang;
-        } catch (_) {}
-      }
-      markTranslationPlaying(textLength: text.length);
-      await _deviceTts.stop();
-      await _applyTranslatedVolumeToDeviceTts();
-      await _deviceTts.speak(text);
-    } catch (_) {
-      markTranslationDone();
-    }
-  }
+  Future<void> _playWithLocalTts(String text, String lang) =>
+      _enqueueSpeak(text, lang);
 
   /// The "translated voice volume" slider used to reach only the audioplayers
   /// element that plays a cloud mp3 — a path neither the device voice nor the
@@ -1056,30 +1130,8 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
-  Future<void> _speakDeviceTts(String text, String lang) async {
-    DebugOverlay.log('speakDeviceTts lang=$lang text="$text"');
-    markTranslationPlaying(textLength: text.length);
-    try {
-      if (lang.isNotEmpty && lang != _deviceTtsLang) {
-        try {
-          await _deviceTts.setLanguage(lang);
-          _deviceTtsLang = lang;
-        } catch (_) {}
-      }
-      // stop() clears any queued utterances before playing the latest translation.
-      await _deviceTts.stop();
-      await _applyTranslatedVolumeToDeviceTts();
-      // Wake speechSynthesis if the browser auto-paused it (mobile Chrome does
-      // this after inactivity) — otherwise speak() plays nothing and the "end"
-      // event never fires, which also leaves the half-duplex gate stuck.
-      resumeSpeechSynthesisIfPaused();
-      await _deviceTts.speak(text);
-      DebugOverlay.log('speakDeviceTts OK');
-    } catch (e) {
-      markTranslationDone();
-      DebugOverlay.log('speakDeviceTts ERROR: $e');
-    }
-  }
+  Future<void> _speakDeviceTts(String text, String lang) =>
+      _enqueueSpeak(text, lang);
 
   Future<void> _toggleCam() async {
     final room = _room;
@@ -1527,7 +1579,7 @@ class _CallScreenState extends State<CallScreen> {
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();
     unawaited(_ttsPlayer.dispose());
-    unawaited(_deviceTts.stop());
+    _cancelQueuedSpeech();
     ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
