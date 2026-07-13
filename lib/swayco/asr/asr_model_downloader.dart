@@ -16,11 +16,47 @@ class AsrModelDownloader {
   /// download (app killed mid-transfer) is retried instead of loaded.
   static const _completeMarker = '.complete';
 
+  static bool _migrated = false;
+
   static Future<Directory> sttDir() async {
     final base = await getApplicationSupportDirectory();
     final dir = Directory('${base.path}/stt');
     await dir.create(recursive: true);
+    if (!_migrated) {
+      _migrated = true;
+      await _renameLegacyPaths(dir);
+    }
     return dir;
+  }
+
+  /// Moves the model files an earlier build installed onto their current names.
+  ///
+  /// Without this, renaming a model id or a file would read as "not installed"
+  /// and re-pull hundreds of MB over the user's data plan. Best-effort: if a
+  /// rename fails, the download path still produces a working install.
+  static Future<void> _renameLegacyPaths(Directory base) async {
+    Future<void> move(String from, String to) async {
+      try {
+        final src = Directory('${base.path}/$from');
+        final dst = Directory('${base.path}/$to');
+        if (await src.exists() && !await dst.exists()) {
+          await src.rename(dst.path);
+        }
+      } catch (_) {}
+    }
+
+    Future<void> moveFile(String from, String to) async {
+      try {
+        final src = File('${base.path}/$from');
+        final dst = File('${base.path}/$to');
+        if (await src.exists() && !await dst.exists()) {
+          await src.rename(dst.path);
+        }
+      } catch (_) {}
+    }
+
+    await move(kLegacyUniversalModelId, kUniversalModelId);
+    await moveFile(_legacySegmenterFile, _segmenterFile);
   }
 
   static Future<Directory> modelDir(AsrModelSpec spec) async {
@@ -28,19 +64,19 @@ class AsrModelDownloader {
     return Directory('${base.path}/${spec.id}');
   }
 
-  /// Silero VAD (~2 MB) — the segmenter, not a model of any one language. It
+  static const _segmenterFile = 'seg.onnx';
+  static const _legacySegmenterFile = 'silero_vad.onnx';
+
+  /// The voice-activity segmenter (~2 MB) — not a model of any one language. It
   /// lives beside the language models rather than inside one, because it is
   /// shared and must survive [pruneExcept] wiping the others on a language
   /// switch. Returns the on-disk path.
-  static Future<String> ensureSileroVad() async {
+  static Future<String> ensureSegmenter() async {
     final base = await sttDir();
-    final dest = File('${base.path}/silero_vad.onnx');
+    final dest = File('${base.path}/$_segmenterFile');
     if (await dest.exists() && await dest.length() > 0) return dest.path;
     final tmp = File('${dest.path}.tmp');
-    await AsrModelDownloader()._downloadTo(
-      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx',
-      tmp,
-    );
+    await AsrModelDownloader()._downloadTo(kSegmenterUrl, tmp);
     await tmp.rename(dest.path);
     return dest.path;
   }
@@ -85,7 +121,7 @@ class AsrModelDownloader {
         await _downloadNeural(spec, dir, onProgress);
       case LatticeAsrSpec():
         await _downloadLattice(spec, dir, onProgress);
-      case WhisperAsrSpec():
+      case UniversalAsrSpec():
         await _downloadWhisper(spec, dir, onProgress);
     }
 
@@ -126,11 +162,11 @@ class AsrModelDownloader {
   }
 
   /// Same file-by-file fetch as [_downloadNeural], but the release names carry
-  /// the Whisper size (`small-encoder.int8.onnx`) and the engine wants canonical
-  /// ones, so each file is saved under the local name [WhisperAsrSpec.files]
+  /// the published variant prefix (`small-encoder.int8.onnx`) and the engine wants canonical
+  /// ones, so each file is saved under the local name [UniversalAsrSpec.files]
   /// gives it.
   Future<void> _downloadWhisper(
-    WhisperAsrSpec spec,
+    UniversalAsrSpec spec,
     Directory dir,
     void Function(double)? onProgress,
   ) async {

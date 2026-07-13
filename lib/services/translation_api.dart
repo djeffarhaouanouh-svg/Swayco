@@ -390,20 +390,20 @@ class SwayTranslationResult {
   final String? translation;
 }
 
-/// TEST — non-streaming STT (Silero VAD + Whisper). Web-only; revert with the
+/// TEST — non-streaming clip STT (VAD-segmented). Web-only; revert with the
 /// rest of the experiment.
 ///
-/// One VAD-clipped utterance ([wavBytes], 16 kHz mono PCM16 WAV) → Whisper →
+/// One VAD-clipped utterance ([wavBytes], 16 kHz mono PCM16 WAV) → recogniser →
 /// translation. Text only: the peer speaks it with its device TTS, so no audio
 /// comes back. Returns null when the backend heard nothing (HTTP 204) or on any
 /// error — a dropped segment must never tear the call down.
-Future<WhisperTranslationResult?> fetchWhisperTranslation({
+Future<ClipTranslationResult?> fetchClipTranslation({
   required Uint8List wavBytes,
   required String to,
   String? from,
 }) async {
   if (wavBytes.isEmpty) return null;
-  final uri = _translationUri('/translation/whisper');
+  final uri = _translationUri('/translation/clip');
   try {
     final req = http.MultipartRequest('POST', uri)..fields['to'] = to;
     if (from != null && from.isNotEmpty) req.fields['from'] = from;
@@ -420,7 +420,7 @@ Future<WhisperTranslationResult?> fetchWhisperTranslation({
     final trans = (body['trans'] ?? '').toString();
     if (trans.isEmpty) return null;
     final ms = (body['ms'] as Map?) ?? const {};
-    return WhisperTranslationResult(
+    return ClipTranslationResult(
       orig: (body['orig'] ?? '').toString(),
       trans: trans,
       lang: (body['lang'] ?? to).toString(),
@@ -432,8 +432,8 @@ Future<WhisperTranslationResult?> fetchWhisperTranslation({
   }
 }
 
-class WhisperTranslationResult {
-  const WhisperTranslationResult({
+class ClipTranslationResult {
+  const ClipTranslationResult({
     required this.orig,
     required this.trans,
     required this.lang,
@@ -448,7 +448,7 @@ class WhisperTranslationResult {
 }
 
 /// Same host resolution as the other `_translation*Uri()` builders above, but
-/// takes the path — added for the Whisper test rather than copy-pasting a sixth
+/// takes the path — added for the streaming test rather than copy-pasting a sixth
 /// identical function.
 Uri _translationUri(String path) {
   const fromEnv = String.fromEnvironment('TOKEN_API_BASE');

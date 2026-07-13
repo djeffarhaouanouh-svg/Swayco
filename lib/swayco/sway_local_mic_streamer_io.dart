@@ -8,19 +8,19 @@ import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
-import 'asr/whisper_hallucination.dart';
+import 'asr/transcript_guard.dart';
 import '../services/translation_api.dart';
 import 'sway_mic_streamer_base.dart';
 import 'sway_mic_streamer_io.dart' show createCloudMicStreamer;
 
 /// Native (iOS/Android) SENDER-side pipeline, fully on-device for the STT step.
 ///
-/// Replaces the cloud engine WebSocket: instead of shipping mic PCM to a remote STT
+/// Replaces the cloud WebSocket: instead of shipping mic PCM to a remote STT
 /// proxy, the audio never leaves the phone. Only the recognised **text** goes
 /// out, to the backend text-translation endpoint.
 ///
 ///   record (PCM16 16 kHz, system AEC) → VAD segmentation → neural|lattice
-///     → fetchTextTranslation → onTranslation → peer synthesises with the local TTS engine
+///     → fetchTextTranslation → onTranslation → peer synthesises with its device TTS
 ///
 /// STT runs on the LOCAL outgoing mic, never the remote track, and that mic is
 /// echo-cancelled — otherwise it would re-capture the translated voice coming
@@ -33,7 +33,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
 
   /// Set when on-device STT is unavailable and we hand the call back to the
-  /// remote the cloud engine pipeline. Every member below then delegates to it.
+  /// remote cloud pipeline. Every member below then delegates to it.
   SwayMicStreamer? _fallback;
 
   String _sourceLang = '';
@@ -48,7 +48,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   void Function(String partial)? _onPartial;
 
   /// Last frame that carried voice. The STREAMING engine's backstop only —
-  /// Silero holds its own state for the clip engines.
+  /// the VAD holds its own state for the clip engines.
   int _lastVoiceMs = 0;
 
   /// True while the mute / half-duplex gate is dropping audio. Edge-triggered so
@@ -85,17 +85,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         .catchError((Object e) => DebugOverlay.log('stt op error: $e'));
   }
 
-  /// Silero VAD (sherpa-onnx) — what decides where a phrase begins and ends for
-  /// a CLIP engine (Whisper, Moonshine). It replaced a mean-square energy
+  /// The VAD (sherpa-onnx) — what decides where a phrase begins and ends for
+  /// a CLIP engine (universal, neural). It replaced a mean-square energy
   /// threshold, which fired on doors, keyboards and breath, and could not tell
   /// speech from noise of the same loudness.
   ///
   /// It does its own min-speech and max-speech bounding, so the old
   /// `_minUtteranceSamples` / `_maxUtteranceSamples` guards are gone with it.
-  sherpa.VoiceActivityDetector? _silero;
+  sherpa.VoiceActivityDetector? _vad;
   static bool _sherpaBindingsReady = false;
 
-  /// Silero cuts on any pause this long — short, deliberately. These are not the
+  /// The VAD cuts on any pause this long — short, deliberately. These are not the
   /// phrase boundaries: they are every real silence in the audio, including the
   /// ones inside a sentence (commas, breath). [_mergeGapMs] is what turns them
   /// back into phrases.
@@ -108,7 +108,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   static const double _silenceSeconds = 0.35;
 
   /// Silence that ends a PHRASE. Segments separated by less than this are the
-  /// same sentence and are re-joined before they reach Whisper. 700 ms is what
+  /// same sentence and are re-joined before they reach the recogniser. 700 ms is what
   /// the old energy-VAD pipeline used, tuned on real calls.
   static const int _mergeGapMs = 700;
 
@@ -116,8 +116,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
   /// mid-word.
   ///
-  /// NOT 30 s, however tempting: Whisper reads exactly 30 s of audio and the
-  /// engine appends 3 s of tail padding ([WhisperAsrEngine._tailPaddings]), so
+  /// NOT 30 s, however tempting: the recogniser reads exactly 30 s of audio and the
+  /// engine appends 3 s of tail padding ([UniversalAsrEngine._tailPaddings]), so
   /// anything past ~27 s is TRUNCATED and the words in it are genuinely lost —
   /// the one outcome this whole change exists to prevent. 26 s + 3 s of padding
   /// sits just under the ceiling.
@@ -126,27 +126,27 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// waits 26 s. That is the price of never cutting mid-sentence.
   static const int _maxMergedMs = 26000;
 
-  /// Hard ceiling on one Silero segment: a voice with genuinely no pause at all
+  /// Hard ceiling on one VAD segment: a voice with genuinely no pause at all
   /// for this long is cut regardless. Unavoidable, and rare.
   static const double _maxSpeechSeconds = 15.0;
 
   /// Shorter than this is a cough, a click, a chair — and, crucially, a scrap of
-  /// our own loudspeaker. Raised from 0.25 s: Whisper hallucinates in direct
+  /// our own loudspeaker. Raised from 0.25 s: the recogniser hallucinates in direct
   /// proportion to how little speech it is given, and a 250 ms fragment is
   /// exactly what it captions with subtitle boilerplate.
   static const double _minSpeechSeconds = 0.4;
 
-  /// Silero's speech probability threshold (0..1). Above sherpa's 0.5 default:
-  /// every marginal segment that squeaks past becomes a Whisper hallucination
+  /// The VAD's speech-probability threshold (0..1). Above sherpa's 0.5 default:
+  /// every marginal segment that squeaks past becomes a hallucination
   /// spoken out loud on the peer's phone, so the cost of a false positive here
   /// is far higher than the cost of missing a mumbled word.
-  static const double _sileroThreshold = 0.6;
+  static const double _speechProbThreshold = 0.6;
 
   /// Peak amplitude a segment must reach to be worth transcribing (0..1).
   ///
-  /// The last line against our own echo. Silero says "this is speech" — and it
+  /// The last line against our own echo. The VAD says "this is speech" — and it
   /// is right, it IS speech: it is the translation coming out of our own
-  /// loudspeaker, and Silero has no idea whose voice it is. But that residue,
+  /// loudspeaker, and the VAD has no idea whose voice it is. But that residue,
   /// once AEC has had it and with AGC off, is far quieter than someone actually
   /// talking into the phone. Level is the one thing that still tells them apart.
   static const double _speechFloor = 0.06;
@@ -154,10 +154,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// Transcriptions run one at a time, in order. See [_sendPending].
   Future<void> _asrQueue = Future.value();
 
-  /// The phrase being assembled out of Silero's chunks — see [_drainSilero].
+  /// The phrase being assembled out of the VAD's chunks — see [_drainSegmenter].
   final List<double> _pending = [];
 
-  /// Where the last chunk ended, in Silero's own sample clock. Compared against
+  /// Where the last chunk ended, in the VAD's own sample clock. Compared against
   /// the next chunk's start to measure the silence between them.
   int _pendingEndSample = 0;
 
@@ -178,9 +178,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   int _lastOrigMs = 0;
   static const int _repeatWindowMs = 8000;
 
-  // Kept for the STREAMING engine (Vosk) only, whose endpointer sometimes never
+  // Kept for the STREAMING engine (lattice) only, whose endpointer sometimes never
   // fires: if a hypothesis is pending and the mic has been quiet this long, we
-  // force the close ourselves. Unused by the clip engines, which Silero segments.
+  // force the close ourselves. Unused by the clip engines, which the VAD segments.
   static const double _vadThreshold = 0.0002;
   static const int _silenceFlushMs = 700;
 
@@ -200,7 +200,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
   /// The mic now stays open for the whole call — dozing (releasing it after 20 s
   /// of silence, to spare the battery) is gone. It cost the first syllable of
-  /// every phrase that woke it, and Silero is cheap enough to run continuously.
+  /// every phrase that woke it, and the VAD is cheap enough to run continuously.
   @override
   bool get isDozing => _fallback?.isDozing ?? false;
 
@@ -246,12 +246,12 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         return;
       }
 
-      // Silero (~2 MB) is fetched once and shared by every language. Without it
+      // the VAD (~2 MB) is fetched once and shared by every language. Without it
       // a clip engine has nothing to tell it where a phrase ends, so it would
       // never transcribe anything — hence the fallback.
-      unawaited(_startSilero());
+      unawaited(_startSegmenter());
 
-      // First call in a language downloads the model (Whisper small: ~357 MB).
+      // First call in a language downloads the model (universal: ~357 MB).
       // Capture starts anyway so the call is never blocked on it; utterances are
       // dropped until ready.
       unawaited(
@@ -276,22 +276,25 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
   }
 
-  /// Download Silero once and build the detector. Its buffer holds
+  /// Download the VAD once and build the detector. Its buffer holds
   /// [_maxSpeechSeconds] plus a margin, so a long phrase is never truncated by
   /// the ring buffer before the VAD itself cuts it.
-  Future<void> _startSilero() async {
+  Future<void> _startSegmenter() async {
     try {
-      final model = await AsrModelDownloader.ensureSileroVad();
-      if (!_running || _silero != null) return;
+      final model = await AsrModelDownloader.ensureSegmenter();
+      if (!_running || _vad != null) return;
       if (!_sherpaBindingsReady) {
         sherpa.initBindings();
         _sherpaBindingsReady = true;
       }
-      _silero = sherpa.VoiceActivityDetector(
+      // `sileroVad` names the architecture the segmenter graph was exported in —
+      // sherpa dispatches on the field, so it is the runtime's vocabulary, not
+      // ours. Everything else here calls it the segmenter.
+      _vad = sherpa.VoiceActivityDetector(
         config: sherpa.VadModelConfig(
           sileroVad: sherpa.SileroVadModelConfig(
             model: model,
-            threshold: _sileroThreshold,
+            threshold: _speechProbThreshold,
             minSilenceDuration: _silenceSeconds,
             minSpeechDuration: _minSpeechSeconds,
             maxSpeechDuration: _maxSpeechSeconds,
@@ -301,10 +304,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         ),
         bufferSizeInSeconds: _maxSpeechSeconds + 5,
       );
-      DebugOverlay.log('stt silero VAD ready — '
+      DebugOverlay.log('stt VAD ready — '
           '${(_silenceSeconds * 1000).round()}ms silence closes a phrase');
     } catch (e) {
-      DebugOverlay.log('stt silero FAILED: $e');
+      DebugOverlay.log('stt VAD FAILED: $e');
       await _startFallback('vad_unavailable');
     }
   }
@@ -316,7 +319,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
     await _audioSub?.cancel();
     _audioSub = null;
-    _freeSilero();
+    _freeSegmenter();
     try {
       await _rec.stop();
     } catch (_) {}
@@ -350,8 +353,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       noiseSuppress: true,
       // AGC OFF. It was on, and it was actively harmful here: what AEC leaves of
       // the loudspeaker's own output is quiet — and AGC's whole job is to pull
-      // quiet things up. It was handing Silero an amplified echo that looks like
-      // speech, and Whisper captioned it. Without AGC the residue stays under
+      // quiet things up. It was handing the VAD an amplified echo that looks like
+      // speech, and the recogniser captioned it. Without AGC the residue stays under
       // [_speechFloor] and never reaches the recogniser.
       autoGain: false,
     ));
@@ -387,7 +390,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     //                       gets sent back to the peer, who answers it. Costs
     //                       barge-in: you cannot interrupt a translation.
     //
-    // The gate is EDGE-triggered: on the closing edge, whatever Silero is
+    // The gate is EDGE-triggered: on the closing edge, whatever the VAD is
     // already holding was spoken BEFORE the gate shut — before the mute was
     // pressed, before our own TTS started. Those words were said out loud, on
     // purpose, to be heard, so they are flushed and published with `force`
@@ -399,13 +402,13 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         final gate = isSendMuted ? 'muted' : 'tts';
         DebugOverlay.log('stt gate CLOSED ($gate)');
         if (!_modelReady) {
-          _silero?.reset();
+          _vad?.reset();
           _resetPending();
         } else if (AsrService.instance.isStreaming) {
           DebugOverlay.log('stt gate — flushing what was already said');
           _serialize(() => _flushAndSend(onTranslation, force: true));
         } else {
-          _flushSilero(onTranslation, force: true);
+          _flushSegmenter(onTranslation, force: true);
         }
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
@@ -414,9 +417,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     if (_gated) {
       _gated = false;
       DebugOverlay.log('stt gate OPEN');
-      // Silero kept scoring nothing while the gate was shut; drop whatever half
+      // the VAD kept scoring nothing while the gate was shut; drop whatever half
       // state it holds so the next phrase starts clean.
-      _silero?.reset();
+      _vad?.reset();
     }
 
     final samples = _toFloat32(bytes);
@@ -427,7 +430,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // Streaming engine (Vosk): it endpoints for itself — but not always.
     // Observed on device: partials build up and accept_waveform never returns 1,
     // so no utterance ever closes. The old mean-square VAD stays as its backstop.
-    // Whisper is a clip engine, so this branch is unreachable today.
+    // The universal engine is a clip engine, so this branch is unreachable today.
     if (AsrService.instance.isStreaming) {
       final voiced = _meanSquare(samples) > _vadThreshold;
       if (voiced) _lastVoiceMs = nowMs;
@@ -445,10 +448,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       return;
     }
 
-    // Clip engine (Whisper): Silero decides where phrases start and end. It
+    // Clip engine (universal): the VAD decides where phrases start and end. It
     // keeps its own pre-roll, so the first syllable is never clipped — which the
     // mean-square VAD, firing only once the level was already up, used to eat.
-    final vad = _silero;
+    final vad = _vad;
     if (vad == null) return; // still downloading — nothing to segment with
 
     vad.acceptWaveform(samples);
@@ -456,26 +459,26 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       DebugOverlay.log('stt pcm frames=$_frames speaking=${vad.isDetected()} '
           'ready=$_modelReady held=${_pendingMs}ms');
     }
-    _drainSilero(onTranslation, onError);
+    _drainSegmenter(onTranslation, onError);
     // Silence emits no VAD event, so the end of a phrase can only be noticed by
     // the clock. Checked on every frame.
     _flushIfIdle(onTranslation, onError);
   }
 
-  /// Collect Silero's chunks and re-join them into whole phrases.
+  /// Collect the VAD's chunks and re-join them into whole phrases.
   ///
-  /// Silero cuts at every real silence, including the ones inside a sentence.
+  /// the VAD cuts at every real silence, including the ones inside a sentence.
   /// A chunk that follows the previous one by less than [_mergeGapMs] is the same
   /// sentence carrying on, so it is appended rather than sent. What forces a send
   /// is a genuine pause ([_flushIfIdle], driven by the clock) or the [_maxMergedMs]
   /// ceiling — and the ceiling lands on a silence between two chunks, never inside
   /// a word.
-  void _drainSilero(
+  void _drainSegmenter(
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError, {
     bool force = false,
   }) {
-    final vad = _silero;
+    final vad = _vad;
     if (vad == null) return;
     while (!vad.isEmpty()) {
       final segment = vad.front();
@@ -485,9 +488,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       final peak = _peak(segment.samples);
       final ms = (segment.samples.length / _sampleRate * 1000).round();
 
-      // Too quiet to be someone talking INTO this phone. Silero is not wrong that
+      // Too quiet to be someone talking INTO this phone. the VAD is not wrong that
       // it is speech — it just cannot know whose. It is our own loudspeaker's, and
-      // handing it to Whisper is how the peer ends up hearing sentences nobody
+      // handing it to the recogniser is how the peer ends up hearing sentences nobody
       // said.
       if (peak < _speechFloor) {
         DebugOverlay.log('stt chunk ${ms}ms DROPPED — too quiet '
@@ -510,7 +513,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       _pendingPeak = peak > _pendingPeak ? peak : _pendingPeak;
       if (force) _pendingForce = true;
 
-      // Never let one phrase grow past what Whisper can read. The cut falls here,
+      // Never let one phrase grow past what the recogniser can read. The cut falls here,
       // on the boundary between two chunks — i.e. in a silence.
       if (_pendingMs >= _maxMergedMs) {
         _sendPending(onTranslation, onError, why: 'no pause, ceiling reached');
@@ -521,7 +524,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   int get _pendingMs => (_pending.length / _sampleRate * 1000).round();
 
   /// The speaker has genuinely stopped: [_mergeGapMs] of silence with nothing new
-  /// from Silero. Called on every audio frame — it is the clock, not the VAD, that
+  /// from the VAD. Called on every audio frame — it is the clock, not the VAD, that
   /// tells us a phrase is over, because a VAD that emits nothing emits no event.
   void _flushIfIdle(
     void Function(String, String, String, String) onTranslation,
@@ -546,7 +549,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     final force = _pendingForce;
     _resetPending();
 
-    // QUEUED, never fired in parallel. The Whisper engine drops a transcribe
+    // QUEUED, never fired in parallel. The universal engine drops a transcribe
     // request that lands while it is already busy (`if (_busy) return ''`) — and
     // it takes seconds to decode a long phrase, so the phrase that followed was
     // being thrown away in silence. That is why the second half of a cut sentence
@@ -580,16 +583,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     return m;
   }
 
-  /// Close whatever phrase Silero is mid-way through and send it. Used on the
+  /// Close whatever phrase the VAD is mid-way through and send it. Used on the
   /// gate's closing edge, so the sentence a mute press interrupts still lands.
-  void _flushSilero(
+  void _flushSegmenter(
     void Function(String, String, String, String) onTranslation, {
     bool force = false,
   }) {
-    final vad = _silero;
+    final vad = _vad;
     if (vad == null) return;
     vad.flush();
-    _drainSilero(onTranslation, _onError, force: force);
+    _drainSegmenter(onTranslation, _onError, force: force);
     vad.reset();
     // And the phrase we were still assembling: without this it would sit in the
     // buffer until the user next spoke, and be spliced onto whatever they said.
@@ -655,7 +658,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       final orig = await AsrService.instance.transcribe(samples);
       final durationMs = (samples.length / _sampleRate * 1000).round();
 
-      // Whisper captions silence and noise with subtitle boilerplate, and it
+      // the recogniser captions silence and noise with subtitle boilerplate, and it
       // does it confidently. Unfiltered, the peer's phone says a sentence nobody
       // spoke, out loud, mid-conversation.
       if (looksHallucinated(orig, durationMs: durationMs)) {
@@ -738,11 +741,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     return sum / samples.length;
   }
 
-  /// Silero is native memory — it has to be freed by hand, and never used again
+  /// the VAD is native memory — it has to be freed by hand, and never used again
   /// after (a second free, or a use-after-free, takes the whole app down).
-  void _freeSilero() {
-    final vad = _silero;
-    _silero = null;
+  void _freeSegmenter() {
+    final vad = _vad;
+    _vad = null;
     try {
       vad?.free();
     } catch (_) {}
@@ -763,7 +766,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     _gated = false;
     _hasPending = false;
     _lastPartial = '';
-    _freeSilero();
+    _freeSegmenter();
     _onTranslation = null;
     _onError = null;
     _onPartial = null;

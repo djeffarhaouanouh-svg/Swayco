@@ -1183,9 +1183,13 @@ app.post(VOICE_HTTP_PATHS, _limTight, voiceUpload.single('audio'), async (req, r
  *
  * Fields: `audio` (WAV bytes), `from` / `to` (BCP-47).
  * Returns: { orig, trans, lang, ms: { stt, translate, total } }
- *          204 when Whisper heard nothing worth saying.
+ *          204 when the recogniser heard nothing worth saying.
  */
-app.post('/translation/whisper', _limTight, voiceUpload.single('audio'), async (req, res) => {
+// `/translation/whisper` is the legacy spelling: builds already installed call
+// it. Both are answered by this one handler until those builds age out.
+const CLIP_STT_PATHS = ['/translation/clip', '/translation/whisper'];
+
+app.post(CLIP_STT_PATHS, _limTight, voiceUpload.single('audio'), async (req, res) => {
   if (!OPENAI_API_KEY) {
     return res.status(500).json({ error: 'openai_not_configured' });
   }

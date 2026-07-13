@@ -1,4 +1,4 @@
-/// Whisper invents text when it is handed audio with no speech in it.
+/// The recogniser invents text when it is handed audio with no speech in it.
 ///
 /// It was trained on subtitle tracks, so when a clip is silence, breath, a door,
 /// or a scrap of the loudspeaker's own output, it falls back on the boilerplate
@@ -9,12 +9,12 @@
 /// In a call that is far worse than a bad transcription: the peer's phone speaks
 /// a sentence nobody said, out loud, in the middle of the conversation.
 ///
-/// A VAD in front of Whisper removes most of the opportunity, but not all: Silero
-/// will hand over a 300 ms cough, and Whisper will happily caption it. So every
+/// A VAD in front of the recogniser removes most of the opportunity, but not all: the VAD
+/// will hand over a 300 ms cough, and the recogniser will happily caption it. So every
 /// transcript is checked here before it can travel.
 library;
 
-/// Fragments that only ever appear in Whisper's subtitle boilerplate. Matched on
+/// Fragments that only ever appear in the recogniser's subtitle boilerplate. Matched on
 /// a lowercased, accent-insensitive form of the transcript, so one entry covers
 /// its variants. Deliberately narrow: each is a phrase no one says on a call.
 const List<String> _boilerplate = [
@@ -49,7 +49,7 @@ String _fold(String s) {
 
 /// True when [transcript] should be thrown away instead of translated.
 ///
-/// [durationMs] is the length of the audio it came from: Whisper's inventions
+/// [durationMs] is the length of the audio it came from: its inventions
 /// cluster on very short clips, where a full sentence cannot physically have
 /// been spoken. A 2-second clip that decodes to forty words is not a
 /// transcription.
@@ -74,7 +74,7 @@ bool looksHallucinated(String transcript, {required int durationMs}) {
   return false;
 }
 
-/// Whisper's decoder gets stuck and repeats one word until it runs out of
+/// the decoder gets stuck and repeats one word until it runs out of
 /// budget: "oui, oui, oui, oui, oui, oui…". The character-rate guard above misses
 /// it — a short word repeated eight times over three seconds is a perfectly
 /// human rate — so the repetition itself has to be what gives it away.

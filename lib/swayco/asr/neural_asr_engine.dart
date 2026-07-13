@@ -3,7 +3,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'asr_engine_native.dart';
 
-/// The neural ASR on sherpa-onnx's `OfflineRecognizer`, Moonshine **v2**
+/// The neural ASR on sherpa-onnx's `OfflineRecognizer`, **v2**
 /// (2-file: encoder + merged decoder + tokens.txt).
 ///
 /// Replaces the hand-rolled ONNX Runtime pipeline (encoder/decoder sessions,

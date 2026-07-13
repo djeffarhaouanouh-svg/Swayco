@@ -17,7 +17,7 @@ class AppLanguage {
 }
 
 /// Every language that can be both TRANSCRIBED and SPOKEN on-device — i.e. the
-/// intersection of the ASR catalogue (Vosk + Moonshine) and the TTS one (Piper +
+/// intersection of the ASR catalogue (lattice + neural) and the TTS one (Piper +
 /// mimic3 + the Japanese engine). A language that could only be heard, or only
 /// spoken, would break one direction of a call, so nothing else belongs here.
 ///
@@ -35,11 +35,11 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'it', flag: '🇮🇹', label: 'Italiano'),
   AppLanguage(code: 'pt', flag: '🇵🇹', label: 'Português'),
   AppLanguage(code: 'nl', flag: '🇳🇱', label: 'Nederlands'),
-  // Standard Arabic, explicitly. Both models are fus'ha-centric: Moonshine's ar
+  // Standard Arabic, explicitly. Both models are fus'ha-centric: the neural ar
   // training mix is Egyptian + Gulf + MSA with ZERO Maghrebi hours, and the
   // ar_JO Piper voice is MSA read by a Jordanian speaker. A Moroccan or Algerian
   // speaking their dialect into it gets ~85-90% WER (Casablanca, EMNLP 2024) —
-  // and Whisper-family models hallucinate rather than fail, so the peer would
+  // and the recognisers hallucinate rather than fail, so the peer would
   // hear confident nonsense. Naming the variety is the honest minimum until a
   // Darija model exists.
   AppLanguage(code: 'ar', flag: '🇸🇦', label: 'العربية الفصحى'),

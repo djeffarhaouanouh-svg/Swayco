@@ -1,4 +1,4 @@
-/// TEST — non-streaming STT: Silero VAD (in the browser) + Whisper (backend).
+/// TEST — non-streaming STT: VAD in the browser, recognition on the backend.
 /// WEB ONLY, MEANT TO BE REVERTED.
 ///
 /// Replaces the continuous PCM-over-WebSocket streamer for the duration of the
@@ -6,16 +6,16 @@
 ///
 ///   mic open for the whole call
 ///        ↓
-///   Silero v5 listens (frames of 512 samples @ 16 kHz)
+///   VAD v5 listens (frames of 512 samples @ 16 kHz)
 ///        ↓
 ///   "Bonjour…"  → speech starts (with 500 ms of pre-roll, so the first
 ///                 syllable is never clipped)
 ///        ↓
 ///   300 ms of silence → the utterance is closed and clipped
 ///        ↓
-///   only that segment goes to Whisper → translation → peer
+///   only that segment goes to the recogniser → translation → peer
 ///
-/// Nothing leaves the browser while the user is silent, and Whisper sees a whole
+/// Nothing leaves the browser while the user is silent, and the recogniser sees a whole
 /// phrase at once instead of guessing word by word. The cost is latency: no
 /// translation can start before the phrase has ended.
 ///
@@ -37,7 +37,7 @@ import 'sway_mic_streamer_base.dart';
 SwayMicStreamer createSwayMicStreamer() => _VadWhisperStreamer();
 
 void _log(String m) {
-  web.console.log('[vad-whisper] $m'.toJS);
+  web.console.log('[vad-asr] $m'.toJS);
   DebugOverlay.log('[vad] $m');
 }
 
@@ -61,7 +61,7 @@ extension type _MicVad(JSObject _) implements JSObject {
   external void pause();
 }
 
-/// `{ isSpeech, notSpeech }` — Silero's per-frame verdict, 0..1.
+/// `{ isSpeech, notSpeech }` — the VAD's per-frame verdict, 0..1.
 extension type _VadProbs(JSObject _) implements JSObject {
   external double get isSpeech;
 }
@@ -98,7 +98,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
   bool _ready = false;
   int _segments = 0;
 
-  /// Silero diagnostics: highest score seen since the last report, and the
+  /// VAD diagnostics: highest score seen since the last report, and the
   /// frame counter that paces those reports.
   double _peak = 0;
   int _frames = 0;
@@ -113,7 +113,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
       _cbTranslation;
   void Function(String error)? _cbError;
 
-  /// Whisper calls are chained, never run in parallel: two overlapping segments
+  /// Recogniser calls are chained, never run in parallel: two overlapping segments
   /// would race and the peer could hear the second sentence before the first.
   Future<void> _queue = Future<void>.value();
 
@@ -183,22 +183,22 @@ class _VadWhisperStreamer implements SwayMicStreamer {
             // 700 ms of silence closes a phrase — the same value as native, and
             // for the same reason. 300 ms was shorter than the pauses INSIDE a
             // sentence (a breath, a comma, the gap before a word you are still
-            // looking for), so phrases were being cut in half. Whisper then got
+            // looking for), so phrases were being cut in half. the recogniser then got
             // context-free fragments, which is both a bad translation and what it
             // hallucinates on.
             redemptionMs: 700,
-            // Silero needs a few frames to be sure speech started. Without
+            // The VAD needs a few frames to be sure speech started. Without
             // pre-roll the first syllable would be cut, so re-attach the half
             // second that precedes the trigger — the mic is always open, that
             // buffer is always there.
             preSpeechPadMs: 500,
             // Shorter than this is a cough, a click, a chair — and, crucially, a
-            // scrap of our own loudspeaker. Whisper invents subtitle boilerplate
+            // scrap of our own loudspeaker. The recogniser invents subtitle boilerplate
             // in direct proportion to how little speech it is handed.
             minSpeechMs: 400,
             // The library defaults. An earlier 0.5/0.35 — "a call is noisy, and
-            // every false positive costs a Whisper round-trip" — misfired on
-            // EVERY utterance: with AGC off the mic is quiet, Silero's score
+            // every false positive costs a recogniser round-trip" — misfired on
+            // EVERY utterance: with AGC off the mic is quiet, the VAD's score
             // hovers near 0.4, so it crossed 0.5 for a frame or two, fell back
             // under 0.35, and the 300 ms window closed before 200 ms of speech
             // had accumulated. Tighten these again only with the peak-score log
@@ -220,7 +220,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
                   '(peak score ${_peak.toStringAsFixed(2)})');
               _peak = 0;
             }).toJS,
-            // Silero's score on every frame (32 ms). We only surface the peak,
+            // the VAD's score on every frame (32 ms). We only surface the peak,
             // every ~3 s: it is the one number that says whether the thresholds
             // are wrong or the mic is simply too quiet.
             onFrameProcessed: ((_VadProbs p, JSFloat32Array _) {
@@ -247,7 +247,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
       _vadInstance = vad;
       vad.start();
       _ready = true;
-      _log('Silero v5 listening — redemption 300ms, pad 500ms, $_from→$_to');
+      _log('VAD v5 listening — redemption 300ms, pad 500ms, $_from→$_to');
     } catch (e) {
       _log('start FAILED: $e');
       onError?.call('start_failed: $e');
@@ -293,7 +293,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
     return stream;
   }
 
-  /// One finished utterance, 16 kHz mono float. Whisper it, translate it, hand
+  /// One finished utterance, 16 kHz mono float. Transcribe it, translate it, hand
   /// the text back to the caller, which publishes it on the data channel.
   void _onSegment(Float32List samples) {
     if (!_running || samples.isEmpty) return;
@@ -328,7 +328,7 @@ class _VadWhisperStreamer implements SwayMicStreamer {
       if (!_running) return;
       final sentAt = DateTime.now();
       final waited = sentAt.difference(queuedAt).inMilliseconds;
-      final res = await fetchWhisperTranslation(
+      final res = await fetchClipTranslation(
         wavBytes: wav,
         from: _from,
         to: _to,
@@ -354,11 +354,11 @@ class _VadWhisperStreamer implements SwayMicStreamer {
       _cbTranslation?.call(res.orig, res.trans, res.lang, '');
     }).catchError((Object e) {
       _log('segment #$seq FAILED: $e');
-      _cbError?.call('whisper:$e');
+      _cbError?.call('asr:$e');
     });
   }
 
-  /// Float32 @16 kHz → 16-bit PCM WAV. Whisper wants a real container, and this
+  /// Float32 @16 kHz → 16-bit PCM WAV. the recogniser wants a real container, and this
   /// is the cheapest one to build (44-byte header, no encoder).
   Uint8List _encodeWav16kMono(Float32List samples) {
     const int sampleRate = 16000;
