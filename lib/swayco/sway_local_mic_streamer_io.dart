@@ -95,20 +95,39 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   sherpa.VoiceActivityDetector? _silero;
   static bool _sherpaBindingsReady = false;
 
-  /// Silence that closes a phrase. Straight latency — nothing can be transcribed
-  /// before it has elapsed — so the temptation is to make it small.
+  /// Silero cuts on any pause this long — short, deliberately. These are not the
+  /// phrase boundaries: they are every real silence in the audio, including the
+  /// ones inside a sentence (commas, breath). [_mergeGapMs] is what turns them
+  /// back into phrases.
   ///
-  /// 300 ms was too small, and it cost more than it saved: it is shorter than the
-  /// pauses inside a normal sentence (a breath, a hesitation, the gap before a
-  /// word you are still looking for), so phrases were being cut in half. Whisper
-  /// then got short, context-free fragments — precisely what it hallucinates on.
-  /// The chopped phrases and the invented ones were the same bug.
-  ///
-  /// 700 ms is what the old energy-VAD pipeline used, tuned on real calls.
-  static const double _silenceSeconds = 0.7;
+  /// Splitting the job in two is what lets us never cut mid-word. A single
+  /// endpoint value cannot: set it long (700 ms) and a speaker who does not pause
+  /// — a synthetic voice, someone reading — runs until the hard cap and gets
+  /// guillotined mid-syllable; set it short and ordinary sentences are chopped in
+  /// half. Cutting at every real silence and re-joining afterwards gives both.
+  static const double _silenceSeconds = 0.35;
 
-  /// A phrase this long is cut and sent whether or not the speaker paused —
-  /// without it, a monologue would never reach the recogniser.
+  /// Silence that ends a PHRASE. Segments separated by less than this are the
+  /// same sentence and are re-joined before they reach Whisper. 700 ms is what
+  /// the old energy-VAD pipeline used, tuned on real calls.
+  static const int _mergeGapMs = 700;
+
+  /// A speaker who never pauses has to be cut somewhere. We hold at most this
+  /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
+  /// mid-word.
+  ///
+  /// NOT 30 s, however tempting: Whisper reads exactly 30 s of audio and the
+  /// engine appends 3 s of tail padding ([WhisperAsrEngine._tailPaddings]), so
+  /// anything past ~27 s is TRUNCATED and the words in it are genuinely lost —
+  /// the one outcome this whole change exists to prevent. 26 s + 3 s of padding
+  /// sits just under the ceiling.
+  ///
+  /// This is straight latency for a monologue: 26 s of speech means the peer
+  /// waits 26 s. That is the price of never cutting mid-sentence.
+  static const int _maxMergedMs = 26000;
+
+  /// Hard ceiling on one Silero segment: a voice with genuinely no pause at all
+  /// for this long is cut regardless. Unavoidable, and rare.
   static const double _maxSpeechSeconds = 15.0;
 
   /// Shorter than this is a cough, a click, a chair — and, crucially, a scrap of
@@ -131,6 +150,27 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// once AEC has had it and with AGC off, is far quieter than someone actually
   /// talking into the phone. Level is the one thing that still tells them apart.
   static const double _speechFloor = 0.06;
+
+  /// Transcriptions run one at a time, in order. See [_sendPending].
+  Future<void> _asrQueue = Future.value();
+
+  /// The phrase being assembled out of Silero's chunks — see [_drainSilero].
+  final List<double> _pending = [];
+
+  /// Where the last chunk ended, in Silero's own sample clock. Compared against
+  /// the next chunk's start to measure the silence between them.
+  int _pendingEndSample = 0;
+
+  /// Wall clock of the last chunk appended, so [_flushIfIdle] can tell that the
+  /// speaker has stopped — silence produces no VAD event to react to.
+  int _pendingLastMs = 0;
+
+  /// Loudest sample across the whole assembled phrase.
+  double _pendingPeak = 0;
+
+  /// Set when a chunk arrived on the gate's closing edge: the phrase predates the
+  /// mute press and must be published anyway.
+  bool _pendingForce = false;
 
   /// Last transcript we accepted, and when. An identical one inside this window
   /// is our own translation coming back around, not the user saying it twice.
@@ -360,6 +400,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         DebugOverlay.log('stt gate CLOSED ($gate)');
         if (!_modelReady) {
           _silero?.reset();
+          _resetPending();
         } else if (AsrService.instance.isStreaming) {
           DebugOverlay.log('stt gate — flushing what was already said');
           _serialize(() => _flushAndSend(onTranslation, force: true));
@@ -413,12 +454,22 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     vad.acceptWaveform(samples);
     if (++_frames % 100 == 0) {
       DebugOverlay.log('stt pcm frames=$_frames speaking=${vad.isDetected()} '
-          'ready=$_modelReady');
+          'ready=$_modelReady held=${_pendingMs}ms');
     }
     _drainSilero(onTranslation, onError);
+    // Silence emits no VAD event, so the end of a phrase can only be noticed by
+    // the clock. Checked on every frame.
+    _flushIfIdle(onTranslation, onError);
   }
 
-  /// Hand every phrase Silero has closed to the recogniser.
+  /// Collect Silero's chunks and re-join them into whole phrases.
+  ///
+  /// Silero cuts at every real silence, including the ones inside a sentence.
+  /// A chunk that follows the previous one by less than [_mergeGapMs] is the same
+  /// sentence carrying on, so it is appended rather than sent. What forces a send
+  /// is a genuine pause ([_flushIfIdle], driven by the clock) or the [_maxMergedMs]
+  /// ceiling — and the ceiling lands on a silence between two chunks, never inside
+  /// a word.
   void _drainSilero(
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError, {
@@ -430,27 +481,93 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       final segment = vad.front();
       vad.pop();
       if (!_modelReady) continue; // model still downloading — drop the phrase
-      final ms = (segment.samples.length / _sampleRate * 1000).round();
-      final peak = _peak(segment.samples);
 
-      // Too quiet to be someone talking INTO this phone. Silero is not wrong —
-      // it is speech — but it is our own loudspeaker's, and handing it to Whisper
-      // is how the peer ends up hearing sentences nobody said.
+      final peak = _peak(segment.samples);
+      final ms = (segment.samples.length / _sampleRate * 1000).round();
+
+      // Too quiet to be someone talking INTO this phone. Silero is not wrong that
+      // it is speech — it just cannot know whose. It is our own loudspeaker's, and
+      // handing it to Whisper is how the peer ends up hearing sentences nobody
+      // said.
       if (peak < _speechFloor) {
-        DebugOverlay.log('stt phrase ${ms}ms DROPPED — too quiet '
+        DebugOverlay.log('stt chunk ${ms}ms DROPPED — too quiet '
             '(peak ${peak.toStringAsFixed(3)} < $_speechFloor)');
         continue;
       }
 
-      DebugOverlay.log(
-          'stt phrase ${ms}ms peak=${peak.toStringAsFixed(3)} → transcribing');
-      unawaited(_recognizeAndTranslate(
-        segment.samples,
-        onTranslation,
-        onError,
-        force: force,
-      ));
+      // A gap longer than _mergeGapMs means the previous phrase ended. Send it
+      // before starting the new one.
+      final gapMs = _pending.isEmpty
+          ? 0
+          : ((segment.start - _pendingEndSample) / _sampleRate * 1000).round();
+      if (_pending.isNotEmpty && gapMs >= _mergeGapMs) {
+        _sendPending(onTranslation, onError, why: '${gapMs}ms pause');
+      }
+
+      _pending.addAll(segment.samples);
+      _pendingEndSample = segment.start + segment.samples.length;
+      _pendingLastMs = DateTime.now().millisecondsSinceEpoch;
+      _pendingPeak = peak > _pendingPeak ? peak : _pendingPeak;
+      if (force) _pendingForce = true;
+
+      // Never let one phrase grow past what Whisper can read. The cut falls here,
+      // on the boundary between two chunks — i.e. in a silence.
+      if (_pendingMs >= _maxMergedMs) {
+        _sendPending(onTranslation, onError, why: 'no pause, ceiling reached');
+      }
     }
+  }
+
+  int get _pendingMs => (_pending.length / _sampleRate * 1000).round();
+
+  /// The speaker has genuinely stopped: [_mergeGapMs] of silence with nothing new
+  /// from Silero. Called on every audio frame — it is the clock, not the VAD, that
+  /// tells us a phrase is over, because a VAD that emits nothing emits no event.
+  void _flushIfIdle(
+    void Function(String, String, String, String) onTranslation,
+    void Function(String)? onError,
+  ) {
+    if (_pending.isEmpty) return;
+    final idleMs = DateTime.now().millisecondsSinceEpoch - _pendingLastMs;
+    if (idleMs >= _mergeGapMs) {
+      _sendPending(onTranslation, onError, why: '${idleMs}ms silence');
+    }
+  }
+
+  void _sendPending(
+    void Function(String, String, String, String) onTranslation,
+    void Function(String)? onError, {
+    required String why,
+  }) {
+    if (_pending.isEmpty) return;
+    final samples = Float32List.fromList(_pending);
+    final ms = _pendingMs;
+    final peak = _pendingPeak;
+    final force = _pendingForce;
+    _resetPending();
+
+    // QUEUED, never fired in parallel. The Whisper engine drops a transcribe
+    // request that lands while it is already busy (`if (_busy) return ''`) — and
+    // it takes seconds to decode a long phrase, so the phrase that followed was
+    // being thrown away in silence. That is why the second half of a cut sentence
+    // never arrived. Waiting our turn costs latency; dropping costs the words.
+    //
+    // Chaining also keeps the phrases in order: unqueued, a short phrase decoded
+    // after a long one could overtake it and reach the peer first.
+    DebugOverlay.log('stt phrase ${ms}ms peak=${peak.toStringAsFixed(3)} '
+        '($why) → queued');
+    _asrQueue = _asrQueue
+        .then((_) =>
+            _recognizeAndTranslate(samples, onTranslation, onError, force: force))
+        .catchError((Object e) => DebugOverlay.log('stt queue error: $e'));
+  }
+
+  void _resetPending() {
+    _pending.clear();
+    _pendingEndSample = 0;
+    _pendingLastMs = 0;
+    _pendingPeak = 0;
+    _pendingForce = false;
   }
 
   /// Loudest sample in the segment, 0..1.
@@ -474,6 +591,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     vad.flush();
     _drainSilero(onTranslation, _onError, force: force);
     vad.reset();
+    // And the phrase we were still assembling: without this it would sit in the
+    // buffer until the user next spoke, and be spliced onto whatever they said.
+    _sendPending(onTranslation, _onError, why: 'gate closed');
   }
 
   /// Streaming path: one frame in, partials out, and a finished utterance
