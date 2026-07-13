@@ -1042,8 +1042,17 @@ class _CallScreenState extends State<CallScreen> {
   /// translation is spoken by flutter_tts, the volume has to be handed to it,
   /// before each utterance (the engine forgets it across a stop()).
   Future<void> _applyTranslatedVolumeToDeviceTts() async {
+    final v = _audio.translatedVolume.clamp(0.0, 1.0);
+    // Logged because this setting is persisted: a slider left at zero during an
+    // earlier call silences every translation in every call after it, and until
+    // this volume was actually wired to the engine, a stored zero was harmless —
+    // so a zero can be sitting in prefs from before it meant anything.
+    if (v < 0.05) {
+      DebugOverlay.log('translated volume is ${v.toStringAsFixed(2)} — '
+          'the voice will be inaudible (check the in-call volume slider)');
+    }
     try {
-      await _deviceTts.setVolume(_audio.translatedVolume.clamp(0.0, 1.0));
+      await _deviceTts.setVolume(v);
     } catch (_) {}
   }
 
