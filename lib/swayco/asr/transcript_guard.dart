@@ -71,7 +71,42 @@ bool looksHallucinated(String transcript, {required int durationMs}) {
 
   if (_isStuckLoop(folded)) return true;
 
+  if (_isLetterSalad(t)) return true;
+
   return false;
+}
+
+/// Handed a noise it cannot place, the decoder sometimes emits stray letters
+/// rather than a phrase: `"L - L"`, `"A. A"`, `"T"`. Every guard above lets them
+/// past — they hold letters, they are not boilerplate, the character rate is
+/// plausible, and [_isStuckLoop] wants four words before it will speak up. So the
+/// peer's phone reads them out, mid-conversation.
+///
+/// The tell is that no word reaches two letters. Nothing here may touch the real
+/// short answers a call is made of — "Oui", "Ça va", "はい" — which is what the
+/// script test below protects: in Japanese, Chinese, Korean and Thai a lone
+/// character IS a word, and there are no spaces to split on. Those scripts are
+/// left alone entirely; the rule only applies where words are spelled out.
+bool _isLetterSalad(String t) {
+  const denseRanges = <List<int>>[
+    [0x3040, 0x30FF], // kana
+    [0x3400, 0x4DBF], // han, extension A
+    [0x4E00, 0x9FFF], // han
+    [0xAC00, 0xD7AF], // hangul syllables
+    [0x1100, 0x11FF], // hangul jamo
+    [0x0E00, 0x0E7F], // thai
+  ];
+  for (final r in t.runes) {
+    for (final range in denseRanges) {
+      if (r >= range[0] && r <= range[1]) return false;
+    }
+  }
+
+  final words = t
+      .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
+      .where((w) => w.isNotEmpty);
+  if (words.isEmpty) return true;
+  return words.every((w) => w.runes.length < 2);
 }
 
 /// the decoder gets stuck and repeats one word until it runs out of
