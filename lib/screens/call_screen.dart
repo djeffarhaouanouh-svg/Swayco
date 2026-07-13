@@ -155,46 +155,6 @@ class _CallScreenState extends State<CallScreen> {
     // Make speak() resolve when the sentence has FINISHED, not when it starts.
     // Without it the queue below cannot know when to start the next one.
     unawaited(_deviceTts.awaitSpeakCompletion(true));
-    unawaited(_applySpeechRate());
-  }
-
-  /// How much faster than the engine's own normal the translation is read.
-  ///
-  /// The translation is already late by the time it is spoken — the listener has
-  /// been waiting through the silence, the transcription and the round trip — so
-  /// reading it at conversational pace wastes the one part of the budget we fully
-  /// control. It also drains the speech queue faster, which matters when the peer
-  /// sends several phrases in a row.
-  ///
-  /// 1.2 = 20% above normal: 0.6 on iOS (whose normal is 0.5), 1.2 on Android and
-  /// the web (whose normal is 1.0). Brisk but natural — past ~1.5 the OS voices
-  /// start slurring. This is the one number to turn if it feels too fast or too
-  /// slow; it applies to every platform at once.
-  static const double _kSpeechRateBoost = 1.2;
-
-  /// Set the reading speed RELATIVE to whatever this engine calls normal.
-  ///
-  /// A hard-coded number cannot work: on iOS the value goes straight into
-  /// `AVSpeechUtterance.rate`, where normal is 0.5 and 1.0 is the maximum — so
-  /// "1.0" is a perfectly ordinary pace on Android and unintelligible gabbling on
-  /// an iPhone. `getSpeechRateValidRange` is the engine telling us its own scale.
-  Future<void> _applySpeechRate() async {
-    var normal = kIsWeb ? 1.0 : (defaultTargetPlatform == TargetPlatform.iOS ? 0.5 : 1.0);
-    var maximum = kIsWeb ? 2.0 : (defaultTargetPlatform == TargetPlatform.iOS ? 1.0 : 2.0);
-    try {
-      final range = await _deviceTts.getSpeechRateValidRange;
-      final n = double.tryParse('${range.normal}');
-      final m = double.tryParse('${range.max}');
-      if (n != null && n > 0) normal = n;
-      if (m != null && m > 0) maximum = m;
-    } catch (_) {
-      // Engine did not answer — the platform defaults above are the fallback.
-    }
-    final rate = (normal * _kSpeechRateBoost).clamp(0.0, maximum);
-    try {
-      await _deviceTts.setSpeechRate(rate);
-      DebugOverlay.log('tts rate $rate (normal $normal, max $maximum)');
-    } catch (_) {}
   }
 
   /// Translations are SPOKEN one after another, never on top of each other.

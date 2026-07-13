@@ -207,12 +207,7 @@ class AudioController extends ChangeNotifier {
   // Same on web and native: livekit_client shares one flutter_webrtc engine, so
   // both remote tracks play through one audio session and the duck is driven by
   // Helper.setVolume on the original track.
-  // 0.0 — the original voice is SILENCED while the translation speaks, not merely
-  // ducked. It went 25% → 10% → 5% and each step still bled through: a peer who
-  // talks on over their own translation clashed with it. Muting outright is the
-  // end of that road, and it drops the long-standing rule that the real voice must
-  // never be cut ("the human-connection moat") — asked for explicitly.
-  static const double _duckedLevel = 0.0;
+  static const double _duckedLevel = 0.05;
   // How long the duck holds after the translation stops, so the gaps between
   // two translated sentences don't make the volume flap. 1400 ms kept the real
   // voice under water well after the translation was over.
