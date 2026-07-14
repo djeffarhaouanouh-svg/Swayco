@@ -793,15 +793,18 @@ class _ProfileInfoPanel extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
           // Verre clair type iOS : la photo transparaît, le texte passe en noir.
-          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
           child: Container(
             decoration: BoxDecoration(
+              // Un voile blanc TRÈS léger : à 0.6 il agissait comme une
+              // peinture et effaçait la photo. Le flou fait le gros du travail,
+              // le blanc ne sert qu'à porter le texte noir.
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withValues(alpha: 0.72),
-                  Colors.white.withValues(alpha: 0.60),
+                  Colors.white.withValues(alpha: 0.30),
+                  Colors.white.withValues(alpha: 0.18),
                 ],
               ),
               borderRadius: const BorderRadius.vertical(
