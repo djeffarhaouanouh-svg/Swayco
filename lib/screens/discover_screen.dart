@@ -421,28 +421,16 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swayco.ai — ".ai" en cyan, comme la page Live.
+              // Logo Swayco à la place du wordmark — tap = paramètres.
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'swayco'),
-                        TextSpan(
-                          text: '.ai',
-                          style: TextStyle(color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Image.asset(
+                    'assets/notif-android.png',
+                    height: 34,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
