@@ -335,6 +335,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               onSearch: _openSearch,
               onSettings: () {},
               topInset: safeTop,
+              searchExpanded: _searchExpanded,
+              searchController: _searchCtrl,
+              searchFocus: _searchFocus,
+              onSearchChanged: _onSearchChanged,
+              onCloseSearch: _closeSearch,
             ),
           ),
 
@@ -372,23 +377,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 child: const ColoredBox(color: Color(0x88000000)),
               ),
             ),
-            Positioned(
-              left: 12,
-              right: 12,
-              top: tabBarH + 8,
-              child: _SearchOverlay(
-                controller: _searchCtrl,
-                focusNode: _searchFocus,
-                loading: _searching,
-                results: _searchResults,
-                query: _searchCtrl.text.trim(),
-                statusFor: _statusFor,
-                onChanged: _onSearchChanged,
-                onClose: _closeSearch,
-                onAdd: _likePeer,
-                onOpen: _openResult,
+            if (_searchCtrl.text.trim().isNotEmpty)
+              Positioned(
+                left: 12,
+                right: 12,
+                top: tabBarH + 8,
+                child: _SearchOverlay(
+                  loading: _searching,
+                  results: _searchResults,
+                  query: _searchCtrl.text.trim(),
+                  statusFor: _statusFor,
+                  onAdd: _likePeer,
+                  onOpen: _openResult,
+                ),
               ),
-            ),
           ],
         ],
       ),
@@ -407,6 +409,11 @@ class _TopTabBar extends StatelessWidget {
     required this.onTabSelected,
     required this.onSearch,
     required this.onSettings,
+    required this.searchExpanded,
+    required this.searchController,
+    required this.searchFocus,
+    required this.onSearchChanged,
+    required this.onCloseSearch,
     this.topInset = 0,
   });
 
@@ -416,6 +423,14 @@ class _TopTabBar extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onSettings;
   final double topInset;
+
+  /// Search: the loupe stretches open into the field right here in the header
+  /// (220 ms), the wordmark stepping aside while it does.
+  final bool searchExpanded;
+  final TextEditingController searchController;
+  final FocusNode searchFocus;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onCloseSearch;
 
   // Content height (excluding safe-area top inset)
   static const double height = 52.0;
@@ -428,7 +443,9 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swayco.ai — ".ai" en cyan, comme la page Live.
+              // Wordmark swayco.ai — ".ai" en cyan. Il s'efface pendant la
+              // recherche pour laisser le champ s'étirer sur toute la barre.
+              if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
@@ -455,13 +472,86 @@ class _TopTabBar extends StatelessWidget {
               ),
               // Onglets retirés — logo à gauche, actions à droite.
               const Spacer(),
-              // Search icon
+              // La loupe s'ouvre EN champ : même pastille, largeur animée
+              // (220 ms) — le geste d'origine, avant que la recherche ne
+              // s'ouvre d'un coup.
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: onSearch,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(Icons.search_rounded, color: Colors.white, size: 24),
+                onTap: searchExpanded ? null : onSearch,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  width: searchExpanded
+                      ? (MediaQuery.sizeOf(context).width - 56).clamp(
+                          200.0,
+                          520.0,
+                        )
+                      : 40,
+                  height: 40,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: searchExpanded ? 14 : 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: searchExpanded
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: searchExpanded
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.search_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      if (searchExpanded) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: searchController,
+                            focusNode: searchFocus,
+                            onChanged: onSearchChanged,
+                            textInputAction: TextInputAction.search,
+                            cursorColor: const Color(0xFF22D3EE),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              hintText: AppStrings.t('search_friend_hint'),
+                              hintStyle: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 15,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onCloseSearch,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1316,28 +1406,22 @@ class _GlassButton extends StatelessWidget {
 // Search overlay
 // ══════════════════════════════════════════════════════════════════════════════
 
+/// Le panneau de résultats, sous le header. Le champ de saisie, lui, vit dans
+/// la barre du haut : c'est la loupe elle-même qui s'étire pour le devenir.
 class _SearchOverlay extends StatelessWidget {
   const _SearchOverlay({
-    required this.controller,
-    required this.focusNode,
     required this.loading,
     required this.results,
     required this.query,
     required this.statusFor,
-    required this.onChanged,
-    required this.onClose,
     required this.onAdd,
     required this.onOpen,
   });
 
-  final TextEditingController controller;
-  final FocusNode focusNode;
   final bool loading;
   final List<RemoteProfile> results;
   final String query;
   final FriendshipStatus Function(RemoteProfile) statusFor;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClose;
   final ValueChanged<RemoteProfile> onAdd;
   final ValueChanged<RemoteProfile> onOpen;
 
@@ -1355,45 +1439,7 @@ class _SearchOverlay extends StatelessWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              // Search field
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search_rounded, color: Colors.white70, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onChanged: onChanged,
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
-                        cursorColor: Colors.white,
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          hintText: 'Rechercher un profil…',
-                          hintStyle: TextStyle(color: Colors.white54, fontSize: 15),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 6),
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: onClose,
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close_rounded, color: Colors.white70, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (query.isNotEmpty) ...[
-                Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
-                _buildResults(),
-              ],
-            ],
+            children: [_buildResults()],
           ),
         ),
       ),
