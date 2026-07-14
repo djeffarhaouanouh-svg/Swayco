@@ -512,6 +512,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           children: [
             _titleBar,
+            // Le liseré qui ferme le header : pleine largeur, bord à bord.
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Colors.white.withValues(alpha: 0.10),
+            ),
             Expanded(child: _buildBody()),
           ],
         ),
@@ -1271,28 +1277,9 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-          child: _title(),
-        ),
-        // Hairline right under the title — it delimits the section, Tinder-style.
-        Divider(
-          height: 1,
-          thickness: 1,
-          indent: 14,
-          endIndent: 14,
-          color: Colors.white.withValues(alpha: 0.10),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-
-  Widget _title() {
-    return Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      child: Row(
         children: [
           Text(
             label.toUpperCase(),
@@ -1325,6 +1312,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ],
         ],
+      ),
     );
   }
 }
