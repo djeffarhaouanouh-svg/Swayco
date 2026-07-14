@@ -18,12 +18,9 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
-import '../services/interests_i18n.dart';
 import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
-import '../services/push_dispatcher.dart';
-import '../services/scheduled_call_api.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../services/translation_api.dart';
@@ -34,7 +31,6 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
-import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -439,143 +435,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  /// Contextual ice-breakers shown above the composer while the thread is
-  /// still empty — the hardest message to write is the first one, doubly so
-  /// across a language barrier. Built from the peer's own profile (interests,
-  /// place) so the opener references something real, which lifts the reply
-  /// rate. All copy is in MY UI language (it's my outgoing text); the peer
-  /// gets it auto-translated on their side like any other message.
-  /// True once the peer has sent at least one message — the ice-breakers then
-  /// retire. While it's still just me (empty thread, or only my own openers /
-  /// an emoji), they stay above the composer to help me get a real reply.
-  ///
-  /// Keyed on the peer's id, NOT `senderId != _myId`: at boot `_myId` can still
-  /// be empty, which would make my OWN messages look like the peer's and hide
-  /// the bubbles the instant I send a wave.
-  bool get _peerHasReplied =>
-      _messages.any((m) => m.senderId == widget.peerDeviceId);
-
-  List<String> _iceBreakers() {
-    final out = <String>[];
-    final peer = _peer;
-    final firstName = (peer?.displayName.trim().isNotEmpty == true
-            ? peer!.displayName
-            : widget.title)
-        .split(' ')
-        .first
-        .trim();
-    // Country-adapted opener first — the peer's home country is the most
-    // natural, culturally-tuned thing to open on across a language barrier.
-    final country = peer?.country.trim() ?? '';
-    if (country.isNotEmpty) {
-      out.add(AppStrings.t('ib_country', args: {'country': country}));
-    }
-    out.add(
-      firstName.isEmpty
-          ? AppStrings.t('ib_hi_noname')
-          : AppStrings.t('ib_hi', args: {'name': firstName}),
-    );
-    // One opener per interest (up to 3) so the rotating strip has variety.
-    final interests = peer?.interests ?? const <String>[];
-    for (final interest in interests.take(3)) {
-      out.add(
-        AppStrings.t('ib_interest', args: {'interest': interestLabel(interest)}),
-      );
-    }
-    // City only (country already covered by ib_country above).
-    final city = peer?.city.trim() ?? '';
-    if (city.isNotEmpty) {
-      out.add(AppStrings.t('ib_place', args: {'place': city}));
-    }
-    // Generic openers — these don't depend on any peer field, so the pool
-    // stays rich (and the 5 s rotation keeps working) even when the peer left
-    // their country / interests / city blank.
-    out.add(AppStrings.t('ib_g1'));
-    out.add(AppStrings.t('ib_g2'));
-    out.add(AppStrings.t('ib_g3'));
-    out.add(AppStrings.t('ib_g4'));
-    out.add(AppStrings.t('ib_call'));
-    return out;
-  }
-
-  /// Tapping a suggestion just DROPS it into the composer (cursor at end) — it
-  /// does NOT send. The user edits / sends it themselves like any draft.
-  void _useSuggestion(String text) {
-    _inputCtrl.text = text;
-    _inputCtrl.selection = TextSelection.collapsed(offset: text.length);
-  }
-
-  String _formatWhen(DateTime when) {
-    final loc = MaterialLocalizations.of(context);
-    final d = loc.formatMediumDate(when);
-    final t = loc.formatTimeOfDay(
-      TimeOfDay.fromDateTime(when),
-      alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
-    );
-    return '$d · $t';
-  }
-
-  /// Plan a future call: pick a date + time (in MY local zone — it's stored as
-  /// an absolute UTC instant, so each side later sees it in their own zone),
-  /// persist it, tell the peer now, and let the backend cron fire the reminder
-  /// push to both of us shortly before it starts.
-  Future<void> _scheduleCall() async {
-    if (_myId.isEmpty || widget.peerDeviceId.isEmpty) return;
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 60)),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
-    );
-    if (time == null || !mounted) return;
-    final when =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    if (!when.isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('schedule_past_error'))),
-      );
-      return;
-    }
-    final res = await ScheduledCallApi.schedule(
-      callerId: _myId,
-      calleeId: widget.peerDeviceId,
-      when: when,
-    );
-    if (!mounted) return;
-    if (res.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('schedule_failed'))),
-      );
-      return;
-    }
-    final whenLabel = _formatWhen(when);
-    // Push lands on the peer → localise into THEIR language.
-    final lang = _peer?.language ?? '';
-    final caller = _myName.trim().isEmpty
-        ? AppStrings.tIn(lang, 'call_locked_peer_fallback')
-        : _myName.trim();
-    unawaited(PushDispatcher.notify(
-      recipientUid: widget.peerDeviceId,
-      title: AppStrings.tIn(lang, 'schedule_push_title', args: {'name': caller}),
-      body: AppStrings.tIn(lang, 'schedule_push_body', args: {'when': whenLabel}),
-      type: 'call_scheduled',
-      data: {'fromId': _myId, 'whenIso': when.toUtc().toIso8601String()},
-    ));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          AppStrings.t('schedule_confirmed', args: {'when': whenLabel}),
-        ),
-      ),
-    );
-  }
-
   /// Upload a recorded voice message via the backend STT pipeline. The
   /// backend persists the audio, transcribes it and inserts the row;
   /// the realtime stream will surface the new message to both sides so
@@ -690,7 +549,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               translation: widget.translation,
                               startWithCamera: true,
                             ),
-                      onSchedule: _scheduleCall,
                       onViewProfile: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
                           builder: (_) =>
@@ -808,11 +666,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (!_peerHasReplied)
-                          _IceBreakers(
-                            suggestions: _iceBreakers(),
-                            onTap: _useSuggestion,
-                          ),
                         _Composer(
                           controller: _inputCtrl,
                           sending: _sending,
@@ -912,7 +765,6 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
-    required this.onSchedule,
     required this.onViewProfile,
     this.peerBlocked = false,
     this.blockedByPeer = false,
@@ -928,8 +780,6 @@ class _ThreadHeader extends StatelessWidget {
   /// Call button — starts a video call (camera on).
   final VoidCallback onCall;
 
-  /// Calendar button — opens the date/time picker to plan a future call.
-  final VoidCallback onSchedule;
   final VoidCallback onViewProfile;
 
   // Block / report are no longer surfaced in the header (the ⋮ menu was
@@ -1077,15 +927,6 @@ class _ThreadHeader extends StatelessWidget {
                 },
               ),
             ),
-            // Plan a future call (date/time picker → reminder push to both).
-            GlassIconButton(
-              icon: Icons.event_rounded,
-              size: 40,
-              iconSize: 19,
-              popScale: 1.25,
-              onTap: onSchedule,
-            ),
-            const SizedBox(width: 8),
             // Single call button — a tap starts a video call (camera on).
             // Greyed when the peer has blocked me (the call can't connect).
             Opacity(
@@ -1648,126 +1489,6 @@ const Duration _kMaxVoiceMessage = Duration(seconds: 60);
 
 /// Replaces the composer when the peer has blocked me — a flat, disabled
 /// notice bar so it's obvious messages can't be sent (they'd go nowhere).
-/// Horizontal strip of tappable ice-breaker suggestions, floated just above
-/// the composer until the peer replies. Shows up to [_maxVisible] Apple-glass
-/// bubbles and cycles ONE of them to a fresh suggestion every 5 s (fade), so
-/// the user keeps seeing new openers without the strip overflowing. Tapping a
-/// bubble drops its text into the composer (no auto-send).
-class _IceBreakers extends StatefulWidget {
-  const _IceBreakers({required this.suggestions, required this.onTap});
-
-  /// The full pool to rotate through.
-  final List<String> suggestions;
-  final ValueChanged<String> onTap;
-
-  @override
-  State<_IceBreakers> createState() => _IceBreakersState();
-}
-
-class _IceBreakersState extends State<_IceBreakers> {
-  static const int _maxVisible = 3;
-  static const Duration _interval = Duration(seconds: 5);
-
-  /// Pool index shown in each visible slot.
-  List<int> _slots = const [];
-  int _nextPool = 0; // next pool index to bring in
-  int _rotateSlot = 0; // which slot rotates next (round-robin)
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _seed();
-    _timer = Timer.periodic(_interval, (_) => _rotate());
-  }
-
-  @override
-  void didUpdateWidget(covariant _IceBreakers old) {
-    super.didUpdateWidget(old);
-    // Re-seed only when the pool SIZE changes (e.g. the peer profile finished
-    // loading and added country/interest openers) — not on every parent
-    // rebuild, so the rotation isn't reset while the user is reading.
-    if (old.suggestions.length != widget.suggestions.length) _seed();
-  }
-
-  void _seed() {
-    final n = widget.suggestions.length;
-    final count = n < _maxVisible ? n : _maxVisible;
-    _slots = [for (var i = 0; i < count; i++) i];
-    _nextPool = n == 0 ? 0 : count % n;
-    _rotateSlot = 0;
-  }
-
-  void _rotate() {
-    final n = widget.suggestions.length;
-    if (n <= _slots.length) return; // no spare openers to cycle in
-    setState(() {
-      // Bring in the next pool entry that isn't already on screen.
-      var idx = _nextPool;
-      var guard = 0;
-      while (_slots.contains(idx) && guard < n) {
-        idx = (idx + 1) % n;
-        guard++;
-      }
-      _slots[_rotateSlot] = idx;
-      _nextPool = (idx + 1) % n;
-      _rotateSlot = (_rotateSlot + 1) % _slots.length;
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_slots.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _slots.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final text = widget.suggestions[_slots[i]];
-          return Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 350),
-              transitionBuilder: (child, anim) =>
-                  FadeTransition(opacity: anim, child: child),
-              child: Pressable(
-                // Key on the text so the switcher cross-fades when this slot
-                // rotates to a new suggestion.
-                key: ValueKey(text),
-                onTap: () => widget.onTap(text),
-                bounce: true,
-                // Apple-glass bubble: blur + low-alpha white tint + hairline,
-                // white text. Same language as the header / composer glass.
-                child: GlassContainer(
-                  borderRadius: BorderRadius.circular(22),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _BlockedComposerNotice extends StatelessWidget {
   const _BlockedComposerNotice();
 
