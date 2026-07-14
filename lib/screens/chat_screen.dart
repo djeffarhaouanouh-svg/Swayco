@@ -451,12 +451,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// The fixed "Messages" band pinned at the top of the page.
-  Widget get _titleBar => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+  /// The band pinned at the top of the page — the same swayco.ai wordmark as
+  /// the Discover header (".ai" in cyan), where the "Messages" title used to be.
+  Widget get _titleBar => const Padding(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: Text(AppStrings.t('messages_title'), style: SCText.h1),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: 'swayco'),
+                TextSpan(
+                  text: '.ai',
+                  style: TextStyle(color: Color(0xFF22D3EE)),
+                ),
+              ],
+            ),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+            ),
+          ),
         ),
       );
 
