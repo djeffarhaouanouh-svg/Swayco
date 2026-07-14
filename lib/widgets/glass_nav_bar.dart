@@ -166,9 +166,9 @@ class _GlassNavBarState extends State<GlassNavBar>
         badge: unreadChat,
       ),
       _NavItemData(
-        // Card-stack glyph (Discover deck metaphor).
-        icon: Icons.style_outlined,
-        selectedIcon: Icons.style,
+        // Coconut — Discover. No Material glyph comes close, so the tab wears
+        // the emoji itself.
+        emoji: '🥥',
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
@@ -325,14 +325,18 @@ class _GlassNavBarState extends State<GlassNavBar>
 
 class _NavItemData {
   const _NavItemData({
-    required this.icon,
-    required this.selectedIcon,
+    this.icon,
+    this.selectedIcon,
+    this.emoji,
     required this.label,
     this.badge = 0,
-  });
+  }) : assert(emoji != null || (icon != null && selectedIcon != null));
 
-  final IconData icon;
-  final IconData selectedIcon;
+  final IconData? icon;
+  final IconData? selectedIcon;
+
+  /// Set instead of [icon] when the tab is drawn as an emoji (the coconut).
+  final String? emoji;
   final String label;
   final int badge;
 }
@@ -411,16 +415,27 @@ class _NavItemState extends State<_NavItem>
             ),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              child: Icon(
-                widget.selected
-                    ? widget.data.selectedIcon
-                    : widget.data.icon,
-                key: ValueKey(widget.selected),
-                size: 26,
-                color: widget.selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.50),
-              ),
+              child: widget.data.emoji != null
+                  // An emoji carries its own colour, so "unselected" is a
+                  // fade, not a tint.
+                  ? Opacity(
+                      key: ValueKey(widget.selected),
+                      opacity: widget.selected ? 1.0 : 0.5,
+                      child: Text(
+                        widget.data.emoji!,
+                        style: const TextStyle(fontSize: 24, height: 1.1),
+                      ),
+                    )
+                  : Icon(
+                      widget.selected
+                          ? widget.data.selectedIcon
+                          : widget.data.icon,
+                      key: ValueKey(widget.selected),
+                      size: 26,
+                      color: widget.selected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.50),
+                    ),
             ),
           ),
           widget.data.badge,
