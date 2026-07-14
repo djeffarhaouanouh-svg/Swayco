@@ -25,6 +25,9 @@ import 'translation_route.dart';
 ///
 /// Renews the live engine side before the ephemeral credential expires and retries on failure.
 class SwayLiveTranslation extends ChangeNotifier implements RealtimeTranslationPort {
+  @override
+  ValueListenable<SpokenLine>? get localTranscript => null;
+
   Room? _room;
   TranslationRoute? _route;
   EventsListener<RoomEvent>? _listener;

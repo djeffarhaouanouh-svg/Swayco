@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -12,6 +13,16 @@ enum TranslationFeedbackPhase {
   working,
   /// the live engine path connected and receiving media.
   live,
+}
+
+/// One utterance, as it lands on screen: what someone actually said, already
+/// in the language of the device showing it. [seq] rises with every line so a
+/// repeated sentence still counts as new (a ValueNotifier swallows an
+/// identical value).
+class SpokenLine {
+  const SpokenLine({required this.seq, required this.text});
+  final int seq;
+  final String text;
 }
 
 /// Abstraction for bidirectional realtime speech translation.
@@ -50,6 +61,12 @@ abstract class RealtimeTranslationPort {
   /// the implementation has no translated audio stream of its own.
   Future<void> setTranslatedAudioVolume(double volume) async {}
 
+  /// What *I* just said, in MY language — the STT transcript of my own mic,
+  /// before it is translated for the peer. The peer's side already receives
+  /// its own text over the data channel; this is the missing half that lets a
+  /// device caption both voices. Null when the implementation has no STT.
+  ValueListenable<SpokenLine>? get localTranscript => null;
+
   /// Short, human-readable status of the translation audio pipeline, surfaced
   /// in an on-screen debug panel. The user builds on a remote Mac and has no
   /// way to read device logs, so the phone itself must show whether the
@@ -59,6 +76,9 @@ abstract class RealtimeTranslationPort {
 
 /// Default: no processing; keeps call path simple until you add an adapter.
 class NoOpRealtimeTranslation implements RealtimeTranslationPort {
+  @override
+  ValueListenable<SpokenLine>? get localTranscript => null;
+
   const NoOpRealtimeTranslation();
   @override
   Future<void> attachToRoom(

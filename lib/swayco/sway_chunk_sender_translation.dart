@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -25,6 +26,21 @@ import 'translation_route.dart';
 /// this, so both directions are translated.
 class SwayChunkSenderTranslation extends ChangeNotifier
     implements RealtimeTranslationPort {
+  /// Ce que je viens de dire, dans MA langue — la légende locale s'y abonne.
+  final ValueNotifier<SpokenLine> _localTranscript =
+      ValueNotifier<SpokenLine>(const SpokenLine(seq: 0, text: ''));
+  int _transcriptSeq = 0;
+
+  @override
+  ValueListenable<SpokenLine> get localTranscript => _localTranscript;
+
+  /// Appelé par le pipeline dès qu'une phrase est reconnue au micro.
+  void _emitLocalTranscript(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    _localTranscript.value = SpokenLine(seq: ++_transcriptSeq, text: t);
+  }
+
   /// Must match call_screen's `_captionTopic`.
   static const String _captionTopic = 'swayco-chat';
 
@@ -296,6 +312,8 @@ class SwayChunkSenderTranslation extends ChangeNotifier
       _lastTranscript = orig;
       _lastTranslation = trans;
       _lastError = null;
+      // Mes propres mots, dans MA langue → la légende locale les affiche.
+      _emitLocalTranscript(orig);
       if (trans.isEmpty && orig.isEmpty) return;
 
       final map = <String, dynamic>{

@@ -117,6 +117,30 @@ class _CallScreenState extends State<CallScreen> {
   /// The blue control rail is folded away behind the chevron until the user
   /// asks for it — the video stays clean. Hang up is never hidden.
   bool _controlsOpen = false;
+  /// Ce qui est DIT, transcrit — chaque device dans sa langue. Les lignes ne
+  /// vivent que le temps de l'appel (rien n'est persisté).
+  final List<_SpokenTurn> _turns = [];
+
+  /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
+  bool _turnsOpen = false;
+
+  void _addTurn(_SpokenTurn turn) {
+    if (!mounted || turn.text.trim().isEmpty) return;
+    setState(() {
+      _turns.add(turn);
+      // Un appel long ne doit pas garder la conversation entière en mémoire.
+      if (_turns.length > 60) _turns.removeRange(0, _turns.length - 60);
+    });
+  }
+
+  /// Mon micro vient de produire une phrase : elle s'affiche chez moi dans ma
+  /// langue (le pair, lui, reçoit sa traduction par le canal de données).
+  void _onMyTranscript() {
+    final line = widget.translation.localTranscript?.value;
+    if (line == null) return;
+    _addTurn(_SpokenTurn(mine: true, text: line.text));
+  }
+
   bool _micOn = true;
   late bool _camOn = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
@@ -549,6 +573,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    widget.translation.localTranscript?.addListener(_onMyTranscript);
     Analytics.track('screen_view', props: {'screen': 'live'});
     _start();
     // Hold the connecting splash for a minimum of 5s so it is actually
@@ -1036,6 +1061,7 @@ class _CallScreenState extends State<CallScreen> {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
         DebugOverlay.log('caption localTts trans="$trans" lang=$lang web=$kIsWeb');
+        _addTurn(_SpokenTurn(mine: false, text: trans));
         if (trans.isNotEmpty) {
           if (kIsWeb) {
             unawaited(_speakDeviceTts(trans, lang));
@@ -1046,6 +1072,7 @@ class _CallScreenState extends State<CallScreen> {
         return;
       }
       if (m['voiceOnly'] == true) {
+        _addTurn(_SpokenTurn(mine: false, text: m['trans']?.toString() ?? ''));
         final audioB64 = m['audio']?.toString() ?? '';
         DebugOverlay.log('caption voiceOnly audio=${audioB64.length}b web=$kIsWeb');
         // On web: play via <audio> element so browser AEC can cancel the echo.
@@ -1646,6 +1673,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    widget.translation.localTranscript?.removeListener(_onMyTranscript);
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
@@ -1982,6 +2010,31 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // Ce qui est dit, transcrit — en bas à gauche, à l'emplacement
+                // de l'ancienne zone de saisie. Deux bulles au repos ; un tap
+                // déplie les derniers tours.
+                if (_turns.isNotEmpty)
+                  Positioned(
+                    left: 16,
+                    right: 84,
+                    bottom: 0,
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 28),
+                        child: _SpokenTurnsPanel(
+                          turns: _turns,
+                          open: _turnsOpen,
+                          myName: widget.displayName,
+                          myAvatarUrl: '',
+                          peerName: _peerProfile?.displayName ?? '',
+                          peerAvatarUrl: _peerProfile?.avatarUrl ?? '',
+                          onToggle: () =>
+                              setState(() => _turnsOpen = !_turnsOpen),
+                        ),
+                      ),
+                    ),
+                  ),
                 // Controls as a vertical rail anchored to the BOTTOM-RIGHT, so
                 // they grow upward from the bottom and never reach the PiP
                 // self-view in the top-right corner.
@@ -2192,6 +2245,174 @@ class _LowCreditCounter extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Un tour de parole : ce qu'une des deux personnes vient de dire, déjà dans
+/// la langue de CE device (ma phrase telle que je l'ai dite ; celle du pair
+/// telle qu'elle m'arrive traduite).
+class _SpokenTurn {
+  _SpokenTurn({required this.mine, required this.text});
+  final bool mine;
+  final String text;
+}
+
+/// La légende de l'appel. Au repos : les deux derniers tours, en bulles de
+/// verre. Un tap déplie les quatre derniers, le haut fondu en dégradé — on
+/// remonte plus loin en faisant défiler. Aucune saisie : ça ne fait que
+/// retranscrire la voix.
+class _SpokenTurnsPanel extends StatelessWidget {
+  const _SpokenTurnsPanel({
+    required this.turns,
+    required this.open,
+    required this.onToggle,
+    required this.myName,
+    required this.myAvatarUrl,
+    required this.peerName,
+    required this.peerAvatarUrl,
+  });
+
+  final List<_SpokenTurn> turns;
+  final bool open;
+  final VoidCallback onToggle;
+  final String myName;
+  final String myAvatarUrl;
+  final String peerName;
+  final String peerAvatarUrl;
+
+  /// Hauteur dépliée : quatre bulles tiennent dedans, la cinquième se devine
+  /// sous le dégradé — c'est ce qui invite à faire défiler.
+  static const double _openHeight = 232;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = open
+        ? turns
+        : turns.sublist(turns.length > 2 ? turns.length - 2 : 0);
+
+    final list = ListView.builder(
+      // Le plus récent en bas, et on remonte le temps en faisant défiler.
+      reverse: true,
+      physics: open
+          ? const BouncingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      shrinkWrap: !open,
+      itemCount: visible.length,
+      itemBuilder: (ctx, i) {
+        final turn = visible[visible.length - 1 - i];
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _TurnBubble(
+            turn: turn,
+            name: turn.mine ? myName : peerName,
+            avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
+          ),
+        );
+      },
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onToggle,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.bottomLeft,
+        child: SizedBox(
+          height: open ? _openHeight : null,
+          child: open
+              // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un
+              // ShaderMask — il isolerait le flou des bulles et le tuerait).
+              ? Stack(
+                  children: [
+                    Positioned.fill(child: list),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 56,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.55),
+                                Colors.black.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : list,
+        ),
+      ),
+    );
+  }
+}
+
+/// Une bulle : la PDP de qui parle, puis sa phrase, sur du verre sombre.
+class _TurnBubble extends StatelessWidget {
+  const _TurnBubble({
+    required this.turn,
+    required this.name,
+    required this.avatarUrl,
+  });
+
+  final _SpokenTurn turn;
+  final String name;
+  final String avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ProfileAvatar(
+          displayName: name,
+          avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+          size: 30,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: turn.mine
+                      ? SC.accent.withValues(alpha: 0.32)
+                      : Colors.black.withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Text(
+                  turn.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

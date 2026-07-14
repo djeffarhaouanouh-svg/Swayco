@@ -25,6 +25,9 @@ import 'translation_route.dart';
 /// for `SwayLiveTranslation` at the wiring point ([main]) with no other
 /// changes — the live engine path is left fully intact for an easy revert.
 class SwayChunkTranslation extends ChangeNotifier implements RealtimeTranslationPort {
+  @override
+  ValueListenable<SpokenLine>? get localTranscript => null;
+
   Room? _room;
   TranslationRoute? _route;
   EventsListener<RoomEvent>? _listener;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -38,6 +39,21 @@ import 'wire_compat.dart';
 /// → SEND re-translation feedback loop.
 class SwayStreamTranslation extends ChangeNotifier
     implements RealtimeTranslationPort {
+  /// Ce que je viens de dire, dans MA langue — la légende locale s'y abonne.
+  final ValueNotifier<SpokenLine> _localTranscript =
+      ValueNotifier<SpokenLine>(const SpokenLine(seq: 0, text: ''));
+  int _transcriptSeq = 0;
+
+  @override
+  ValueListenable<SpokenLine> get localTranscript => _localTranscript;
+
+  /// Appelé par le pipeline dès qu'une phrase est reconnue au micro.
+  void _emitLocalTranscript(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    _localTranscript.value = SpokenLine(seq: ++_transcriptSeq, text: t);
+  }
+
   static const String _captionTopic = 'swayco-chat';
   static const int _maxAudioB64 = 60000;
 
@@ -256,6 +272,10 @@ class SwayStreamTranslation extends ChangeNotifier
       _lastSentTrans = transToSend;
       _lastSentMs = nowMs;
     }
+
+    // Mes propres mots, dans MA langue → la légende locale les affiche (le pair,
+    // lui, reçoit déjà 'trans' par le canal de données).
+    _emitLocalTranscript(orig);
 
     final room = _room;
     final route = _route;
