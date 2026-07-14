@@ -959,11 +959,26 @@ class _PeerClockChip extends StatefulWidget {
 }
 
 class _PeerClockChipState extends State<_PeerClockChip> {
-  // Held down → the pill stretches open to spell out whose local time it is;
-  // released → it snaps back to just the time + sun/moon.
+  // A tap stretches the pill open to spell out whose local time it is; it
+  // folds back on the next tap, or on its own after a few seconds.
   bool _open = false;
-  void _set(bool v) {
-    if (mounted && _open != v) setState(() => _open = v);
+  Timer? _autoClose;
+
+  void _toggle() {
+    if (!mounted) return;
+    setState(() => _open = !_open);
+    _autoClose?.cancel();
+    if (_open) {
+      _autoClose = Timer(const Duration(seconds: 4), () {
+        if (mounted) setState(() => _open = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoClose?.cancel();
+    super.dispose();
   }
 
   @override
@@ -1012,11 +1027,9 @@ class _PeerClockChipState extends State<_PeerClockChip> {
     );
 
     return GestureDetector(
-      // A real press-and-hold (~0.5s) opens it — a brush/tap does nothing.
-      // Stays open while held; snaps shut the instant the finger lifts.
-      onLongPressStart: (_) => _set(true),
-      onLongPressEnd: (_) => _set(false),
-      onLongPressCancel: () => _set(false),
+      // One tap and it unfolds — no press-and-hold any more.
+      behavior: HitTestBehavior.opaque,
+      onTap: _toggle,
       child: GlassPanel(
         borderRadius: 999,
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
