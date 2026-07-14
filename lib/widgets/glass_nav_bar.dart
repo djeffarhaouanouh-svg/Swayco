@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart' as lg;
 
@@ -167,8 +168,9 @@ class _GlassNavBarState extends State<GlassNavBar>
       ),
       _NavItemData(
         // Coconut — Discover. No Material glyph comes close, so the tab wears
-        // the emoji itself.
-        emoji: '🥥',
+        // its own SVG pair (filled when selected, outlined otherwise).
+        assetIcon: 'assets/icons/coconut_outline.svg',
+        assetSelectedIcon: 'assets/icons/coconut_filled.svg',
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
@@ -327,16 +329,21 @@ class _NavItemData {
   const _NavItemData({
     this.icon,
     this.selectedIcon,
-    this.emoji,
+    this.assetIcon,
+    this.assetSelectedIcon,
     required this.label,
     this.badge = 0,
-  }) : assert(emoji != null || (icon != null && selectedIcon != null));
+  }) : assert(
+          (assetIcon != null && assetSelectedIcon != null) ||
+              (icon != null && selectedIcon != null),
+        );
 
   final IconData? icon;
   final IconData? selectedIcon;
 
-  /// Set instead of [icon] when the tab is drawn as an emoji (the coconut).
-  final String? emoji;
+  /// Set instead of [icon] when the tab is drawn from an SVG (the coconut).
+  final String? assetIcon;
+  final String? assetSelectedIcon;
   final String label;
   final int badge;
 }
@@ -415,15 +422,19 @@ class _NavItemState extends State<_NavItem>
             ),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              child: widget.data.emoji != null
-                  // An emoji carries its own colour, so "unselected" is a
-                  // fade, not a tint.
-                  ? Opacity(
+              child: widget.data.assetIcon != null
+                  ? SvgPicture.asset(
+                      widget.selected
+                          ? widget.data.assetSelectedIcon!
+                          : widget.data.assetIcon!,
                       key: ValueKey(widget.selected),
-                      opacity: widget.selected ? 1.0 : 0.5,
-                      child: Text(
-                        widget.data.emoji!,
-                        style: const TextStyle(fontSize: 24, height: 1.1),
+                      width: 26,
+                      height: 26,
+                      colorFilter: ColorFilter.mode(
+                        widget.selected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.50),
+                        BlendMode.srcIn,
                       ),
                     )
                   : Icon(
