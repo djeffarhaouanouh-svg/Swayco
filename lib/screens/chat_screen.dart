@@ -614,8 +614,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           matches: _newMatches,
                           onTap: _openThread,
                         ),
-                        const SizedBox(height: 6),
-                        _rowDivider,
+                        const SizedBox(height: 10),
                       ],
                       if (_friends.isNotEmpty)
                         _SectionHeader(
@@ -1272,9 +1271,28 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          child: _title(),
+        ),
+        // Hairline right under the title — it delimits the section, Tinder-style.
+        Divider(
+          height: 1,
+          thickness: 1,
+          indent: 14,
+          endIndent: 14,
+          color: Colors.white.withValues(alpha: 0.10),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _title() {
+    return Row(
         children: [
           Text(
             label.toUpperCase(),
@@ -1307,7 +1325,6 @@ class _SectionHeader extends StatelessWidget {
             ),
           ],
         ],
-      ),
     );
   }
 }
@@ -1360,20 +1377,11 @@ class _MatchBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Cyan ring = never written to. It disappears with the bubble the
-            // moment the first message is sent.
-            Container(
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.accent, width: 2),
-              ),
-              child: ProfileAvatar(
-                displayName: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                avatarColorHex: profile.avatarColor,
-                size: 62,
-              ),
+            ProfileAvatar(
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+              avatarColorHex: profile.avatarColor,
+              size: 66,
             ),
             const SizedBox(height: 6),
             Text(
