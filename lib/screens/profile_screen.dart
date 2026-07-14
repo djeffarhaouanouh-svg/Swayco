@@ -623,6 +623,31 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _remote = _remote!.copyWith(bio: saved));
   }
 
+  /// Persist one of the "Mes infos" facts (age, height, job, sign, looking
+  /// for). Empty clears the column. Optimistic — the panel on Discover reads
+  /// the same row.
+  Future<void> _savePersonalInfo({
+    Object? age = _keep,
+    Object? heightCm = _keep,
+    Object? job = _keep,
+    Object? zodiac = _keep,
+    Object? lookingFor = _keep,
+  }) async {
+    if (_deviceId.isEmpty) return;
+    await ProfileApi.updatePersonalInfo(
+      userId: _deviceId,
+      age: identical(age, _keep) ? ProfileApi.unset : age,
+      heightCm: identical(heightCm, _keep) ? ProfileApi.unset : heightCm,
+      job: identical(job, _keep) ? ProfileApi.unset : job,
+      zodiac: identical(zodiac, _keep) ? ProfileApi.unset : zodiac,
+      lookingFor:
+          identical(lookingFor, _keep) ? ProfileApi.unset : lookingFor,
+    );
+    if (mounted) await _reload(silent: true);
+  }
+
+  static const Object _keep = Object();
+
   Future<void> _saveInterests(List<String> interests) async {
     if (_deviceId.isEmpty) return;
     final saved = await ProfileApi.updateMyInterests(
@@ -756,6 +781,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onEditName: _saveName,
                             onEditBio: _saveBio,
                             onEditInterests: _saveInterests,
+                            personalInfo: _remote,
+                            onSavePersonalInfo: _savePersonalInfo,
                             onTapLikes: _openLikesReceived,
                             onPickPhoto: _pickAndAddPhoto,
                             onPickAvatar: _pickAndSetAvatar,
@@ -918,6 +945,8 @@ class _IdentitySection extends StatelessWidget {
     required this.onEditBio,
     this.onPickAvatar,
     this.onEditInterests,
+    this.personalInfo,
+    this.onSavePersonalInfo,
     required this.onTapLikes,
     required this.onPickPhoto,
     required this.onRemovePhoto,
@@ -979,6 +1008,17 @@ class _IdentitySection extends StatelessWidget {
 
   /// Persist the edited interests list. Null in viewer mode (read-only).
   final Future<void> Function(List<String>)? onEditInterests;
+
+  /// The profile row behind the "Mes infos" section (age, height, job, star
+  /// sign, looking for) — the same facts the Discover card's panel shows.
+  final RemoteProfile? personalInfo;
+  final Future<void> Function({
+    Object? age,
+    Object? heightCm,
+    Object? job,
+    Object? zodiac,
+    Object? lookingFor,
+  })? onSavePersonalInfo;
   final VoidCallback onTapLikes;
 
   /// Own profile: append a photo to the gallery.
@@ -1244,6 +1284,15 @@ class _IdentitySection extends StatelessWidget {
         // Centres d'intérêt — picked chips + an "add" chip; tapping either
         // unfolds the category picker inline, right under the chips (no
         // overlay), then folds back when you're done. Shown ABOVE the photos.
+        // "Mes infos" — les faits que le panneau du Discover affiche sous la
+        // bio. Tout est optionnel : une ligne vide s'affiche "Ajouter".
+        _ProfileSectionHeader(AppStrings.t('info_section_title')),
+        const SizedBox(height: 12),
+        _PersonalInfoSection(
+          profile: personalInfo,
+          onSave: onSavePersonalInfo,
+        ),
+        const SizedBox(height: 24),
         _InterestsSection(
           interests: interests,
           onSave: onEditInterests,
@@ -1887,6 +1936,134 @@ class _PhotoGallery extends StatelessWidget {
 /// [placeholder] when empty) as centred tappable text; tapping turns it into
 /// a centred field that commits on submit (keyboard "done") or when focus
 /// leaves. Reused for the name and the bio on my own profile.
+/// Les 5 faits optionnels du profil, éditables en place. Une ligne vide se lit
+/// "Ajouter" : rien n'est obligatoire, et un champ vidé disparaît du panneau
+/// que la carte Discover déplie.
+class _PersonalInfoSection extends StatelessWidget {
+  const _PersonalInfoSection({required this.profile, required this.onSave});
+
+  final RemoteProfile? profile;
+  final Future<void> Function({
+    Object? age,
+    Object? heightCm,
+    Object? job,
+    Object? zodiac,
+    Object? lookingFor,
+  })? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final save = onSave;
+    if (save == null) return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: SC.glassStrong,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SC.glassBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        children: [
+          _PersonalInfoRow(
+            icon: Icons.cake_outlined,
+            label: AppStrings.t('info_age'),
+            value: p?.age?.toString() ?? '',
+            numeric: true,
+            onSave: (v) => save(age: v.isEmpty ? null : int.tryParse(v)),
+          ),
+          _PersonalInfoRow(
+            icon: Icons.straighten_rounded,
+            label: AppStrings.t('info_height'),
+            value: p?.heightCm?.toString() ?? '',
+            numeric: true,
+            onSave: (v) => save(heightCm: v.isEmpty ? null : int.tryParse(v)),
+          ),
+          _PersonalInfoRow(
+            icon: Icons.work_outline_rounded,
+            label: AppStrings.t('info_job'),
+            value: p?.job ?? '',
+            onSave: (v) => save(job: v),
+          ),
+          _PersonalInfoRow(
+            icon: Icons.auto_awesome_outlined,
+            label: AppStrings.t('info_zodiac'),
+            value: p?.zodiac ?? '',
+            onSave: (v) => save(zodiac: v),
+          ),
+          _PersonalInfoRow(
+            icon: Icons.favorite_outline_rounded,
+            label: AppStrings.t('info_looking_for'),
+            value: p?.lookingFor ?? '',
+            onSave: (v) => save(lookingFor: v),
+            last: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonalInfoRow extends StatelessWidget {
+  const _PersonalInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onSave,
+    this.numeric = false,
+    this.last = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool numeric;
+  final bool last;
+  final Future<void> Function(String) onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: SC.accent),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: const TextStyle(color: SC.textMuted, fontSize: 14),
+              ),
+              const Spacer(),
+              Flexible(
+                child: _InlineEditable(
+                  value: value,
+                  placeholder: AppStrings.t('info_add'),
+                  onSave: onSave,
+                  maxLength: 60,
+                  keyboardType: numeric ? TextInputType.number : null,
+                  style: const TextStyle(
+                    color: SC.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!last)
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withValues(alpha: 0.06),
+          ),
+      ],
+    );
+  }
+}
+
 class _InlineEditable extends StatefulWidget {
   const _InlineEditable({
     required this.value,
@@ -1895,11 +2072,15 @@ class _InlineEditable extends StatefulWidget {
     required this.maxLength,
     required this.style,
     this.maxLines = 1,
+    this.keyboardType,
   });
   final String value;
   final String placeholder;
   final Future<void> Function(String) onSave;
   final int maxLength;
+
+  /// Number pad for the numeric facts (age, height); null = plain text.
+  final TextInputType? keyboardType;
 
   /// Text style used both for the display text and the field — so editing
   /// looks like the static text it replaces.
@@ -1971,6 +2152,7 @@ class _InlineEditableState extends State<_InlineEditable> {
       focusNode: _focus,
       autofocus: true,
       textAlign: TextAlign.center,
+      keyboardType: widget.keyboardType,
       maxLength: widget.maxLength,
       maxLines: widget.maxLines,
       minLines: 1,

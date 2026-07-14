@@ -12,10 +12,12 @@ import '../services/friendship_api.dart';
 import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
+import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
+import '../theme/swayco_theme.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass_nav_bar.dart';
@@ -67,6 +69,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _searching = false;
   List<RemoteProfile> _searchResults = const [];
 
+  /// The card's info panel: pulled up from the photo, folded back down by a
+  /// drag or a tap on the scrim. While it's open the nav bar slides away and
+  /// the ✕ / ♥ float on top of the card.
+  bool _infoOpen = false;
+
+  void _openInfo() {
+    if (_infoOpen || _cards.isEmpty) return;
+    setState(() => _infoOpen = true);
+    NavChrome.hide();
+  }
+
+  void _closeInfo() {
+    if (!_infoOpen) return;
+    setState(() => _infoOpen = false);
+    NavChrome.show();
+  }
+
   // Tabs
   int _activeTab = 0;
   static const _tabs = ['Pour vous', 'Double Date', 'Astrologie'];
@@ -81,6 +100,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    NavChrome.show();
     _pollTimer?.cancel();
     _searchDebounce?.cancel();
     _searchCtrl.dispose();
@@ -194,6 +214,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       FriendshipApi.statusWith(_myId, peer.id, _myFriendships).$1;
 
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
+    _closeInfo();
     if (isRight) {
       HapticFeedback.lightImpact();
       _likePeer(profile);
@@ -286,17 +307,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final cardBottom = btnBottom + actionH + 14;
     final tabBarH = safeTop + _TopTabBar.height;
 
+    // Panneau ouvert : la carte descend dans l'espace libéré par la nav, et le
+    // panneau occupe sa moitié basse — la photo reste visible au-dessus.
+    final openCardBottom = safeBottom + 12;
+    final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
+
     return Scaffold(
       backgroundColor: Colors.black,
       extendBody: true,
       body: Stack(
         children: [
           // ── Card — flotte sous le header (coins arrondis bien visibles) ──
-          Positioned(
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
             top: tabBarH + 8,
             left: 8,
             right: 8,
-            bottom: cardBottom,
+            bottom: currentCardBottom,
             child: _feedLoading
                 ? const Center(
                     child: CircularProgressIndicator(
@@ -311,12 +339,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         cards: _cards,
                         currentIndex: _currentIndex,
                         onSwiped: _onCardSwiped,
+                        onPullUp: _openInfo,
+                        infoOpen: _infoOpen,
+                        onCloseInfo: _closeInfo,
                       ),
           ),
 
           // ── Retour arrière — coin haut-GAUCHE de la photo, verre nu (pas de
           //    liseré cyan : seule l'icône est colorée). ─────────────────────
-          if (!_feedLoading && _cards.isNotEmpty)
+          if (!_feedLoading && _cards.isNotEmpty && !_infoOpen)
             Positioned(
               top: tabBarH + 20,
               left: 20,
@@ -343,11 +374,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           ),
 
-          // ── Boutons action — sur le gradient sombre de la card ────────────
-          Positioned(
+          // ── Boutons action — sous la carte au repos, flottant PAR-DESSUS
+          //    elle (sur le panneau) dès qu'il est déplié. ─────────────────
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
-            bottom: btnBottom,
+            bottom: _infoOpen ? safeBottom + 4 : btnBottom,
             height: actionH,
             child: _SwipeActionBar(
               height: actionH,
@@ -570,11 +604,21 @@ class _TinderCardStack extends StatefulWidget {
     required this.cards,
     required this.currentIndex,
     required this.onSwiped,
+    required this.onPullUp,
+    required this.infoOpen,
+    required this.onCloseInfo,
   });
 
   final List<({RemoteProfile profile, List<String> photos})> cards;
   final int currentIndex;
   final void Function(bool isRight, RemoteProfile profile) onSwiped;
+
+  /// Dragging the photo upward asks for the info panel.
+  final VoidCallback onPullUp;
+
+  /// True while that panel is up — it covers the bottom half of the card.
+  final bool infoOpen;
+  final VoidCallback onCloseInfo;
 
   @override
   State<_TinderCardStack> createState() => _TinderCardStackState();
@@ -607,7 +651,12 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     if (n == 0) return const SizedBox.shrink();
     final i = widget.currentIndex % n;
 
-    return Stack(
+    return LayoutBuilder(
+      builder: (context, c) {
+        // The panel takes a bit over half the card — the photo has to keep
+        // reading as the subject, and the fold-back drag needs a target.
+        final panelH = c.maxHeight * 0.58;
+        return Stack(
         children: [
           // Back card (3rd)
           if (n >= 3)
@@ -635,11 +684,45 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               key: _topKey,
               onSwiped: (right) => widget.onSwiped(right, widget.cards[i].profile),
               onProgress: (p) => _progress.value = p,
+              // Pulling the photo up is what opens the panel — no chevron.
+              onPullUp: widget.onPullUp,
+              locked: widget.infoOpen,
               child: _buildCard(widget.cards[i]),
+            ),
+          ),
+          // Tapping the photo above the panel folds it back.
+          if (widget.infoOpen)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: panelH,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onCloseInfo,
+                onVerticalDragEnd: (d) {
+                  if ((d.primaryVelocity ?? 0) > 0) widget.onCloseInfo();
+                },
+                child: const SizedBox.expand(),
+              ),
+            ),
+          // The panel itself — slides up from the bottom edge of the card.
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            left: 0,
+            right: 0,
+            height: panelH,
+            bottom: widget.infoOpen ? 0 : -panelH,
+            child: _ProfileInfoPanel(
+              profile: widget.cards[i].profile,
+              onClose: widget.onCloseInfo,
             ),
           ),
         ],
       );
+      },
+    );
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
@@ -662,6 +745,174 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               borderRadius: BorderRadius.circular(24),
               child: tinderCard,
             ),
+    );
+  }
+}
+
+/// Le panneau que la carte déplie : la bio d'abord, puis les infos que la
+/// personne a choisi de partager (âge, taille, métier, signe, ce qu'elle
+/// cherche), puis ses centres d'intérêt. Il reste DANS la carte — on ne change
+/// pas de page — et se rabat d'un glissement vers le bas.
+class _ProfileInfoPanel extends StatelessWidget {
+  const _ProfileInfoPanel({required this.profile, required this.onClose});
+
+  final RemoteProfile profile;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final lang = findLanguageByCode(p.language);
+    final place = [p.city.trim(), p.country.trim()]
+        .where((e) => e.isNotEmpty)
+        .join(', ');
+    final facts = <({IconData icon, String label})>[
+      if (p.age != null)
+        (icon: Icons.cake_outlined, label: AppStrings.t('info_age_value', args: {'n': '${p.age}'})),
+      if (p.heightCm != null)
+        (icon: Icons.straighten_rounded, label: '${p.heightCm} cm'),
+      if (p.job.trim().isNotEmpty)
+        (icon: Icons.work_outline_rounded, label: p.job.trim()),
+      if (p.zodiac.trim().isNotEmpty)
+        (icon: Icons.auto_awesome_outlined, label: p.zodiac.trim()),
+      if (p.lookingFor.trim().isNotEmpty)
+        (icon: Icons.favorite_outline_rounded, label: p.lookingFor.trim()),
+      if (place.isNotEmpty)
+        (icon: Icons.place_outlined, label: place),
+      if (lang != null)
+        (icon: Icons.translate_rounded, label: '${lang.flag}  ${lang.label}'),
+    ];
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // Un glissement vers le bas suffit à le rabattre — pas de bouton.
+      onVerticalDragEnd: (d) {
+        if ((d.primaryVelocity ?? 0) > 120) onClose();
+      },
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF101418).withValues(alpha: 0.94),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // La poignée : elle dit "tire-moi vers le bas".
+                Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 8),
+                  child: Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
+                    children: [
+                      if (p.bio.trim().isNotEmpty) ...[
+                        _PanelSectionTitle(AppStrings.t('info_bio')),
+                        const SizedBox(height: 8),
+                        Text(
+                          p.bio.trim(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.5,
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                      ],
+                      if (facts.isNotEmpty) ...[
+                        _PanelSectionTitle(AppStrings.t('info_about')),
+                        const SizedBox(height: 10),
+                        for (final f in facts)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                Icon(f.icon, size: 18, color: SC.accent),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    f.label,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (p.interests.isNotEmpty) ...[
+                        _PanelSectionTitle(AppStrings.t('info_interests')),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final tag in p.interests)
+                              _InterestChip(label: interestLabel(tag)),
+                          ],
+                        ),
+                      ],
+                      if (p.bio.trim().isEmpty &&
+                          facts.isEmpty &&
+                          p.interests.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            AppStrings.t('info_empty'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelSectionTitle extends StatelessWidget {
+  const _PanelSectionTitle(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: const TextStyle(
+        color: SC.accent,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.8,
+      ),
     );
   }
 }
@@ -702,10 +953,19 @@ class _DraggableCard extends StatefulWidget {
     required this.child,
     required this.onSwiped,
     required this.onProgress,
+    this.onPullUp,
+    this.locked = false,
   });
   final Widget child;
   final ValueChanged<bool> onSwiped;
   final ValueChanged<double> onProgress;
+
+  /// Fired when the gesture was a real upward pull — the info panel opens
+  /// instead of the card flying off.
+  final VoidCallback? onPullUp;
+
+  /// True while the panel is up: the card must not swipe under it.
+  final bool locked;
 
   @override
   State<_DraggableCard> createState() => _DraggableCardState();
@@ -786,6 +1046,12 @@ class _DraggableCardState extends State<_DraggableCard>
   bool _dragEngaged = false;
   static const double _kDragEngageSlop = 6.0;
 
+  /// Which way the finger committed once it passed the slop. An upward pull
+  /// belongs to the info panel; anything else is the Tinder swipe. Deciding
+  /// once, at engage time, keeps a sloppy diagonal from doing both.
+  bool _pullingUp = false;
+  static const double _kPullUpThreshold = 48.0;
+
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
@@ -798,16 +1064,24 @@ class _DraggableCardState extends State<_DraggableCard>
         _dragEngaged = false;
       },
       onPointerMove: (e) {
-        if (_flying) return;
+        if (_flying || widget.locked) return;
         final origin = _dragOrigin;
         if (!_dragEngaged) {
           if (origin == null ||
               (e.position - origin).distance < _kDragEngageSlop) {
             return; // micro-mouvement : pas encore un drag, laisse le tap gagner
           }
+          final d = e.position - origin;
+          // Franchement vers le haut → c'est le panneau qu'on tire, pas la carte.
+          _pullingUp = d.dy < 0 && d.dy.abs() > d.dx.abs();
           _dragEngaged = true;
           _ctrl.stop();
           _anim = null;
+        }
+        if (_pullingUp) {
+          // On laisse la carte immobile : le panneau fera l'animation.
+          _pos += Offset(0, e.delta.dy);
+          return;
         }
         setState(() {
           _pos += Offset(e.delta.dx, e.delta.dy * 0.3);
@@ -816,9 +1090,17 @@ class _DraggableCardState extends State<_DraggableCard>
       },
       onPointerUp: (_) {
         final wasEngaged = _dragEngaged;
+        final wasPullingUp = _pullingUp;
+        final travelled = _pos;
         _dragEngaged = false;
+        _pullingUp = false;
         _dragOrigin = null;
         if (!wasEngaged || _flying) return;
+        if (wasPullingUp) {
+          _pos = Offset.zero;
+          if (travelled.dy <= -_kPullUpThreshold) widget.onPullUp?.call();
+          return;
+        }
         if (_pos.dx.abs() >= _kThreshold) {
           _flyOff(_pos.dx > 0);
         } else {

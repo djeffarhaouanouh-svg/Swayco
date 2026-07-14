@@ -16,6 +16,7 @@ import '../services/call_audio.dart';
 import '../services/incoming_call_api.dart';
 import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
+import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
 import '../services/profile_api.dart';
@@ -558,22 +559,40 @@ class _RootShellState extends State<RootShell> {
                       right: 52,
                       bottom: MediaQuery.paddingOf(context).bottom +
                           GlassNavBar.floatBottom,
-                      // Rebuild on every pager tick so the highlight pill
-                      // glides with the swipe instead of snapping at the end.
-                      child: AnimatedBuilder(
-                        animation: _pageController,
-                        builder: (context, _) {
-                          final frac = _pageController.hasClients
-                              ? (_pageController.page ?? index.toDouble())
-                              : index.toDouble();
-                          return GlassNavBar(
-                            selected: index,
-                            selectedFraction: frac,
-                            unreadChat: unread,
-                            unreadRequests: pending + activity,
-                            onSelect: _selectTab,
-                          );
-                        },
+                      // A page can ask for the bottom of the screen (the
+                      // Discover info panel does): the bar slides out below.
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: NavChrome.hidden,
+                        builder: (context, hidden, child) => IgnorePointer(
+                          ignoring: hidden,
+                          child: AnimatedSlide(
+                            offset: hidden ? const Offset(0, 1.8) : Offset.zero,
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: AnimatedOpacity(
+                              opacity: hidden ? 0 : 1,
+                              duration: const Duration(milliseconds: 200),
+                              child: child,
+                            ),
+                          ),
+                        ),
+                        // Rebuild on every pager tick so the highlight pill
+                        // glides with the swipe instead of snapping at the end.
+                        child: AnimatedBuilder(
+                          animation: _pageController,
+                          builder: (context, _) {
+                            final frac = _pageController.hasClients
+                                ? (_pageController.page ?? index.toDouble())
+                                : index.toDouble();
+                            return GlassNavBar(
+                              selected: index,
+                              selectedFraction: frac,
+                              unreadChat: unread,
+                              unreadRequests: pending + activity,
+                              onSelect: _selectTab,
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],

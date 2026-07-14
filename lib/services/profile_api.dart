@@ -61,6 +61,11 @@ class RemoteProfile {
     this.lastSeen,
     this.nameChangedAt,
     this.referralCode = '',
+    this.age,
+    this.heightCm,
+    this.job = '',
+    this.zodiac = '',
+    this.lookingFor = '',
   });
 
   final String id;
@@ -103,6 +108,15 @@ class RemoteProfile {
   /// card. Either may be empty.
   final String country;
   final String city;
+
+  /// The optional facts a person chooses to share — they fill the info panel
+  /// that the Discover card pulls up, under the bio. Any of them may be unset
+  /// (null / empty), in which case its row simply isn't rendered.
+  final int? age;
+  final int? heightCm;
+  final String job;
+  final String zodiac;
+  final String lookingFor;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -212,6 +226,15 @@ class RemoteProfile {
     return DateTime.tryParse(s)?.toLocal();
   }
 
+  /// Null-safe int: an absent / blank / bogus column stays null (the row it
+  /// would fill just doesn't render).
+  static int? _parseIntOrNull(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
   static int _parseInt(dynamic v, int fallback) {
     if (v is int) return v;
     if (v is num) return v.toInt();
@@ -260,6 +283,11 @@ class RemoteProfile {
     }(),
     country: m['country']?.toString() ?? '',
     city: m['city']?.toString() ?? '',
+    age: _parseIntOrNull(m['age']),
+    heightCm: _parseIntOrNull(m['height_cm']),
+    job: m['job']?.toString() ?? '',
+    zodiac: m['zodiac']?.toString() ?? '',
+    lookingFor: m['looking_for']?.toString() ?? '',
     gender: () {
       final g = m['gender']?.toString().trim() ?? '';
       return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -304,6 +332,11 @@ class RemoteProfile {
     List<String>? interests,
     String? country,
     String? city,
+    int? age,
+    int? heightCm,
+    String? job,
+    String? zodiac,
+    String? lookingFor,
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
@@ -331,6 +364,11 @@ class RemoteProfile {
     emojis: emojis ?? this.emojis,
     interests: interests ?? this.interests,
     country: country ?? this.country,
+    age: age ?? this.age,
+    heightCm: heightCm ?? this.heightCm,
+    job: job ?? this.job,
+    zodiac: zodiac ?? this.zodiac,
+    lookingFor: lookingFor ?? this.lookingFor,
     city: city ?? this.city,
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
@@ -1107,6 +1145,40 @@ abstract final class ProfileApi {
       return false;
     }
   }
+
+  /// Persist one of the optional "personal info" facts shown in the Discover
+  /// info panel. Pass only the field being edited; the others are left alone.
+  /// An empty string / null CLEARS the column (the row stops rendering), which
+  /// is why every parameter is nullable and explicitly checked.
+  static Future<bool> updatePersonalInfo({
+    required String userId,
+    Object? age = unset,
+    Object? heightCm = unset,
+    Object? job = unset,
+    Object? zodiac = unset,
+    Object? lookingFor = unset,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return false;
+    final patch = <String, dynamic>{};
+    if (!identical(age, unset)) patch['age'] = age;
+    if (!identical(heightCm, unset)) patch['height_cm'] = heightCm;
+    if (!identical(job, unset)) patch['job'] = job;
+    if (!identical(zodiac, unset)) patch['zodiac'] = zodiac;
+    if (!identical(lookingFor, unset)) patch['looking_for'] = lookingFor;
+    if (patch.isEmpty) return true;
+    try {
+      patch['updated_at'] = DateTime.now().toUtc().toIso8601String();
+      await _c.from('profiles').update(patch).eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('ProfileApi.updatePersonalInfo failed: $e');
+      return false;
+    }
+  }
+
+  /// Sentinel telling [updatePersonalInfo] "this field wasn't passed" — null
+  /// means "clear it", so it can't double as the absent marker.
+  static const Object unset = Object();
 
   /// Persist the "send me re-engagement emails" toggle. The backend reads
   /// `profiles.email_notifications` before sending any email, so this is the
