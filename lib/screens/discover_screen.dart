@@ -17,7 +17,6 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
-import '../theme/swayco_theme.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass_nav_bar.dart';
@@ -793,15 +792,23 @@ class _ProfileInfoPanel extends StatelessWidget {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          // Verre clair type iOS : la photo transparaît, le texte passe en noir.
+          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF101418).withValues(alpha: 0.94),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.72),
+                  Colors.white.withValues(alpha: 0.60),
+                ],
+              ),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(24),
               ),
               border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.75)),
               ),
             ),
             child: Column(
@@ -815,7 +822,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                       width: 44,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.28),
+                        color: Colors.black.withValues(alpha: 0.28),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -831,7 +838,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                         Text(
                           p.bio.trim(),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black,
                             fontSize: 15.5,
                             height: 1.45,
                           ),
@@ -846,13 +853,13 @@ class _ProfileInfoPanel extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               children: [
-                                Icon(f.icon, size: 18, color: SC.accent),
+                                Icon(f.icon, size: 18, color: Colors.black87),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     f.label,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Colors.black,
                                       fontSize: 15,
                                     ),
                                   ),
@@ -870,7 +877,27 @@ class _ProfileInfoPanel extends StatelessWidget {
                           runSpacing: 8,
                           children: [
                             for (final tag in p.interests)
-                              _InterestChip(label: interestLabel(tag)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.55),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.black.withValues(alpha: 0.10),
+                                  ),
+                                ),
+                                child: Text(
+                                  interestLabel(tag),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -883,7 +910,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                             AppStrings.t('info_empty'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
+                              color: Colors.black.withValues(alpha: 0.55),
                               fontSize: 14,
                             ),
                           ),
@@ -908,8 +935,8 @@ class _PanelSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label.toUpperCase(),
-      style: const TextStyle(
-        color: SC.accent,
+      style: TextStyle(
+        color: Colors.black.withValues(alpha: 0.55),
         fontSize: 12,
         fontWeight: FontWeight.w800,
         letterSpacing: 0.8,
