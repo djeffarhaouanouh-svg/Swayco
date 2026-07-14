@@ -12,7 +12,6 @@ import '../services/friendship_api.dart';
 import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
-import '../services/missions_service.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
@@ -99,7 +98,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final id = await DeviceId.getOrCreate();
     if (!mounted) return;
     setState(() => _myId = id);
-    MissionsService.instance.refresh(id);
     if (!isSupabaseReady || id.isEmpty) {
       setState(() => _feedLoading = false);
       AppBoot.markHomeReady();

@@ -656,9 +656,7 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     ),
     safeCount("blocked_users"),
     safeCount("reports"),
-    safeRows("profiles", "photos, interests, missions_done", (q) =>
-      q.limit(200000),
-    ),
+    safeRows("profiles", "photos, interests", (q) => q.limit(200000)),
   ]);
 
   const users = overview.totalUsers || 0;
@@ -683,27 +681,20 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
   }
   const avgCallMin = endedCalls > 0 ? callSecs / endedCalls / 60 : 0;
 
-  // Profiles: photos, interests, and mission-based completion. The app's
-  // onboarding has 6 missions (see lib/services/missions_service.dart);
-  // completion = filled missions / 6, averaged across all profiles.
-  const MISSIONS = 6;
+  // Profiles: photos + interests.
   let photoTotal = 0;
   let withPhoto = 0;
   let interestTotal = 0;
-  let missionTotal = 0;
   for (const p of profileRows) {
     const photos = Array.isArray(p.photos) ? p.photos : [];
     const interests = Array.isArray(p.interests) ? p.interests : [];
-    const missions = Array.isArray(p.missions_done) ? p.missions_done : [];
     photoTotal += photos.length;
     if (photos.length > 0) withPhoto++;
     interestTotal += interests.length;
-    missionTotal += Math.min(missions.length, MISSIONS);
   }
   const seen = profileRows.length || 0;
   const avgPhotos = seen > 0 ? photoTotal / seen : 0;
   const avgInterests = seen > 0 ? interestTotal / seen : 0;
-  const avgMissions = seen > 0 ? missionTotal / seen : 0;
   const withPhotoRate = seen > 0 ? withPhoto / seen : 0;
 
   const todayDau = retention.dau.length
@@ -855,13 +846,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     },
 
     // ─── Profil ───
-    {
-      group: "Profil",
-      label: "Complétion de profil",
-      total: fmtPct(avgMissions / MISSIONS),
-      perUser: `${fmtNum(avgMissions)} / ${MISSIONS}`,
-      detail: "missions d'onboarding remplies",
-    },
     {
       group: "Profil",
       label: "Photos",

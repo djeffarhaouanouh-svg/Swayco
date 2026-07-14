@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
-import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 
@@ -234,30 +233,6 @@ abstract final class ChatApi {
     return out;
   }
 
-  /// True once the user has sent ANY real message to anyone — text, image,
-  /// voice or a Discover intro, from any screen. Pure rail reactions
-  /// (emoji-only bodies) don't count. Used by the onboarding "first message"
-  /// mission, which must not depend on WHERE the message was sent.
-  static Future<bool> hasSentAnyMessage(String meId) async {
-    if (meId.isEmpty) return false;
-    try {
-      final rows = await _client
-          .from('messages')
-          .select('body')
-          .eq('sender', meId)
-          .limit(200);
-      for (final r in rows as List) {
-        final body = (Map<String, dynamic>.from(r as Map)['body'] ?? '')
-            .toString();
-        if (!photoReactionEmojis.contains(body)) return true;
-      }
-      return false;
-    } catch (e) {
-      debugPrint('ChatApi.hasSentAnyMessage failed: $e');
-      return false;
-    }
-  }
-
   /// Photo reactions (Discover-rail emoji taps) addressed to [meId] — one
   /// entry per DISTINCT reaction (sender + photo + emoji), so a person who
   /// reacts to several photos (or with several emojis) accumulates instead of
@@ -366,7 +341,6 @@ abstract final class ChatApi {
       senderId: senderId,
       body: body,
     ));
-    pokeMissions();
   }
 
   /// Resolve the recipient's language (param or fetch) and fire the localised
@@ -443,7 +417,6 @@ abstract final class ChatApi {
       senderId: senderId,
       imageBody: true,
     ));
-    pokeMissions();
   }
 
   /// Delete a single message by id. Used by "long-press → delete" on a

@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
-import 'mission_signal.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -53,28 +52,9 @@ abstract final class LikeApi {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'liker,liked,photo_url');
       unawaited(_notifyLike(likerId, likedId));
-      pokeMissions();
     } catch (e) {
       debugPrint('LikeApi.like failed: $e');
       rethrow;
-    }
-  }
-
-  /// True once anyone has liked one of [userId]'s photos — drives the "receive
-  /// a like" onboarding mission. Passive (the user can't trigger it), so it's
-  /// detected on refresh rather than poked.
-  static Future<bool> hasReceivedLike(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) return false;
-    try {
-      final rows = await _c
-          .from('likes')
-          .select('liker')
-          .eq('liked', userId)
-          .limit(1);
-      return (rows as List).isNotEmpty;
-    } catch (e) {
-      debugPrint('LikeApi.hasReceivedLike failed: $e');
-      return false;
     }
   }
 

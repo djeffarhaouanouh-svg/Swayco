@@ -71,8 +71,7 @@ export default async function TableauPage() {
         Les moyennes « par utilisateur » = total cumulé ÷ nombre total
         d&apos;utilisateurs. Les métriques d&apos;activité (DAU, rétention,
         nouveaux) gardent leur fenêtre temporelle, indiquée dans la colonne
-        Détail. La complétion de profil = missions d&apos;onboarding remplies
-        sur 6.
+        Détail.
       </p>
     </>
   );

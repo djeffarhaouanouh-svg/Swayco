@@ -9,14 +9,12 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
 import '../services/voice_message_api.dart';
 
 import '../services/app_strings.dart';
-import '../services/auth_service.dart';
 import '../services/block_api.dart';
 import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
@@ -26,8 +24,6 @@ import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/like_api.dart';
-import '../services/missions_service.dart';
-import '../services/revenue_cat.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
@@ -37,8 +33,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/glass_panel.dart';
-import '../widgets/missions_ring.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -47,7 +41,6 @@ import 'chat_thread_screen.dart';
 import 'friends_list_screen.dart';
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
-import 'paywall_screen.dart';
 import 'settings_screen.dart';
 
 /// Profile view. Two modes:
@@ -96,8 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   // state on the "Ajouter" button.
   bool _iRequestedPeer = false;
   Timer? _pollTimer;
-  // Lets the mission celebration scroll the missions card into view.
-  final GlobalKey _missionsKey = GlobalKey();
 
   bool get _isViewingOther => widget.userId != null;
   String get _targetId => widget.userId ?? _deviceId;
@@ -114,30 +105,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       const Duration(seconds: 12),
       () => _reload(silent: true),
     );
-    MissionsService.instance.justCompleted.addListener(_onMissionFlash);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    MissionsService.instance.justCompleted.removeListener(_onMissionFlash);
     _pollTimer?.cancel();
     super.dispose();
-  }
-
-  /// When a mission completes, bring the missions card into view (own profile
-  /// only) so the celebration star is visible flying into its ring.
-  void _onMissionFlash() {
-    if (!mounted || _isViewingOther) return;
-    if (MissionsService.instance.justCompleted.value == null) return;
-    final ctx = _missionsKey.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 340),
-      curve: Curves.easeOutCubic,
-      alignment: 0.4,
-    );
   }
 
   @override
@@ -215,11 +189,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       _iRequestedPeer = iRequestedPeer;
       _loading = false;
     });
-    // Refresh the onboarding-missions ring for my OWN profile (force so an edit
-    // just made — bio, interests, photo — shows up and fires the shooting star).
-    if (!_isViewingOther) {
-      MissionsService.instance.refresh(deviceId, force: true);
-    }
   }
 
   /// Optimistic like/unlike of one of the peer's photos (viewer mode). Roll
@@ -818,55 +787,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                           ),
-                          const SizedBox(height: 20),
-                          _LanguageCard(language: lang),
-                          if (!_isViewingOther) ...[
-                            // "Mon abonnement" — directly under the spoken-
-                            // language card. Web (Stripe) + native with
-                            // RevenueCat configured; hidden on native without it
-                            // (would fall back to forbidden Stripe).
-                            if (kIsWeb || RevenueCat.isConfigured) ...[
-                              const SizedBox(height: 16),
-                              _MySubscriptionSection(
-                                currentTier:
-                                    _remote?.subscriptionTier ?? 'free',
-                              ),
-                            ],
-                            // Missions ring — earn call minutes by completing
-                            // onboarding quests. Sits above the referral block.
-                            const SizedBox(height: 20),
-                            MissionsCard(key: _missionsKey),
-                            // Referral section — sits between the language card
-                            // (above) and "Mon abonnement" (below): invite 3
-                            // friends, earn 15 min of translated calls.
-                            const SizedBox(height: 20),
-                            const _InviteFriendsSection(),
-                            // Voice-clone card. Shown to ALL tiers when viewing
-                            // your own profile — Ultra users get the recording
-                            // flow, everyone else gets a locked state that
-                            // points at the Ultra checkout. The visible "🔒
-                            // Réservé Ultra" hint is a deliberate upsell hook;
-                            // hiding the feature for non-Ultra would forfeit
-                            // the conversion event.
-                            // TEMPORARILY HIDDEN — "Clone my voice" card removed from
-                            // the UI on request. The widget and all supporting code
-                            // (_VoiceCloneCard, enrollClonedVoice, etc.) are left
-                            // intact so this block can simply be uncommented to
-                            // restore the feature.
-                            // if (!_isViewingOther) ...[
-                            //   _VoiceCloneCard(
-                            //     isUltra: _remote?.isUltra == true,
-                            //     alreadyEnrolled: _remote?.hasClonedVoice == true,
-                            //     onEnrolled: () {
-                            //       // Refresh the remote profile so the badge
-                            //       // flips to "Voix clonée" without a manual
-                            //       // pull-to-refresh.
-                            //       unawaited(_reload(silent: true));
-                            //     },
-                            //   ),
-                            //   const SizedBox(height: 16),
-                            // ],
-                          ],
                         ],
                       ),
               ),
@@ -1200,204 +1120,6 @@ class CreditsCard extends StatelessWidget {
   }
 }
 
-/// Collapsible "Mon abonnement" card that gates the upgrade pricing
-/// cards behind a header tap. Mirrors the rest of the profile card
-/// stack (SC.bubbleIn surface, 16 px radius, slate border) and slides
-/// the [_PlansSection] in / out via an AnimatedSize. Hidden entirely
-/// when the user is on the top tier (Ultra Plus) — no upgrades to
-/// surface.
-/// Referral section on the user's own profile (between the language card and
-/// "Mon abonnement"): invite 3 friends with your link, earn 15 min. Fetches
-/// the referral code + signed-up count itself and opens the OS share sheet.
-class _InviteFriendsSection extends StatefulWidget {
-  const _InviteFriendsSection();
-
-  @override
-  State<_InviteFriendsSection> createState() => _InviteFriendsSectionState();
-}
-
-class _InviteFriendsSectionState extends State<_InviteFriendsSection> {
-  String _code = '';
-  int _referrals = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  Future<void> _load() async {
-    final uid = AuthService.currentUserId;
-    if (uid.isEmpty) return;
-    final p = await ProfileApi.fetchById(uid);
-    final n = await ProfileApi.countReferrals(uid);
-    if (!mounted) return;
-    setState(() {
-      _code = p?.referralCode ?? '';
-      _referrals = n;
-    });
-  }
-
-  Future<void> _share() async {
-    final box = context.findRenderObject() as RenderBox?;
-    final link = _code.isEmpty
-        ? 'https://www.swayco.fr'
-        : 'https://www.swayco.fr/?ref=$_code';
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text', args: {'link': link}),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // User cancelled or sharing unavailable.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = _referrals % 3;
-    return GlassPanel(
-      borderRadius: 20,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: SC.accent.withValues(alpha: 0.15),
-                ),
-                child: const Icon(
-                  Icons.group_add_rounded,
-                  color: SC.accent,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  AppStrings.t('invite_bonus_title'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            AppStrings.t('invite_bonus_body'),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            AppStrings.t(
-              'invite_bonus_progress',
-              args: {'count': '$progress', 'total': '3'},
-            ),
-            style: const TextStyle(
-              color: SC.accent,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _share,
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.ios_share_rounded, size: 18),
-              label: Text(AppStrings.t('invite_bonus_share_cta')),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MySubscriptionSection extends StatelessWidget {
-  const _MySubscriptionSection({required this.currentTier});
-
-  final String currentTier;
-
-  /// Tier ladder, used only to decide whether the user has any upgrade
-  /// above their current tier. Ultra users have none, so the whole
-  /// "Mon abonnement" row disappears.
-  static const List<String> _ladder = ['free', 'plus', 'ultra_plus'];
-
-  @override
-  Widget build(BuildContext context) {
-    final i = _ladder.indexOf(currentTier);
-    final rank = i < 0 ? 0 : i;
-    final hasUpgrades = _ladder.skip(rank + 1).isNotEmpty;
-    if (!hasUpgrades) return const SizedBox.shrink();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SC.glassBorder),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          // Tapping the row slides the paywall up from the bottom as a
-          // modal sheet instead of expanding the pricing cards inline.
-          onTap: () => showPaywallSheet(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.workspace_premium_outlined,
-                  color: SC.accent,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    AppStrings.t('my_subscription_section'),
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: SC.textMuted),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Opens the Stripe Customer Portal. Shown on the credits card when
 /// the user is already Pro / Ultra so they can cancel / change card /
 /// upgrade / downgrade. Web-only.
@@ -1445,51 +1167,6 @@ class _ManageSubscriptionButtonState extends State<_ManageSubscriptionButton> {
             )
           : const Icon(Icons.settings_outlined, size: 18),
       label: const Text('Gérer mon abonnement'),
-    );
-  }
-}
-
-/// The account language, shown as "Speaks X".
-///
-/// It no longer warns that calls must be held in this language: the call screen
-/// lets the user switch the language they speak mid-call, so the account one is
-/// only a default now, not a rule.
-class _LanguageCard extends StatelessWidget {
-  const _LanguageCard({required this.language});
-  final AppLanguage? language;
-
-  @override
-  Widget build(BuildContext context) {
-    final flag = language?.flag ?? '🌐';
-    // Language name localised to the UI language (e.g. "French" in EN,
-    // "Français" in FR) — not the native label, so it never reads
-    // "Speaks Français".
-    final langName = language != null
-        ? AppStrings.t('lang_name_${language!.code}')
-        : '';
-    final label = language != null
-        ? AppStrings.t('profile_speaks', args: {'lang': langName})
-        : AppStrings.t('profile_no_language');
-    return GlassPanel(
-      borderRadius: 16,
-      color: SC.glassStrong,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: Row(
-        children: [
-          Text(flag, style: const TextStyle(fontSize: 32)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -3172,12 +2849,6 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The hint is two sentences joined by "\n". Show each on its own row with
-    // its own ⓘ, and put the short "framed photo" sentence (always the 2nd)
-    // first — hence the reversed order.
-    final sentences = AppStrings.t(
-      'discover_visibility_hint',
-    ).split('\n').where((s) => s.trim().isNotEmpty).toList().reversed.toList();
     return Align(
       alignment: Alignment.centerLeft,
       child: InkWell(
@@ -3185,40 +2856,26 @@ class _DiscoverVisibilityHint extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (var i = 0; i < sentences.length; i++)
-                Padding(
-                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 1),
-                        child: Icon(
-                          Icons.info_outline,
-                          size: 14,
-                          color: SC.textMuted,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        // Keywords wrapped in **…** in app_strings render cyan.
-                        child: Text.rich(
-                          _highlightKeywords(sentences[i]),
-                          style: const TextStyle(
-                            color: SC.textMuted,
-                            fontSize: 12,
-                            height: 1.35,
-                          ),
-                        ),
-                      ),
-                    ],
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(Icons.info_outline, size: 14, color: SC.textMuted),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                // Keywords wrapped in **…** in app_strings render cyan.
+                child: Text.rich(
+                  _highlightKeywords(AppStrings.t('discover_visibility_hint')),
+                  style: const TextStyle(
+                    color: SC.textMuted,
+                    fontSize: 12,
+                    height: 1.35,
                   ),
                 ),
+              ),
             ],
           ),
         ),
