@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 /// Small curated list of UI-facing languages (BCP-47 primary subtag).
 class AppLanguage {
   const AppLanguage({
@@ -52,6 +54,21 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'uk', flag: '🇺🇦', label: 'Українська'),
   AppLanguage(code: 'hi', flag: '🇮🇳', label: 'हिन्दी'),
 ];
+
+/// The phone's own language, when we support it — used to pre-select the
+/// onboarding picker so a first-run user confirms instead of choosing.
+///
+/// [PlatformDispatcher.locales] is ordered by the user's OS preference, so the
+/// first entry we support is the best guess. Returns null rather than a default
+/// when none matches: the caller decides, and a wrong guess here becomes the
+/// language their first call is transcribed in.
+String? deviceLanguageCode() {
+  for (final locale in PlatformDispatcher.instance.locales) {
+    final match = findLanguageByCode(locale.languageCode);
+    if (match != null) return match.code;
+  }
+  return null;
+}
 
 /// Returns the language whose primary subtag matches [code] (case-insensitive),
 /// or null if the code is empty or unknown.

@@ -24,6 +24,7 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
+import '../swayco/asr/asr_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
@@ -287,6 +288,27 @@ class _CallScreenState extends State<CallScreen> {
   /// we only re-attach when it actually changes.
   String _attachedTargetLang = '';
 
+  /// Same, for the source: a source-only change leaves the target untouched, so
+  /// without this the re-attach would be short-circuited and the input language
+  /// button would do nothing.
+  String _attachedSourceLang = '';
+
+  /// The language this phone TRANSCRIBES its own mic in. Starts at the account
+  /// language and is changeable mid-call via the input language button.
+  ///
+  /// Unlike [_myOutputLang] this is a purely local concern — the peer never
+  /// needs to know it, because we ship them translated text, not audio. What it
+  /// costs is a pipeline restart: `attachToRoom` tears the mic streamer down and
+  /// the on-device engine reloads with the new `language:` (no download — the
+  /// universal model covers every language in [supportedLanguages]).
+  late String _mySourceLang = widget.mySourceLang;
+
+  /// True while the engine reloads for a new input language. The button is
+  /// locked for the duration: a second change while the first load is in flight
+  /// would be silently dropped by [AsrService.ensureLanguageInstalled], leaving
+  /// the recogniser pinned to the previous language.
+  bool _switchingInputLang = false;
+
   /// The language the local user currently *hears* the remote translated into.
   /// Starts at the user's own language; changeable mid-call via the language
   /// button.
@@ -470,11 +492,15 @@ class _CallScreenState extends State<CallScreen> {
         // The peer may have joined after we picked a language — re-announce so
         // they translate into it rather than into our account language.
         _announceOutputLang(room);
-        if (target == _attachedTargetLang) continue;
+        if (target == _attachedTargetLang &&
+            _mySourceLang == _attachedSourceLang) {
+          continue;
+        }
         _attachedTargetLang = target;
+        _attachedSourceLang = _mySourceLang;
         final route = TranslationRoute(
           // Our mic, our real spoken language — never the language we listen in.
-          sourceBcp47: widget.mySourceLang,
+          sourceBcp47: _mySourceLang,
           targetBcp47: target,
         );
         await widget.translation.attachToRoom(room, route: route);
@@ -883,7 +909,7 @@ class _CallScreenState extends State<CallScreen> {
       Analytics.track(
         'call_started',
         roomName: widget.roomName,
-        langFrom: widget.mySourceLang,
+        langFrom: _mySourceLang,
         langTo: _attachedTargetLang,
         props: {'kind': _callKind},
       );
@@ -1231,6 +1257,73 @@ class _CallScreenState extends State<CallScreen> {
     unawaited(_deviceTts.setLanguage(code).catchError((_) {}));
   }
 
+  /// Pick the language this phone transcribes its own mic in.
+  ///
+  /// Locked while a switch is in flight, and — on device — until the engine has
+  /// finished loading the language we started the call with. Both guards exist
+  /// for the same reason: [AsrService.ensureLanguageInstalled] returns the
+  /// in-flight load whatever language is asked for, so a second request during
+  /// the first would resolve as a success while the recogniser stayed pinned to
+  /// the old language, and the user would speak into a pipeline transcribing
+  /// them in a language they are not speaking.
+  void _openInputLanguageSheet() {
+    if (!UsageTracker.isDisabled && UsageTracker.creditsExhausted.value) {
+      unawaited(_showOutOfCreditsDialog());
+      return;
+    }
+    if (_switchingInputLang) return;
+    if (!kIsWeb && !AsrService.instance.isReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('call_input_language_loading'))),
+      );
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0E0E0E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _InputLanguageSheet(
+        currentCode: _mySourceLang,
+        onSelected: (code) {
+          Navigator.of(ctx).pop();
+          unawaited(_changeInputLanguage(code));
+        },
+      ),
+    );
+  }
+
+  /// Change the language we transcribe our own mic in.
+  ///
+  /// Nothing is announced to the peer: they receive translated text, so our
+  /// spoken language is our business. The cost is local — [attachToRoom] tears
+  /// the mic streamer down and rebuilds it on the new source, which reloads the
+  /// on-device engine with the new `language:`. No download: every language in
+  /// [supportedLanguages] resolves to the same universal model, already on disk.
+  Future<void> _changeInputLanguage(String code) async {
+    if (code.isEmpty || code == _mySourceLang || _switchingInputLang) return;
+    setState(() {
+      _mySourceLang = code;
+      _switchingInputLang = true;
+    });
+    DebugOverlay.log('input lang → $code (engine reload)');
+    try {
+      final room = _room;
+      if (room != null) await _refreshTranslationBinding(room);
+      // The streamer fires this itself, unawaited — we join the same future so
+      // the button stays locked until the engine is actually live on [code].
+      if (!kIsWeb) {
+        await AsrService.instance.ensureLanguageInstalled(code);
+      }
+    } catch (e) {
+      DebugOverlay.log('input lang switch failed: $e');
+    } finally {
+      if (mounted) setState(() => _switchingInputLang = false);
+    }
+  }
+
   /// Tell the peer which language to translate into for us.
   ///
   /// Idempotent: only publishes when the announced value actually changed, so
@@ -1565,7 +1658,7 @@ class _CallScreenState extends State<CallScreen> {
       Analytics.track(
         'call_ended',
         roomName: widget.roomName,
-        langFrom: widget.mySourceLang,
+        langFrom: _mySourceLang,
         langTo: _attachedTargetLang,
         props: {
           'kind': _callKind,
@@ -1934,8 +2027,18 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                           const SizedBox(height: 12),
                           _RoundCallButton(
+                            icon: Icons.record_voice_over_rounded,
+                            label: AppStrings.t('call_language_input'),
+                            background:
+                                _switchingInputLang ? Colors.white24 : SC.accent,
+                            onTap: _switchingInputLang
+                                ? () {}
+                                : _openInputLanguageSheet,
+                          ),
+                          const SizedBox(height: 12),
+                          _RoundCallButton(
                             icon: Icons.translate,
-                            label: AppStrings.t('call_language'),
+                            label: AppStrings.t('call_language_output'),
                             background: SC.accent,
                             onTap: _openLanguageSheet,
                           ),
@@ -2186,6 +2289,82 @@ class _OutputLanguageSheet extends StatelessWidget {
                       lang: lang,
                       selected: lang.code == current,
                       available: _canSpeak(lang.code),
+                      onTap: () => onSelected(lang.code),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet to change the language this phone transcribes its own mic in —
+/// see [_CallScreenState._changeInputLanguage].
+///
+/// Nothing is greyed out here, unlike [_OutputLanguageSheet]: that one depends
+/// on the OS shipping a *voice*, while this one depends on the on-device
+/// recogniser, and the universal model covers every language in
+/// [supportedLanguages].
+class _InputLanguageSheet extends StatelessWidget {
+  const _InputLanguageSheet({
+    required this.currentCode,
+    required this.onSelected,
+  });
+
+  final String currentCode;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = findLanguageByCode(currentCode)?.code ?? '';
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              AppStrings.t('call_input_language_title'),
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.t('call_input_language_hint'),
+              style: const TextStyle(
+                color: SC.textMuted,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final lang in supportedLanguages)
+                    _LanguageRow(
+                      lang: lang,
+                      selected: lang.code == current,
                       onTap: () => onSelected(lang.code),
                     ),
                 ],

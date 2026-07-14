@@ -106,6 +106,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       });
     }
+    // Brand-new user, nothing stored: guess from the phone's own language so the
+    // picker opens with the right row already checked and the step is one tap.
+    // Only a pre-selection — the user can still change it, and the phone may lie
+    // (plenty of French speakers run their phone in English), which is why we
+    // never skip the step outright: this value becomes the language their first
+    // call is transcribed in.
+    if (_selectedLang == null) {
+      final guess = deviceLanguageCode();
+      if (guess != null) {
+        _onLanguageSelected(guess);
+      }
+    }
     if (mounted) {
       setState(() {
         _genderAlreadySet = genderAlready;
