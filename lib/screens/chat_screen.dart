@@ -12,8 +12,10 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/match_seen.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
+import '../services/nav_tab.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
@@ -53,6 +55,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Matches with no message yet, newest first — the bubble row under the
   /// wordmark. Once a conversation starts they move down into the list.
   List<RemoteProfile> _newMatches = const [];
+  /// Matches the user has already laid eyes on — they stay in the rail but
+  /// stop counting toward the badge.
+  Set<String> _seenMatches = const {};
+  /// Fires a few seconds after the rail is on screen: by then the user has
+  /// seen the new matches, so the badge clears.
+  Timer? _matchSeenTimer;
   Map<String, ChatMessage> _latestByConv = const {};
   Map<String, DateTime> _seenByConv = const {};
   Map<String, int> _unreadCountByConv = const {};
@@ -88,6 +96,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // so the green dots on every row vanish (or come back)
     // immediately, without waiting for the 7 s poll.
     AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
+    NavTab.index.addListener(_onNavTabChanged);
     _reload();
     _checkNotifStatus();
     // Web build doesn't always get realtime push reliably — poll the list
@@ -108,6 +117,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
+    NavTab.index.removeListener(_onNavTabChanged);
+    _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -116,6 +127,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {});
   }
+
+  void _onNavTabChanged() {
+    if (!mounted) return;
+    if (NavTab.index.value == NavTab.chat) {
+      _scheduleMatchSeen();
+    } else {
+      _matchSeenTimer?.cancel();
+      _matchSeenTimer = null;
+    }
+  }
+
+  /// The badge is a "you have new matches" nudge, so it dies once the rail has
+  /// actually been looked at: three seconds on the Messages tab with unseen
+  /// bubbles on screen is enough. The bubbles themselves stay.
+  void _scheduleMatchSeen() {
+    if (_matchSeenTimer != null) return;
+    if (_unseenMatches == 0) return;
+    if (NavTab.index.value != NavTab.chat) return;
+    _matchSeenTimer = Timer(const Duration(seconds: 3), () async {
+      _matchSeenTimer = null;
+      if (!mounted) return;
+      final ids = _newMatches.map((p) => p.id).toList();
+      final seen = await MatchSeen.markSeen(
+        ids,
+        stillMatched: ids.toSet(),
+      );
+      if (!mounted) return;
+      setState(() => _seenMatches = seen);
+    });
+  }
+
+  /// Matches in the rail the user hasn't laid eyes on yet — the badge count.
+  int get _unseenMatches =>
+      _newMatches.where((p) => !_seenMatches.contains(p.id)).length;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -215,6 +260,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         for (final p in matches)
           if (visible.contains(p) && latest[convIdFor(p.id)] == null) p,
       ];
+      final seenMatches = await MatchSeen.load();
       final friends = visible
           .where((p) => latest[convIdFor(p.id)] != null)
           .toList()
@@ -245,11 +291,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _myId = id;
         _friends = friends;
         _newMatches = newMatches;
+        _seenMatches = seenMatches;
         _latestByConv = latest;
         _seenByConv = seen;
         _unreadCountByConv = unreadCounts;
         _loading = false;
       });
+      // Landed on Messages with fresh matches → start the "seen" countdown.
+      _scheduleMatchSeen();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -559,7 +608,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       if (_newMatches.isNotEmpty) ...[
                         _SectionHeader(
                           label: AppStrings.t('new_matches_section'),
-                          count: _newMatches.length,
+                          count: _unseenMatches,
                         ),
                         _MatchBubbleRail(
                           matches: _newMatches,
