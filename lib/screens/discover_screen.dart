@@ -19,8 +19,10 @@ import '../services/web_poll.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -144,11 +146,48 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  Future<void> _sendFriendRequest(RemoteProfile peer) async {
-    final f = await FriendshipApi.sendRequest(meId: _myId, peerId: peer.id);
-    Analytics.track('friend_request_sent', props: {'source': 'discover'});
-    if (!mounted || f == null) return;
-    setState(() => _myFriendships = [..._myFriendships, f]);
+  /// Swipe right = a like. If the peer had already liked me the likes meet
+  /// and it's a match right away — celebrate it over the card stack.
+  Future<void> _likePeer(RemoteProfile peer) async {
+    final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
+    Analytics.track(
+      'friend_request_sent',
+      props: {'source': 'discover', 'kind': res.matched ? 'match' : 'like'},
+    );
+    if (!mounted) return;
+    final f = res.friendship;
+    if (f != null) {
+      setState(() => _myFriendships = [..._myFriendships, f]);
+    }
+    if (res.matched) await _celebrateMatch(peer);
+  }
+
+  /// "It's a match!" over the Discover stack. "Dire bonjour" opens the DM.
+  Future<void> _celebrateMatch(RemoteProfile peer) async {
+    final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
+    if (!mounted) return;
+    final peerName = peer.displayName.trim().isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : peer.displayName;
+    await showMatchOverlay(
+      context,
+      myName: me?.displayName ?? '',
+      myPhotoUrl: me?.avatarUrl ?? '',
+      theirName: peerName,
+      theirPhotoUrl: peer.avatarUrl,
+      onSayHi: () {
+        final ids = [_myId, peer.id]..sort();
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatThreadScreen(
+              conversationId: 'dm-${ids[0]}-${ids[1]}',
+              title: peerName,
+              peerDeviceId: peer.id,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   FriendshipStatus _statusFor(RemoteProfile peer) =>
@@ -157,7 +196,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
     if (isRight) {
       HapticFeedback.lightImpact();
-      _sendFriendRequest(profile);
+      _likePeer(profile);
     }
     if (!mounted || _cards.isEmpty) return;
     setState(() {
@@ -339,7 +378,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 statusFor: _statusFor,
                 onChanged: _onSearchChanged,
                 onClose: _closeSearch,
-                onAdd: _sendFriendRequest,
+                onAdd: _likePeer,
                 onOpen: _openResult,
               ),
             ),

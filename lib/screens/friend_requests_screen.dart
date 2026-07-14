@@ -18,7 +18,9 @@ import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/list_panel.dart';
+import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
+import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
 /// A reaction entry rendered on the Demandes feed — the chat message
@@ -30,9 +32,9 @@ class _PhotoReaction {
   final RemoteProfile? author;
 }
 
-/// Demandes — incoming pending friend requests. Each row exposes
-/// Accepter / Refuser actions; accepted requests disappear (they
-/// become regular friendships and surface on the Chat list).
+/// Demandes — the people who liked me. Accepting is the match (the two likes
+/// meet and the conversation opens); refusing drops the like. Accepted rows
+/// disappear from here and surface on the Chat list.
 class FriendRequestsScreen extends StatefulWidget {
   const FriendRequestsScreen({super.key});
 
@@ -47,9 +49,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   List<_PhotoReaction> _reactions = const [];
   // Profiles who liked one of my photos, newest first.
   List<RemoteProfile> _likers = const [];
-  // People who follow me but I don't follow back yet — surfaced here with a
-  // "S'abonner en retour" button so the relation can be made mutual.
-  List<RemoteProfile> _newFollowers = const [];
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
@@ -141,7 +140,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _requests = const [];
         _reactions = const [];
         _likers = const [];
-        _newFollowers = const [];
       });
       return;
     }
@@ -178,16 +176,11 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         for (final m in reactionMessages)
           _PhotoReaction(message: m, author: byId[m.senderId]),
       ];
-      // People who follow me (accepted, I'm the addressee) but I haven't
-      // followed back yet (no accepted row where I'm the requester). These
-      // get a "S'abonner en retour" button below.
-      final newFollowers = await _fetchFollowBackCandidates();
       if (!mounted) return;
       setState(() {
         _requests = friendships;
         _likers = likers;
         _reactions = reactions;
-        _newFollowers = newFollowers;
         _loading = false;
       });
       FriendRequestUnread.setCount(friendships.length);
@@ -200,47 +193,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     }
   }
 
-  /// Resolve the people who follow me but I don't follow back. Reads all my
-  /// friendship edges once and diffs the two accepted directions. Returns an
-  /// empty list (never throws) so a hiccup here can't blank the whole page.
-  Future<List<RemoteProfile>> _fetchFollowBackCandidates() async {
-    try {
-      final mine = await FriendshipApi.fetchMine(_myId);
-      final iFollow = <String>{}; // accepted edges where I'm the requester
-      final followMe = <String>{}; // accepted edges where I'm the addressee
-      for (final f in mine) {
-        if (f.status != 'accepted') continue;
-        if (f.requester == _myId) iFollow.add(f.addressee);
-        if (f.addressee == _myId) followMe.add(f.requester);
-      }
-      final ids = followMe
-          .where((id) => id.isNotEmpty && id != _myId && !iFollow.contains(id))
-          .toList(growable: false);
-      if (ids.isEmpty) return const [];
-      return await ProfileApi.fetchByIds(ids);
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  /// "S'abonner en retour": follow back instantly (accepted edge, no approval).
-  /// Optimistically drops the row; restores it on failure.
-  Future<void> _followBack(RemoteProfile peer) async {
-    final next = _newFollowers.where((p) => p.id != peer.id).toList();
-    setState(() => _newFollowers = next);
-    try {
-      await FriendshipApi.follow(meId: _myId, peerId: peer.id);
-      Analytics.track(
-        'friend_request_sent',
-        props: {'source': 'requests', 'kind': 'follow'},
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _newFollowers = [..._newFollowers, peer]);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
+  /// Accepting a like IS the match — the celebration fires right here.
   Future<void> _accept(IncomingFriendRequest req) async {
     final next = _requests
         .where((r) => r.friendship.id != req.friendship.id)
@@ -249,12 +202,47 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     FriendRequestUnread.setCount(next.length);
     try {
       await FriendshipApi.accept(req.friendship.id);
+      Analytics.track(
+        'friend_request_sent',
+        props: {'source': 'requests', 'kind': 'match'},
+      );
+      if (!mounted) return;
+      await _celebrateMatch(req.requester);
     } catch (e) {
       if (!mounted) return;
       setState(() => _requests = [..._requests, req]);
       FriendRequestUnread.setCount(_requests.length);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
+  }
+
+  /// "It's a match!" over the Demandes list. "Dire bonjour" opens the DM.
+  Future<void> _celebrateMatch(RemoteProfile? peer) async {
+    if (peer == null) return;
+    final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
+    if (!mounted) return;
+    final peerName = peer.displayName.trim().isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : peer.displayName;
+    await showMatchOverlay(
+      context,
+      myName: me?.displayName ?? '',
+      myPhotoUrl: me?.avatarUrl ?? '',
+      theirName: peerName,
+      theirPhotoUrl: peer.avatarUrl,
+      onSayHi: () {
+        final ids = [_myId, peer.id]..sort();
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatThreadScreen(
+              conversationId: 'dm-${ids[0]}-${ids[1]}',
+              title: peerName,
+              peerDeviceId: peer.id,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _reject(IncomingFriendRequest req) async {
@@ -331,9 +319,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       );
     }
     // Every category flattened into one list of rows, laid on the single white
-    // block (same panel as the Messages page), in priority order: pending
-    // requests (need a decision) → new followers (follow back) → likes →
-    // reactions. A hairline divider falls between consecutive rows.
+    // block (same panel as the Messages page), in priority order: incoming
+    // likes (need a decision) → photo likes → reactions. A hairline divider
+    // falls between consecutive rows.
     final rows = <Widget>[
       for (final req in _requests)
         _RequestRow(
@@ -344,12 +332,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           },
           onAccept: () => _accept(req),
           onReject: () => _reject(req),
-        ),
-      for (final p in _newFollowers)
-        _FollowBackRow(
-          follower: p,
-          onTap: () => _openProfile(p),
-          onFollowBack: () => _followBack(p),
         ),
       for (final p in _likers)
         _LikeRow(liker: p, onTap: () => _openProfile(p)),
@@ -435,7 +417,7 @@ class _RequestRow extends StatelessWidget {
               ? '@${p!.handle}'
               : AppStrings.t('chat_no_name'));
     final subtitle = AppStrings.t(
-      'demandes_wants_to_be_friend',
+      'demandes_wants_to_match',
       args: {'name': name},
     );
 
@@ -471,70 +453,6 @@ class _RequestRow extends StatelessWidget {
               _AcceptButton(onTap: onAccept),
               const SizedBox(width: 6),
               _RejectButton(onTap: onReject),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// "X s'est abonné·e à toi" row — the peer follows me and I don't follow
-/// back yet. One "S'abonner en retour" button makes the relation mutual;
-/// tapping the rest of the row opens their profile.
-class _FollowBackRow extends StatelessWidget {
-  const _FollowBackRow({
-    required this.follower,
-    required this.onTap,
-    required this.onFollowBack,
-  });
-
-  final RemoteProfile follower;
-  final VoidCallback onTap;
-  final VoidCallback onFollowBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = follower.displayName.isNotEmpty
-        ? follower.displayName
-        : (follower.handle.isNotEmpty
-              ? '@${follower.handle}'
-              : AppStrings.t('chat_no_name'));
-    final subtitle = AppStrings.t(
-      'demandes_started_following',
-      args: {'name': name},
-    );
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              ProfileAvatar(
-                displayName: follower.displayName,
-                avatarUrl: follower.avatarUrl,
-                avatarColorHex: follower.avatarColor,
-                size: 46,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: SCText.body.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _FollowBackButton(onTap: onFollowBack),
             ],
           ),
         ),
@@ -767,36 +685,6 @@ class _AcceptButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text(
             AppStrings.t('accept'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Accent pill that follows the peer back. Same shape as [_AcceptButton]
-/// but carries the "S'abonner en retour" label.
-class _FollowBackButton extends StatelessWidget {
-  const _FollowBackButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            AppStrings.t('follow_back'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,

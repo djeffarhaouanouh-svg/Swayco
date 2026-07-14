@@ -16,12 +16,6 @@ class IncomingFriendRequest {
 
 enum FriendshipStatus { none, pendingOutgoing, pendingIncoming, accepted, rejected }
 
-class FriendshipCounts {
-  const FriendshipCounts({required this.followers, required this.following});
-  final int followers;
-  final int following;
-}
-
 enum FriendDirection { followers, following }
 
 class Friendship {
@@ -142,43 +136,6 @@ abstract final class FriendshipApi {
     }
   }
 
-  /// Counts for the profile screen.
-  /// - `followers`  = accepted friendships where the user is the addressee.
-  /// - `following`  = accepted friendships where the user is the requester.
-  ///
-  /// Delegates to the `friendship_counts` SECURITY DEFINER RPC so the
-  /// numbers are correct even when viewing someone else's profile under a
-  /// restrictive RLS policy. The RPC returns aggregates only (no row data
-  /// leaks), so it's safe to expose.
-  static Future<FriendshipCounts> countsFor(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) {
-      return const FriendshipCounts(followers: 0, following: 0);
-    }
-    try {
-      final result = await _c.rpc(
-        'friendship_counts',
-        params: {'p_user_id': userId},
-      );
-      // The function `returns table(...)` so Supabase serialises it as a
-      // list of one row. Accept either shape defensively.
-      final Map<String, dynamic> row;
-      if (result is List && result.isNotEmpty) {
-        row = Map<String, dynamic>.from(result.first as Map);
-      } else if (result is Map) {
-        row = Map<String, dynamic>.from(result);
-      } else {
-        return const FriendshipCounts(followers: 0, following: 0);
-      }
-      return FriendshipCounts(
-        followers: (row['followers'] as num?)?.toInt() ?? 0,
-        following: (row['following'] as num?)?.toInt() ?? 0,
-      );
-    } catch (e) {
-      debugPrint('FriendshipApi.countsFor failed: $e');
-      return const FriendshipCounts(followers: 0, following: 0);
-    }
-  }
-
   /// Fetch every friendship row involving [meId] in either direction.
   static Future<List<Friendship>> fetchMine(String meId) async {
     if (!isSupabaseReady || meId.isEmpty) return const [];
@@ -191,27 +148,48 @@ abstract final class FriendshipApi {
         .toList(growable: false);
   }
 
-  /// Send a friend request from [meId] to [peerId]. Lands as `pending`
-  /// so the addressee must explicitly accept it from the Demandes page
-  /// before the two sides become friends. If a reverse row already
-  /// exists in `pending`, it stays pending — both sides can decide
-  /// independently.
+  /// Like [peerId] — the Tinder move. Two outcomes:
+  ///   * they had already liked me (a `pending` row the other way) → the two
+  ///     likes meet, the row flips to `accepted` and it's a MATCH on the spot;
+  ///   * nobody liked me yet → a `pending` row lands and they decide from the
+  ///     Demandes page.
   ///
-  /// Idempotent: if a same-direction row already exists, it's returned
-  /// as-is.
-  static Future<Friendship?> sendRequest({
+  /// There is no instant one-way follow any more: an accepted row always means
+  /// both sides said yes. Idempotent — re-liking someone returns the existing
+  /// state instead of duplicating a row.
+  static Future<({Friendship? friendship, bool matched})> like({
     required String meId,
     required String peerId,
   }) async {
-    if (!isSupabaseReady) return null;
-    if (meId.isEmpty || peerId.isEmpty || meId == peerId) return null;
+    if (!isSupabaseReady) return (friendship: null, matched: false);
+    if (meId.isEmpty || peerId.isEmpty || meId == peerId) {
+      return (friendship: null, matched: false);
+    }
 
     // Guarantee my own `profiles` row exists first — the insert below FK-
     // references it (friendships_requester_fkey), and a boot-time sync
     // skipped on a flaky launch would otherwise crash with 23503.
     await ProfileApi.ensureMyProfileRow();
 
-    // 1. Same-direction row → idempotent.
+    // 1. They already liked me → accepting their row IS the match.
+    final reverse = await _c
+        .from('friendships')
+        .select()
+        .eq('requester', peerId)
+        .eq('addressee', meId)
+        .limit(1)
+        .maybeSingle();
+    if (reverse != null) {
+      final theirs = Friendship.fromMap(Map<String, dynamic>.from(reverse));
+      if (theirs.status == 'accepted') {
+        return (friendship: theirs, matched: true);
+      }
+      final matched = await _promoteToMatch(theirs.id);
+      unawaited(_notifyMatch(meId, peerId));
+      return (friendship: matched ?? theirs, matched: true);
+    }
+
+    // 2. I already liked them → idempotent, still waiting on their answer.
     final sameDir = await _c
         .from('friendships')
         .select()
@@ -220,7 +198,8 @@ abstract final class FriendshipApi {
         .limit(1)
         .maybeSingle();
     if (sameDir != null) {
-      return Friendship.fromMap(Map<String, dynamic>.from(sameDir));
+      final mine = Friendship.fromMap(Map<String, dynamic>.from(sameDir));
+      return (friendship: mine, matched: mine.status == 'accepted');
     }
 
     final inserted = await _c
@@ -232,63 +211,45 @@ abstract final class FriendshipApi {
         })
         .select()
         .single();
-    // Fire-and-forget push: peer gets a "X veut être ami" notif. Best
-    // effort — never block the friendship insert on the dispatch call.
+    // Fire-and-forget push: peer gets a "X veut te matcher" notif. Best
+    // effort — never block the insert on the dispatch call.
     unawaited(_notifyNewFollower(meId, peerId));
-    return Friendship.fromMap(Map<String, dynamic>.from(inserted));
+    return (
+      friendship: Friendship.fromMap(Map<String, dynamic>.from(inserted)),
+      matched: false,
+    );
   }
 
-  /// Follow [peerId] outright — TikTok / Instagram style, no approval
-  /// step. Lands the edge as `accepted` immediately so the "following"
-  /// count and the mutual relation update on the spot. This is what the
-  /// profile's "Ajouter" / "S'abonner en retour" buttons use — they are
-  /// instant follows, NOT friend requests that the peer has to accept.
-  ///
-  /// Idempotent: a same-direction row is reused, and a leftover `pending`
-  /// row (e.g. a request sent before this flow existed) is promoted to
-  /// `accepted` rather than duplicated.
-  static Future<Friendship?> follow({
-    required String meId,
-    required String peerId,
-  }) async {
-    if (!isSupabaseReady) return null;
-    if (meId.isEmpty || peerId.isEmpty || meId == peerId) return null;
-
-    // Same as sendRequest: the accepted-edge insert FK-references my
-    // profiles row, so self-heal it before touching the table.
-    await ProfileApi.ensureMyProfileRow();
-
-    final sameDir = await _c
+  /// Flip a row to `accepted` (= matched) and return it.
+  static Future<Friendship?> _promoteToMatch(String friendshipId) async {
+    final row = await _c
         .from('friendships')
-        .select()
-        .eq('requester', meId)
-        .eq('addressee', peerId)
-        .limit(1)
-        .maybeSingle();
-    if (sameDir != null) {
-      final existing = Friendship.fromMap(Map<String, dynamic>.from(sameDir));
-      if (existing.status == 'accepted') return existing;
-      final promoted = await _c
-          .from('friendships')
-          .update({'status': 'accepted'})
-          .eq('id', existing.id)
-          .select()
-          .single();
-      return Friendship.fromMap(Map<String, dynamic>.from(promoted));
-    }
-
-    final inserted = await _c
-        .from('friendships')
-        .insert({
-          'requester': meId,
-          'addressee': peerId,
+        .update({
           'status': 'accepted',
+          'responded_at': DateTime.now().toUtc().toIso8601String(),
         })
+        .eq('id', friendshipId)
         .select()
-        .single();
-    // Tell the peer they have a new follower. Best-effort.
-    unawaited(_notifyNewFollower(meId, peerId));
-    return Friendship.fromMap(Map<String, dynamic>.from(inserted));
+        .maybeSingle();
+    if (row == null) return null;
+    return Friendship.fromMap(Map<String, dynamic>.from(row));
+  }
+
+  /// Everyone I'm matched with — an `accepted` row in either direction, since
+  /// a match is symmetric (who liked first no longer means anything).
+  static Future<List<RemoteProfile>> fetchMatches(String meId) async {
+    if (!isSupabaseReady || meId.isEmpty) return const [];
+    final lists = await Future.wait([
+      fetchAcceptedPeers(meId: meId, direction: FriendDirection.followers),
+      fetchAcceptedPeers(meId: meId, direction: FriendDirection.following),
+    ]);
+    final byId = <String, RemoteProfile>{};
+    for (final list in lists) {
+      for (final p in list) {
+        byId[p.id] = p;
+      }
+    }
+    return byId.values.toList(growable: false);
   }
 
   static Future<void> _notifyNewFollower(String meId, String peerId) async {
@@ -312,12 +273,35 @@ abstract final class FriendshipApi {
     }
   }
 
+  /// "C'est un match" push to [peerId] once both sides have liked each other.
+  static Future<void> _notifyMatch(String meId, String peerId) async {
+    if (!isSupabaseReady) return;
+    try {
+      final myProfile = await ProfileApi.fetchById(meId);
+      final myName = myProfile?.displayName.trim() ?? '';
+      final peer = await ProfileApi.fetchById(peerId);
+      final lang = peer?.language ?? '';
+      await PushDispatcher.notify(
+        recipientUid: peerId,
+        title: AppStrings.tIn(lang, 'push_match_title'),
+        body: myName.isEmpty
+            ? AppStrings.tIn(lang, 'push_match_body_anon')
+            : AppStrings.tIn(lang, 'push_match_body', args: {'name': myName}),
+        type: 'match',
+        data: {'peerId': meId},
+      );
+    } catch (e) {
+      debugPrint('match notify failed: $e');
+    }
+  }
+
+  /// Accept an incoming like → the two sides are matched. The requester gets
+  /// a "c'est un match" push (best effort — never blocks the write).
   static Future<void> accept(String friendshipId) async {
     if (!isSupabaseReady) return;
-    await _c.from('friendships').update({
-      'status': 'accepted',
-      'responded_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', friendshipId);
+    final row = await _promoteToMatch(friendshipId);
+    if (row == null) return;
+    unawaited(_notifyMatch(row.addressee, row.requester));
   }
 
   static Future<void> reject(String friendshipId) async {
@@ -333,62 +317,57 @@ abstract final class FriendshipApi {
     await _c.from('friendships').delete().eq('id', friendshipId);
   }
 
-  /// Unfollow [peerId]: delete the friendship edge I created when I
-  /// followed them (requester = me, addressee = peer). The reverse edge,
-  /// if any (they still follow me), is left intact — unfollowing is a
-  /// one-directional action, like Instagram. Idempotent: deleting a row
-  /// that doesn't exist is a no-op.
-  static Future<void> unfollow({
-    required String meId,
-    required String peerId,
-  }) async {
-    if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty) return;
-    await _c
-        .from('friendships')
-        .delete()
-        .eq('requester', meId)
-        .eq('addressee', peerId);
-  }
-
-  /// Viewer-mode helper for the profile screen: resolves the relation
-  /// between me ([meId]) and a [peerId].
-  ///   * `peerFollowsMe`   → peer's accepted row (requester = peer).
-  ///   * `iFollowPeer`     → my accepted row (requester = me).
-  ///   * `iRequestedPeer`  → my still-`pending` outgoing request — the
-  ///     "Ajouter" button sent a request the peer hasn't accepted yet.
-  /// Both directions can be true (mutual) or false (strangers).
-  static Future<({bool peerFollowsMe, bool iFollowPeer, bool iRequestedPeer})>
-      directionalWith({
+  /// Viewer-mode helper for the profile screen: where do [meId] and [peerId]
+  /// stand?
+  ///   * `matched`     → an accepted row either way: both said yes.
+  ///   * `iLiked`      → my like is still pending their answer.
+  ///   * `peerLikedMe` → their like is waiting for MY answer (one tap = match).
+  static Future<({bool matched, bool iLiked, bool peerLikedMe})> matchStateWith({
     required String meId,
     required String peerId,
   }) async {
     if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty || meId == peerId) {
-      return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
+      return (matched: false, iLiked: false, peerLikedMe: false);
     }
     try {
       final mine = await fetchMine(meId);
-      var peerFollowsMe = false;
-      var iFollowPeer = false;
-      var iRequestedPeer = false;
+      var matched = false;
+      var iLiked = false;
+      var peerLikedMe = false;
       for (final f in mine) {
         final iSentToPeer = f.requester == meId && f.addressee == peerId;
         final peerSentToMe = f.requester == peerId && f.addressee == meId;
+        if (!iSentToPeer && !peerSentToMe) continue;
         if (f.status == 'accepted') {
-          if (peerSentToMe) peerFollowsMe = true;
-          if (iSentToPeer) iFollowPeer = true;
-        } else if (f.status == 'pending' && iSentToPeer) {
-          iRequestedPeer = true;
+          matched = true;
+        } else if (f.status == 'pending') {
+          if (iSentToPeer) iLiked = true;
+          if (peerSentToMe) peerLikedMe = true;
         }
       }
-      return (
-        peerFollowsMe: peerFollowsMe,
-        iFollowPeer: iFollowPeer,
-        iRequestedPeer: iRequestedPeer,
-      );
+      return (matched: matched, iLiked: iLiked, peerLikedMe: peerLikedMe);
     } catch (e) {
-      debugPrint('FriendshipApi.directionalWith failed: $e');
-      return (peerFollowsMe: false, iFollowPeer: false, iRequestedPeer: false);
+      debugPrint('FriendshipApi.matchStateWith failed: $e');
+      return (matched: false, iLiked: false, peerLikedMe: false);
     }
+  }
+
+  /// The pending row where [peerId] liked ME — the one to accept to match back.
+  static Future<Friendship?> incomingPendingFrom({
+    required String meId,
+    required String peerId,
+  }) async {
+    if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty) return null;
+    final row = await _c
+        .from('friendships')
+        .select()
+        .eq('requester', peerId)
+        .eq('addressee', meId)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    return Friendship.fromMap(Map<String, dynamic>.from(row));
   }
 
   /// Derive how I (`meId`) currently stand with [peerId] given a list of my

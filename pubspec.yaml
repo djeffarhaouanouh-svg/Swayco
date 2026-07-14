@@ -195,6 +195,8 @@ flutter:
     - assets/Traduction.json
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
+    # Short chime played when the "It's a match" badge pops.
+    - assets/sounds/match_pop.wav
 
   # To add assets to your application, add an assets section, like this:
   # assets:

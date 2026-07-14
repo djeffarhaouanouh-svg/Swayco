@@ -71,22 +71,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       final profile = await UserPrefs.loadProfile();
       List<RemoteProfile> friends = const [];
       if (isSupabaseReady) {
-        final followers = await FriendshipApi.fetchAcceptedPeers(
-          meId: id,
-          direction: FriendDirection.followers,
-        );
-        final following = await FriendshipApi.fetchAcceptedPeers(
-          meId: id,
-          direction: FriendDirection.following,
-        );
-        final byId = <String, RemoteProfile>{};
-        for (final p in followers) {
-          byId[p.id] = p;
-        }
-        for (final p in following) {
-          byId[p.id] = p;
-        }
-        friends = byId.values.toList()
+        friends = (await FriendshipApi.fetchMatches(id)).toList()
           ..sort((a, b) =>
               a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
       }

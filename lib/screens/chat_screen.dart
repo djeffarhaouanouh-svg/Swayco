@@ -147,14 +147,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // 6-7× the latency of one request. Future.wait collapses them
       // into a single round-trip from the user's point of view.
       final results = await Future.wait([
-        FriendshipApi.fetchAcceptedPeers(
-          meId: id,
-          direction: FriendDirection.followers,
-        ),
-        FriendshipApi.fetchAcceptedPeers(
-          meId: id,
-          direction: FriendDirection.following,
-        ),
+        FriendshipApi.fetchMatches(id),
         // Latest message per conversation involving me — used for the
         // "WhatsApp-style" last-message preview and the sort order.
         ChatApi.fetchLatestPerConversation(id),
@@ -169,27 +162,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Recent inbound messages — counted per conversation for the badge.
         ChatApi.fetchInboundForUnread(id),
       ]);
-      final followers = results[0] as List<RemoteProfile>;
-      final following = results[1] as List<RemoteProfile>;
-      final latest = results[2] as Map<String, ChatMessage>;
-      final seen = results[3] as Map<String, DateTime>;
-      final cleared = results[4] as Map<String, DateTime>;
-      final iBlocked = results[5] as List<RemoteProfile>;
-      final blockedMe = results[6] as Set<String>;
+      final matches = results[0] as List<RemoteProfile>;
+      final latest = results[1] as Map<String, ChatMessage>;
+      final seen = results[2] as Map<String, DateTime>;
+      final cleared = results[3] as Map<String, DateTime>;
+      final iBlocked = results[4] as List<RemoteProfile>;
+      final blockedMe = results[5] as Set<String>;
       final inbound =
-          results[7] as List<({String conversationId, DateTime createdAt})>;
+          results[6] as List<({String conversationId, DateTime createdAt})>;
 
       final byId = <String, RemoteProfile>{};
-      for (final p in followers) {
+      for (final p in matches) {
         byId[p.id] = p;
       }
-      for (final p in following) {
-        byId[p.id] = p;
-      }
-      // Keep conversations alive after the friendship ends. Removing
-      // (unfollowing) someone deletes the friendship edge but not the
-      // messages, so any peer we have a thread with — even a now-stranger —
-      // still earns a row here. Pull the profiles the friends lists missed.
+      // Keep conversations alive after a match ends: the messages outlive the
+      // friendship row, so any peer we have a thread with — even a now-
+      // stranger — still earns a row here. Pull the profiles matches missed.
       final convPeerIds = <String>{};
       for (final msg in latest.values) {
         final peer = msg.senderId == id ? msg.recipientId : msg.senderId;

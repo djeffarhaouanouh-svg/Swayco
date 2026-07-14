@@ -33,12 +33,12 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'chat_thread_screen.dart';
-import 'friends_list_screen.dart';
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
@@ -67,7 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _deviceId = '';
   RemoteProfile? _remote;
   ProfileSnapshot? _local;
-  FriendshipCounts _counts = const FriendshipCounts(followers: 0, following: 0);
   // Own profile: likes received per photo URL — drives each gallery photo's
   // heart badge. Likes belong to a specific photo now.
   Map<String, int> _likesByPhoto = const {};
@@ -80,14 +79,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Viewer-mode only: which of the peer's photo URLs I've liked. Drives the
   // filled heart on each of the peer's gallery photos.
   Set<String> _likedPhotoUrls = const {};
-  // Viewer-mode only: directional follow state with the displayed user.
-  // `_peerFollowsMe` → they added me; `_iFollowPeer` → I added them.
-  bool _peerFollowsMe = false;
-  bool _iFollowPeer = false;
-  // Viewer-mode only: I sent the peer a friend request that's still
-  // pending (they haven't accepted yet). Drives the "Demande envoyée"
-  // state on the "Ajouter" button.
-  bool _iRequestedPeer = false;
+  // Viewer-mode only: where the two of us stand.
+  //   `_matched`     → we liked each other: it's a match.
+  //   `_iLiked`      → my like is waiting for their answer.
+  //   `_peerLikedMe` → their like is waiting for mine (one tap = match).
+  bool _matched = false;
+  bool _iLiked = false;
+  bool _peerLikedMe = false;
   Timer? _pollTimer;
 
   bool get _isViewingOther => widget.userId != null;
@@ -134,9 +132,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     final remote = isSupabaseReady
         ? await ProfileApi.fetchById(targetId)
         : null;
-    final counts = isSupabaseReady
-        ? await FriendshipApi.countsFor(targetId)
-        : const FriendshipCounts(followers: 0, following: 0);
     // Likes received are only meaningful (and visible) on my own profile.
     // The peer's count would leak who liked them. Now keyed per photo URL.
     final likesByPhoto = !_isViewingOther && isSupabaseReady
@@ -161,32 +156,31 @@ class _ProfileScreenState extends State<ProfileScreen>
         likedPhotoUrls = await LikeApi.fetchMyLikedPhotos(deviceId);
       } catch (_) {}
     }
-    // Directional follow state — drives the "Follow back" button.
-    var peerFollowsMe = false;
-    var iFollowPeer = false;
-    var iRequestedPeer = false;
+    // Match state — drives the Matcher / Accepter / Matché button.
+    var matched = false;
+    var iLiked = false;
+    var peerLikedMe = false;
     if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
-      final rel = await FriendshipApi.directionalWith(
+      final rel = await FriendshipApi.matchStateWith(
         meId: deviceId,
         peerId: targetId,
       );
-      peerFollowsMe = rel.peerFollowsMe;
-      iFollowPeer = rel.iFollowPeer;
-      iRequestedPeer = rel.iRequestedPeer;
+      matched = rel.matched;
+      iLiked = rel.iLiked;
+      peerLikedMe = rel.peerLikedMe;
     }
     if (!mounted) return;
     setState(() {
       _deviceId = deviceId;
       _local = local;
       _remote = remote;
-      _counts = counts;
       _likesByPhoto = likesByPhoto;
       _peerBlocked = blocked;
       _peerBlockedMe = peerBlockedMe;
       _likedPhotoUrls = likedPhotoUrls;
-      _peerFollowsMe = peerFollowsMe;
-      _iFollowPeer = iFollowPeer;
-      _iRequestedPeer = iRequestedPeer;
+      _matched = matched;
+      _iLiked = iLiked;
+      _peerLikedMe = peerLikedMe;
       _loading = false;
     });
   }
@@ -273,81 +267,90 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// "S'abonner en retour": the peer already follows me, so following
-  /// them back is an instant abonnement — no approval step (see
-  /// [FriendshipApi.follow]). Optimistic — roll back if the write fails.
-  Future<void> _followBack() async {
+  /// "Matcher" — I like the peer. If they had already liked me the two likes
+  /// meet on the spot and it's a match (celebration overlay); otherwise the
+  /// like lands as a pending request they'll answer from Demandes. Optimistic:
+  /// flip the button first, roll back if the write fails.
+  Future<void> _likePeer() async {
     if (_targetId.isEmpty || _deviceId.isEmpty) return;
-    setState(() => _iFollowPeer = true);
+    setState(() => _iLiked = true);
     try {
-      await FriendshipApi.follow(meId: _deviceId, peerId: _targetId);
+      final res = await FriendshipApi.like(meId: _deviceId, peerId: _targetId);
       Analytics.track(
         'friend_request_sent',
-        props: {'source': 'profile', 'kind': 'follow'},
+        props: {'source': 'profile', 'kind': res.matched ? 'match' : 'like'},
       );
       if (!mounted) return;
-      // Re-pull so the followers/following counts reflect the new edge.
-      await _reload(silent: true);
+      if (res.matched) {
+        setState(() {
+          _matched = true;
+          _iLiked = false;
+          _peerLikedMe = false;
+        });
+        await _celebrateMatch();
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _iFollowPeer = false);
+      setState(() => _iLiked = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
-  /// "Ajouter": the peer is a stranger (doesn't follow me, I don't
-  /// follow them). Unlike follow-back this SENDS A REQUEST that they
-  /// must accept — lands as `pending`. Optimistic: flip the button to
-  /// "Demande envoyée"; roll back if the write fails.
-  Future<void> _addPeer() async {
+  /// "Accepter" — the peer liked me first, so saying yes IS the match.
+  Future<void> _acceptPeer() async {
     if (_targetId.isEmpty || _deviceId.isEmpty) return;
-    setState(() => _iRequestedPeer = true);
+    setState(() {
+      _matched = true;
+      _peerLikedMe = false;
+    });
     try {
-      await FriendshipApi.sendRequest(meId: _deviceId, peerId: _targetId);
+      final pending = await FriendshipApi.incomingPendingFrom(
+        meId: _deviceId,
+        peerId: _targetId,
+      );
+      if (pending == null) {
+        // Their like vanished (unmatched / rejected between two reads) —
+        // fall back to liking them, which re-opens a pending request.
+        await FriendshipApi.like(meId: _deviceId, peerId: _targetId);
+      } else {
+        await FriendshipApi.accept(pending.id);
+      }
       Analytics.track(
         'friend_request_sent',
-        props: {'source': 'profile', 'kind': 'request'},
+        props: {'source': 'profile', 'kind': 'match'},
       );
       if (!mounted) return;
+      await _celebrateMatch();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _iRequestedPeer = false);
+      setState(() {
+        _matched = false;
+        _peerLikedMe = true;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
     }
   }
 
-  /// Unfollow the displayed peer — removes them from my friends. Reachable
-  /// only when I already follow them (see the button gating in
-  /// [_IdentitySection]). Confirms first, then optimistic with rollback.
-  Future<void> _unfollowPeer() async {
-    if (_targetId.isEmpty || _deviceId.isEmpty) return;
-    final name = _displayName.isEmpty
-        ? AppStrings.t('incoming_someone').toLowerCase()
-        : _displayName;
-    final ok = await showSwaycoConfirm(
-      context: context,
-      title: AppStrings.t('unfollow_q', args: {'name': name}),
-      body: AppStrings.t('unfollow_body'),
-      confirmLabel: AppStrings.t('follow_unfollow'),
+  /// The "It's a match!" celebration. Needs MY avatar too — in viewer mode
+  /// `_remote` holds the PEER's profile, so pull mine for the left circle.
+  Future<void> _celebrateMatch() async {
+    final me = isSupabaseReady ? await ProfileApi.fetchById(_deviceId) : null;
+    if (!mounted) return;
+    await showMatchOverlay(
+      context,
+      myName: me?.displayName ?? '',
+      myPhotoUrl: me?.avatarUrl ?? '',
+      theirName: _displayName.isEmpty
+          ? AppStrings.t('profile_anonymous')
+          : _displayName,
+      theirPhotoUrl: _remote?.avatarUrl ?? '',
+      onSayHi: _openChatWithPeer,
     );
-    if (ok != true) return;
-    setState(() => _iFollowPeer = false);
-    try {
-      await FriendshipApi.unfollow(meId: _deviceId, peerId: _targetId);
-      if (!mounted) return;
-      // Re-pull so the followers/following counts reflect the dropped edge.
-      await _reload(silent: true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _iFollowPeer = true);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
-    }
+    if (mounted) await _reload(silent: true);
   }
 
   Future<void> _openChatWithPeer() async {
@@ -366,22 +369,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
-  }
-
-  Future<void> _openFriendsList(FriendDirection direction) async {
-    // On someone else's profile, tap their follower / following count
-    // → show THEIR list, not mine. _targetId resolves to the peer's
-    // id in viewer mode and falls back to the local device id on the
-    // user's own profile.
-    final targetId = _isViewingOther ? widget.userId : null;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            FriendsListScreen(direction: direction, userId: targetId),
-      ),
-    );
-    // Counts may have changed (follow-back).
-    await _reload();
   }
 
   Future<void> _openEditor() async {
@@ -758,31 +745,25 @@ class _ProfileScreenState extends State<ProfileScreen>
                             avatarUrl: _remote?.avatarUrl ?? '',
                             discoverPhotoUrl: _remote?.discoverPhotoUrl ?? '',
                             onSelectDiscover: _setDiscoverPhoto,
-                            counts: _counts,
                             likesByPhoto: _likesByPhoto,
                             viewerMode: _isViewingOther,
-                            peerFollowsMe: _peerFollowsMe,
-                            iFollowPeer: _iFollowPeer,
-                            iRequestedPeer: _iRequestedPeer,
+                            matched: _matched,
+                            iLiked: _iLiked,
+                            peerLikedMe: _peerLikedMe,
                             peerBlocked: _peerBlocked,
                             peerBlockedMe: _peerBlockedMe,
                             likedPhotoUrls: _likedPhotoUrls,
                             onEditName: _saveName,
                             onEditBio: _saveBio,
                             onEditInterests: _saveInterests,
-                            onTapFollowers: () =>
-                                _openFriendsList(FriendDirection.followers),
-                            onTapFollowing: () =>
-                                _openFriendsList(FriendDirection.following),
                             onTapLikes: _openLikesReceived,
                             onPickPhoto: _pickAndAddPhoto,
                             onPickAvatar: _pickAndSetAvatar,
                             onRemovePhoto: _removePhoto,
                             onEdit: _openEditor,
                             onSettings: _openSettings,
-                            onFollowBack: _followBack,
-                            onAddPeer: _addPeer,
-                            onUnfollow: _unfollowPeer,
+                            onLikePeer: _likePeer,
+                            onAcceptPeer: _acceptPeer,
                             onToggleBlock: _toggleBlock,
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
@@ -1189,28 +1170,24 @@ class _IdentitySection extends StatelessWidget {
     required this.avatarUrl,
     this.discoverPhotoUrl = '',
     this.onSelectDiscover,
-    required this.counts,
     required this.likesByPhoto,
     required this.onEditName,
     required this.onEditBio,
     this.onPickAvatar,
     this.onEditInterests,
-    required this.onTapFollowers,
-    required this.onTapFollowing,
     required this.onTapLikes,
     required this.onPickPhoto,
     required this.onRemovePhoto,
     required this.onEdit,
     required this.onSettings,
     this.viewerMode = false,
-    this.peerFollowsMe = false,
-    this.iFollowPeer = false,
-    this.iRequestedPeer = false,
+    this.matched = false,
+    this.iLiked = false,
+    this.peerLikedMe = false,
     this.peerBlocked = false,
     this.peerBlockedMe = false,
-    this.onFollowBack,
-    this.onAddPeer,
-    this.onUnfollow,
+    this.onLikePeer,
+    this.onAcceptPeer,
     this.onToggleBlock,
     this.likedPhotoUrls = const {},
     this.onTogglePhotoLike,
@@ -1249,7 +1226,6 @@ class _IdentitySection extends StatelessWidget {
 
   /// Own profile: pick which gallery photo is the Discover photo (by URL).
   final void Function(String url)? onSelectDiscover;
-  final FriendshipCounts counts;
 
   /// Likes received per photo URL. Only shown on my own profile (private).
   final Map<String, int> likesByPhoto;
@@ -1260,8 +1236,6 @@ class _IdentitySection extends StatelessWidget {
 
   /// Persist the edited interests list. Null in viewer mode (read-only).
   final Future<void> Function(List<String>)? onEditInterests;
-  final VoidCallback onTapFollowers;
-  final VoidCallback onTapFollowing;
   final VoidCallback onTapLikes;
 
   /// Own profile: append a photo to the gallery.
@@ -1282,34 +1256,30 @@ class _IdentitySection extends StatelessWidget {
   /// Follow-back.
   final bool viewerMode;
 
-  /// Viewer-mode only: does the displayed peer follow me? Gates the
-  /// "Follow back" button.
-  final bool peerFollowsMe;
+  /// Viewer-mode only: we liked each other — it's a match.
+  final bool matched;
 
-  /// Viewer-mode only: do I already follow the displayed peer?
-  final bool iFollowPeer;
+  /// Viewer-mode only: my like is still waiting for their answer.
+  final bool iLiked;
 
-  /// Viewer-mode only: I sent a still-pending request via "Ajouter".
-  final bool iRequestedPeer;
+  /// Viewer-mode only: they liked me — one tap on "Accepter" makes it a match.
+  final bool peerLikedMe;
 
   /// Viewer-mode only: have I blocked the displayed peer? When true the
   /// action stack collapses to a single "Débloquer" button — the follow
   /// relation and Message CTA are meaningless on a profile I've cut off.
   final bool peerBlocked;
 
-  /// Viewer-mode only: has the displayed peer blocked ME? When true the
-  /// relationship actions (Unfollow / Follow-back / Add) are hidden — the
-  /// edge is dead on their side, so offering to manage it is misleading.
+  /// Viewer-mode only: has the displayed peer blocked ME? When true the match
+  /// actions are hidden — the edge is dead on their side, so offering to
+  /// manage it is misleading.
   final bool peerBlockedMe;
 
-  /// Viewer-mode only: follow the peer back (instant abonnement).
-  final VoidCallback? onFollowBack;
+  /// Viewer-mode only: like the peer ("Matcher").
+  final VoidCallback? onLikePeer;
 
-  /// Viewer-mode only: send a friend request to a stranger ("Ajouter").
-  final VoidCallback? onAddPeer;
-
-  /// Viewer-mode only: unfollow the peer (removes them from my friends).
-  final VoidCallback? onUnfollow;
+  /// Viewer-mode only: accept the like they already sent me ("Accepter").
+  final VoidCallback? onAcceptPeer;
 
   /// Viewer-mode only: block / unblock the displayed peer. Drives the
   /// "Débloquer" action button shown while [peerBlocked] is true.
@@ -1527,30 +1497,6 @@ class _IdentitySection extends StatelessWidget {
             const Positioned(right: 0, top: -4, child: _RewardHint()),
           ],
         ),
-        const SizedBox(height: 16),
-        // Stats — posts | followers | following — centred across the full
-        // width (the settings gear now lives in the top-right header).
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _InlineStat(
-              value: photos.length,
-              label: AppStrings.t('profile_posts').toLowerCase(),
-            ),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.followers,
-              label: AppStrings.t('profile_followers').toLowerCase(),
-              onTap: onTapFollowers,
-            ),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.following,
-              label: AppStrings.t('profile_following').toLowerCase(),
-              onTap: onTapFollowing,
-            ),
-          ],
-        ),
         const SizedBox(height: 24),
         // Centres d'intérêt — picked chips + an "add" chip; tapping either
         // unfolds the category picker inline, right under the chips (no
@@ -1645,38 +1591,14 @@ class _IdentitySection extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 16),
-        // Stats — posts (= gallery size) | followers | following.
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _InlineStat(
-              value: photos.length,
-              label: AppStrings.t('profile_posts').toLowerCase(),
-            ),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.followers,
-              label: AppStrings.t('profile_followers').toLowerCase(),
-              onTap: onTapFollowers,
-            ),
-            const _StatDivider(),
-            _InlineStat(
-              value: counts.following,
-              label: AppStrings.t('profile_following').toLowerCase(),
-              onTap: onTapFollowing,
-            ),
-          ],
-        ),
         // Action stack. When I've blocked this peer the whole stack
-        // collapses to a single "Débloquer" CTA — the follow relation and
-        // Message button would otherwise read as wrong ("Se désabonner" /
-        // "Message") on a profile I've deliberately cut off.
-        // Otherwise: Message + (Unfollow / Follow-back / Add) by relation:
-        //  • I already follow them → "Unfollow".
-        //  • peer follows me, I don't → "S'abonner en retour" (instant).
-        //  • stranger, request already sent → "Demande envoyée".
-        //  • stranger → "Ajouter" (sends a request they must accept).
+        // collapses to a single "Débloquer" CTA — the match actions and the
+        // Message button would read as wrong on a profile I've cut off.
+        // Otherwise: Message + one match action, by relation:
+        //  • we matched → "Matché" (inert badge).
+        //  • they liked me first → "Accepter" (one tap = match).
+        //  • I liked them, no answer yet → "Envoyé".
+        //  • nobody liked anybody → "Matcher" (sends the like).
         const SizedBox(height: 16),
         if (peerBlocked) ...[
           _GradientActionButton(
@@ -1692,24 +1614,24 @@ class _IdentitySection extends StatelessWidget {
             glass: true,
           ),
           // The peer blocked me → their edge with me is dead on their side,
-          // so hide the relationship actions (no Unfollow / Follow-back /
-          // Add). Only the Message button stays above.
+          // so hide the match actions. Only the Message button stays above.
           if (!peerBlockedMe) ...[
-            if (iFollowPeer) ...[
+            if (matched) ...[
               const SizedBox(height: 10),
               _GradientActionButton(
-                label: AppStrings.t('follow_unfollow'),
-                icon: Icons.person_remove_alt_1,
-                onTap: onUnfollow ?? () {},
+                label: AppStrings.t('match_matched'),
+                icon: Icons.favorite,
+                onTap: () {},
+                subdued: true,
               ),
-            ] else if (peerFollowsMe) ...[
+            ] else if (peerLikedMe) ...[
               const SizedBox(height: 10),
               _GradientActionButton(
-                label: AppStrings.t('follow_back'),
-                icon: Icons.person_add_alt_1,
-                onTap: onFollowBack ?? () {},
+                label: AppStrings.t('accept'),
+                icon: Icons.favorite,
+                onTap: onAcceptPeer ?? () {},
               ),
-            ] else if (iRequestedPeer) ...[
+            ] else if (iLiked) ...[
               const SizedBox(height: 10),
               _GradientActionButton(
                 label: AppStrings.t('friendship_sent'),
@@ -1720,9 +1642,9 @@ class _IdentitySection extends StatelessWidget {
             ] else ...[
               const SizedBox(height: 10),
               _GradientActionButton(
-                label: AppStrings.t('profile_add'),
-                icon: Icons.person_add_alt_1,
-                onTap: onAddPeer ?? () {},
+                label: AppStrings.t('match_cta'),
+                icon: Icons.favorite_border,
+                onTap: onLikePeer ?? () {},
               ),
             ],
           ],
@@ -3114,64 +3036,6 @@ class _PhotoCell extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _InlineStat extends StatelessWidget {
-  const _InlineStat({required this.value, required this.label, this.onTap});
-
-  final int value;
-  final String label;
-
-  /// Optional — when null the stat is purely decorative (used for the
-  /// posts count, which doesn't navigate anywhere yet).
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final col = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Count up to the value when it first appears / changes.
-        TweenAnimationBuilder<int>(
-          tween: IntTween(begin: 0, end: value),
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeOutCubic,
-          builder: (context, v, _) => Text(
-            '$v',
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: SC.textMuted, fontSize: 13)),
-      ],
-    );
-    if (onTap == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: col,
-      );
-    }
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: col,
-      ),
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 28, color: const Color(0xFF2A3942));
   }
 }
 
