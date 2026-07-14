@@ -343,7 +343,28 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
   }
 
+  /// Open the mic, retrying once after a beat.
+  ///
+  /// The first attempt can lose a race it has no way to see: an input language
+  /// change restarts this streamer, and iOS may still be holding the audio
+  /// session we just released — [record] then throws, and the call would run to
+  /// the end with no STT at all. The session is free a moment later, so one
+  /// retry is the whole fix. A genuine failure (no route, mic taken by another
+  /// app) throws again and reaches the caller's handler as before.
   Future<void> _startCapture() async {
+    try {
+      await _openMicStream();
+    } catch (e) {
+      if (!_running) rethrow;
+      DebugOverlay.log('stt capture refused ($e) — retrying in 300ms');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      if (!_running) return;
+      await _openMicStream();
+      DebugOverlay.log('stt capture recovered on retry');
+    }
+  }
+
+  Future<void> _openMicStream() async {
     _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
     final stream = await _rec.startStream(const RecordConfig(
       encoder: AudioEncoder.pcm16bits,
