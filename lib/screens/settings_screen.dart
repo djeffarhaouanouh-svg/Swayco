@@ -22,7 +22,6 @@ import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
 import 'liked_photos_screen.dart';
-import 'profile_screen.dart' show CreditsCard;
 
 /// Hosts every secondary account-level action that doesn't belong on the
 /// main profile view: account management, notification toggles, privacy,
@@ -423,18 +422,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                // Translation credits (moved here from the profile screen).
-                _SectionHeader(label: AppStrings.t('settings_section_credits')),
-                CreditsCard(profile: _profile),
-                const SizedBox(height: 8),
                 _SectionHeader(label: AppStrings.t('settings_section_account')),
                 _SettingsCard(
                   children: [
-                    _SettingsRow(
-                      icon: Icons.alternate_email,
-                      label: AppStrings.t('settings_email'),
-                      trailing: _SubtleText(_email.isEmpty ? '—' : _email),
-                    ),
                     _SettingsRow(
                       icon: Icons.lock_reset,
                       label: AppStrings.t('settings_change_password'),
