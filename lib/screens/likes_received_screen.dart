@@ -121,7 +121,6 @@ class _LikerRow extends StatelessWidget {
               ProfileAvatar(
                 displayName: profile.displayName,
                 avatarUrl: profile.avatarUrl,
-                avatarColorHex: profile.avatarColor,
                 size: 44,
               ),
               const SizedBox(width: 12),

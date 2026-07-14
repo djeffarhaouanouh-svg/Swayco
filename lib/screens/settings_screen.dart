@@ -903,7 +903,6 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
                           ProfileAvatar(
                             displayName: p.displayName,
                             avatarUrl: p.avatarUrl,
-                            avatarColorHex: p.avatarColor,
                             size: 40,
                           ),
                           const SizedBox(width: 12),

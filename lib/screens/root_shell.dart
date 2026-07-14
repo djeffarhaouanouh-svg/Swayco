@@ -674,7 +674,6 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
                   ProfileAvatar(
                     displayName: widget.callerName,
                     avatarUrl: widget.callerAvatarUrl,
-                    avatarColorHex: widget.callerAvatarColor,
                     size: 88,
                     fontSize: 36,
                   ),

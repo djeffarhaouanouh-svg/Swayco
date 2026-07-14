@@ -1504,7 +1504,6 @@ class _CallScreenState extends State<CallScreen> {
                             ProfileAvatar(
                               displayName: name,
                               avatarUrl: profile?.avatarUrl,
-                              avatarColorHex: profile?.avatarColor,
                               size: 132,
                             ),
                             const SizedBox(height: 20),

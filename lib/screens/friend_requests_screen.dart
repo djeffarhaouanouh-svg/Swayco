@@ -434,7 +434,6 @@ class _RequestRow extends StatelessWidget {
               ProfileAvatar(
                 displayName: p?.displayName ?? '',
                 avatarUrl: p?.avatarUrl,
-                avatarColorHex: p?.avatarColor,
                 size: 46,
               ),
               const SizedBox(width: 12),
@@ -496,7 +495,6 @@ class _ReactionRow extends StatelessWidget {
               ProfileAvatar(
                 displayName: p?.displayName ?? '',
                 avatarUrl: p?.avatarUrl,
-                avatarColorHex: p?.avatarColor,
                 size: 46,
               ),
               const SizedBox(width: 12),
@@ -554,7 +552,6 @@ class _LikeRow extends StatelessWidget {
               ProfileAvatar(
                 displayName: liker.displayName,
                 avatarUrl: liker.avatarUrl,
-                avatarColorHex: liker.avatarColor,
                 size: 46,
               ),
               const SizedBox(width: 12),

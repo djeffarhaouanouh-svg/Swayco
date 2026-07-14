@@ -11,7 +11,6 @@ class ProfileAvatar extends StatelessWidget {
     super.key,
     required this.displayName,
     this.avatarUrl,
-    this.avatarColorHex,
     this.size = 44,
     this.fontSize,
     this.onTap,
@@ -21,19 +20,14 @@ class ProfileAvatar extends StatelessWidget {
   /// colored-letter placeholder.
   final String? avatarUrl;
   final String displayName;
-  final String? avatarColorHex;
   final double size;
   final double? fontSize;
   final VoidCallback? onTap;
 
-  Color get _bg {
-    final hex = avatarColorHex;
-    if (hex != null && hex.isNotEmpty) {
-      final parsed = _parseHex(hex);
-      if (parsed != null) return parsed;
-    }
-    return _fallbackColor(displayName.isEmpty ? '?' : displayName);
-  }
+  /// No photo → a colour drawn from the name. The stored `avatar_color` is
+  /// deliberately ignored: it had drifted to the same teal for most accounts,
+  /// so every letter-avatar looked alike.
+  Color get _bg => _fallbackColor(displayName.isEmpty ? '?' : displayName);
 
   String get _initial {
     final n = displayName.trim();
@@ -43,25 +37,18 @@ class ProfileAvatar extends StatelessWidget {
 
   bool get _hasPhoto => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
-  static Color? _parseHex(String hex) {
-    var v = hex.trim();
-    if (v.isEmpty) return null;
-    if (v.startsWith('#')) v = v.substring(1);
-    if (v.length == 6) v = 'FF$v';
-    if (v.length != 8) return null;
-    final n = int.tryParse(v, radix: 16);
-    return n == null ? null : Color(n);
-  }
-
+  /// FNV-1a over the name — the old `hash * 31` collapsed half the names onto
+  /// the same swatch (Lenny, Djeffar and Alice all came out yellow); FNV
+  /// spreads them across the palette.
   static Color _fallbackColor(String seed) {
     const palette = <int>[
       0xFF00A884, 0xFF128C7E, 0xFF34B7F1, 0xFF1F6FEB, 0xFF7B61FF,
       0xFFA855F7, 0xFFEC4899, 0xFFF97316, 0xFFEAB308, 0xFF22C55E,
     ];
     if (seed.isEmpty) return Color(palette[0]);
-    var hash = 0;
+    var hash = 0x811c9dc5;
     for (final c in seed.codeUnits) {
-      hash = (hash * 31 + c) & 0x7fffffff;
+      hash = ((hash ^ c) * 0x01000193) & 0xFFFFFFFF;
     }
     return Color(palette[hash % palette.length]);
   }

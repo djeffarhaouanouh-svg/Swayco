@@ -832,7 +832,6 @@ class _ThreadHeader extends StatelessWidget {
                   ProfileAvatar(
                     displayName: title,
                     avatarUrl: peer?.avatarUrl,
-                    avatarColorHex: peer?.avatarColor,
                     size: 36,
                   ),
                   if (_peerOnline)

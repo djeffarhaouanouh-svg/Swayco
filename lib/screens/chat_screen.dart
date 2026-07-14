@@ -585,14 +585,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final fill = constraints.maxHeight - 26 - navBody;
+        final fill = constraints.maxHeight - 12 - navBody;
         return RefreshIndicator(
           color: SC.accent,
           backgroundColor: SC.bubbleIn,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(top: 26, bottom: navBody),
+            padding: EdgeInsets.only(top: 12, bottom: navBody),
             children: [
               ConstrainedBox(
                 constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
@@ -620,7 +620,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           matches: _newMatches,
                           onTap: _openThread,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                       ],
                       if (_friends.isNotEmpty)
                         _SectionHeader(
@@ -877,7 +877,6 @@ class _FriendChatRow extends StatelessWidget {
                   ProfileAvatar(
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
-                    avatarColorHex: profile.avatarColor,
                     size: 46,
                   ),
                   if (_peerOnline)
@@ -1329,7 +1328,7 @@ class _MatchBubbleRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 108,
+      height: 100,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1368,7 +1367,6 @@ class _MatchBubble extends StatelessWidget {
             ProfileAvatar(
               displayName: profile.displayName,
               avatarUrl: profile.avatarUrl,
-              avatarColorHex: profile.avatarColor,
               size: 66,
             ),
             const SizedBox(height: 6),
@@ -1422,10 +1420,10 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
     final navBody = GlassNavBar.height + MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final fill = constraints.maxHeight - 26 - navBody;
+        final fill = constraints.maxHeight - 12 - navBody;
         return ListView(
           physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.only(top: 26, bottom: navBody),
+          padding: EdgeInsets.only(top: 12, bottom: navBody),
           children: [
             ConstrainedBox(
               constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
