@@ -1987,13 +1987,20 @@ class _CallScreenState extends State<CallScreen> {
                 // self-view in the top-right corner.
                 Positioned(
                   key: const ValueKey('call_controls'),
-                  right: 12,
+                  // Un poil plus loin du bord : le rail frôlait la tranche et
+                  // se décalait à chaque pliage.
+                  right: 20,
                   bottom: 0,
                   child: SafeArea(
                     top: false,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 28),
-                      child: Column(
+                      child: SizedBox(
+                        // Largeur figée = le rail ne bouge plus d'un pixel
+                        // entre l'état plié et l'état déplié (la colonne se
+                        // re-centrait sur la largeur de son contenu).
+                        width: 48,
+                        child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // The blue controls — unfolded by the chevron below.
@@ -2002,7 +2009,7 @@ class _CallScreenState extends State<CallScreen> {
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.bottomCenter,
                             child: !_controlsOpen
-                                ? const SizedBox(width: 56, height: 0)
+                                ? const SizedBox(width: 48, height: 0)
                                 : Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -2091,6 +2098,7 @@ class _CallScreenState extends State<CallScreen> {
                             onTap: _hangUp,
                           ),
                         ],
+                      ),
                       ),
                     ),
                   ),
