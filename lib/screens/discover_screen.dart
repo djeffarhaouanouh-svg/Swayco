@@ -314,6 +314,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       ),
           ),
 
+          // ── Retour arrière — coin haut-droit de la photo ─────────────────
+          if (!_feedLoading && _cards.isNotEmpty)
+            Positioned(
+              top: tabBarH + 20,
+              right: 20,
+              child: _GlassButton(
+                size: 44,
+                iconSize: 20,
+                icon: Icons.replay_rounded,
+                color: const Color(0xFF22D3EE),
+                onTap: _onActionUndo,
+              ),
+            ),
+
           // ── Top bar — flotte sur la card ──────────────────────────────────
           Positioned(
             top: 0,
@@ -337,9 +351,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             height: actionH,
             child: _SwipeActionBar(
               height: actionH,
-              onUndo: _onActionUndo,
               onNope: _onSwipeLeft,
-              onSuperLike: _onSwipeRight,
               onLike: _onSwipeRight,
               onMessage: () {
                 if (_cards.isEmpty) return;
@@ -455,16 +467,6 @@ class _TopTabBar extends StatelessWidget {
                 child: const Padding(
                   padding: EdgeInsets.all(6),
                   child: Icon(Icons.search_rounded, color: Colors.white, size: 24),
-                ),
-              ),
-              const SizedBox(width: 4),
-              // Boost / lightning icon
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {},
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(Icons.bolt_rounded, color: Color(0xFFC77DFF), size: 26),
                 ),
               ),
             ],
@@ -1139,24 +1141,24 @@ class _InterestChip extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Action bar — 5 glass circle buttons (Tinder style)
+// Action bar — pass / like. The rewind arrow lives on the card now, and the
+// super-like / send-a-message buttons are gone.
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SwipeActionBar extends StatelessWidget {
   const _SwipeActionBar({
     required this.height,
-    required this.onUndo,
     required this.onNope,
-    required this.onSuperLike,
     required this.onLike,
     required this.onMessage,
   });
 
   final double height;
-  final VoidCallback onUndo;
   final VoidCallback onNope;
-  final VoidCallback onSuperLike;
   final VoidCallback onLike;
+
+  /// Kept wired (the profile opens from here) even though no button surfaces
+  /// it any more — the card itself opens the profile.
   final VoidCallback onMessage;
 
   @override
@@ -1168,43 +1170,19 @@ class _SwipeActionBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _GlassButton(
-            size: 46,
-            iconSize: 20,
-            icon: Icons.replay_rounded,
-            color: const Color(0xFFFBBF24),
-            onTap: onUndo,
-          ),
-          const SizedBox(width: 16),
-          _GlassButton(
             size: 58,
             iconSize: 27,
             icon: Icons.close_rounded,
             color: const Color(0xFFFF4458),
             onTap: onNope,
           ),
-          const SizedBox(width: 16),
-          _GlassButton(
-            size: 48,
-            iconSize: 22,
-            icon: Icons.star_rounded,
-            color: const Color(0xFF38BDF8),
-            onTap: onSuperLike,
-          ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 28),
           _GlassButton(
             size: 58,
             iconSize: 27,
             icon: Icons.favorite_rounded,
             color: const Color(0xFF3DCA72),
             onTap: onLike,
-          ),
-          const SizedBox(width: 16),
-          _GlassButton(
-            size: 46,
-            iconSize: 20,
-            icon: Icons.send_rounded,
-            color: const Color(0xFF22D3EE),
-            onTap: onMessage,
           ),
         ],
       ),
