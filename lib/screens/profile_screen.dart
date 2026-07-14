@@ -819,10 +819,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onMessagePeer: _openChatWithPeer,
                           ),
                           const SizedBox(height: 20),
-                          _LanguageCard(
-                            language: lang,
-                            showCallWarning: !_isViewingOther,
-                          ),
+                          _LanguageCard(language: lang),
                           if (!_isViewingOther) ...[
                             // "Mon abonnement" — directly under the spoken-
                             // language card. Web (Stripe) + native with
@@ -1452,13 +1449,14 @@ class _ManageSubscriptionButtonState extends State<_ManageSubscriptionButton> {
   }
 }
 
+/// The account language, shown as "Speaks X".
+///
+/// It no longer warns that calls must be held in this language: the call screen
+/// lets the user switch the language they speak mid-call, so the account one is
+/// only a default now, not a rule.
 class _LanguageCard extends StatelessWidget {
-  const _LanguageCard({required this.language, this.showCallWarning = true});
+  const _LanguageCard({required this.language});
   final AppLanguage? language;
-
-  /// The "during calls you have to speak only X" hint only makes sense on
-  /// my own profile — not when peeking at someone else's.
-  final bool showCallWarning;
 
   @override
   Widget build(BuildContext context) {
@@ -1472,62 +1470,24 @@ class _LanguageCard extends StatelessWidget {
     final label = language != null
         ? AppStrings.t('profile_speaks', args: {'lang': langName})
         : AppStrings.t('profile_no_language');
-    final warning = (showCallWarning && language != null)
-        ? AppStrings.t(
-            'profile_call_language_warning',
-            args: {'lang': langName},
-          )
-        : null;
     return GlassPanel(
       borderRadius: 16,
       color: SC.glassStrong,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text(flag, style: const TextStyle(fontSize: 32)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+          Text(flag, style: const TextStyle(fontSize: 32)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
               ),
-            ],
-          ),
-          if (warning != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 1),
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: SC.textMuted,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    warning,
-                    style: const TextStyle(
-                      color: SC.textMuted,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
             ),
-          ],
+          ),
         ],
       ),
     );

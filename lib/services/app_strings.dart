@@ -475,9 +475,6 @@ abstract final class AppStrings {
     'lang_name_ja': 'Japonais',
     'lang_name_ko': 'Coréen',
     'profile_no_language': 'Aucune langue',
-    'profile_call_language_warning':
-        "Lors de tes appels tu devras parler uniquement {lang} pour que la traduction fonctionne.",
-    'profile_edit': 'Modifier',
     'profile_message': 'Message',
     'follow_back': "S'abonner en retour",
     'profile_add': 'Ajouter',
@@ -1036,8 +1033,6 @@ abstract final class AppStrings {
     'lang_name_ja': 'Japanese',
     'lang_name_ko': 'Korean',
     'profile_no_language': 'No language',
-    'profile_call_language_warning':
-        'During calls you have to speak only {lang} so the translation works.',
     'profile_edit': 'Edit',
     'profile_message': 'Message',
     'follow_back': 'Follow back',
@@ -1561,8 +1556,6 @@ abstract final class AppStrings {
     'lang_name_ja': 'Japonés',
     'lang_name_ko': 'Coreano',
     'profile_no_language': 'Sin idioma',
-    'profile_call_language_warning':
-        'Durante tus llamadas tendrás que hablar solo {lang} para que funcione la traducción.',
     'profile_edit': 'Editar',
     'profile_message': 'Mensaje',
     'profile_loading': 'Cargando...',
@@ -2208,8 +2201,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinesisch',
     'lang_name_ja': 'Japanisch',
     'lang_name_ko': 'Koreanisch',
-    'profile_call_language_warning':
-        'Während Anrufen musst du nur {lang} sprechen, damit die Übersetzung funktioniert.',
     'sent_label': 'Gesendet',
     'profile_email_private': 'Privat · nur für dich sichtbar',
     'profile_signout': 'Abmelden',
@@ -2763,8 +2754,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'Cinese',
     'lang_name_ja': 'Giapponese',
     'lang_name_ko': 'Coreano',
-    'profile_call_language_warning':
-        'Durante le chiamate devi parlare solo {lang} affinché la traduzione funzioni.',
     'sent_label': 'Inviato',
     'profile_email_private': 'Privato · visibile solo a te',
     'profile_signout': 'Esci',
@@ -3319,8 +3308,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinês',
     'lang_name_ja': 'Japonês',
     'lang_name_ko': 'Coreano',
-    'profile_call_language_warning':
-        'Durante as chamadas tem de falar apenas {lang} para que a tradução funcione.',
     'sent_label': 'Enviado',
     'profile_email_private': 'Privado · visível apenas para si',
     'profile_signout': 'Terminar sessão',
@@ -3874,8 +3861,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'Chinees',
     'lang_name_ja': 'Japans',
     'lang_name_ko': 'Koreaans',
-    'profile_call_language_warning':
-        'Tijdens gesprekken moet je alleen {lang} spreken zodat de vertaling werkt.',
     'sent_label': 'Verzonden',
     'profile_email_private': 'Privé · alleen zichtbaar voor jou',
     'profile_signout': 'Uitloggen',
@@ -4413,8 +4398,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'الصينية',
     'lang_name_ja': 'اليابانية',
     'lang_name_ko': 'الكورية',
-    'profile_call_language_warning':
-        'أثناء المكالمات عليك التحدث بلغة {lang} فقط حتى تعمل الترجمة.',
     'sent_label': 'تم الإرسال',
     'profile_email_private': 'خاص · مرئي لك فقط',
     'profile_signout': 'تسجيل الخروج',
@@ -4961,8 +4944,6 @@ abstract final class AppStrings {
     'lang_name_zh': 'Китайский',
     'lang_name_ja': 'Японский',
     'lang_name_ko': 'Корейский',
-    'profile_call_language_warning':
-        'Во время звонков нужно говорить только на {lang}, чтобы перевод работал.',
     'sent_label': 'Отправлено',
     'profile_email_private': 'Приватно · видно только вам',
     'profile_signout': 'Выйти',
@@ -5473,7 +5454,6 @@ abstract final class AppStrings {
     'lang_name_zh': '中文',
     'lang_name_ja': '日语',
     'lang_name_ko': '韩语',
-    'profile_call_language_warning': '通话时你只能说 {lang}，这样翻译才能正常工作。',
     'sent_label': '已发送',
     'profile_email_private': '私密 · 仅你可见',
     'profile_signout': '退出登录',
@@ -5973,7 +5953,6 @@ abstract final class AppStrings {
     'lang_name_zh': '中国語',
     'lang_name_ja': '日本語',
     'lang_name_ko': '韓国語',
-    'profile_call_language_warning': '通話中は翻訳が機能するように{lang}だけで話す必要があります。',
     'sent_label': '送信済み',
     'profile_email_private': '非公開・あなたにのみ表示',
     'profile_signout': 'サインアウト',
@@ -6471,7 +6450,6 @@ abstract final class AppStrings {
     'lang_name_zh': '중국어',
     'lang_name_ja': '일본어',
     'lang_name_ko': '한국어',
-    'profile_call_language_warning': '번역이 작동하도록 통화 중에는 {lang}만 사용해야 해요.',
     'sent_label': '보냄',
     'profile_email_private': '비공개 · 나에게만 보여요',
     'profile_signout': '로그아웃',
