@@ -426,6 +426,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsCard(
                   children: [
                     _SettingsRow(
+                      icon: Icons.alternate_email,
+                      label: AppStrings.t('settings_email'),
+                      trailing: _SubtleText(_email.isEmpty ? '—' : _email),
+                    ),
+                    _SettingsRow(
                       icon: Icons.lock_reset,
                       label: AppStrings.t('settings_change_password'),
                       onTap: _changePassword,
