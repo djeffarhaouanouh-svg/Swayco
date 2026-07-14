@@ -690,7 +690,10 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               child: _buildCard(widget.cards[i]),
             ),
           ),
-          // Tapping the photo above the panel folds it back.
+          // Au-dessus du panneau, la photo reste vivante : les taps
+          // gauche/droite continuent de faire défiler le carrousel. Seul un
+          // glissement vers le BAS est capté ici, pour rabattre le panneau —
+          // d'où le translucent (il ne réclame pas le tap).
           if (widget.infoOpen)
             Positioned(
               left: 0,
@@ -698,12 +701,10 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               top: 0,
               bottom: panelH,
               child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: widget.onCloseInfo,
+                behavior: HitTestBehavior.translucent,
                 onVerticalDragEnd: (d) {
                   if ((d.primaryVelocity ?? 0) > 0) widget.onCloseInfo();
                 },
-                child: const SizedBox.expand(),
               ),
             ),
           // The panel itself — slides up from the bottom edge of the card.
