@@ -430,12 +430,17 @@ class _NavItemState extends State<_NavItem>
                       key: ValueKey(widget.selected),
                       width: 26,
                       height: 26,
-                      colorFilter: ColorFilter.mode(
-                        widget.selected
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.50),
-                        BlendMode.srcIn,
-                      ),
+                      // The filled coconut carries its own two-tone shading
+                      // (the dark rim of the opening) — flattening it through
+                      // a srcIn filter would erase that, so only the outline
+                      // one gets tinted, to the same muted white as the other
+                      // unselected tabs.
+                      colorFilter: widget.selected
+                          ? null
+                          : ColorFilter.mode(
+                              Colors.white.withValues(alpha: 0.50),
+                              BlendMode.srcIn,
+                            ),
                     )
                   : Icon(
                       widget.selected

@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <!-- Outlined coconut: the shell as a ring, the three pores as small solid
-       dots. Everything is a fill, so a single srcIn ColorFilter tints it. -->
-  <path fill-rule="evenodd" clip-rule="evenodd"
-        d="M12 2.6c-5.19 0-9.4 4.21-9.4 9.4s4.21 9.4 9.4 9.4 9.4-4.21 9.4-9.4S17.19 2.6 12 2.6z
-           M12 4.3a7.7 7.7 0 1 1 0 15.4 7.7 7.7 0 0 1 0-15.4z"/>
-  <circle cx="9.15" cy="10.75" r="1.15"/>
-  <circle cx="14.85" cy="10.75" r="1.15"/>
-  <circle cx="12" cy="15.5" r="1.15"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <g fill="none" stroke="#9E9E9E" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 18c4-7 19-7 25 0"/>
+    <path d="M18 20c0-8 28-8 28 0"/>
+    <path d="M14 22c0 16 12 28 26 28 7 0 13-3 18-8"/>
+    <path d="M50 42c2-3 4-8 4-14 0-3-1-5-3-6"/>
+    <path d="M21 47l-3-5"/>
+    <path d="M28 50l-3-6"/>
+    <path d="M36 51l-2-6"/>
+  </g>
 </svg>
