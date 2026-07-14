@@ -314,18 +314,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       ),
           ),
 
-          // ── Retour arrière — coin haut-droit de la photo ─────────────────
+          // ── Retour arrière — coin haut-GAUCHE de la photo, verre nu (pas de
+          //    liseré cyan : seule l'icône est colorée). ─────────────────────
           if (!_feedLoading && _cards.isNotEmpty)
             Positioned(
               top: tabBarH + 20,
-              right: 20,
-              child: _GlassButton(
-                size: 44,
-                iconSize: 20,
-                icon: Icons.replay_rounded,
-                color: const Color(0xFF22D3EE),
-                onTap: _onActionUndo,
-              ),
+              left: 20,
+              child: _CardUndoButton(onTap: _onActionUndo),
             ),
 
           // ── Top bar — flotte sur la card ──────────────────────────────────
@@ -1185,6 +1180,40 @@ class _SwipeActionBar extends StatelessWidget {
             onTap: onLike,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Le retour arrière posé sur la photo : verre flouté SANS contour coloré —
+/// seule l'icône reste cyan, le cercle se fond dans l'image.
+class _CardUndoButton extends StatelessWidget {
+  const _CardUndoButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.replay_rounded,
+              color: Color(0xFF22D3EE),
+              size: 22,
+            ),
+          ),
+        ),
       ),
     );
   }

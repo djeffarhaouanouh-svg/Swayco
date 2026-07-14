@@ -114,6 +114,9 @@ class _CallScreenState extends State<CallScreen> {
   /// Wraps the shareable part of the summary card so it can be captured to a
   /// PNG and shared ("partager la page").
   final GlobalKey _shareCardKey = GlobalKey();
+  /// The blue control rail is folded away behind the chevron until the user
+  /// asks for it — the video stays clean. Hang up is never hidden.
+  bool _controlsOpen = false;
   bool _micOn = true;
   late bool _camOn = widget.startWithCamera;
   /// When true, the local self-view fills the screen and the remote feed
@@ -1994,66 +1997,92 @@ class _CallScreenState extends State<CallScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _RoundCallButton(
-                            icon: _micOn
-                                ? Icons.mic_rounded
-                                : Icons.mic_off_rounded,
-                            label: _micOn
-                                ? AppStrings.t('call_mute')
-                                : AppStrings.t('call_unmute'),
-                            background: SC.accent,
-                            onTap: _toggleMic,
+                          // The blue controls — unfolded by the chevron below.
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 240),
+                            curve: Curves.easeOutCubic,
+                            alignment: Alignment.bottomCenter,
+                            child: !_controlsOpen
+                                ? const SizedBox(width: 56, height: 0)
+                                : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _RoundCallButton(
+                                        icon: _micOn
+                                            ? Icons.mic_rounded
+                                            : Icons.mic_off_rounded,
+                                        label: _micOn
+                                            ? AppStrings.t('call_mute')
+                                            : AppStrings.t('call_unmute'),
+                                        background: SC.accent,
+                                        onTap: _toggleMic,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // Live keeps the camera on — no toggle.
+                                      if (_callKind != 'live') ...[
+                                        _RoundCallButton(
+                                          icon: _camOn
+                                              ? Icons.videocam_rounded
+                                              : Icons.videocam_off_rounded,
+                                          label: _camOn
+                                              ? AppStrings.t('call_video')
+                                              : AppStrings.t('call_video_off'),
+                                          background: SC.accent,
+                                          onTap: _toggleCam,
+                                        ),
+                                        const SizedBox(height: 12),
+                                      ],
+                                      _RoundCallButton(
+                                        icon: Icons.tune_rounded,
+                                        label: AppStrings.t('call_audio'),
+                                        background: SC.accent,
+                                        onTap: _openAudioSheet,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _RoundCallButton(
+                                        icon: Icons.record_voice_over_rounded,
+                                        label:
+                                            AppStrings.t('call_language_input'),
+                                        background: _switchingInputLang
+                                            ? Colors.white24
+                                            : SC.accent,
+                                        onTap: _switchingInputLang
+                                            ? () {}
+                                            : _openInputLanguageSheet,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _RoundCallButton(
+                                        icon: Icons.translate,
+                                        label: AppStrings.t(
+                                          'call_language_output',
+                                        ),
+                                        background: SC.accent,
+                                        onTap: _openLanguageSheet,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _RoundCallButton(
+                                        icon: _translationEnabled
+                                            ? Icons.hearing_rounded
+                                            : Icons.hearing_disabled_rounded,
+                                        label: AppStrings.t(_translationEnabled
+                                            ? 'call_translation_cut'
+                                            : 'call_translation_resume'),
+                                        background: _translationEnabled
+                                            ? SC.accent
+                                            : Colors.white24,
+                                        onTap: _toggleTranslation,
+                                      ),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  ),
                           ),
-                          const SizedBox(height: 12),
-                          // Live broadcasts keep the camera on — no toggle.
-                          if (_callKind != 'live') ...[
-                            _RoundCallButton(
-                              icon: _camOn
-                                  ? Icons.videocam_rounded
-                                  : Icons.videocam_off_rounded,
-                              label: _camOn
-                                  ? AppStrings.t('call_video')
-                                  : AppStrings.t('call_video_off'),
-                              background: SC.accent,
-                              onTap: _toggleCam,
+                          // The chevron itself: points up while the rail is
+                          // folded (tap to unfold), flips down to close it.
+                          _RailToggleButton(
+                            open: _controlsOpen,
+                            onTap: () => setState(
+                              () => _controlsOpen = !_controlsOpen,
                             ),
-                            const SizedBox(height: 12),
-                          ],
-                          _RoundCallButton(
-                            icon: Icons.tune_rounded,
-                            label: AppStrings.t('call_audio'),
-                            background: SC.accent,
-                            onTap: _openAudioSheet,
-                          ),
-                          const SizedBox(height: 12),
-                          _RoundCallButton(
-                            icon: Icons.record_voice_over_rounded,
-                            label: AppStrings.t('call_language_input'),
-                            background:
-                                _switchingInputLang ? Colors.white24 : SC.accent,
-                            onTap: _switchingInputLang
-                                ? () {}
-                                : _openInputLanguageSheet,
-                          ),
-                          const SizedBox(height: 12),
-                          _RoundCallButton(
-                            icon: Icons.translate,
-                            label: AppStrings.t('call_language_output'),
-                            background: SC.accent,
-                            onTap: _openLanguageSheet,
-                          ),
-                          const SizedBox(height: 12),
-                          _RoundCallButton(
-                            icon: _translationEnabled
-                                ? Icons.hearing_rounded
-                                : Icons.hearing_disabled_rounded,
-                            label: AppStrings.t(_translationEnabled
-                                ? 'call_translation_cut'
-                                : 'call_translation_resume'),
-                            background: _translationEnabled
-                                ? SC.accent
-                                : Colors.white24,
-                            onTap: _toggleTranslation,
                           ),
                           const SizedBox(height: 12),
                           _RoundCallButton(
@@ -2156,6 +2185,51 @@ class _LowCreditCounter extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// The glass chevron that unfolds the blue control rail — the same pill as the
+/// one on a Discover card, a size up, and flipped: it points UP to open the
+/// rail (which grows upward) and DOWN to fold it away again.
+class _RailToggleButton extends StatelessWidget {
+  const _RailToggleButton({required this.open, required this.onTap});
+
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: 1,
+              ),
+            ),
+            child: AnimatedRotation(
+              turns: open ? 0.5 : 0.0,
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              child: const Icon(
+                Icons.keyboard_arrow_up_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
