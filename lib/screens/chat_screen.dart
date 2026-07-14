@@ -50,6 +50,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String _myId = '';
   List<RemoteProfile> _friends = const [];
+  /// Matches with no message yet, newest first — the bubble row under the
+  /// wordmark. Once a conversation starts they move down into the list.
+  List<RemoteProfile> _newMatches = const [];
   Map<String, ChatMessage> _latestByConv = const {};
   Map<String, DateTime> _seenByConv = const {};
   Map<String, int> _unreadCountByConv = const {};
@@ -138,6 +141,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() {
           _myId = id;
           _friends = const [];
+          _newMatches = const [];
           _loading = false;
         });
         return;
@@ -147,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // 6-7× the latency of one request. Future.wait collapses them
       // into a single round-trip from the user's point of view.
       final results = await Future.wait([
-        FriendshipApi.fetchMatches(id),
+        FriendshipApi.fetchMatchesNewestFirst(id),
         // Latest message per conversation involving me — used for the
         // "WhatsApp-style" last-message preview and the sort order.
         ChatApi.fetchLatestPerConversation(id),
@@ -198,13 +202,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return 'dm-${ids[0]}-${ids[1]}';
       }
 
-      final friends = byId.values.where((p) {
+      final visible = byId.values.where((p) {
         final clearedAt = cleared[convIdFor(p.id)];
         if (clearedAt == null) return true;
         // Re-surface the conversation once a newer message lands.
         final lm = latest[convIdFor(p.id)];
         return lm != null && lm.createdAt.isAfter(clearedAt);
-      }).toList()
+      }).toSet();
+      // A match with no message yet is a BUBBLE, not a row (Tinder split).
+      // `matches` already comes newest-first, so the freshest match leads.
+      final newMatches = [
+        for (final p in matches)
+          if (visible.contains(p) && latest[convIdFor(p.id)] == null) p,
+      ];
+      final friends = visible
+          .where((p) => latest[convIdFor(p.id)] != null)
+          .toList()
         ..sort((a, b) {
           final la = latest[convIdFor(a.id)]?.createdAt;
           final lb = latest[convIdFor(b.id)]?.createdAt;
@@ -231,6 +244,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {
         _myId = id;
         _friends = friends;
+        _newMatches = newMatches;
         _latestByConv = latest;
         _seenByConv = seen;
         _unreadCountByConv = unreadCounts;
@@ -244,6 +258,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
     }
   }
+
+  /// Conversations with at least one unread inbound message — the number in
+  /// the "Messages" badge.
+  int get _unreadConversations =>
+      _friends.where(_isUnread).length;
 
   String _conversationIdFor(String otherId) {
     final ids = [_myId, otherId]..sort();
@@ -498,7 +517,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    if (_friends.isEmpty) {
+    if (_friends.isEmpty && _newMatches.isEmpty) {
       return const _NoFriendsEmpty();
     }
     // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
@@ -535,6 +554,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             onDismiss: () =>
                                 setState(() => _notifBannerDismissed = true),
                           ),
+                        ),
+                      // "Nouveaux matchs" — the bubble rail, newest first.
+                      if (_newMatches.isNotEmpty) ...[
+                        _SectionHeader(
+                          label: AppStrings.t('new_matches_section'),
+                          count: _newMatches.length,
+                        ),
+                        _MatchBubbleRail(
+                          matches: _newMatches,
+                          onTap: _openThread,
+                        ),
+                        const SizedBox(height: 6),
+                        _rowDivider,
+                      ],
+                      if (_friends.isNotEmpty)
+                        _SectionHeader(
+                          label: AppStrings.t('messages_section'),
+                          count: _unreadConversations,
                         ),
                       // Conversation rows.
                       for (final (i, p) in _friends.indexed)
@@ -1175,6 +1212,138 @@ class _InviteToCallRow extends StatelessWidget {
 /// glass card + same row geometry as the real list, with each row
 /// replaced by shimmering bars. Keeps the page layout stable so the
 /// content doesn't pop in / shift when the data lands.
+/// A section title on the Messages page — "NOUVEAUX MATCHS" / "MESSAGES" in
+/// the cyan accent, with the count in a filled pill next to it (Tinder-style,
+/// but cyan on black rather than red on white).
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label, required this.count});
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: SC.accent,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              constraints: const BoxConstraints(minWidth: 18),
+              height: 18,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: const BoxDecoration(
+                color: SC.accent,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: Color(0xFF0E0E0E),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The horizontal rail of match bubbles: one circle per match you haven't
+/// written to yet, newest first, name underneath. Tapping one opens the
+/// conversation — which is exactly what moves it out of the rail.
+class _MatchBubbleRail extends StatelessWidget {
+  const _MatchBubbleRail({required this.matches, required this.onTap});
+
+  final List<RemoteProfile> matches;
+  final void Function(RemoteProfile) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 108,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        itemCount: matches.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (ctx, i) => _MatchBubble(
+          profile: matches[i],
+          onTap: () => onTap(matches[i]),
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchBubble extends StatelessWidget {
+  const _MatchBubble({required this.profile, required this.onTap});
+
+  final RemoteProfile profile;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile.displayName.trim().isNotEmpty
+        ? profile.displayName
+        : (profile.handle.isNotEmpty
+              ? '@${profile.handle}'
+              : AppStrings.t('chat_no_name'));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Cyan ring = never written to. It disappears with the bubble the
+            // moment the first message is sent.
+            Container(
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: SC.accent, width: 2),
+              ),
+              child: ProfileAvatar(
+                displayName: profile.displayName,
+                avatarUrl: profile.avatarUrl,
+                avatarColorHex: profile.avatarColor,
+                size: 62,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatListSkeleton extends StatefulWidget {
   const _ChatListSkeleton();
 

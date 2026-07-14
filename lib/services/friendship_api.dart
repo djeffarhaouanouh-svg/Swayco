@@ -24,6 +24,7 @@ class Friendship {
     required this.requester,
     required this.addressee,
     required this.status,
+    this.matchedAt,
   });
 
   final String id;
@@ -31,11 +32,19 @@ class Friendship {
   final String addressee;
   final String status;
 
+  /// When the two sides became a match (`responded_at`), falling back to when
+  /// the like was sent. Drives the "newest match first" order of the bubbles.
+  final DateTime? matchedAt;
+
   factory Friendship.fromMap(Map<String, dynamic> m) => Friendship(
         id: m['id']?.toString() ?? '',
         requester: m['requester']?.toString() ?? '',
         addressee: m['addressee']?.toString() ?? '',
         status: m['status']?.toString() ?? 'pending',
+        matchedAt:
+            DateTime.tryParse(
+              (m['responded_at'] ?? m['created_at'] ?? '').toString(),
+            )?.toUtc(),
       );
 
   /// The "other side" of the relation from [meId]'s perspective.
@@ -233,6 +242,42 @@ abstract final class FriendshipApi {
         .maybeSingle();
     if (row == null) return null;
     return Friendship.fromMap(Map<String, dynamic>.from(row));
+  }
+
+  /// My matches, newest first — the order the Messages page shows the match
+  /// bubbles in. Reads my own rows (so the timestamps come along) instead of
+  /// the peers RPC, then hydrates the profiles in that order.
+  static Future<List<RemoteProfile>> fetchMatchesNewestFirst(String meId) async {
+    if (!isSupabaseReady || meId.isEmpty) return const [];
+    try {
+      final mine = await fetchMine(meId);
+      final accepted = mine.where((f) => f.status == 'accepted').toList()
+        ..sort((a, b) {
+          final ta = a.matchedAt;
+          final tb = b.matchedAt;
+          if (ta == null && tb == null) return 0;
+          if (ta == null) return 1;
+          if (tb == null) return -1;
+          return tb.compareTo(ta);
+        });
+      final ids = <String>[];
+      for (final f in accepted) {
+        final peer = f.peerOf(meId);
+        if (peer.isNotEmpty && peer != meId && !ids.contains(peer)) {
+          ids.add(peer);
+        }
+      }
+      if (ids.isEmpty) return const [];
+      final profiles = await ProfileApi.fetchByIds(ids);
+      final byId = {for (final p in profiles) p.id: p};
+      return [
+        for (final id in ids)
+          if (byId[id] != null) byId[id]!,
+      ];
+    } catch (e) {
+      debugPrint('FriendshipApi.fetchMatchesNewestFirst failed: $e');
+      return const [];
+    }
   }
 
   /// Everyone I'm matched with — an `accepted` row in either direction, since
