@@ -123,15 +123,14 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   ),
 
   // Japanese → dedicated on-device engine: native reading frontend + phonemizer
-  // + an external-tokens path, on the app's single ORT. From our mirror; the
-  // bundle carries the fp16 model, tokens, lexicon and the reading dictionary.
-  // ~110 MB. NOTE: the bundle filename below still names the engine on the wire
-  // — rename it on the mirror to a neutral id (like v1-fr) to finish hiding ja.
+  // + an external-tokens path, on the app's single ORT. From our mirror under a
+  // neutral name; the bundle carries the fp16 model, tokens, lexicon and the
+  // reading dictionary. ~110 MB.
   const TtsModelSpec(
-    id: 'ja-melo-openjtalk',
+    id: 'v1-ja',
     langs: ['ja'],
     approxMb: 110,
-    bundleUrl: '$_voiceMirror/ja-melo-openjtalk.tar.bz2',
+    bundleUrl: '$_voiceMirror/v1-ja.tar.bz2',
     modelFile: 'model.fp16.onnx',
     isJapanese: true,
   ),
