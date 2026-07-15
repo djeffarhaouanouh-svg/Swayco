@@ -41,6 +41,15 @@ abstract final class IosCallKit {
             onAccept(id);
           case CallEventActionCallDecline(:final id):
             onDecline(id);
+          case CallEventActionCallEnded(:final id):
+            // Tapping "Refuser" on the native CallKit incoming screen fires a
+            // CXEndCallAction → this ENDED event, NOT a DECLINE. Without this
+            // case the decline never reached the caller, who rang into the void
+            // until the 25 s timeout. Route it to decline: if the call had been
+            // accepted, _onCallKitDecline is already guarded by _handledCallIds
+            // (the accept added the id), so an ended-after-answer can't fire a
+            // spurious decline.
+            onDecline(id);
           case CallEventActionCallTimeout(:final id):
             // Unanswered ring auto-dismisses → treat like a decline so the
             // caller stops waiting.
