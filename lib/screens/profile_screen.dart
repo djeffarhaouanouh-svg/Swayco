@@ -52,11 +52,16 @@ import 'settings_screen.dart';
 ///     warning are dropped (private to me), and the action row becomes
 ///     Bloquer / Débloquer instead of Edit / Paramètres.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.userId});
+  const ProfileScreen({super.key, this.userId, this.preview = false});
 
   /// When non-null, render the profile of the given Supabase auth user id
   /// in read-only "viewer" mode rather than my own profile.
   final String? userId;
+
+  /// Aperçu de MON profil tel que les autres le voient : rendu viewer sur mes
+  /// propres données, mais sans les actions (Message / Matcher / bloquer) ni le
+  /// menu ⋮ — juste un bouton retour pour fermer.
+  final bool preview;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -88,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _peerLikedMe = false;
   Timer? _pollTimer;
 
-  bool get _isViewingOther => widget.userId != null;
+  bool get _isViewingOther => widget.userId != null || widget.preview;
   String get _targetId => widget.userId ?? _deviceId;
 
   @override
@@ -381,6 +386,15 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
     await _reload();
+  }
+
+  /// Bouton œil : ouvre mon profil rendu comme un pair le voit (aperçu).
+  Future<void> _openSelfPreview() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const ProfileScreen(preview: true),
+      ),
+    );
   }
 
   String get _displayName {
@@ -789,6 +803,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onRemovePhoto: _removePhoto,
                             onEdit: _openEditor,
                             onSettings: _openSettings,
+                            onPreview: _openSelfPreview,
+                            preview: widget.preview,
                             onLikePeer: _likePeer,
                             onAcceptPeer: _acceptPeer,
                             onToggleBlock: _toggleBlock,
@@ -820,6 +836,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
                         const Spacer(),
+                        // En aperçu de mon propre profil : pas de menu ⋮
+                        // (rien à signaler / bloquer sur soi-même).
+                        if (!widget.preview)
                         PopupMenuButton<String>(
                           tooltip: AppStrings.t('tooltip_more'),
                           icon: const Icon(
@@ -954,6 +973,8 @@ class _IdentitySection extends StatelessWidget {
     required this.onRemovePhoto,
     required this.onEdit,
     required this.onSettings,
+    this.onPreview,
+    this.preview = false,
     this.viewerMode = false,
     this.matched = false,
     this.iLiked = false,
@@ -1035,6 +1056,13 @@ class _IdentitySection extends StatelessWidget {
   /// Own profile: open the editor (name / language) — the header pencil.
   final VoidCallback onEdit;
   final VoidCallback onSettings;
+
+  /// Own profile: ouvre l'aperçu "vu de l'extérieur" (bouton œil).
+  final VoidCallback? onPreview;
+
+  /// True quand CETTE instance EST l'aperçu (rendu viewer sur mes données) :
+  /// masque toutes les actions relationnelles.
+  final bool preview;
 
   /// True when this section is rendering someone else's profile read-only.
   /// Hides editing affordances and swaps Edit/Paramètres for Message /
@@ -1170,10 +1198,12 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // Œil = aperçu de mon profil vu de l'extérieur (à la place de
+            // l'engrenage, qui descend sur le crayon près du nom).
             _GhostIconButton(
-              icon: Icons.settings_outlined,
-              onTap: onSettings,
-              tooltip: AppStrings.t('settings_title'),
+              icon: Icons.visibility_outlined,
+              onTap: onPreview ?? () {},
+              tooltip: AppStrings.t('profile_preview'),
             ),
           ],
         ),
@@ -1212,14 +1242,16 @@ class _IdentitySection extends StatelessWidget {
                 ],
               ),
             ),
+            // Paramètres (à la place du crayon) — l'édition du nom / de la bio
+            // se fait en tapant le texte directement.
             Material(
               color: SC.accent.withValues(alpha: 0.15),
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: onEdit,
+                onTap: onSettings,
                 child: Tooltip(
-                  message: AppStrings.t('profile_edit'),
+                  message: AppStrings.t('settings_title'),
                   child: Container(
                     width: 36,
                     height: 36,
@@ -1230,7 +1262,7 @@ class _IdentitySection extends StatelessWidget {
                       ),
                     ),
                     child: const Icon(
-                      Icons.edit_outlined,
+                      Icons.settings_outlined,
                       size: 16,
                       color: SC.accent,
                     ),
@@ -1371,6 +1403,9 @@ class _IdentitySection extends StatelessWidget {
         //  • they liked me first → "Accepter" (one tap = match).
         //  • I liked them, no answer yet → "Envoyé".
         //  • nobody liked anybody → "Matcher" (sends the like).
+        // En aperçu de mon propre profil : aucune action (on ne se matche /
+        // bloque pas soi-même).
+        if (!preview) ...[
         const SizedBox(height: 16),
         if (peerBlocked) ...[
           _GradientActionButton(
@@ -1424,6 +1459,7 @@ class _IdentitySection extends StatelessWidget {
               ),
             ],
           ],
+        ],
         ],
         // Centres d'intérêt (read-only) — just above the photos.
         if (interests.isNotEmpty) ...[
