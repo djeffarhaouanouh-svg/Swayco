@@ -1247,59 +1247,8 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // Bio — between the name block and the stats. Edited IN PLACE (tap
-        // the text → it turns into a field), no bottom-sheet popup. Shows
-        // the placeholder when empty so it stays an obvious edit affordance.
-        const SizedBox(height: 12),
-        // Bio stays fully centred under the name; the +20 reward hint floats
-        // at the far right of the same line, nudged up — it lines up with the
-        // Interests / Your photos +20 badges below and never pushes the bio
-        // down or off-centre. Symmetric side padding keeps a long bio clear
-        // of the hint while preserving the centring.
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 44),
-              child: SizedBox(
-                width: double.infinity,
-                child: _InlineEditable(
-                  value: bio,
-                  placeholder: _bioPlaceholder,
-                  onSave: onEditBio,
-                  maxLength: profileBioMaxLength,
-                  maxLines: 2,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 16.5,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-            const Positioned(right: 0, top: -4, child: _RewardHint()),
-          ],
-        ),
         const SizedBox(height: 24),
-        // Centres d'intérêt — picked chips + an "add" chip; tapping either
-        // unfolds the category picker inline, right under the chips (no
-        // overlay), then folds back when you're done. Shown ABOVE the photos.
-        // "Mes infos" — les faits que le panneau du Discover affiche sous la
-        // bio. Tout est optionnel : une ligne vide s'affiche "Ajouter".
-        _ProfileSectionHeader(AppStrings.t('info_section_title')),
-        const SizedBox(height: 12),
-        _PersonalInfoSection(
-          profile: personalInfo,
-          onSave: onSavePersonalInfo,
-        ),
-        const SizedBox(height: 24),
-        _InterestsSection(
-          interests: interests,
-          onSave: onEditInterests,
-          country: country,
-        ),
-        const SizedBox(height: 24),
-        // "Tes photos (n)" + horizontal gallery (add tile first, then photos).
+        // Photos EN HAUT : "Tes photos (n)" + galerie horizontale.
         _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
         const SizedBox(height: 12),
         _PhotoGallery(
@@ -1311,6 +1260,35 @@ class _IdentitySection extends StatelessWidget {
           onTapLikes: onTapLikes,
           discoverPhotoUrl: discoverPhotoUrl,
           onSelectDiscover: onSelectDiscover,
+        ),
+        const SizedBox(height: 24),
+        // "Mes infos" : un seul panneau qui porte la bio (en haut), les faits
+        // perso, puis les centres d'intérêt (en bas).
+        _ProfileSectionHeader(AppStrings.t('info_section_title')),
+        const SizedBox(height: 12),
+        _PersonalInfoSection(
+          profile: personalInfo,
+          onSave: onSavePersonalInfo,
+          // Bio en haut du panneau — édition en place, placeholder si vide.
+          top: _InlineEditable(
+            value: bio,
+            placeholder: _bioPlaceholder,
+            onSave: onEditBio,
+            maxLength: profileBioMaxLength,
+            maxLines: 3,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 15.5,
+              height: 1.4,
+            ),
+          ),
+          // Centres d'intérêt à l'intérieur du panneau (choix unique).
+          bottom: _InterestsSection(
+            interests: interests,
+            onSave: onEditInterests,
+            country: country,
+            compact: true,
+          ),
         ),
         const SizedBox(height: 10),
         // ⓘ hint — taps jump to Settings where "Me cacher de mon pays" lives.
@@ -1944,7 +1922,12 @@ class _PhotoGallery extends StatelessWidget {
 /// "Ajouter" : rien n'est obligatoire, et un champ vidé disparaît du panneau
 /// que la carte Discover déplie.
 class _PersonalInfoSection extends StatelessWidget {
-  const _PersonalInfoSection({required this.profile, required this.onSave});
+  const _PersonalInfoSection({
+    required this.profile,
+    required this.onSave,
+    this.top,
+    this.bottom,
+  });
 
   final RemoteProfile? profile;
   final Future<void> Function({
@@ -1954,6 +1937,18 @@ class _PersonalInfoSection extends StatelessWidget {
     Object? zodiac,
     Object? lookingFor,
   })? onSave;
+
+  /// Rendu EN HAUT du panneau, au-dessus des lignes d'infos (la bio).
+  final Widget? top;
+
+  /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intérêt).
+  final Widget? bottom;
+
+  static Widget get _divider => Divider(
+        height: 1,
+        thickness: 1,
+        color: Colors.white.withValues(alpha: 0.06),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -1969,6 +1964,13 @@ class _PersonalInfoSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Column(
         children: [
+          if (top != null) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: top!,
+            ),
+            _divider,
+          ],
           _PersonalInfoRow(
             icon: Icons.cake_outlined,
             label: AppStrings.t('info_age'),
@@ -2000,8 +2002,15 @@ class _PersonalInfoSection extends StatelessWidget {
             label: AppStrings.t('info_looking_for'),
             value: p?.lookingFor ?? '',
             onSave: (v) => save(lookingFor: v),
-            last: true,
+            last: bottom == null,
           ),
+          if (bottom != null) ...[
+            _divider,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: bottom!,
+            ),
+          ],
         ],
       ),
     );
@@ -2319,6 +2328,7 @@ class _InterestsSection extends StatefulWidget {
     required this.interests,
     required this.onSave,
     this.country = '',
+    this.compact = false,
   });
 
   final List<String> interests;
@@ -2326,6 +2336,10 @@ class _InterestsSection extends StatefulWidget {
 
   /// The user's country — selects which interests taxonomy the picker shows.
   final String country;
+
+  /// Rendu dans le panneau "Mes infos" : un petit libellé muet façon ligne
+  /// d'info au lieu du gros titre de section (et pas de badge +20).
+  final bool compact;
 
   @override
   State<_InterestsSection> createState() => _InterestsSectionState();
@@ -2357,11 +2371,8 @@ class _InterestsSectionState extends State<_InterestsSection> {
   // state once more when folding, which also wins any rapid-tap race.
   void _toggle(String tag) {
     setState(() {
-      if (_sel.contains(tag)) {
-        _sel.remove(tag);
-      } else if (_sel.length < profileInterestsMax) {
-        _sel.add(tag);
-      }
+      // Choix unique : re-taper enlève, taper un autre remplace.
+      _sel = _sel.contains(tag) ? <String>{} : {tag};
     });
     widget.onSave?.call(_sel.toList());
   }
@@ -2393,11 +2404,27 @@ class _InterestsSectionState extends State<_InterestsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProfileSectionHeader(
-          AppStrings.t('profile_interests_section'),
-          trailing: const _RewardHint(),
-        ),
-        const SizedBox(height: 12),
+        if (widget.compact)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10, left: 2),
+            child: Row(
+              children: [
+                const Icon(Icons.interests_outlined, size: 18, color: SC.accent),
+                const SizedBox(width: 12),
+                Text(
+                  AppStrings.t('profile_interests_section'),
+                  style: const TextStyle(color: SC.textMuted, fontSize: 14),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          _ProfileSectionHeader(
+            AppStrings.t('profile_interests_section'),
+            trailing: const _RewardHint(),
+          ),
+          const SizedBox(height: 12),
+        ],
         // The picked chips + the add/toggle chip. Tapping any of them folds
         // or unfolds the inline picker below. In the same TapRegion group as
         // the picker so tapping a chip while open doesn't count as "outside".
@@ -2503,19 +2530,6 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Live counter row.
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${widget.sel.length}/$profileInterestsMax',
-              style: TextStyle(
-                color: full ? SC.accent : SC.textMuted,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
           // One page per category — swipe sideways to switch category.
           SizedBox(
             height: 248,

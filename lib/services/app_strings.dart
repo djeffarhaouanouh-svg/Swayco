@@ -571,6 +571,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Swipe entre les catégories et choisis ce qui te ressemble. (facultatif)',
     'onb_interests_count': '{n} / {max} sélectionnés',
+    'onb_interests_pick_one': 'Choisis un centre d\'intérêt',
     'onb_interests_max': 'Maximum {n} centres d\'intérêt.',
     'onb_gift_title': 'Cadeau de bienvenue',
     'onb_gift_subtitle': "C'est cadeau, profites-en pour ton premier appel.",
@@ -1123,6 +1124,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Swipe through the categories and pick what fits you. (optional)',
     'onb_interests_count': '{n} / {max} selected',
+    'onb_interests_pick_one': 'Pick one interest',
     'onb_interests_max': 'Up to {n} interests.',
     'onb_gift_title': 'Welcome gift',
     'onb_gift_subtitle': "It's on us — enjoy it on your first call.",
@@ -1695,6 +1697,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Desliza por las categorías y elige lo que te encaje. (opcional)',
     'onb_interests_count': '{n} / {max} seleccionados',
+    'onb_interests_pick_one': 'Elige un interés',
     'onb_interests_max': 'Hasta {n} intereses.',
     'onb_gift_title': 'Regalo de bienvenida',
     'onb_gift_subtitle':
@@ -2250,6 +2253,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Wische durch die Kategorien und wähle, was zu dir passt. (optional)',
     'onb_interests_count': '{n} / {max} ausgewählt',
+    'onb_interests_pick_one': 'Wähle ein Interesse',
     'onb_interests_max': 'Bis zu {n} Interessen.',
     'onb_gift_title': 'Willkommensgeschenk',
     'onb_gift_subtitle': 'Geht auf uns — genieße es bei deinem ersten Anruf.',
@@ -2798,6 +2802,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Scorri tra le categorie e scegli ciò che ti rappresenta. (facoltativo)',
     'onb_interests_count': '{n} / {max} selezionati',
+    'onb_interests_pick_one': 'Scegli un interesse',
     'onb_interests_max': 'Fino a {n} interessi.',
     'onb_gift_title': 'Regalo di benvenuto',
     'onb_gift_subtitle': 'Offre la casa — goditelo alla tua prima chiamata.',
@@ -3346,6 +3351,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Percorra as categorias e escolha o que combina consigo. (opcional)',
     'onb_interests_count': '{n} / {max} selecionados',
+    'onb_interests_pick_one': 'Escolhe um interesse',
     'onb_interests_max': 'Até {n} interesses.',
     'onb_gift_title': 'Presente de boas-vindas',
     'onb_gift_subtitle':
@@ -3894,6 +3900,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Veeg door de categorieën en kies wat bij je past. (optioneel)',
     'onb_interests_count': '{n} / {max} geselecteerd',
+    'onb_interests_pick_one': 'Kies één interesse',
     'onb_interests_max': 'Maximaal {n} interesses.',
     'onb_gift_title': 'Welkomstcadeau',
     'onb_gift_subtitle': 'Van ons — geniet ervan tijdens je eerste gesprek.',
@@ -4425,6 +4432,7 @@ abstract final class AppStrings {
     'onb_interests_title_france': 'ما الذي تحبه أكثر في فرنسا؟',
     'onb_interests_subtitle': 'تصفّح الفئات واختر ما يناسبك. (اختياري)',
     'onb_interests_count': 'تم اختيار {n} / {max}',
+    'onb_interests_pick_one': 'اختر اهتماماً واحداً',
     'onb_interests_max': 'حتى {n} من الاهتمامات.',
     'onb_gift_title': 'هدية الترحيب',
     'onb_gift_subtitle': 'إنها على حسابنا — استمتع بها في مكالمتك الأولى.',
@@ -4968,6 +4976,7 @@ abstract final class AppStrings {
     'onb_interests_subtitle':
         'Пролистайте категории и выберите подходящее. (необязательно)',
     'onb_interests_count': 'Выбрано {n} / {max}',
+    'onb_interests_pick_one': 'Выберите один интерес',
     'onb_interests_max': 'До {n} интересов.',
     'onb_gift_title': 'Приветственный подарок',
     'onb_gift_subtitle':
@@ -5465,6 +5474,7 @@ abstract final class AppStrings {
     'onb_interests_title_france': '你最喜欢法国的什么？',
     'onb_interests_subtitle': '滑动浏览各个分类，选出适合你的。（可选）',
     'onb_interests_count': '已选 {n} / {max}',
+    'onb_interests_pick_one': '选择一个兴趣',
     'onb_interests_max': '最多 {n} 个兴趣。',
     'onb_gift_title': '欢迎礼物',
     'onb_gift_subtitle': '这是我们送你的 — 在你的第一次通话中尽情享用吧。',
@@ -5961,6 +5971,7 @@ abstract final class AppStrings {
     'onb_interests_title_france': 'フランスの何が一番好きですか？',
     'onb_interests_subtitle': 'カテゴリーをスワイプして、自分に合うものを選んでください。（任意）',
     'onb_interests_count': '{n} / {max} 選択中',
+    'onb_interests_pick_one': '興味を1つ選んでください',
     'onb_interests_max': '興味は{n}個まで。',
     'onb_gift_title': 'ようこそギフト',
     'onb_gift_subtitle': '私たちからのプレゼント — 最初の通話でお使いください。',
@@ -6455,6 +6466,7 @@ abstract final class AppStrings {
     'onb_interests_title_france': '프랑스에서 가장 좋아하는 것은 무엇인가요?',
     'onb_interests_subtitle': '카테고리를 넘기며 나에게 맞는 것을 골라요. (선택)',
     'onb_interests_count': '{n} / {max} 선택됨',
+    'onb_interests_pick_one': '관심사 하나를 선택하세요',
     'onb_interests_max': '관심사는 최대 {n}개까지예요.',
     'onb_gift_title': '환영 선물',
     'onb_gift_subtitle': '저희가 드려요 — 첫 통화에서 사용해 보세요.',

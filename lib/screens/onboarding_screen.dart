@@ -525,25 +525,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Add / remove an interest, capping at [profileInterestsMax] and nudging
   /// the user when the cap is hit instead of silently ignoring the tap.
+  /// Un seul centre d'intérêt : re-taper le même le désélectionne, taper un
+  /// autre remplace. (Idem sur le profil.)
   void _toggleInterest(String label) {
     setState(() {
       if (_selectedInterests.contains(label)) {
-        _selectedInterests.remove(label);
+        _selectedInterests.clear();
       } else {
-        if (_selectedInterests.length >= profileInterestsMax) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                AppStrings.t(
-                  'onb_interests_max',
-                  args: {'n': '$profileInterestsMax'},
-                ),
-              ),
-            ),
-          );
-          return;
-        }
-        _selectedInterests.add(label);
+        _selectedInterests
+          ..clear()
+          ..add(label);
       }
     });
   }
@@ -936,17 +927,11 @@ class _StepInterestsState extends State<_StepInterests> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Selection counter so the user knows the cap (e.g. "2 / 6").
+        // Choix unique : un petit rappel, pas de compteur "x/max".
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
           child: Text(
-            AppStrings.t(
-              'onb_interests_count',
-              args: {
-                'n': '${widget.selected.length}',
-                'max': '$profileInterestsMax',
-              },
-            ),
+            AppStrings.t('onb_interests_pick_one'),
             style: const TextStyle(color: SC.textMuted, fontSize: 13),
           ),
         ),
