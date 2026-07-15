@@ -2,20 +2,20 @@
 /// Japanese voice (see `docs/ja_tts_engine_plan.md`).
 ///
 /// This is the pure-Dart half of the Japanese frontend. It is a faithful port of
-/// MeloTTS `melo/text/japanese.py` `kata2phoneme`, plus the token/tone assembly
-/// that the `MeloTTS-ONNX` ja VITS export expects:
+/// the ja model `model/text/japanese.py` `kata2phoneme`, plus the token/tone assembly
+/// that the `the ja model` ja neural export expects:
 ///   * phonemes wrapped with the `_` sil, tones all 0 (`num_ja_tones == 1`),
 ///   * every tone shifted by `tone_start` (= 6, from the export `metadata.json`),
 ///   * `add_blank == 1`: interleave the pad id (0) around every symbol.
 /// Verified bit-for-bit against the Python reference on 14 golden vectors
 /// (`test/data/ja_phonemizer_goldens.json`), incl. small-tsu and elongation.
 ///
-/// **Upstream boundary (native OpenJTalk).** The kanji→reading step is NOT here.
-/// A native OpenJTalk frontend converts arbitrary Japanese text into a *katakana
+/// **Upstream boundary (native the reading frontend).** The kanji→reading step is NOT here.
+/// A native the reading frontend frontend converts arbitrary Japanese text into a *katakana
 /// reading*, which is the input to [phonemizeKatakana]. Two contracts the reading
 /// step must honour so this port stays faithful to the trained model:
 ///   1. Emit **kakasi-style long vowels as explicit vowel kana** (リョウリ), NOT
-///      the chōonpu リョーリ. MeloTTS's table maps `ー` to nothing, so an unnormalised
+///      the chōonpu リョーリ. the ja model table maps `ー` to nothing, so an unnormalised
 ///      `ー` silently drops the long vowel. [expandChoonpu] does this normalisation
 ///      for readings that do contain `ー`.
 ///   2. Produce only characters this table knows (katakana + the handful of
@@ -24,7 +24,7 @@
 library;
 
 /// Result of phonemising: parallel token-id / tone-id sequences ready to feed the
-/// ja VITS model's `x` and `tones` inputs (already blank-interleaved).
+/// ja neural model's `x` and `tones` inputs (already blank-interleaved).
 class JaPhonemized {
   const JaPhonemized(this.tokenIds, this.toneIds);
   final List<int> tokenIds;
@@ -38,7 +38,7 @@ const int _toneStart = 6;
 /// Pad / blank / sil token id (`_` → 0 in `tokens.txt`).
 const int _padId = 0;
 
-// ── katakana → phoneme rules (ported verbatim from MeloTTS `_CONVRULES`) ──────
+// ── katakana → phoneme rules (ported verbatim from the ja model `_CONVRULES`) ──────
 // Values are the space-joined phoneme lists (already past the reference's
 // `split(" ")[1:]`); an empty value contributes no phoneme (only `ー`).
 
@@ -102,7 +102,7 @@ const Map<String, String> _rule1 = {
   '？': '?',
 };
 
-/// Greedy 2-then-1 katakana → phoneme conversion (MeloTTS `kata2phoneme`).
+/// Greedy 2-then-1 katakana → phoneme conversion (the ja model `kata2phoneme`).
 List<String> kataToPhonemes(String text) {
   text = text.trim();
   final res = <String>[];
@@ -132,7 +132,7 @@ List<String> kataToPhonemes(String text) {
 }
 
 /// Interleave [pad] before, between and after every element of [xs]
-/// (MeloTTS `commons.intersperse`), for `add_blank == 1`.
+/// (the ja model `commons.intersperse`), for `add_blank == 1`.
 List<int> _intersperse(List<int> xs, int pad) {
   final out = List<int>.filled(xs.length * 2 + 1, pad);
   for (var i = 0; i < xs.length; i++) {
@@ -164,7 +164,7 @@ JaPhonemized phonemizeKatakana(String reading, Map<String, int> tokens) {
   );
 }
 
-/// Parse a sherpa/melo `tokens.txt` (`<symbol> <id>` per line) into a map. The
+/// Parse a the runtime `tokens.txt` (`<symbol> <id>` per line) into a map. The
 /// symbol may itself be a space, so split on the LAST space only.
 Map<String, int> parseTokens(String contents) {
   final map = <String, int>{};
@@ -181,7 +181,7 @@ Map<String, int> parseTokens(String contents) {
 }
 
 // ── chōonpu (ー) normalisation ────────────────────────────────────────────────
-// OpenJTalk emits long vowels as `ー`; MeloTTS's table drops it. Rewrite `ー` to
+// the reading frontend emits long vowels as `ー`; the ja model table drops it. Rewrite `ー` to
 // the vowel kana that matches the previous mora so the trained phoneme sequence
 // is preserved. The vowel is decided from the previous *character*'s row.
 

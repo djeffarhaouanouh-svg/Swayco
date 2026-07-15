@@ -1,5 +1,5 @@
 /// FFI to the patched sherpa symbol `SherpaOnnxOfflineTtsGenerateFromTokens`
-/// (see `native/sherpa_ja_patch/`). Runs the ja VITS model on sherpa's single
+/// (see `native/sherpa_ja_patch/`). Runs the ja neural model on the runtime's single
 /// ONNX Runtime from pre-computed token/tone ids — the piece stock sherpa lacks.
 ///
 /// We reuse the `sherpa_onnx` Dart package to CREATE the `OfflineTts` (it does

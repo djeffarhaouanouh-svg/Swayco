@@ -163,7 +163,7 @@ class _CallScreenState extends State<CallScreen> {
   String _deviceTtsLang = '';
 
   /// True exactly while a translation is being SPOKEN, whichever engine speaks
-  /// it — the sherpa voice or the device (`flutter_tts`) one.
+  /// it — the premium voice or the device (`flutter_tts`) one.
   ///
   /// This is NOT [isTranslationPlaying]: that flag is an 800 ms anti-echo gate
   /// that self-clears on a timer whether the voice is still talking or not, and
@@ -221,7 +221,7 @@ class _CallScreenState extends State<CallScreen> {
     // download), so it falls straight through to the OS voice below. That is the
     // whole "one downloadable language, everything else flutter_tts" rule.
     if (!kIsWeb && SpeechService.instance.isLoadedFor(lang)) {
-      await _speakWithSherpa(text, lang);
+      await _speakPremium(text, lang);
       return;
     }
     final tag = _voiceTagFor(lang);
@@ -247,7 +247,7 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Speak with the installed premium (Piper/sherpa) voice.
+  /// Speak with the installed premium on-device voice.
   ///
   /// [speak] returns at playback *start*, and swallows its own errors — a
   /// missing model just returns without playing and fires no completion. So the
@@ -255,7 +255,7 @@ class _CallScreenState extends State<CallScreen> {
   /// come: the completion stream only *shortens* the gate's own safety timer,
   /// it is never the sole signal. Subscribe before speaking — a short clip can
   /// finish before the await returns.
-  Future<void> _speakWithSherpa(String text, String lang) async {
+  Future<void> _speakPremium(String text, String lang) async {
     final speech = SpeechService.instance;
     DebugOverlay.log('speak lang=$lang (premium voice) text="$text"');
     try {
@@ -1194,7 +1194,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Speak [text] with the device's own OS voice (`flutter_tts`).
   ///
-  /// This used to prefer a Piper/VITS voice running on sherpa-onnx, downloaded
+  /// The premium on-device voice, when one is loaded for this language; downloaded
   /// per language (~60–110 MB a bundle) and kept in sync with a catalogue. That
   /// whole machinery is gone: the phone already ships dozens of languages, they
   /// need no download, and they start speaking instantly. `ttsSpeaking` is now
@@ -1208,7 +1208,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// The "translated voice volume" slider used to reach only the audioplayers
   /// element that plays a cloud mp3 — a path neither the device voice nor the
-  /// old Piper one ever took, so the slider silently did nothing. Now that every
+  /// old on-device one ever took, so the slider silently did nothing. Now that every
   /// translation is spoken by flutter_tts, the volume has to be handed to it,
   /// before each utterance (the engine forgets it across a stop()).
   Future<void> _applyTranslatedVolumeToDeviceTts() async {
@@ -2562,7 +2562,7 @@ class _RoundCallButton extends StatelessWidget {
 /// picker carries 17 languages — plenty of phones ship no Ukrainian or Hindi
 /// voice.
 ///
-/// The account language stays selectable even when the OS lacks it — its sherpa
+/// The account language stays selectable even when the OS lacks it — its premium
 /// bundle is installed and speaks it.
 class _OutputLanguageSheet extends StatelessWidget {
   const _OutputLanguageSheet({

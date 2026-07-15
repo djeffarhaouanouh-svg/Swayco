@@ -7,20 +7,20 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
-import 'ja_openjtalk_ffi.dart';
+import 'ja_reading_ffi.dart';
 import 'ja_phonemizer.dart';
-import 'ja_sherpa_tokens.dart';
+import 'ja_tokens.dart';
 
 /// On-device **Japanese** TTS engine (see `docs/ja_tts_engine_plan.md`).
 ///
 /// Japanese can't go through sherpa's text frontend (it char-splits kanji), so
 /// this engine does its own g2p and feeds the model pre-computed tokens:
-///   native OpenJTalk reading ([JaOpenJTalk]) → katakana
+///   native the reading frontend reading ([JaReadingFrontend]) → katakana
 ///   → [expandChoonpu] + [phonemizeKatakana] → token/tone ids
 ///   → patched sherpa `GenerateFromTokens` ([generateFromTokens]) → PCM.
-/// The model still runs on sherpa's **single** ONNX Runtime — no second runtime.
+/// The model still runs on the runtime's **single** ONNX Runtime — no second runtime.
 ///
-/// Mirrors [SherpaTtsEngine]: everything native lives in a worker isolate (model
+/// Mirrors [NeuralTtsEngine]: everything native lives in a worker isolate (model
 /// load + generate are blocking calls); only text in and PCM out cross the
 /// boundary. Public surface matches so `SpeechService` can treat it like the
 /// sherpa engine.
@@ -36,7 +36,7 @@ class JaTtsModel {
   });
 
   /// fp16 ja `.onnx`, its `tokens.txt`, a `lexicon.txt` (only to satisfy sherpa
-  /// engine creation — g2p is bypassed), and the extracted OpenJTalk dict dir.
+  /// engine creation — g2p is bypassed), and the extracted the reading frontend dict dir.
   final String model;
   final String tokens;
   final String lexicon;
@@ -187,8 +187,8 @@ class JaTtsEngine {
 }
 
 // ─────────────────────────── Worker isolate ───────────────────────────────────
-// Owns the sherpa OfflineTts (for its ORT + model) and the OpenJTalk frontend.
-// FFI bindings are per-isolate, so initBindings + JaOpenJTalk.load run here.
+// Owns the runtime (for its ORT + model) and the the reading frontend frontend.
+// FFI bindings are per-isolate, so initBindings + JaReadingFrontend.load run here.
 
 void _jaTtsWorkerMain(SendPort toMain) {
   final rp = ReceivePort();
@@ -196,7 +196,7 @@ void _jaTtsWorkerMain(SendPort toMain) {
 
   var bindingsReady = false;
   sherpa.OfflineTts? tts;
-  JaOpenJTalk? frontend;
+  JaReadingFrontend? frontend;
   Map<String, int> tokenMap = const {};
 
   rp.listen((message) {
@@ -229,7 +229,7 @@ void _jaTtsWorkerMain(SendPort toMain) {
             ),
           );
           frontend?.dispose();
-          frontend = JaOpenJTalk.load(m.dictDir);
+          frontend = JaReadingFrontend.load(m.dictDir);
           tokenMap = parseTokens(File(m.tokens).readAsStringSync());
           toMain.send(['configured']);
         } catch (e) {

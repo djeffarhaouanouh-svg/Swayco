@@ -7,7 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
-/// The on-device TTS engine, on sherpa-onnx's `OfflineTts` (VITS: Piper/mimic3).
+/// The on-device TTS engine, on the runtime's `OfflineTts` (neural: neural).
 ///
 /// **Runs in a background isolate.** `OfflineTts` creation loads an ONNX session
 /// and `generate` synthesises — both are blocking native calls. On the main
@@ -20,10 +20,10 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 /// Public surface (`configure` / `isReady` / `speak` / `onPlaybackComplete` /
 /// `stop` / `dispose`) is unchanged, so `SpeechService` is untouched.
 
-/// The files a configured VITS voice needs on disk: the `.onnx` model, its
-/// `tokens.txt`, and the espeak-ng data directory.
-class SherpaTtsModel {
-  const SherpaTtsModel({
+/// The files a configured neural voice needs on disk: the `.onnx` model, its
+/// `tokens.txt`, and the the phonemiser data directory.
+class NeuralTtsModel {
+  const NeuralTtsModel({
     required this.model,
     required this.tokens,
     required this.dataDir,
@@ -39,14 +39,14 @@ class SherpaTtsModel {
         'dataDir': dataDir,
       };
 
-  static SherpaTtsModel fromMap(Map<String, dynamic> m) => SherpaTtsModel(
+  static NeuralTtsModel fromMap(Map<String, dynamic> m) => NeuralTtsModel(
         model: m['model'] as String,
         tokens: m['tokens'] as String,
         dataDir: m['dataDir'] as String,
       );
 }
 
-class SherpaTtsEngine {
+class NeuralTtsEngine {
   Isolate? _isolate;
   SendPort? _toWorker;
   ReceivePort? _fromWorker;
@@ -80,7 +80,7 @@ class SherpaTtsEngine {
 
   /// Build the native engine for [m] in the worker isolate. Awaits the build but
   /// does not block the UI thread.
-  Future<void> configure(SherpaTtsModel m) async {
+  Future<void> configure(NeuralTtsModel m) async {
     await _ensureSpawned();
     final c = Completer<List<dynamic>>();
     _pending = c;
@@ -209,7 +209,7 @@ void _ttsWorkerMain(SendPort toMain) {
             bindingsReady = true;
           }
           final m =
-              SherpaTtsModel.fromMap((msg[1] as Map).cast<String, dynamic>());
+              NeuralTtsModel.fromMap((msg[1] as Map).cast<String, dynamic>());
           tts?.free();
           tts = sherpa.OfflineTts(
             sherpa.OfflineTtsConfig(model: _buildModelConfig(m)),
@@ -246,7 +246,7 @@ void _ttsWorkerMain(SendPort toMain) {
   });
 }
 
-sherpa.OfflineTtsModelConfig _buildModelConfig(SherpaTtsModel m) {
+sherpa.OfflineTtsModelConfig _buildModelConfig(NeuralTtsModel m) {
   return sherpa.OfflineTtsModelConfig(
     vits: sherpa.OfflineTtsVitsModelConfig(
       model: m.model,

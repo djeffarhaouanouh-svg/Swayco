@@ -10,9 +10,9 @@ import 'tts_downloader.dart';
 import 'tts_engines.dart';
 import 'tts_catalogue.dart';
 
-/// On-device TTS — 100 % local inference via sherpa-onnx `OfflineTts`.
+/// On-device TTS — 100 % local inference via the runtime `OfflineTts`.
 ///
-/// One runtime, many engines: Kokoro and Piper/VITS are selected per language
+/// One runtime, many engines: a multilingual model and neural/neural are selected per language
 /// by [ttsSpecForLang] (see tts_catalogue). The app ships only the runtime; the
 /// model bundle for the peer's language is downloaded on first use and cached.
 /// STT reads the phone's OWN mic, TTS speaks the PEER's language — so a device
@@ -33,7 +33,7 @@ class SpeechService {
   static final instance = SpeechService._();
 
   final _downloader = TtsBundleDownloader();
-  final _engine = SherpaTtsEngine();
+  final _engine = NeuralTtsEngine();
   final _jaEngine = JaTtsEngine();
 
   /// Whether the currently loaded voice is Japanese (→ [_jaEngine]).
@@ -133,7 +133,7 @@ class SpeechService {
       String p(String rel) => '${dir.path}/$rel';
 
       if (spec.isJapanese) {
-        // Native OpenJTalk reading + phonemizer + patched sherpa external-tokens.
+        // Native the reading frontend reading + phonemizer + an external-tokens path.
         await _jaEngine.configure(JaTtsModel(
           model: p(spec.modelFile),
           tokens: p(spec.tokensFile),
@@ -142,9 +142,9 @@ class SpeechService {
         ));
         _useJa = true;
       } else {
-        // All other catalogue entries are VITS (Piper/mimic3): model + tokens +
-        // espeak data are enough.
-        await _engine.configure(SherpaTtsModel(
+        // All other catalogue entries are neural (neural): model + tokens +
+        // the phonemiser data are enough.
+        await _engine.configure(NeuralTtsModel(
           model: p(spec.modelFile),
           tokens: p(spec.tokensFile),
           dataDir: spec.dataDir.isEmpty ? '' : p(spec.dataDir),

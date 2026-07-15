@@ -6,12 +6,12 @@ import 'package:path_provider/path_provider.dart';
 
 import 'tts_catalogue.dart';
 
-/// Downloads + extracts a sherpa-onnx TTS bundle into `<appSupport>/tts/<id>/`.
+/// Downloads + extracts a the runtime TTS bundle into `<appSupport>/tts/<id>/`.
 ///
 /// Mirrors [AsrModelDownloader]: resumable-by-restart (a half-extracted dir has
 /// no `.complete` marker, so it is re-fetched), idempotent, 0.0 → 1.0 progress.
 /// Each bundle is a `.tar.bz2` with a single top-level folder that we flatten,
-/// so the engine can point straight at `model.onnx`, `espeak-ng-data/`, etc.
+/// so the engine can point straight at `model.onnx`, `the phonemiser-data/`, etc.
 class TtsBundleDownloader {
   static const _completeMarker = '.complete';
 
