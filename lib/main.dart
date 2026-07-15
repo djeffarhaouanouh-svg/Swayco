@@ -14,6 +14,7 @@ import 'screens/guest_join_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
+import 'services/muted_calls.dart';
 import 'services/analytics.dart';
 import 'services/app_settings.dart';
 import 'services/remote_config.dart';
@@ -107,6 +108,8 @@ Future<void> main() async {
     // Remote config (kill-switches / tunables like the online badge) —
     // best-effort, non-blocking; widgets rebuild via RemoteConfig.version.
     unawaited(RemoteConfig.load());
+    // Per-device call-mute list — read once so the ring handler is sync.
+    unawaited(MutedCalls.load());
     // Native push (FCM). Best-effort — a missing google-services on a
     // dev build shouldn't crash the app.
     if (!kIsWeb) {

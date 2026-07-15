@@ -13,6 +13,7 @@ import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/match_seen.dart';
+import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
 import '../services/nav_tab.dart';
@@ -793,6 +794,30 @@ class _FriendChatRow extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ValueListenableBuilder<Set<String>>(
+              valueListenable: MutedCalls.ids,
+              builder: (_, muted, _) {
+                final isMuted = muted.contains(profile.id);
+                return ListTile(
+                  leading: Icon(
+                    isMuted
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    color: SC.textPrimary,
+                  ),
+                  title: Text(
+                    AppStrings.t(
+                      isMuted ? 'calls_unmute' : 'calls_mute',
+                    ),
+                    style: const TextStyle(color: SC.textPrimary),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    MutedCalls.setMuted(profile.id, !isMuted);
+                  },
+                );
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.block, color: Color(0xFFE53935)),
               title: Text(

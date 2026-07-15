@@ -16,6 +16,7 @@ import '../services/call_audio.dart';
 import '../services/incoming_call_api.dart';
 import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
+import '../services/muted_calls.dart';
 import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
 import '../services/notification_router.dart';
@@ -172,6 +173,13 @@ class _RootShellState extends State<RootShell> {
   }
 
   Future<void> _handleIncomingCall(IncomingCall call) async {
+    // En sourdine pour ce contact : on n'affiche rien, on ne fait pas sonner,
+    // et on éteint le ringer de fond s'il s'est déclenché.
+    if (MutedCalls.isMuted(call.callerId)) {
+      _handledCallIds.add(call.id);
+      unawaited(LocalNotifications.cancelIncomingCall());
+      return;
+    }
     // On iOS the incoming call is owned by CallKit (native full-screen via
     // VoIP push). Running the in-app dialog in parallel races it: when the
     // user answers in CallKit, this dialog's auto-decline timer fires and
