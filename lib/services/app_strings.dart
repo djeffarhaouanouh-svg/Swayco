@@ -426,12 +426,10 @@ abstract final class AppStrings {
     'call_route_internal_hint':
         'Active le haut-parleur ou repasse à l’écouteur.',
     'call_language': 'Langue',
-    'call_language_input': 'Je parle',
     'call_language_output': 'J’entends',
     'call_input_language_title': 'Langue que je parle',
     'call_input_language_hint':
         'Choisis la langue dans laquelle tu parles. La reconnaissance se recharge, ça prend quelques secondes.',
-    'call_input_language_loading': 'Préparation en cours…',
     'call_output_language_title': 'Langue que j’entends',
     'call_output_language_hint':
         'Change la langue dans laquelle tu entends l’autre personne. Ça ne change rien pour elle.',
@@ -983,12 +981,10 @@ abstract final class AppStrings {
     'call_route_internal_hint':
         'Turn on the speaker or switch back to the earpiece.',
     'call_language': 'Language',
-    'call_language_input': 'I speak',
     'call_language_output': 'I hear',
     'call_input_language_title': 'Language I speak',
     'call_input_language_hint':
         'Pick the language you are speaking. Recognition reloads, which takes a few seconds.',
-    'call_input_language_loading': 'Getting ready…',
     'call_output_language_title': 'Language I hear',
     'call_output_language_hint':
         "Changes the language you hear the other person in. It doesn't change anything for them.",
@@ -1496,12 +1492,10 @@ abstract final class AppStrings {
     'sent_label': 'Enviado',
     'follow_following': 'Siguiendo',
     'call_language': 'Idioma',
-    'call_language_input': 'Yo hablo',
     'call_language_output': 'Yo escucho',
     'call_input_language_title': 'Idioma que hablo',
     'call_input_language_hint':
         'Elige el idioma en el que hablas. El reconocimiento se recarga, tarda unos segundos.',
-    'call_input_language_loading': 'Preparando…',
     'call_output_language_title': 'Idioma que escucho',
     'call_output_language_hint':
         'Cambia el idioma en el que escuchas a la otra persona. No cambia nada para ella.',
@@ -1972,12 +1966,10 @@ abstract final class AppStrings {
     'invite_friend': 'Einen Freund zu Swayco einladen',
     'follow_following': 'Abonniert',
     'call_language': 'Sprache',
-    'call_language_input': 'Ich spreche',
     'call_language_output': 'Ich höre',
     'call_input_language_title': 'Sprache, die ich spreche',
     'call_input_language_hint':
         'Wähle die Sprache, in der du sprichst. Die Erkennung lädt neu, das dauert ein paar Sekunden.',
-    'call_input_language_loading': 'Wird vorbereitet…',
     'call_output_language_title': 'Sprache, die ich höre',
     'call_output_language_hint':
         'Ändert die Sprache, in der du die andere Person hörst. Für sie ändert sich nichts.',
@@ -2525,12 +2517,10 @@ abstract final class AppStrings {
     'invite_friend': 'Invita un amico su Swayco',
     'follow_following': 'Già seguito',
     'call_language': 'Lingua',
-    'call_language_input': 'Io parlo',
     'call_language_output': 'Io sento',
     'call_input_language_title': 'Lingua che parlo',
     'call_input_language_hint':
         'Scegli la lingua in cui parli. Il riconoscimento si ricarica, ci vogliono alcuni secondi.',
-    'call_input_language_loading': 'Preparazione…',
     'call_output_language_title': 'Lingua che sento',
     'call_output_language_hint':
         'Cambia la lingua in cui senti l’altra persona. Per lei non cambia nulla.',
@@ -3074,12 +3064,10 @@ abstract final class AppStrings {
     'invite_friend': 'Convidar um amigo para o Swayco',
     'follow_following': 'A seguir',
     'call_language': 'Idioma',
-    'call_language_input': 'Eu falo',
     'call_language_output': 'Eu ouço',
     'call_input_language_title': 'Idioma que falo',
     'call_input_language_hint':
         'Escolhe o idioma em que falas. O reconhecimento recarrega, demora alguns segundos.',
-    'call_input_language_loading': 'A preparar…',
     'call_output_language_title': 'Idioma que ouço',
     'call_output_language_hint':
         'Muda o idioma em que ouves a outra pessoa. Não muda nada para ela.',
@@ -3625,12 +3613,10 @@ abstract final class AppStrings {
     'invite_friend': 'Nodig een vriend uit voor Swayco',
     'follow_following': 'Volgend',
     'call_language': 'Taal',
-    'call_language_input': 'Ik spreek',
     'call_language_output': 'Ik hoor',
     'call_input_language_title': 'Taal die ik spreek',
     'call_input_language_hint':
         'Kies de taal waarin je spreekt. De herkenning laadt opnieuw, dat duurt enkele seconden.',
-    'call_input_language_loading': 'Even voorbereiden…',
     'call_output_language_title': 'Taal die ik hoor',
     'call_output_language_hint':
         'Verandert de taal waarin je de ander hoort. Voor de ander verandert er niets.',
@@ -4163,12 +4149,10 @@ abstract final class AppStrings {
     'invite_friend': 'ادعُ صديقًا إلى Swayco',
     'follow_following': 'تتابعه',
     'call_language': 'اللغة',
-    'call_language_input': 'أنا أتحدث',
     'call_language_output': 'أنا أسمع',
     'call_input_language_title': 'اللغة التي أتحدث بها',
     'call_input_language_hint':
         'اختر اللغة التي تتحدث بها. سيُعاد تحميل التعرّف على الكلام، ويستغرق ذلك بضع ثوانٍ.',
-    'call_input_language_loading': 'جارٍ التحضير…',
     'call_output_language_title': 'اللغة التي أسمعها',
     'call_output_language_hint':
         'يغيّر اللغة التي تسمع بها الشخص الآخر. لا يتغيّر شيء بالنسبة له.',
@@ -4701,12 +4685,10 @@ abstract final class AppStrings {
     'invite_friend': 'Пригласить друга в Swayco',
     'follow_following': 'Вы подписаны',
     'call_language': 'Язык',
-    'call_language_input': 'Я говорю',
     'call_language_output': 'Я слышу',
     'call_input_language_title': 'Язык, на котором я говорю',
     'call_input_language_hint':
         'Выбери язык, на котором ты говоришь. Распознавание перезагрузится, это займёт несколько секунд.',
-    'call_input_language_loading': 'Подготовка…',
     'call_output_language_title': 'Язык, который я слышу',
     'call_output_language_hint':
         'Меняет язык, на котором вы слышите собеседника. Для него ничего не меняется.',
@@ -5230,11 +5212,9 @@ abstract final class AppStrings {
     'invite_friend': '邀请好友加入 Swayco',
     'follow_following': '已关注',
     'call_language': '语言',
-    'call_language_input': '我说',
     'call_language_output': '我听',
     'call_input_language_title': '我说的语言',
     'call_input_language_hint': '选择你所说的语言。语音识别将重新加载，需要几秒钟。',
-    'call_input_language_loading': '准备中…',
     'call_output_language_title': '我听到的语言',
     'call_output_language_hint': '更改你听到对方时所用的语言。对方不受影响。',
     'call_language_unavailable': '不可用',
@@ -5721,11 +5701,9 @@ abstract final class AppStrings {
     'invite_friend': '友達をSwaycoに招待',
     'follow_following': 'フォロー中',
     'call_language': '言語',
-    'call_language_input': '話す言語',
     'call_language_output': '聞く言語',
     'call_input_language_title': '自分が話す言語',
     'call_input_language_hint': '自分が話す言語を選びます。音声認識が読み込み直され、数秒かかります。',
-    'call_input_language_loading': '準備中…',
     'call_output_language_title': '自分が聞く言語',
     'call_output_language_hint': '相手の声が聞こえる言語を変更します。相手側には影響しません。',
     'call_language_unavailable': '利用できません',
@@ -6218,11 +6196,9 @@ abstract final class AppStrings {
     'invite_friend': '친구를 Swayco에 초대',
     'follow_following': '팔로잉',
     'call_language': '언어',
-    'call_language_input': '내가 말함',
     'call_language_output': '내가 들음',
     'call_input_language_title': '내가 말하는 언어',
     'call_input_language_hint': '말하는 언어를 선택하세요. 음성 인식이 다시 로드되며 몇 초 걸립니다.',
-    'call_input_language_loading': '준비 중…',
     'call_output_language_title': '내가 듣는 언어',
     'call_output_language_hint': '상대방의 말이 들리는 언어를 바꿉니다. 상대방에게는 영향이 없습니다.',
     'call_language_unavailable': '사용 불가',
