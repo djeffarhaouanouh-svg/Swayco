@@ -1051,17 +1051,14 @@ class _DraggableCardState extends State<_DraggableCard>
     });
   }
 
-  /// [flyRight] = de quel côté la carte s'envole (le côté du doigt). [reportAs]
-  /// = l'action rapportée : par défaut identique au côté (bouton), mais le drag
-  /// la passe inversée — glisser à droite doit REFUSER, glisser à gauche LIKER.
-  void _flyOff(bool flyRight, {bool? reportAs}) {
+  void _flyOff(bool right) {
     _flying = true;
     _animateTo(
-      Offset(flyRight ? 1000.0 : -1000.0, _pos.dy),
+      Offset(right ? 1000.0 : -1000.0, _pos.dy),
       const Duration(milliseconds: 280),
       Curves.easeIn,
       done: () {
-        if (mounted) widget.onSwiped(reportAs ?? flyRight);
+        if (mounted) widget.onSwiped(right);
       },
     );
   }
@@ -1089,9 +1086,8 @@ class _DraggableCardState extends State<_DraggableCard>
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
-    // Inversé : glisser à droite = NOPE, glisser à gauche = LIKE.
-    final nopeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
-    final likeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
+    final likeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
+    final nopeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
 
     return Listener(
       onPointerDown: (e) {
@@ -1137,8 +1133,7 @@ class _DraggableCardState extends State<_DraggableCard>
           return;
         }
         if (_pos.dx.abs() >= _kThreshold) {
-          final dragRight = _pos.dx > 0;
-          _flyOff(dragRight, reportAs: !dragRight);
+          _flyOff(_pos.dx > 0);
         } else {
           _springBack();
         }
@@ -1612,20 +1607,20 @@ class _PillActionButton extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Container(
-            width: 96,
-            height: 50,
+            width: 132,
+            height: 60,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
             child: Container(
-              width: 34,
-              height: 34,
+              width: 40,
+              height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: Colors.white, size: 25),
             ),
           ),
         ),
