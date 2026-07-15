@@ -230,6 +230,12 @@ class _CallScreenState extends State<CallScreen> {
     return _ttsQueue;
   }
 
+  /// Kill-switch for the premium on-device voice. OFF for this build so every
+  /// translation goes through flutter_tts — the only path the voice-chat echo
+  /// fix (731c4a4) covers — giving a clean echo test. Flip back to `true` to
+  /// re-enable the gender-matched Piper voices.
+  static const bool _kPremiumVoiceEnabled = false;
+
   /// One utterance, start to finish. The timeout is the queue's safety net:
   /// flutter_tts can return without ever playing (a missing voice, a browser that
   /// suspended speechSynthesis), and then the completion event never comes — which
@@ -245,7 +251,8 @@ class _CallScreenState extends State<CallScreen> {
     // the call — no need to send it over the wire. A language with no gender
     // pair, or an unknown gender, just uses whatever voice is loaded.
     final peerGender = _peerProfile?.gender ?? '';
-    if (!kIsWeb &&
+    if (_kPremiumVoiceEnabled &&
+        !kIsWeb &&
         SpeechService.instance.isLoadedFor(lang, gender: peerGender)) {
       await _speakPremium(text, lang);
       return;
