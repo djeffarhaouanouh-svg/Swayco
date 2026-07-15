@@ -6,7 +6,9 @@ import '../screens/call_screen.dart';
 import '../swayco/realtime_translation_port.dart';
 import 'call_alert.dart';
 import 'call_credit_gate.dart';
+import 'app_strings.dart';
 import 'device_id.dart';
+import 'friendship_api.dart';
 import 'incoming_call_api.dart';
 import 'profile_api.dart';
 import 'supabase_service.dart';
@@ -81,6 +83,22 @@ abstract final class CallLauncher {
     _starting = true;
     try {
       final myId = await DeviceId.getOrCreate();
+
+      // Sécurité : on n'appelle QUE ses matchs. Tant que les deux ne se sont
+      // pas likés (arête 'accepted', peu importe qui a liké en premier), pas
+      // d'appel possible — ni depuis un profil, ni depuis une conversation.
+      final rel = await FriendshipApi.matchStateWith(
+        meId: myId,
+        peerId: peerDeviceId,
+      );
+      if (!rel.matched) {
+        if (!context.mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('call_needs_match'))),
+        );
+        return false;
+      }
+
       final me = await resolveMyIdentity();
       final myName = me.name;
       final mySourceLang = me.sourceLang;
