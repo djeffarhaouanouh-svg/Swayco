@@ -810,7 +810,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    // Un peu d'air : le retour ne colle plus au bord (sans
+                    // pour autant le pousser vers le centre).
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
                         GlassIconButton(
@@ -1440,22 +1442,146 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Read-only photos — always shown under their own header: the gallery
-        // when the peer has photos, else an "Aucune photo" placeholder.
+        // Grandes cartes empilées, pas d'entête "Photos" : la carte infos
+        // perso vient EN PREMIER, puis chaque photo en grand.
         const SizedBox(height: 24),
-        _ProfileSectionHeader(AppStrings.t('profile_photos_peer')),
-        const SizedBox(height: 12),
-        if (photos.isNotEmpty)
-          _PhotoGallery(
-            photos: photos,
-            viewerMode: true,
-            onPick: () {},
-            onRemove: (_) {},
-            likedPhotoUrls: likedPhotoUrls,
-            onTogglePhotoLike: onTogglePhotoLike,
-          )
-        else
-          const _EmptyPhotosPlaceholder(),
+        _PeerMediaStack(
+          personalInfo: personalInfo,
+          photos: photos,
+          likedPhotoUrls: likedPhotoUrls,
+          onTogglePhotoLike: onTogglePhotoLike,
+        ),
+      ],
+    );
+  }
+}
+
+/// Read-only "infos perso" rendue comme une CARTE (glass) — la première carte
+/// de la pile sur le profil de quelqu'un. Ne montre que les champs remplis ;
+/// vide si la personne n'a rien renseigné.
+class _PeerInfoCard extends StatelessWidget {
+  const _PeerInfoCard({required this.profile});
+  final RemoteProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    if (p == null) return const SizedBox.shrink();
+    final rows = <({IconData icon, String label, String value})>[
+      if (p.age != null)
+        (icon: Icons.cake_outlined, label: AppStrings.t('info_age'), value: '${p.age}'),
+      if (p.heightCm != null)
+        (
+          icon: Icons.straighten_rounded,
+          label: AppStrings.t('info_height'),
+          value: '${p.heightCm} cm',
+        ),
+      if (p.job.trim().isNotEmpty)
+        (icon: Icons.work_outline_rounded, label: AppStrings.t('info_job'), value: p.job.trim()),
+      if (p.zodiac.trim().isNotEmpty)
+        (
+          icon: Icons.auto_awesome_outlined,
+          label: AppStrings.t('info_zodiac'),
+          value: p.zodiac.trim(),
+        ),
+      if (p.lookingFor.trim().isNotEmpty)
+        (
+          icon: Icons.favorite_outline_rounded,
+          label: AppStrings.t('info_looking_for'),
+          value: p.lookingFor.trim(),
+        ),
+    ];
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: SC.glassStrong,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SC.glassBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      child: Column(
+        children: [
+          for (final (i, r) in rows.indexed) ...[
+            if (i > 0)
+              Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              child: Row(
+                children: [
+                  Icon(r.icon, size: 20, color: SC.accent),
+                  const SizedBox(width: 14),
+                  Text(r.label, style: const TextStyle(color: SC.textMuted, fontSize: 15)),
+                  const Spacer(),
+                  Text(
+                    r.value,
+                    style: const TextStyle(
+                      color: SC.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// La pile de grandes cartes sur le profil d'un pair : la carte infos perso en
+/// tête, puis chaque photo en grand (portrait plein-largeur, avec le cœur).
+class _PeerMediaStack extends StatelessWidget {
+  const _PeerMediaStack({
+    required this.personalInfo,
+    required this.photos,
+    required this.likedPhotoUrls,
+    required this.onTogglePhotoLike,
+  });
+
+  final RemoteProfile? personalInfo;
+  final List<String> photos;
+  final Set<String> likedPhotoUrls;
+  final void Function(String photoUrl)? onTogglePhotoLike;
+
+  static bool _hasInfo(RemoteProfile? p) =>
+      p != null &&
+      (p.age != null ||
+          p.heightCm != null ||
+          p.job.trim().isNotEmpty ||
+          p.zodiac.trim().isNotEmpty ||
+          p.lookingFor.trim().isNotEmpty);
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[
+      if (_hasInfo(personalInfo)) _PeerInfoCard(profile: personalInfo),
+      for (var i = 0; i < photos.length; i++)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: AspectRatio(
+            aspectRatio: 3 / 4,
+            child: _PhotoCell(
+              photoUrl: photos[i],
+              viewerMode: true,
+              onTap: () => showPhotoViewer(context, photos: photos, index: i),
+              iLikePeer: likedPhotoUrls.contains(photos[i]),
+              onTogglePeerLike: onTogglePhotoLike != null
+                  ? () => onTogglePhotoLike!(photos[i])
+                  : null,
+            ),
+          ),
+        ),
+    ];
+    if (items.isEmpty) return const _EmptyPhotosPlaceholder();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, w) in items.indexed) ...[
+          if (i > 0) const SizedBox(height: 14),
+          w,
+        ],
       ],
     );
   }
@@ -1774,13 +1900,14 @@ class _PhotoGallery extends StatelessWidget {
     required this.onRemove,
     this.likesByPhoto = const {},
     this.onTapLikes,
-    this.likedPhotoUrls = const {},
-    this.onTogglePhotoLike,
     this.discoverPhotoUrl = '',
     this.onSelectDiscover,
   });
 
   final List<String> photos;
+
+  /// Toujours false désormais — le profil d'un pair passe par [_PeerMediaStack].
+  /// Le param reste pour ne pas casser les points d'appel.
   final bool viewerMode;
   final VoidCallback onPick;
   final void Function(String url) onRemove;
@@ -1790,126 +1917,59 @@ class _PhotoGallery extends StatelessWidget {
   // Own profile: likes received per photo URL.
   final Map<String, int> likesByPhoto;
   final VoidCallback? onTapLikes;
-  // Viewer mode: the peer's photo URLs I've liked.
-  final Set<String> likedPhotoUrls;
-  // Viewer mode: like/unlike one of the peer's photos by URL.
-  final void Function(String photoUrl)? onTogglePhotoLike;
 
-  // Portrait tiles (3:4) laid out three-per-row, Instagram-style.
+  // Portrait tiles (3:4) — a single horizontal, scrollable row of larger tiles.
   static const double _aspect = 216 / 162; // height / width
   static const double _spacing = 8;
-  static const int _columns = 3;
-  // Cap the tile size so wide (desktop / web) layouts show small thumbnails
-  // that wrap across the row, instead of three giant images. Phones stay
-  // below this cap, so they keep exactly three per row.
-  static const double _maxTile = 150;
 
   @override
   Widget build(BuildContext context) {
-    if (viewerMode && photos.isEmpty) return const SizedBox.shrink();
-    final canAdd = !viewerMode && photos.length < profilePhotosMax;
-
-    // Own profile: a single horizontal, scrollable row of LARGER tiles (the
-    // add-tile first) — your photos stack on one line you swipe through,
-    // instead of the small 3-up grid used on someone else's profile.
-    if (!viewerMode) {
-      const double tileWidth = 160;
-      final double tileHeight = tileWidth * _aspect;
-      final count = (canAdd ? 1 : 0) + photos.length;
-      return SizedBox(
-        height: tileHeight,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
-          itemCount: count,
-          separatorBuilder: (_, _) => const SizedBox(width: _spacing),
-          itemBuilder: (context, index) {
-            if (canAdd && index == 0) {
-              return SizedBox(
-                width: tileWidth,
-                height: tileHeight,
-                child: _AddDiscoverPhotoCta(onTap: onPick),
-              );
-            }
-            final url = photos[canAdd ? index - 1 : index];
+    final canAdd = photos.length < profilePhotosMax;
+    // "Tes photos" agrandies : une rangée horizontale de grandes tuiles (la
+    // tuile "+" d'abord), qu'on fait défiler.
+    const double tileWidth = 210;
+    final double tileHeight = tileWidth * _aspect;
+    final count = (canAdd ? 1 : 0) + photos.length;
+    return SizedBox(
+      height: tileHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: count,
+        separatorBuilder: (_, _) => const SizedBox(width: _spacing),
+        itemBuilder: (context, index) {
+          if (canAdd && index == 0) {
             return SizedBox(
               width: tileWidth,
               height: tileHeight,
-              child: _PhotoCell(
-                photoUrl: url,
-                viewerMode: false,
-                isDiscover:
-                    discoverPhotoUrl.isNotEmpty &&
-                    url.split('?').first == discoverPhotoUrl.split('?').first,
-                onTap: () => showPhotoViewer(
-                  context,
-                  photos: photos,
-                  index: canAdd ? index - 1 : index,
-                  onSetDiscover: onSelectDiscover,
-                ),
-                onDelete: () => onRemove(url),
-                likesCount: likesByPhoto[url] ?? 0,
-                onTapLikes: onTapLikes,
-                iLikePeer: false,
-                onTogglePeerLike: null,
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Phone: three per row (width / 3). Desktop: the three-up width blows
-        // past [_maxTile], so clamp to it and let the Wrap flow more, smaller
-        // tiles across the width.
-        final threeUp =
-            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
-        final tileWidth = threeUp > _maxTile ? _maxTile : threeUp;
-        final tileHeight = tileWidth * _aspect;
-        final cells = <Widget>[
-          if (canAdd)
-            SizedBox(
-              width: tileWidth,
-              height: tileHeight,
               child: _AddDiscoverPhotoCta(onTap: onPick),
-            ),
-          for (var i = 0; i < photos.length; i++)
-            SizedBox(
-              width: tileWidth,
-              height: tileHeight,
-              child: _PhotoCell(
-                photoUrl: photos[i],
-                viewerMode: viewerMode,
-                // Cyan ring on the photo currently shown in Discover.
-                isDiscover:
-                    !viewerMode &&
-                    discoverPhotoUrl.isNotEmpty &&
-                    photos[i].split('?').first ==
-                        discoverPhotoUrl.split('?').first,
-                // Tapping a photo opens it full-screen (overlay).
-                onTap: () => showPhotoViewer(
-                  context,
-                  photos: photos,
-                  index: i,
-                  viewerMode: true,
-                ),
-                // Delete badge on every photo on my own profile.
-                onDelete: viewerMode ? null : () => onRemove(photos[i]),
-                // Per-photo likes badge on each of my own photos.
-                likesCount: viewerMode ? 0 : (likesByPhoto[photos[i]] ?? 0),
-                onTapLikes: viewerMode ? null : onTapLikes,
-                // Per-photo like heart on each of the peer's photos (viewer).
-                iLikePeer: likedPhotoUrls.contains(photos[i]),
-                onTogglePeerLike: viewerMode && onTogglePhotoLike != null
-                    ? () => onTogglePhotoLike!(photos[i])
-                    : null,
+            );
+          }
+          final url = photos[canAdd ? index - 1 : index];
+          return SizedBox(
+            width: tileWidth,
+            height: tileHeight,
+            child: _PhotoCell(
+              photoUrl: url,
+              viewerMode: false,
+              isDiscover:
+                  discoverPhotoUrl.isNotEmpty &&
+                  url.split('?').first == discoverPhotoUrl.split('?').first,
+              onTap: () => showPhotoViewer(
+                context,
+                photos: photos,
+                index: canAdd ? index - 1 : index,
+                onSetDiscover: onSelectDiscover,
               ),
+              onDelete: () => onRemove(url),
+              likesCount: likesByPhoto[url] ?? 0,
+              onTapLikes: onTapLikes,
+              iLikePeer: false,
+              onTogglePeerLike: null,
             ),
-        ];
-        return Wrap(spacing: _spacing, runSpacing: _spacing, children: cells);
-      },
+          );
+        },
+      ),
     );
   }
 }
