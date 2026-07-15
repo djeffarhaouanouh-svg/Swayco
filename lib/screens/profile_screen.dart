@@ -3205,34 +3205,6 @@ class _GradientActionButton extends StatelessWidget {
   }
 }
 
-class _GhostIconButton extends StatelessWidget {
-  const _GhostIconButton({
-    required this.icon,
-    required this.onTap,
-    required this.tooltip,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final String tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    // Real glass circle — the same widget as the header back/call buttons
-    // (BackdropFilter glass + spring bounce), not a flat fill.
-    return Tooltip(
-      message: tooltip,
-      child: GlassIconButton(
-        icon: icon,
-        onTap: onTap,
-        size: 44,
-        iconSize: 21,
-        // Bigger, marked grow-then-settle pop on tap (like the nav bar).
-        popScale: 1.25,
-      ),
-    );
-  }
-}
 
 /// Ultra-only "Clone ma voix" card. Lets the user record ~30 s of
 /// audio, ships it to /voice/enroll and flips into a green
