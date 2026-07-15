@@ -184,26 +184,6 @@ class _CallScreenState extends State<CallScreen> {
     // Make speak() resolve when the sentence has FINISHED, not when it starts.
     // Without it the queue below cannot know when to start the next one.
     unawaited(_deviceTts.awaitSpeakCompletion(true));
-    // Echo fix: play the OS voice through the SAME voice-chat session WebRTC
-    // uses (playAndRecord + voiceChat mode), not its default playback session.
-    // By default the device TTS renders outside WebRTC's voice-processing unit,
-    // so on speakerphone the peer's mic re-captures the translation and the
-    // speaker hears their own words echoed. voiceChat mode is what turns on
-    // iOS's acoustic echo canceller for this audio. iOS-only; a no-op elsewhere.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      unawaited(_deviceTts.setIosAudioCategory(
-        IosTextToSpeechAudioCategory.playAndRecord,
-        [
-          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-          IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
-          IosTextToSpeechAudioCategoryOptions.allowBluetooth,
-          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-        ],
-        IosTextToSpeechAudioMode.voiceChat,
-      ).catchError((Object e) {
-        DebugOverlay.log('iOS TTS audio category failed: $e');
-      }));
-    }
   }
 
   /// Translations are SPOKEN one after another, never on top of each other.
@@ -230,11 +210,9 @@ class _CallScreenState extends State<CallScreen> {
     return _ttsQueue;
   }
 
-  /// Kill-switch for the premium on-device voice. OFF for this build so every
-  /// translation goes through flutter_tts — the only path the voice-chat echo
-  /// fix (731c4a4) covers — giving a clean echo test. Flip back to `true` to
-  /// re-enable the gender-matched Piper voices.
-  static const bool _kPremiumVoiceEnabled = false;
+  /// Kill-switch for the premium on-device (gender-matched) voice. Left as a
+  /// switch so a build can force the OS voice for a clean audio test.
+  static const bool _kPremiumVoiceEnabled = true;
 
   /// One utterance, start to finish. The timeout is the queue's safety net:
   /// flutter_tts can return without ever playing (a missing voice, a browser that
