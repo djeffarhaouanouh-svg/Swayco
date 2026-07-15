@@ -1448,8 +1448,7 @@ class _TinderCardState extends State<_TinderCard> {
                         width: 1,
                       ),
                     ),
-                    child: const Icon(Icons.keyboard_arrow_up_rounded,
-                        color: Colors.white, size: 24),
+                    child: const _ScrollHintChevrons(),
                   ),
                 ),
               ),
@@ -1457,6 +1456,71 @@ class _TinderCardState extends State<_TinderCard> {
           ),
         ],
       );
+  }
+}
+
+/// Deux petits chevrons qui défilent vers le haut en boucle : le repère "il y a
+/// une carte / des infos à découvrir, tire vers le haut". Rendu dans le petit
+/// bouton en verre, coin bas-droit de la photo.
+class _ScrollHintChevrons extends StatefulWidget {
+  const _ScrollHintChevrons();
+
+  @override
+  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
+}
+
+class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            return Stack(
+              alignment: Alignment.center,
+              // Deux chevrons décalés d'une demi-phase : l'un monte pendant que
+              // l'autre réapparaît en bas → effet de défilement continu.
+              children: [
+                _chevron((_c.value) % 1.0),
+                _chevron((_c.value + 0.5) % 1.0),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _chevron(double t) {
+    // t: 0 → en bas et transparent, 0.5 → centre plein, 1 → en haut et fondu.
+    final dy = 8.0 - 16.0 * t; // de +8 (bas) à -8 (haut)
+    final opacity = (1.0 - (2.0 * t - 1.0).abs()).clamp(0.0, 1.0);
+    return Transform.translate(
+      offset: Offset(0, dy),
+      child: Opacity(
+        opacity: opacity,
+        child: const Icon(
+          Icons.keyboard_arrow_up_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
   }
 }
 
