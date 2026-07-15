@@ -1399,17 +1399,21 @@ class _IdentitySection extends StatelessWidget {
             onTap: onToggleBlock ?? () {},
           ),
         ] else ...[
-          _GradientActionButton(
-            label: AppStrings.t('profile_message'),
-            icon: Icons.chat_bubble_outline,
-            onTap: onMessagePeer ?? () {},
-            glass: true,
-          ),
+          // Message (et donc l'appel, qui vit dans la conversation) n'existe
+          // qu'entre matchs : avant, on ne peut que liker / accepter.
+          if (matched) ...[
+            _GradientActionButton(
+              label: AppStrings.t('profile_message'),
+              icon: Icons.chat_bubble_outline,
+              onTap: onMessagePeer ?? () {},
+              glass: true,
+            ),
+            if (!peerBlockedMe) const SizedBox(height: 10),
+          ],
           // The peer blocked me → their edge with me is dead on their side,
-          // so hide the match actions. Only the Message button stays above.
+          // so hide the match actions.
           if (!peerBlockedMe) ...[
             if (matched) ...[
-              const SizedBox(height: 10),
               _GradientActionButton(
                 label: AppStrings.t('match_matched'),
                 icon: Icons.favorite,
