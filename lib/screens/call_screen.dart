@@ -220,7 +220,13 @@ class _CallScreenState extends State<CallScreen> {
     // picked mid-call is never loaded (a live call can't wait on a 110 MB
     // download), so it falls straight through to the OS voice below. That is the
     // whole "one downloadable language, everything else flutter_tts" rule.
-    if (!kIsWeb && SpeechService.instance.isLoadedFor(lang)) {
+    // Match the voice to the SPEAKER (the peer): a woman's line comes out in a
+    // woman's voice. The gender rides on the peer's profile, already loaded for
+    // the call — no need to send it over the wire. A language with no gender
+    // pair, or an unknown gender, just uses whatever voice is loaded.
+    final peerGender = _peerProfile?.gender ?? '';
+    if (!kIsWeb &&
+        SpeechService.instance.isLoadedFor(lang, gender: peerGender)) {
       await _speakPremium(text, lang);
       return;
     }
@@ -662,7 +668,19 @@ class _CallScreenState extends State<CallScreen> {
     if (id == null || id.isEmpty) return;
     try {
       final p = await ProfileApi.fetchById(id);
-      if (mounted && p != null) setState(() => _peerProfile = p);
+      if (mounted && p != null) {
+        setState(() => _peerProfile = p);
+        // Both halves of my language's voice were fetched at boot; now that the
+        // peer's gender is known, configure the matching one so the very first
+        // translation already speaks in the right voice. From disk — no
+        // download, and it no-ops when the gender is already the loaded one.
+        if (!kIsWeb && _myOutputLang.isNotEmpty && p.gender.isNotEmpty) {
+          unawaited(SpeechService.instance.ensureLanguageInstalled(
+            _myOutputLang,
+            gender: p.gender,
+          ));
+        }
+      }
     } catch (_) {
       // Offline / not found — summary degrades gracefully.
     }
@@ -1001,6 +1019,19 @@ class _CallScreenState extends State<CallScreen> {
     final it = room.remoteParticipants.values.iterator;
     if (!it.moveNext()) return null;
     return it.current;
+  }
+
+  /// Whether the peer has muted their mic. Their mute disables the LiveKit audio
+  /// track, which reaches us as a muted publication (and a `TrackMutedEvent`
+  /// that already rebuilds this screen). Camera tracks are ignored — only the
+  /// mic counts as "muted".
+  bool _peerMicMuted(Room room) {
+    final peer = _primaryRemote(room);
+    if (peer == null) return false;
+    for (final pub in peer.audioTrackPublications) {
+      if (pub.muted) return true;
+    }
+    return false;
   }
 
   String _remoteDisplayName(RemoteParticipant? p) {
@@ -1933,7 +1964,10 @@ class _CallScreenState extends State<CallScreen> {
                   // name as placeholder.
                   GestureDetector(
                     onTap: () => setState(() => _selfMain = false),
-                    child: _CameraOffTile(label: localFirstName),
+                    child: _CameraOffTile(
+                      label: localFirstName,
+                      muted: !_micOn,
+                    ),
                   )
                 else if (remote != null)
                   VideoTrackRenderer(
@@ -1944,7 +1978,10 @@ class _CallScreenState extends State<CallScreen> {
                 else if (remoteCount > 0)
                   // Remote is connected but has their camera off â€” keep the
                   // tile visible, the call (audio + translation) is still up.
-                  _CameraOffTile(label: peerFirstName)
+                  _CameraOffTile(
+                    label: peerFirstName,
+                    muted: _peerMicMuted(room),
+                  )
                 else
                   Container(
                     color: SC.bubbleIn,
@@ -2023,6 +2060,7 @@ class _CallScreenState extends State<CallScreen> {
                               return _CameraOffTile(
                                 compact: true,
                                 label: peerFirstName,
+                                muted: _peerMicMuted(room),
                               );
                             }
                             // Main = remote, PiP = local.
@@ -2036,6 +2074,7 @@ class _CallScreenState extends State<CallScreen> {
                             return _CameraOffTile(
                               compact: true,
                               label: localFirstName,
+                              muted: !_micOn,
                             );
                           }(),
                         ),
@@ -2911,10 +2950,15 @@ class _MicLevelStrip extends StatelessWidget {
 /// The call audio + translation keep running underneath; this just keeps
 /// the visual cell from collapsing when video drops mid-call.
 class _CameraOffTile extends StatelessWidget {
-  const _CameraOffTile({this.label, this.compact = false});
+  const _CameraOffTile({this.label, this.compact = false, this.muted = false});
 
   final String? label;
   final bool compact;
+
+  /// This participant's mic is off. Both sides render it — a peer's mute
+  /// arrives as a LiveKit `TrackMutedEvent`, our own from `_micOn` — so each
+  /// caller can see who has gone silent.
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
@@ -2937,16 +2981,31 @@ class _CameraOffTile extends StatelessWidget {
             SizedBox(height: compact ? 6 : 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                label!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (muted) ...[
+                    Icon(
+                      Icons.mic_off_rounded,
+                      size: fontSize + 2,
+                      color: const Color(0xFFFF3B30),
+                    ),
+                    SizedBox(width: compact ? 4 : 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
