@@ -1553,35 +1553,54 @@ class _PeerMediaStack extends StatelessWidget {
           p.zodiac.trim().isNotEmpty ||
           p.lookingFor.trim().isNotEmpty);
 
+  // Grille façon Instagram : 3 par ligne, tuiles portrait (3:4).
+  static const double _aspect = 216 / 162; // height / width
+  static const double _spacing = 8;
+  static const int _columns = 3;
+
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      if (_hasInfo(personalInfo)) _PeerInfoCard(profile: personalInfo),
-      for (var i = 0; i < photos.length; i++)
-        ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: AspectRatio(
-            aspectRatio: 3 / 4,
-            child: _PhotoCell(
-              photoUrl: photos[i],
-              viewerMode: true,
-              onTap: () => showPhotoViewer(context, photos: photos, index: i),
-              iLikePeer: likedPhotoUrls.contains(photos[i]),
-              onTogglePeerLike: onTogglePhotoLike != null
-                  ? () => onTogglePhotoLike!(photos[i])
-                  : null,
-            ),
-          ),
-        ),
-    ];
-    if (items.isEmpty) return const _EmptyPhotosPlaceholder();
+    final hasInfo = _hasInfo(personalInfo);
+    if (!hasInfo && photos.isEmpty) return const _EmptyPhotosPlaceholder();
+
+    final grid = LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth =
+            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
+        final tileHeight = tileWidth * _aspect;
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: [
+            for (var i = 0; i < photos.length; i++)
+              SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _PhotoCell(
+                  photoUrl: photos[i],
+                  viewerMode: true,
+                  onTap: () =>
+                      showPhotoViewer(context, photos: photos, index: i, viewerMode: true),
+                  iLikePeer: likedPhotoUrls.contains(photos[i]),
+                  onTogglePeerLike: onTogglePhotoLike != null
+                      ? () => onTogglePhotoLike!(photos[i])
+                      : null,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final (i, w) in items.indexed) ...[
-          if (i > 0) const SizedBox(height: 14),
-          w,
+        // La carte infos perso vient en premier, puis la grille de photos.
+        if (hasInfo) ...[
+          _PeerInfoCard(profile: personalInfo),
+          const SizedBox(height: 16),
         ],
+        if (photos.isNotEmpty) grid,
       ],
     );
   }
