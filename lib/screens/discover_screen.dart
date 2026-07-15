@@ -1051,14 +1051,17 @@ class _DraggableCardState extends State<_DraggableCard>
     });
   }
 
-  void _flyOff(bool right) {
+  /// [flyRight] = de quel côté la carte s'envole (le côté du doigt). [reportAs]
+  /// = l'action rapportée : par défaut identique au côté (bouton), mais le drag
+  /// la passe inversée — glisser à droite doit REFUSER, glisser à gauche LIKER.
+  void _flyOff(bool flyRight, {bool? reportAs}) {
     _flying = true;
     _animateTo(
-      Offset(right ? 1000.0 : -1000.0, _pos.dy),
+      Offset(flyRight ? 1000.0 : -1000.0, _pos.dy),
       const Duration(milliseconds: 280),
       Curves.easeIn,
       done: () {
-        if (mounted) widget.onSwiped(right);
+        if (mounted) widget.onSwiped(reportAs ?? flyRight);
       },
     );
   }
@@ -1086,8 +1089,9 @@ class _DraggableCardState extends State<_DraggableCard>
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
-    final likeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
-    final nopeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
+    // Inversé : glisser à droite = NOPE, glisser à gauche = LIKE.
+    final nopeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
+    final likeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
 
     return Listener(
       onPointerDown: (e) {
@@ -1133,7 +1137,8 @@ class _DraggableCardState extends State<_DraggableCard>
           return;
         }
         if (_pos.dx.abs() >= _kThreshold) {
-          _flyOff(_pos.dx > 0);
+          final dragRight = _pos.dx > 0;
+          _flyOff(dragRight, reportAs: !dragRight);
         } else {
           _springBack();
         }
@@ -1567,20 +1572,16 @@ class _SwipeActionBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: _PillActionButton(
-              icon: Icons.close_rounded,
-              color: const Color(0xFFE0245E),
-              onTap: onNope,
-            ),
+          _PillActionButton(
+            icon: Icons.close_rounded,
+            color: const Color(0xFFE0245E),
+            onTap: onNope,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _PillActionButton(
-              icon: Icons.check_rounded,
-              color: const Color(0xFF2BB673),
-              onTap: onLike,
-            ),
+          const SizedBox(width: 22),
+          _PillActionButton(
+            icon: Icons.check_rounded,
+            color: const Color(0xFF2BB673),
+            onTap: onLike,
           ),
         ],
       ),
@@ -1606,26 +1607,27 @@ class _PillActionButton extends StatelessWidget {
     return Pressable(
       bounce: true,
       onTap: onTap,
-      child: Container(
-        height: 62,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            width: 96,
+            height: 50,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
-          ],
-        ),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: Icon(icon, color: Colors.white, size: 26),
+            child: Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+          ),
         ),
       ),
     );
