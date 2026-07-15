@@ -25,6 +25,7 @@ import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
 import '../swayco/asr/asr_service.dart';
+import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
@@ -214,6 +215,15 @@ class _CallScreenState extends State<CallScreen> {
   /// suspended speechSynthesis), and then the completion event never comes — which
   /// would wedge every translation behind it for the rest of the call.
   Future<void> _speakOne(String text, String lang) async {
+    // Premium on-device voice, but ONLY for the one language whose bundle is
+    // already installed — the account language, downloaded at boot. A language
+    // picked mid-call is never loaded (a live call can't wait on a 110 MB
+    // download), so it falls straight through to the OS voice below. That is the
+    // whole "one downloadable language, everything else flutter_tts" rule.
+    if (!kIsWeb && SpeechService.instance.isLoadedFor(lang)) {
+      await _speakWithSherpa(text, lang);
+      return;
+    }
     final tag = _voiceTagFor(lang);
     DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
     markTranslationPlaying(textLength: text.length);
@@ -237,12 +247,42 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// Speak with the installed premium (Piper/sherpa) voice.
+  ///
+  /// [speak] returns at playback *start*, and swallows its own errors — a
+  /// missing model just returns without playing and fires no completion. So the
+  /// gate and [ttsSpeaking] are never left waiting on an event that may not
+  /// come: the completion stream only *shortens* the gate's own safety timer,
+  /// it is never the sole signal. Subscribe before speaking — a short clip can
+  /// finish before the await returns.
+  Future<void> _speakWithSherpa(String text, String lang) async {
+    final speech = SpeechService.instance;
+    DebugOverlay.log('speak lang=$lang (premium voice) text="$text"');
+    try {
+      final done = speech.onPlaybackComplete.first;
+      markTranslationPlaying(textLength: text.length);
+      ttsSpeaking.value = true;
+      unawaited(done
+          .timeout(const Duration(seconds: 15))
+          .then((_) => markTranslationDone())
+          .catchError((_) {/* the gate's safety timer reopens the mic */})
+          .whenComplete(() => ttsSpeaking.value = false));
+      await speech.speak(text: text, languageCode: lang);
+      DebugOverlay.log('speak done (premium)');
+    } catch (e) {
+      ttsSpeaking.value = false;
+      markTranslationDone();
+      DebugOverlay.log('premium speak FAILED: $e');
+    }
+  }
+
   /// Drop everything still waiting to be spoken, and silence what is playing.
   /// Used by "cut translation" and on leaving the call — the only two places a
   /// translation is genuinely no longer wanted.
   void _cancelQueuedSpeech() {
     _ttsGeneration++;
     unawaited(_deviceTts.stop());
+    if (!kIsWeb) unawaited(SpeechService.instance.stop());
     ttsSpeaking.value = false;
     markTranslationDone();
   }

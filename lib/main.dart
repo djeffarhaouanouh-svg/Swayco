@@ -30,6 +30,7 @@ import 'services/notification_client.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'swayco/asr/asr_service.dart';
+import 'swayco/speech/speech_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
 import 'services/debug_overlay.dart';
@@ -136,9 +137,13 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
     }
-    // TTS needs no warm-up any more: translations are spoken by the device's own
-    // voice (flutter_tts), which is already installed. The Piper/sherpa bundles
-    // this used to pre-download are gone.
+    // Warm up the premium on-device voice for the account language so it is
+    // loaded before the first call. Native-only; a no-op on web, and it never
+    // blocks boot (fire-and-forget). Languages picked mid-call are spoken by
+    // flutter_tts and need no warm-up.
+    if (!kIsWeb) {
+      unawaited(SpeechService.instance.init());
+    }
     // Seed the hide-online cache so presence renders are correct on
     // the first frame. 2s cap — SharedPreferences must never block.
     try {
@@ -302,6 +307,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           if (!kIsWeb) {
             unawaited(AsrService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
+            // The one downloadable premium voice: the account language, the
+            // only one a call ever speaks to this user. Everything picked
+            // mid-call is served by the OS voice — see call_screen._speakOne.
+            unawaited(SpeechService.instance
+                .ensureLanguageInstalled(localProfile.sourceLang));
           }
         }
       } catch (e) {
@@ -449,6 +459,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           // STT reads this phone's own mic, so the model we need is the one for
           // the account's language. Downloaded once, never during a call.
           unawaited(AsrService.instance.ensureLanguageInstalled(lang));
+          // Same language, its premium TTS voice — the only voice this account
+          // ever downloads. A mid-call language change falls back to the OS
+          // voice instead (call_screen._speakOne).
+          unawaited(SpeechService.instance.ensureLanguageInstalled(lang));
         }
         // Keep the local cache in step so the next cold boot restores in the
         // account's language immediately (no stale-language flash).
