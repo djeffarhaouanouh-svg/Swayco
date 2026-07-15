@@ -222,6 +222,27 @@ abstract final class IncomingCallApi {
     }
   }
 
+  /// True once ring [callId] has been ended (caller cancelled, or the callee
+  /// answered/declined) — its `ended_at` is stamped. Lets the iOS CallKit
+  /// watcher catch a cancel that landed in the instant before it subscribed to
+  /// the realtime broadcast. Missing row → treat as ended (nothing to ring).
+  static Future<bool> isEnded(String callId) async {
+    if (!isSupabaseReady || callId.isEmpty) return true;
+    try {
+      final row = await _c
+          .from('incoming_calls')
+          .select('ended_at')
+          .eq('id', callId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      if (row == null) return true;
+      return row['ended_at'] != null;
+    } catch (e) {
+      debugPrint('IncomingCallApi.isEnded failed: $e');
+      return false;
+    }
+  }
+
   /// Marks a ringing row as ended via the `end_incoming_call` RPC, which
   /// stamps `ended_at = now()` and records the elapsed duration in
   /// `duration_seconds`. Replaces the old hard-DELETE so the row

@@ -155,6 +155,16 @@ class _RootShellState extends State<RootShell> {
       calleeId: myId,
       onCall: _handleIncomingCall,
     );
+    // iOS cold-launch: the VoIP push already showed CallKit, but the realtime
+    // INSERT that drives _handleIncomingCall fired before we subscribed above.
+    // Sweep the still-ringing rows once so their cancel-watcher is armed (and a
+    // ring the caller already gave up on is dismissed via the isEnded check).
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      final pending = await IncomingCallApi.fetchPending(myId);
+      for (final call in pending) {
+        _watchCancelForCallKit(call);
+      }
+    }
     // Web realtime occasionally misses INSERT events (websocket drop,
     // tab throttling). Poll every 3s as a safety net so a missed
     // notification is at most ~3s late.
@@ -184,8 +194,12 @@ class _RootShellState extends State<RootShell> {
     // VoIP push). Running the in-app dialog in parallel races it: when the
     // user answers in CallKit, this dialog's auto-decline timer fires and
     // broadcasts a spurious "declined", which makes the caller leave and the
-    // just-joined call drop. So skip the dialog entirely on iOS.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) return;
+    // just-joined call drop. So skip the dialog entirely on iOS — but still
+    // watch for the caller cancelling, so CallKit stops ringing then too.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      _watchCancelForCallKit(call);
+      return;
+    }
     if (!mounted || _ringingDialogOpen) return;
     if (_handledCallIds.contains(call.id)) return;
     _handledCallIds.add(call.id);
@@ -357,6 +371,7 @@ class _RootShellState extends State<RootShell> {
     // Don't let the realtime poll re-open the in-app dialog for the same
     // call we're already answering.
     _handledCallIds.add(callId);
+    _endCallKitCancelSub(callId);
     // Prefer the room straight from the CallKit payload (no DB / auth
     // dependency); fall back to the incoming_calls row only if it's missing.
     final extra = await IosCallKit.extraFor(callId);
@@ -388,12 +403,51 @@ class _RootShellState extends State<RootShell> {
     unawaited(IosCallKit.endCall(callId));
   }
 
+  /// iOS-only: while CallKit rings, listen for the caller giving up (they hung
+  /// up before pickup → `broadcastCancel`) and dismiss the native ring. Also
+  /// covers the race where the cancel landed just before we subscribed, by
+  /// re-checking the row's ended state once.
+  final Map<String, RealtimeChannel> _callKitCancelSubs = {};
+
+  void _watchCancelForCallKit(IncomingCall call) {
+    if (call.id.isEmpty || _callKitCancelSubs.containsKey(call.id)) return;
+    // A stale ring (older than the ring window) isn't ringing anymore.
+    if (DateTime.now().difference(call.createdAt) >
+        const Duration(seconds: 45)) {
+      return;
+    }
+    final ch = IncomingCallApi.subscribeCancel(
+      callId: call.id,
+      onCancelled: () {
+        unawaited(IosCallKit.endCall(call.id));
+        _endCallKitCancelSub(call.id);
+      },
+    );
+    _callKitCancelSubs[call.id] = ch;
+    // Close the subscribe-after-broadcast race: if the caller already gave up
+    // in the instant before we joined the channel, end CallKit right now.
+    unawaited(() async {
+      if (await IncomingCallApi.isEnded(call.id)) {
+        unawaited(IosCallKit.endCall(call.id));
+        _endCallKitCancelSub(call.id);
+      }
+    }());
+  }
+
+  void _endCallKitCancelSub(String callId) {
+    final ch = _callKitCancelSubs.remove(callId);
+    if (ch != null) {
+      unawaited(Supabase.instance.client.removeChannel(ch));
+    }
+  }
+
   /// iOS CallKit "Decline" (or the ring timing out): close the row and tell
   /// the caller so their waiting screen stops ringing.
   Future<void> _onCallKitDecline(String callId) async {
     if (callId.isEmpty) return;
     if (_handledCallIds.contains(callId)) return;
     _handledCallIds.add(callId);
+    _endCallKitCancelSub(callId);
     await IncomingCallApi.broadcastDecline(callId: callId);
     await IncomingCallApi.cancel(callId: callId);
     unawaited(IosCallKit.endCall(callId));
@@ -401,6 +455,10 @@ class _RootShellState extends State<RootShell> {
 
   @override
   void dispose() {
+    for (final ch in _callKitCancelSubs.values) {
+      unawaited(Supabase.instance.client.removeChannel(ch));
+    }
+    _callKitCancelSubs.clear();
     _callPollTimer?.cancel();
     _pageController.dispose();
     NotificationRouter.pending.removeListener(_onNotificationIntent);
