@@ -1576,7 +1576,7 @@ class _SwipeActionBar extends StatelessWidget {
           ),
           const SizedBox(width: 22),
           _PillActionButton(
-            icon: Icons.check_rounded,
+            icon: Icons.favorite_rounded,
             color: const Color(0xFF2BB673),
             onTap: onLike,
           ),
