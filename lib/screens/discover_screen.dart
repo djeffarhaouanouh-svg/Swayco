@@ -1149,10 +1149,12 @@ class _DraggableCardState extends State<_DraggableCard>
           child: Stack(
             children: [
               widget.child,
+              // LIKE à DROITE (le côté vers lequel on glisse pour liker),
+              // NOPE à gauche.
               if (likeOpacity > 0.02)
                 Positioned(
                   top: 36,
-                  left: 24,
+                  right: 24,
                   child: Opacity(
                     opacity: likeOpacity,
                     child: const _SwipeStamp(text: 'LIKE', color: Color(0xFF3DCA72)),
@@ -1161,7 +1163,7 @@ class _DraggableCardState extends State<_DraggableCard>
               if (nopeOpacity > 0.02)
                 Positioned(
                   top: 36,
-                  right: 24,
+                  left: 24,
                   child: Opacity(
                     opacity: nopeOpacity,
                     child: const _SwipeStamp(text: 'NOPE', color: Color(0xFFFF4458)),
