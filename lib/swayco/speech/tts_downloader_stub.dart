@@ -5,7 +5,7 @@ import 'tts_catalogue.dart';
 /// so none of this ever runs.
 class TtsBundleDownloader {
   static Future<bool> isInstalled(TtsModelSpec spec) async => false;
-  static Future<void> pruneExcept(TtsModelSpec keep) async {}
+  static Future<void> pruneExcept(Set<String> keepIds) async {}
 
   Future<BundleDir> ensureBundle(
     TtsModelSpec spec, {

@@ -23,9 +23,6 @@ const _voiceMirror = 'https://huggingface.co/djeffar/swayco-tts/resolve/main';
 /// The un-mirrored upstream, still used by every language we have NOT copied to
 /// [_voiceMirror] yet. A first launch in one of those languages announces the
 /// voice on the network — mirror it (like `v1-fr`) to close that, one at a time.
-const _upstreamHost =
-    'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models';
-
 class TtsModelSpec {
   const TtsModelSpec({
     required this.id,
@@ -37,10 +34,16 @@ class TtsModelSpec {
     this.dataDir = 'espeak-ng-data',
     this.sid = 0,
     this.speed = 1.0,
+    this.gender = '',
     this.isJapanese = false,
     this.lexiconFile = 'lexicon.txt',
     this.openjtalkDictDir = 'open_jtalk_dic_utf_8-1.11',
   });
+
+  /// `'f'` / `'m'` when a language has a matched pair, `''` for a single voice.
+  /// The receiver picks by the SPEAKER's account gender, so the peer's voice
+  /// sounds like them. A language with only `''` voices ignores gender.
+  final String gender;
 
   /// Directory name under `<appSupport>/tts/`.
   final String id;
@@ -67,65 +70,71 @@ class TtsModelSpec {
   final String openjtalkDictDir;
 }
 
-/// An upstream voice bundle: id is the release asset name, the model file inside
-/// is `<voice>.onnx`. Used for every language not yet on [_voiceMirror].
-TtsModelSpec _upstreamVoice(String voice, List<String> langs, {int mb = 64}) {
-  final id = 'vits-piper-$voice';
+/// One voice from our mirror. Every bundle is repackaged to the same neutral
+/// layout (`model.onnx` + `tokens.txt` + phonemiser data under a `v1/` folder),
+/// so id is all that changes. [gender] tags one half of a pair; [sid] selects a
+/// speaker inside a multi-speaker model (so one bundle can serve both genders).
+TtsModelSpec _mirror(
+  String lang, {
+  String? id,
+  String gender = '',
+  int sid = 0,
+  int mb = 64,
+}) {
+  final vid = id ?? 'v1-$lang';
   return TtsModelSpec(
-    id: id,
-    langs: langs,
+    id: vid,
+    langs: [lang],
     approxMb: mb,
-    bundleUrl: '$_upstreamHost/$id.tar.bz2',
-    modelFile: '$voice.onnx',
+    bundleUrl: '$_voiceMirror/$vid.tar.bz2',
+    modelFile: 'model.onnx',
+    gender: gender,
+    sid: sid,
   );
 }
 
-const _koVoice = 'vits-mimic3-ko_KO-kss_low';
-
 final List<TtsModelSpec> _specs = <TtsModelSpec>[
-  // Premium tier everywhere the upstream has one; the rest stay at their best
-  // available tier. Every entry still on [_upstreamHost] names its voice on the
-  // network at first launch — mirror it to [_voiceMirror] under a neutral name
-  // to close that, as fr and ja already are.
+  // Every voice comes from our own mirror ([_voiceMirror]) under a neutral name:
+  // nothing on the wire, nothing in the bundle, says which voice tech or which
+  // speaker. A device downloads only its account language's voice(s).
   //
-  // fr and ja (the launch markets) come from our own mirror: nothing on the
-  // wire, nothing in the bundle, says which voice or which tech. The rest are
-  // premium-by-tier but not yet hidden.
-  const TtsModelSpec(
-    id: 'v1-fr',
-    langs: ['fr'],
-    approxMb: 64,
-    bundleUrl: '$_voiceMirror/v1-fr.tar.bz2',
-    modelFile: 'model.onnx',
-  ),
-  _upstreamVoice('en_US-lessac-high', ['en'], mb: 110),
-  _upstreamVoice('es_ES-davefx-medium', ['es']),
-  _upstreamVoice('pt_BR-faber-medium', ['pt']),
-  _upstreamVoice('it_IT-paola-medium', ['it']),
-  _upstreamVoice('de_DE-thorsten-high', ['de'], mb: 110),
-  _upstreamVoice('nl_BE-rdh-medium', ['nl']),
-  _upstreamVoice('pl_PL-darkman-medium', ['pl']),
-  _upstreamVoice('sv_SE-nst-medium', ['sv']),
-  _upstreamVoice('tr_TR-dfki-medium', ['tr']),
-  _upstreamVoice('ru_RU-dmitri-medium', ['ru']),
-  _upstreamVoice('uk_UA-ukrainian_tts-medium', ['uk']),
-  _upstreamVoice('ar_JO-kareem-medium', ['ar']),
-  _upstreamVoice('hi_IN-pratham-medium', ['hi']),
-  _upstreamVoice('zh_CN-huayan-medium', ['zh']),
+  // fr / en / de / es are gender-matched: two entries tagged 'f'/'m', so the
+  // peer's line comes out in a voice of the peer's gender. Both halves are
+  // fetched at boot (the "2 voices max" a device holds). es uses ONE
+  // multi-speaker bundle — sid 0 is the man, sid 1 the woman. Every other
+  // language has a single voice and ignores gender. ja is single by nature: a
+  // quality Japanese voice needs its reading engine, and that model is one voice.
 
-  // Korean → same general voice engine (still upstream, not yet mirrored).
-  const TtsModelSpec(
-    id: _koVoice,
-    langs: ['ko'],
-    approxMb: 63,
-    bundleUrl: '$_upstreamHost/$_koVoice.tar.bz2',
-    modelFile: 'ko_KO-kss_low.onnx',
-  ),
+  // fr — siwis (f) / tom (m)
+  _mirror('fr', gender: 'f'),
+  _mirror('fr', id: 'v1-fr-m', gender: 'm'),
+  // en — lessac (f) / ryan (m), both premium 'high'
+  _mirror('en', gender: 'f', mb: 110),
+  _mirror('en', id: 'v1-en-m', gender: 'm', mb: 110),
+  // de — thorsten (m) / kerstin (f)
+  _mirror('de', gender: 'm', mb: 110),
+  _mirror('de', id: 'v1-de-f', gender: 'f'),
+  // es — one multi-speaker bundle: sid 0 man, sid 1 woman
+  _mirror('es', id: 'v1-es-f', gender: 'm', sid: 0),
+  _mirror('es', id: 'v1-es-f', gender: 'f', sid: 1),
+
+  // Single-voice languages (no gender pair).
+  _mirror('pt'),
+  _mirror('it'),
+  _mirror('nl'),
+  _mirror('pl'),
+  _mirror('sv'),
+  _mirror('tr'),
+  _mirror('ru'),
+  _mirror('uk'),
+  _mirror('ar'),
+  _mirror('hi'),
+  _mirror('zh'),
+  _mirror('ko', mb: 63),
 
   // Japanese → dedicated on-device engine: native reading frontend + phonemizer
-  // + an external-tokens path, on the app's single ORT. From our mirror under a
-  // neutral name; the bundle carries the fp16 model, tokens, lexicon and the
-  // reading dictionary. ~110 MB.
+  // + an external-tokens path, on the app's single ORT. The bundle carries the
+  // fp16 model, tokens, lexicon and the reading dictionary. ~110 MB, one voice.
   const TtsModelSpec(
     id: 'v1-ja',
     langs: ['ja'],
@@ -140,13 +149,30 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
 String normalizeLang(String langCode) =>
     langCode.toLowerCase().split(RegExp(r'[-_]')).first;
 
-/// The TTS model serving [langCode], or null when no on-device voice exists.
-TtsModelSpec? ttsSpecForLang(String langCode) {
+/// The voice serving [langCode] for a speaker of [gender] (`'f'`/`'m'`/`''`).
+///
+/// When the language has a matched pair, the entry whose [TtsModelSpec.gender]
+/// equals [gender] wins; otherwise (unknown gender, or a language with a single
+/// voice) the first entry for the language is used. Never null-picks across a
+/// gender: a missing pair falls back to the language's default voice, never to
+/// another language.
+TtsModelSpec? ttsSpecForLang(String langCode, {String gender = ''}) {
   final lc = normalizeLang(langCode);
-  for (final s in _specs) {
-    if (s.langs.contains(lc)) return s;
+  final forLang = _specs.where((s) => s.langs.contains(lc)).toList();
+  if (forLang.isEmpty) return null;
+  if (gender.isNotEmpty) {
+    for (final s in forLang) {
+      if (s.gender == gender) return s;
+    }
   }
-  return null;
+  return forLang.first;
+}
+
+/// Every voice for [langCode] — up to two (a gender pair). Used to download
+/// both at once so either speaker's voice is ready before the first call.
+List<TtsModelSpec> ttsSpecsForLang(String langCode) {
+  final lc = normalizeLang(langCode);
+  return _specs.where((s) => s.langs.contains(lc)).toList();
 }
 
 /// Languages that can be spoken fully on-device.

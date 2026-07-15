@@ -307,9 +307,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           if (!kIsWeb) {
             unawaited(AsrService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
-            // The one downloadable premium voice: the account language, the
-            // only one a call ever speaks to this user. Everything picked
-            // mid-call is served by the OS voice — see call_screen._speakOne.
+            // The account language's premium voice(s): both halves of the
+            // gender pair are fetched (up to 2 bundles — the only voices this
+            // account downloads), so whoever calls, they already sound right.
+            // Everything picked mid-call is served by the OS voice — see
+            // call_screen._speakOne.
+            unawaited(SpeechService.instance
+                .prefetchLanguage(localProfile.sourceLang));
             unawaited(SpeechService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
           }
@@ -459,9 +463,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           // STT reads this phone's own mic, so the model we need is the one for
           // the account's language. Downloaded once, never during a call.
           unawaited(AsrService.instance.ensureLanguageInstalled(lang));
-          // Same language, its premium TTS voice — the only voice this account
-          // ever downloads. A mid-call language change falls back to the OS
-          // voice instead (call_screen._speakOne).
+          // Same language, its premium voice(s) — both halves of the gender
+          // pair, the only voices this account downloads. A mid-call language
+          // change falls back to the OS voice (call_screen._speakOne).
+          unawaited(SpeechService.instance.prefetchLanguage(lang));
           unawaited(SpeechService.instance.ensureLanguageInstalled(lang));
         }
         // Keep the local cache in step so the next cold boot restores in the

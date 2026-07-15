@@ -37,17 +37,17 @@ class TtsBundleDownloader {
   /// A device speaks exactly one voice at a time (the peer's language), so an
   /// earlier bundle is dead weight once a new one is configured. Called after a
   /// successful language swap. Best-effort: a failed delete is swallowed.
-  static Future<void> pruneExcept(TtsModelSpec keep) async {
+  static Future<void> pruneExcept(Set<String> keepIds) async {
     final base = await ttsDir();
     if (!await base.exists()) return;
     await for (final entry in base.list()) {
       if (entry is! Directory) continue;
-      if (entry.path.split(RegExp(r'[\\/]')).last == keep.id) continue;
+      if (keepIds.contains(entry.path.split(RegExp(r'[\\/]')).last)) continue;
       try {
         await entry.delete(recursive: true);
       } catch (_) {
-        // A bundle still open in the sherpa runtime can refuse deletion; skip
-        // it — the next prune after the engine reconfigures will collect it.
+        // A bundle still open in the runtime can refuse deletion; skip it —
+        // the next prune after the engine reconfigures will collect it.
       }
     }
   }

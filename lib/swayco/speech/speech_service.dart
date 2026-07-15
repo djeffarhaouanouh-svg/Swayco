@@ -43,6 +43,11 @@ class SpeechService {
   String? _loadedLang;
   Future<void>? _loading;
 
+  /// Gender of the currently loaded voice (`'f'`/`'m'`/`''`). Tracks which half
+  /// of a pair is live so [isLoadedFor] can tell "wrong gender, reload" from
+  /// "already right".
+  String get _loadedGender => _loadedSpec?.gender ?? '';
+
   /// Playback-complete events, merged from both engines.
   ///
   /// The in-call half-duplex gate subscribes to this to reopen the mic as soon
@@ -94,8 +99,15 @@ class SpeechService {
   /// than their account one. That pick must speak immediately, so it goes to the
   /// device's own OS voice instead of pulling a 60 MB bundle mid-call; only the
   /// account language (installed at boot) is served from here.
-  bool isLoadedFor(String langCode) =>
-      isReady && _loadedLang == normalizeLang(langCode);
+  bool isLoadedFor(String langCode, {String gender = ''}) {
+    if (!isReady || _loadedLang != normalizeLang(langCode)) return false;
+    // A language with no gender pair speaks with its single voice regardless of
+    // who is talking. A paired language must have the matching half loaded — but
+    // an unknown speaker gender ('x' or '') takes whatever is loaded rather than
+    // forcing a reload to nothing.
+    if (gender.isEmpty || _loadedGender.isEmpty) return true;
+    return _loadedGender == gender;
+  }
 
   // ── Language / voice management ────────────────────────────────────────────
 
@@ -111,18 +123,39 @@ class SpeechService {
   /// still loading awaits the same future instead of building a second engine.
   Future<void> ensureLanguageInstalled(
     String langCode, {
+    String gender = '',
     void Function(double)? onProgress,
   }) {
     if (kIsWeb) return Future.value();
     final lang = normalizeLang(langCode);
-    if (_loadedLang == lang && isReady) return Future.value();
-    return _loading ??= _load(lang, onProgress).whenComplete(() {
+    // Already speaking this language in a voice that matches → nothing to do.
+    if (isLoadedFor(lang, gender: gender)) return Future.value();
+    return _loading ??= _load(lang, gender, onProgress).whenComplete(() {
       _loading = null;
     });
   }
 
-  Future<void> _load(String lang, void Function(double)? onProgress) async {
-    final spec = ttsSpecForLang(lang);
+  /// Fetch every voice for [langCode] (both halves of a pair) onto disk without
+  /// loading any. Called at boot so the peer's matching voice is already local
+  /// when a call starts — the only thing left to do then is configure it, which
+  /// is fast. Fire-and-forget; failures fall back to the OS voice later.
+  Future<void> prefetchLanguage(String langCode) async {
+    if (kIsWeb) return;
+    for (final spec in ttsSpecsForLang(langCode)) {
+      try {
+        await _downloader.ensureBundle(spec);
+      } catch (e) {
+        debugPrint('[speech] prefetch ${spec.id} failed: $e');
+      }
+    }
+  }
+
+  Future<void> _load(
+    String lang,
+    String gender,
+    void Function(double)? onProgress,
+  ) async {
+    final spec = ttsSpecForLang(lang, gender: gender);
     if (spec == null) {
       debugPrint('[speech] no on-device voice for "$lang"');
       return;
@@ -158,9 +191,12 @@ class SpeechService {
       await prefs.setString(_prefKeySelectedLang, lang);
       await prefs.setString(_prefKeySelectedVoice, spec.id);
 
-      // The new voice is configured; drop every other bundle so calling peers
-      // in different languages doesn't accumulate one bundle per language.
-      await TtsBundleDownloader.pruneExcept(spec);
+      // Drop bundles for other languages, but KEEP both halves of this
+      // language's gender pair: switching to speak the other gender mid-session
+      // must not trigger a re-download.
+      await TtsBundleDownloader.pruneExcept(
+        ttsSpecsForLang(lang).map((s) => s.id).toSet(),
+      );
     } catch (e) {
       debugPrint('[speech] load failed for "$lang" (${spec.id}): $e');
     }
