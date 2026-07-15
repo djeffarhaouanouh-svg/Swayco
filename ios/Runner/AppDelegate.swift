@@ -149,10 +149,11 @@ import FirebaseMessaging
   }
 
   /// A VoIP push arrived. iOS 13+ REQUIRES reporting an incoming call to
-  /// CallKit synchronously from this method (or the app is killed). The
-  /// plugin does the CallKit reporting; we just translate the payload into
-  /// its Data model. These keys must match what backend/notify.js puts in
-  /// the VoIP payload.
+  /// CallKit synchronously from this method (or the app is killed and future
+  /// VoIP pushes are throttled). The plugin does the CallKit reporting; we
+  /// just translate the payload into its Data model. These keys must match
+  /// what backend/notify.js puts in the VoIP payload (type, callId, roomName,
+  /// callerId, callerName).
   func pushRegistry(
     _ registry: PKPushRegistry,
     didReceiveIncomingPushWith payload: PKPushPayload,
@@ -160,6 +161,7 @@ import FirebaseMessaging
     completion: @escaping () -> Void
   ) {
     let dict = payload.dictionaryPayload
+    let pushType = (dict["type"] as? String) ?? "incoming_call"
     let callId = (dict["callId"] as? String) ?? UUID().uuidString
     let callerName = (dict["callerName"] as? String) ?? "Appel entrant"
     let handle = (dict["callerId"] as? String) ?? ""
@@ -176,6 +178,24 @@ import FirebaseMessaging
       "roomName": roomName,
       "callerId": handle,
     ] as NSDictionary
+
+    // The caller gave up before pickup: backend/notify.js sent a 'call_cancel'
+    // VoIP push so a fully-killed phone stops ringing. We CANNOT just end the
+    // CallKit call — iOS 13+ still demands that EVERY VoIP push report a new
+    // incoming call synchronously, or it kills us and throttles the transport.
+    // So we honour the contract by reporting the call and then, the instant the
+    // report lands, ending it. Same callId ⇒ same CallKit UUID, so this tears
+    // down the ring already showing from the 'incoming_call' push (and, if the
+    // ring push never arrived, briefly reports-then-ends a call that was already
+    // over — the correct, penalty-free way to satisfy the deadline).
+    if pushType == "call_cancel" {
+      let plugin = SwiftFlutterCallkitIncomingPlugin.sharedInstance
+      plugin?.showCallkitIncoming(data, fromPushKit: true) {
+        plugin?.endCall(data)
+        completion()
+      }
+      return
+    }
 
     SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(data, fromPushKit: true)
     completion()
