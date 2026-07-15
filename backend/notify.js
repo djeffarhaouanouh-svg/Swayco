@@ -186,6 +186,12 @@ async function notifyUser(recipientUid, payload) {
   await Promise.all(
     targets.map(async (t) => {
       try {
+        if (payload.type === 'call_cancel' && t.platform !== 'ios_voip') {
+          // A cancel exists only to stop CallKit's VoIP ring — no banner on
+          // web / FCM (the app-alive path already dismisses those via realtime).
+          out.results.push({ id: t.id, skipped: 'cancel-voip-only' });
+          return;
+        }
         if (t.platform === 'web') {
           if (!wp) {
             out.results.push({ id: t.id, skipped: 'vapid-missing' });
@@ -245,9 +251,10 @@ async function notifyUser(recipientUid, payload) {
           out.results.push({ id: t.id, sent: t.platform });
         } else if (t.platform === 'ios_voip') {
           // iOS CallKit rides a VoIP push sent straight to APNs (FCM can't
-          // send VoIP). Only calls use this transport — anything else would
-          // just wake the device for nothing.
-          if (payload.type !== 'incoming_call') {
+          // send VoIP). Only calls use this transport: the ring
+          // ('incoming_call') and its cancel ('call_cancel', which tells the
+          // native side to end the CallKit ring — see AppDelegate.swift).
+          if (payload.type !== 'incoming_call' && payload.type !== 'call_cancel') {
             out.results.push({ id: t.id, skipped: 'voip-non-call' });
             return;
           }
@@ -257,7 +264,7 @@ async function notifyUser(recipientUid, payload) {
           }
           const d = payload.data || {};
           const res = await sendVoipPush(t.fcm_token, {
-            type: 'incoming_call',
+            type: String(payload.type),
             callId: String(d.callId || ''),
             roomName: String(d.roomName || ''),
             callerId: String(d.callerId || ''),

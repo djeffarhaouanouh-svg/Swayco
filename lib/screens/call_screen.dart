@@ -1481,6 +1481,14 @@ class _CallScreenState extends State<CallScreen> {
     final outId = widget.outgoingCallId;
     if (widget.isCaller && !_hadRemote && outId != null && outId.isNotEmpty) {
       unawaited(IncomingCallApi.broadcastCancel(callId: outId));
+      // App-killed filet: a VoIP "cancel" push so the callee's CallKit ring
+      // stops even when their app isn't running to hear the realtime cancel.
+      final callee = widget.peerId ?? '';
+      if (callee.isNotEmpty) {
+        unawaited(
+          IncomingCallApi.notifyCancel(calleeId: callee, callId: outId),
+        );
+      }
     }
     // Bounded: on iOS a WebRTC/CallKit teardown can hang (same class of
     // unbounded-await bug already fixed on the join path) — without a

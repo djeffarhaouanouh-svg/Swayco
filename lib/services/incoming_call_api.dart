@@ -322,6 +322,32 @@ abstract final class IncomingCallApi {
     }
   }
 
+  /// Caller-side: the app-killed filet for [broadcastCancel]. The realtime
+  /// broadcast above only reaches a callee whose app is running; a fully-killed
+  /// iOS phone keeps ringing via CallKit (owned by the VoIP push) until its own
+  /// timeout. This fires a "call_cancel" VoIP push so the native side ends the
+  /// CallKit ring at once (see AppDelegate.swift). VoIP-only: the backend sends
+  /// no banner for it. Best-effort — never blocks the hang-up.
+  static Future<void> notifyCancel({
+    required String calleeId,
+    required String callId,
+  }) async {
+    if (calleeId.isEmpty || callId.isEmpty) return;
+    try {
+      await PushDispatcher.notify(
+        // Title is required by /api/notify but never shown (web/FCM skip a
+        // cancel; the VoIP transport ignores it).
+        recipientUid: calleeId,
+        title: 'call_cancel',
+        body: '',
+        type: 'call_cancel',
+        data: {'callId': callId},
+      );
+    } catch (e) {
+      debugPrint('IncomingCallApi.notifyCancel failed: $e');
+    }
+  }
+
   /// Callee-side counterpart to [broadcastCancel]: subscribe to the per-call
   /// channel and fire [onCancelled] when the caller cancels the ring
   /// [callId] before pickup. Returns the channel so the callee can remove it
