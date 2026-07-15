@@ -1438,8 +1438,8 @@ class _TinderCardState extends State<_TinderCard> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    width: 30,
-                    height: 30,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
@@ -1449,7 +1449,7 @@ class _TinderCardState extends State<_TinderCard> {
                       ),
                     ),
                     child: const Icon(Icons.keyboard_arrow_up_rounded,
-                        color: Colors.white, size: 19),
+                        color: Colors.white, size: 24),
                   ),
                 ),
               ),
