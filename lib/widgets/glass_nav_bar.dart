@@ -54,10 +54,10 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 62;
+  static const double height = 56;
 
   /// Gap between the pill bottom and the screen safe-area top.
-  static const double floatBottom = 8.0;
+  static const double floatBottom = 16.0;
 
   /// Total vertical space to reserve below content (height + float gap).
   static const double totalReservedHeight = height + floatBottom;
@@ -428,8 +428,8 @@ class _NavItemState extends State<_NavItem>
                           ? widget.data.assetSelectedIcon!
                           : widget.data.assetIcon!,
                       key: ValueKey(widget.selected),
-                      width: 31,
-                      height: 31,
+                      width: 28,
+                      height: 28,
                       // The filled coconut carries its own two-tone shading
                       // (the dark rim of the opening) — flattening it through
                       // a srcIn filter would erase that, so only the outline
@@ -447,7 +447,7 @@ class _NavItemState extends State<_NavItem>
                           ? widget.data.selectedIcon
                           : widget.data.icon,
                       key: ValueKey(widget.selected),
-                      size: 31,
+                      size: 28,
                       color: widget.selected
                           ? Colors.white
                           : Colors.white.withValues(alpha: 0.50),
