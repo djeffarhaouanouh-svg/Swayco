@@ -1448,10 +1448,22 @@ class _TinderCardState extends State<_TinderCard> {
                         width: 1,
                       ),
                     ),
-                    child: const _ScrollHintChevrons(),
+                    child: const Icon(Icons.keyboard_arrow_up_rounded,
+                        color: Colors.white, size: 24),
                   ),
                 ),
               ),
+            ),
+          ),
+
+          // ── Repère "tire vers le haut" — chevrons animés, centrés en bas de
+          //    la photo. Distinct du bouton coin (qui ouvre le profil).
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 14,
+            child: IgnorePointer(
+              child: Center(child: _ScrollHintChevrons()),
             ),
           ),
         ],
