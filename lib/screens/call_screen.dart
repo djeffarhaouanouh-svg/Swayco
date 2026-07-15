@@ -184,6 +184,26 @@ class _CallScreenState extends State<CallScreen> {
     // Make speak() resolve when the sentence has FINISHED, not when it starts.
     // Without it the queue below cannot know when to start the next one.
     unawaited(_deviceTts.awaitSpeakCompletion(true));
+    // Echo fix: play the OS voice through the SAME voice-chat session WebRTC
+    // uses (playAndRecord + voiceChat mode), not its default playback session.
+    // By default the device TTS renders outside WebRTC's voice-processing unit,
+    // so on speakerphone the peer's mic re-captures the translation and the
+    // speaker hears their own words echoed. voiceChat mode is what turns on
+    // iOS's acoustic echo canceller for this audio. iOS-only; a no-op elsewhere.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      unawaited(_deviceTts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playAndRecord,
+        [
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+          IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+        ],
+        IosTextToSpeechAudioMode.voiceChat,
+      ).catchError((Object e) {
+        DebugOverlay.log('iOS TTS audio category failed: $e');
+      }));
+    }
   }
 
   /// Translations are SPOKEN one after another, never on top of each other.
