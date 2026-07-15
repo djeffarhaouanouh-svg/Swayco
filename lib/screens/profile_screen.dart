@@ -1295,6 +1295,14 @@ class _IdentitySection extends StatelessWidget {
           discoverPhotoUrl: discoverPhotoUrl,
           onSelectDiscover: onSelectDiscover,
         ),
+        const SizedBox(height: 10),
+        // ⓘ hint — juste sous le cadre photo. Taps jump to Settings where
+        // "Me cacher de mon pays" lives.
+        _DiscoverVisibilityHint(
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+          ),
+        ),
         const SizedBox(height: 24),
         // "Mes infos" : un seul panneau qui porte la bio (en haut), les faits
         // perso, puis les centres d'intérêt (en bas).
@@ -1322,13 +1330,6 @@ class _IdentitySection extends StatelessWidget {
             onSave: onEditInterests,
             country: country,
             compact: true,
-          ),
-        ),
-        const SizedBox(height: 10),
-        // ⓘ hint — taps jump to Settings where "Me cacher de mon pays" lives.
-        _DiscoverVisibilityHint(
-          onTap: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
         ),
       ],
