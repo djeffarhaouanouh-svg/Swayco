@@ -1184,6 +1184,39 @@ abstract final class ProfileApi {
   /// `profiles.email_notifications` before sending any email, so this is the
   /// source of truth (mirrors the one-click unsubscribe link). Returns true on
   /// success so the caller can revert optimistic UI on failure.
+  /// Mirror the device's call-mute for [peerId] to the account row so the
+  /// BACKEND can honour it (iOS CallKit rings from the VoIP push, which only
+  /// the server can suppress). Best-effort — the local mute already silences
+  /// web / Android in-app, this just extends it to the push.
+  static Future<void> setCallMuted({
+    required String myId,
+    required String peerId,
+    required bool muted,
+  }) async {
+    if (!isSupabaseReady || myId.isEmpty || peerId.isEmpty) return;
+    try {
+      final row = await _c
+          .from('profiles')
+          .select('muted_call_peers')
+          .eq('id', myId)
+          .maybeSingle();
+      final current = <String>{
+        ...?(row?['muted_call_peers'] as List?)?.map((e) => e.toString()),
+      };
+      if (muted) {
+        current.add(peerId);
+      } else {
+        current.remove(peerId);
+      }
+      await _c
+          .from('profiles')
+          .update({'muted_call_peers': current.toList()})
+          .eq('id', myId);
+    } catch (e) {
+      debugPrint('ProfileApi.setCallMuted failed: $e');
+    }
+  }
+
   static Future<bool> updateEmailNotifications({
     required String userId,
     required bool enabled,

@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'device_id.dart';
+import 'profile_api.dart';
+
 /// People whose calls must NOT ring this phone. Muting is per-device and local
 /// (like the chat "seen" pointers): the call still connects if you open it, the
 /// phone just stays silent — no in-app ring dialog, no ringer notification.
@@ -35,5 +38,8 @@ abstract final class MutedCalls {
     ids.value = next;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_key, next.toList());
+    // Mirror to the account so the backend skips the VoIP/CallKit push too.
+    final myId = await DeviceId.getOrCreate();
+    await ProfileApi.setCallMuted(myId: myId, peerId: peerId, muted: muted);
   }
 }

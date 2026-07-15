@@ -138,6 +138,25 @@ async function notifyUser(recipientUid, payload) {
     return out;
   }
 
+  // Call mute: if this is an incoming call and the callee has muted the
+  // caller, drop the whole push — this is the only way to keep iOS CallKit
+  // (which rings straight from the VoIP push) silent for that pair.
+  if (payload.type === 'incoming_call') {
+    const callerId = String((payload.data || {}).callerId || '');
+    if (callerId) {
+      const { data: prof } = await sb
+        .from('profiles')
+        .select('muted_call_peers')
+        .eq('id', recipientUid)
+        .maybeSingle();
+      const muted = (prof && prof.muted_call_peers) || [];
+      if (Array.isArray(muted) && muted.includes(callerId)) {
+        out.results.push({ skipped: 'callee-muted-caller' });
+        return out;
+      }
+    }
+  }
+
   const { data: allTargets, error } = await sb
     .from('notification_targets')
     .select('*')
