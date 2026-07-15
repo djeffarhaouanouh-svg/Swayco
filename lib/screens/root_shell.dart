@@ -621,8 +621,8 @@ class _RootShellState extends State<RootShell> {
                       ],
                     ),
                     Positioned(
-                      left: 52,
-                      right: 52,
+                      left: 30,
+                      right: 30,
                       bottom: MediaQuery.paddingOf(context).bottom +
                           GlassNavBar.floatBottom,
                       // A page can ask for the bottom of the screen (the

@@ -1198,12 +1198,31 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Œil = aperçu de mon profil vu de l'extérieur (à la place de
-            // l'engrenage, qui descend sur le crayon près du nom).
-            _GhostIconButton(
-              icon: Icons.visibility_outlined,
-              onTap: onPreview ?? () {},
-              tooltip: AppStrings.t('profile_preview'),
+            // Œil = aperçu de mon profil vu de l'extérieur. Couleur cyan
+            // (inversée avec l'engrenage, qui est passé en verre gris).
+            Material(
+              color: SC.accent.withValues(alpha: 0.15),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onPreview ?? () {},
+                child: Tooltip(
+                  message: AppStrings.t('profile_preview'),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
+                    ),
+                    child: const Icon(
+                      Icons.visibility_outlined,
+                      size: 21,
+                      color: SC.accent,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -1242,10 +1261,11 @@ class _IdentitySection extends StatelessWidget {
                 ],
               ),
             ),
-            // Paramètres (à la place du crayon) — l'édition du nom / de la bio
-            // se fait en tapant le texte directement.
+            // Paramètres (à la place du crayon), en verre gris — couleur
+            // inversée avec l'œil. L'édition du nom / de la bio se fait en
+            // tapant le texte directement.
             Material(
-              color: SC.accent.withValues(alpha: 0.15),
+              color: Colors.white.withValues(alpha: 0.10),
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -1258,13 +1278,13 @@ class _IdentitySection extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: SC.accent.withValues(alpha: 0.6),
+                        color: Colors.white.withValues(alpha: 0.22),
                       ),
                     ),
                     child: const Icon(
                       Icons.settings_outlined,
                       size: 16,
-                      color: SC.accent,
+                      color: SC.textPrimary,
                     ),
                   ),
                 ),
