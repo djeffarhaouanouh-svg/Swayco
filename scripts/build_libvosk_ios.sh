@@ -167,7 +167,13 @@ fi
 echo "==> [4/5] fusing archives into libvosk.a"
 cd "$WORK/vosk-api/src"
 KALDI_LIBS=()
-for d in online2 decoder lat gmm tree feat nnet3 ivector hmm transform \
+# `chain` and `nnet2` are NOT optional, even though vosk never calls them
+# directly: online2/online-nnet2-decoding.o references kaldi::nnet2::* and
+# nnet3/nnet-chain-training.o references kaldi::chain::*. Omitting either dir
+# builds a green archive that passes the vosk_* check in step 5 and then fails
+# the APP link with ~13 "Undefined symbol: kaldi::chain::Supervision..." errors
+# — `make online2` already builds both as deps, they just weren't fused in.
+for d in online2 decoder lat gmm tree feat nnet3 nnet2 chain ivector hmm transform \
          cudamatrix matrix util base lm rnnlm fstext; do
   for a in "$WORK/kaldi/src/$d"/*.a; do
     [ -f "$a" ] && KALDI_LIBS+=("$a")
@@ -212,6 +218,36 @@ if [ "$MISSING" -ne 0 ]; then
   echo "ERROR: some vosk_* symbols are missing — do NOT ship this .a" >&2
   exit 1
 fi
+
+# The vosk_* check above is necessary but NOT sufficient: it says the entry
+# points exist, not that the archive is self-contained. Miss a Kaldi dir in the
+# fusion list and every vosk_* symbol is still a perfect 'T' — the breakage
+# surfaces two minutes later as "Undefined symbol: kaldi::chain::Supervision"
+# in the APP link, which reads like an Xcode problem and isn't. -force_load
+# pulls in EVERY member, so a kaldi/fst symbol no member defines is fatal.
+#
+# 'U' alone does NOT mean missing: nm lists symbols PER OBJECT, and the whole
+# point of an archive is that one member's 'U' is another member's 'T' (1649 of
+# these here, all fine). Only flag symbols undefined in every member — that set
+# is what the app linker actually fails on. Measured: 1649 raw 'U' vs 13 truly
+# missing, and those 13 matched the 13 Xcode errors exactly.
+# System deps (libc++, Accelerate, libc) are legitimately unresolved until the
+# app link, hence the kaldi/fst filter rather than a blanket check.
+echo "    checking archive is self-contained (no unresolved kaldi/fst symbols)"
+ALL_SYMS="$(nm -g "$WORK/libvosk.a" 2>/dev/null || true)"
+DEFINED="$(awk '$1!="U"{print $NF}' <<<"$ALL_SYMS" | sort -u)"
+UNDEFINED="$(awk '$1=="U"{print $2}' <<<"$ALL_SYMS" | sort -u)"
+UNRESOLVED="$(comm -23 <(echo "$UNDEFINED") <(echo "$DEFINED") \
+              | grep -E '(kaldi|fst)' || true)"
+if [ -n "$UNRESOLVED" ]; then
+  echo "ERROR: libvosk.a references kaldi/fst symbols NO member defines." >&2
+  echo "       A Kaldi dir is missing from the KALDI_LIBS list in step 4 —" >&2
+  echo "       map the namespace to its dir (kaldi::chain:: -> chain)." >&2
+  echo "       total: $(wc -l <<<"$UNRESOLVED" | tr -d ' ') symbols, first few:" >&2
+  head -5 <<<"$UNRESOLVED" | c++filt | sed 's/^/         /' >&2
+  exit 1
+fi
+echo "    ✓ self-contained"
 
 mkdir -p "$DEST"
 cp "$WORK/libvosk.a" "$DEST/libvosk.a"
