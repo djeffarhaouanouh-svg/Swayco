@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // Append a line to the on-screen debug overlay. Active on every build, signed
 // releases included — tap the 🐛 (top right) to reveal the panel. See [init]
@@ -96,18 +97,89 @@ class _DebugOverlayState extends State<DebugOverlay> {
                 return Container(
                   color: Colors.black.withValues(alpha: 0.88),
                   padding: const EdgeInsets.all(6),
-                  child: ListView.builder(
-                    controller: _scroll,
-                    itemCount: lines.length,
-                    itemBuilder: (_, i) => Text(
-                      lines[i],
-                      style: const TextStyle(
-                        color: Color(0xFF00FF00),
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                        height: 1.3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Copy-all bar: notification/on-screen logs can't be
+                      // copy-pasted, so this dumps every buffered line into
+                      // the clipboard in one tap.
+                      Row(
+                        children: [
+                          Text(
+                            '${lines.length} lignes',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 10,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: lines.join('\n')),
+                              );
+                              if (!context2.mounted) return;
+                              ScaffoldMessenger.of(context2).showSnackBar(
+                                SnackBar(
+                                  content: Text('${lines.length} lignes copiées'),
+                                  duration: const Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.greenAccent.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.copy,
+                                      color: Colors.greenAccent, size: 12),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Copier tout',
+                                    style: TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      // SelectionArea lets you also drag-select a single line
+                      // if you only want part of the buffer.
+                      Expanded(
+                        child: SelectionArea(
+                          child: ListView.builder(
+                            controller: _scroll,
+                            itemCount: lines.length,
+                            itemBuilder: (_, i) => Text(
+                              lines[i],
+                              style: const TextStyle(
+                                color: Color(0xFF00FF00),
+                                fontSize: 10,
+                                fontFamily: 'monospace',
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
