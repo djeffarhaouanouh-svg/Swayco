@@ -108,9 +108,12 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   static const double _silenceSeconds = 0.35;
 
   /// Silence that ends a PHRASE. Segments separated by less than this are the
-  /// same sentence and are re-joined before they reach the recogniser. 700 ms is what
-  /// the old energy-VAD pipeline used, tuned on real calls.
-  static const int _mergeGapMs = 700;
+  /// same sentence and are re-joined before they reach the recogniser. Raised
+  /// from 700 ms to 1400 ms — the native analogue of the web VAD's redemption:
+  /// 700 ms closed a phrase on the short lull inside a sentence (a soft
+  /// syllable, a breath, the gap before a word), so one sentence was chopped
+  /// into separately-translated fragments. 1400 ms holds it together.
+  static const int _mergeGapMs = 1400;
 
   /// A speaker who never pauses has to be cut somewhere. We hold at most this
   /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
