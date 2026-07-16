@@ -32,6 +32,7 @@ import 'package:web/web.dart' as web;
 import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
 import '../services/translation_api.dart';
+import 'asr/transcript_guard.dart';
 import 'sway_mic_streamer_base.dart';
 
 SwayMicStreamer createSwayMicStreamer() => _VadAsrStreamer();
@@ -180,13 +181,15 @@ class _VadAsrStreamer implements SwayMicStreamer {
             // our own output back to them.
             getStream: (() => Future<web.MediaStream>.value(stream).toJS).toJS,
             model: 'v5',
-            // 700 ms of silence closes a phrase — the same value as native, and
-            // for the same reason. 300 ms was shorter than the pauses INSIDE a
-            // sentence (a breath, a comma, the gap before a word you are still
-            // looking for), so phrases were being cut in half. the recogniser then got
-            // context-free fragments, which is both a bad translation and what it
-            // hallucinates on.
-            redemptionMs: 700,
+            // How long a lull must last before a phrase is closed. NOT silence
+            // alone: the VAD also closes when its speech probability dips (a
+            // softer syllable, a trailing vowel), so a real spoken sentence
+            // whose middle drops in energy gets cut into fragments — each then
+            // translated on its own, which is the "chopped sentence" bug. 700 ms
+            // was half the library's own default and cut too eagerly; back to
+            // the library default keeps whole sentences together through the
+            // dips. This is the library's tuned value, not a guess.
+            redemptionMs: 1400,
             // The VAD needs a few frames to be sure speech started. Without
             // pre-roll the first syllable would be cut, so re-attach the half
             // second that precedes the trigger — the mic is always open, that
@@ -247,7 +250,7 @@ class _VadAsrStreamer implements SwayMicStreamer {
       _vadInstance = vad;
       vad.start();
       _ready = true;
-      _log('VAD v5 listening — redemption 300ms, pad 500ms, $_from→$_to');
+      _log('VAD v5 listening — redemption 1400ms, pad 500ms, $_from→$_to');
     } catch (e) {
       _log('start FAILED: $e');
       onError?.call('start_failed: $e');
@@ -351,6 +354,14 @@ class _VadAsrStreamer implements SwayMicStreamer {
           'vad=300ms queue=${waited}ms stt=${res.sttMs}ms '
           'trad=${res.translateMs}ms net=${roundTrip - res.sttMs - res.translateMs}ms '
           'TOTAL=${300 + waited + roundTrip}ms');
+      // A Japanese fragment that is only grammatical tail ("よ", "ますよ") — the
+      // segmenter split off a phrase's ending — reads correctly but translates
+      // to junk ("Yo", "Bien sûr"). The backend already spent the round trip,
+      // but we can still refuse to speak the scrap on the peer's phone.
+      if (isUntranslatableScrap(res.orig, _from)) {
+        _log('segment #$seq dropped scrap: "${res.orig}"');
+        return;
+      }
       _cbTranslation?.call(res.orig, res.trans, res.lang, '');
     }).catchError((Object e) {
       _log('segment #$seq FAILED: $e');

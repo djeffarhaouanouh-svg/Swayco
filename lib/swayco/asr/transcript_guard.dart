@@ -47,6 +47,78 @@ String _fold(String s) {
   return b.toString();
 }
 
+/// Whisper sometimes emits a whole phrase twice inside a single clip —
+/// "A。A。" — and the peer's bubble shows it doubled. Neither [_isStuckLoop]
+/// (which wants one *word* repeated four times) nor the caller's cross-clip
+/// repeat guard (which compares *separate* sends) catches a doubling that lives
+/// inside one transcript, so it travels as-is.
+///
+/// Collapse a transcript that is exactly one unit repeated twice — with an
+/// optional run of separators in the seam — back to that single unit. The unit
+/// must be at least 6 characters, so a real short echo ("はいはい", "oui oui")
+/// is left untouched.
+String collapseSelfRepeat(String transcript) {
+  final t = transcript.trim();
+  if (t.length < 12) return t;
+  final m = RegExp(
+    r'^(.{6,}?)[\s。.!?！？、,…\-]*\1[\s。.!?！？、,…\-]*$',
+    unicode: true,
+    dotAll: true,
+  ).firstMatch(t);
+  return m != null ? m.group(1)!.trim() : t;
+}
+
+/// A Japanese transcript that is *only* grammatical tail — a sentence-final
+/// particle or copula/verb ending with no content word — is a scrap the
+/// segmenter split off (typically the tail of a phrase whose head was dropped
+/// while the mic was muted for playback). The STT reads it correctly, but the
+/// translator, handed 「よ」 or 「ますよ」, invents "Yo" / "Bien sûr" — junk spoken
+/// on the peer's phone.
+///
+/// This is Japanese-specific ON PURPOSE. A German fragment ("sind", "nach
+/// Hause") is a real word that still translates; a Japanese fragment is often a
+/// contentless particle. So the filter runs only for `ja` and leaves every
+/// other language untouched.
+///
+/// Safe by construction: any kanji or katakana means a content word is present
+/// → not a scrap. Only an all-hiragana string that is *entirely* consumed by
+/// known tail tokens is dropped, so real short answers survive — はい, うん,
+/// そう, だめ, ありがとう, ごめん all contain non-tail kana and are kept.
+bool isUntranslatableScrap(String transcript, String lang) {
+  if (!lang.toLowerCase().startsWith('ja')) return false;
+  var t = transcript.trim().replaceAll(
+        RegExp(r'''^[\s。、！？!?,.…「」『』（）()〜~ー]+|[\s。、！？!?,.…「」『』（）()〜~ー]+$''',
+            unicode: true),
+        '',
+      );
+  if (t.isEmpty) return false; // empty is handled by [looksHallucinated]
+  // A kanji or katakana run carries the meaning — never a scrap.
+  if (RegExp(r'[一-鿿㐀-䶿゠-ヿ]', unicode: true)
+      .hasMatch(t)) {
+    return false;
+  }
+  // Grammatical tail tokens, longest first so greedy matching is correct.
+  const tails = <String>[
+    'んですけど', 'んですが', 'ませんでした', 'でしょう', 'ですね', 'ですよ', 'でした',
+    'ません', 'ました', 'だよね', 'ますよ', 'ますね', 'けれども', 'けれど', 'んです',
+    'だろう', 'でしょ', 'です', 'ます', 'かな', 'よね', 'っけ', 'から', 'ので', 'けど',
+    'って', 'だよ', 'だね', 'だ', 'よ', 'ね', 'な', 'わ', 'ぞ', 'ぜ', 'さ', 'の', 'か', 'ん',
+  ];
+  var i = 0;
+  while (i < t.length) {
+    var matched = false;
+    for (final tok in tails) {
+      if (t.startsWith(tok, i)) {
+        i += tok.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) return false; // a non-tail kana = real content, keep it
+  }
+  return true; // the whole string was grammatical filler
+}
+
 /// True when [transcript] should be thrown away instead of translated.
 ///
 /// [durationMs] is the length of the audio it came from: its inventions
@@ -59,6 +131,16 @@ bool looksHallucinated(String transcript, {required int durationMs}) {
 
   // No letters at all — punctuation, musical notes, "..." — nothing was said.
   if (!RegExp(r'\p{L}', unicode: true).hasMatch(t)) return true;
+
+  // A whole transcript that is one bracketed group is the recogniser tagging
+  // non-speech, not a spoken sentence: "(音声)", "(音楽)", "(英語)", "(musique)",
+  // "[Music]". These slip past the no-letter guard above because the tag holds
+  // real letters (kanji, "musique"), yet no one ever says a lone parenthesis
+  // into the phone. Only a SINGLE group is matched (no bracket inside), so a
+  // real sentence that merely contains "(...)" is left untouched.
+  if (RegExp(r'^[(（\[［【〔][^()（）\[\]［］【】〔〕]*[)）\]］】〕]$').hasMatch(t)) {
+    return true;
+  }
 
   final folded = _fold(t);
   for (final phrase in _boilerplate) {

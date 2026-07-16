@@ -687,6 +687,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         return;
       }
 
+      // A Japanese fragment that is only grammatical tail ("よ", "ますよ"): the
+      // segmenter split off a phrase's ending (often its head was dropped while
+      // the mic was muted for playback). The STT reads it correctly, but the
+      // translator turns the contentless scrap into junk — "Yo", "Bien sûr" —
+      // spoken on the peer's phone. Drop it before it can travel.
+      if (isUntranslatableScrap(orig, _sourceLang)) {
+        DebugOverlay.log('stt DROPPED scrap: "$orig"');
+        return;
+      }
+
       // The same sentence twice in a row, seconds apart, is the recogniser
       // chewing on its own echo — not someone repeating themselves.
       final nowMs = DateTime.now().millisecondsSinceEpoch;
