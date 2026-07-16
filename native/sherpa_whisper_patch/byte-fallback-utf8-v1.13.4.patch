@@ -1,0 +1,49 @@
+diff --git a/sherpa-onnx/csrc/offline-recognizer-whisper-impl.h b/sherpa-onnx/csrc/offline-recognizer-whisper-impl.h
+index 47a40d1..fb13a95 100644
+--- a/sherpa-onnx/csrc/offline-recognizer-whisper-impl.h
++++ b/sherpa-onnx/csrc/offline-recognizer-whisper-impl.h
+@@ -173,13 +173,20 @@ class OfflineRecognizerWhisperImpl : public OfflineRecognizerImpl {
+       }
+ 
+       std::string s = sym_table[i];
+-      s = ApplyInverseTextNormalization(s);
+-      s = ApplyHomophoneReplacer(std::move(s));
+ 
+       text += s;
+       r.tokens.push_back(s);
+     }
+ 
++    // Normalise the COMPLETE text once. Applying ApplyInverseTextNormalization
++    // per-token runs RemoveInvalidUtf8Sequences on a single byte-fallback token
++    // (a lone fragment of a multi-byte UTF-8 char is invalid UTF-8 on its own),
++    // dropping the byte before it can be concatenated with the rest of the
++    // character. That corrupts every 3-byte script split across byte tokens
++    // (ja, zh, ko, hi). Concatenating the raw bytes first keeps characters whole.
++    text = ApplyInverseTextNormalization(text);
++    text = ApplyHomophoneReplacer(std::move(text));
++
+     r.text = text;
+     r.lang = src.lang;
+ 
+@@ -202,16 +209,16 @@ class OfflineRecognizerWhisperImpl : public OfflineRecognizerImpl {
+         duration = std::max(0.0f, duration);
+         r.segment_durations.push_back(duration);
+ 
+-        // Convert token IDs to text
++        // Convert token IDs to text: accumulate raw bytes, then normalise once
++        // (per-token normalisation drops UTF-8 bytes — see the main loop above).
+         std::string seg_text;
+         for (int32_t tok_id : seg.token_ids) {
+           if (sym_table.Contains(tok_id)) {
+-            std::string s = sym_table[tok_id];
+-            s = ApplyInverseTextNormalization(s);
+-            s = ApplyHomophoneReplacer(std::move(s));
+-            seg_text += s;
++            seg_text += sym_table[tok_id];
+           }
+         }
++        seg_text = ApplyInverseTextNormalization(seg_text);
++        seg_text = ApplyHomophoneReplacer(std::move(seg_text));
+         r.segment_texts.push_back(std::move(seg_text));
+       }
+     }

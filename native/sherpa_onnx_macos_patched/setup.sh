@@ -9,11 +9,14 @@ PUB=$(find "$HOME/.pub-cache/hosted/pub.dev" -maxdepth 1 -name "sherpa_onnx_maco
 cp "$PUB/macos/libonnxruntime."*.dylib "$HERE/macos/"
 cp "$PUB/macos/libsherpa-onnx-cxx-api.dylib" "$HERE/macos/"
 
-# 2) patched c-api: clone sherpa v1.13.4, apply patch, build (see sherpa_ja_patch)
+# 2) patched c-api: clone sherpa v1.13.4, apply patches, build (see sherpa_ja_patch
+#    + sherpa_whisper_patch). Delete $WORK to force a clean re-clone + re-apply.
 WORK="${SHERPA_SRC:-/tmp/sherpa-onnx-patched}"
 if [ ! -d "$WORK" ]; then
   git clone --depth 1 --branch v1.13.4 https://github.com/k2-fsa/sherpa-onnx "$WORK"
   git -C "$WORK" apply "$REPO/native/sherpa_ja_patch/external-tokens-v1.13.4.patch"
+  # STT byte-fallback UTF-8 fix (ja/zh/ko/hi character dropping).
+  git -C "$WORK" apply "$REPO/native/sherpa_whisper_patch/byte-fallback-utf8-v1.13.4.patch"
 fi
 cmake -S "$WORK" -B "$WORK/build" -DBUILD_SHARED_LIBS=ON -DSHERPA_ONNX_ENABLE_TTS=ON \
   -DSHERPA_ONNX_ENABLE_C_API=ON -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
