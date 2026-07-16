@@ -68,56 +68,75 @@ String collapseSelfRepeat(String transcript) {
   return m != null ? m.group(1)!.trim() : t;
 }
 
-/// A Japanese transcript that is *only* grammatical tail — a sentence-final
-/// particle or copula/verb ending with no content word — is a scrap the
-/// segmenter split off (typically the tail of a phrase whose head was dropped
-/// while the mic was muted for playback). The STT reads it correctly, but the
-/// translator, handed 「よ」 or 「ますよ」, invents "Yo" / "Bien sûr" — junk spoken
-/// on the peer's phone.
+/// A transcript that is *only* grammatical tail — a sentence-final particle or
+/// copula/verb ending with no content word — is a scrap the segmenter split off
+/// (typically the tail of a phrase whose head was dropped while the mic was
+/// muted for playback). The STT reads it correctly, but the translator, handed
+/// 「よ」 / 「요」, invents "Yo" / "C'est ça" — junk spoken on the peer's phone.
 ///
-/// This is Japanese-specific ON PURPOSE. A German fragment ("sind", "nach
-/// Hause") is a real word that still translates; a Japanese fragment is often a
-/// contentless particle. So the filter runs only for `ja` and leaves every
-/// other language untouched.
+/// Scoped to languages that actually work this way — Japanese and Korean. A
+/// German fragment ("sind", "nach Hause") is a real word that still translates,
+/// so European languages are left untouched (verified: sind→sont, und→et).
 ///
-/// Safe by construction: any kanji or katakana means a content word is present
-/// → not a scrap. Only an all-hiragana string that is *entirely* consumed by
-/// known tail tokens is dropped, so real short answers survive — はい, うん,
-/// そう, だめ, ありがとう, ごめん all contain non-tail kana and are kept.
+/// The two scripts need different tests:
+///  * **ja** — any kanji or katakana means a content word is present, so only an
+///    all-hiragana string that is *entirely* consumed by known tail tokens is
+///    dropped. Real short answers survive (はい, うん, そう, ありがとう, ごめん).
+///  * **ko** — all-hangul, so the "kanji = content" trick does not exist. Match
+///    the whole string against known contentless endings instead; a real word
+///    carries a content stem and is not in the set (아니요, 좋아요, 맞아요, 가요 all
+///    end in 요 yet are kept).
 bool isUntranslatableScrap(String transcript, String lang) {
-  if (!lang.toLowerCase().startsWith('ja')) return false;
-  var t = transcript.trim().replaceAll(
-        RegExp(r'''^[\s。、！？!?,.…「」『』（）()〜~ー]+|[\s。、！？!?,.…「」『』（）()〜~ー]+$''',
+  final lc = lang.toLowerCase();
+  final t = transcript.trim().replaceAll(
+        RegExp(r'''^[\s。、！？!?,.…「」『』（）()〜~ー・]+|[\s。、！？!?,.…「」『』（）()〜~ー・]+$''',
             unicode: true),
         '',
       );
   if (t.isEmpty) return false; // empty is handled by [looksHallucinated]
-  // A kanji or katakana run carries the meaning — never a scrap.
-  if (RegExp(r'[一-鿿㐀-䶿゠-ヿ]', unicode: true)
-      .hasMatch(t)) {
-    return false;
-  }
-  // Grammatical tail tokens, longest first so greedy matching is correct.
-  const tails = <String>[
-    'んですけど', 'んですが', 'ませんでした', 'でしょう', 'ですね', 'ですよ', 'でした',
-    'ません', 'ました', 'だよね', 'ますよ', 'ますね', 'けれども', 'けれど', 'んです',
-    'だろう', 'でしょ', 'です', 'ます', 'かな', 'よね', 'っけ', 'から', 'ので', 'けど',
-    'って', 'だよ', 'だね', 'だ', 'よ', 'ね', 'な', 'わ', 'ぞ', 'ぜ', 'さ', 'の', 'か', 'ん',
-  ];
-  var i = 0;
-  while (i < t.length) {
-    var matched = false;
-    for (final tok in tails) {
-      if (t.startsWith(tok, i)) {
-        i += tok.length;
-        matched = true;
-        break;
+
+  if (lc.startsWith('ja')) {
+    // A kanji or katakana run carries the meaning — never a scrap.
+    if (RegExp(r'[一-鿿㐀-䶿゠-ヿ]', unicode: true).hasMatch(t)) return false;
+    // Grammatical tail tokens, longest first so greedy matching is correct.
+    const tails = <String>[
+      'んですけど', 'んですが', 'ませんでした', 'でしょう', 'ですね', 'ですよ', 'でした',
+      'ません', 'ました', 'だよね', 'ますよ', 'ますね', 'けれども', 'けれど', 'んです',
+      'だろう', 'でしょ', 'です', 'ます', 'かな', 'よね', 'っけ', 'から', 'ので', 'けど',
+      'って', 'だよ', 'だね', 'だ', 'よ', 'ね', 'な', 'わ', 'ぞ', 'ぜ', 'さ', 'の', 'か', 'ん',
+    ];
+    var i = 0;
+    while (i < t.length) {
+      var matched = false;
+      for (final tok in tails) {
+        if (t.startsWith(tok, i)) {
+          i += tok.length;
+          matched = true;
+          break;
+        }
       }
+      if (!matched) return false; // a non-tail kana = real content, keep it
     }
-    if (!matched) return false; // a non-tail kana = real content, keep it
+    return true; // the whole string was grammatical filler
   }
-  return true; // the whole string was grammatical filler
+
+  if (lc.startsWith('ko')) {
+    return _koScraps.contains(t);
+  }
+
+  return false;
 }
+
+/// Korean sentence-final endings that carry no content on their own. Matched as
+/// the WHOLE (punctuation-stripped) transcript, so real words that merely end in
+/// the same particle — 아니요 (no), 좋아요 (I like it), 맞아요 (that's right),
+/// 가요 (let's go) — are never in the set and are kept. Extend as new scraps
+/// surface; the list catches the common ones, it does not generalise like ja.
+const Set<String> _koScraps = {
+  '요', '죠', '네요', '거든요', '는데요', '군요', '는군요', '지요', '세요', '으세요',
+  '습니다', 'ㅂ니다', '입니다', '이에요', '예요', '잖아요', '는걸요', '던데요', '더라고요',
+  '더라구요', '는데', '어요', '으니까', '니까', '대요', '래요', '는거죠', '거죠', '죠뭐',
+};
 
 /// True when [transcript] should be thrown away instead of translated.
 ///
