@@ -2547,8 +2547,10 @@ class _OutputLanguageSheet extends StatelessWidget {
   final Set<String> deviceVoiceLangs;
   final ValueChanged<String> onSelected;
 
-  bool _canSpeak(String code) =>
-      deviceVoiceLangs.isEmpty || deviceVoiceLangs.contains(code);
+  // TEMP (this build): the TTS-availability gate is disabled, so every language
+  // is selectable even when the device has no voice for it. RESTORE later with:
+  //   deviceVoiceLangs.isEmpty || deviceVoiceLangs.contains(code)
+  bool _canSpeak(String code) => true;
 
   @override
   Widget build(BuildContext context) {
