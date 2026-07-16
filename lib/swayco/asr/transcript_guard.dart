@@ -74,9 +74,10 @@ String collapseSelfRepeat(String transcript) {
 /// muted for playback). The STT reads it correctly, but the translator, handed
 /// 「よ」 / 「요」, invents "Yo" / "C'est ça" — junk spoken on the peer's phone.
 ///
-/// Scoped to languages that actually work this way — Japanese and Korean. A
-/// German fragment ("sind", "nach Hause") is a real word that still translates,
-/// so European languages are left untouched (verified: sind→sont, und→et).
+/// Scoped to languages that actually work this way — Japanese, Korean and
+/// Hindi. A German fragment ("sind", "nach Hause") is a real word that still
+/// translates, and so is an Arabic one (و→et, في→en, إلى→à), so European and
+/// Arabic-script languages are left untouched (verified on the translator).
 ///
 /// The two scripts need different tests:
 ///  * **ja** — any kanji or katakana means a content word is present, so only an
@@ -89,7 +90,7 @@ String collapseSelfRepeat(String transcript) {
 bool isUntranslatableScrap(String transcript, String lang) {
   final lc = lang.toLowerCase();
   final t = transcript.trim().replaceAll(
-        RegExp(r'''^[\s。、！？!?,.…「」『』（）()〜~ー・]+|[\s。、！？!?,.…「」『』（）()〜~ー・]+$''',
+        RegExp(r'''^[\s।॥。、！？!?,.…「」『』（）()〜~ー・]+|[\s।॥。、！？!?,.…「」『』（）()〜~ー・]+$''',
             unicode: true),
         '',
       );
@@ -124,6 +125,14 @@ bool isUntranslatableScrap(String transcript, String lang) {
     return _koScraps.contains(t);
   }
 
+  if (lc.startsWith('hi')) {
+    // Same idea as ko (mono-script Devanagari): a whole transcript that is only
+    // a postposition / auxiliary / tense marker is a scrap. Real words carry
+    // content and aren't in the set — क्या (what), हाँ (yes), प्यार (love) survive,
+    // while का/के/की (of), को (to), है (is) are dropped.
+    return _hiScraps.contains(t);
+  }
+
   return false;
 }
 
@@ -136,6 +145,16 @@ const Set<String> _koScraps = {
   '요', '죠', '네요', '거든요', '는데요', '군요', '는군요', '지요', '세요', '으세요',
   '습니다', 'ㅂ니다', '입니다', '이에요', '예요', '잖아요', '는걸요', '던데요', '더라고요',
   '더라구요', '는데', '어요', '으니까', '니까', '대요', '래요', '는거죠', '거죠', '죠뭐',
+};
+
+/// Hindi postpositions, copula/auxiliaries and tense markers that carry no
+/// content alone. Matched as the WHOLE (punctuation-stripped) transcript, so
+/// real words are kept — क्या (what) is distinct from का/के/की (of), and हाँ
+/// (yes), नहीं (no), प्यार (love) are not in the set. Extend as scraps surface.
+const Set<String> _hiScraps = {
+  'है', 'हैं', 'हूँ', 'हूं', 'हो', 'था', 'थे', 'थी', 'थीं', 'का', 'के', 'की', 'को',
+  'में', 'से', 'ने', 'पे', 'गा', 'गी', 'गे', 'रहा', 'रही', 'रहे', 'रहा है', 'रही है',
+  'रहे हैं', 'रहा हूँ', 'रही हूँ', 'ना', 'ही',
 };
 
 /// True when [transcript] should be thrown away instead of translated.
