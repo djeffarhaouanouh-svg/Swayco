@@ -825,6 +825,14 @@ app.post('/translation/text', _limText, async (req, res) => {
     `- Resolve pronouns and elliptical references using the history.\n` +
     `- Match the register (formal / casual / flirty / slang) that a native ` +
     `speaker of the target language would naturally use given the relationship.\n` +
+    `- When the relationship is not specified, DEFAULT to an informal, friendly ` +
+    `register — tutoiement: "tu" in French, "du" in German, informal "you", etc. ` +
+    `This is a casual social app where people meet and chat, never a formal one. ` +
+    `Keep ONE register for the whole conversation so it never flips between ` +
+    `"tu" and "vous" from one message to the next.\n` +
+    `- Say it the way a native speaker actually would, not word-for-word. Drop ` +
+    `literal politeness nouns ("優しい方" → "tu es gentille", not "tu es une ` +
+    `personne gentille"; Korean 님, etc.) and reorder to sound natural.\n` +
     `- For gendered languages, use the correct grammatical gender for the ` +
     `speaker and the addressee.\n` +
     `- Preserve emojis, proper nouns, @mentions, #hashtags and URLs verbatim.\n` +
