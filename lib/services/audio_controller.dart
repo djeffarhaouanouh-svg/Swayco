@@ -46,6 +46,8 @@ class AudioController extends ChangeNotifier {
   Timer? _duckRelease;
   Timer? _micTimer;
   StreamSubscription<List<MediaDevice>>? _deviceSub;
+  EventsListener<RoomEvent>? _roomListener;
+  Timer? _reapplyTimer;
   bool _bound = false;
 
   /// Translated-audio volume in [0, 1]. User-controllable.
@@ -105,6 +107,21 @@ class AudioController extends ChangeNotifier {
     await _applyOriginalVolume(_prefs.originalVolume);
     _refreshRouteFromDevices();
 
+    // The apply above lands in the void when the call has only just connected:
+    // on web LiveKit has not created the remote <audio> element yet, so setting
+    // its volume/mute reaches nothing, and the element is later born at full
+    // volume — the "I muted the original but it still plays at the start of the
+    // call" bug. Re-apply whenever a remote audio track attaches, plus once more
+    // a beat later because the DOM element is created just after the event.
+    _roomListener = room.createListener()
+      ..on<TrackSubscribedEvent>((e) {
+        if (e.track is! RemoteAudioTrack) return;
+        _reapplyOriginalVolume();
+        _reapplyTimer?.cancel();
+        _reapplyTimer =
+            Timer(const Duration(milliseconds: 500), _reapplyOriginalVolume);
+      });
+
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       // Re-apply the speaker pref through `_applySpeaker` so that a
       // headset plugged in mid-call instantly takes over from the
@@ -124,6 +141,9 @@ class AudioController extends ChangeNotifier {
   void dispose() {
     _bound = false;
     _duckRelease?.cancel();
+    _reapplyTimer?.cancel();
+    unawaited(_roomListener?.dispose());
+    _roomListener = null;
     _micTimer?.cancel();
     unawaited(_deviceSub?.cancel());
     _deviceSub = null;
@@ -195,6 +215,16 @@ class AudioController extends ChangeNotifier {
         notifyListeners();
       });
     }
+  }
+
+  /// Re-push the current original-volume / duck state onto the remote track(s).
+  /// Called when a track attaches after [bind]'s initial apply — see there.
+  void _reapplyOriginalVolume() {
+    if (!_bound) return;
+    final live = _isDucking
+        ? _prefs.originalVolume * _duckedLevel
+        : _prefs.originalVolume;
+    unawaited(_applyOriginalVolume(live));
   }
 
   // While the translation is actually speaking, duck the original remote voice
