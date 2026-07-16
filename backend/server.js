@@ -959,6 +959,11 @@ async function grokTranslateText({ transcript, from, to }) {
     const sys =
       `You are a translation engine. Translate the user's text into ${to}` +
       `${from ? ` (it is in ${from})` : ''}. ` +
+      `Use an informal, friendly register — tutoiement: "tu" in French, "du" in ` +
+      `German, informal "you", etc. This is a casual social app where people ` +
+      `meet and chat, never a formal one; do NOT use "vous" / formal forms. ` +
+      `Say it the way a native speaker actually would, not word-for-word — drop ` +
+      `literal politeness nouns and reorder to sound natural in the target language. ` +
       `Reply with the translation ONLY — no quotes, no notes, no language tags.`;
     const r = await fetch(`${GROK_BASE}/chat/completions`, {
       method: 'POST',
