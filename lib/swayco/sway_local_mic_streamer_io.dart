@@ -561,6 +561,15 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     void Function(String)? onError,
   ) {
     if (_pending.isEmpty) return;
+    // Never close a phrase while the speaker is STILL TALKING. The clock below
+    // measures wall time since the VAD last handed us a chunk — and the VAD
+    // hands over nothing for the whole length of an ongoing burst. So a clause
+    // that runs longer than [_mergeGapMs] made this fire mid-sentence and ship
+    // the previous chunk on its own: one sentence arriving as fragments, each
+    // translated out of context. Raising the gap never fixed it because the
+    // clause simply outlasts whatever gap you pick. Only real silence — the VAD
+    // hearing nothing — may end a phrase.
+    if (_vad?.isDetected() ?? false) return;
     final idleMs = DateTime.now().millisecondsSinceEpoch - _pendingLastMs;
     if (idleMs >= _mergeGapMs) {
       _sendPending(onTranslation, onError, why: '${idleMs}ms silence');
