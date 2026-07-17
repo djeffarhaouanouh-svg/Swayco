@@ -165,20 +165,42 @@ const OPENAI_TRANSLATION_CLIENT_SECRETS =
 const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translations/calls';
 
 // ─── Text translation provider (POST /translation/text) ───────────────────
-// Any OpenAI-compatible chat/completions endpoint. Defaults to the incumbent so
-// an unset env behaves exactly as before; set the three together to move house.
-// Which engine is actually used is a deployment fact, not a source fact: it
-// lives in the env, never here — same discipline as the on-device recogniser,
-// whose vendor the client deliberately does not name.
+// Any OpenAI-compatible chat/completions endpoint.
 //
-// Why it is a switch and not a rewrite: the model is the only cloud cost in a
-// call (STT and TTS run on-device), so it is the one knob that decides whether
-// the bill scales with success — and it must be revertible in one variable if
-// quality disappoints in production.
-const TRANSLATE_BASE = (process.env.TRANSLATE_BASE?.trim() || 'https://api.openai.com/v1')
-  .replace(/\/$/, '');
-const TRANSLATE_MODEL = process.env.TRANSLATE_MODEL?.trim() || 'gpt-4.1';
-const TRANSLATE_KEY = process.env.TRANSLATE_KEY?.trim() || OPENAI_API_KEY;
+// This is the one setting that decides whether the bill grows with success: the
+// model is the ONLY cloud cost of a call, since speech recognition and speech
+// synthesis both run on the device. Measured at 1000 one-hour calls/day, the
+// same route spans 351 $/month to 5945 $/month depending on this block alone.
+//
+// The chosen engine takes over AS SOON AS ITS KEY EXISTS, and not before: until
+// then the incumbent keeps serving. Pointing at a new host without its key would
+// mean 401 on every sentence — no translation at all in every live call — so the
+// key is what arms the switch, and it is the only variable that has to be set.
+// Each part stays overridable on its own for a one-variable rollback.
+// The host is public knowledge and worth stating — it is in the EU, which is the
+// point of picking it. WHICH model runs there is not: that one stays out of the
+// source and comes from TRANSLATE_MODEL. So the switch needs BOTH its key and its
+// name; a key alone can never arm a half-configured route.
+const _translateKey = process.env.TRANSLATE_KEY?.trim();
+const _translateModel = process.env.TRANSLATE_MODEL?.trim();
+const _translateSwitched = !!(_translateKey && _translateModel);
+const TRANSLATE_KEY = _translateSwitched ? _translateKey : OPENAI_API_KEY;
+const TRANSLATE_BASE = (
+  process.env.TRANSLATE_BASE?.trim() ||
+  (_translateSwitched
+    ? 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1' // OVHcloud AI Endpoints, Gravelines
+    : 'https://api.openai.com/v1')
+).replace(/\/$/, '');
+const TRANSLATE_MODEL = _translateSwitched ? _translateModel : 'gpt-4.1';
+// Sent only when set — an engine that does not reason answers 400 to the field,
+// so the incumbent must not carry it. On one that does, it is the biggest lever
+// left: measured, it cuts the BILLED output from ~270 tokens to ~51 for the same
+// sentence, because the thinking we pay for is never shown to anyone. The trade
+// was measured too, on 40 real sentences: translating INTO a gender-marking
+// language (fr) it costs ~2 slips per 40 — a masculine agreement, a clumsy turn,
+// both still understood; INTO one that barely marks gender (ja) it costs nothing.
+const TRANSLATE_EFFORT =
+  process.env.TRANSLATE_REASONING_EFFORT?.trim() || (_translateSwitched ? 'low' : '');
 // `cache_control` is an OpenAI extension; other gateways reject the array form.
 const TRANSLATE_IS_OPENAI = TRANSLATE_BASE.includes('api.openai.com');
 
@@ -201,7 +223,13 @@ function resolveGenderHedges(text, authorGender, peerGender) {
   if (addressee && !speaker) g = peerGender;
   else if (speaker && !addressee) g = authorGender;
   else g = authorGender || peerGender;
-  if (g !== 'm' && g !== 'f') return text; // no idea — better a hedge than a lie
+  // Unknown gender: fall back to masculine rather than leaving the hedge in. Not
+  // a preference — measured, every model already answers "Je suis crevé" / "Tu es
+  // nouveau ?" when told nothing, so this changes no output. What it changes is
+  // that the net now resolves EVERY hedge, instead of letting a "content(e)"
+  // through to be read aloud, parenthesis and all, on the one profile that never
+  // filled its gender in.
+  if (g !== 'm' && g !== 'f') g = 'm';
   let out = text.replace(/(\p{L}+)\((\p{L}{1,3})\)/gu, (_, w, suf) => (g === 'f' ? w + suf : w));
   // Slashed pairs, but never inside a URL — the prompt promises those verbatim.
   if (!/https?:|www\.|\/\//i.test(out)) {
@@ -832,6 +860,10 @@ app.post('/translation/text', _limText, async (req, res) => {
   if (from && from === to) {
     return res.json({ translated: text });
   }
+  // Set by the call path: this is a raw on-device STT transcript, not something
+  // anyone typed. It both arms the repair rule and drops the chat-only rules —
+  // see the prompt below.
+  const isSpeech = req.body?.speech === true;
 
   // Sanitise the supplied history. Cap at last 10 messages, 400 chars each,
   // so a hostile or buggy client can't blow up the prompt size.
@@ -891,8 +923,15 @@ app.post('/translation/text', _limText, async (req, res) => {
     `where it stands is far more likely a recognition error than a real ` +
     `utterance, so repair it from the surrounding context instead of ` +
     `translating the mis-hearing literally.\n` +
-    `- Preserve emojis, proper nouns, @mentions, #hashtags and URLs verbatim.\n` +
-    `- Keep punctuation, capitalisation and message length close to the original.\n` +
+    // Chat only. Speech has no emoji, no @mention, no URL and no punctuation to
+    // preserve — nobody pronounces an at-sign — so these two lines are ~31
+    // tokens billed on every single spoken sentence for nothing. The system
+    // prompt is ~80% of a call's input tokens, and gateways without a prompt
+    // cache re-charge every one of them per sentence.
+    (isSpeech
+      ? ''
+      : `- Preserve emojis, proper nouns, @mentions, #hashtags and URLs verbatim.\n` +
+        `- Keep punctuation, capitalisation and message length close to the original.\n`) +
     `- If a phrase was already translated earlier in the conversation, ` +
     `reuse the same wording for consistency.\n` +
     `- If the last message is already in the target language, return it unchanged.\n` +
@@ -956,6 +995,7 @@ app.post('/translation/text', _limText, async (req, res) => {
         // below, and hence a variable rather than a hard-coded name: the trade
         // between the two is a business call, remade without touching this file.
         model: TRANSLATE_MODEL,
+        ...(TRANSLATE_EFFORT ? { reasoning_effort: TRANSLATE_EFFORT } : {}),
         messages: [
           {
             role: 'system',
