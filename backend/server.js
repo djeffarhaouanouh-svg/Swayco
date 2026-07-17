@@ -902,12 +902,18 @@ app.post('/translation/text', _limText, async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // gpt-4.1-mini: 5× cheaper than gpt-4.1 on both input and
-        // output tokens, with no measurable quality loss on this
-        // single-message translation prompt. Switch back to gpt-4.1
-        // (full) if we ever see register / gender-accord errors creep
-        // in for tricky language pairs.
-        model: 'gpt-4.1-mini',
+        // Was gpt-4.1-mini (5× cheaper), on the note above: "switch back to
+        // gpt-4.1 (full) if we ever see register / gender-accord errors creep
+        // in for tricky language pairs". That day came, and it is worse than
+        // errors — mini simply IGNORES rules. Two explicit ones had zero effect
+        // on it, verified against the live route: it still answered "J'y suis
+        // allé(e) seul(e)" and "nouveau/nouvelle" after being told never to
+        // hedge (the TTS reads those parentheses out loud), and it ignored the
+        // marker saying its input is a raw STT transcript to repair.
+        //
+        // Affordable here: STT and TTS both run on-device, so this single short
+        // text call is the only cloud cost in a whole conversation.
+        model: 'gpt-4.1',
         messages: [
           {
             role: 'system',
