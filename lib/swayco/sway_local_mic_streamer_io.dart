@@ -10,6 +10,7 @@ import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
 import '../services/translation_api.dart';
+import '../services/user_prefs.dart';
 import 'sway_mic_streamer_base.dart';
 import 'sway_mic_streamer_io.dart' show createCloudMicStreamer;
 
@@ -204,6 +205,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   final List<String> _recentOrigs = [];
   static const int _historyDepth = 5;
 
+  /// This speaker's self-declared grammatical gender (`m` / `f` / `x`), read
+  /// once per call from the local profile. Empty when unknown — we then send no
+  /// gender and the translator falls back to its own guess, as before.
+  String _myGender = '';
+
   // Kept for the STREAMING engine (lattice) only, whose endpointer sometimes never
   // fires: if a hypothesis is pending and the mic has been quiet this long, we
   // force the close ourselves. Unused by the clip engines, which the VAD segments.
@@ -254,6 +260,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     _sourceLang = sourceLang;
     _targetLang = targetLang;
     _recentOrigs.clear(); // a new call starts with no conversation behind it
+    // Our own grammatical gender, handed to the translator. Japanese marks no
+    // gender and French demands it on the very first adjective, so without this
+    // every woman is translated "je suis prêt" / "je suis crevé" — or worse, the
+    // model hedges with "content(e)" and "allé(e) seul(e)", which the TTS then
+    // reads out loud, parenthesis and all. Best-effort: no profile, or gender
+    // never set, means we send nothing and behave exactly as before.
+    try {
+      _myGender = (await UserPrefs.loadProfile())?.gender.trim() ?? '';
+    } catch (_) {
+      _myGender = '';
+    }
     _onTranslation = onTranslation;
     _onError = onError;
     _onPartial = onPartial;
@@ -768,6 +785,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
           for (final h in _recentOrigs)
             TranslationHistoryItem(author: 'me', text: h),
         ],
+        context: _myGender.isEmpty
+            ? null
+            : TranslationContext(authorGender: _myGender),
       );
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
