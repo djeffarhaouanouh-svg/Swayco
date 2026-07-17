@@ -188,6 +188,22 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   int _lastOrigMs = 0;
   static const int _repeatWindowMs = 8000;
 
+  /// The last few things THIS speaker said (originals, oldest→newest), handed to
+  /// the translator as context. Each utterance is translated in its own request,
+  /// so on its own it knows nothing of what came before. Verified to matter:
+  /// 「疲れた。」 alone comes back "Je suis crevé" (masculine), but with a couple
+  /// of lines behind it saying the speaker is a woman it comes back "Je suis
+  /// fatiguée" — gender agreement a lone sentence cannot possibly get right.
+  /// That is what lets us close a phrase early (fast bubbles) without losing
+  /// meaning.
+  ///
+  /// Deliberately shallow: a call runs for minutes, so the prompt must not grow
+  /// with it. Five lines is a few dozen extra input tokens per request — nothing
+  /// next to the (cached) system prompt — and the backend caps history on its
+  /// side too.
+  final List<String> _recentOrigs = [];
+  static const int _historyDepth = 5;
+
   // Kept for the STREAMING engine (lattice) only, whose endpointer sometimes never
   // fires: if a hypothesis is pending and the mic has been quiet this long, we
   // force the close ourselves. Unused by the clip engines, which the VAD segments.
@@ -237,6 +253,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
     _sourceLang = sourceLang;
     _targetLang = targetLang;
+    _recentOrigs.clear(); // a new call starts with no conversation behind it
     _onTranslation = onTranslation;
     _onError = onError;
     _onPartial = onPartial;
@@ -747,12 +764,19 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         text: orig,
         from: _sourceLang,
         to: _targetLang,
+        history: [
+          for (final h in _recentOrigs)
+            TranslationHistoryItem(author: 'me', text: h),
+        ],
       );
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
       onError?.call('translate:$e');
       return;
     }
+    // Remember what was said, so the NEXT sentence is translated knowing it.
+    _recentOrigs.add(orig);
+    if (_recentOrigs.length > _historyDepth) _recentOrigs.removeAt(0);
     if (trans.trim().isEmpty) {
       DebugOverlay.log('stt translate returned EMPTY ($_sourceLang→$_targetLang)');
       return;
