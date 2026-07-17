@@ -110,16 +110,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// Silence that ends a PHRASE. Segments separated by less than this are the
   /// same sentence and are re-joined before they reach the recogniser.
   ///
-  /// Language-aware on purpose: CJK and Hindi speech carries longer lulls inside
-  /// a sentence (mora timing, particles, the gap before a word), so 700 ms cut
-  /// them into separately-translated fragments — the "chopped sentence" bug.
-  /// Those get 1400 ms. Latin-script languages (fr, de, es, en…) were fine at
-  /// 700 ms and keep it, so they are NOT slowed down.
-  int get _mergeGapMs {
-    final lc = _sourceLang.toLowerCase();
-    const longGap = ['ja', 'ko', 'zh', 'hi'];
-    return longGap.any(lc.startsWith) ? 1400 : 700;
-  }
+  /// One value for every language, on purpose. The chopped-sentence bug was
+  /// never this threshold: measured on the TTS actually used for testing, the
+  /// pauses INSIDE a sentence are 380-460 ms and the ones between sentences
+  /// ~700 ms — already far under the 1400 ms it was briefly raised to, and it
+  /// chopped anyway. The real cause was [_flushIfIdle] closing a phrase while
+  /// the speaker was still mid-burst; with that fixed, 700 ms keeps clauses
+  /// together AND still closes on a genuine end-of-sentence pause, so the peer
+  /// hears a sentence as soon as it lands instead of waiting out a whole
+  /// paragraph. A speaker who never really pauses stays in one clip — correct:
+  /// bubbles follow real silences, they are not cut artificially.
+  static const int _mergeGapMs = 700;
 
   /// A speaker who never pauses has to be cut somewhere. We hold at most this
   /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
