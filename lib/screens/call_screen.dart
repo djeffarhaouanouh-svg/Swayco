@@ -669,6 +669,11 @@ class _CallScreenState extends State<CallScreen> {
       final p = await ProfileApi.fetchById(id);
       if (mounted && p != null) {
         setState(() => _peerProfile = p);
+        // Same gender, second use: the translator needs it to agree on the
+        // person we are talking TO. Japanese marks no gender, so "あなたは新しい
+        // 方ですか" is otherwise rendered "tu es nouveau/nouvelle ici ?" — and the
+        // TTS reads the slash out loud.
+        widget.translation.peerGender = p.gender;
         // Both halves of my language's voice were fetched at boot; now that the
         // peer's gender is known, configure the matching one so the very first
         // translation already speaks in the right voice. From disk — no
@@ -1131,6 +1136,11 @@ class _CallScreenState extends State<CallScreen> {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
         DebugOverlay.log('caption localTts trans="$trans" lang=$lang web=$kIsWeb');
+        // Their ORIGINAL rides along next to the translation and was, until now,
+        // dropped on the floor. Keep it: our own next sentence is translated in
+        // its own request, so without this it has no idea what it replies to —
+        // and reusing their exact wording keeps terms consistent both ways.
+        widget.translation.notePeerUtterance(m['orig']?.toString() ?? '');
         _addTurn(_SpokenTurn(mine: false, text: trans));
         if (trans.isNotEmpty) {
           if (kIsWeb) {

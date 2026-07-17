@@ -189,26 +189,48 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   int _lastOrigMs = 0;
   static const int _repeatWindowMs = 8000;
 
-  /// The last few things THIS speaker said (originals, oldest→newest), handed to
-  /// the translator as context. Each utterance is translated in its own request,
-  /// so on its own it knows nothing of what came before. Verified to matter:
-  /// 「疲れた。」 alone comes back "Je suis crevé" (masculine), but with a couple
-  /// of lines behind it saying the speaker is a woman it comes back "Je suis
-  /// fatiguée" — gender agreement a lone sentence cannot possibly get right.
-  /// That is what lets us close a phrase early (fast bubbles) without losing
-  /// meaning.
+  /// The last few turns of the conversation — BOTH sides, in arrival order,
+  /// each as its ORIGINAL text rather than the translation. Handed to the
+  /// translator as context for the next utterance, since each one is otherwise
+  /// translated in its own request knowing nothing of what came before.
+  ///
+  /// Verified to matter: 「疲れた。」 alone comes back "Je suis crevé"
+  /// (masculine); with lines behind it establishing the speaker is a woman it
+  /// comes back "Je suis fatiguée". The peer's half earns its place too — a
+  /// reply ("oui, avec plaisir") is meaningless without the question it answers,
+  /// and quoting the peer's own wording keeps terms consistent: they said
+  /// ポートフォリオ, so our "portfolio" goes back as ポートフォリオ, not a synonym.
   ///
   /// Deliberately shallow: a call runs for minutes, so the prompt must not grow
-  /// with it. Five lines is a few dozen extra input tokens per request — nothing
+  /// with it. Five turns is a few dozen extra input tokens per request — nothing
   /// next to the (cached) system prompt — and the backend caps history on its
   /// side too.
-  final List<String> _recentOrigs = [];
+  final List<TranslationHistoryItem> _history = [];
   static const int _historyDepth = 5;
+
+  void _note(String author, String text) {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    _history.add(TranslationHistoryItem(author: author, text: t));
+    while (_history.length > _historyDepth) {
+      _history.removeAt(0);
+    }
+  }
 
   /// This speaker's self-declared grammatical gender (`m` / `f` / `x`), read
   /// once per call from the local profile. Empty when unknown — we then send no
   /// gender and the translator falls back to its own guess, as before.
   String _myGender = '';
+
+  /// The peer's gender. A setter rather than a [start] argument because their
+  /// profile is fetched asynchronously and often lands after the call connects.
+  String _peerGender = '';
+
+  @override
+  set peerGender(String value) => _peerGender = value.trim();
+
+  @override
+  void notePeerUtterance(String orig) => _note('peer', orig);
 
   // Kept for the STREAMING engine (lattice) only, whose endpointer sometimes never
   // fires: if a hypothesis is pending and the mic has been quiet this long, we
@@ -259,7 +281,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
     _sourceLang = sourceLang;
     _targetLang = targetLang;
-    _recentOrigs.clear(); // a new call starts with no conversation behind it
+    _history.clear(); // a new call starts with no conversation behind it
     // Our own grammatical gender, handed to the translator. Japanese marks no
     // gender and French demands it on the very first adjective, so without this
     // every woman is translated "je suis prêt" / "je suis crevé" — or worse, the
@@ -781,13 +803,13 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         text: orig,
         from: _sourceLang,
         to: _targetLang,
-        history: [
-          for (final h in _recentOrigs)
-            TranslationHistoryItem(author: 'me', text: h),
-        ],
-        context: _myGender.isEmpty
+        history: List<TranslationHistoryItem>.of(_history),
+        context: (_myGender.isEmpty && _peerGender.isEmpty)
             ? null
-            : TranslationContext(authorGender: _myGender),
+            : TranslationContext(
+                authorGender: _myGender.isEmpty ? null : _myGender,
+                peerGender: _peerGender.isEmpty ? null : _peerGender,
+              ),
         // This is an on-device STT transcript, not something anyone typed: let
         // the translator repair an obvious mis-hearing from context instead of
         // rendering it literally ("財布のボール" → "portfolio", not "balle de
@@ -800,8 +822,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       return;
     }
     // Remember what was said, so the NEXT sentence is translated knowing it.
-    _recentOrigs.add(orig);
-    if (_recentOrigs.length > _historyDepth) _recentOrigs.removeAt(0);
+    // After the call above, never before: this utterance is the thing being
+    // translated, not context for itself.
+    _note('me', orig);
     if (trans.trim().isEmpty) {
       DebugOverlay.log('stt translate returned EMPTY ($_sourceLang→$_targetLang)');
       return;

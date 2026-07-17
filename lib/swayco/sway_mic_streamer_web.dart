@@ -90,6 +90,12 @@ class _WebSwayMicStreamer implements SwayMicStreamer {
   bool get isStreaming => _running && _wsOpen;
 
   @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
+
+  @override
   bool get accumulatesTranscript => true;
 
   // The the cloud engine path streams continuously; it never releases the mic.

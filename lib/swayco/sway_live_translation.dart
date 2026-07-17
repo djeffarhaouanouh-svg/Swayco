@@ -114,6 +114,12 @@ class SwayLiveTranslation extends ChangeNotifier implements RealtimeTranslationP
   bool get translationSpeaking => _translationSpeaking;
 
   @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
+
+  @override
   String get translationDiagnostics {
     final pc = _pc;
     final cs = pc?.connectionState;

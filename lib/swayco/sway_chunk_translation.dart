@@ -102,6 +102,12 @@ class SwayChunkTranslation extends ChangeNotifier implements RealtimeTranslation
   Widget? buildTranslationAudioOverlay() => null; // audioplayers handles output
 
   @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
+
+  @override
   String get translationDiagnostics {
     final route = _route;
     final String routeLabel;

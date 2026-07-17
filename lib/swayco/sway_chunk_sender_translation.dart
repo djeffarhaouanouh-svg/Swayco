@@ -101,6 +101,12 @@ class SwayChunkSenderTranslation extends ChangeNotifier
   Widget? buildTranslationAudioOverlay() => null;
 
   @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
+
+  @override
   String get translationDiagnostics {
     final route = _route;
     final routeLabel = route == null

@@ -110,6 +110,20 @@ class SwayStreamTranslation extends ChangeNotifier
     } catch (_) {}
   }
 
+  /// Held as well as forwarded: the peer's profile is fetched asynchronously and
+  /// can land either side of the streamer being created, so whichever happens
+  /// first, the other picks it up (see the hand-off after `createSwayMicStreamer`).
+  String _peerGender = '';
+
+  @override
+  set peerGender(String value) {
+    _peerGender = value;
+    _sendStreamer?.peerGender = value;
+  }
+
+  @override
+  void notePeerUtterance(String orig) => _sendStreamer?.notePeerUtterance(orig);
+
   @override
   String get translationDiagnostics {
     final route = _route;
@@ -170,6 +184,8 @@ class SwayStreamTranslation extends ChangeNotifier
         room.localParticipant?.audioTrackPublications.firstOrNull?.track;
     final sendStreamer = createSwayMicStreamer();
     _sendStreamer = sendStreamer;
+    // The peer's profile may already have landed while we were connecting.
+    if (_peerGender.isNotEmpty) sendStreamer.peerGender = _peerGender;
 
     // The on-device streamer releases the mic after ~20 s of silence. Once it
     // has, it can no longer hear the user start talking again — so LiveKit's

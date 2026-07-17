@@ -124,6 +124,12 @@ class _VadAsrStreamer implements SwayMicStreamer {
   @override
   bool get isStreaming => _running && _ready;
 
+  @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
+
   /// Each callback is one independent VAD-clipped utterance, so the caller must
   /// NOT apply the streaming path's delta/dedup logic.
   @override

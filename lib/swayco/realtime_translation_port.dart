@@ -61,6 +61,19 @@ abstract class RealtimeTranslationPort {
   /// the implementation has no translated audio stream of its own.
   Future<void> setTranslatedAudioVolume(double volume) async {}
 
+  /// The peer's grammatical gender (`m` / `f` / `x`), pushed in by the call
+  /// screen once their profile lands, so our translations agree on the person
+  /// we are talking TO. Japanese marks no gender, so without it the translator
+  /// guesses — or hedges "tu es venu(e) seul(e)", which the TTS then reads out
+  /// loud, parenthesis included. No-op where translation happens off-device.
+  set peerGender(String value) {}
+
+  /// Note what the PEER just said, as their ORIGINAL text (it already rides the
+  /// data channel next to the translation). Our next utterance is then
+  /// translated knowing what it replies to. No-op where translation happens
+  /// off-device.
+  void notePeerUtterance(String orig) {}
+
   /// What *I* just said, in MY language — the STT transcript of my own mic,
   /// before it is translated for the peer. The peer's side already receives
   /// its own text over the data channel; this is the missing half that lets a
@@ -106,6 +119,12 @@ class NoOpRealtimeTranslation implements RealtimeTranslationPort {
 
   @override
   Future<void> setTranslatedAudioVolume(double volume) async {}
+
+  @override
+  set peerGender(String value) {}
+
+  @override
+  void notePeerUtterance(String orig) {}
 
   @override
   String get translationDiagnostics => '';

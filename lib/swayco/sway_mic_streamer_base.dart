@@ -66,4 +66,18 @@ abstract class SwayMicStreamer {
   /// happens to extend the previous one, and swallow a repeated short word.
   bool get accumulatesTranscript;
 
+  /// The peer's self-declared grammatical gender (`m` / `f` / `x`), pushed in
+  /// once their profile lands. Japanese marks no gender, so "あなたは新しい方
+  /// ですか" cannot tell the translator whether to say "nouveau" or "nouvelle" —
+  /// without this it either guesses or hedges "nouveau/nouvelle", which the TTS
+  /// then reads out loud, slash included. Only the on-device path uses it; the
+  /// cloud paths translate off-device and ignore it.
+  set peerGender(String value) {}
+
+  /// Record, in arrival order, something the PEER just said — their ORIGINAL
+  /// text, not the translation we heard. It becomes context for OUR next
+  /// utterance: a reply ("oui, avec plaisir") is meaningless without the
+  /// question it answers, and reusing the peer's own wording keeps terms
+  /// consistent across the conversation. No-op off the on-device path.
+  void notePeerUtterance(String orig) {}
 }
