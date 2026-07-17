@@ -165,12 +165,11 @@ const OPENAI_TRANSLATION_CLIENT_SECRETS =
 const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translations/calls';
 
 // ─── Text translation provider (POST /translation/text) ───────────────────
-// Any OpenAI-compatible chat/completions endpoint. Defaults to OpenAI so an
-// unset env behaves exactly as before; set the three together to move house:
-//
-//   TRANSLATE_BASE=https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
-//   TRANSLATE_MODEL=gpt-oss-20b
-//   TRANSLATE_KEY=<clé OVH AI Endpoints>
+// Any OpenAI-compatible chat/completions endpoint. Defaults to the incumbent so
+// an unset env behaves exactly as before; set the three together to move house.
+// Which engine is actually used is a deployment fact, not a source fact: it
+// lives in the env, never here — same discipline as the on-device recogniser,
+// whose vendor the client deliberately does not name.
 //
 // Why it is a switch and not a rewrite: the model is the only cloud cost in a
 // call (STT and TTS run on-device), so it is the one knob that decides whether
@@ -950,11 +949,12 @@ app.post('/translation/text', _limText, async (req, res) => {
       },
       body: JSON.stringify({
         // Set by TRANSLATE_MODEL — see the provider block near the top. Measured
-        // on the same 20 real sentences, same prompt: gpt-4.1 and DeepSeek V4
-        // Flash both hedged 0/20 and read 明日は早いから寝るね correctly;
-        // gpt-oss-20b hedged 1/20 ("T'es venu(e) tout(e) seul(e)") and inverted
-        // that sentence's meaning — hence resolveGenderHedges() below, and why
-        // this is a variable rather than a hard-coded name.
+        // on the same 20 real sentences with this exact prompt: the large
+        // engines never hedge and read 明日は早いから寝るね correctly, while the
+        // small ones hedge about 1 time in 20 ("T'es venu(e) tout(e) seul(e)")
+        // and can invert that sentence's meaning. Hence resolveGenderHedges()
+        // below, and hence a variable rather than a hard-coded name: the trade
+        // between the two is a business call, remade without touching this file.
         model: TRANSLATE_MODEL,
         messages: [
           {
