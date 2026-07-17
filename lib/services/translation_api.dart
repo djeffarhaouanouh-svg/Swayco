@@ -313,12 +313,17 @@ class TranslationContext {
 /// (`/translation/text`, which prompts the text engine with conversation history and
 /// speaker profiles). Returns the translated string; falls back to the
 /// original [text] on any error so the UI never goes blank.
+/// Set [speech] when [text] is a raw on-device STT transcript rather than
+/// something the user typed: it tells the backend to expect phonetic errors and
+/// translate the intended meaning instead of the mis-hearing. Never set it for
+/// a typed message — those mean exactly what they say.
 Future<String> fetchTextTranslation({
   required String text,
   required String to,
   String? from,
   List<TranslationHistoryItem>? history,
   TranslationContext? context,
+  bool speech = false,
 }) async {
   if (text.trim().isEmpty) return text;
   final uri = _translationTextUri();
@@ -327,6 +332,7 @@ Future<String> fetchTextTranslation({
       'text': text,
       if (from != null && from.isNotEmpty) 'from': from,
       'to': to,
+      if (speech) 'speech': true,
     };
     if (history != null && history.isNotEmpty) {
       body['history'] = history.map((h) => h.toJson()).toList();

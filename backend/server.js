@@ -835,6 +835,16 @@ app.post('/translation/text', _limText, async (req, res) => {
     `personne gentille"; Korean 님, etc.) and reorder to sound natural.\n` +
     `- For gendered languages, use the correct grammatical gender for the ` +
     `speaker and the addressee.\n` +
+    `- NEVER hedge with a parenthetical or slashed alternative: "content(e)", ` +
+    `"nouveau/nouvelle", "allé(e) seul(e)" are forbidden. This text is read ` +
+    `ALOUD by a speech voice, which pronounces the parenthesis and the slash. ` +
+    `Pick the single most likely form and commit to it.\n` +
+    `- When the context marks the input as speech recognition, treat it as a ` +
+    `possibly-misheard transcript: expect phonetic errors and missing ` +
+    `punctuation. Translate what the speaker MEANT. A word that makes no sense ` +
+    `where it stands is far more likely a recognition error than a real ` +
+    `utterance, so repair it from the surrounding context instead of ` +
+    `translating the mis-hearing literally.\n` +
     `- Preserve emojis, proper nouns, @mentions, #hashtags and URLs verbatim.\n` +
     `- Keep punctuation, capitalisation and message length close to the original.\n` +
     `- If a phrase was already translated earlier in the conversation, ` +
@@ -846,6 +856,14 @@ app.post('/translation/text', _limText, async (req, res) => {
   const contextLines = [];
   if (from) contextLines.push(`Source language: ${from}`);
   contextLines.push(`Target language: ${to}`);
+  // Set by the call path: the text is a raw on-device STT transcript, not
+  // something the user typed. Arms the repair rule in the system prompt — chat
+  // messages must NOT claim this, they are typed and mean exactly what they say.
+  if (req.body?.speech === true) {
+    contextLines.push(
+      'Input: speech recognition (raw transcript — expect phonetic errors and no punctuation)',
+    );
+  }
   if (authorName || authorGender || authorLang) {
     contextLines.push(
       `Sender${authorName ? ` (${authorName})` : ''}: ` +

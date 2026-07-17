@@ -788,6 +788,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         context: _myGender.isEmpty
             ? null
             : TranslationContext(authorGender: _myGender),
+        // This is an on-device STT transcript, not something anyone typed: let
+        // the translator repair an obvious mis-hearing from context instead of
+        // rendering it literally ("財布のボール" → "portfolio", not "balle de
+        // portefeuille").
+        speech: true,
       );
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
