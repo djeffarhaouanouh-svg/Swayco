@@ -164,6 +164,53 @@ const OPENAI_TRANSLATION_CLIENT_SECRETS =
   'https://api.openai.com/v1/realtime/translations/client_secrets';
 const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translations/calls';
 
+// ─── Text translation provider (POST /translation/text) ───────────────────
+// Any OpenAI-compatible chat/completions endpoint. Defaults to OpenAI so an
+// unset env behaves exactly as before; set the three together to move house:
+//
+//   TRANSLATE_BASE=https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
+//   TRANSLATE_MODEL=gpt-oss-20b
+//   TRANSLATE_KEY=<clé OVH AI Endpoints>
+//
+// Why it is a switch and not a rewrite: the model is the only cloud cost in a
+// call (STT and TTS run on-device), so it is the one knob that decides whether
+// the bill scales with success — and it must be revertible in one variable if
+// quality disappoints in production.
+const TRANSLATE_BASE = (process.env.TRANSLATE_BASE?.trim() || 'https://api.openai.com/v1')
+  .replace(/\/$/, '');
+const TRANSLATE_MODEL = process.env.TRANSLATE_MODEL?.trim() || 'gpt-4.1';
+const TRANSLATE_KEY = process.env.TRANSLATE_KEY?.trim() || OPENAI_API_KEY;
+// `cache_control` is an OpenAI extension; other gateways reject the array form.
+const TRANSLATE_IS_OPENAI = TRANSLATE_BASE.includes('api.openai.com');
+
+/**
+ * Resolve a gender hedge the model produced anyway: "venu(e)", "tout(e) seul(e)",
+ * "nouveau/nouvelle". The prompt forbids these, and the big models obey — but a
+ * small one slips ~1 time in 20 (measured), and this is not cosmetic: the
+ * translation is SPOKEN, so the TTS reads "parenthèse e" and "slash" out loud.
+ *
+ * We know the genders, so resolve it deterministically here rather than pay 25×
+ * for a model that never hedges. A clause about "je" is the speaker's, one about
+ * "tu" is the addressee's; when it is ambiguous or the gender is unknown we
+ * leave the text untouched rather than guess wrong.
+ */
+function resolveGenderHedges(text, authorGender, peerGender) {
+  if (!text || (!text.includes('(') && !text.includes('/'))) return text;
+  const addressee = /\b(tu|te|toi)\b|\bt['’]/i.test(text);
+  const speaker = /\b(je|me|moi)\b|\bj['’]/i.test(text);
+  let g = '';
+  if (addressee && !speaker) g = peerGender;
+  else if (speaker && !addressee) g = authorGender;
+  else g = authorGender || peerGender;
+  if (g !== 'm' && g !== 'f') return text; // no idea — better a hedge than a lie
+  let out = text.replace(/(\p{L}+)\((\p{L}{1,3})\)/gu, (_, w, suf) => (g === 'f' ? w + suf : w));
+  // Slashed pairs, but never inside a URL — the prompt promises those verbatim.
+  if (!/https?:|www\.|\/\//i.test(out)) {
+    out = out.replace(/(\p{L}{3,})\/(\p{L}{3,})/gu, (_, a, b) => (g === 'f' ? b : a));
+  }
+  return out;
+}
+
 // ElevenLabs — voice messages (Scribe STT) + voice dubbing (TTS).
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim();
 const ELEVENLABS_STT_MODEL =
@@ -895,35 +942,28 @@ app.post('/translation/text', _limText, async (req, res) => {
     `\n\n[Last message to translate — translate THIS one only]\n${text}`;
 
   try {
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    const r = await fetch(`${TRANSLATE_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${TRANSLATE_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Was gpt-4.1-mini (5× cheaper), on the note above: "switch back to
-        // gpt-4.1 (full) if we ever see register / gender-accord errors creep
-        // in for tricky language pairs". That day came, and it is worse than
-        // errors — mini simply IGNORES rules. Two explicit ones had zero effect
-        // on it, verified against the live route: it still answered "J'y suis
-        // allé(e) seul(e)" and "nouveau/nouvelle" after being told never to
-        // hedge (the TTS reads those parentheses out loud), and it ignored the
-        // marker saying its input is a raw STT transcript to repair.
-        //
-        // Affordable here: STT and TTS both run on-device, so this single short
-        // text call is the only cloud cost in a whole conversation.
-        model: 'gpt-4.1',
+        // Set by TRANSLATE_MODEL — see the provider block near the top. Measured
+        // on the same 20 real sentences, same prompt: gpt-4.1 and DeepSeek V4
+        // Flash both hedged 0/20 and read 明日は早いから寝るね correctly;
+        // gpt-oss-20b hedged 1/20 ("T'es venu(e) tout(e) seul(e)") and inverted
+        // that sentence's meaning — hence resolveGenderHedges() below, and why
+        // this is a variable rather than a hard-coded name.
+        model: TRANSLATE_MODEL,
         messages: [
           {
             role: 'system',
-            content: [
-              {
-                type: 'text',
-                text: sys,
-                cache_control: { type: 'ephemeral' },
-              },
-            ],
+            // cache_control is an OpenAI extension: the array form is rejected
+            // elsewhere, and other gateways cache automatically anyway.
+            content: TRANSLATE_IS_OPENAI
+              ? [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }]
+              : sys,
           },
           { role: 'user', content: userMsg },
         ],
@@ -948,6 +988,8 @@ app.post('/translation/text', _limText, async (req, res) => {
     // Defensive: strip a leading/trailing pair of straight or smart quotes
     // some models still add despite the explicit instruction.
     translated = translated.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+    // Last line against "venu(e) tout(e) seul(e)" reaching a speech voice.
+    translated = resolveGenderHedges(translated, authorGender, peerGender);
 
     track({
       event: 'text_translation',
