@@ -202,11 +202,12 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// ポートフォリオ, so our "portfolio" goes back as ポートフォリオ, not a synonym.
   ///
   /// Deliberately shallow: a call runs for minutes, so the prompt must not grow
-  /// with it. Five turns is a few dozen extra input tokens per request — nothing
-  /// next to the (cached) system prompt — and the backend caps history on its
-  /// side too.
+  /// with it. Two turns is enough to disambiguate a "oui" or fix an agreement,
+  /// and going deeper buys little — measured, 5 turns instead of 2 costs ~7%
+  /// more per call, because the bill is dominated by the OUTPUT tokens, not by
+  /// the context. The backend caps history on its side too.
   final List<TranslationHistoryItem> _history = [];
-  static const int _historyDepth = 5;
+  static const int _historyDepth = 2;
 
   void _note(String author, String text) {
     final t = text.trim();
