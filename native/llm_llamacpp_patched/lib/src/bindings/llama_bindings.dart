@@ -164,6 +164,44 @@ class LlamaBindings {
   late final _llama_detach_threadpool = _llama_detach_threadpoolPtr
       .asFunction<void Function(ffi.Pointer<llama_context>)>();
 
+  /// Create a new model from GGUF metadata as well as a function to set the tensor data
+  /// - tensors are created as GGML_TYPE_F32 by default,
+  /// override by adding a tensor with the same name but a different name to the context
+  ffi.Pointer<llama_model> llama_model_init_from_user(
+    ffi.Pointer<gguf_context> metadata,
+    llama_model_set_tensor_data_t set_tensor_data,
+    ffi.Pointer<ffi.Void> set_tensor_data_ud,
+    llama_model_params params,
+  ) {
+    return _llama_model_init_from_user(
+      metadata,
+      set_tensor_data,
+      set_tensor_data_ud,
+      params,
+    );
+  }
+
+  late final _llama_model_init_from_userPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Pointer<llama_model> Function(
+            ffi.Pointer<gguf_context>,
+            llama_model_set_tensor_data_t,
+            ffi.Pointer<ffi.Void>,
+            llama_model_params,
+          )
+        >
+      >('llama_model_init_from_user');
+  late final _llama_model_init_from_user = _llama_model_init_from_userPtr
+      .asFunction<
+        ffi.Pointer<llama_model> Function(
+          ffi.Pointer<gguf_context>,
+          llama_model_set_tensor_data_t,
+          ffi.Pointer<ffi.Void>,
+          llama_model_params,
+        )
+      >();
+
   ffi.Pointer<llama_model> llama_load_model_from_file(
     ffi.Pointer<ffi.Char> path_model,
     llama_model_params params,
@@ -188,7 +226,7 @@ class LlamaBindings {
         )
       >();
 
-  /// Load the model from a file
+  /// Load a model from a file
   /// If the file is split into multiple parts, the file name must follow this pattern: <name>-%05d-of-%05d.gguf
   /// If the split file name does not follow this pattern, use llama_model_load_from_splits
   ffi.Pointer<llama_model> llama_model_load_from_file(
@@ -215,7 +253,33 @@ class LlamaBindings {
         )
       >();
 
-  /// Load the model from multiple splits (support custom naming scheme)
+  /// Load a model from an open FILE pointer
+  ffi.Pointer<llama_model> llama_model_load_from_file_ptr(
+    ffi.Pointer<__sFILE> file,
+    llama_model_params params,
+  ) {
+    return _llama_model_load_from_file_ptr(file, params);
+  }
+
+  late final _llama_model_load_from_file_ptrPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Pointer<llama_model> Function(
+            ffi.Pointer<__sFILE>,
+            llama_model_params,
+          )
+        >
+      >('llama_model_load_from_file_ptr');
+  late final _llama_model_load_from_file_ptr =
+      _llama_model_load_from_file_ptrPtr
+          .asFunction<
+            ffi.Pointer<llama_model> Function(
+              ffi.Pointer<__sFILE>,
+              llama_model_params,
+            )
+          >();
+
+  /// Load a model from multiple splits (support custom naming scheme)
   /// The paths must be in the correct order
   ffi.Pointer<llama_model> llama_model_load_from_splits(
     ffi.Pointer<ffi.Pointer<ffi.Char>> paths,
@@ -343,63 +407,6 @@ class LlamaBindings {
       >('llama_free');
   late final _llama_free = _llama_freePtr
       .asFunction<void Function(ffi.Pointer<llama_context>)>();
-
-  /// fits mparams and cparams to free device memory (assumes system memory is unlimited)
-  /// - returns true if the parameters could be successfully modified to fit device memory
-  /// - this function is NOT thread safe because it modifies the global llama logger state
-  /// - only parameters that have the same value as in llama_default_model_params are modified
-  llama_params_fit_status llama_params_fit(
-    ffi.Pointer<ffi.Char> path_model,
-    ffi.Pointer<llama_model_params> mparams,
-    ffi.Pointer<llama_context_params> cparams,
-    ffi.Pointer<ffi.Float> tensor_split,
-    ffi.Pointer<llama_model_tensor_buft_override> tensor_buft_overrides,
-    ffi.Pointer<ffi.Size> margins,
-    int n_ctx_min,
-    ggml_log_level log_level,
-  ) {
-    return llama_params_fit_status.fromValue(
-      _llama_params_fit(
-        path_model,
-        mparams,
-        cparams,
-        tensor_split,
-        tensor_buft_overrides,
-        margins,
-        n_ctx_min,
-        log_level.value,
-      ),
-    );
-  }
-
-  late final _llama_params_fitPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.UnsignedInt Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<llama_model_params>,
-            ffi.Pointer<llama_context_params>,
-            ffi.Pointer<ffi.Float>,
-            ffi.Pointer<llama_model_tensor_buft_override>,
-            ffi.Pointer<ffi.Size>,
-            ffi.Uint32,
-            ffi.UnsignedInt,
-          )
-        >
-      >('llama_params_fit');
-  late final _llama_params_fit = _llama_params_fitPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<ffi.Char>,
-          ffi.Pointer<llama_model_params>,
-          ffi.Pointer<llama_context_params>,
-          ffi.Pointer<ffi.Float>,
-          ffi.Pointer<llama_model_tensor_buft_override>,
-          ffi.Pointer<ffi.Size>,
-          int,
-          int,
-        )
-      >();
 
   int llama_time_us() {
     return _llama_time_us();
@@ -534,6 +541,17 @@ class LlamaBindings {
         ffi.NativeFunction<ffi.Uint32 Function(ffi.Pointer<llama_context>)>
       >('llama_n_seq_max');
   late final _llama_n_seq_max = _llama_n_seq_maxPtr
+      .asFunction<int Function(ffi.Pointer<llama_context>)>();
+
+  int llama_n_rs_seq(ffi.Pointer<llama_context> ctx) {
+    return _llama_n_rs_seq(ctx);
+  }
+
+  late final _llama_n_rs_seqPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Uint32 Function(ffi.Pointer<llama_context>)>
+      >('llama_n_rs_seq');
+  late final _llama_n_rs_seq = _llama_n_rs_seqPtr
       .asFunction<int Function(ffi.Pointer<llama_context>)>();
 
   int llama_n_ctx_train(ffi.Pointer<llama_model> model) {
@@ -709,6 +727,17 @@ class LlamaBindings {
         'llama_model_n_layer',
       );
   late final _llama_model_n_layer = _llama_model_n_layerPtr
+      .asFunction<int Function(ffi.Pointer<llama_model>)>();
+
+  int llama_model_n_layer_nextn(ffi.Pointer<llama_model> model) {
+    return _llama_model_n_layer_nextn(model);
+  }
+
+  late final _llama_model_n_layer_nextnPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<llama_model>)>>(
+        'llama_model_n_layer_nextn',
+      );
+  late final _llama_model_n_layer_nextn = _llama_model_n_layer_nextnPtr
       .asFunction<int Function(ffi.Pointer<llama_model>)>();
 
   int llama_model_n_head(ffi.Pointer<llama_model> model) {
@@ -1102,7 +1131,6 @@ class LlamaBindings {
 
   /// Load a LoRA adapter from file
   /// The adapter is valid as long as the associated model is not freed
-  /// All adapters must be loaded before context creation
   ffi.Pointer<llama_adapter_lora> llama_adapter_lora_init(
     ffi.Pointer<llama_model> model,
     ffi.Pointer<ffi.Char> path_lora,
@@ -1235,7 +1263,7 @@ class LlamaBindings {
           >();
 
   /// Manually free a LoRA adapter
-  /// NOTE: loaded adapters will be free when the associated model is deleted
+  /// NOTE: loaded adapters that are not manually freed will be freed when the associated model is deleted
   void llama_adapter_lora_free(ffi.Pointer<llama_adapter_lora> adapter) {
     return _llama_adapter_lora_free(adapter);
   }
@@ -1280,72 +1308,36 @@ class LlamaBindings {
             ffi.Pointer<llama_token> Function(ffi.Pointer<llama_adapter_lora>)
           >();
 
-  /// Add a loaded LoRA adapter to given context
-  /// This will not modify model's weight
-  int llama_set_adapter_lora(
+  /// Set LoRa adapters on the context. Will only modify if the adapters currently in context are different.
+  int llama_set_adapters_lora(
     ffi.Pointer<llama_context> ctx,
-    ffi.Pointer<llama_adapter_lora> adapter,
-    double scale,
+    ffi.Pointer<ffi.Pointer<llama_adapter_lora>> adapters,
+    int n_adapters,
+    ffi.Pointer<ffi.Float> scales,
   ) {
-    return _llama_set_adapter_lora(ctx, adapter, scale);
+    return _llama_set_adapters_lora(ctx, adapters, n_adapters, scales);
   }
 
-  late final _llama_set_adapter_loraPtr =
+  late final _llama_set_adapters_loraPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
             ffi.Pointer<llama_context>,
-            ffi.Pointer<llama_adapter_lora>,
-            ffi.Float,
+            ffi.Pointer<ffi.Pointer<llama_adapter_lora>>,
+            ffi.Size,
+            ffi.Pointer<ffi.Float>,
           )
         >
-      >('llama_set_adapter_lora');
-  late final _llama_set_adapter_lora = _llama_set_adapter_loraPtr
+      >('llama_set_adapters_lora');
+  late final _llama_set_adapters_lora = _llama_set_adapters_loraPtr
       .asFunction<
         int Function(
           ffi.Pointer<llama_context>,
-          ffi.Pointer<llama_adapter_lora>,
-          double,
+          ffi.Pointer<ffi.Pointer<llama_adapter_lora>>,
+          int,
+          ffi.Pointer<ffi.Float>,
         )
       >();
-
-  /// Remove a specific LoRA adapter from given context
-  /// Return -1 if the adapter is not present in the context
-  int llama_rm_adapter_lora(
-    ffi.Pointer<llama_context> ctx,
-    ffi.Pointer<llama_adapter_lora> adapter,
-  ) {
-    return _llama_rm_adapter_lora(ctx, adapter);
-  }
-
-  late final _llama_rm_adapter_loraPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<llama_context>,
-            ffi.Pointer<llama_adapter_lora>,
-          )
-        >
-      >('llama_rm_adapter_lora');
-  late final _llama_rm_adapter_lora = _llama_rm_adapter_loraPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<llama_context>,
-          ffi.Pointer<llama_adapter_lora>,
-        )
-      >();
-
-  /// Remove all LoRA adapters from given context
-  void llama_clear_adapter_lora(ffi.Pointer<llama_context> ctx) {
-    return _llama_clear_adapter_lora(ctx);
-  }
-
-  late final _llama_clear_adapter_loraPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<llama_context>)>
-      >('llama_clear_adapter_lora');
-  late final _llama_clear_adapter_lora = _llama_clear_adapter_loraPtr
-      .asFunction<void Function(ffi.Pointer<llama_context>)>();
 
   /// Apply a loaded control vector to a llama_context, or if data is NULL, clear
   /// the currently loaded vector.
@@ -1353,7 +1345,7 @@ class LlamaBindings {
   /// to an n_embd x n_layers buffer starting from layer 1.
   /// il_start and il_end are the layer range the vector should apply to (both inclusive)
   /// See llama_control_vector_load in common to load a control vector.
-  int llama_apply_adapter_cvec(
+  int llama_set_adapter_cvec(
     ffi.Pointer<llama_context> ctx,
     ffi.Pointer<ffi.Float> data,
     int len,
@@ -1361,10 +1353,10 @@ class LlamaBindings {
     int il_start,
     int il_end,
   ) {
-    return _llama_apply_adapter_cvec(ctx, data, len, n_embd, il_start, il_end);
+    return _llama_set_adapter_cvec(ctx, data, len, n_embd, il_start, il_end);
   }
 
-  late final _llama_apply_adapter_cvecPtr =
+  late final _llama_set_adapter_cvecPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
@@ -1376,8 +1368,8 @@ class LlamaBindings {
             ffi.Int32,
           )
         >
-      >('llama_apply_adapter_cvec');
-  late final _llama_apply_adapter_cvec = _llama_apply_adapter_cvecPtr
+      >('llama_set_adapter_cvec');
+  late final _llama_set_adapter_cvec = _llama_set_adapter_cvecPtr
       .asFunction<
         int Function(
           ffi.Pointer<llama_context>,
@@ -2229,6 +2221,9 @@ class LlamaBindings {
 
   /// Set whether the model is in warmup mode or not
   /// If true, all model tensors are activated during llama_decode() to load and cache their weights.
+  ///
+  /// note: using this can cause extra graph reallocations because it changes the graph topology with MoE models,
+  /// so it is generally not recommended to use in practice. will be removed in the future
   void llama_set_warmup(ffi.Pointer<llama_context> ctx, bool warmup) {
     return _llama_set_warmup(ctx, warmup);
   }
@@ -2314,7 +2309,7 @@ class LlamaBindings {
 
   /// Logits for the ith token. For positive indices, Equivalent to:
   /// llama_get_logits(ctx) + ctx->output_ids[i]*n_vocab
-  /// Negative indicies can be used to access logits in reverse order, -1 is the last logit.
+  /// Negative indices can be used to access logits in reverse order, -1 is the last logit.
   /// returns NULL for invalid ids.
   ffi.Pointer<ffi.Float> llama_get_logits_ith(
     ffi.Pointer<llama_context> ctx,
@@ -2358,7 +2353,7 @@ class LlamaBindings {
 
   /// Get the embeddings for the ith token. For positive indices, Equivalent to:
   /// llama_get_embeddings(ctx) + ctx->output_ids[i]*n_embd
-  /// Negative indicies can be used to access embeddings in reverse order, -1 is the last embedding.
+  /// Negative indices can be used to access embeddings in reverse order, -1 is the last embedding.
   /// shape: [n_embd] (1-dimensional)
   /// returns NULL for invalid ids.
   ffi.Pointer<ffi.Float> llama_get_embeddings_ith(
@@ -2419,9 +2414,9 @@ class LlamaBindings {
   late final _llama_get_sampled_token_ith = _llama_get_sampled_token_ithPtr
       .asFunction<int Function(ffi.Pointer<llama_context>, int)>();
 
-  /// Get the backend sampled probabilites for the ith token
+  /// Get the backend sampled probabilities for the ith token
   /// The index matches llama_get_sampled_token_ith().
-  /// Returns NULL if no probabilites were generated.
+  /// Returns NULL if no probabilities were generated.
   ffi.Pointer<ffi.Float> llama_get_sampled_probs_ith(
     ffi.Pointer<llama_context> ctx,
     int i,
@@ -3186,9 +3181,9 @@ class LlamaBindings {
       >();
 
   /// Apply chat template. Inspired by hf apply_chat_template() on python.
-  /// Both "model" and "custom_template" are optional, but at least one is required. "custom_template" has higher precedence than "model"
+  ///
   /// NOTE: This function does not use a jinja parser. It only support a pre-defined list of template. See more: https://github.com/ggml-org/llama.cpp/wiki/Templates-supported-by-llama_chat_apply_template
-  /// @param tmpl A Jinja template to use for this chat. If this is nullptr, the model’s default chat template will be used instead.
+  /// @param tmpl A Jinja template to use for this chat.
   /// @param chat Pointer to a list of multiple llama_chat_message
   /// @param n_msg Number of llama_chat_message in this chat
   /// @param add_ass Whether to end the prompt with the token(s) that indicate the start of an assistant message.
@@ -3705,7 +3700,7 @@ class LlamaBindings {
             ffi.Pointer<llama_sampler> Function(int, double, double)
           >();
 
-  /// @details Intializes a GBNF grammar, see grammars/README.md for details.
+  /// @details Initializes a GBNF grammar, see grammars/README.md for details.
   /// @param vocab The vocabulary that this grammar will be used with.
   /// @param grammar_str The production rules for the grammar, encoded as a string. Returns an empty grammar if empty. Returns NULL if parsing of grammar_str fails.
   /// @param grammar_root The name of the start symbol for the grammar.
@@ -4091,12 +4086,12 @@ class LlamaBindings {
   late final _llama_split_pathPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int Function(
+          ffi.Int32 Function(
             ffi.Pointer<ffi.Char>,
             ffi.Size,
             ffi.Pointer<ffi.Char>,
-            ffi.Int,
-            ffi.Int,
+            ffi.Int32,
+            ffi.Int32,
           )
         >
       >('llama_split_path');
@@ -4133,12 +4128,12 @@ class LlamaBindings {
   late final _llama_split_prefixPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int Function(
+          ffi.Int32 Function(
             ffi.Pointer<ffi.Char>,
             ffi.Size,
             ffi.Pointer<ffi.Char>,
-            ffi.Int,
-            ffi.Int,
+            ffi.Int32,
+            ffi.Int32,
           )
         >
       >('llama_split_prefix');
@@ -4346,18 +4341,6 @@ class LlamaBindings {
       >('llama_perf_sampler_reset');
   late final _llama_perf_sampler_reset = _llama_perf_sampler_resetPtr
       .asFunction<void Function(ffi.Pointer<llama_sampler>)>();
-
-  /// print a breakdown of per-device memory use via LLAMA_LOG:
-  void llama_memory_breakdown_print(ffi.Pointer<llama_context> ctx) {
-    return _llama_memory_breakdown_print(ctx);
-  }
-
-  late final _llama_memory_breakdown_printPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<llama_context>)>
-      >('llama_memory_breakdown_print');
-  late final _llama_memory_breakdown_print = _llama_memory_breakdown_printPtr
-      .asFunction<void Function(ffi.Pointer<llama_context>)>();
 
   /// always returns true
   bool llama_opt_param_filter_all(
@@ -4574,7 +4557,12 @@ enum ggml_type {
 
   /// MXFP4 (1 block)
   GGML_TYPE_MXFP4(39),
-  GGML_TYPE_COUNT(40);
+
+  /// NVFP4 (4 blocks, E4M3 scale)
+  GGML_TYPE_NVFP4(40),
+  GGML_TYPE_Q1_0(41),
+  GGML_TYPE_STQ1_0(42),
+  GGML_TYPE_COUNT(43);
 
   final int value;
   const ggml_type(this.value);
@@ -4612,7 +4600,10 @@ enum ggml_type {
     34 => GGML_TYPE_TQ1_0,
     35 => GGML_TYPE_TQ2_0,
     39 => GGML_TYPE_MXFP4,
-    40 => GGML_TYPE_COUNT,
+    40 => GGML_TYPE_NVFP4,
+    41 => GGML_TYPE_Q1_0,
+    42 => GGML_TYPE_STQ1_0,
+    43 => GGML_TYPE_COUNT,
     _ => throw ArgumentError('Unknown value for ggml_type: $value'),
   };
 }
@@ -4676,47 +4667,49 @@ enum ggml_op {
   GGML_OP_IM2COL(52),
   GGML_OP_IM2COL_BACK(53),
   GGML_OP_IM2COL_3D(54),
-  GGML_OP_CONV_2D(55),
-  GGML_OP_CONV_3D(56),
-  GGML_OP_CONV_2D_DW(57),
-  GGML_OP_CONV_TRANSPOSE_2D(58),
-  GGML_OP_POOL_1D(59),
-  GGML_OP_POOL_2D(60),
-  GGML_OP_POOL_2D_BACK(61),
-  GGML_OP_UPSCALE(62),
-  GGML_OP_PAD(63),
-  GGML_OP_PAD_REFLECT_1D(64),
-  GGML_OP_ROLL(65),
-  GGML_OP_ARANGE(66),
-  GGML_OP_TIMESTEP_EMBEDDING(67),
-  GGML_OP_ARGSORT(68),
-  GGML_OP_TOP_K(69),
-  GGML_OP_LEAKY_RELU(70),
-  GGML_OP_TRI(71),
-  GGML_OP_FILL(72),
-  GGML_OP_FLASH_ATTN_EXT(73),
-  GGML_OP_FLASH_ATTN_BACK(74),
-  GGML_OP_SSM_CONV(75),
-  GGML_OP_SSM_SCAN(76),
-  GGML_OP_WIN_PART(77),
-  GGML_OP_WIN_UNPART(78),
-  GGML_OP_GET_REL_POS(79),
-  GGML_OP_ADD_REL_POS(80),
-  GGML_OP_RWKV_WKV6(81),
-  GGML_OP_GATED_LINEAR_ATTN(82),
-  GGML_OP_RWKV_WKV7(83),
-  GGML_OP_SOLVE_TRI(84),
-  GGML_OP_UNARY(85),
-  GGML_OP_MAP_CUSTOM1(86),
-  GGML_OP_MAP_CUSTOM2(87),
-  GGML_OP_MAP_CUSTOM3(88),
-  GGML_OP_CUSTOM(89),
-  GGML_OP_CROSS_ENTROPY_LOSS(90),
-  GGML_OP_CROSS_ENTROPY_LOSS_BACK(91),
-  GGML_OP_OPT_STEP_ADAMW(92),
-  GGML_OP_OPT_STEP_SGD(93),
-  GGML_OP_GLU(94),
-  GGML_OP_COUNT(95);
+  GGML_OP_COL2IM_1D(55),
+  GGML_OP_CONV_2D(56),
+  GGML_OP_CONV_3D(57),
+  GGML_OP_CONV_2D_DW(58),
+  GGML_OP_CONV_TRANSPOSE_2D(59),
+  GGML_OP_POOL_1D(60),
+  GGML_OP_POOL_2D(61),
+  GGML_OP_POOL_2D_BACK(62),
+  GGML_OP_UPSCALE(63),
+  GGML_OP_PAD(64),
+  GGML_OP_PAD_REFLECT_1D(65),
+  GGML_OP_ROLL(66),
+  GGML_OP_ARANGE(67),
+  GGML_OP_TIMESTEP_EMBEDDING(68),
+  GGML_OP_ARGSORT(69),
+  GGML_OP_TOP_K(70),
+  GGML_OP_LEAKY_RELU(71),
+  GGML_OP_TRI(72),
+  GGML_OP_FILL(73),
+  GGML_OP_FLASH_ATTN_EXT(74),
+  GGML_OP_FLASH_ATTN_BACK(75),
+  GGML_OP_SSM_CONV(76),
+  GGML_OP_SSM_SCAN(77),
+  GGML_OP_WIN_PART(78),
+  GGML_OP_WIN_UNPART(79),
+  GGML_OP_GET_REL_POS(80),
+  GGML_OP_ADD_REL_POS(81),
+  GGML_OP_RWKV_WKV6(82),
+  GGML_OP_GATED_LINEAR_ATTN(83),
+  GGML_OP_RWKV_WKV7(84),
+  GGML_OP_SOLVE_TRI(85),
+  GGML_OP_GATED_DELTA_NET(86),
+  GGML_OP_UNARY(87),
+  GGML_OP_MAP_CUSTOM1(88),
+  GGML_OP_MAP_CUSTOM2(89),
+  GGML_OP_MAP_CUSTOM3(90),
+  GGML_OP_CUSTOM(91),
+  GGML_OP_CROSS_ENTROPY_LOSS(92),
+  GGML_OP_CROSS_ENTROPY_LOSS_BACK(93),
+  GGML_OP_OPT_STEP_ADAMW(94),
+  GGML_OP_OPT_STEP_SGD(95),
+  GGML_OP_GLU(96),
+  GGML_OP_COUNT(97);
 
   final int value;
   const ggml_op(this.value);
@@ -4777,47 +4770,49 @@ enum ggml_op {
     52 => GGML_OP_IM2COL,
     53 => GGML_OP_IM2COL_BACK,
     54 => GGML_OP_IM2COL_3D,
-    55 => GGML_OP_CONV_2D,
-    56 => GGML_OP_CONV_3D,
-    57 => GGML_OP_CONV_2D_DW,
-    58 => GGML_OP_CONV_TRANSPOSE_2D,
-    59 => GGML_OP_POOL_1D,
-    60 => GGML_OP_POOL_2D,
-    61 => GGML_OP_POOL_2D_BACK,
-    62 => GGML_OP_UPSCALE,
-    63 => GGML_OP_PAD,
-    64 => GGML_OP_PAD_REFLECT_1D,
-    65 => GGML_OP_ROLL,
-    66 => GGML_OP_ARANGE,
-    67 => GGML_OP_TIMESTEP_EMBEDDING,
-    68 => GGML_OP_ARGSORT,
-    69 => GGML_OP_TOP_K,
-    70 => GGML_OP_LEAKY_RELU,
-    71 => GGML_OP_TRI,
-    72 => GGML_OP_FILL,
-    73 => GGML_OP_FLASH_ATTN_EXT,
-    74 => GGML_OP_FLASH_ATTN_BACK,
-    75 => GGML_OP_SSM_CONV,
-    76 => GGML_OP_SSM_SCAN,
-    77 => GGML_OP_WIN_PART,
-    78 => GGML_OP_WIN_UNPART,
-    79 => GGML_OP_GET_REL_POS,
-    80 => GGML_OP_ADD_REL_POS,
-    81 => GGML_OP_RWKV_WKV6,
-    82 => GGML_OP_GATED_LINEAR_ATTN,
-    83 => GGML_OP_RWKV_WKV7,
-    84 => GGML_OP_SOLVE_TRI,
-    85 => GGML_OP_UNARY,
-    86 => GGML_OP_MAP_CUSTOM1,
-    87 => GGML_OP_MAP_CUSTOM2,
-    88 => GGML_OP_MAP_CUSTOM3,
-    89 => GGML_OP_CUSTOM,
-    90 => GGML_OP_CROSS_ENTROPY_LOSS,
-    91 => GGML_OP_CROSS_ENTROPY_LOSS_BACK,
-    92 => GGML_OP_OPT_STEP_ADAMW,
-    93 => GGML_OP_OPT_STEP_SGD,
-    94 => GGML_OP_GLU,
-    95 => GGML_OP_COUNT,
+    55 => GGML_OP_COL2IM_1D,
+    56 => GGML_OP_CONV_2D,
+    57 => GGML_OP_CONV_3D,
+    58 => GGML_OP_CONV_2D_DW,
+    59 => GGML_OP_CONV_TRANSPOSE_2D,
+    60 => GGML_OP_POOL_1D,
+    61 => GGML_OP_POOL_2D,
+    62 => GGML_OP_POOL_2D_BACK,
+    63 => GGML_OP_UPSCALE,
+    64 => GGML_OP_PAD,
+    65 => GGML_OP_PAD_REFLECT_1D,
+    66 => GGML_OP_ROLL,
+    67 => GGML_OP_ARANGE,
+    68 => GGML_OP_TIMESTEP_EMBEDDING,
+    69 => GGML_OP_ARGSORT,
+    70 => GGML_OP_TOP_K,
+    71 => GGML_OP_LEAKY_RELU,
+    72 => GGML_OP_TRI,
+    73 => GGML_OP_FILL,
+    74 => GGML_OP_FLASH_ATTN_EXT,
+    75 => GGML_OP_FLASH_ATTN_BACK,
+    76 => GGML_OP_SSM_CONV,
+    77 => GGML_OP_SSM_SCAN,
+    78 => GGML_OP_WIN_PART,
+    79 => GGML_OP_WIN_UNPART,
+    80 => GGML_OP_GET_REL_POS,
+    81 => GGML_OP_ADD_REL_POS,
+    82 => GGML_OP_RWKV_WKV6,
+    83 => GGML_OP_GATED_LINEAR_ATTN,
+    84 => GGML_OP_RWKV_WKV7,
+    85 => GGML_OP_SOLVE_TRI,
+    86 => GGML_OP_GATED_DELTA_NET,
+    87 => GGML_OP_UNARY,
+    88 => GGML_OP_MAP_CUSTOM1,
+    89 => GGML_OP_MAP_CUSTOM2,
+    90 => GGML_OP_MAP_CUSTOM3,
+    91 => GGML_OP_CUSTOM,
+    92 => GGML_OP_CROSS_ENTROPY_LOSS,
+    93 => GGML_OP_CROSS_ENTROPY_LOSS_BACK,
+    94 => GGML_OP_OPT_STEP_ADAMW,
+    95 => GGML_OP_OPT_STEP_SGD,
+    96 => GGML_OP_GLU,
+    97 => GGML_OP_COUNT,
     _ => throw ArgumentError('Unknown value for ggml_op: $value'),
   };
 }
@@ -5344,6 +5339,15 @@ enum llama_ftype {
   /// except 1d tensors
   LLAMA_FTYPE_MOSTLY_MXFP4_MOE(38),
 
+  /// except 1d tensors
+  LLAMA_FTYPE_MOSTLY_NVFP4(39),
+
+  /// except 1d tensors
+  LLAMA_FTYPE_MOSTLY_Q1_0(40),
+
+  /// except 1d tensors
+  LLAMA_FTYPE_MOSTLY_STQ1_0(41),
+
   /// not specified in the model file
   LLAMA_FTYPE_GUESSED(1024);
 
@@ -5384,6 +5388,9 @@ enum llama_ftype {
     36 => LLAMA_FTYPE_MOSTLY_TQ1_0,
     37 => LLAMA_FTYPE_MOSTLY_TQ2_0,
     38 => LLAMA_FTYPE_MOSTLY_MXFP4_MOE,
+    39 => LLAMA_FTYPE_MOSTLY_NVFP4,
+    40 => LLAMA_FTYPE_MOSTLY_Q1_0,
+    41 => LLAMA_FTYPE_MOSTLY_STQ1_0,
     1024 => LLAMA_FTYPE_GUESSED,
     _ => throw ArgumentError('Unknown value for llama_ftype: $value'),
   };
@@ -5485,7 +5492,8 @@ enum llama_split_mode {
   LLAMA_SPLIT_MODE_LAYER(1),
 
   /// split layers and KV across GPUs, use tensor parallelism if supported
-  LLAMA_SPLIT_MODE_ROW(2);
+  LLAMA_SPLIT_MODE_ROW(2),
+  LLAMA_SPLIT_MODE_TENSOR(3);
 
   final int value;
   const llama_split_mode(this.value);
@@ -5494,7 +5502,22 @@ enum llama_split_mode {
     0 => LLAMA_SPLIT_MODE_NONE,
     1 => LLAMA_SPLIT_MODE_LAYER,
     2 => LLAMA_SPLIT_MODE_ROW,
+    3 => LLAMA_SPLIT_MODE_TENSOR,
     _ => throw ArgumentError('Unknown value for llama_split_mode: $value'),
+  };
+}
+
+enum llama_context_type {
+  LLAMA_CONTEXT_TYPE_DEFAULT(0),
+  LLAMA_CONTEXT_TYPE_MTP(1);
+
+  final int value;
+  const llama_context_type(this.value);
+
+  static llama_context_type fromValue(int value) => switch (value) {
+    0 => LLAMA_CONTEXT_TYPE_DEFAULT,
+    1 => LLAMA_CONTEXT_TYPE_MTP,
+    _ => throw ArgumentError('Unknown value for llama_context_type: $value'),
   };
 }
 
@@ -5669,7 +5692,7 @@ final class llama_model_params extends ffi.Struct {
   @ffi.Bool()
   external bool use_mmap;
 
-  /// use direct io, takes precedence over use_mmap
+  /// use direct io, takes precedence over use_mmap when supported
   @ffi.Bool()
   external bool use_direct_io;
 
@@ -5720,6 +5743,14 @@ final class llama_context_params extends ffi.Struct {
   @ffi.Uint32()
   external int n_seq_max;
 
+  /// number of recurrent-state snapshots per seq for rollback (0 = no rollback) [EXPERIMENTAL]
+  @ffi.Uint32()
+  external int n_rs_seq;
+
+  /// max outputs in a ubatch (0 = n_batch)
+  @ffi.Uint32()
+  external int n_outputs_max;
+
   /// number of threads to use for generation
   @ffi.Int32()
   external int n_threads;
@@ -5727,6 +5758,13 @@ final class llama_context_params extends ffi.Struct {
   /// number of threads to use for batch processing
   @ffi.Int32()
   external int n_threads_batch;
+
+  /// set the context type (e.g. MTP)
+  @ffi.UnsignedInt()
+  external int ctx_typeAsInt;
+
+  llama_context_type get ctx_type =>
+      llama_context_type.fromValue(ctx_typeAsInt);
 
   /// RoPE scaling type, from `enum llama_rope_scaling_type`
   @ffi.Int()
@@ -5858,6 +5896,28 @@ final class llama_context_params extends ffi.Struct {
 
   @ffi.Size()
   external int n_samplers;
+
+  /// a source/target/parent context
+  /// can be utilized in various ways, for example by sharing results or llama_memory between 2 contexts
+  external ffi.Pointer<llama_context> ctx_other;
+}
+
+final class llama_model_tensor_override extends ffi.Struct {
+  external ffi.Pointer<ffi.Char> pattern;
+
+  @ffi.UnsignedInt()
+  external int typeAsInt;
+
+  ggml_type get type => ggml_type.fromValue(typeAsInt);
+}
+
+final class llama_model_imatrix_data extends ffi.Struct {
+  external ffi.Pointer<ffi.Char> name;
+
+  external ffi.Pointer<ffi.Float> data;
+
+  @ffi.Size()
+  external int size;
 }
 
 /// model quantization parameters
@@ -5906,17 +5966,21 @@ final class llama_model_quantize_params extends ffi.Struct {
   @ffi.Bool()
   external bool keep_split;
 
+  /// calculate and show the final quantization size without performing quantization
+  @ffi.Bool()
+  external bool dry_run;
+
   /// pointer to importance matrix data
-  external ffi.Pointer<ffi.Void> imatrix;
+  external ffi.Pointer<llama_model_imatrix_data> imatrix;
 
-  /// pointer to vector containing overrides
-  external ffi.Pointer<ffi.Void> kv_overrides;
+  /// pointer to kv overrides
+  external ffi.Pointer<llama_model_kv_override> kv_overrides;
 
-  /// pointer to vector containing tensor types
-  external ffi.Pointer<ffi.Void> tensor_types;
+  /// pointer to tensor overrides
+  external ffi.Pointer<llama_model_tensor_override> tt_overrides;
 
-  /// pointer to vector containing layer indices to prune
-  external ffi.Pointer<ffi.Void> prune_layers;
+  /// pointer to layer indices to prune
+  external ffi.Pointer<ffi.Int32> prune_layers;
 }
 
 final class llama_logit_bias extends ffi.Struct {
@@ -5943,27 +6007,140 @@ final class llama_chat_message extends ffi.Struct {
 /// lora adapter
 final class llama_adapter_lora extends ffi.Opaque {}
 
-enum llama_params_fit_status {
-  /// found allocations that are projected to fit
-  LLAMA_PARAMS_FIT_STATUS_SUCCESS(0),
+typedef llama_model_set_tensor_data_tFunction =
+    ffi.Void Function(
+      ffi.Pointer<ggml_tensor> tensor,
+      ffi.Pointer<ffi.Void> userdata,
+    );
+typedef Dartllama_model_set_tensor_data_tFunction =
+    void Function(
+      ffi.Pointer<ggml_tensor> tensor,
+      ffi.Pointer<ffi.Void> userdata,
+    );
+typedef llama_model_set_tensor_data_t =
+    ffi.Pointer<ffi.NativeFunction<llama_model_set_tensor_data_tFunction>>;
 
-  /// could not find allocations that are projected to fit
-  LLAMA_PARAMS_FIT_STATUS_FAILURE(1),
+final class gguf_context extends ffi.Opaque {}
 
-  /// a hard error occured, e.g. because no model could be found at the specified path
-  LLAMA_PARAMS_FIT_STATUS_ERROR(2);
+/// stdio buffers
+final class __sbuf extends ffi.Struct {
+  external ffi.Pointer<ffi.UnsignedChar> _base;
 
-  final int value;
-  const llama_params_fit_status(this.value);
+  @ffi.Int()
+  external int _size;
+}
 
-  static llama_params_fit_status fromValue(int value) => switch (value) {
-    0 => LLAMA_PARAMS_FIT_STATUS_SUCCESS,
-    1 => LLAMA_PARAMS_FIT_STATUS_FAILURE,
-    2 => LLAMA_PARAMS_FIT_STATUS_ERROR,
-    _ => throw ArgumentError(
-      'Unknown value for llama_params_fit_status: $value',
-    ),
-  };
+/// hold a buncha junk that would grow the ABI
+final class __sFILEX extends ffi.Opaque {}
+
+/// stdio state variables.
+///
+/// The following always hold:
+///
+/// if (_flags&(__SLBF|__SWR)) == (__SLBF|__SWR),
+/// _lbfsize is -_bf._size, else _lbfsize is 0
+/// if _flags&__SRD, _w is 0
+/// if _flags&__SWR, _r is 0
+///
+/// This ensures that the getc and putc macros (or inline functions) never
+/// try to write or read from a file that is in `read' or `write' mode.
+/// (Moreover, they can, and do, automatically switch from read mode to
+/// write mode, and back, on "r+" and "w+" files.)
+///
+/// _lbfsize is used only to make the inline line-buffered output stream
+/// code as compact as possible.
+///
+/// _ub, _up, and _ur are used when ungetc() pushes back more characters
+/// than fit in the current _bf, or when ungetc() pushes back a character
+/// that does not match the previous one in _bf.  When this happens,
+/// _ub._base becomes non-nil (i.e., a stream has ungetc() data iff
+/// _ub._base!=NULL) and _up and _ur save the current values of _p and _r.
+///
+/// NB: see WARNING above before changing the layout of this structure!
+final class __sFILE extends ffi.Struct {
+  /// current position in (some) buffer
+  external ffi.Pointer<ffi.UnsignedChar> _p;
+
+  /// read space left for getc()
+  @ffi.Int()
+  external int _r;
+
+  /// write space left for putc()
+  @ffi.Int()
+  external int _w;
+
+  /// flags, below; this FILE is free if 0
+  @ffi.Short()
+  external int _flags;
+
+  /// fileno, if Unix descriptor, else -1
+  @ffi.Short()
+  external int _file;
+
+  /// the buffer (at least 1 byte, if !NULL)
+  external __sbuf _bf;
+
+  /// 0 or -_bf._size, for inline putc
+  @ffi.Int()
+  external int _lbfsize;
+
+  /// cookie passed to io functions
+  external ffi.Pointer<ffi.Void> _cookie;
+
+  external ffi.Pointer<
+    ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Void>)>
+  >
+  _close;
+
+  external ffi.Pointer<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Char>, ffi.Int)
+    >
+  >
+  _read;
+
+  external ffi.Pointer<
+    ffi.NativeFunction<
+      ffi.LongLong Function(ffi.Pointer<ffi.Void>, ffi.LongLong, ffi.Int)
+    >
+  >
+  _seek;
+
+  external ffi.Pointer<
+    ffi.NativeFunction<
+      ffi.Int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Char>, ffi.Int)
+    >
+  >
+  _write;
+
+  /// ungetc buffer
+  external __sbuf _ub;
+
+  /// additions to FILE to not break ABI
+  external ffi.Pointer<__sFILEX> _extra;
+
+  /// saved _r when _r is counting ungetc data
+  @ffi.Int()
+  external int _ur;
+
+  /// guarantee an ungetc() buffer
+  @ffi.Array.multi([3])
+  external ffi.Array<ffi.UnsignedChar> _ubuf;
+
+  /// guarantee a getc() buffer
+  @ffi.Array.multi([1])
+  external ffi.Array<ffi.UnsignedChar> _nbuf;
+
+  /// buffer for fgetln()
+  external __sbuf _lb;
+
+  /// stat.st_blksize (may be != _bf._size)
+  @ffi.Int()
+  external int _blksize;
+
+  /// current lseek offset (see WARNING)
+  @ffi.LongLong()
+  external int _offset;
 }
 
 typedef llama_state_seq_flags = ffi.Uint32;
@@ -6137,6 +6314,10 @@ const int LLAMA_STATE_SEQ_MAGIC = 1734833009;
 
 const int LLAMA_STATE_SEQ_VERSION = 2;
 
+const int LLAMA_STATE_SEQ_FLAGS_NONE = 0;
+
 const int LLAMA_STATE_SEQ_FLAGS_SWA_ONLY = 1;
 
 const int LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY = 1;
+
+const int LLAMA_STATE_SEQ_FLAGS_ON_DEVICE = 2;

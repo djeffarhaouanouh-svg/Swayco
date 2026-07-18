@@ -66,10 +66,12 @@ llama_model_free
 llama_model_get_vocab
 llama_model_has_decoder
 llama_model_has_encoder
+llama_model_init_from_user
 llama_model_is_diffusion
 llama_model_is_hybrid
 llama_model_is_recurrent
 llama_model_load_from_file
+llama_model_load_from_file_ptr
 llama_model_load_from_splits
 llama_model_meta_count
 llama_model_meta_key_by_index
@@ -84,6 +86,7 @@ llama_model_n_embd_out
 llama_model_n_head
 llama_model_n_head_kv
 llama_model_n_layer
+llama_model_n_layer_nextn
 llama_model_n_params
 llama_model_n_swa
 llama_model_quantize
@@ -99,6 +102,7 @@ llama_n_ctx_train
 llama_n_embd
 llama_n_head
 llama_n_layer
+llama_n_rs_seq
 llama_n_seq_max
 llama_n_threads
 llama_n_threads_batch
@@ -154,6 +158,8 @@ llama_sampler_reset
 llama_sampler_sample
 llama_save_session_file
 llama_set_abort_callback
+llama_set_adapter_cvec
+llama_set_adapters_lora
 llama_set_causal_attn
 llama_set_embeddings
 llama_set_n_threads

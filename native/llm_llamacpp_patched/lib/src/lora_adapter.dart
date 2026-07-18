@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'package:llm_llamacpp/src/bindings/llama_bindings.dart';
 import 'package:llm_llamacpp/src/exceptions.dart';
 import 'package:llm_llamacpp/src/llamacpp_model.dart';
+import 'package:llm_llamacpp/src/bindings/lora_compat.dart';
 
 /// Represents a loaded LoRA adapter.
 ///

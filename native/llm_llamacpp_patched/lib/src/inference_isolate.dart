@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'package:llm_llamacpp/src/backend_initializer.dart';
 import 'package:llm_llamacpp/src/bindings/llama_bindings.dart';
 import 'package:llm_llamacpp/src/isolate_messages.dart';
+import 'package:llm_llamacpp/src/bindings/lora_compat.dart';
 
 /// Runs inference in an isolate.
 ///
