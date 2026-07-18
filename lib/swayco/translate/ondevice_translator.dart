@@ -158,6 +158,12 @@ class OnDeviceTranslator {
     final lines = <String>[];
 
     final ctx = <String>[];
+    // Always first: keep the meaning intact and phrase it the way a native
+    // speaker of the TARGET language actually talks. Without this the model
+    // renders word-for-word and the peer hears a stilted, translated-sounding
+    // line instead of natural speech.
+    ctx.add('preserve the exact meaning, and phrase it the way a native speaker '
+        'of the target language would naturally say it');
     final ag = _genderPhrase(authorGender, 'the speaker');
     if (ag != null) ctx.add(ag);
     final pg = _genderPhrase(peerGender, 'the person being spoken to');
