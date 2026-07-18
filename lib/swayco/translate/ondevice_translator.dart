@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -51,17 +52,14 @@ class OnDeviceTranslator {
   /// lands. (Was 99 = all-GPU for the Q4_K_M quant.)
   static const int _gpuLayers = 0;
 
-  /// Context window, in tokens. The plugin defaults to 4096, which is what was
-  /// killing the app: llama.cpp reserves the KV cache for the FULL n_ctx, and on
-  /// a 1.8B model 4096 tokens of KV is on the order of several hundred MB on top
-  /// of the 440 MB of weights. iOS then SIGKILLs the process — which is why the
-  /// app vanished with no .ips crash report at all (a Jetsam kill produces no
-  /// ordinary crash log). The cache is only fully touched once generation
-  /// starts, so the app loaded fine and died on the first spoken phrase.
+  /// Context window, in tokens. The plugin defaults to 4096; one utterance plus
+  /// two turns of history is a few hundred tokens, so 1024 is already generous.
   ///
-  /// One utterance plus two turns of history is a few hundred tokens at most, so
-  /// 1024 is already generous and cuts the KV cache 4x. Raise only with a
-  /// memory measurement on a real device.
+  /// This is hygiene, NOT the crash fix — measured from the GGUF metadata,
+  /// hunyuan-dense is GQA (head_count 16 / head_count_kv 4), so the KV cache is
+  /// only 268 MB at 4096 and 67 MB here. With 440 MB of mmap'd weights that is
+  /// far under an iPhone's per-app ceiling, which is what ruled memory out as
+  /// the cause of the first-inference kill.
   static const int _contextSize = 1024;
 
   /// Prompt-ingest batch. Must not exceed [_contextSize]; the plugin's 512
@@ -145,11 +143,12 @@ class OnDeviceTranslator {
         peerGender: peerGender,
         speech: speech,
       );
-      // Breadcrumbs around the native call. A Jetsam kill leaves no crash log,
-      // so without these the app just vanishes and we cannot tell whether it
-      // died building the prompt, creating the context (first inference only),
-      // or mid-generation. Each line lands in the in-app DebugOverlay.
-      DebugOverlay.log('translate: infer start (${prompt.length} chars)');
+      // Breadcrumbs around the native call. The app dies INSIDE it with no crash
+      // report, so these are the only instrument we have — and DebugOverlay
+      // keeps its lines in memory only, so they vanish with the process. Mirror
+      // them to a file that survives the kill; [lastCrashTrace] reads it back on
+      // the next launch.
+      await _trace('infer start (${prompt.length} chars)');
       final buf = StringBuffer();
       var chunks = 0;
       final stream = chat.streamChatWithGenerationOptions(
@@ -165,11 +164,11 @@ class OnDeviceTranslator {
         ),
       );
       await for (final chunk in stream) {
-        if (chunks == 0) DebugOverlay.log('translate: first token');
+        if (chunks == 0) await _trace('first token');
         chunks++;
         buf.write(chunk.message?.content ?? '');
       }
-      DebugOverlay.log('translate: done ($chunks chunks)');
+      await _trace('done ($chunks chunks)');
       return buf.toString().trim();
     } catch (e) {
       DebugOverlay.log('translate on-device error: $e');
@@ -253,6 +252,43 @@ class OnDeviceTranslator {
       'tr': 'Turkish',
     }[c] ??
         code;
+  }
+
+  /// Write a breadcrumb to BOTH the in-app overlay and a file, then flush.
+  ///
+  /// The overlay alone is not enough: it holds its lines in memory, so when the
+  /// process is killed mid-inference every line dies with it and the user sees
+  /// "nothing". The file is flushed on each write, so whatever was reached
+  /// before the kill is still on disk at the next launch — read it with
+  /// [lastCrashTrace]. Never throws: a failing breadcrumb must not break a call.
+  Future<void> _trace(String msg) async {
+    DebugOverlay.log('translate: $msg');
+    try {
+      final f = File('${(await getApplicationSupportDirectory()).path}'
+          '/translate/trace.log');
+      await f.parent.create(recursive: true);
+      await f.writeAsString(
+        '${DateTime.now().toIso8601String()} $msg\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (_) {
+      // Diagnostics must never take the call down with them.
+    }
+  }
+
+  /// The breadcrumbs left by the run that died, oldest first — empty when the
+  /// last run exited cleanly or never wrote any. Surface this after a crash to
+  /// see how far inference got.
+  static Future<List<String>> lastCrashTrace() async {
+    try {
+      final f = File('${(await getApplicationSupportDirectory()).path}'
+          '/translate/trace.log');
+      if (!f.existsSync()) return const [];
+      return const LineSplitter().convert(await f.readAsString());
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Ensure the GGUF is on disk, downloading it once if missing. Returns the

@@ -24,7 +24,7 @@
 # 5 libs (ggml-blas folded into Accelerate; common/cpp-httplib are example-only
 # C++ helpers the C-API FFI never calls, so they are not built).
 llama_libs = %w[
-  libllama.a libggml.a libggml-base.a libggml-cpu.a libggml-metal.a
+  libllama.a libggml.a libggml-base.a libggml-cpu.a
 ]
 # Path is resolved from the Runner (app) target's SRCROOT (= the ios/ dir), via
 # the Flutter plugin symlink. $(PODS_TARGET_SRCROOT) does NOT work here: it is a
@@ -71,11 +71,13 @@ Pod::Spec.new do |s|
   # libvosk.a. The libs stay in place under the plugin symlink.
   #
   # OTHER_LDFLAGS goes on the APP target (user_target_xcconfig) because the app
-  # binary is what DynamicLibrary.process() reads. ggml-metal needs Metal +
-  # MetalKit + Foundation; ggml-blas needs Accelerate; llama.cpp is C++.
+  # binary is what DynamicLibrary.process() reads. No Metal/MetalKit: the libs
+  # are built with GGML_METAL=OFF (see scripts/build_llama_ios.sh — STQ1_0 has no
+  # Metal kernel and we run nGpuLayers = 0, so a Metal backend could only ever
+  # be handed tensor types it cannot execute). Accelerate for ggml's BLAS path,
+  # libc++ because llama.cpp is C++.
   s.user_target_xcconfig = {
     'OTHER_LDFLAGS' => "#{force_load} #{keep_roots} " \
-                       '-framework Metal -framework MetalKit ' \
                        '-framework Foundation -framework Accelerate -lc++',
   }
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

@@ -16,8 +16,16 @@
 #   ./scripts/build_llama_ios.sh
 #
 # Needs CMake + Xcode. The libs (~8 MB) are git-ignored; run once after a clone.
-# NOTE: STQ1_0 ships only a CPU ARM-NEON kernel — there is no Metal path for the
-# ternary weights, so ondevice_translator.dart runs with nGpuLayers = 0.
+#
+# METAL IS DELIBERATELY OFF. STQ1_0 ships only a CPU ARM-NEON kernel (PR #22836)
+# — there is no Metal path for the ternary weights — and the app already runs
+# with nGpuLayers = 0. Building Metal in was pure liability: it registers a
+# backend and lets the scheduler consider placing ops on tensors of a type it
+# cannot handle. The app died inside the first native inference call (the
+# DebugOverlay printed "translate: infer start" and nothing after), with the
+# model's tensor types verified correct (GGML_TYPE_STQ1_0 = 42 on both sides)
+# and only 67 MB of KV cache, so memory and type numbering were both ruled out.
+# CPU-only also drops ~800 KB of binary.
 
 set -euo pipefail
 
@@ -48,7 +56,7 @@ echo "==> configure (iOS arm64, Metal embedded, static)"
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN" \
   -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
   -DBUILD_SHARED_LIBS=OFF \
-  -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON \
+  -DGGML_METAL=OFF \
   -DGGML_ACCELERATE=ON -DGGML_BLAS=OFF \
   -DLLAMA_CURL=OFF \
   -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
