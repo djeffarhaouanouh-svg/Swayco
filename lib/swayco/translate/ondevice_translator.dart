@@ -51,6 +51,24 @@ class OnDeviceTranslator {
   /// lands. (Was 99 = all-GPU for the Q4_K_M quant.)
   static const int _gpuLayers = 0;
 
+  /// Context window, in tokens. The plugin defaults to 4096, which is what was
+  /// killing the app: llama.cpp reserves the KV cache for the FULL n_ctx, and on
+  /// a 1.8B model 4096 tokens of KV is on the order of several hundred MB on top
+  /// of the 440 MB of weights. iOS then SIGKILLs the process — which is why the
+  /// app vanished with no .ips crash report at all (a Jetsam kill produces no
+  /// ordinary crash log). The cache is only fully touched once generation
+  /// starts, so the app loaded fine and died on the first spoken phrase.
+  ///
+  /// One utterance plus two turns of history is a few hundred tokens at most, so
+  /// 1024 is already generous and cuts the KV cache 4x. Raise only with a
+  /// memory measurement on a real device.
+  static const int _contextSize = 1024;
+
+  /// Prompt-ingest batch. Must not exceed [_contextSize]; the plugin's 512
+  /// default already fits, but pin it so the two stay consistent if the context
+  /// is ever lowered further.
+  static const int _batchSize = 256;
+
   LlamaCppRepository? _repo;
   LlamaCppModel? _model;
   LlamaCppChatRepository? _chat;
@@ -81,12 +99,18 @@ class OnDeviceTranslator {
         path,
         options: const ModelLoadOptions(nGpuLayers: _gpuLayers),
       );
-      final chat = LlamaCppChatRepository.withModel(model, repo.bindings);
+      final chat = LlamaCppChatRepository.withModel(
+        model,
+        repo.bindings,
+        contextSize: _contextSize,
+        batchSize: _batchSize,
+      );
       _repo = repo;
       _model = model;
       _chat = chat;
       _ready = true;
-      DebugOverlay.log('translate on-device READY (hy-mt2, gpu=$_gpuLayers)');
+      DebugOverlay.log('translate on-device READY (hy-mt2, gpu=$_gpuLayers, '
+          'ctx=$_contextSize, batch=$_batchSize)');
     } catch (e) {
       _ready = false;
       DebugOverlay.log('translate on-device LOAD FAILED: $e');
@@ -121,7 +145,13 @@ class OnDeviceTranslator {
         peerGender: peerGender,
         speech: speech,
       );
+      // Breadcrumbs around the native call. A Jetsam kill leaves no crash log,
+      // so without these the app just vanishes and we cannot tell whether it
+      // died building the prompt, creating the context (first inference only),
+      // or mid-generation. Each line lands in the in-app DebugOverlay.
+      DebugOverlay.log('translate: infer start (${prompt.length} chars)');
       final buf = StringBuffer();
+      var chunks = 0;
       final stream = chat.streamChatWithGenerationOptions(
         'hy-mt2',
         messages: [LLMMessage(role: LLMRole.user, content: prompt)],
@@ -135,8 +165,11 @@ class OnDeviceTranslator {
         ),
       );
       await for (final chunk in stream) {
+        if (chunks == 0) DebugOverlay.log('translate: first token');
+        chunks++;
         buf.write(chunk.message?.content ?? '');
       }
+      DebugOverlay.log('translate: done ($chunks chunks)');
       return buf.toString().trim();
     } catch (e) {
       DebugOverlay.log('translate on-device error: $e');
