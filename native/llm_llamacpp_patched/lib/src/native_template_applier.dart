@@ -8,6 +8,22 @@ String _applyNativeChatTemplate(
   final chatMessages = calloc<llama_chat_message>(messages.length);
   final allocatedPointers = <ffi.Pointer<Utf8>>[];
 
+  // SWAYCO PATCH: pass the MODEL'S OWN template.
+  //
+  // llama_chat_apply_template's first parameter is the template STRING. Older
+  // llama.cpp took a `llama_model *` there, where NULL meant "use the model's
+  // template", so the upstream code passes nullptr — but the model parameter is
+  // long gone, and nullptr now just falls back to a built-in default (ChatML).
+  // The `model` argument this function receives was never used.
+  //
+  // For a model with a custom template that is silently fatal: Hy-MT2 wraps
+  // turns in <｜hy_begin▁of▁sentence｜> / <｜hy_place▁holder▁no▁3｜>, so fed
+  // ChatML it never sees a question and free-associates instead of translating
+  // ("Bonjour, tu vas bien ?" -> "ボンジュール・トゥルー・トゥルー…"). Verified
+  // locally with llama-completion: identical prompt and sampling, --jinja gives
+  // "こんにちは、元気ですか？" and no template gives that garbage.
+  final tmpl = bindings.llama_model_chat_template(model, ffi.nullptr);
+
   try {
     for (var i = 0; i < messages.length; i++) {
       final msg = messages[i];
@@ -21,7 +37,7 @@ String _applyNativeChatTemplate(
     }
 
     final requiredSize = bindings.llama_chat_apply_template(
-      ffi.nullptr,
+      tmpl,
       chatMessages,
       messages.length,
       true,
@@ -36,7 +52,7 @@ String _applyNativeChatTemplate(
     final buffer = calloc<ffi.Char>(requiredSize + 1);
     try {
       final actualSize = bindings.llama_chat_apply_template(
-        ffi.nullptr,
+        tmpl,
         chatMessages,
         messages.length,
         true,
