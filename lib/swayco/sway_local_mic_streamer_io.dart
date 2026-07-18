@@ -9,6 +9,7 @@ import '../services/debug_overlay.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
+import 'translate/ondevice_translator.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import 'sway_mic_streamer_base.dart';
@@ -317,6 +318,12 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       // a clip engine has nothing to tell it where a phrase ends, so it would
       // never transcribe anything — hence the fallback.
       unawaited(_startSegmenter());
+
+      // On-device translator (Hy-MT2 on llama.cpp): download-once + load
+      // resident, in parallel with the call so it never blocks connect.
+      // Utterances spoken before it is ready are dropped — translate() returns
+      // '' and the empty-translation guard in _translateAndSend skips them.
+      unawaited(OnDeviceTranslator.instance.ensureLoaded());
 
       // First call in a language downloads the model (universal: ~357 MB).
       // Capture starts anyway so the call is never blocked on it; utterances are
@@ -800,21 +807,18 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   }) async {
     final String trans;
     try {
-      trans = await fetchTextTranslation(
+      // On-device translation (Hy-MT2 on llama.cpp) — replaces the cloud
+      // /translation/text call. Same inputs: gender + 2-turn history + the
+      // speech flag, which lets the translator repair an obvious mis-hearing
+      // from context instead of rendering it literally ("財布のボール" →
+      // "portfolio", not "balle de portefeuille").
+      trans = await OnDeviceTranslator.instance.translate(
         text: orig,
         from: _sourceLang,
         to: _targetLang,
         history: List<TranslationHistoryItem>.of(_history),
-        context: (_myGender.isEmpty && _peerGender.isEmpty)
-            ? null
-            : TranslationContext(
-                authorGender: _myGender.isEmpty ? null : _myGender,
-                peerGender: _peerGender.isEmpty ? null : _peerGender,
-              ),
-        // This is an on-device STT transcript, not something anyone typed: let
-        // the translator repair an obvious mis-hearing from context instead of
-        // rendering it literally ("財布のボール" → "portfolio", not "balle de
-        // portefeuille").
+        authorGender: _myGender.isEmpty ? null : _myGender,
+        peerGender: _peerGender.isEmpty ? null : _peerGender,
         speech: true,
       );
     } catch (e) {

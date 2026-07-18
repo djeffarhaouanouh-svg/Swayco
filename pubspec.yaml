@@ -105,6 +105,14 @@ dependencies:
   # fail to link on duplicate symbols. Models stay download-on-demand.
   sherpa_onnx: ^1.13.4
 
+  # On-device TRANSLATION (lib/swayco/translate): Tencent Hy-MT2 (GGUF) run on
+  # llama.cpp via llm_llamacpp (MIT — commercial-safe, unlike GPL fllama / the
+  # NonCommercial flutter_llama). Replaces the cloud /translation/text call in
+  # the native call pipeline. This is a SECOND native runtime (ggml) alongside
+  # sherpa_onnx — different engine, no ONNX duplicate-symbol clash, but the iOS
+  # link/size must be validated on the Mac build.
+  llm_llamacpp: ^0.1.9
+
   # On-device STT (lib/swayco/asr): the neural engine (Moonshine) runs on
   # sherpa_onnx above; the lattice engine (Vosk) is bound directly with dart:ffi
   # against its native library (no plugin — the only published one is
