@@ -30,7 +30,12 @@ android {
     compileSdkVersion 34
 
     // Specify NDK version for consistent builds
-    ndkVersion "26.3.11579264"
+    // SWAYCO PATCH: this module ships PREBUILT .so (STQ-fork jniLibs) and
+    // compiles no native code, so it needs no NDK. The upstream pin (26.3)
+    // isn't installed here and made AGP fail resolving project.android
+    // .ndkDirectory. Match the installed NDK; the value is inert now that the
+    // NDK-touching validate task below is unhooked.
+    ndkVersion "28.2.13676358"
 
     defaultConfig {
         // Minimum SDK 28 for better native library support
@@ -66,7 +71,12 @@ task validateNativeLibraries {
         } else {
             // Required libraries for each ABI
             def requiredLibs = ['libllama.so', 'libggml.so', 'libggml-base.so']
-            def abis = ['arm64-v8a', 'x86_64']
+            // SWAYCO PATCH: arm64-v8a only. We ship prebuilt STQ-fork .so as
+            // jniLibs (no auto-build submodule), and the app is built
+            // --target-platform android-arm64. Requiring x86_64 here made this
+            // task try to auto-build from a llama.cpp submodule that does not
+            // exist in the vendored copy, failing every Android build.
+            def abis = ['arm64-v8a']
             def errors = []
             
             // Check each ABI directory
@@ -290,7 +300,12 @@ Please check the build script output above for errors.
             
             // Re-check required libraries
             def requiredLibs = ['libllama.so', 'libggml.so', 'libggml-base.so']
-            def abis = ['arm64-v8a', 'x86_64']
+            // SWAYCO PATCH: arm64-v8a only. We ship prebuilt STQ-fork .so as
+            // jniLibs (no auto-build submodule), and the app is built
+            // --target-platform android-arm64. Requiring x86_64 here made this
+            // task try to auto-build from a llama.cpp submodule that does not
+            // exist in the vendored copy, failing every Android build.
+            def abis = ['arm64-v8a']
             def postBuildErrors = []
             
             abis.each { abi ->
@@ -381,4 +396,9 @@ Please check the build script output above for errors.
 }
 
 // Run validation before building
-preBuild.dependsOn validateNativeLibraries
+// SWAYCO PATCH: unhooked. This optional task probes project.android
+// .ndkDirectory (and would auto-build llama.cpp from a submodule that doesn't
+// exist in the vendored copy). We ship verified prebuilt STQ .so as jniLibs, so
+// there is nothing to validate or build here — and touching ndkDirectory failed
+// the whole Android build when the pinned NDK wasn't installed.
+// preBuild.dependsOn validateNativeLibraries

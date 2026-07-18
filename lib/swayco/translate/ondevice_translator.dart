@@ -29,12 +29,14 @@ class OnDeviceTranslator {
   OnDeviceTranslator._();
   static final OnDeviceTranslator instance = OnDeviceTranslator._();
 
-  /// Our own model mirror — same repo the STT models come from. The GGUF is
-  /// AngelSlim's 1.25-bit STQ quant (440 MB), which needs Tencent's STQ1_0
-  /// ternary kernel — llama.cpp PR #22836 (`sjl623/llama.cpp`, branch `STQ_0`,
-  /// not merged). The iOS static libs the app links are built from that fork
-  /// (scripts/build_llama_ios.sh); the plugin's stock prebuilt does NOT carry
-  /// the kernel and would fail to load this file.
+  /// Our own model mirror — same repo the STT models come from (the GGUF must
+  /// be uploaded under `translate/`). It is AngelSlim's 1.25-bit STQ quant
+  /// (440 MB), which only loads with Tencent's STQ1_0 ternary kernel —
+  /// llama.cpp PR #22836 (`sjl623/llama.cpp`, branch `STQ_0`, not merged). The
+  /// native libs the app links are built from that fork: iOS static libs via
+  /// scripts/build_llama_ios.sh, Android arm64 .so via
+  /// scripts/build_llama_android.sh (jniLibs). The plugin's stock prebuilt does
+  /// NOT carry the kernel and rejects this file ("tensor offset mismatch").
   static const String _modelUrl =
       'https://huggingface.co/djeffar/swayco-stt-models/resolve/main/translate/hy-mt2-1.8b-1.25bit.gguf';
 

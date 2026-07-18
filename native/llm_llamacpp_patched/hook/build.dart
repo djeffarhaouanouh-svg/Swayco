@@ -62,6 +62,18 @@ void main(List<String> args) async {
       return;
     }
 
+    // SWAYCO PATCH: Android ships the STQ-fork .so (libllama.so + libggml*.so,
+    // built from the STQ1_0 kernel that can load Tencent's 1.25-bit GGUF) as
+    // jniLibs under android/src/main/jniLibs/. The stock hook would download a
+    // STANDARD-llama.cpp prebuilt that CANNOT load that model. Emit no code
+    // asset for Android — gradle packages the jniLibs and the loader opens
+    // libllama.so from the app lib dir.
+    if (targetOS == OS.android) {
+      logger.info('llm_llamacpp: Android uses STQ .so from jniLibs — '
+          'skipping native-assets hook');
+      return;
+    }
+
     logger.info('Building llm_llamacpp for $targetOS-$targetArch');
 
     // Determine library name based on OS

@@ -44,7 +44,11 @@ android {
         applicationId = "com.translate.livekit.livekit_translate"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Raised from flutter.minSdkVersion (24) to 28 (Android 9): the
+        // on-device translation plugin (llm_llamacpp) requires minSdk 28.
+        // On-device LLM inference needs a capable device anyway, so pre-Android-9
+        // phones are out of scope for this feature. Drops Android 7.x/8.x users.
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
