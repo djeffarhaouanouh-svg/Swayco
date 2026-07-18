@@ -226,13 +226,37 @@ class OnDeviceTranslator {
     if (file.existsSync() && file.lengthSync() > 0) return file.path;
 
     DebugOverlay.log('translate model: downloading $_modelFile …');
-    final res = await http.get(Uri.parse(_modelUrl));
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('model download HTTP ${res.statusCode}');
+    // STREAM to disk — a plain http.get() buffers the whole 440 MB in RAM
+    // (res.bodyBytes) before writing, which OOM-crashes the phone. Pipe the
+    // response straight into a `.part` file, then rename: an interrupted
+    // download leaves no final file, so it re-downloads instead of loading a
+    // truncated model.
+    final tmp = File('${file.path}.part');
+    final client = http.Client();
+    try {
+      final resp = await client.send(http.Request('GET', Uri.parse(_modelUrl)));
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('model download HTTP ${resp.statusCode}');
+      }
+      final sink = tmp.openWrite();
+      try {
+        await resp.stream.pipe(sink);
+      } finally {
+        await sink.close();
+      }
+      await tmp.rename(file.path);
+    } catch (e) {
+      if (tmp.existsSync()) {
+        try {
+          tmp.deleteSync();
+        } catch (_) {}
+      }
+      rethrow;
+    } finally {
+      client.close();
     }
-    await file.writeAsBytes(res.bodyBytes, flush: true);
     DebugOverlay.log('translate model: downloaded '
-        '${(res.bodyBytes.length / 1e6).round()} MB');
+        '${(file.lengthSync() / 1e6).round()} MB');
     return file.path;
   }
 
