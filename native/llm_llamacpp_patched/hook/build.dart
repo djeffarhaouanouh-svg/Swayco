@@ -46,6 +46,22 @@ void main(List<String> args) async {
     final targetOS = input.config.code.targetOS;
     final targetArch = input.config.code.targetArchitecture;
 
+    // SWAYCO PATCH: iOS is handled by the CocoaPods podspec
+    // (native/llm_llamacpp_patched/ios/llm_llamacpp.podspec), NOT native
+    // assets. The v0.1.0 iOS release ships STATIC archives (libllama.a +
+    // libggml*.a), but this hook only knows how to deliver a dynamic
+    // `llama.framework` — which that release does not contain — so it fails
+    // every iOS build ("Failed to build llama.cpp for ios-arm64"). The podspec
+    // vendors the static libs and -force_loads them, and the plugin's own iOS
+    // Dart path resolves symbols via DynamicLibrary.process(), i.e. it expects
+    // static linking anyway. Emit no code asset for iOS so the two mechanisms
+    // don't fight.
+    if (targetOS == OS.iOS) {
+      logger.info('llm_llamacpp: iOS linked via podspec (static libs) — '
+          'skipping native-assets hook');
+      return;
+    }
+
     logger.info('Building llm_llamacpp for $targetOS-$targetArch');
 
     // Determine library name based on OS

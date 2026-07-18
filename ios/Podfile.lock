@@ -11,6 +11,8 @@ PODS:
     - Flutter
     - flutter_webrtc
     - WebRTC-SDK (= 144.7559.01)
+  - llm_llamacpp (0.1.9):
+    - Flutter
   - permission_handler_apple (9.3.0):
     - Flutter
   - sherpa_onnx_ios (1.13.4):
@@ -23,6 +25,7 @@ DEPENDENCIES:
   - flutter_tts (from `.symlinks/plugins/flutter_tts/ios`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
   - livekit_client (from `.symlinks/plugins/livekit_client/ios`)
+  - llm_llamacpp (from `.symlinks/plugins/llm_llamacpp/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - sherpa_onnx_ios (from `.symlinks/plugins/sherpa_onnx_ios/ios`)
 
@@ -41,6 +44,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
   livekit_client:
     :path: ".symlinks/plugins/livekit_client/ios"
+  llm_llamacpp:
+    :path: ".symlinks/plugins/llm_llamacpp/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
   sherpa_onnx_ios:
@@ -52,6 +57,7 @@ SPEC CHECKSUMS:
   flutter_tts: 35ac3c7d42412733e795ea96ad2d7e05d0a75113
   flutter_webrtc: ec91d94b484ad49cf191ef93413f64a40ffd3b4c
   livekit_client: 9b9a08c5c78f694ac6a9e70c1c269704ba574b73
+  llm_llamacpp: 319ea1d2ef77a219c730ed248c415212dcdda668
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   sherpa_onnx_ios: 5f86bd1e6734fedb92d3ae5358530c318d4aeaf2
   WebRTC-SDK: ab9b5319e458c2bfebdc92b3600740da35d5630d

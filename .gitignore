@@ -97,3 +97,7 @@ android/app/src/main/jniLibs/
 # libvosk for iOS — built by scripts/build_libvosk_ios.sh (large static lib)
 build/libvosk-ios/
 ios/Frameworks/libvosk.a
+
+# llama.cpp / ggml static libs for iOS on-device translation — fetched by
+# scripts/fetch_llama_ios.sh (~15 MB). The podspec force_loads them.
+native/llm_llamacpp_patched/ios/libs/
