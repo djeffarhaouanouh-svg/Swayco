@@ -787,10 +787,9 @@ packages:
   llm_llamacpp:
     dependency: "direct main"
     description:
-      name: llm_llamacpp
-      sha256: dbf36aa8090f952ca321de1382acd32f611a1dc8d8dfb01093fd8a878c461d0a
-      url: "https://pub.dev"
-    source: hosted
+      path: "native/llm_llamacpp_patched"
+      relative: true
+    source: path
     version: "0.1.9"
   logger:
     dependency: transitive

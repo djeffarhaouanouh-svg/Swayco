@@ -132,6 +132,14 @@ dependency_overrides:
     path: native/sherpa_onnx_macos_patched
   sherpa_onnx_ios:
     path: native/sherpa_onnx_ios_patched
+  # llm_llamacpp 0.1.9's native-assets build hook dereferences
+  # input.config.code unconditionally, which is null on the WEB target — it
+  # NPEs and breaks `flutter build web` (the hook runs for the pubspec
+  # dependency regardless of the Dart import graph). The vendored copy adds the
+  # canonical `buildCodeAssets` guard so web is a no-op; iOS/Android build
+  # unchanged. Drop this override once upstream guards its hook.
+  llm_llamacpp:
+    path: native/llm_llamacpp_patched
 
 dev_dependencies:
   flutter_test:
