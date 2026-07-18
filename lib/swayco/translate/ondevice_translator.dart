@@ -29,21 +29,25 @@ class OnDeviceTranslator {
   OnDeviceTranslator._();
   static final OnDeviceTranslator instance = OnDeviceTranslator._();
 
-  /// Our own model mirror — same repo the STT models come from. The GGUF must
-  /// be uploaded under `translate/` there. A standard quant (Q4_K_M) on
-  /// purpose: the 440 MB 1.25-bit needs Tencent's un-merged STQ kernel, which
-  /// the plugin's stock llama.cpp does not carry.
+  /// Our own model mirror — same repo the STT models come from. The GGUF is
+  /// AngelSlim's 1.25-bit STQ quant (440 MB), which needs Tencent's STQ1_0
+  /// ternary kernel — llama.cpp PR #22836 (`sjl623/llama.cpp`, branch `STQ_0`,
+  /// not merged). The iOS static libs the app links are built from that fork
+  /// (scripts/build_llama_ios.sh); the plugin's stock prebuilt does NOT carry
+  /// the kernel and would fail to load this file.
   static const String _modelUrl =
-      'https://huggingface.co/djeffar/swayco-stt-models/resolve/main/translate/hy-mt2-1.8b-q4km.gguf';
+      'https://huggingface.co/djeffar/swayco-stt-models/resolve/main/translate/hy-mt2-1.8b-1.25bit.gguf';
 
   /// On-disk name under `<appSupport>/translate/`. Bumping it is what makes a
   /// phone fetch new weights (the "is it installed?" check keys on this).
-  static const String _modelFile = 'hy-mt2-1.8b-q4km.gguf';
+  static const String _modelFile = 'hy-mt2-1.8b-1.25bit.gguf';
 
-  /// Offload everything to the GPU (Metal on iOS, Vulkan on Android) — the one
-  /// lever that turns the ~5-7 s CPU generation into ~2-3 s. `-1`/99 = all
-  /// layers; the plugin clamps to what the model has.
-  static const int _gpuLayers = 99;
+  /// STQ1_0 ships ONLY a CPU ARM-NEON vec_dot kernel (PR #22836) — there is no
+  /// Metal path for the ternary weights, so offloading them to the GPU is not
+  /// possible. Keep inference on the CPU (NEON), which is what the quant is
+  /// designed for; iPhone's ARM cores run it. Revisit if a Metal STQ kernel
+  /// lands. (Was 99 = all-GPU for the Q4_K_M quant.)
+  static const int _gpuLayers = 0;
 
   LlamaCppRepository? _repo;
   LlamaCppModel? _model;

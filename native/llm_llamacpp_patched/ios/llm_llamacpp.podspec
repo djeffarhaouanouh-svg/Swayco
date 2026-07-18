@@ -18,9 +18,13 @@
 #
 # Part of the native/llm_llamacpp_patched override.
 #
+# Built from sjl623/llama.cpp @ STQ_0 (PR #22836) by scripts/build_llama_ios.sh,
+# NOT the plugin's prebuilt GitHub release — that stock llama.cpp lacks the
+# STQ1_0 ternary kernel the 1.25-bit Hy-MT2 model needs. This source build emits
+# 5 libs (ggml-blas folded into Accelerate; common/cpp-httplib are example-only
+# C++ helpers the C-API FFI never calls, so they are not built).
 llama_libs = %w[
-  libllama.a libggml.a libggml-base.a libggml-cpu.a
-  libggml-metal.a libggml-blas.a libcommon.a libcpp-httplib.a
+  libllama.a libggml.a libggml-base.a libggml-cpu.a libggml-metal.a
 ]
 # Path is resolved from the Runner (app) target's SRCROOT (= the ios/ dir), via
 # the Flutter plugin symlink. $(PODS_TARGET_SRCROOT) does NOT work here: it is a

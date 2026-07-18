@@ -8,7 +8,6 @@ llama_adapter_meta_val_str
 llama_adapter_meta_val_str_by_index
 llama_add_bos_token
 llama_add_eos_token
-llama_apply_adapter_cvec
 llama_attach_threadpool
 llama_backend_free
 llama_backend_init
@@ -17,7 +16,6 @@ llama_batch_get_one
 llama_batch_init
 llama_chat_apply_template
 llama_chat_builtin_templates
-llama_clear_adapter_lora
 llama_context_default_params
 llama_copy_state_data
 llama_decode
@@ -50,7 +48,6 @@ llama_log_set
 llama_max_devices
 llama_max_parallel_sequences
 llama_max_tensor_buft_overrides
-llama_memory_breakdown_print
 llama_memory_can_shift
 llama_memory_clear
 llama_memory_seq_add
@@ -112,7 +109,6 @@ llama_numa_init
 llama_opt_epoch
 llama_opt_init
 llama_opt_param_filter_all
-llama_params_fit
 llama_perf_context
 llama_perf_context_print
 llama_perf_context_reset
@@ -121,7 +117,6 @@ llama_perf_sampler_print
 llama_perf_sampler_reset
 llama_pooling_type
 llama_print_system_info
-llama_rm_adapter_lora
 llama_sampler_accept
 llama_sampler_apply
 llama_sampler_chain_add
@@ -159,7 +154,6 @@ llama_sampler_reset
 llama_sampler_sample
 llama_save_session_file
 llama_set_abort_callback
-llama_set_adapter_lora
 llama_set_causal_attn
 llama_set_embeddings
 llama_set_n_threads

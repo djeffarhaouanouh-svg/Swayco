@@ -57,7 +57,7 @@ SPEC CHECKSUMS:
   flutter_tts: 35ac3c7d42412733e795ea96ad2d7e05d0a75113
   flutter_webrtc: ec91d94b484ad49cf191ef93413f64a40ffd3b4c
   livekit_client: 9b9a08c5c78f694ac6a9e70c1c269704ba574b73
-  llm_llamacpp: 319ea1d2ef77a219c730ed248c415212dcdda668
+  llm_llamacpp: 4e5b173d50fbc062b64a1897c3757eab84672acb
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   sherpa_onnx_ios: 5f86bd1e6734fedb92d3ae5358530c318d4aeaf2
   WebRTC-SDK: ab9b5319e458c2bfebdc92b3600740da35d5630d
