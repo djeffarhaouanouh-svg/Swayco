@@ -110,13 +110,22 @@ void _handleInferenceRequest(
       }
 
       final promptPtr = prompt.toNativeUtf8();
-      final maxTokens = prompt.length + 256;
+      // SWAYCO PATCH: llama_tokenize wants the length in BYTES, but
+      // String.length counts UTF-16 code units. Every multi-byte character
+      // makes the two diverge, and the templated prompt is full of them —
+      // <｜…｜> markers, ▁, accented French. Measured on a real call: 431 vs
+      // 450, i.e. the last 19 bytes were never tokenised, and those 19 bytes
+      // are exactly "｜hy_Assistant｜>" — the cue telling the model to answer.
+      // Without it the model just continued the text, which is why the output
+      // was HTML-ish web filler ("br>", "</td>") instead of a translation.
+      final promptBytes = utf8.encode(prompt).length;
+      final maxTokens = promptBytes + 256;
       final tokensPtr = calloc<ffi.Int32>(maxTokens);
 
       final nTokens = bindings.llama_tokenize(
         vocab,
         promptPtr.cast(),
-        prompt.length,
+        promptBytes,
         tokensPtr,
         maxTokens,
         // add_special: off once templated. Hy-MT2's template opens with

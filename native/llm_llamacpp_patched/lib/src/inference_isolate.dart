@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'dart:math' as math;
 
@@ -130,7 +131,8 @@ void runInference(InferenceRequest request) {
       final nTokens = bindings.llama_tokenize(
         vocab, // Use vocab instead of model
         promptPtr.cast(),
-        request.prompt.length,
+        utf8.encode(request.prompt).length, // BYTES, not UTF-16 units
+
         tokensPtr,
         maxTokens,
         true, // add_special
