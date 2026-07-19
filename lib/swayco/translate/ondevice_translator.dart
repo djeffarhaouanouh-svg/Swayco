@@ -154,11 +154,23 @@ class OnDeviceTranslator {
       final stream = chat.streamChatWithGenerationOptions(
         'hy-mt2',
         messages: [LLMMessage(role: LLMRole.user, content: prompt)],
-        // Hy-MT2's recommended sampling for the 1.8B/7B dense models.
+        // GREEDY on purpose, against Tencent's recommended 0.7/0.6/20 for the
+        // dense models. That default is meant for generative use; translating a
+        // spoken line is not creative work — we want the single most likely
+        // rendering, and we want the SAME one every time. At 0.7 the same
+        // sentence came back three different ways, drifting from the natural
+        // "On se retrouve samedi ou dimanche ?" into stilted forms like
+        // "Voulez-vous que nous nous rencontrions…" or the calque "Devrions-nous
+        // nous rencontrer…". temp 0 + topK 1 pins it to the good one.
+        //
+        // Checked across both directions (fr↔ja, greetings, apologies, casual
+        // register): no repetition loops, no quality loss, ~1.2 s per utterance.
+        // Slang is still weak ("je suis crevé" → 私は死んでしまった) but that
+        // was equally wrong at 0.7 — a model limit, not a sampling one.
         generationOptions: const GenerationOptions(
-          temperature: 0.7,
-          topP: 0.6,
-          topK: 20,
+          temperature: 0.0,
+          topP: 1.0,
+          topK: 1,
           maxTokens: 256,
           repeatPenalty: 1.05,
         ),
