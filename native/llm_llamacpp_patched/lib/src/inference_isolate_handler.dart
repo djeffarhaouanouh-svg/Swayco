@@ -98,8 +98,13 @@ void _handleInferenceRequest(
 
     try {
       String prompt;
+      // SWAYCO PATCH: a chat template emits the model's BOS itself, so the
+      // tokenizer must not add a second one. Remember which path built the
+      // prompt and pass that as add_special below.
+      var templated = false;
       if (request.messages != null && request.messages!.isNotEmpty) {
         prompt = _applyNativeChatTemplate(bindings, model, request.messages!);
+        templated = true;
       } else {
         prompt = request.prompt;
       }
@@ -114,8 +119,13 @@ void _handleInferenceRequest(
         prompt.length,
         tokensPtr,
         maxTokens,
-        true,
-        true,
+        // add_special: off once templated. Hy-MT2's template opens with
+        // <｜hy_begin▁of▁sentence｜>, which IS its BOS, so leaving this true fed
+        // the model two BOS in a row and it replied with an endless run of that
+        // very token instead of a translation. llama.cpp's own tools tokenize
+        // template output with add_special off for exactly this reason.
+        !templated,
+        true, // parse_special: the template's markers must become token IDs
       );
       calloc.free(promptPtr);
 

@@ -24,6 +24,33 @@ String _applyNativeChatTemplate(
   // "こんにちは、元気ですか？" and no template gives that garbage.
   final tmpl = bindings.llama_model_chat_template(model, ffi.nullptr);
 
+  // SWAYCO PATCH #2: llama.cpp MIS-DETECTS Hy-MT2's template.
+  //
+  // llama_chat_apply_template does not run Jinja — it pattern-matches the
+  // template string against a list of known families. In llama-chat.cpp the
+  // HUNYUAN_VL arm is tested BEFORE HUNYUAN_DENSE and only asks whether the
+  // template mentions <｜hy_Assistant｜> and <｜hy_begin▁of▁sentence｜>, which
+  // Hy-MT2's does — so this hunyuan-DENSE model gets formatted as VL. The two
+  // put the markers in opposite order:
+  //
+  //   DENSE (right): <｜hy_User｜>{content}<｜hy_Assistant｜>
+  //   VL    (wrong): <｜hy_begin▁of▁sentence｜>{content}<｜hy_User｜>
+  //
+  // Formatted as VL the model never receives <｜hy_Assistant｜>, i.e. the cue
+  // that it is its turn to answer, so it emits its BOS over and over instead of
+  // translating — the endless <｜hy_begin▁of▁sentence｜> run we were seeing.
+  //
+  // Detect the dense template by a marker only IT carries in the Jinja source
+  // and render it here. Verified against this exact GGUF with llama-completion:
+  // "<｜hy_User｜>Translate … Bonjour, ça va ?<｜hy_Assistant｜>" returns
+  // "こんにちは、元気ですか？".
+  if (tmpl != ffi.nullptr) {
+    final tmplStr = tmpl.cast<Utf8>().toDartString();
+    if (tmplStr.contains('<｜hy_User｜>{{ message[\'content\'] }}')) {
+      return _formatHunyuanDense(messages);
+    }
+  }
+
   try {
     for (var i = 0; i < messages.length; i++) {
       final msg = messages[i];
@@ -74,6 +101,29 @@ String _applyNativeChatTemplate(
     }
     calloc.free(chatMessages);
   }
+}
+
+/// Render Tencent's hunyuan-dense chat format, mirroring llama.cpp's
+/// LLM_CHAT_TEMPLATE_HUNYUAN_DENSE arm (see llama-chat.cpp) — which that
+/// library's own detection never reaches for this model.
+///
+/// Emits the leading <｜hy_begin▁of▁sentence｜> (the model's BOS) itself, so the
+/// caller tokenises this with add_special = false and the model sees exactly one.
+String _formatHunyuanDense(List<IsolateMessage> messages) {
+  final b = StringBuffer('<｜hy_begin▁of▁sentence｜>');
+  for (var i = 0; i < messages.length; i++) {
+    final m = messages[i];
+    if (i == 0 && m.role == 'system') {
+      b.write('${m.content}<｜hy_place▁holder▁no▁3｜>');
+    } else if (m.role == 'assistant') {
+      b.write('<｜hy_Assistant｜>${m.content}<｜hy_place▁holder▁no▁2｜>');
+    } else if (m.role == 'user') {
+      // The trailing <｜hy_Assistant｜> is the generation prompt: it tells the
+      // model to answer. Without it Hy-MT2 just repeats its BOS.
+      b.write('<｜hy_User｜>${m.content}<｜hy_Assistant｜>');
+    }
+  }
+  return b.toString();
 }
 
 String _fallbackFormatMessages(List<IsolateMessage> messages) {
