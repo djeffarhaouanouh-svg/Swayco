@@ -200,10 +200,16 @@ class OnDeviceTranslator {
     if (ag != null) ctx.add(ag);
     final pg = _genderPhrase(peerGender, 'the person being spoken to');
     if (pg != null) ctx.add(pg);
-    if (speech) {
-      ctx.add('this is a rough voice transcription — correct an obvious '
-          'mis-hearing and translate the intended meaning');
-    }
+    // [speech] deliberately adds nothing to the prompt. It used to append
+    // "this is a rough voice transcription — correct an obvious mis-hearing and
+    // translate the intended meaning", which measured as pure cost: fed a
+    // degraded transcript (こんにちは、パリのよそうはいかがすか) Hy-MT2 returned
+    // the same "Bonjour, comment allez-vous à Paris ?" with or without it, and
+    // it is ~110 characters the CPU has to ingest on every utterance. Prompt
+    // eval is the bulk of the latency here — 85 tokens took 1076 ms where 30
+    // took 420 ms — so anything that does not change the output is worth
+    // dropping. The flag stays in the signature: the cloud path still uses it,
+    // and it marks the call site as speech for whatever we do next.
     if (ctx.isNotEmpty) lines.add('Context: ${ctx.join('. ')}.');
 
     if (history != null && history.isNotEmpty) {
