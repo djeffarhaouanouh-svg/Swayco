@@ -151,6 +151,39 @@ abstract final class UserPrefs {
     await p.setBool(keyProfileTipSeen, true);
   }
 
+  /// The language the user last said they would SPEAK on a call, and whether
+  /// they asked not to be prompted again.
+  ///
+  /// Deliberately separate from [keySourceLang] (the account/profile language):
+  /// the profile says what someone speaks in general, this says what they chose
+  /// for calls. Someone registered in French may run their calls in Japanese
+  /// without rewriting their profile.
+  static const String keyCallSpokenLang = 'call_spoken_lang';
+  static const String keyCallSpokenLangDontAsk = 'call_spoken_lang_dont_ask';
+
+  /// ('', false) until the user has answered the gate once.
+  static Future<({String lang, bool dontAsk})> loadCallSpokenLang() async {
+    final p = await SharedPreferences.getInstance();
+    return (
+      lang: p.getString(keyCallSpokenLang)?.trim() ?? '',
+      dontAsk: p.getBool(keyCallSpokenLangDontAsk) ?? false,
+    );
+  }
+
+  /// The language is remembered even when [dontAsk] is false — it then serves
+  /// as the pre-selection next time, which beats falling back to the profile.
+  static Future<void> saveCallSpokenLang(String lang, {required bool dontAsk}) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(keyCallSpokenLang, lang);
+    await p.setBool(keyCallSpokenLangDontAsk, dontAsk);
+  }
+
+  /// Re-arms the gate — for a "ask me again before each call" setting.
+  static Future<void> clearCallSpokenLangDontAsk() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(keyCallSpokenLangDontAsk, false);
+  }
+
   static Future<AudioPrefs> loadAudio() async {
     final p = await SharedPreferences.getInstance();
     return AudioPrefs(

@@ -33,6 +33,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/spoken_language_gate.dart';
 import 'paywall_screen.dart';
 
 class CallScreen extends StatefulWidget {
@@ -49,7 +50,15 @@ class CallScreen extends StatefulWidget {
     this.outgoingCallId,
     this.startWithCamera = false,
     this.peerId,
+    this.askLanguageOnEntry = false,
   });
+
+  /// Ask "which language will you speak?" once this screen is up, instead of
+  /// before it. Set on the INCOMING path only: there the phone is ringing and
+  /// the caller is waiting, so the callee answers first and picks after — the
+  /// pipeline simply re-attaches on the new [_mySourceLang]. Outgoing paths ask
+  /// before minting the token and leave this false.
+  final bool askLanguageOnEntry;
 
   final String wsUrl;
   final String jwt;
@@ -522,6 +531,23 @@ class _CallScreenState extends State<CallScreen> {
     return '';
   }
 
+  /// The mandatory "which language will you speak?" gate, on the INCOMING
+  /// path. The callee answers the ringing call first and picks afterwards, so
+  /// the caller is not left waiting while a dialog is read.
+  ///
+  /// Changing [_mySourceLang] alone is not enough: the pipeline was already
+  /// attached with the old language, so re-run the binding — it compares
+  /// against [_attachedSourceLang] and restarts the recogniser on the new one.
+  Future<void> _askSpokenLangOnEntry() async {
+    if (!mounted) return;
+    final picked =
+        await askSpokenLanguage(context, preselect: _mySourceLang);
+    if (!mounted || picked == null || picked == _mySourceLang) return;
+    setState(() => _mySourceLang = picked);
+    final room = _room;
+    if (room != null) await _refreshTranslationBinding(room);
+  }
+
   /// Returns the first remote participant whose metadata carries a sourceLang.
   String _discoverRemoteLang(Room room) {
     for (final p in room.remoteParticipants.values) {
@@ -631,6 +657,12 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
+    // After the first frame: the dialog needs a mounted Navigator, and the room
+    // connection must not wait on the user reading a prompt.
+    if (widget.askLanguageOnEntry) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => unawaited(_askSpokenLangOnEntry()));
+    }
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
     // can close this screen instead of ringing into an empty room.

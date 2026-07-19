@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/call_screen.dart';
 import '../swayco/realtime_translation_port.dart';
+import '../widgets/spoken_language_gate.dart';
 import 'call_alert.dart';
 import 'call_credit_gate.dart';
 import 'app_strings.dart';
@@ -122,12 +123,22 @@ abstract final class CallLauncher {
         return false;
       }
 
+      // Which language will actually be spoken, asked every time. The account
+      // language is only the pre-selection — see [askSpokenLanguage]. This runs
+      // BEFORE the token is minted on purpose: the token carries the language
+      // into the LiveKit metadata, which is what tells the peer's app what to
+      // translate FROM. Asking after it would publish the wrong one.
+      if (!context.mounted) return false;
+      final spokenLang =
+          await askSpokenLanguage(context, preselect: mySourceLang);
+      if (spokenLang == null || !context.mounted) return false;
+
       final room = roomNameFor(myId, peerDeviceId);
       final token = await fetchLiveKitToken(
         roomName: room,
         identity: _newIdentity(),
         displayName: myName,
-        sourceLang: mySourceLang,
+        sourceLang: spokenLang,
       );
       // Fire a "ring" row so the callee's open tab gets a realtime push
       // to show the incoming-call modal. If this fails (RLS, FK, …) the
@@ -158,7 +169,7 @@ abstract final class CallLauncher {
             jwt: token.token,
             roomName: token.roomName,
             displayName: myName,
-            mySourceLang: mySourceLang,
+            mySourceLang: spokenLang,
             translation: translation,
             isCaller: true,
             startWithCamera: startWithCamera,

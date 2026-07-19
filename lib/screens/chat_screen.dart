@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
+import '../widgets/spoken_language_gate.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
@@ -467,12 +468,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           // re-share the link from there.
         }
       }
+      // Ask which language will be spoken before minting anything: the token
+      // carries it into the LiveKit metadata, which is what the peer translates
+      // FROM. The account language is only the pre-selection.
+      if (!mounted) return;
+      final spokenLang = await askSpokenLanguage(context, preselect: myLang);
+      if (spokenLang == null || !mounted) return;
+
       // Enter the waiting room — the call connects when the guest joins.
       final token = await fetchLiveKitToken(
         roomName: invite.roomName,
         identity: _newCallIdentity(),
         displayName: myName,
-        sourceLang: myLang,
+        sourceLang: spokenLang,
         inviteSig: invite.sig,
         inviteExp: invite.exp,
       );
@@ -484,7 +492,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             jwt: token.token,
             roomName: token.roomName,
             displayName: myName,
-            mySourceLang: myLang,
+            mySourceLang: spokenLang,
             translation: widget.translation,
             inviteShareText: shareText,
             isCaller: true,

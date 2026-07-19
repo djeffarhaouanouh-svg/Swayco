@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../config/app_config.dart';
 import '../services/app_strings.dart';
+import '../widgets/spoken_language_gate.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/languages.dart';
@@ -136,12 +137,19 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       _error = null;
     });
     try {
+      // Which language will be spoken, asked every time — it is minted into
+      // the token and tells the peer what to translate FROM.
+      if (!mounted) return;
+      final spokenLang =
+          await askSpokenLanguage(context, preselect: _mySourceLang);
+      if (spokenLang == null || !mounted) return;
+
       final room = _roomNameFor(peer.id);
       final token = await fetchLiveKitToken(
         roomName: room,
         identity: _newIdentity(),
         displayName: _myName,
-        sourceLang: _mySourceLang,
+        sourceLang: spokenLang,
       );
       if (!mounted) return;
       await Navigator.of(context).push<void>(
@@ -151,7 +159,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
             jwt: token.token,
             roomName: token.roomName,
             displayName: _myName,
-            mySourceLang: _mySourceLang,
+            mySourceLang: spokenLang,
             translation: widget.translation,
             isCaller: true,
           ),
