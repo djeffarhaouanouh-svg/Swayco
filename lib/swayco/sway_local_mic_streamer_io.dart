@@ -10,6 +10,7 @@ import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
 import 'translate/ondevice_translator.dart';
+import 'translate/translate_routing.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import 'sway_mic_streamer_base.dart';
@@ -807,13 +808,50 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   }) async {
     final String trans;
     try {
+      // Which engine handles this speaker's language — see [routeFor]. The
+      // decision is made on the SOURCE language: it is what determines both how
+      // badly the recogniser mangled the audio and whether the on-device model
+      // speaks it at all.
+      final route = routeFor(_sourceLang);
+      var source = orig;
+
+      if (route != TranslateRoute.onDevice) {
+        // Repair the transcript in the cloud first. For a language Hy-MT2 does
+        // not speak, the same call also translates (`to` set) and the phone is
+        // skipped entirely.
+        final translateThere = route == TranslateRoute.cloudOnly;
+        final fixed = await fetchTranscriptFix(
+          text: orig,
+          from: _sourceLang,
+          to: translateThere ? _targetLang : null,
+          authorGender: _myGender.isEmpty ? null : _myGender,
+          peerGender: _peerGender.isEmpty ? null : _peerGender,
+        );
+        if (fixed.unclear) {
+          // No model could read it. Drop rather than speak an invention: a
+          // fluent wrong sentence is undetectable by the peer, a missing one is
+          // recoverable ("répète ?").
+          DebugOverlay.log('stt DROPPED unreadable transcript: "$orig"');
+          _note('me', orig);
+          return;
+        }
+        DebugOverlay.log('stt fix(${fixed.engine}) → "${fixed.text}"');
+        if (translateThere) {
+          trans = fixed.text; // already in the peer's language
+          _note('me', orig);
+          _publish(orig, trans, onTranslation, force: force);
+          return;
+        }
+        source = fixed.text; // repaired, still in the speaker's language
+      }
+
       // On-device translation (Hy-MT2 on llama.cpp) — replaces the cloud
       // /translation/text call. Same inputs: gender + 2-turn history + the
       // speech flag, which lets the translator repair an obvious mis-hearing
       // from context instead of rendering it literally ("財布のボール" →
       // "portfolio", not "balle de portefeuille").
       trans = await OnDeviceTranslator.instance.translate(
-        text: orig,
+        text: source,
         from: _sourceLang,
         to: _targetLang,
         history: List<TranslationHistoryItem>.of(_history),
@@ -830,6 +868,18 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // After the call above, never before: this utterance is the thing being
     // translated, not context for itself.
     _note('me', orig);
+    _publish(orig, trans, onTranslation, force: force);
+  }
+
+  /// Last gate before the peer hears it. Shared by every route (on-device,
+  /// repaired-then-on-device, cloud-only) so the mute rule can never be
+  /// bypassed by whichever engine produced the text.
+  void _publish(
+    String orig,
+    String trans,
+    void Function(String, String, String, String) onTranslation, {
+    bool force = false,
+  }) {
     if (trans.trim().isEmpty) {
       DebugOverlay.log('stt translate returned EMPTY ($_sourceLang→$_targetLang)');
       return;

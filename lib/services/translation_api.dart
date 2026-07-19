@@ -357,6 +357,78 @@ Future<String> fetchTextTranslation({
   }
 }
 
+/// Result of `/translation/fix`. [unclear] means no model could read the
+/// transcript with confidence — the caller must DROP the utterance rather than
+/// speak a plausible invention, which is fluent and therefore undetectable.
+class TranscriptFix {
+  const TranscriptFix({
+    required this.text,
+    required this.unclear,
+    this.engine = '',
+  });
+  final String text;
+  final bool unclear;
+  final String engine;
+}
+
+/// Repair a noisy on-device STT transcript through the backend
+/// (`/translation/fix`, which runs a cheap model first and escalates to a big
+/// one only when the cheap one declines).
+///
+/// With [to] omitted the backend repairs only, in the source language, and the
+/// phone then translates on-device for free. With [to] set it repairs AND
+/// translates — for the languages the on-device model does not speak at all.
+///
+/// The API keys live on the backend, never in the app: a key shipped in an
+/// APK/IPA is extractable in minutes and anyone could bill against it.
+///
+/// Any transport failure returns [unclear] so the caller drops the utterance.
+/// Handing the RAW garbled text to the translator instead was measured to
+/// produce confident wrong sentences ~40% of the time — worse than silence,
+/// because the peer cannot tell.
+Future<TranscriptFix> fetchTranscriptFix({
+  required String text,
+  required String from,
+  String? to,
+  String? authorGender,
+  String? peerGender,
+}) async {
+  if (text.trim().isEmpty) {
+    return const TranscriptFix(text: '', unclear: true);
+  }
+  try {
+    final body = <String, dynamic>{'text': text, 'from': from};
+    if (to != null && to.isNotEmpty) body['to'] = to;
+    final ctx = <String, dynamic>{};
+    if (authorGender != null && authorGender.isNotEmpty) {
+      ctx['authorGender'] = authorGender;
+    }
+    if (peerGender != null && peerGender.isNotEmpty) {
+      ctx['peerGender'] = peerGender;
+    }
+    if (ctx.isNotEmpty) body['context'] = ctx;
+
+    final res = await http.post(
+      _translationUri('/translation/fix'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      return const TranscriptFix(text: '', unclear: true);
+    }
+    final j = _decodeObjectMap(res.body);
+    final t = j['text'];
+    final unclear = j['unclear'] == true;
+    final engine = j['engine'] is String ? j['engine'] as String : '';
+    if (unclear || t is! String || t.trim().isEmpty) {
+      return TranscriptFix(text: '', unclear: true, engine: engine);
+    }
+    return TranscriptFix(text: t.trim(), unclear: false, engine: engine);
+  } catch (_) {
+    return const TranscriptFix(text: '', unclear: true);
+  }
+}
+
 /// Text-to-speech via the backend (`/translation/tts`, which drives the cloud
 /// voice engine). POSTs the text (+ optional BCP-47 [lang] and [voice])
 /// and returns the spoken audio bytes (mp3), or null on any error so the

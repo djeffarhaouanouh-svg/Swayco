@@ -1135,6 +1135,166 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
   }
 }
 
+// ─── Transcript repair for weak-STT languages (POST /translation/fix) ─────
+//
+// The on-device translator (Hy-MT2 1.25-bit) needs a CLEAN sentence. It is fine
+// where Whisper is strong (fr, en, es, ja, de, it, pt, nl, ru, pl, zh, ko), but
+// on lower-resource languages Whisper drops diacritics and glues words, and the
+// 1.8B has no capacity to repair that: measured, it either invents a fluent
+// wrong sentence or echoes the input untranslated.
+//
+// So the phone sends the raw transcript here first. Two modes:
+//   `to` absent  → repair only; the phone then translates on-device (free).
+//   `to` present → repair AND translate; for the ~66 languages Whisper knows
+//                  but Hy-MT2 does not speak at all, where the phone can do
+//                  nothing useful with the text.
+//
+// Cheap model first, big one only on the residue. Measured over 4 languages
+// (lv, et, el, sw) on realistic Whisper noise, deepseek-v4-flash matched gpt-4.1
+// exactly (16/16 both) at 1/16th the price, so paying for the big model by
+// default buys nothing. On EXTREME degradation (invented non-words) flash
+// declines and gpt-4.1 still recovers — hence the escalation, which only fires
+// on UNCLEAR and therefore costs almost nothing.
+const FIX_KEY = process.env.FIX_KEY?.trim();
+const FIX_BASE = (process.env.FIX_BASE?.trim() || 'https://api.deepseek.com')
+  .replace(/\/$/, '');
+const FIX_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
+// The escalation runs on the incumbent OpenAI key/host, not on FIX_*.
+const FIX_ESCALATE_MODEL = process.env.FIX_ESCALATE_MODEL?.trim() || 'gpt-4.1';
+// Set to '0' to disable the escalation entirely (cheapest possible mode).
+const FIX_ESCALATE = process.env.FIX_ESCALATE?.trim() !== '0';
+
+/** The sentinel a model returns rather than inventing. Never spoken aloud. */
+const FIX_UNCLEAR = 'UNCLEAR';
+
+// The prompt must name the language in ENGLISH, not pass the tag through.
+// Measured: with "a transcription in lt" the repair degraded badly — Vietnamese
+// invented a word ("Cho thứ bảy", Saturday) and Lithuanian guessed instead of
+// declining; with "in Lithuanian" both behave. The language is the single
+// biggest hint the model has. Intl covers all 99 of Whisper's languages, so no
+// hand-maintained table can fall out of date.
+const _fixLangNames = new Intl.DisplayNames(['en'], { type: 'language' });
+function fixLanguageName(tag) {
+  if (!tag) return '';
+  try {
+    return _fixLangNames.of(tag) || tag;
+  } catch {
+    return tag;
+  }
+}
+
+function fixPrompt({ text, fromName, toName, authorGender, peerGender }) {
+  const who = [];
+  if (authorGender === 'm') who.push('the speaker is a man');
+  if (authorGender === 'f') who.push('the speaker is a woman');
+  if (peerGender === 'm') who.push('the person being spoken to is a man');
+  if (peerGender === 'f') who.push('the person being spoken to is a woman');
+  const gender = who.length ? ` ${who.join('. ')}.` : '';
+  // Deliberately minimal: no conversation history, no style rules. The prompt is
+  // ~76% of the billed input on such short utterances, so every clause costs
+  // real money at scale — and history buys nothing here, because repairing a
+  // transcript is a LOCAL task (restore diacritics, split glued words). History
+  // earns its place in the TRANSLATION step, which runs free on the phone.
+  return toName
+    ? `This is a noisy voice transcription in ${fromName}. Correct the ` +
+      `mis-hearing and translate it into ${toName}. Preserve the exact meaning ` +
+      `and phrase it the way a native ${toName} speaker would naturally say it.` +
+      `${gender} Never write a gender hedge like "ravi(e)" — pick one form. ` +
+      `If the transcript is too garbled to understand with confidence, output ` +
+      `exactly ${FIX_UNCLEAR} instead of guessing. Output only the ${toName} ` +
+      `translation.\n\n${text}`
+    : `This is a noisy voice transcription in ${fromName}. Correct it. Return ` +
+      `ONLY the corrected text, in the same language. If you are not sure, ` +
+      `output exactly ${FIX_UNCLEAR} instead of guessing.\n\n${text}`;
+}
+
+/** One OpenAI-compatible chat call. Returns the trimmed content, or null. */
+async function fixCall({ base, key, model, prompt, noThink }) {
+  const body = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0,
+    max_tokens: 300,
+  };
+  // DeepSeek v4 reasons by default and BILLS the hidden thinking: measured, the
+  // same repair cost 131 output tokens instead of 16, ran 2x slower, and on one
+  // sentence the reasoning ate the whole max_tokens and returned EMPTY. OpenAI
+  // rejects the field, so it is sent only to the cheap host.
+  if (noThink) body.thinking = { type: 'disabled' };
+  const r = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const raw = await r.text();
+  if (!r.ok) {
+    console.error('fix error', model, r.status, raw.slice(0, 200));
+    return null;
+  }
+  let out = JSON.parse(raw)?.choices?.[0]?.message?.content;
+  if (typeof out !== 'string') return null;
+  return out.trim().replace(/^[“”’"']+|[“”’"']+$/g, '').trim();
+}
+
+/**
+ * POST /translation/fix  (application/json)
+ * Body: { text, from, to?, context?: { authorGender, peerGender } }
+ *   →  { text, engine, unclear }
+ *
+ * `unclear: true` means no model could read the transcript with confidence. The
+ * caller must DROP the utterance — speaking a plausible invention is worse than
+ * silence, because it is fluent and nobody can tell it is wrong.
+ */
+app.post('/translation/fix', _limText, async (req, res) => {
+  const rawText = typeof req.body?.text === 'string' ? req.body.text : '';
+  const text = rawText.trim().slice(0, 1000);
+  const from = primaryLanguageTag(req.body?.from);
+  const to = primaryLanguageTag(req.body?.to);
+  if (!text || !isReasonableLanguageTag(from)) {
+    return res.status(400).json({ error: 'invalid_input' });
+  }
+  if (!FIX_KEY && !OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'fix_misconfigured' });
+  }
+  const ctx = (req.body?.context && typeof req.body.context === 'object')
+    ? req.body.context : {};
+  const g = (v) => (v === 'm' || v === 'f' ? v : '');
+  const prompt = fixPrompt({
+    text,
+    fromName: fixLanguageName(from),
+    toName: to && to !== from ? fixLanguageName(to) : '',
+    authorGender: g(ctx.authorGender),
+    peerGender: g(ctx.peerGender),
+  });
+
+  try {
+    let engine = '';
+    let out = null;
+    if (FIX_KEY) {
+      engine = FIX_MODEL;
+      out = await fixCall({
+        base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
+      });
+    }
+    // Escalate when the cheap model failed outright OR honestly declined.
+    const declined = !out || out.toUpperCase().startsWith(FIX_UNCLEAR);
+    if (declined && FIX_ESCALATE && OPENAI_API_KEY) {
+      engine = FIX_ESCALATE_MODEL;
+      out = await fixCall({
+        base: 'https://api.openai.com/v1', key: OPENAI_API_KEY,
+        model: FIX_ESCALATE_MODEL, prompt, noThink: false,
+      });
+    }
+    if (!out || out.toUpperCase().startsWith(FIX_UNCLEAR)) {
+      return res.json({ text: '', engine, unclear: true });
+    }
+    return res.json({ text: out, engine, unclear: false });
+  } catch (e) {
+    console.error('fix failed', e?.message || e);
+    return res.status(502).json({ error: 'fix_failed' });
+  }
+});
+
 /**
  * POST /translation/tts  (application/json)
  * Body: { text, lang?, voice? }  →  audio/mpeg (Grok TTS).
