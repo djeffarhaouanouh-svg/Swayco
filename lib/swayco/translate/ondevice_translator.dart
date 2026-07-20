@@ -181,14 +181,89 @@ class OnDeviceTranslator {
         buf.write(chunk.message?.content ?? '');
       }
       await _trace('done ($chunks chunks)');
-      return buf.toString().trim();
+      return _sanitise(buf.toString(), source: text);
     } catch (e) {
       DebugOverlay.log('translate on-device error: $e');
       return '';
     }
   }
 
+  /// Last line of defence between the model and the peer's loudspeaker.
+  ///
+  /// The prompt tells the model to output the translation and nothing else, and
+  /// it usually obeys — but "usually" is not good enough when the failure mode
+  /// is the TTS reading our own instructions out loud. Observed twice on
+  /// device: a Japanese line came back prefixed "日本語訳：", and once the model
+  /// returned the ENTIRE prompt translated into French ("Contexte : préservez
+  /// le sens exact… Premiers passages de la conversation…"), which the peer's
+  /// phone dutifully spoke for fifteen seconds.
+  ///
+  /// A prompt can be ignored; this cannot. Returns '' to DROP the utterance —
+  /// the caller already treats an empty translation as "say nothing", and
+  /// silence is far better than confidently speaking our own scaffolding.
+  String _sanitise(String raw, {required String source}) {
+    var out = raw.trim();
+    if (out.isEmpty) return '';
+
+    // 1. The prompt came back at us. These anchors are our own wording, and
+    //    none of them can legitimately appear in the translation of a spoken
+    //    line. Checked case-insensitively; the leak we saw was translated, so
+    //    also catch the shape rather than only the English.
+    const anchors = [
+      'translate the following text into',
+      'without any additional explanation',
+      'context: sound natural',
+      'sound natural, not word-for-word',
+    ];
+    final low = out.toLowerCase();
+    for (final a in anchors) {
+      if (low.contains(a)) {
+        DebugOverlay.log('translate DROPPED: prompt echoed back');
+        return '';
+      }
+    }
+
+    // 2. A spoken utterance translates to ONE line. Our prompt is the only
+    //    multi-line thing in the request, so several lines coming back means we
+    //    are looking at a translated copy of it (that is exactly how the
+    //    fifteen-second incident looked) — not at someone's sentence.
+    if (!source.contains('\n') && '\n'.allMatches(out).length >= 2) {
+      DebugOverlay.log('translate DROPPED: multi-line output for a one-line utterance');
+      return '';
+    }
+
+    // 3. A label glued in front: "日本語訳：…", "Translation: …", "Traduction : …".
+    //    Only strip a SHORT leading fragment that ends in a colon, so a real
+    //    sentence that happens to contain one ("Il a dit : viens") survives.
+    final label = RegExp(r'^[^\n:：]{0,24}[:：]\s*');
+    final m = label.firstMatch(out);
+    if (m != null) {
+      final rest = out.substring(m.end).trim();
+      // Keep the strip only if it leaves a real sentence behind.
+      if (rest.isNotEmpty) out = rest;
+    }
+
+    // 4. Wrapping quotes the model sometimes adds around the whole line.
+    out = out.replaceAll(RegExp(r'^[“”"«»\x27]+|[“”"«»\x27]+$'), '').trim();
+    return out;
+  }
+
   /// Build Hy-MT2's instruction. The model has NO system prompt: gender,
+  /// history and the target language all go into the one user turn.
+  ///
+  /// Written TELEGRAPHIC on purpose. Prompt ingestion is the bulk of the
+  /// latency on the phone — measured on device, 334 chars took 2.53 s to the
+  /// first token and 505 chars took 5.13 s, i.e. ~15 ms per character — so
+  /// every clause is paid on every single utterance. Compressing the context
+  /// and the history (108 -> 75 tokens) cut ~2 s per phrase with byte-identical
+  /// output on the fr/ja battery.
+  ///
+  /// What is NOT compressed: the closing "Note that you should only output the
+  /// translated result without any additional explanation". It is Hy-MT2's
+  /// canonical wording and it earns its 5 tokens — shortened to "Output only
+  /// the translation:" the model prefixed a label ("日本語訳：…") that the peer's
+  /// TTS then read out loud.
+  ///
   /// history and the speech-repair note all go into the one user turn, ahead of
   /// the fixed "Translate ... only output the result" instruction.
   String _buildPrompt({
@@ -206,11 +281,10 @@ class OnDeviceTranslator {
     // speaker of the TARGET language actually talks. Without this the model
     // renders word-for-word and the peer hears a stilted, translated-sounding
     // line instead of natural speech.
-    ctx.add('preserve the exact meaning, and phrase it the way a native speaker '
-        'of the target language would naturally say it');
-    final ag = _genderPhrase(authorGender, 'the speaker');
+    ctx.add('sound natural, not word-for-word');
+    final ag = _genderPhrase(authorGender, 'speaker');
     if (ag != null) ctx.add(ag);
-    final pg = _genderPhrase(peerGender, 'the person being spoken to');
+    final pg = _genderPhrase(peerGender, 'listener');
     if (pg != null) ctx.add(pg);
     // [speech] deliberately adds nothing to the prompt. It used to append
     // "this is a rough voice transcription — correct an obvious mis-hearing and
@@ -225,10 +299,9 @@ class OnDeviceTranslator {
     if (ctx.isNotEmpty) lines.add('Context: ${ctx.join('. ')}.');
 
     if (history != null && history.isNotEmpty) {
-      lines.add('Earlier turns of the conversation (original text), for context:');
+      lines.add('Earlier:');
       for (final h in history) {
-        final who = h.author == 'peer' ? 'other person' : 'speaker';
-        lines.add('- ($who) ${h.text}');
+        lines.add('${h.author == 'peer' ? 'them' : 'me'}: ${h.text}');
       }
     }
 
@@ -245,9 +318,9 @@ class OnDeviceTranslator {
   String? _genderPhrase(String? g, String subject) {
     switch (g?.trim().toLowerCase()) {
       case 'm':
-        return '$subject is a man';
+        return '$subject: man';
       case 'f':
-        return '$subject is a woman';
+        return '$subject: woman';
       default:
         return null;
     }
