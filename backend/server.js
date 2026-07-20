@@ -1167,6 +1167,13 @@ const FIX_ESCALATE = process.env.FIX_ESCALATE?.trim() !== '0';
 /** The sentinel a model returns rather than inventing. Never spoken aloud. */
 const FIX_UNCLEAR = 'UNCLEAR';
 
+// Test switch. When '1', the WEB clip route additionally runs the repair prompt
+// over its Whisper transcript and logs whether a WORD changed — the same
+// repair-vs-translate measurement the native path prints to its debug overlay,
+// but on the web, so it can be gathered with no device build. Off by default:
+// it costs one extra cheap call per segment and changes nothing the peer hears.
+const CLIP_REPAIR_PROBE = process.env.CLIP_REPAIR_PROBE?.trim() === '1';
+
 // The prompt must name the language in ENGLISH, not pass the tag through.
 // Measured: with "a transcription in lt" the repair degraded badly — Vietnamese
 // invented a word ("Cho thứ bảy", Saturday) and Lithuanian guessed instead of
@@ -1364,6 +1371,55 @@ async function fixCall({ base, key, model, prompt, noThink }) {
   let out = JSON.parse(raw)?.choices?.[0]?.message?.content;
   if (typeof out !== 'string') return null;
   return out.trim().replace(/^[“”’"']+|[“”’"']+$/g, '').trim();
+}
+
+/**
+ * Measure, without changing anything, whether the recogniser actually erred.
+ *
+ * Runs the EXACT repair prompt the native path uses (JSON-forced, so the model
+ * cannot silently skip the repair) over a Whisper transcript, then compares the
+ * repaired source against the original — words only, spacing and punctuation
+ * stripped, for the reason spelled out on TranscriptFix.repaired: Korean spacing
+ * is wrong almost always and means nothing, a swapped homophone is the signal.
+ *
+ * Logs one line per segment and returns the verdict; never throws, never affects
+ * the translation the caller returns. whisper-1 here is large-v2, STRONGER than
+ * the ~244 MB model on the phone, so this is a LOWER bound on the device error
+ * rate — if even this transcribes cleanly, expect a little more noise on-device.
+ */
+async function repairProbe({ transcript, from, to }) {
+  try {
+    const fromName = fixLanguageName(from);
+    const toName = fixLanguageName(to) || 'English';
+    if (!fromName) return null;
+    const prompt = fixRepairPrompt({
+      text: transcript,
+      fromName,
+      toName,
+      hint: FIX_HINTS[from] || '',
+      gender: '',
+      hedge: '',
+    });
+    const raw = await fixCall({
+      base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
+    });
+    if (!raw) return null;
+    const { fixed } = fixUnwrapJson(raw);
+    if (!fixed || fixed.toUpperCase().startsWith(FIX_UNCLEAR)) {
+      console.log(`[repair-probe] unclear   ${from} "${transcript.slice(0, 60)}"`);
+      return null;
+    }
+    const strip = (s) => s.replace(/[\s.,!?;:、。！？「」『』]/gu, '');
+    const changed = strip(fixed) !== strip(transcript);
+    console.log(
+      `[repair-probe] ${changed ? 'MOT-CHANGE' : 'sans-effet'} ${from} `
+      + `"${transcript.slice(0, 60)}"${changed ? ` -> "${fixed.slice(0, 60)}"` : ''}`,
+    );
+    return { fixed, repaired: changed };
+  } catch (e) {
+    console.error('[repair-probe] failed', e?.message || e);
+    return null;
+  }
 }
 
 /**
@@ -1681,7 +1737,15 @@ app.post(CLIP_STT_PATHS, _limTight, voiceUpload.single('audio'), async (req, res
     return res.status(204).end();
   }
 
-  const tr = await grokTranslateText({ transcript, from, to });
+  // The repair probe runs ALONGSIDE Grok, not before it, so the measurement adds
+  // no latency to what the peer hears. Only armed when CLIP_REPAIR_PROBE=1 and a
+  // repair key is configured; otherwise it is a resolved null.
+  const [tr, probe] = await Promise.all([
+    grokTranslateText({ transcript, from, to }),
+    (CLIP_REPAIR_PROBE && FIX_KEY)
+      ? repairProbe({ transcript, from, to })
+      : Promise.resolve(null),
+  ]);
   if (tr.error) {
     return res
       .status(tr.status)
@@ -1699,6 +1763,9 @@ app.post(CLIP_STT_PATHS, _limTight, voiceUpload.single('audio'), async (req, res
     trans: tr.translated,
     lang: to,
     ms: { stt: tStt - t0, translate: tEnd - tStt, total: tEnd - t0 },
+    // Additive, ignored by the current web client; present so the measurement
+    // is visible in a network trace too, not only in the server logs.
+    ...(probe ? { fixed: probe.fixed, repaired: probe.repaired } : {}),
   });
 });
 
