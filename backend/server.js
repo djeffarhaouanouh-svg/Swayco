@@ -1183,142 +1183,29 @@ function fixLanguageName(tag) {
   }
 }
 
-// Per-language rules, appended to the repair prompt. Each one earned its place
-// on a measured failure: without them Polish scored 8/10, Italian 8/10, German
-// 9/10, Czech 8/10 on the same sentences. Keyed by primary tag, so a regional
-// variant (pt-BR, zh-Hant) still gets its rule.
-const FIX_HINTS = {
-  de: '\nGerman: umlauts change the word (nutzen/nützen, schon/schön).',
-  it: '\nItalian: a final accented vowel marks the passato remoto (lasciò, tornò); '
-    + 'without it the verb becomes present tense.',
-  nl: "\nDutch: één = the number one, een = the article 'a'.",
-  pl: '\nPolish: the endings ę/ą carry the person of the verb — never change them. '
-    + 'Leave quoted foreign names as they are.',
-  cs: '\nCzech: keep diminutives. Never expand an abbreviation or a currency.',
-  tr: '\nTurkish: respect vowel harmony and ı/i. When two words were glued, split '
-    + 'them back into the ORIGINAL verb.',
-  ko: '\nKorean: 띄어쓰기 (spacing) is wrong constantly — re-space it. Check 받침 '
-    + 'and the particles.',
-  ja: '\nJapanese: wrong KANJI for the right sound (同音異義語). A word that does not '
-    + 'fit is a conversion error — swap it for the homophone that does, same reading.',
-};
-
-const _cjk = /[぀-ヿ㐀-䶿一-鿿가-힯]/;
-
-/**
- * Does this utterance need the repair step, or is plain translation enough?
- *
- * Measured over 12 languages x {short,long} x {clean,damaged}: plain translation
- * matches the repair prompt everywhere EXCEPT two pockets.
- *
- *  - Japanese, at any length. When the recogniser picks a wrong kanji that is
- *    itself a real word, nothing in the sentence contradicts it: 橋 (bridge) for
- *    箸 (chopsticks) survived a full sentence about the meal going cold and came
- *    out "can you pass me that bridge". Context does not rescue it; only the
- *    explicit instruction to look for a homophone does.
- *  - Short utterances in any language. With no surrounding words to disambiguate,
- *    "boi a aserlo aora" became "Bois-le à soir" and "er is maar een manier"
- *    became "c'est une façon de parler" — not approximations, plain nonsense.
- *
- * Everywhere else the translator repairs implicitly and, unasked, produces
- * markedly more natural speech: told to repair first it stays glued to the
- * source ("Regarde" for Guarda, where plain translation says "Écoute").
- *
- * The threshold is deliberately generous. Erring towards repair costs a fraction
- * of a cent; erring the other way ships "Bois-le à soir" to a speech voice.
- */
-function fixNeedsRepair(fromTag, text) {
-  if (fromTag === 'ja') return true;
-  const short = _cjk.test(text)
-    ? text.length < 50
-    : text.trim().split(/\s+/).length < 30;
-  return short;
-}
-
-/**
- * Repair AND translate, in ONE call, forced through JSON.
- *
- * The JSON is not cosmetic. Asked to "repair, then translate" in prose the model
- * silently skips the repair and translates the mis-hearing — 0/6 on Japanese
- * homophones. Made to EMIT the repaired sentence in a "fixed" field it cannot
- * skip the step, and the same six pass 6/6. That field is billed output we throw
- * away; it is the price of the repair actually happening.
- */
-function fixRepairPrompt({ text, fromName, toName, hint, gender, hedge }) {
-  return (
-    `Raw speech recognition, ${fromName}. Sounds right, letters often wrong.\n`
-    + `Repair it (accents, word boundaries, and any word that does not fit -> the `
-    + `HOMOPHONE that does)${hint}, then translate the repaired sentence into `
-    + `natural spoken ${toName}.${gender}${hedge}\n`
-    + `If it is too garbled to read with confidence, return exactly ${FIX_UNCLEAR}. `
-    + `Otherwise return ONLY this JSON: `
-    + `{"fixed":"<repaired ${fromName}>","out":"<${toName}>"}\n\n${text}`
-  );
-}
-
-/** Translate only — for the long, non-Japanese majority. Half the tokens. */
-function fixTranslatePrompt({ text, toName, gender, hedge }) {
-  return (
-    `Translate into natural spoken ${toName}, the way a person really talks on a `
-    + `call.${gender}${hedge} Never explain. Return ONLY the translation.\n\n${text}`
-  );
-}
-
-/** Repair only, same language — the phone translates it itself afterwards. */
-function fixRepairOnlyPrompt({ text, fromName, hint }) {
-  return (
-    `Raw speech recognition, ${fromName}. Sounds right, letters often wrong.\n`
-    + `Repair it (accents, word boundaries, and any word that does not fit -> the `
-    + `HOMOPHONE that does)${hint}. Same language, same meaning, nothing added.\n`
-    + `If you are not sure, output exactly ${FIX_UNCLEAR}. Return ONLY the text.`
-    + `\n\n${text}`
-  );
-}
-
-/**
- * "speaker: woman. listener: man." — telegraphic on purpose. Measured against
- * the sentence form ("The speaker is a woman."): same accuracy, one token less.
- * Worth its place: it is what makes 疲れた come out "fatiguée" rather than
- * "fatigué", and it fixes the ADDRESSEE too ("tu as l'air fatiguée") on source
- * languages that carry no gender at all.
- */
-function fixGenderPhrase(authorGender, peerGender) {
-  const parts = [];
-  if (authorGender === 'm') parts.push('speaker: man.');
-  if (authorGender === 'f') parts.push('speaker: woman.');
-  if (peerGender === 'm') parts.push('listener: man.');
-  if (peerGender === 'f') parts.push('listener: woman.');
-  return parts.length ? ` ${parts.join(' ')}` : '';
-}
-
-/**
- * Pull the translation out of the repair route's JSON.
- *
- * Returns '' when nothing usable came back, which the caller turns into
- * `unclear` — the utterance is dropped rather than spoken. That is the right
- * failure: this text goes straight to a speech voice, and the raw JSON braces or
- * a stray "fixed" field would be read ALOUD.
- */
-function fixUnwrapJson(raw) {
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (m) {
-    try {
-      const v = JSON.parse(m[0])?.out;
-      if (typeof v === 'string' && v.trim()) return v.trim();
-    } catch (_) { /* fall through to the salvage below */ }
-    // Truncated by max_tokens, or an unescaped quote inside the sentence: the
-    // "out" value is still there and readable even when the object never closed.
-    const s = raw.match(/"out"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-    if (s) {
-      const v = s[1].replace(/\\(["\\/])/g, '$1').replace(/\\n/g, ' ').trim();
-      if (v) return v;
-    }
-    return '';
-  }
-  // No JSON at all. Some models answer the bare sentence; accept it, but only if
-  // it is a single line — anything else is commentary we must not speak.
-  const t = raw.trim();
-  return t && !t.includes('\n') ? t : '';
+function fixPrompt({ text, fromName, toName, authorGender, peerGender }) {
+  const who = [];
+  if (authorGender === 'm') who.push('the speaker is a man');
+  if (authorGender === 'f') who.push('the speaker is a woman');
+  if (peerGender === 'm') who.push('the person being spoken to is a man');
+  if (peerGender === 'f') who.push('the person being spoken to is a woman');
+  const gender = who.length ? ` ${who.join('. ')}.` : '';
+  // Deliberately minimal: no conversation history, no style rules. The prompt is
+  // ~76% of the billed input on such short utterances, so every clause costs
+  // real money at scale — and history buys nothing here, because repairing a
+  // transcript is a LOCAL task (restore diacritics, split glued words). History
+  // earns its place in the TRANSLATION step, which runs free on the phone.
+  return toName
+    ? `This is a noisy voice transcription in ${fromName}. Correct the ` +
+      `mis-hearing and translate it into ${toName}. Preserve the exact meaning ` +
+      `and phrase it the way a native ${toName} speaker would naturally say it.` +
+      `${gender} Never write a gender hedge like "ravi(e)" — pick one form. ` +
+      `If the transcript is too garbled to understand with confidence, output ` +
+      `exactly ${FIX_UNCLEAR} instead of guessing. Output only the ${toName} ` +
+      `translation.\n\n${text}`
+    : `This is a noisy voice transcription in ${fromName}. Correct it. Return ` +
+      `ONLY the corrected text, in the same language. If you are not sure, ` +
+      `output exactly ${FIX_UNCLEAR} instead of guessing.\n\n${text}`;
 }
 
 /** One OpenAI-compatible chat call. Returns the trimmed content, or null. */
@@ -1327,11 +1214,7 @@ async function fixCall({ base, key, model, prompt, noThink }) {
     model,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0,
-    // The repair route emits the repaired sentence AND the translation, so it
-    // needs roughly twice the room of a bare translation. Only tokens actually
-    // produced are billed, so a generous ceiling costs nothing and a tight one
-    // truncates the JSON mid-sentence on the longest utterances.
-    max_tokens: 800,
+    max_tokens: 300,
   };
   // DeepSeek v4 reasons by default and BILLS the hidden thinking: measured, the
   // same repair cost 131 output tokens instead of 16, ran 2x slower, and on one
@@ -1376,30 +1259,13 @@ app.post('/translation/fix', _limText, async (req, res) => {
   const ctx = (req.body?.context && typeof req.body.context === 'object')
     ? req.body.context : {};
   const g = (v) => (v === 'm' || v === 'f' ? v : '');
-  const authorGender = g(ctx.authorGender);
-  const peerGender = g(ctx.peerGender);
-
-  const fromName = fixLanguageName(from);
-  const toName = to && to !== from ? fixLanguageName(to) : '';
-  const hint = FIX_HINTS[from] || '';
-  const gender = fixGenderPhrase(authorGender, peerGender);
-  // The hedge ban costs ~12 tokens on EVERY utterance, and naming the genders
-  // already prevents hedging — across the gendered test cases, not one hedge came
-  // back. So it is spent only when we genuinely do not know who is speaking, which
-  // is the only case where the model has a reason to write "ravi(e)" and the
-  // speech voice a reason to pronounce the parenthesis.
-  const hedge = (authorGender || peerGender)
-    ? ''
-    : ' Never write a gender hedge like "ravi(e)" — pick one form.';
-
-  // No target language: repair only, the caller translates it itself.
-  const repair = !toName || fixNeedsRepair(from, text);
-  const route = !toName ? 'repair-only' : (repair ? 'repair' : 'translate');
-  const prompt = !toName
-    ? fixRepairOnlyPrompt({ text, fromName, hint })
-    : repair
-      ? fixRepairPrompt({ text, fromName, toName, hint, gender, hedge })
-      : fixTranslatePrompt({ text, toName, gender, hedge });
+  const prompt = fixPrompt({
+    text,
+    fromName: fixLanguageName(from),
+    toName: to && to !== from ? fixLanguageName(to) : '',
+    authorGender: g(ctx.authorGender),
+    peerGender: g(ctx.peerGender),
+  });
 
   try {
     let engine = '';
@@ -1420,13 +1286,9 @@ app.post('/translation/fix', _limText, async (req, res) => {
       });
     }
     if (!out || out.toUpperCase().startsWith(FIX_UNCLEAR)) {
-      return res.json({ text: '', engine, route, unclear: true });
+      return res.json({ text: '', engine, unclear: true });
     }
-    if (route === 'repair') {
-      out = fixUnwrapJson(out);
-      if (!out) return res.json({ text: '', engine, route, unclear: true });
-    }
-    return res.json({ text: out, engine, route, unclear: false });
+    return res.json({ text: out, engine, unclear: false });
   } catch (e) {
     console.error('fix failed', e?.message || e);
     return res.status(502).json({ error: 'fix_failed' });
