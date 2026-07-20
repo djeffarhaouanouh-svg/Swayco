@@ -1310,25 +1310,28 @@ function fixGenderPhrase(authorGender, peerGender) {
  * a stray "fixed" field would be read ALOUD.
  */
 function fixUnwrapJson(raw) {
+  const pick = (s) => (typeof s === 'string' && s.trim() ? s.trim() : '');
+  const salvage = (key) => {
+    // Truncated by max_tokens, or an unescaped quote inside the sentence: the
+    // value is still there and readable even when the object never closed.
+    const s = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+    return s
+      ? s[1].replace(/\\(["\\/])/g, '$1').replace(/\\n/g, ' ').trim()
+      : '';
+  };
   const m = raw.match(/\{[\s\S]*\}/);
   if (m) {
     try {
-      const v = JSON.parse(m[0])?.out;
-      if (typeof v === 'string' && v.trim()) return v.trim();
+      const j = JSON.parse(m[0]);
+      const out = pick(j?.out);
+      if (out) return { out, fixed: pick(j?.fixed) };
     } catch (_) { /* fall through to the salvage below */ }
-    // Truncated by max_tokens, or an unescaped quote inside the sentence: the
-    // "out" value is still there and readable even when the object never closed.
-    const s = raw.match(/"out"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-    if (s) {
-      const v = s[1].replace(/\\(["\\/])/g, '$1').replace(/\\n/g, ' ').trim();
-      if (v) return v;
-    }
-    return '';
+    return { out: salvage('out'), fixed: salvage('fixed') };
   }
   // No JSON at all. Some models answer the bare sentence; accept it, but only if
   // it is a single line — anything else is commentary we must not speak.
   const t = raw.trim();
-  return t && !t.includes('\n') ? t : '';
+  return { out: t && !t.includes('\n') ? t : '', fixed: '' };
 }
 
 /** One OpenAI-compatible chat call. Returns the trimmed content, or null. */
@@ -1417,30 +1420,40 @@ app.post('/translation/fix', _limText, async (req, res) => {
   // and the literal word "UNCLEAR" is handed to a speech voice, which says it
   // out loud. Observed, not hypothetical.
   const usable = (raw) => {
-    if (!raw) return '';
-    const t = route === 'repair' ? fixUnwrapJson(raw) : raw.trim();
-    return !t || t.toUpperCase().startsWith(FIX_UNCLEAR) ? '' : t;
+    if (!raw) return { out: '', fixed: '' };
+    const r = route === 'repair'
+      ? fixUnwrapJson(raw)
+      : { out: raw.trim(), fixed: '' };
+    return r.out.toUpperCase().startsWith(FIX_UNCLEAR)
+      ? { out: '', fixed: '' }
+      : r;
   };
 
   try {
     let engine = '';
-    let out = '';
+    let r = { out: '', fixed: '' };
     if (FIX_KEY) {
       engine = FIX_MODEL;
-      out = usable(await fixCall({
+      r = usable(await fixCall({
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
       }));
     }
     // Escalate when the cheap model failed outright OR honestly declined.
-    if (!out && FIX_ESCALATE && OPENAI_API_KEY) {
+    if (!r.out && FIX_ESCALATE && OPENAI_API_KEY) {
       engine = FIX_ESCALATE_MODEL;
-      out = usable(await fixCall({
+      r = usable(await fixCall({
         base: 'https://api.openai.com/v1', key: OPENAI_API_KEY,
         model: FIX_ESCALATE_MODEL, prompt, noThink: false,
       }));
     }
-    if (!out) return res.json({ text: '', engine, route, unclear: true });
-    return res.json({ text: out, engine, route, unclear: false });
+    if (!r.out) return res.json({ text: '', engine, route, unclear: true });
+    // `fixed` is the repaired SOURCE sentence. It is never spoken — it is
+    // returned so the caller can log it next to the raw transcript and see
+    // whether the repair changed anything at all. That comparison is the only
+    // way to know how often the recogniser really errs on live audio, which is
+    // what decides whether this route needs the repair prompt or just a
+    // translation. Absent on the translate route, which never produces one.
+    return res.json({ text: r.out, fixed: r.fixed, engine, route, unclear: false });
   } catch (e) {
     console.error('fix failed', e?.message || e);
     return res.status(502).json({ error: 'fix_failed' });

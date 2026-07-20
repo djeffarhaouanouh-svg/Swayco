@@ -835,7 +835,21 @@ class LocalSttMicStreamer implements SwayMicStreamer {
           _note('me', orig);
           return;
         }
-        DebugOverlay.log('stt fix(${fixed.engine}) → "${fixed.text}"');
+        // Log the repaired SOURCE next to the raw transcript, not just the
+        // result. Without the pair there is no way to tell whether the repair
+        // did anything — and how often the recogniser really errs on live audio
+        // is exactly what decides whether this route needs the repair prompt at
+        // all, or whether a plain translation (half the tokens, ~1 s faster,
+        // more natural output) would have served. Measured on FABRICATED damage
+        // the repair looks essential; nobody has yet measured it on real calls.
+        DebugOverlay.log(
+          'stt fix[${fixed.route}](${fixed.engine}) '
+          '${fixed.repaired ? "MOT CHANGE" : "sans effet"} → "${fixed.text}"',
+        );
+        if (fixed.repaired) {
+          DebugOverlay.log('  brut   : "$orig"');
+          DebugOverlay.log('  repare : "${fixed.fixed}"');
+        }
         if (translateThere) {
           trans = fixed.text; // already in the peer's language
           _note('me', orig);

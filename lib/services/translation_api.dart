@@ -365,10 +365,41 @@ class TranscriptFix {
     required this.text,
     required this.unclear,
     this.engine = '',
-  });
+    this.fixed = '',
+    this.route = '',
+    String raw = '',
+  }) : _raw = raw;
   final String text;
   final bool unclear;
   final String engine;
+
+  /// The repaired SOURCE sentence, when the backend took the repair route.
+  /// Never spoken — it exists so a caller can log it beside the raw transcript
+  /// and see whether the repair changed anything. Empty on the translate route.
+  final String fixed;
+
+  /// Which prompt the backend used: `repair`, `translate` or `repair-only`.
+  final String route;
+
+  /// True when the repair changed actual WORDS, not just how they were
+  /// separated.
+  ///
+  /// Spacing and punctuation are stripped before comparing, deliberately. They
+  /// are the changes the repair makes most often and the ones that matter
+  /// least: Korean 띄어쓰기 is wrong in almost every transcript, yet plain
+  /// translation handled every Korean case correctly without it being fixed.
+  /// Counting those would report a high repair rate that means nothing. What
+  /// this flags is the case the repair prompt actually exists for — a word
+  /// swapped for the homophone that belongs there.
+  bool get repaired {
+    if (fixed.isEmpty) return false;
+    String k(String s) => s.replaceAll(RegExp(r'[\s.,!?、。！？]'), '');
+    return k(fixed) != k(_raw);
+  }
+
+  /// The transcript as the recogniser wrote it, so [repaired] has something to
+  /// compare against.
+  final String _raw;
 }
 
 /// Repair a noisy on-device STT transcript through the backend
@@ -410,7 +441,10 @@ Future<TranscriptFix> fetchTranscriptFix({
 
     final res = await http.post(
       _translationUri('/translation/fix'),
-      headers: const {'Content-Type': 'application/json'},
+      // charset spelled out on purpose. Non-ASCII source languages are the whole
+      // point of this route, and a transport that mangles them does not fail
+      // loudly — the model receives mojibake, cannot read it, and declines.
+      headers: const {'Content-Type': 'application/json; charset=utf-8'},
       body: jsonEncode(body),
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -420,10 +454,20 @@ Future<TranscriptFix> fetchTranscriptFix({
     final t = j['text'];
     final unclear = j['unclear'] == true;
     final engine = j['engine'] is String ? j['engine'] as String : '';
+    final route = j['route'] is String ? j['route'] as String : '';
+    final fixed = j['fixed'] is String ? j['fixed'] as String : '';
     if (unclear || t is! String || t.trim().isEmpty) {
-      return TranscriptFix(text: '', unclear: true, engine: engine);
+      return TranscriptFix(
+        text: '', unclear: true, engine: engine, route: route);
     }
-    return TranscriptFix(text: t.trim(), unclear: false, engine: engine);
+    return TranscriptFix(
+      text: t.trim(),
+      unclear: false,
+      engine: engine,
+      route: route,
+      fixed: fixed,
+      raw: text,
+    );
   } catch (_) {
     return const TranscriptFix(text: '', unclear: true);
   }
