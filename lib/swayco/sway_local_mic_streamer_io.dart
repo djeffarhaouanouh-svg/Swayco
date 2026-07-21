@@ -106,7 +106,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// — a synthetic voice, someone reading — runs until the hard cap and gets
   /// guillotined mid-syllable; set it short and ordinary sentences are chopped in
   /// half. Cutting at every real silence and re-joining afterwards gives both.
-  static const double _silenceSeconds = 0.35;
+  ///
+  /// Lowered 0.35 → 0.30 to shave latency: the VAD closes each segment 50 ms
+  /// sooner. Must stay well below [_mergeGapMs], or a segment could be cut on a
+  /// gap wider than the merge window and never re-joined to its own sentence.
+  static const double _silenceSeconds = 0.30;
 
   /// Silence that ends a PHRASE. Segments separated by less than this are the
   /// same sentence and are re-joined before they reach the recogniser.
@@ -121,7 +125,14 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// hears a sentence as soon as it lands instead of waiting out a whole
   /// paragraph. A speaker who never really pauses stays in one clip — correct:
   /// bubbles follow real silences, they are not cut artificially.
-  static const int _mergeGapMs = 700;
+  ///
+  /// Lowered 700 → 500 ms to cut ~200 ms of latency off every phrase — the peer
+  /// hears each sentence sooner. This is the single biggest silence the pipeline
+  /// waits out, so it is the highest-value knob. Caveat: intra-sentence pauses
+  /// were measured at 380-460 ms, so 500 ms leaves only ~40-120 ms of margin —
+  /// a speaker who pauses hard mid-sentence may now be split where 700 ms held
+  /// them together. Watch for clipped sentences; nudge back up if they appear.
+  static const int _mergeGapMs = 500;
 
   /// A speaker who never pauses has to be cut somewhere. We hold at most this
   /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
