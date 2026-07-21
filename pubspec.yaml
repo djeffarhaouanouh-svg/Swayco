@@ -105,13 +105,13 @@ dependencies:
   # fail to link on duplicate symbols. Models stay download-on-demand.
   sherpa_onnx: ^1.13.4
 
-  # On-device TRANSLATION (lib/swayco/translate): Tencent Hy-MT2 (GGUF) run on
-  # llama.cpp via llm_llamacpp (MIT — commercial-safe, unlike GPL fllama / the
-  # NonCommercial flutter_llama). Replaces the cloud /translation/text call in
-  # the native call pipeline. This is a SECOND native runtime (ggml) alongside
-  # sherpa_onnx — different engine, no ONNX duplicate-symbol clash, but the iOS
-  # link/size must be validated on the Mac build.
-  llm_llamacpp: ^0.1.9
+  # On-device TRANSLATION (Hy-MT2 on llama.cpp / llm_llamacpp) was REMOVED here:
+  # every language now repairs+translates in the cloud (see the note on
+  # translate_routing.routeFor). It cost a 440 MB download, ~2.5-4 s of latency,
+  # and shipped confident wrong sentences on the 1.25-bit quant. Bringing it back
+  # means restoring `llm_llamacpp: ^0.1.9` here, its dependency_override below,
+  # lib/swayco/translate/ondevice_translator.dart, and the on-device branch in
+  # sway_local_mic_streamer_io._translateAndSend — all recoverable from git.
 
   # On-device STT (lib/swayco/asr): the neural engine (Moonshine) runs on
   # sherpa_onnx above; the lattice engine (Vosk) is bound directly with dart:ffi
@@ -132,14 +132,6 @@ dependency_overrides:
     path: native/sherpa_onnx_macos_patched
   sherpa_onnx_ios:
     path: native/sherpa_onnx_ios_patched
-  # llm_llamacpp 0.1.9's native-assets build hook dereferences
-  # input.config.code unconditionally, which is null on the WEB target — it
-  # NPEs and breaks `flutter build web` (the hook runs for the pubspec
-  # dependency regardless of the Dart import graph). The vendored copy adds the
-  # canonical `buildCodeAssets` guard so web is a no-op; iOS/Android build
-  # unchanged. Drop this override once upstream guards its hook.
-  llm_llamacpp:
-    path: native/llm_llamacpp_patched
 
 dev_dependencies:
   flutter_test:

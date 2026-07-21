@@ -9,8 +9,6 @@ import '../services/debug_overlay.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
-import 'translate/ondevice_translator.dart';
-import 'translate/translate_routing.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import 'sway_mic_streamer_base.dart';
@@ -319,12 +317,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       // a clip engine has nothing to tell it where a phrase ends, so it would
       // never transcribe anything — hence the fallback.
       unawaited(_startSegmenter());
-
-      // On-device translator (Hy-MT2 on llama.cpp): download-once + load
-      // resident, in parallel with the call so it never blocks connect.
-      // Utterances spoken before it is ready are dropped — translate() returns
-      // '' and the empty-translation guard in _translateAndSend skips them.
-      unawaited(OnDeviceTranslator.instance.ensureLoaded());
 
       // First call in a language downloads the model (universal: ~357 MB).
       // Capture starts anyway so the call is never blocked on it; utterances are
@@ -806,88 +798,53 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     void Function(String)? onError, {
     bool force = false,
   }) async {
-    final String trans;
+    final TranscriptFix fixed;
     try {
-      // Which engine handles this speaker's language — see [routeFor]. The
-      // decision is made on the SOURCE language: it is what determines both how
-      // badly the recogniser mangled the audio and whether the on-device model
-      // speaks it at all.
-      final route = routeFor(_sourceLang);
-      var source = orig;
-
-      if (route != TranslateRoute.onDevice) {
-        // Repair the transcript in the cloud first. For a language Hy-MT2 does
-        // not speak, the same call also translates (`to` set) and the phone is
-        // skipped entirely.
-        final translateThere = route == TranslateRoute.cloudOnly;
-        final fixed = await fetchTranscriptFix(
-          text: orig,
-          from: _sourceLang,
-          to: translateThere ? _targetLang : null,
-          authorGender: _myGender.isEmpty ? null : _myGender,
-          peerGender: _peerGender.isEmpty ? null : _peerGender,
-        );
-        if (fixed.unclear) {
-          // No model could read it. Drop rather than speak an invention: a
-          // fluent wrong sentence is undetectable by the peer, a missing one is
-          // recoverable ("répète ?").
-          DebugOverlay.log('stt DROPPED unreadable transcript: "$orig"');
-          _note('me', orig);
-          return;
-        }
-        // Log the repaired SOURCE next to the raw transcript, not just the
-        // result. Without the pair there is no way to tell whether the repair
-        // did anything — and how often the recogniser really errs on live audio
-        // is exactly what decides whether this route needs the repair prompt at
-        // all, or whether a plain translation (half the tokens, ~1 s faster,
-        // more natural output) would have served. Measured on FABRICATED damage
-        // the repair looks essential; nobody has yet measured it on real calls.
-        DebugOverlay.log(
-          'stt fix[${fixed.route}](${fixed.engine}) '
-          '${fixed.repaired ? "MOT CHANGE" : "sans effet"} → "${fixed.text}"',
-        );
-        if (fixed.repaired) {
-          DebugOverlay.log('  brut   : "$orig"');
-          DebugOverlay.log('  repare : "${fixed.fixed}"');
-        }
-        if (translateThere) {
-          trans = fixed.text; // already in the peer's language
-          _note('me', orig);
-          _publish(orig, trans, onTranslation, force: force);
-          return;
-        }
-        source = fixed.text; // repaired, still in the speaker's language
-      }
-
-      // On-device translation (Hy-MT2 on llama.cpp) — replaces the cloud
-      // /translation/text call. Same inputs: gender + 2-turn history + the
-      // speech flag, which lets the translator repair an obvious mis-hearing
-      // from context instead of rendering it literally ("財布のボール" →
-      // "portfolio", not "balle de portefeuille").
-      trans = await OnDeviceTranslator.instance.translate(
-        text: source,
+      // Repair AND translate in the cloud, in one call. The repair-vs-translate
+      // decision and the per-language rules live in /translation/fix; the phone
+      // just hands it the raw transcript plus gender and target and speaks the
+      // result. This used to fork to an on-device translator (Hy-MT2 on
+      // llama.cpp) for some languages — see the git history and the retired
+      // routeFor() — but that path was dropped: unreliable output, phone weight,
+      // and latency.
+      fixed = await fetchTranscriptFix(
+        text: orig,
         from: _sourceLang,
         to: _targetLang,
-        history: List<TranslationHistoryItem>.of(_history),
         authorGender: _myGender.isEmpty ? null : _myGender,
         peerGender: _peerGender.isEmpty ? null : _peerGender,
-        speech: true,
       );
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
       onError?.call('translate:$e');
       return;
     }
-    // Remember what was said, so the NEXT sentence is translated knowing it.
-    // After the call above, never before: this utterance is the thing being
-    // translated, not context for itself.
+    if (fixed.unclear) {
+      // No model could read it. Drop rather than speak an invention: a fluent
+      // wrong sentence is undetectable by the peer, a missing one is
+      // recoverable ("répète ?").
+      DebugOverlay.log('stt DROPPED unreadable transcript: "$orig"');
+      _note('me', orig);
+      return;
+    }
+    // Log the repaired SOURCE next to the raw transcript, not just the result.
+    // Whether the recogniser really errs on live audio is what decides if this
+    // path needs the repair prompt at all, or whether a plain translation
+    // (half the tokens, ~1 s faster, more natural output) would have served.
+    DebugOverlay.log(
+      'stt fix[${fixed.route}](${fixed.engine}) '
+      '${fixed.repaired ? "MOT CHANGE" : "sans effet"} → "${fixed.text}"',
+    );
+    if (fixed.repaired) {
+      DebugOverlay.log('  brut   : "$orig"');
+      DebugOverlay.log('  repare : "${fixed.fixed}"');
+    }
     _note('me', orig);
-    _publish(orig, trans, onTranslation, force: force);
+    _publish(orig, fixed.text, onTranslation, force: force);
   }
 
-  /// Last gate before the peer hears it. Shared by every route (on-device,
-  /// repaired-then-on-device, cloud-only) so the mute rule can never be
-  /// bypassed by whichever engine produced the text.
+  /// Last gate before the peer hears it. Kept separate from the translate call
+  /// so the mute rule lives in one place and can never be bypassed.
   void _publish(
     String orig,
     String trans,
