@@ -38,14 +38,22 @@ class UniversalAsrEngine extends AsrEngine {
   /// gain nothing, since per-step accelerator hand-offs can cost more than they
   /// save.
   ///
-  /// MEASURED ON DEVICE: false. CoreML was accepted (no fallback) and ran 3-7x
-  /// SLOWER than the CPU — 0.74 s of audio took 1121 ms to decode (1.51x real
-  /// time) where the CPU does ~0.21x. The penalty scales inversely with clip
-  /// length, the signature of a ~1 s fixed cost per inference: the decoder's
-  /// token-by-token loop pays an accelerator hand-off on every step and the
-  /// setup dwarfs the compute. Conversation clips are 1-3 s, i.e. exactly the
-  /// worst case. Left in place, off, so nobody re-runs this experiment blind.
-  static const bool _tryAccelerator = false;
+  /// ON, and the reason is systemic — not the decode number alone.
+  ///
+  /// Measured on device, CoreML decodes SLOWER in isolation: 0.74 s of audio
+  /// took 1121 ms (1.51x real time) where the CPU does ~0.21x, the penalty
+  /// scaling inversely with clip length — a ~1 s fixed cost per inference, paid
+  /// by the decoder's token-by-token hand-offs.
+  ///
+  /// It stays on anyway because the CPU is the scarce resource here, not the
+  /// NPU. On-device voice conversion (OpenVoice) is going to run on that CPU,
+  /// alongside WebRTC and the UI; leaving Whisper there means the two fight for
+  /// it. Moving recognition onto an otherwise idle NPU buys the conversion a
+  /// free CPU, and the end-to-end call is what matters, not one stage of it.
+  /// Confirmed by ear on a live call before it was measured.
+  ///
+  /// Re-measure END-TO-END once the converter is in, not decode in isolation.
+  static const bool _tryAccelerator = true;
 
   /// Ordered backends to attempt. Always ends on 'cpu': a build without the
   /// provider compiled in, or a device without the hardware, must NOT take the
