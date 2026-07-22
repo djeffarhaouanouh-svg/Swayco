@@ -1373,6 +1373,116 @@ async function fixCall({ base, key, model, prompt, noThink }) {
   return out.trim().replace(/^[“”’"']+|[“”’"']+$/g, '').trim();
 }
 
+// A complete sentence to flush: CJK terminators (。！？…) need no trailing space;
+// Latin ones (.!?) do, so a decimal or "Mr." is not split mid-number.
+const _fixSentenceEnd = /([.!?][)"'”’]?\s)|([。！？…]+["'”’)\]】」』]?)/;
+
+/**
+ * Stream a DeepSeek reply and hand back one whole SENTENCE at a time.
+ *
+ * The only thing that shortens a LONG turn's latency: the peer starts hearing
+ * sentence 1 while sentence 2 is still being written, instead of waiting for the
+ * whole paragraph. Handles both response shapes:
+ *   - `json:false` — the `translate` route returns plain text; flush its
+ *     sentences directly.
+ *   - `json:true`  — the `repair` route returns {"fixed":…,"out":…}; the value
+ *     of "out" is pulled out of the JSON as it streams and its sentences flushed.
+ *     ("fixed" is written first — it is what forces the repair to happen — so the
+ *     first French sentence only starts once the repaired source is out, but the
+ *     rest still streams.)
+ * Returns the full raw content; sentences arrive via [onSentence].
+ */
+async function fixStreamSentences({ base, key, model, prompt, noThink, json, onSentence }) {
+  const body = {
+    model, messages: [{ role: 'user', content: prompt }],
+    temperature: 0, max_tokens: 800, stream: true,
+  };
+  if (noThink) body.thinking = { type: 'disabled' };
+  const r = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok || !r.body) {
+    console.error('fix stream error', model, r.status);
+    return '';
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let sse = '';       // raw SSE line buffer
+  let full = '';      // every content delta, returned for logging/fallback
+  let flushed = 0;    // chars of the TARGET text already emitted as sentences
+
+  // Emit every complete sentence in `str`; with `tail`, emit the leftover too.
+  // Returns how many chars were consumed, so the caller can advance its cursor.
+  const flushFrom = (str, tail) => {
+    let rest = str, consumed = 0, m;
+    while ((m = rest.match(_fixSentenceEnd))) {
+      const end = m.index + m[0].length;
+      const s = rest.slice(0, end).trim();
+      if (s) onSentence(s);
+      consumed += end;
+      rest = rest.slice(end);
+    }
+    if (tail) {
+      const t = rest.trim();
+      if (t) onSentence(t);
+      consumed += rest.length;
+    }
+    return consumed;
+  };
+
+  // The (possibly partial) value of the "out" JSON field within `full`.
+  const outValue = () => {
+    const m = full.match(/"out"\s*:\s*"/);
+    if (!m) return null;
+    let i = m.index + m[0].length, val = '', closed = false;
+    while (i < full.length) {
+      const c = full[i];
+      if (c === '\\') {
+        const n = full[i + 1];
+        if (n === undefined) break; // escape split across chunks — wait for more
+        val += (n === 'n' || n === 't') ? ' ' : n;
+        i += 2;
+        continue;
+      }
+      if (c === '"') { closed = true; break; }
+      val += c; i += 1;
+    }
+    return { val, closed };
+  };
+
+  const pump = (final) => {
+    if (json) {
+      const o = outValue();
+      if (o) flushed += flushFrom(o.val.slice(flushed), o.closed || final);
+    } else {
+      flushed += flushFrom(full.slice(flushed), final);
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    sse += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = sse.indexOf('\n')) >= 0) {
+      const line = sse.slice(0, nl).trim();
+      sse = sse.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') continue;
+      let delta;
+      try { delta = JSON.parse(data)?.choices?.[0]?.delta?.content; } catch { continue; }
+      if (typeof delta !== 'string' || !delta) continue;
+      full += delta;
+      pump(false);
+    }
+  }
+  pump(true);
+  return full.trim();
+}
+
 /**
  * Measure, without changing anything, whether the recogniser actually erred.
  *
@@ -1484,6 +1594,58 @@ app.post('/translation/fix', _limText, async (req, res) => {
       ? { out: '', fixed: '' }
       : r;
   };
+
+  // Streaming (call path only). When the client asks, respond as NDJSON: one
+  // {"out":...} line per SENTENCE, then a final {"done":true,...}. Only the
+  // `translate` route actually streams — it is where a long turn produces
+  // several sentences; repair/repair-only send their single result as one line
+  // so the client treats every route the same. The JSON response below is
+  // untouched and is the fallback whenever `stream` is absent.
+  if (req.body?.stream === true && FIX_KEY) {
+    res.set({
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    });
+    const send = (o) => res.write(`${JSON.stringify(o)}\n`);
+    // `repair` answers in JSON ({"fixed","out"}); `translate` in plain text.
+    const isJson = route === 'repair';
+    try {
+      let any = false;
+      const full = await fixStreamSentences({
+        base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
+        json: isJson,
+        onSentence: (s) => {
+          const t = s.trim();
+          if (!t || t.toUpperCase().startsWith(FIX_UNCLEAR)) return;
+          any = true;
+          send({ out: t });
+        },
+      });
+      let engine = FIX_MODEL;
+      let fixed = any && isJson ? (fixUnwrapJson(full).fixed || '') : '';
+      // Stream produced nothing usable (empty, or an in-JSON UNCLEAR decline).
+      // Fall back to one normal call — with the escalation — so a translatable
+      // phrase is never lost to a stream hiccup or a cheap-model refusal.
+      if (!any) {
+        let rr = usable(await fixCall({
+          base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
+        }));
+        if (!rr.out && FIX_ESCALATE && OPENAI_API_KEY) {
+          engine = FIX_ESCALATE_MODEL;
+          rr = usable(await fixCall({
+            base: 'https://api.openai.com/v1', key: OPENAI_API_KEY,
+            model: FIX_ESCALATE_MODEL, prompt, noThink: false,
+          }));
+        }
+        if (rr.out) { send({ out: rr.out }); any = true; fixed = rr.fixed; }
+      }
+      send({ done: true, engine, route, fixed, unclear: !any });
+    } catch (e) {
+      console.error('fix stream failed', e?.message || e);
+      send({ done: true, unclear: true });
+    }
+    return res.end();
+  }
 
   try {
     let engine = '';

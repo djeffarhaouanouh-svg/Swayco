@@ -811,19 +811,32 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   }) async {
     final TranscriptFix fixed;
     try {
-      // Repair AND translate in the cloud, in one call. The repair-vs-translate
-      // decision and the per-language rules live in /translation/fix; the phone
-      // just hands it the raw transcript plus gender and target and speaks the
-      // result. This used to fork to an on-device translator (Hy-MT2 on
-      // llama.cpp) for some languages — see the git history and the retired
-      // routeFor() — but that path was dropped: unreliable output, phone weight,
-      // and latency.
-      fixed = await fetchTranscriptFix(
+      // Repair AND translate in the cloud. The repair-vs-translate decision and
+      // the per-language rules live in /translation/fix; the phone hands it the
+      // raw transcript plus gender and target and speaks the result. This used to
+      // fork to an on-device translator (Hy-MT2 on llama.cpp) — see the git
+      // history and the retired routeFor() — dropped for unreliable output,
+      // phone weight, and latency.
+      //
+      // STREAMING: each SENTENCE is published the instant it lands, so a long
+      // turn (the peer talking without pausing → one big segment → a multi-
+      // sentence translation) reaches the far end piece by piece instead of as
+      // one late block. The source caption rides the FIRST packet only — it is
+      // the whole utterance, not one sentence of it, and repeating it would
+      // duplicate on the peer. A short repaired phrase arrives as one sentence,
+      // exactly like before.
+      var firstSentence = true;
+      fixed = await fetchTranscriptFixStream(
         text: orig,
         from: _sourceLang,
         to: _targetLang,
         authorGender: _myGender.isEmpty ? null : _myGender,
         peerGender: _peerGender.isEmpty ? null : _peerGender,
+        onSentence: (sentence) {
+          _publish(firstSentence ? orig : '', sentence, onTranslation,
+              force: force);
+          firstSentence = false;
+        },
       );
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
@@ -833,7 +846,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     if (fixed.unclear) {
       // No model could read it. Drop rather than speak an invention: a fluent
       // wrong sentence is undetectable by the peer, a missing one is
-      // recoverable ("répète ?").
+      // recoverable ("répète ?"). unclear is only set when NO sentence was
+      // published, so there is nothing half-said to take back.
       DebugOverlay.log('stt DROPPED unreadable transcript: "$orig"');
       _note('me', orig);
       return;
@@ -842,6 +856,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // Whether the recogniser really errs on live audio is what decides if this
     // path needs the repair prompt at all, or whether a plain translation
     // (half the tokens, ~1 s faster, more natural output) would have served.
+    // The sentences were already published above as they streamed in.
     DebugOverlay.log(
       'stt fix[${fixed.route}](${fixed.engine}) '
       '${fixed.repaired ? "MOT CHANGE" : "sans effet"} → "${fixed.text}"',
@@ -851,7 +866,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       DebugOverlay.log('  repare : "${fixed.fixed}"');
     }
     _note('me', orig);
-    _publish(orig, fixed.text, onTranslation, force: force);
   }
 
   /// Last gate before the peer hears it. Kept separate from the translate call

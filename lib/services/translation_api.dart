@@ -473,6 +473,101 @@ Future<TranscriptFix> fetchTranscriptFix({
   }
 }
 
+/// Streaming variant of [fetchTranscriptFix], for the CALL path only.
+///
+/// The backend replies as NDJSON — one `{"out":"…"}` line per SENTENCE, then a
+/// final `{"done":true,…}`. [onSentence] fires for each sentence the instant it
+/// lands, so a long turn reaches the peer piece by piece instead of as one late
+/// block. Only the backend's `translate` route actually streams; a short repaired
+/// phrase arrives as a single sentence, exactly like the non-streaming call.
+///
+/// Returns the final [TranscriptFix] (the joined text plus route/engine/fixed)
+/// once the stream ends. Any transport failure returns `unclear`, so the caller
+/// drops — the same contract as [fetchTranscriptFix]. On failure NOTHING has been
+/// published if the failure came before the first sentence; a mid-stream drop
+/// keeps whatever sentences already reached the peer.
+Future<TranscriptFix> fetchTranscriptFixStream({
+  required String text,
+  required String from,
+  String? to,
+  String? authorGender,
+  String? peerGender,
+  required void Function(String sentence) onSentence,
+}) async {
+  if (text.trim().isEmpty) return const TranscriptFix(text: '', unclear: true);
+  final client = http.Client();
+  try {
+    final body = <String, dynamic>{'text': text, 'from': from, 'stream': true};
+    if (to != null && to.isNotEmpty) body['to'] = to;
+    final ctx = <String, dynamic>{};
+    if (authorGender != null && authorGender.isNotEmpty) {
+      ctx['authorGender'] = authorGender;
+    }
+    if (peerGender != null && peerGender.isNotEmpty) {
+      ctx['peerGender'] = peerGender;
+    }
+    if (ctx.isNotEmpty) body['context'] = ctx;
+
+    final req = http.Request('POST', _translationUri('/translation/fix'))
+      ..headers['Content-Type'] = 'application/json; charset=utf-8'
+      ..body = jsonEncode(body);
+    final resp = await client.send(req).timeout(const Duration(seconds: 30));
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      return const TranscriptFix(text: '', unclear: true);
+    }
+
+    final sentences = <String>[];
+    var route = '', engine = '', fixed = '';
+    var unclear = false;
+    var buf = '';
+    await for (final chunk in resp.stream.transform(utf8.decoder)) {
+      buf += chunk;
+      var nl = buf.indexOf('\n');
+      while (nl >= 0) {
+        final line = buf.substring(0, nl).trim();
+        buf = buf.substring(nl + 1);
+        nl = buf.indexOf('\n');
+        if (line.isEmpty) continue;
+        Map<String, dynamic> j;
+        try {
+          j = jsonDecode(line) as Map<String, dynamic>;
+        } catch (_) {
+          continue; // a partial line can't arrive — NDJSON is line-framed here
+        }
+        final out = j['out'];
+        if (out is String && out.trim().isNotEmpty) {
+          final s = out.trim();
+          sentences.add(s);
+          onSentence(s);
+        }
+        if (j['done'] == true) {
+          if (j['route'] is String) route = j['route'] as String;
+          if (j['engine'] is String) engine = j['engine'] as String;
+          if (j['fixed'] is String) fixed = j['fixed'] as String;
+          unclear = j['unclear'] == true;
+        }
+      }
+    }
+
+    final full = sentences.join(' ');
+    if (unclear || full.isEmpty) {
+      return TranscriptFix(text: '', unclear: true, engine: engine, route: route);
+    }
+    return TranscriptFix(
+      text: full,
+      unclear: false,
+      engine: engine,
+      route: route,
+      fixed: fixed,
+      raw: text,
+    );
+  } catch (_) {
+    return const TranscriptFix(text: '', unclear: true);
+  } finally {
+    client.close();
+  }
+}
+
 /// Text-to-speech via the backend (`/translation/tts`, which drives the cloud
 /// voice engine). POSTs the text (+ optional BCP-47 [lang] and [voice])
 /// and returns the spoken audio bytes (mp3), or null on any error so the
