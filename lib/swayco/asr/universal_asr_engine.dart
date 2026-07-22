@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import '../../services/debug_overlay.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine_native.dart';
 
@@ -27,6 +28,33 @@ class UniversalAsrEngine extends AsrEngine {
   /// doc. Enough to keep the last word, far below the runtime's offline default.
   static const int _tailPaddings = 300;
 
+  /// Try the phone's neural accelerator before falling back to the CPU.
+  ///
+  /// The NPU (Neural Engine on iOS, NNAPI on Android) is built for exactly this
+  /// and sits completely idle during a call, while the CPU is also carrying
+  /// WebRTC and the UI. The win lands mostly on the ENCODER — on a short
+  /// utterance it does the bulk of the work, because it attends over the whole
+  /// padded segment in one pass; the decoder emits a handful of tokens and may
+  /// gain nothing, since per-step accelerator hand-offs can cost more than they
+  /// save. Set to false to pin the CPU again.
+  static const bool _tryAccelerator = true;
+
+  /// Ordered backends to attempt. Always ends on 'cpu': a build without the
+  /// provider compiled in, or a device without the hardware, must NOT take the
+  /// STT — and therefore the whole call — down with it.
+  static List<String> get _providers {
+    if (!_tryAccelerator) return const ['cpu'];
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return const ['coreml', 'cpu'];
+      case TargetPlatform.android:
+        return const ['nnapi', 'cpu'];
+      default:
+        return const ['cpu'];
+    }
+  }
+
   sherpa.OfflineRecognizer? _recognizer;
   bool _busy = false;
 
@@ -40,23 +68,36 @@ class UniversalAsrEngine extends AsrEngine {
     // the ONNX graphs were exported in: sherpa dispatches on them, so they are
     // the runtime's vocabulary, not ours. They are the only place the family
     // name appears — the rest of the app calls this the universal engine.
-    final config = sherpa.OfflineRecognizerConfig(
-      model: sherpa.OfflineModelConfig(
-        whisper: sherpa.OfflineWhisperModelConfig(
-          encoder: '$modelDir/${UniversalAsrSpec.encoderFile}',
-          decoder: '$modelDir/${UniversalAsrSpec.decoderFile}',
-          language: universalLangCode(lang),
-          task: 'transcribe',
-          tailPaddings: _tailPaddings,
+    for (final provider in _providers) {
+      final config = sherpa.OfflineRecognizerConfig(
+        model: sherpa.OfflineModelConfig(
+          whisper: sherpa.OfflineWhisperModelConfig(
+            encoder: '$modelDir/${UniversalAsrSpec.encoderFile}',
+            decoder: '$modelDir/${UniversalAsrSpec.decoderFile}',
+            language: universalLangCode(lang),
+            task: 'transcribe',
+            tailPaddings: _tailPaddings,
+          ),
+          tokens: '$modelDir/${UniversalAsrSpec.tokensFile}',
+          numThreads: 2,
+          debug: false,
+          provider: provider,
+          modelType: 'whisper',
         ),
-        tokens: '$modelDir/${UniversalAsrSpec.tokensFile}',
-        numThreads: 2,
-        debug: false,
-        provider: 'cpu',
-        modelType: 'whisper',
-      ),
-    );
-    _recognizer = sherpa.OfflineRecognizer(config);
+      );
+      try {
+        _recognizer = sherpa.OfflineRecognizer(config);
+        // Logged so the on-screen panel says which backend actually took it.
+        // The runtime can also fall back internally without raising, so this
+        // line reports what we ASKED for — compare `stt decode` times to see
+        // whether the accelerator really did anything.
+        DebugOverlay.log('stt engine provider=$provider');
+        return;
+      } catch (e) {
+        DebugOverlay.log('stt provider=$provider unavailable ($e)');
+        _recognizer = null;
+      }
+    }
   }
 
   @override
