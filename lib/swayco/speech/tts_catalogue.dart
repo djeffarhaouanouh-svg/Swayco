@@ -98,12 +98,14 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   // nothing on the wire, nothing in the bundle, says which voice tech or which
   // speaker. A device downloads only its account language's voice(s).
   //
-  // fr / en / de / es are gender-matched: two entries tagged 'f'/'m', so the
+  // EVERY language here is gender-matched: two entries tagged 'f'/'m', so the
   // peer's line comes out in a voice of the peer's gender. Both halves are
   // fetched at boot (the "2 voices max" a device holds). es uses ONE
-  // multi-speaker bundle — sid 0 is the man, sid 1 the woman. Every other
-  // language has a single voice and ignores gender. ja is single by nature: a
-  // quality Japanese voice needs its reading engine, and that model is one voice.
+  // multi-speaker bundle — sid 0 is the man, sid 1 the woman. A language that
+  // cannot be paired in medium/high quality is deliberately absent (it falls
+  // back to the device OS voice) — see the note below the pairs. ja is the one
+  // exception: single by nature, because a quality Japanese voice needs its
+  // reading engine and that model ships one voice.
 
   // fr — siwis (f) / tom (m)
   _mirror('fr', gender: 'f'),
@@ -118,19 +120,32 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   _mirror('es', id: 'v1-es-f', gender: 'm', sid: 0),
   _mirror('es', id: 'v1-es-f', gender: 'f', sid: 1),
 
-  // Single-voice languages (no gender pair).
-  _mirror('pt'),
-  _mirror('it'),
-  _mirror('nl'),
-  _mirror('pl'),
-  _mirror('sv'),
-  _mirror('tr'),
-  _mirror('ru'),
-  _mirror('uk'),
-  _mirror('ar'),
-  _mirror('hi'),
-  _mirror('zh'),
-  _mirror('ko', mb: 63),
+  // Gender-matched Piper pairs (medium/high only). The receiver plays the half
+  // matching the SPEAKER's account gender (see [ttsSpecForLang]); both halves are
+  // fetched at boot, so a paired account language holds 2 bundles. A language
+  // whose opposite-gender Piper voice is only low/x_low — or absent — is NOT
+  // here: shipping a robotic bundle, or forcing every speaker into one gender,
+  // is worse than the device's own OS voice, so those fall back to flutter_tts.
+  // pl — gosia (f, medium) / bass (m, high)
+  _mirror('pl', id: 'v1-pl-f', gender: 'f'),
+  _mirror('pl', id: 'v1-pl-m', gender: 'm', mb: 110),
+  // ru — irina (f) / denis (m), both medium
+  _mirror('ru', id: 'v1-ru-f', gender: 'f'),
+  _mirror('ru', id: 'v1-ru-m', gender: 'm'),
+  // hi — priyamvada (f) / pratham (m), both medium
+  _mirror('hi', id: 'v1-hi-f', gender: 'f'),
+  _mirror('hi', id: 'v1-hi-m', gender: 'm'),
+
+  // Served by the device OS voice (flutter_tts), NOT on-device Piper: no viable
+  // medium/high gender pair exists — pt/ar are male-only, it's male is only
+  // x_low, tr has one voice, nl/sv/zh have an unconfirmed opposite gender, and ko
+  // has no Piper voice at all. uk is out for a different reason: its only
+  // multi-speaker model (ukrainian_tts) is not built on espeak phonemes, so on
+  // this pipeline it emits near-silence (0.06–0.38 s at amplitude <0.04, against
+  // ~2.3 s at ~0.55 for a working voice) — measured, not assumed.
+  // Absent from the catalogue → ttsSpecForLang returns null → _speakOne falls
+  // through to flutter_tts. (Japanese is the exception below: a dedicated
+  // engine, one voice by nature.)
 
   // Japanese → dedicated on-device engine: native reading frontend + phonemizer
   // + an external-tokens path, on the app's single ORT. The bundle carries the
