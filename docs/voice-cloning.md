@@ -94,17 +94,24 @@ from a PC measurement.
 
 ## What still blocks integration
 
-1. **One ONNX Runtime in the app.** sherpa statically links its own; a second one
-   breaks the iOS link (already hit once). Fix: build sherpa against a shared
-   runtime via `SHERPA_ONNXRUNTIME_LIB_DIR` / `SHERPA_ONNXRUNTIME_INCLUDE_DIR`.
-   The vendored sherpa is already built from source, so this is a build-script
-   change, not a refactor.
-2. **A base TTS that returns samples.** `flutter_tts` synthesises *and* plays —
-   it never hands over the audio, so nothing can be converted. sherpa's
-   `OfflineTts` returns the samples. Playback can stay exactly as it is today,
-   which means the half-duplex gate and the mute rule are unaffected — and the
-   echo problem that got sherpa TTS removed may well have come from its own
-   player rather than from on-device TTS as such.
+1. **One ONNX Runtime in the app — iOS only.** On macOS sherpa already links ORT
+   as a separate dylib exporting `OrtGetApiBase`, so the Dart side can be built
+   and validated on a Mac today. iOS is where the static link collides, and iOS
+   is what ships. Fix: build sherpa against a shared runtime via
+   `SHERPA_ONNXRUNTIME_LIB_DIR` / `SHERPA_ONNXRUNTIME_INCLUDE_DIR`. The vendored
+   sherpa is already built from source, so this is a build-script change, not a
+   refactor.
+2. ~~**A base TTS that returns samples.**~~ **Already there** — corrected after
+   this was first written. `flutter_tts` indeed never hands over the audio, but
+   the sherpa engine does: `neural_tts_engine.dart:121` takes a `Float32List`
+   back from its worker isolate, then writes a temp WAV and plays it. The
+   conversion slots in between those two steps. Small change, not a project.
+
+   Worth noting while in there: playback goes through `audioplayers`
+   (`_player.play(DeviceFileSource(...))`) — a *separate* player from the
+   flutter_tts path. That is the likeliest source of the echo that got sherpa
+   TTS pulled: a player that ignores the call's audio session, not the TTS model
+   itself.
 3. **Dart wiring**: capture the fingerprint from a VAD segment, send it once with
    the first translation (~1.7 KB over the data channel), refine it as the call
    goes on, and convert on the receiving side before playback.
