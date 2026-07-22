@@ -135,14 +135,35 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   // hi — priyamvada (f) / pratham (m), both medium
   _mirror('hi', id: 'v1-hi-f', gender: 'f'),
   _mirror('hi', id: 'v1-hi-m', gender: 'm'),
+  // uk — tetiana (f) / mykyta (m), both 'high'. Converted by hand: these two are
+  // not pre-packaged upstream, unlike every other voice here. NOT the
+  // multi-speaker ukrainian_tts model, which is unusable (see the note below).
+  _mirror('uk', id: 'v1-uk-f', gender: 'f', mb: 110),
+  _mirror('uk', id: 'v1-uk-m', gender: 'm', mb: 110),
+  // sv — alma (f) / nst (m). alma is CC BY 4.0: it REQUIRES crediting Daniel
+  // Nylander in the app's licence screen. Every other voice here is CC0/Apache.
+  _mirror('sv', id: 'v1-sv-f', gender: 'f'),
+  _mirror('sv', id: 'v1-sv-m', gender: 'm'),
+  // nl — nathalie (f) / pim (m). The pitch gap is the narrowest of the set
+  // (155 vs 133 Hz), but nathalie is a real female speaker, so timbre carries
+  // the gender cue that pitch alone understates. nathalie is Flemish (nl_BE);
+  // the only nl_NL female alternative is an unauditioned LibriVox model.
+  _mirror('nl', id: 'v1-nl-f', gender: 'f'),
+  _mirror('nl', id: 'v1-nl-m', gender: 'm'),
 
-  // Served by the device OS voice (flutter_tts), NOT on-device Piper: no viable
-  // medium/high gender pair exists — pt/ar are male-only, it's male is only
-  // x_low, tr has one voice, nl/sv/zh have an unconfirmed opposite gender, and ko
-  // has no Piper voice at all. uk is out for a different reason: its only
-  // multi-speaker model (ukrainian_tts) is not built on espeak phonemes, so on
-  // this pipeline it emits near-silence (0.06–0.38 s at amplitude <0.04, against
-  // ~2.3 s at ~0.55 for a working voice) — measured, not assumed.
+  // Served by the device OS voice (flutter_tts), NOT on-device: no pair we can
+  // legally ship exists. pt is male-only; it's male is x_low (no better than the
+  // OS voice); tr's voices are non-commercial or were withdrawn upstream; ar and
+  // zh are non-commercial, of unclear provenance, or — for zh — cloned game
+  // characters. ko has no voice at all in this family.
+  //
+  // Note for anyone extending this list: the tempting 'high'-tier voices for
+  // it/nl/pt/ar (dii, miro, SA_*) are CC BY-NC-SA — they cannot ship in a paid
+  // app. And ukrainian_tts, the obvious uk pick, is built on raw graphemes
+  // rather than espeak phonemes: it emits near-silence here (0.06–0.38 s at
+  // amplitude <0.04, against ~2.3 s at ~0.55 for a working voice). Check
+  // `phoneme_type` before adopting any new voice.
+  //
   // Absent from the catalogue → ttsSpecForLang returns null → _speakOne falls
   // through to flutter_tts. (Japanese is the exception below: a dedicated
   // engine, one voice by nature.)
