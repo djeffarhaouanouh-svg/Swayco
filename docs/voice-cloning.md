@@ -77,6 +77,18 @@ Two edits were needed to export cleanly:
 an x86 desktop — Apple silicon is ~2.5x faster here, so do not size this feature
 from a PC measurement.
 
+Two things that table hides, both measured while porting the front-end to Dart:
+
+- **The RTF above is the 4-thread figure.** The same pass is 1302 ms at 4 intra-op
+  threads and 2278 ms at 2 — a 1.75x swing. Those are the Mac's four performance
+  cores, and during a call the recogniser is already competing for them (see
+  commit 4dbd333, "the CPU is the scarce resource"). So the number to trust for
+  the product is whatever the phone gives us with STT running, not this one.
+- **A short sentence pays the full pass.** The graph's input is a fixed 520
+  frames ≈ 6.04 s, so a 3.7 s sentence still costs 1.3 s: effective RTF 0.37, not
+  0.22. The lever, if it is ever needed, is exporting a second fixed shape (~260
+  frames) and picking per sentence — not more threads.
+
 ### Dead ends, with the reason
 
 - **int8 (dynamic quantisation): 11x SLOWER** (RTF 0.50 -> 5.46). The graph is
@@ -112,9 +124,37 @@ from a PC measurement.
    flutter_tts path. That is the likeliest source of the echo that got sherpa
    TTS pulled: a player that ignores the call's audio session, not the TTS model
    itself.
-3. **Dart wiring**: capture the fingerprint from a VAD segment, send it once with
-   the first translation (~1.7 KB over the data channel), refine it as the call
-   goes on, and convert on the receiving side before playback.
+3. ~~**Dart wiring.**~~ **The engine is written and validated** —
+   `voice_converter.dart` (+ `ort_runtime.dart`, `voice_spectrogram.dart`). It
+   drives the runtime the app already ships through `dart:ffi`, so it adds no
+   binary. What is left is *app* wiring, not engine work: capture the fingerprint
+   from a VAD segment, send it once with the first translation (1 KB over the
+   data channel), refine it as the call goes on, and convert on the receiving
+   side between `neural_tts_engine.dart`'s `Float32List` and its WAV.
+
+### How the engine is checked
+
+`tool/voice_convert_check.dart` runs the whole chain outside the app, on the
+macOS plugin's own `libonnxruntime`:
+
+```sh
+dart run tool/voice_convert_check.dart --models ~/Downloads \
+  --in docs/ja_tts_phase0_samples/fp16/fp16_03_kinou_ryouri.wav [--ref voice.wav]
+```
+
+Three properties, all currently holding:
+
+- **The front-end matches numpy** to float noise — spectrogram sum within 2e-8,
+  fingerprint cosine 1.000000. This matters because the spectrogram convention
+  (reflect-pad 384, centre off, periodic Hann, `sqrt(|X|² + 1e-6)`) is not
+  something the graph validates: get it wrong and it returns noise, not an error.
+- **Identity holds.** Converting a voice onto its *own* fingerprint gives back
+  the input: log-spectral distance 0.82, RMS 0.117 → 0.106. Phase is not
+  preserved (waveform correlation ~0) — that is the vocoder, and it is fine.
+- **The fingerprint is a speaker, not an utterance.** Two different sentences in
+  the same voice score 0.925 and convert to almost nothing (LSD 0.91, barely
+  above identity); a different timbre scores 0.398 and moves the audio properly
+  (LSD 1.22).
 
 There is no cold start: the fingerprint takes ~50 ms to compute from the same
 segment already being sent to the recogniser, so it is ready long before the
