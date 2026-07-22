@@ -7,6 +7,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import 'tts_audio_context.dart';
+
 /// The on-device TTS engine, on the runtime's `OfflineTts` (neural: neural).
 ///
 /// **Runs in a background isolate.** `OfflineTts` creation loads an ONNX session
@@ -91,6 +93,9 @@ class NeuralTtsEngine {
       throw StateError(
           'sherpa TTS configure failed: ${res.length > 1 ? res[1] : "?"}');
     }
+    // Route playback like flutter_tts (the call's voice route), not the media
+    // route a bare AudioPlayer would use.
+    await applyCallTtsAudioContext(_player);
     _configured = true;
   }
 

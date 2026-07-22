@@ -220,7 +220,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Kill-switch for the premium on-device (gender-matched) voice. Left as a
   /// switch so a build can force the OS voice for a clean audio test.
-  static const bool _kPremiumVoiceEnabled = false;
+  static const bool _kPremiumVoiceEnabled = true;
 
   /// One utterance, start to finish. The timeout is the queue's safety net:
   /// flutter_tts can return without ever playing (a missing voice, a browser that

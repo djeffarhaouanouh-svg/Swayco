@@ -10,6 +10,7 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import 'ja_reading_ffi.dart';
 import 'ja_phonemizer.dart';
 import 'ja_tokens.dart';
+import 'tts_audio_context.dart';
 
 /// On-device **Japanese** TTS engine (see `docs/ja_tts_engine_plan.md`).
 ///
@@ -96,6 +97,9 @@ class JaTtsEngine {
       throw StateError(
           'ja TTS configure failed: ${res.length > 1 ? res[1] : "?"}');
     }
+    // Route playback like flutter_tts (the call's voice route), not the media
+    // route a bare AudioPlayer would use.
+    await applyCallTtsAudioContext(_player);
     _configured = true;
   }
 
