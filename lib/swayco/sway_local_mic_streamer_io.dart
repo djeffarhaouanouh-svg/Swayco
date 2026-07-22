@@ -126,13 +126,13 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// paragraph. A speaker who never really pauses stays in one clip — correct:
   /// bubbles follow real silences, they are not cut artificially.
   ///
-  /// Lowered 700 → 500 ms to cut ~200 ms of latency off every phrase — the peer
-  /// hears each sentence sooner. This is the single biggest silence the pipeline
-  /// waits out, so it is the highest-value knob. Caveat: intra-sentence pauses
-  /// were measured at 380-460 ms, so 500 ms leaves only ~40-120 ms of margin —
-  /// a speaker who pauses hard mid-sentence may now be split where 700 ms held
-  /// them together. Watch for clipped sentences; nudge back up if they appear.
-  static const int _mergeGapMs = 500;
+  /// Settled at 600 ms. 700 was the safe original; 500 shaved latency but chopped
+  /// — on a live call a speaker hesitated ~597 ms mid-clause and 500 split it, so
+  /// the transcript lost a word. 600 clears those ~597 ms hesitations for +100 ms
+  /// vs 500, and the cost of over-merging is now nil: per-sentence STREAMING
+  /// re-splits a merged phrase on its own sentence boundaries, so a slightly
+  /// generous merge stays fluid. Total wait = [_silenceSeconds] + this = ~900 ms.
+  static const int _mergeGapMs = 600;
 
   /// A speaker who never pauses has to be cut somewhere. We hold at most this
   /// much before sending — and we cut at the LAST REAL SILENCE inside it, never
