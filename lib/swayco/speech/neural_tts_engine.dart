@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'tts_audio_context.dart';
+import 'voice_clone_service.dart';
 
 /// The on-device TTS engine, on the runtime's `OfflineTts` (neural: neural).
 ///
@@ -120,9 +121,25 @@ class NeuralTtsEngine {
       _toWorker!.send(['speak', text, sid, speed]);
       final res = await c.future;
       if (res.isEmpty || res[0] != 'audio') return;
-      final samples = res[1] as Float32List;
-      final sampleRate = res[2] as int;
+      var samples = res[1] as Float32List;
+      var sampleRate = res[2] as int;
       if (samples.isEmpty) return;
+
+      // The peer hears their OWN voice, not this stock one — the whole point of
+      // docs/voice-cloning.md. It lands here because this is the only place the
+      // synthesised audio exists as samples before it becomes a file: the
+      // converter needs audio, not text. Returns null whenever the feature is
+      // not available (no models, no peer fingerprint yet, conversion failed),
+      // and then we play exactly what we synthesised — it must never be the
+      // reason a sentence goes unspoken.
+      final revoiced = VoiceCloneService.instance.revoiceAsPeer(
+        samples,
+        sampleRate,
+      );
+      if (revoiced != null) {
+        samples = revoiced.pcm;
+        sampleRate = revoiced.sampleRate;
+      }
 
       final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
