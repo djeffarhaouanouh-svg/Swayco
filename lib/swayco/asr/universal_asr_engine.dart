@@ -36,8 +36,16 @@ class UniversalAsrEngine extends AsrEngine {
   /// utterance it does the bulk of the work, because it attends over the whole
   /// padded segment in one pass; the decoder emits a handful of tokens and may
   /// gain nothing, since per-step accelerator hand-offs can cost more than they
-  /// save. Set to false to pin the CPU again.
-  static const bool _tryAccelerator = true;
+  /// save.
+  ///
+  /// MEASURED ON DEVICE: false. CoreML was accepted (no fallback) and ran 3-7x
+  /// SLOWER than the CPU — 0.74 s of audio took 1121 ms to decode (1.51x real
+  /// time) where the CPU does ~0.21x. The penalty scales inversely with clip
+  /// length, the signature of a ~1 s fixed cost per inference: the decoder's
+  /// token-by-token loop pays an accelerator hand-off on every step and the
+  /// setup dwarfs the compute. Conversation clips are 1-3 s, i.e. exactly the
+  /// worst case. Left in place, off, so nobody re-runs this experiment blind.
+  static const bool _tryAccelerator = false;
 
   /// Ordered backends to attempt. Always ends on 'cpu': a build without the
   /// provider compiled in, or a device without the hardware, must NOT take the
