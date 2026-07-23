@@ -11,8 +11,8 @@
 /// Two graphs, run at different rates:
 ///   * `ref_encoder.onnx` (3 MB) → a 256-float fingerprint of a speaker. ~50 ms,
 ///     computed from a VAD segment the recogniser is already handling.
-///   * `converter_fp32.onnx` (121 MB) → one pass per sentence, fixed 520 frames
-///     (≈ 6 s); longer sentences are chunked and overlap-added here.
+///   * `converter.onnx` (122 MB) → one pass per sentence, at the sentence's own
+///     length: the time axis is dynamic, so nothing is chunked or padded.
 ///
 /// It runs on the ONNX Runtime the app already has ([OrtRuntime]) — no second
 /// runtime, which is the invariant the whole native stack is built around.

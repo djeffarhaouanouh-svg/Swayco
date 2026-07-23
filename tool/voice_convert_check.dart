@@ -30,7 +30,7 @@ void main(List<String> argv) {
   if (models == null || inPath == null) {
     stderr.writeln('usage: --models <dir> --in <wav> [--ref <wav>] '
         '[--out <wav>] [--golden <json>] [--alpha 1.5] [--threads 4] '
-        '[--ort <dylib>]');
+        '[--ort <dylib>] [--converter converter.onnx]');
     exit(2);
   }
   final alpha = double.tryParse(args['alpha'] ?? '') ?? kDefaultAlpha;
@@ -41,7 +41,9 @@ void main(List<String> argv) {
 
   final converter = VoiceConverter.open(
     refEncoderPath: '$models/ref_encoder.onnx',
-    converterPath: '$models/converter_fp32.onnx',
+    // Same filename the app downloads, so a stale fixed-520 export sitting in
+    // the models dir under its old name cannot be picked up by accident.
+    converterPath: '$models/${args['converter'] ?? 'converter.onnx'}',
     libraryPath: args['ort'] ?? _defaultOrt,
     numThreads: int.tryParse(args['threads'] ?? '') ?? 4,
   );

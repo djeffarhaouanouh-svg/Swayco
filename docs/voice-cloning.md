@@ -142,10 +142,15 @@ dart run tool/voice_convert_check.dart --models ~/Downloads \
   --in docs/ja_tts_phase0_samples/fp16/fp16_03_kinou_ryouri.wav [--ref voice.wav]
 ```
 
-Three properties, all currently holding:
+Three properties, re-checked against the **dynamic-shape** converter
+(`converter.onnx`, 3 inputs, no `spec_lengths`) — the numbers below are the
+dynamic graph's, and they reproduce the fixed-520 graph's to 3 decimals:
 
 - **The front-end matches numpy** to float noise — spectrogram sum within 2e-8,
-  fingerprint cosine 1.000000. This matters because the spectrogram convention
+  fingerprint cosine 1.000000. Checked with `--golden`, whose JSON comes from the
+  OpenVoice numpy env and is *not* in this repo; the dynamic re-export did not
+  touch the front-end, and its spec sum (55749.1) and `se` norm (9.9005) are
+  unchanged. This matters because the spectrogram convention
   (reflect-pad 384, centre off, periodic Hann, `sqrt(|X|² + 1e-6)`) is not
   something the graph validates: get it wrong and it returns noise, not an error.
 - **Identity holds.** Converting a voice onto its *own* fingerprint gives back
@@ -155,6 +160,11 @@ Three properties, all currently holding:
   the same voice score 0.925 and convert to almost nothing (LSD 0.91, barely
   above identity); a different timbre scores 0.398 and moves the audio properly
   (LSD 1.22).
+
+The pass now costs the sentence's own length, not a flat 6 s. On the Mac, 3.67 s
+of speech (316 frames) converts in 823 ms, RTF 0.22; a 0.7 s clip (60 frames) in
+202 ms. Under the old fixed-520 graph that short clip paid a full ~1.35 s pass —
+the same ~6× that turns the phone's `revoiced` line from RTF ~3 into RTF < 1.
 
 There is no cold start: the fingerprint takes ~50 ms to compute from the same
 segment already being sent to the recogniser, so it is ready long before the

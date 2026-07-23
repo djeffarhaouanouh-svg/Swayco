@@ -85,25 +85,6 @@ class Spectrogram {
   final int frames;
 
   double at(int bin, int frame) => data[bin * frames + frame];
-
-  /// The [count] frames starting at [start], padded out to [count] with the
-  /// magnitude of digital silence when the source runs out.
-  ///
-  /// The converter graph has a fixed 520-frame input, so a shorter sentence has
-  /// to be padded; `spec_lengths` tells the model how much of it is real.
-  Float32List window(int start, int count) {
-    final out = Float32List(kSpecBins * count);
-    const silence = 1e-3; // sqrt(1e-6)
-    for (var bin = 0; bin < kSpecBins; bin++) {
-      final src = bin * frames;
-      final dst = bin * count;
-      for (var f = 0; f < count; f++) {
-        final s = start + f;
-        out[dst + f] = s < frames ? data[src + s] : silence;
-      }
-    }
-    return out;
-  }
 }
 
 /// Compute the spectrogram of [samples]. See the library doc for the exact
