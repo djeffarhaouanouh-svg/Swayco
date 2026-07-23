@@ -31,6 +31,16 @@ void markTranslationDone() => impl.markTranslationDone();
 bool get isSendMuted => impl.isSendMuted;
 void setSendMuted(bool v) => impl.setSendMuted(v);
 
+/// Subscribe to *changes* of [isSendMuted]. Fires only on a real transition.
+///
+/// Polling the flag from the audio callback silences the stream but keeps the
+/// microphone open; a listener is what lets the native STT streamer actually
+/// close its capture while muted. Always pair with [removeSendMutedListener].
+void addSendMutedListener(void Function(bool muted) listener) =>
+    impl.addSendMutedListener(listener);
+void removeSendMutedListener(void Function(bool muted) listener) =>
+    impl.removeSendMutedListener(listener);
+
 /// Register the ScriptProcessor AudioContext so markTranslationPlaying can
 /// suspend it (physically stopping capture) during TTS playback.
 // ignore: avoid_dynamic_calls

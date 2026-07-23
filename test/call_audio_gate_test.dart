@@ -26,6 +26,54 @@ void main() {
     });
   });
 
+  // Reading the flag per buffer silences the stream but keeps the microphone
+  // open — and a second capture held on a mic LiveKit also holds is what drove
+  // the signal into clipping. The native streamer releases it on this signal.
+  group('sendMuted listeners', () {
+    test('fire on each transition, with the new value', () {
+      final seen = <bool>[];
+      void listener(bool muted) => seen.add(muted);
+      addSendMutedListener(listener);
+      addTearDown(() => removeSendMutedListener(listener));
+
+      setSendMuted(true);
+      setSendMuted(false);
+      expect(seen, [true, false]);
+    });
+
+    test('do not fire when the value is unchanged', () {
+      final seen = <bool>[];
+      void listener(bool muted) => seen.add(muted);
+      addSendMutedListener(listener);
+      addTearDown(() => removeSendMutedListener(listener));
+
+      setSendMuted(true);
+      setSendMuted(true);
+      // A repeated mute must not restart the capture it just released.
+      expect(seen, [true]);
+    });
+
+    test('a removed listener stops being called', () {
+      final seen = <bool>[];
+      void listener(bool muted) => seen.add(muted);
+      addSendMutedListener(listener);
+      setSendMuted(true);
+      removeSendMutedListener(listener);
+      setSendMuted(false);
+      // A streamer that has stopped must never drive its dead recorder again.
+      expect(seen, [true]);
+    });
+
+    test('a throwing listener cannot break the mute itself', () {
+      void bad(bool muted) => throw StateError('recorder is gone');
+      addSendMutedListener(bad);
+      addTearDown(() => removeSendMutedListener(bad));
+
+      expect(() => setSendMuted(true), returnsNormally);
+      expect(isSendMuted, isTrue);
+    });
+  });
+
   group('half-duplex gate', () {
     test('opens on playing, closes after done + hangover', () async {
       expect(isTranslationPlaying, isFalse);

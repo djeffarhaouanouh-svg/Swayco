@@ -56,6 +56,26 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// we reset the streaming decoder once on entry, not on every dropped frame.
   bool _gated = false;
 
+  /// Whether our `record` capture is currently open, and whether it SHOULD be.
+  ///
+  /// Dropping buffers is enough to stop translating, but it leaves a SECOND
+  /// capture open on a microphone LiveKit already holds — the two then share one
+  /// audio session, and on iOS the voice-processing gain that session applies
+  /// drives the signal into clipping (peak 1.000 in the phrase log, against
+  /// 0.3-0.7 once the LiveKit track is stopped). A muted mic must therefore be
+  /// released, not merely ignored.
+  ///
+  /// Two fields rather than one because a mute can flip twice before the first
+  /// `stop()` has even returned: the listener only records the WANTED state, and
+  /// the serialized worker converges on it.
+  bool _captureOpen = false;
+  bool _captureWanted = true;
+
+  /// Capture open/close operations, serialized. Deliberately separate from
+  /// [_sttChain]: that one guards the native decoder, and a capture restart must
+  /// not queue behind a pending transcription (nor the reverse).
+  Future<void> _captureChain = Future.value();
+
   /// Frames seen since start. The web streamer logs this and it is the first
   /// thing you want when nothing is transcribed: it separates "the mic gives us
   /// nothing" from "the recogniser gives us nothing". On iOS `record` opens a
@@ -348,7 +368,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         }),
       );
 
-      await _startCapture();
+      // Muting must RELEASE the mic, not just silence it, so follow the flag's
+      // transitions rather than only reading it per buffer.
+      addSendMutedListener(_onSendMutedChanged);
+      _captureWanted = !isSendMuted;
+      if (_captureWanted) await _startCapture();
     } catch (e) {
       // record_ios throws here when inputNode.setVoiceProcessingEnabled() is
       // refused — which is what a clash with WebRTC's own VoiceProcessingIO on
@@ -357,6 +381,69 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       onError?.call('start_failed: $e');
       await stop();
     }
+  }
+
+  /// The user muted or unmuted. Release the microphone outright while muted:
+  /// LiveKit has already stopped ITS capture (`stopOnMute` is on for every
+  /// platform but Firefox), so continuing to hold ours is what keeps two
+  /// captures alive on a call that is supposed to be silent.
+  ///
+  /// Whatever the recogniser was holding when the mute landed is flushed FIRST,
+  /// with `force`, exactly as the per-buffer gate does — those words were spoken
+  /// before the press, on purpose, and closing the capture would otherwise
+  /// swallow the sentence a mute interrupts.
+  void _onSendMutedChanged(bool muted) {
+    if (!_running) return;
+    // The cloud fallback owns its own recorder; it reads `isSendMuted` itself.
+    if (_fallback != null) return;
+
+    if (muted && !_gated) {
+      _gated = true;
+      DebugOverlay.log('stt gate CLOSED (muted)');
+      final onTranslation = _onTranslation;
+      if (onTranslation != null) _flushForGateClose(onTranslation);
+    }
+
+    _captureWanted = !muted;
+    _captureChain = _captureChain
+        .then((_) => _applyCaptureState())
+        .catchError((Object e) => DebugOverlay.log('stt capture toggle error: $e'));
+  }
+
+  /// Converge the capture on [_captureWanted]. Re-read at the moment it runs, so
+  /// a mute/unmute burst settles on the final state instead of replaying each
+  /// step of it.
+  Future<void> _applyCaptureState() async {
+    if (!_running) return;
+    if (_captureWanted == _captureOpen) return;
+    if (_captureWanted) {
+      try {
+        await _startCapture();
+      } catch (e) {
+        // The mic did not come back. Say so loudly: the call carries on with no
+        // translation at all, and silence is indistinguishable from "nobody
+        // spoke" unless it is on the record.
+        DebugOverlay.log('stt capture FAILED to reopen after unmute: $e');
+        _onError?.call('capture_reopen_failed: $e');
+      }
+    } else {
+      await _closeCapture();
+    }
+  }
+
+  /// Release the microphone. The recogniser and the VAD are left alone — the
+  /// user is expected to unmute and carry on, and rebuilding them costs a model
+  /// load.
+  Future<void> _closeCapture() async {
+    await _audioSub?.cancel();
+    _audioSub = null;
+    try {
+      await _rec.stop();
+    } catch (e) {
+      DebugOverlay.log('stt capture stop error: $e');
+    }
+    _captureOpen = false;
+    DebugOverlay.log('stt capture RELEASED (muted) — mic left to LiveKit alone');
   }
 
   /// Download the VAD once and build the detector. Its buffer holds
@@ -406,6 +493,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     try {
       await _rec.stop();
     } catch (_) {}
+    // Ours is closed for good; from here the fallback owns the microphone, and
+    // [_onSendMutedChanged] bows out to it.
+    _captureOpen = false;
+    _captureWanted = false;
 
     final streamer = createCloudMicStreamer();
     _fallback = streamer;
@@ -462,6 +553,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       // [_speechFloor] and never reaches the recogniser.
       autoGain: false,
     ));
+    _captureOpen = true;
     DebugOverlay.log('stt capture started — 16 kHz pcm16, aec+ns on, agc OFF');
     _audioSub = stream.listen(
       (bytes) => _onPcm(bytes, _onTranslation!, _onError),
@@ -505,15 +597,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         _gated = true;
         final gate = isSendMuted ? 'muted' : 'tts';
         DebugOverlay.log('stt gate CLOSED ($gate)');
-        if (!_modelReady) {
-          _vad?.reset();
-          _resetPending();
-        } else if (AsrService.instance.isStreaming) {
-          DebugOverlay.log('stt gate — flushing what was already said');
-          _serialize(() => _flushAndSend(onTranslation, force: true));
-        } else {
-          _flushSegmenter(onTranslation, force: true);
-        }
+        _flushForGateClose(onTranslation);
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
       return;
@@ -574,6 +658,27 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // Silence emits no VAD event, so the end of a phrase can only be noticed by
     // the clock. Checked on every frame.
     _flushIfIdle(onTranslation, onError);
+  }
+
+  /// What the gate's CLOSING edge does with the words already captured: close
+  /// the phrase in flight and publish it with `force`, so it survives the mute
+  /// re-check on the way back from the translator.
+  ///
+  /// Shared by the per-buffer gate in [_onPcm] and by [_onSendMutedChanged].
+  /// The mute listener cannot rely on the buffer path: it releases the mic, so
+  /// the buffer that would have carried the flush never arrives.
+  void _flushForGateClose(
+    void Function(String, String, String, String) onTranslation,
+  ) {
+    if (!_modelReady) {
+      _vad?.reset();
+      _resetPending();
+    } else if (AsrService.instance.isStreaming) {
+      DebugOverlay.log('stt gate — flushing what was already said');
+      _serialize(() => _flushAndSend(onTranslation, force: true));
+    } else {
+      _flushSegmenter(onTranslation, force: true);
+    }
   }
 
   /// Collect the VAD's chunks and re-join them into whole phrases.
@@ -1044,6 +1149,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         await AsrService.instance.reset();
       } catch (_) {}
     }
+    // Before anything else: a listener left registered on a module-level list
+    // outlives this streamer and would drive a dead recorder on the next call.
+    removeSendMutedListener(_onSendMutedChanged);
     _running = false;
     _modelReady = false;
     _gated = false;
@@ -1065,5 +1173,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     try {
       await _rec.stop();
     } catch (_) {}
+    _captureOpen = false;
   }
 }

@@ -57,6 +57,34 @@ void markTranslationDone() {
 /// call_screen resets it to false on connect.
 bool _sendMuted = false;
 bool get isSendMuted => _sendMuted;
-void setSendMuted(bool v) => _sendMuted = v;
+
+/// Notified on every *change* of [isSendMuted].
+///
+/// Reading the flag per audio buffer is enough to DROP the audio, but not to
+/// release the microphone: the mute is a one-off event and the capture callback
+/// only fires while a capture is open. The native STT streamer subscribes here
+/// so it can close its `record` capture outright — see the listener in
+/// `sway_local_mic_streamer_io.dart`. Without it a muted call still holds a
+/// SECOND capture open on a mic LiveKit is already using.
+final List<void Function(bool muted)> _sendMutedListeners = [];
+
+void addSendMutedListener(void Function(bool muted) listener) =>
+    _sendMutedListeners.add(listener);
+
+void removeSendMutedListener(void Function(bool muted) listener) =>
+    _sendMutedListeners.remove(listener);
+
+void setSendMuted(bool v) {
+  if (v == _sendMuted) return;
+  _sendMuted = v;
+  // Copy first: a listener is free to unsubscribe itself from inside the call.
+  for (final listener in List.of(_sendMutedListeners)) {
+    try {
+      listener(v);
+    } catch (_) {
+      // A broken listener must never take the mute itself down with it.
+    }
+  }
+}
 
 void registerCaptureContext(dynamic ctx) {}

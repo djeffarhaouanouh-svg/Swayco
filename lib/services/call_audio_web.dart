@@ -22,7 +22,27 @@ bool get isTranslationPlaying => _playing;
 // True when the user has muted their mic — SEND should not stream audio.
 bool _sendMuted = false;
 bool get isSendMuted => _sendMuted;
-void setSendMuted(bool v) => _sendMuted = v;
+
+// Mirrors the native API so the shared facade has one shape. Nothing subscribes
+// on web: that streamer clones the LiveKit track instead of opening a capture of
+// its own, so there is no second microphone to release on mute.
+final List<void Function(bool muted)> _sendMutedListeners = [];
+
+void addSendMutedListener(void Function(bool muted) listener) =>
+    _sendMutedListeners.add(listener);
+
+void removeSendMutedListener(void Function(bool muted) listener) =>
+    _sendMutedListeners.remove(listener);
+
+void setSendMuted(bool v) {
+  if (v == _sendMuted) return;
+  _sendMuted = v;
+  for (final listener in List.of(_sendMutedListeners)) {
+    try {
+      listener(v);
+    } catch (_) {}
+  }
+}
 
 // No-op — AudioContext.suspend/resume is unreliable on Safari (resume()
 // returns a JSPromise that never resolves, leaving capture dead). Half-duplex
