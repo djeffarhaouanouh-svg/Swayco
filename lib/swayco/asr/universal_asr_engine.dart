@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../../services/debug_overlay.dart';
-import '../speech/voice_clone_service.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine_native.dart';
 
@@ -39,33 +38,26 @@ class UniversalAsrEngine extends AsrEngine {
   /// gain nothing, since per-step accelerator hand-offs can cost more than they
   /// save.
   ///
-  /// ON, and the reason is systemic — not the decode number alone.
+  /// OFF, and measured — not assumed.
   ///
-  /// Measured on device, CoreML decodes SLOWER in isolation: 0.74 s of audio
-  /// took 1121 ms (1.51x real time) where the CPU does ~0.21x, the penalty
-  /// scaling inversely with clip length — a ~1 s fixed cost per inference, paid
-  /// by the decoder's token-by-token hand-offs.
+  /// On device, CoreML decodes SLOWER than the CPU: 0.74 s of audio took
+  /// 1121 ms (1.51x real time) where the CPU does ~0.21x, the penalty scaling
+  /// inversely with clip length — a ~1 s fixed cost per inference, paid by the
+  /// decoder's token-by-token hand-offs. The encoder does gain; the decoder
+  /// gives it all back and more.
   ///
-  /// It is worth it ONLY to free the CPU for on-device voice conversion
-  /// (OpenVoice), which runs there alongside WebRTC and the UI — see
-  /// [_providers]. When the converter is not actually running, CoreML is pure
-  /// loss: measured 1.3x real time vs ~0.2x on the CPU.
-  static const bool _tryAccelerator = true;
+  /// It was briefly ON, as a TRADE: accept the slower decode to hand a free CPU
+  /// to on-device voice conversion, which ran there alongside WebRTC and the UI.
+  /// With the converter gone, only the slow half of that trade is left, so the
+  /// accelerator is pure loss — ~6x the decode time for nothing. Turn this back
+  /// on only together with something CPU-hungry that needs the room.
+  static const bool _tryAccelerator = false;
 
   /// Ordered backends to attempt. Always ends on 'cpu': a build without the
   /// provider compiled in, or a device without the hardware, must NOT take the
   /// STT — and therefore the whole call — down with it.
-  ///
-  /// Gated on the converter actually being live. The accelerator only pays for
-  /// itself by handing the converter a free CPU; when the converter is NOT
-  /// running — iOS before sherpa is rebuilt against a shared ORT, or the models
-  /// absent — the NPU just makes recognition slower for nothing. So we use it
-  /// only when [VoiceCloneService] loaded, and it re-arms on the next call the
-  /// moment it does.
   static List<String> get _providers {
-    if (!_tryAccelerator || !VoiceCloneService.instance.isReady) {
-      return const ['cpu'];
-    }
+    if (!_tryAccelerator) return const ['cpu'];
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:

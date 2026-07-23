@@ -1,7 +1,28 @@
 # Voice cloning — the peer hears YOUR voice
 
-Status: **explored and measured, not integrated.** Everything below was run on
-real hardware; the dead ends are recorded so nobody re-runs them.
+Status: **built, shipped to a device, then REMOVED from the tree.** Everything
+below was run on real hardware; the dead ends are recorded so nobody re-runs
+them.
+
+It worked end to end on iOS — fingerprint captured in-call, sent over the data
+channel, peer's sentences re-voiced. It came out for one reason: **latency**.
+The conversion added ~2.1 s on top of a ~3.2 s pipeline, and a call where each
+sentence lands 5+ s late is a worse product than one where the voice is a
+stranger's. The quality of the timbre was never the blocker.
+
+**Read this before deciding it was the right call.** That 2.1 s is the
+*fixed-520* graph, the only one ever run on a phone. The dynamic-shape export
+(`eb2f6d8`) makes a sentence cost its own length instead of a flat 6 s pass, and
+`18f6c30` measured the ~6x on macOS — which would put re-voicing near ~0.35 s and
+the whole pipeline at ~3.5 s, i.e. cheap enough to keep. **Nobody has run the
+dynamic graph on a device.** The removal rests on a number the change it was
+removed before was designed to fix.
+
+To bring it back, restore `3fb6508` (engine), `b0bd145` (wiring), `eb2f6d8`
+(dynamic converter) and `18f6c30` (its validation) — then measure `revoiced` on
+the phone before judging. Re-read the accelerator note in
+`lib/swayco/asr/universal_asr_engine.dart` at the same time: the NPU is only
+worth its slower decode when something CPU-hungry like this needs the room.
 
 ## What the feature is
 

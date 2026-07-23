@@ -11,7 +11,6 @@ import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
-import 'speech/voice_clone_service.dart';
 import 'sway_mic_streamer_base.dart';
 import 'sway_mic_streamer_io.dart' show createCloudMicStreamer;
 
@@ -679,14 +678,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     _asrQueue = _asrQueue
         .then((_) =>
             _recognizeAndTranslate(samples, onTranslation, onError, force: force))
-        // Fingerprint MY voice off the same segment, so the peer can hear their
-        // translation in it (docs/voice-cloning.md). Deliberately last in the
-        // chain and not in the audio callback: it is ~50 ms of blocking FFI, and
-        // running it where frames arrive would drop them. Recognition keeps
-        // priority — this only ever delays the NEXT phrase's decode, and it
-        // stops firing once the fingerprint has stopped moving.
-        .then((_) => VoiceCloneService.instance
-            .observeMyVoice(samples, _sampleRate))
         .catchError((Object e) => DebugOverlay.log('stt queue error: $e'));
   }
 

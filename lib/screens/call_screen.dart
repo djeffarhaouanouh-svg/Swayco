@@ -25,7 +25,6 @@ import '../services/locations.dart';
 import '../services/permission_priming.dart';
 import '../services/profile_api.dart';
 import '../swayco/speech/speech_service.dart';
-import '../swayco/speech/voice_clone_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
@@ -167,16 +166,6 @@ class _CallScreenState extends State<CallScreen> {
   /// Data-channel key carrying "translation is on/off". Shared state: either side
   /// can cut it, and both pipelines stop — see [_toggleTranslation].
   static const String _kTranslationOnKey = 'xlateOn';
-
-  /// Data-channel keys carrying MY voice fingerprint (base64 of 1 KB) so the
-  /// peer can speak my translations in my voice — docs/voice-cloning.md.
-  ///
-  /// Sent by the SPEAKER, used by the LISTENER: the opposite direction to
-  /// [_kListenLangKey], because re-voicing happens where the audio is played.
-  /// Re-sent as it sharpens; the count lets the receiver weight it.
-  static const String _kVoiceFpKey = 'voiceFp';
-  static const String _kVoiceFpObsKey = 'voiceFpObs';
-  StreamSubscription<({Uint8List bytes, int observations})>? _voiceFpSub;
   final AudioPlayer _ttsPlayer = AudioPlayer();
   final FlutterTts _deviceTts = FlutterTts();
   String _deviceTtsLang = '';
@@ -667,7 +656,6 @@ class _CallScreenState extends State<CallScreen> {
     });
     unawaited(_loadPeerProfile());
     _wireDeviceTtsSignal();
-    _wireVoiceClone();
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
@@ -991,11 +979,6 @@ class _CallScreenState extends State<CallScreen> {
         })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
-        ..on<RoomDisconnectedEvent>((_) {
-          // The next call is a different person: keeping their timbre would put
-          // the last caller's voice on the next one's words.
-          VoiceCloneService.instance.forgetPeer();
-        })
         ..on<ParticipantConnectedEvent>((_) {
           // First remote joining = call answered â†’ silence the caller's
           // dial tone (no-op on native via the stub).
@@ -1178,17 +1161,6 @@ class _CallScreenState extends State<CallScreen> {
       if (xlateOn is bool) {
         DebugOverlay.log('peer wants translation: $xlateOn');
         unawaited(_applyPeerWantsTranslation(xlateOn));
-        return;
-      }
-      // The peer's voice, so their sentences come out of this phone sounding
-      // like them. Arrives before their first translation and sharpens after —
-      // a build without the feature simply never sends it.
-      final fp = m[_kVoiceFpKey]?.toString() ?? '';
-      if (fp.isNotEmpty) {
-        VoiceCloneService.instance.setPeerFingerprint(
-          base64Decode(fp),
-          observations: (m[_kVoiceFpObsKey] as num?)?.toInt() ?? 1,
-        );
         return;
       }
       // Translation is off: a packet still in flight from a peer on an older
@@ -1432,29 +1404,6 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Tell the peer which language to translate into for us.
   ///
-  /// Load the voice models and start shipping my fingerprint to the peer.
-  ///
-  /// Both halves are best-effort by design: no models, no peer, or a peer on a
-  /// build that ignores the key, and the call is exactly what it is today.
-  void _wireVoiceClone() {
-    unawaited(VoiceCloneService.instance.ensureLoaded());
-    _voiceFpSub = VoiceCloneService.instance.onFingerprintReady.listen((fp) {
-      final room = _room;
-      if (room == null || room.remoteParticipants.isEmpty) return;
-      DebugOverlay.log('voice: sending fingerprint (${fp.observations} obs)');
-      unawaited(room.localParticipant
-          ?.publishData(
-            Uint8List.fromList(utf8.encode(jsonEncode({
-              _kVoiceFpKey: base64Encode(fp.bytes),
-              _kVoiceFpObsKey: fp.observations,
-            }))),
-            reliable: true,
-            topic: _captionTopic,
-          )
-          .catchError((_) {}));
-    });
-  }
-
   /// Idempotent: only publishes when the announced value actually changed, so
   /// the re-announce on every participant/metadata event costs nothing.
   void _announceOutputLang(Room room) {
@@ -1781,8 +1730,6 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
-    unawaited(_voiceFpSub?.cancel());
-    VoiceCloneService.instance.forgetPeer();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
