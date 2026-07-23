@@ -1415,10 +1415,20 @@ const _fixSentenceEnd = /([.!?][)"'”’]?\s)|([。！？…]+["'”’)\]】�
  *     rest still streams.)
  * Returns the full raw content; sentences arrive via [onSentence].
  */
-async function fixStreamSentences({ base, key, model, prompt, noThink, json, onSentence }) {
+async function fixStreamSentences({
+  base, key, model, prompt, noThink, json, onSentence, onUsage,
+}) {
   const body = {
     model, messages: [{ role: 'user', content: prompt }],
     temperature: 0, max_tokens: 800, stream: true,
+    // A stream reports no token counts unless asked: the provider then appends
+    // one final chunk carrying `usage` and no choices. We want it for
+    // `prompt_cache_hit_tokens` — the instruction block is byte-identical on
+    // every call and sits before the variable text, so it SHOULD be served from
+    // cache at 1/50th the input price. That is the difference between a ceiling
+    // of ~$12.5k and ~$5k per million hour-long calls, and it had been assumed
+    // rather than observed. Costs one extra SSE chunk.
+    stream_options: { include_usage: true },
   };
   if (noThink) body.thinking = { type: 'disabled' };
   const r = await fetch(`${base}/chat/completions`, {
@@ -1495,8 +1505,12 @@ async function fixStreamSentences({ base, key, model, prompt, noThink, json, onS
       if (!line.startsWith('data:')) continue;
       const data = line.slice(5).trim();
       if (data === '[DONE]') continue;
-      let delta;
-      try { delta = JSON.parse(data)?.choices?.[0]?.delta?.content; } catch { continue; }
+      let chunk;
+      try { chunk = JSON.parse(data); } catch { continue; }
+      // The usage chunk arrives last and carries no choices — read it before
+      // the delta check below drops it.
+      if (chunk?.usage && onUsage) onUsage(chunk.usage);
+      const delta = chunk?.choices?.[0]?.delta?.content;
       if (typeof delta !== 'string' || !delta) continue;
       full += delta;
       pump(false);
@@ -1641,9 +1655,11 @@ app.post('/translation/fix', _limText, async (req, res) => {
     const isJson = route === 'repair';
     try {
       let any = false;
+      let usage = null;
       const full = await fixStreamSentences({
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
         json: isJson,
+        onUsage: (u) => { usage = u; },
         onSentence: (s) => {
           const t = s.trim();
           if (!t || t.toUpperCase().startsWith(FIX_UNCLEAR)) return;
@@ -1680,7 +1696,18 @@ app.post('/translation/fix', _limText, async (req, res) => {
         }
         if (rr.out) { send({ out: rr.out }); any = true; fixed = rr.fixed; }
       }
-      send({ done: true, engine, route, fixed, unclear: !any });
+      // Token counts ride along so the on-screen panel can show the cache hit
+      // rate live, instead of it being estimated. `hit` is the slice of the
+      // prompt served from cache at 1/50th the price; on a warm cache it should
+      // be nearly the whole instruction block, and a `hit` that stays at 0 call
+      // after call means the prefix is not stable and the real bill is ~2.5x
+      // what it should be.
+      send({
+        done: true, engine, route, fixed, unclear: !any,
+        hit: usage?.prompt_cache_hit_tokens ?? 0,
+        miss: usage?.prompt_cache_miss_tokens ?? 0,
+        outTok: usage?.completion_tokens ?? 0,
+      });
     } catch (e) {
       console.error('fix stream failed', e?.message || e);
       send({ done: true, unclear: true });

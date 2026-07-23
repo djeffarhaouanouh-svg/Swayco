@@ -128,6 +128,9 @@ class _VadAsrStreamer implements SwayMicStreamer {
   set peerGender(String value) {}
 
   @override
+  set onDropped(void Function(String heard)? value) {}
+
+  @override
   void notePeerUtterance(String orig) {}
 
   /// Each callback is one independent VAD-clipped utterance, so the caller must

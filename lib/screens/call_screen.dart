@@ -147,7 +147,11 @@ class _CallScreenState extends State<CallScreen> {
   void _onMyTranscript() {
     final line = widget.translation.localTranscript?.value;
     if (line == null) return;
-    _addTurn(_SpokenTurn(mine: true, text: line.text));
+    _addTurn(_SpokenTurn(
+      mine: true,
+      text: line.text,
+      delivered: line.delivered,
+    ));
   }
 
   bool _micOn = true;
@@ -2305,9 +2309,12 @@ class _LowCreditCounter extends StatelessWidget {
 /// la langue de CE device (ma phrase telle que je l'ai dite ; celle du pair
 /// telle qu'elle m'arrive traduite).
 class _SpokenTurn {
-  _SpokenTurn({required this.mine, required this.text});
+  _SpokenTurn({required this.mine, required this.text, this.delivered = true});
   final bool mine;
   final String text;
+
+  /// Mine only: heard, but the peer never got it. Drawn dimmed.
+  final bool delivered;
 }
 
 /// La légende de l'appel. Au repos : les deux derniers tours, en bulles de
@@ -2444,18 +2451,23 @@ class _TurnBubble extends StatelessWidget {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
+                  // Same accent, thinner — a phrase nobody received reads as a
+                  // faded version of one that landed, not as another kind of
+                  // message. No new colour: the alpha carries it.
                   color: turn.mine
-                      ? SC.accent.withValues(alpha: 0.32)
+                      ? SC.accent.withValues(alpha: turn.delivered ? 0.32 : 0.12)
                       : Colors.black.withValues(alpha: 0.42),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white
+                        .withValues(alpha: turn.delivered ? 0.18 : 0.10),
                   ),
                 ),
                 child: Text(
                   turn.text,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Colors.white
+                        .withValues(alpha: turn.delivered ? 1.0 : 0.55),
                     fontSize: 14.5,
                     height: 1.35,
                   ),

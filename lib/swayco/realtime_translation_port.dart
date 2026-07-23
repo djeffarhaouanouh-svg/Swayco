@@ -20,9 +20,18 @@ enum TranslationFeedbackPhase {
 /// repeated sentence still counts as new (a ValueNotifier swallows an
 /// identical value).
 class SpokenLine {
-  const SpokenLine({required this.seq, required this.text});
+  const SpokenLine({
+    required this.seq,
+    required this.text,
+    this.delivered = true,
+  });
   final int seq;
   final String text;
+
+  /// False when the phrase was heard but never reached the peer — the repair
+  /// route declined it. The caption still shows it, dimmed, so the speaker can
+  /// see it was understood by nobody and simply say it again.
+  final bool delivered;
 }
 
 /// Abstraction for bidirectional realtime speech translation.

@@ -74,6 +74,18 @@ abstract class SwayMicStreamer {
   /// cloud paths translate off-device and ignore it.
   set peerGender(String value) {}
 
+  /// A phrase was heard but nothing was sent: the repair route could not read
+  /// it and declined (the UNCLEAR sentinel in `backend/server.js`), so the peer
+  /// gets silence — deliberately, because a fluent wrong sentence is
+  /// undetectable by them while a missing one is recoverable ("répète ?").
+  ///
+  /// Carries the raw transcript so the SPEAKER's own screen can still show what
+  /// was heard. Without it the phrase vanished on both sides at once, and there
+  /// was no way to tell "it did not understand me" from "the call is broken" —
+  /// you just watched an empty screen. Only the on-device path can drop a
+  /// phrase this way; the cloud paths never see the decline.
+  set onDropped(void Function(String heard)? value) {}
+
   /// Record, in arrival order, something the PEER just said — their ORIGINAL
   /// text, not the translation we heard. It becomes context for OUR next
   /// utterance: a reply ("oui, avec plaisir") is meaningless without the

@@ -241,6 +241,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   @override
   set peerGender(String value) => _peerGender = value.trim();
 
+  void Function(String heard)? _onDropped;
+
+  @override
+  set onDropped(void Function(String heard)? value) => _onDropped = value;
+
   @override
   void notePeerUtterance(String orig) => _note('peer', orig);
 
@@ -847,11 +852,19 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       return;
     }
     if (fixed.unclear) {
-      // No model could read it. Drop rather than speak an invention: a fluent
-      // wrong sentence is undetectable by the peer, a missing one is
-      // recoverable ("répète ?"). unclear is only set when NO sentence was
-      // published, so there is nothing half-said to take back.
+      // No model could read it. Nothing goes to the PEER rather than an
+      // invention: a fluent wrong sentence is undetectable by them, a missing
+      // one is recoverable ("répète ?"). unclear is only set when NO sentence
+      // was published, so there is nothing half-said to take back.
+      //
+      // But it still surfaces on MY screen, greyed. Dropping it silently on
+      // both sides at once left nothing to react to — no way to tell "it did
+      // not understand me" from "the call is broken", just an empty panel. Now
+      // the raw transcript is there, visibly not delivered, and the obvious
+      // move (say it again) is the right one. Muted follows the same rule as a
+      // real send: what was said with the mic open is shown.
       DebugOverlay.log('stt DROPPED unreadable transcript: "$orig"');
+      if (!isSendMuted || force) _onDropped?.call(orig);
       _note('me', orig);
       return;
     }
@@ -864,6 +877,19 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       'stt fix[${fixed.route}](${fixed.engine}) '
       '${fixed.repaired ? "MOT CHANGE" : "sans effet"} → "${fixed.text}"',
     );
+    // What the call actually cost, rather than what it was assumed to cost.
+    // `cache` is the share of the prompt served at 1/50th the input price: the
+    // instruction block never varies and comes first, so a warm cache should
+    // put this in the 80-95% range. Stuck near 0% means the prefix moved and
+    // the bill is ~2.5x. `out` is the tokens the model wrote — once the prompt
+    // caches, that is where nearly all the money goes.
+    final promptTok = fixed.cacheHit + fixed.cacheMiss;
+    if (promptTok > 0) {
+      final pct = (fixed.cacheHit * 100 / promptTok).round();
+      DebugOverlay.log(
+        '  cache  : $pct% ($promptTok prompt, out ${fixed.outTokens})',
+      );
+    }
     if (fixed.repaired) {
       DebugOverlay.log('  brut   : "$orig"');
       DebugOverlay.log('  repare : "${fixed.fixed}"');

@@ -48,10 +48,11 @@ class SwayStreamTranslation extends ChangeNotifier
   ValueListenable<SpokenLine> get localTranscript => _localTranscript;
 
   /// Appelé par le pipeline dès qu'une phrase est reconnue au micro.
-  void _emitLocalTranscript(String text) {
+  void _emitLocalTranscript(String text, {bool delivered = true}) {
     final t = text.trim();
     if (t.isEmpty) return;
-    _localTranscript.value = SpokenLine(seq: ++_transcriptSeq, text: t);
+    _localTranscript.value =
+        SpokenLine(seq: ++_transcriptSeq, text: t, delivered: delivered);
   }
 
   static const String _captionTopic = 'swayco-chat';
@@ -186,6 +187,13 @@ class SwayStreamTranslation extends ChangeNotifier
     _sendStreamer = sendStreamer;
     // The peer's profile may already have landed while we were connecting.
     if (_peerGender.isNotEmpty) sendStreamer.peerGender = _peerGender;
+
+    // A phrase the repair route refused: it never reaches the peer, but it
+    // still lands on my own caption, dimmed. Goes through the same emitter as a
+    // normal line — nothing here publishes, so there is no path by which an
+    // unreadable phrase could reach the other side.
+    sendStreamer.onDropped =
+        (heard) => _emitLocalTranscript(heard, delivered: false);
 
     // The on-device streamer releases the mic after ~20 s of silence. Once it
     // has, it can no longer hear the user start talking again — so LiveKit's

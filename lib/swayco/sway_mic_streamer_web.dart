@@ -93,6 +93,9 @@ class _WebSwayMicStreamer implements SwayMicStreamer {
   set peerGender(String value) {}
 
   @override
+  set onDropped(void Function(String heard)? value) {}
+
+  @override
   void notePeerUtterance(String orig) {}
 
   @override

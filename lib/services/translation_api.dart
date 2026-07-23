@@ -367,6 +367,9 @@ class TranscriptFix {
     this.engine = '',
     this.fixed = '',
     this.route = '',
+    this.cacheHit = 0,
+    this.cacheMiss = 0,
+    this.outTokens = 0,
     String raw = '',
   }) : _raw = raw;
   final String text;
@@ -380,6 +383,18 @@ class TranscriptFix {
 
   /// Which prompt the backend used: `repair`, `translate` or `repair-only`.
   final String route;
+
+  /// Prompt tokens served from the provider's cache, and those billed at full
+  /// price. The instruction block is identical on every call and sits before
+  /// the variable text, so [cacheHit] should be nearly all of the prompt — a
+  /// hit rate stuck at zero means the prefix is not stable and the bill is
+  /// ~2.5x what it should be. Zero when the backend reported nothing.
+  final int cacheHit;
+  final int cacheMiss;
+
+  /// Tokens the model WROTE. Once the prompt is cached this is the bulk of the
+  /// cost, so it is the number to watch before trying to shorten the prompt.
+  final int outTokens;
 
   /// True when the repair changed actual WORDS, not just how they were
   /// separated.
@@ -518,6 +533,7 @@ Future<TranscriptFix> fetchTranscriptFixStream({
 
     final sentences = <String>[];
     var route = '', engine = '', fixed = '';
+    var cacheHit = 0, cacheMiss = 0, outTokens = 0;
     var unclear = false;
     var buf = '';
     await for (final chunk in resp.stream.transform(utf8.decoder)) {
@@ -544,6 +560,9 @@ Future<TranscriptFix> fetchTranscriptFixStream({
           if (j['route'] is String) route = j['route'] as String;
           if (j['engine'] is String) engine = j['engine'] as String;
           if (j['fixed'] is String) fixed = j['fixed'] as String;
+          cacheHit = (j['hit'] as num?)?.toInt() ?? 0;
+          cacheMiss = (j['miss'] as num?)?.toInt() ?? 0;
+          outTokens = (j['outTok'] as num?)?.toInt() ?? 0;
           unclear = j['unclear'] == true;
         }
       }
@@ -551,7 +570,10 @@ Future<TranscriptFix> fetchTranscriptFixStream({
 
     final full = sentences.join(' ');
     if (unclear || full.isEmpty) {
-      return TranscriptFix(text: '', unclear: true, engine: engine, route: route);
+      return TranscriptFix(
+        text: '', unclear: true, engine: engine, route: route,
+        cacheHit: cacheHit, cacheMiss: cacheMiss, outTokens: outTokens,
+      );
     }
     return TranscriptFix(
       text: full,
@@ -559,6 +581,9 @@ Future<TranscriptFix> fetchTranscriptFixStream({
       engine: engine,
       route: route,
       fixed: fixed,
+      cacheHit: cacheHit,
+      cacheMiss: cacheMiss,
+      outTokens: outTokens,
       raw: text,
     );
   } catch (_) {
