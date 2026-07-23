@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../../services/debug_overlay.dart';
+import '../speech/voice_clone_service.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine_native.dart';
 
@@ -45,21 +46,26 @@ class UniversalAsrEngine extends AsrEngine {
   /// scaling inversely with clip length — a ~1 s fixed cost per inference, paid
   /// by the decoder's token-by-token hand-offs.
   ///
-  /// It stays on anyway because the CPU is the scarce resource here, not the
-  /// NPU. On-device voice conversion (OpenVoice) is going to run on that CPU,
-  /// alongside WebRTC and the UI; leaving Whisper there means the two fight for
-  /// it. Moving recognition onto an otherwise idle NPU buys the conversion a
-  /// free CPU, and the end-to-end call is what matters, not one stage of it.
-  /// Confirmed by ear on a live call before it was measured.
-  ///
-  /// Re-measure END-TO-END once the converter is in, not decode in isolation.
+  /// It is worth it ONLY to free the CPU for on-device voice conversion
+  /// (OpenVoice), which runs there alongside WebRTC and the UI — see
+  /// [_providers]. When the converter is not actually running, CoreML is pure
+  /// loss: measured 1.3x real time vs ~0.2x on the CPU.
   static const bool _tryAccelerator = true;
 
   /// Ordered backends to attempt. Always ends on 'cpu': a build without the
   /// provider compiled in, or a device without the hardware, must NOT take the
   /// STT — and therefore the whole call — down with it.
+  ///
+  /// Gated on the converter actually being live. The accelerator only pays for
+  /// itself by handing the converter a free CPU; when the converter is NOT
+  /// running — iOS before sherpa is rebuilt against a shared ORT, or the models
+  /// absent — the NPU just makes recognition slower for nothing. So we use it
+  /// only when [VoiceCloneService] loaded, and it re-arms on the next call the
+  /// moment it does.
   static List<String> get _providers {
-    if (!_tryAccelerator) return const ['cpu'];
+    if (!_tryAccelerator || !VoiceCloneService.instance.isReady) {
+      return const ['cpu'];
+    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
