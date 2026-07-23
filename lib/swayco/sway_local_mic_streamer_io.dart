@@ -621,6 +621,11 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       // on the boundary between two chunks — i.e. in a silence.
       if (_pendingMs >= _maxMergedMs) {
         _sendPending(onTranslation, onError, why: 'no pause, ceiling reached');
+      } else {
+        // Decode it now, while the merge wait runs. Most phrases arrive as one
+        // segment and nothing follows, so this result is the final one and the
+        // wait costs nothing instead of a second.
+        _speculate();
       }
     }
   }
@@ -668,6 +673,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // listen. Losing that phrase — the last thing you said before going quiet —
     // was the real bug. Finalised while unmuted ⇒ publish, full stop.
     final force = _pendingForce || !isSendMuted;
+    // Reuse the decode started during the merge wait, but only if it covers
+    // EXACTLY this audio. A phrase that grew since falls back to a fresh decode
+    // — translating a stale half-sentence would be worse than the wait.
+    final spec = _speculativeSamples == samples.length ? _speculative : null;
     _resetPending();
 
     // QUEUED, never fired in parallel. The universal engine drops a transcribe
@@ -681,9 +690,48 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     DebugOverlay.log('stt phrase ${ms}ms peak=${peak.toStringAsFixed(3)} '
         '($why) → queued');
     _asrQueue = _asrQueue
-        .then((_) =>
-            _recognizeAndTranslate(samples, onTranslation, onError, force: force))
+        .then((_) => _recognizeAndTranslate(samples, onTranslation, onError,
+            force: force, decoded: spec))
         .catchError((Object e) => DebugOverlay.log('stt queue error: $e'));
+  }
+
+  /// A decode started DURING the merge wait, on the phrase as it stands.
+  ///
+  /// [_mergeGapMs] of silence has to pass before a phrase is closed, because a
+  /// sentence can arrive as several VAD segments (a breath, a comma) and they
+  /// have to be rejoined before the recogniser sees them. That wait is dead
+  /// time: the audio is already in hand and nothing computes. Measured on a real
+  /// call it is ~700 ms, on top of the VAD's own 300 ms, in front of a ~600 ms
+  /// decode — a full second before any work starts.
+  ///
+  /// So the decode starts as soon as a segment lands. If nothing follows, the
+  /// answer is ready when the wait expires and the phrase costs no decode at
+  /// all. If the speaker does continue, this result covers the wrong audio and
+  /// is thrown away.
+  ///
+  /// Two rules keep the bad case bounded. It runs on [_asrQueue] like every
+  /// other decode — the engine DROPS a request that lands while it is busy
+  /// (`if (_busy) return ''`), and a dropped one is how the second half of a cut
+  /// sentence used to vanish. And only one is ever in flight, so a real phrase
+  /// waits behind at most one speculative decode, never a queue of them.
+  Future<String>? _speculative;
+
+  /// Sample count [_speculative] covers. A phrase that has grown since compares
+  /// unequal and takes the slow path — the guard against speaking a translation
+  /// of half a sentence.
+  int _speculativeSamples = -1;
+
+  void _speculate() {
+    if (_speculative != null || _pending.isEmpty) return;
+    final samples = Float32List.fromList(_pending);
+    _speculativeSamples = samples.length;
+    final f = _asrQueue.then((_) => AsrService.instance.transcribe(samples));
+    _speculative = f;
+    // Keep the chain going whatever happens, so one failed speculation cannot
+    // wedge every phrase after it.
+    _asrQueue = f.then((_) {}, onError: (Object e) {
+      DebugOverlay.log('stt speculative error: $e');
+    });
   }
 
   void _resetPending() {
@@ -691,6 +739,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     _pendingEndSample = 0;
     _pendingLastMs = 0;
     _pendingPeak = 0;
+    _speculative = null;
+    _speculativeSamples = -1;
     _pendingForce = false;
   }
 
@@ -774,10 +824,15 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError, {
     bool force = false,
+    Future<String>? decoded,
   }) async {
     try {
-      final orig = await AsrService.instance.transcribe(samples);
+      // [decoded] is the speculative decode started during the merge wait, and
+      // it covers exactly these samples — awaiting it returns at once when it
+      // finished inside the wait, which is the whole point of starting it early.
+      final orig = await (decoded ?? AsrService.instance.transcribe(samples));
       final durationMs = (samples.length / _sampleRate * 1000).round();
+      if (decoded != null) DebugOverlay.log('stt decode reused (merge wait)');
 
       // the recogniser captions silence and noise with subtitle boilerplate, and it
       // does it confidently. Unfiltered, the peer's phone says a sentence nobody
