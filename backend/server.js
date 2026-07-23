@@ -1214,10 +1214,15 @@ const FIX_HINTS = {
   // What it cannot do: recover a cut that produces a coherent sentence.
   // "Champ de Mars" heard as "en mars" is gone — "on se retrouve en mars devant
   // la tour" is perfectly ordinary French, and no rule reaches it.
-  fr: '\nFrench: liaison hides the word boundary — the recogniser cuts between '
-    + 'sounds and produces real words that fit nowhere ("ton loyer" -> "ton roi", '
-    + '"du judo" -> "du jeu doit"). A word that makes no sense where it stands is '
-    + 'a bad cut: re-cut the SOUNDS, keeping the pronunciation identical.',
+  // Short on purpose, and measured: the long version below it earned nothing.
+  // Cached prompt tokens stop at 128 no matter how long the prompt runs, so
+  // every token past that is billed at the full rate on EVERY call — a longer
+  // rule is simply a more expensive one. Cut from ~55 tokens to ~20, the repairs
+  // are identical (5/5, "roi" -> "loyer" included) and the refusals are
+  // identical, for ~33 fewer billed tokens per call: ~$4.4k -> ~$3.1k per
+  // million hour-long calls. Do not grow it back without re-measuring both.
+  fr: '\nFrench: liaison slides the word boundary, so a real word lands where '
+    + 'none fits ("ton loyer" -> "ton roi"). Re-cut the sounds, not the letters.',
   de: '\nGerman: umlauts change the word (nutzen/nützen, schon/schön).',
   it: '\nItalian: a final accented vowel marks the passato remoto (lasciò, tornò); '
     + 'without it the verb becomes present tense.',
