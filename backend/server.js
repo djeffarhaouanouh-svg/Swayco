@@ -1218,72 +1218,19 @@ const FIX_HINTS = {
     + 'sounds and produces real words that fit nowhere ("ton loyer" -> "ton roi", '
     + '"du judo" -> "du jeu doit"). A word that makes no sense where it stands is '
     + 'a bad cut: re-cut the SOUNDS, keeping the pronunciation identical.',
-  es: '\nSpanish: b and v are the SAME sound, h is silent, and s/z/c merge for '
-    + 'most speakers, so the recogniser lands on a real word that fits nowhere '
-    + '("tuvo" -> "tubo", "a ver" -> "haber", "hola" -> "ola", "cocer" -> "coser"). '
-    + 'Written accents also carry the word: esta/está, el/él, si/sí, mas/más. Pick '
-    + 'the spelling the sentence needs; never change how it sounds.',
-  pt: '\nPortuguese: nasal and unstressed vowels collapse, and the accent IS the '
-    + 'word — avô/avó, e/é, por/pôr, esta/está. h is silent and s/z/ç merge, so a '
-    + 'real word can land where nothing fits ("mas" and "mais", coser/cozer, '
-    + 'caça/cassa). Restore the spelling the sentence requires, same sounds.',
-  en: '\nEnglish: homophones are everywhere and every one of them is a real word — '
-    + 'their/there/they are, to/too/two, your/you are, its/it is, hear/here, know/no. '
-    + 'Word boundaries slide too ("a lot"/"allot", "ice cream"/"I scream", '
-    + '"an aim"/"a name"), and contractions get dropped. A word that fits nowhere '
-    + 'is the wrong member of a homophone set: swap it, keep the sound.',
-  ru: '\nRussian: unstressed а and о sound identical (аканье) and final consonants '
-    + 'devoice, so the recogniser writes a real but wrong word — код/кот, луг/лук, '
-    + 'пруд/прут, компания/кампания. The signs ь and ъ get dropped, and -ться/-тся '
-    + 'are confused constantly. Restore the spelling the sentence needs; the sounds '
-    + 'do not change.',
-  ar: '\nArabic: short vowels are not written, so one consonant skeleton has many '
-    + 'readings and the recogniser picks the wrong one. The hamza forms (أ إ آ ا) '
-    + 'get flattened, ة and ه are swapped at word end, ى and ي are confused, and '
-    + 'the article ال is glued or split wrongly. Choose the reading the sentence '
-    + 'requires; keep the consonants.',
-  zh: '\nChinese: the same sound writes many different characters (同音字), and each '
-    + 'wrong one is a real word, so nothing in the sentence contradicts it — 的/得/地, '
-    + '在/再, 是/事, 做/作, 他/她/它. There are no spaces, so the segmentation slides '
-    + 'too. A character that does not fit is a conversion error: swap it for the '
-    + 'homophone that does, same reading.',
-  de: '\nGerman: umlauts change the word (nutzen/nützen, schon/schön), final '
-    + 'consonants devoice (Rad/Rat, Bund/bunt), and das/dass are confused every '
-    + 'time. Compounds get split or glued wrongly ("Vaterland" -> "Vater Land"), '
-    + 'which turns one word into two that fit nowhere. Rejoin or resplit as the '
-    + 'sentence requires, keeping the pronunciation.',
+  de: '\nGerman: umlauts change the word (nutzen/nützen, schon/schön).',
   it: '\nItalian: a final accented vowel marks the passato remoto (lasciò, tornò); '
-    + 'without it the verb becomes present tense. Doubled consonants ARE the word '
-    + '(nono/nonno, casa/cassa, pala/palla, sete/sette) and the recogniser drops or '
-    + 'adds them freely. The apostrophe slides too, gluing or splitting the article. '
-    + 'Restore the spelling the sentence needs, keeping the pronunciation.',
-  nl: '\nDutch: één = the number one, een = the article. ij and ei sound the same '
-    + '(wij/wei, mijn/mein), and word-final d/t is written wrong constantly '
-    + '(wordt/word, hij vindt). Compounds get split into two real words that fit '
-    + 'nowhere ("stationsplein" -> "stations plein"). Rejoin them and keep the '
-    + 'sounds exactly as they are.',
+    + 'without it the verb becomes present tense.',
+  nl: "\nDutch: één = the number one, een = the article 'a'.",
   pl: '\nPolish: the endings ę/ą carry the person of the verb — never change them. '
-    + 'Leave quoted foreign names as they are. ó and u sound identical, as do ż/rz '
-    + 'and ch/h, so a real but wrong word appears where nothing fits (może/morze, '
-    + 'bóg/Bug). Restore the spelling the sentence needs, same pronunciation.',
-  cs: '\nCzech: keep diminutives. Never expand an abbreviation or a currency. i and '
-    + 'y sound identical (byl/bil, mýt/mít) and final consonants devoice (led/let, '
-    + 'hrad/hrat), so the recogniser writes a real word that fits nowhere. Choose '
-    + 'the spelling the sentence requires; the sound does not move.',
+    + 'Leave quoted foreign names as they are.',
+  cs: '\nCzech: keep diminutives. Never expand an abbreviation or a currency.',
   tr: '\nTurkish: respect vowel harmony and ı/i. When two words were glued, split '
-    + 'them back into the ORIGINAL verb. The soft ğ is often dropped and the suffix '
-    + 'chain gets cut in the wrong place, which leaves a real word standing where '
-    + 'nothing fits (dağ/da, yüz/yüzü). Rebuild the suffixes the sentence needs, '
-    + 'keeping the pronunciation.',
+    + 'them back into the ORIGINAL verb.',
   ko: '\nKorean: 띄어쓰기 (spacing) is wrong constantly — re-space it. Check 받침 '
-    + 'and the particles. ㅐ and ㅔ have merged in speech (내/네, 개/게), and 된소리 '
-    + 'is written inconsistently, so a real but wrong word lands where nothing '
-    + 'fits. Restore the spelling the sentence needs; never change the sound.',
+    + 'and the particles.',
   ja: '\nJapanese: wrong KANJI for the right sound (同音異義語). A word that does not '
-    + 'fit is a conversion error — swap it for the homophone that does, same reading. '
-    + 'Long vowels and っ get lost too (おじさん/おじいさん, きて/きって), and the '
-    + 'particles は/わ and へ/え are written with the wrong kana. Fix the spelling, '
-    + 'never the sound.',
+    + 'fit is a conversion error — swap it for the homophone that does, same reading.',
 };
 
 const _cjk = /[぀-ヿ㐀-䶿一-鿿가-힯]/;
