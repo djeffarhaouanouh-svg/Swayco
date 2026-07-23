@@ -830,11 +830,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       // STREAMING: each SENTENCE is published the instant it lands, so a long
       // turn (the peer talking without pausing → one big segment → a multi-
       // sentence translation) reaches the far end piece by piece instead of as
-      // one late block. The source caption rides the FIRST packet only — it is
-      // the whole utterance, not one sentence of it, and repeating it would
-      // duplicate on the peer. A short repaired phrase arrives as one sentence,
-      // exactly like before.
-      var firstSentence = true;
+      // one late block. The caption is NOT emitted here — it is shown once,
+      // below, as the REPAIRED source, never the raw STT.
       fixed = await fetchTranscriptFixStream(
         text: orig,
         from: _sourceLang,
@@ -842,9 +839,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         authorGender: _myGender.isEmpty ? null : _myGender,
         peerGender: _peerGender.isEmpty ? null : _peerGender,
         onSentence: (sentence) {
-          _publish(firstSentence ? orig : '', sentence, onTranslation,
-              force: force);
-          firstSentence = false;
+          _publish('', sentence, onTranslation, force: force);
         },
       );
     } catch (e) {
@@ -873,6 +868,18 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     if (fixed.repaired) {
       DebugOverlay.log('  brut   : "$orig"');
       DebugOverlay.log('  repare : "${fixed.fixed}"');
+    }
+
+    // The caption on MY screen shows what DeepSeek repaired, not what the
+    // recogniser misheard ("doli prenne" → "doliprane"). It lands here, after
+    // the round trip, rather than the instant I speak — deliberately: a clean
+    // caption a second late beats a wrong one now. Empty trans so it only paints
+    // the local bubble and publishes nothing to the peer; muted follows the same
+    // rule as a real send. Falls back to the raw orig only when there is no
+    // repair to show (the translate route produces no `fixed`).
+    final caption = fixed.fixed.isNotEmpty ? fixed.fixed : orig;
+    if (!isSendMuted || force) {
+      onTranslation(caption, '', _targetLang, '');
     }
     _note('me', orig);
   }
