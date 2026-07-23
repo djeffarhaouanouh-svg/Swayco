@@ -552,9 +552,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       return;
     }
 
-    // Clip engine (universal): the VAD decides where phrases start and end. It
-    // keeps its own pre-roll, so the first syllable is never clipped — which the
-    // mean-square VAD, firing only once the level was already up, used to eat.
+    // Clip engine (universal): the VAD decides where phrases start and end.
+    //
+    // It was assumed here to keep its own pre-roll, so that the first syllable
+    // survived. That was never verified and `SileroVadModelConfig` exposes no
+    // padding knob (model, threshold, minSilenceDuration, minSpeechDuration,
+    // windowSize, maxSpeechDuration — nothing else), so treat it as unknown:
+    // reported from a live call, "T'aime le français" came back as "Aime le
+    // français" and "Laime le français". Onset clipping fits those; it does NOT
+    // fit "que tu aimes le français" from the same sentence, which has words
+    // ADDED, so at least one other cause is in play.
     final vad = _vad;
     if (vad == null) return; // still downloading — nothing to segment with
 
@@ -765,6 +772,13 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     vad.flush();
     _drainSegmenter(onTranslation, _onError, force: force);
     vad.reset();
+    // Mark the phrase itself, not just whatever the flush drained. `force` used
+    // to reach _drainSegmenter only, which sets `_pendingForce` as it appends
+    // segments — so a phrase ALREADY complete in `_pending` when the mute landed
+    // drained nothing, kept `_pendingForce` false, and was dropped by the mute
+    // re-check after its round trip. That is the common case, not a corner one:
+    // you finish a sentence, you mute to listen, and the sentence is gone.
+    if (force) _pendingForce = true;
     // And the phrase we were still assembling: without this it would sit in the
     // buffer until the user next spoke, and be spliced onto whatever they said.
     _sendPending(onTranslation, _onError, why: 'gate closed');
