@@ -5,23 +5,43 @@ below was run on real hardware; the dead ends are recorded so nobody re-runs
 them.
 
 It worked end to end on iOS — fingerprint captured in-call, sent over the data
-channel, peer's sentences re-voiced. It came out for one reason: **latency**.
-The conversion added ~2.1 s on top of a ~3.2 s pipeline, and a call where each
-sentence lands 5+ s late is a worse product than one where the voice is a
-stranger's. The quality of the timbre was never the blocker.
+channel, peer's sentences re-voiced. It came out because of **what it sounded
+like on Japanese**, which is half the launch market.
 
-**Read this before deciding it was the right call.** That 2.1 s is the
-*fixed-520* graph, the only one ever run on a phone. The dynamic-shape export
-(`eb2f6d8`) makes a sentence cost its own length instead of a flat 6 s pass, and
-`18f6c30` measured the ~6x on macOS — which would put re-voicing near ~0.35 s and
-the whole pipeline at ~3.5 s, i.e. cheap enough to keep. **Nobody has run the
-dynamic graph on a device.** The removal rests on a number the change it was
-removed before was designed to fix.
+An earlier version of this note blamed latency. That was wrong, and the
+correction matters because it changes what would have to be true to bring the
+feature back. Speed was never the blocker.
 
-To bring it back, restore `3fb6508` (engine), `b0bd145` (wiring), `eb2f6d8`
-(dynamic converter) and `18f6c30` (its validation) — then measure `revoiced` on
-the phone before judging. Re-read the accelerator note in
-`lib/swayco/asr/universal_asr_engine.dart` at the same time: the NPU is only
+### The real reason: nothing to match the speaker's gender in Japanese
+
+The converter extrapolates: `target' = source + 1.5*(target - source)`. The
+further the base voice sits from the fingerprint, the further `alpha` pushes,
+and past some distance it goes metallic. So the size of that gap decides how the
+feature sounds.
+
+Everywhere with a gendered voice pair, the gap is already small before the
+converter runs: `ttsSpecForLang(lang, gender:)` picks the base voice by the
+SPEAKER's account gender, so a male speaker's fingerprint lands on a male base
+voice. Japanese has no pair — `tts_catalogue.dart` carries exactly one voice for
+it ("~110 MB, one voice"). There is nothing for the selector to choose, so a
+male French fingerprint is extrapolated onto whatever that single voice is.
+Worst case for this model, and it is structural, not a tuning mistake.
+
+### What would have to change first
+
+**A gendered Japanese voice pair**, the same treatment the other launch
+languages already got. Until then the conversion has nothing to aim at and the
+rest is beside the point.
+
+Only after that is the cost worth re-measuring. For the record, since it was
+measured: on a phone the fixed-520 graph cost ~2.1 s per sentence; the
+dynamic-shape export (`eb2f6d8`, validated on macOS in `18f6c30`) makes a
+sentence cost its own length, which on the ~2.1 s phrases in a real call works
+out near ~0.9 s. Never run on a device.
+
+To restore: `3fb6508` (engine), `b0bd145` (wiring), `eb2f6d8` (dynamic
+converter), `18f6c30` (its validation). Re-read the accelerator note in
+`lib/swayco/asr/universal_asr_engine.dart` at the same time — the NPU is only
 worth its slower decode when something CPU-hungry like this needs the room.
 
 ## What the feature is
