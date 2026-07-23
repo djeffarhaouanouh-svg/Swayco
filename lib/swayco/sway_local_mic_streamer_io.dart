@@ -655,7 +655,15 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     final samples = Float32List.fromList(_pending);
     final ms = _pendingMs;
     final peak = _pendingPeak;
-    final force = _pendingForce;
+    // A phrase only reaches here from UNMUTED frames — the gate drops muted (and
+    // TTS-playing) audio before it can enter the VAD. So whatever we finalise was
+    // said out loud, on purpose, to be heard, and must survive a mute pressed
+    // DURING its cloud round trip. `_pendingForce` alone did not cover this: it
+    // is set only when the mute EDGE flushes the VAD, not when a phrase was
+    // already closed by silence and is mid-translation when the user mutes to
+    // listen. Losing that phrase — the last thing you said before going quiet —
+    // was the real bug. Finalised while unmuted ⇒ publish, full stop.
+    final force = _pendingForce || !isSendMuted;
     _resetPending();
 
     // QUEUED, never fired in parallel. The universal engine drops a transcribe
