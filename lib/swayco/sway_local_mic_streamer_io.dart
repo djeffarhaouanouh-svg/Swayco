@@ -540,12 +540,41 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
   Future<void> _openMicStream() async {
     _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
+    // iOS: do NOT let `record` touch the shared AVAudioSession. Its own docs say
+    // to turn this off "if another plugin is already managing the AVAudioSession"
+    // — LiveKit is, from AppDelegate's RTCAudioSessionConfiguration. Left on (the
+    // default), opening this capture re-applies record's own category and options
+    // over WebRTC's mid-call, and the call's voice processing goes with them.
+    //
+    // Confirmed on a live call: with translation running, the peer heard constant
+    // crackling that stopped dead the moment the pipeline was detached — the only
+    // thing that changed being whether this second capture was open.
+    try {
+      await _rec.ios?.manageAudioSession(false);
+    } catch (_) {
+      // Not iOS, or an older plugin: the config below still applies.
+    }
     final stream = await _rec.startStream(const RecordConfig(
       encoder: AudioEncoder.pcm16bits,
       sampleRate: _sampleRate,
       numChannels: 1,
       echoCancel: true,
       noiseSuppress: true,
+      // Android: match the call, don't fight it. Every default here is wrong for
+      // a capture opened *during* a WebRTC call:
+      //   audioSource     defaultSource picks a plain recording source; the call
+      //                   runs on voiceCommunication, which is the one carrying
+      //                   the platform's AEC/NS for a two-way conversation.
+      //   audioManagerMode modeNormal is the killer — `record` would drop the
+      //                   AudioManager out of MODE_IN_COMMUNICATION mid-call,
+      //                   taking the call's whole voice-processing chain with it.
+      //   manageBluetooth  record would open its own Bluetooth SCO link while
+      //                   LiveKit is already routing the call.
+      androidConfig: AndroidRecordConfig(
+        audioSource: AndroidAudioSource.voiceCommunication,
+        audioManagerMode: AudioManagerMode.modeInCommunication,
+        manageBluetooth: false,
+      ),
       // AGC OFF. It was on, and it was actively harmful here: what AEC leaves of
       // the loudspeaker's own output is quiet — and AGC's whole job is to pull
       // quiet things up. It was handing the VAD an amplified echo that looks like

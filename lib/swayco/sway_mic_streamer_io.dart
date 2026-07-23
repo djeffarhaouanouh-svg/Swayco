@@ -125,13 +125,26 @@ class _IoSwayMicStreamer implements SwayMicStreamer {
         cancelOnError: true,
       );
 
+      // Same second-capture rules as the on-device streamer — this one opens its
+      // recorder on a live call too, so the defaults hurt here identically. See
+      // the long note in sway_local_mic_streamer_io._openMicStream.
+      try {
+        await _rec.ios?.manageAudioSession(false);
+      } catch (_) {}
       final stream = await _rec.startStream(const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
         echoCancel: true,
         noiseSuppress: true,
-        autoGain: true,
+        // AGC off, as on the on-device path: it amplifies whatever the echo
+        // canceller leaves of our own loudspeaker until the leak transcribes.
+        autoGain: false,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+          manageBluetooth: false,
+        ),
       ));
       _audioSub = stream.listen((bytes) {
         if (!_wsOpen) return;
