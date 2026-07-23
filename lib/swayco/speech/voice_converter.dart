@@ -24,13 +24,6 @@ import 'dart:typed_data';
 import 'ort_runtime.dart';
 import 'voice_spectrogram.dart';
 
-/// Frames per converter pass — the graph's input is a fixed `[1, 513, 520]`.
-const int kConverterFrames = 520;
-
-/// Frames of overlap between consecutive chunks, cross-faded on join. 8 frames
-/// is 93 ms, enough to hide the seam without wasting a pass.
-const int _kChunkOverlap = 8;
-
 /// Conversion strength. `target' = source + alpha * (target - source)`.
 ///
 /// **This is the knob, not `tau`.** `tau` is the noise amplitude of the
@@ -188,48 +181,23 @@ class VoiceConverter {
     final src = source ?? fingerprint(audio, sampleRate: kVoiceSampleRate);
     final tgt = _extrapolate(src.values, target.values, alpha);
 
-    final total = spec.frames * kHopLength;
-    final out = Float32List(total);
-    final step = kConverterFrames - _kChunkOverlap;
-    final fadeSamples = _kChunkOverlap * kHopLength;
-
-    for (var start = 0; start < spec.frames; start += step) {
-      final valid = math.min(kConverterFrames, spec.frames - start);
-      final chunk = _runConverter(
-        spec.window(start, kConverterFrames),
-        valid,
-        src.values,
-        tgt,
-      );
-      final offset = start * kHopLength;
-      final length = math.min(valid * kHopLength, total - offset);
-      final isFirst = start == 0;
-      final isLast = start + step >= spec.frames;
-      for (var i = 0; i < length; i++) {
-        var gain = 1.0;
-        if (!isFirst && i < fadeSamples) gain = i / fadeSamples;
-        if (!isLast && i >= length - fadeSamples) {
-          gain *= (length - i) / fadeSamples;
-        }
-        out[offset + i] += chunk[i] * gain;
-      }
-      if (isLast) break;
-    }
-    return out;
+    // One pass at the sentence's REAL length. The graph's time axis is dynamic,
+    // so a 0.7 s "oui" costs ~0.7 s of compute, not the full 6 s a fixed 520-
+    // frame input forced — the difference between RTF ~3 and ~0.4 on the phone,
+    // seen as `voice: revoiced Xms in Yms` on a live iOS call. No chunking, no
+    // cross-fade, no spec_lengths: there is nothing to stitch or mask.
+    return _runConverter(spec.data, spec.frames, src.values, tgt);
   }
 
   Float32List _runConverter(
     Float32List spec,
-    int validFrames,
+    int frames,
     Float32List seSrc,
     Float32List seTgt,
   ) {
     final res = _converter.run(
       {
-        'spec': OrtInput.floats(spec, [1, kSpecBins, kConverterFrames]),
-        // The graph masks past this, so a padded chunk is not read as silence
-        // the model has to voice.
-        'spec_lengths': OrtInput.int64s(Int64List.fromList([validFrames]), [1]),
+        'spec': OrtInput.floats(spec, [1, kSpecBins, frames]),
         'se_src': OrtInput.floats(seSrc, [1, 256, 1]),
         'se_tgt': OrtInput.floats(seTgt, [1, 256, 1]),
       },

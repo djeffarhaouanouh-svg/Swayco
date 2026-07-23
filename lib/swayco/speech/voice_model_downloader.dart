@@ -22,7 +22,11 @@ class VoiceModelDownloader {
     (name: 'ref_encoder.onnx', url: '$_mirror/voice/ref_encoder.onnx'),
     (name: 'converter.onnx', url: '$_mirror/voice/converter.onnx'),
   ];
-  static const _completeMarker = '.complete';
+  // Bumped .complete -> .complete.v2 when the converter went dynamic-shape: an
+  // install that cached the old FIXED-520 model must re-fetch, or the new
+  // (dynamic, no spec_lengths) Dart would feed it the wrong inputs and silently
+  // fall back to the stock voice. A new marker forces one clean re-download.
+  static const _completeMarker = '.complete.v2';
 
   static Future<Directory> _dir() async {
     final base = await getApplicationSupportDirectory();
