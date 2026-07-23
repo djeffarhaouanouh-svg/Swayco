@@ -1149,20 +1149,26 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
 //                  but Hy-MT2 does not speak at all, where the phone can do
 //                  nothing useful with the text.
 //
-// Cheap model first, big one only on the residue. Measured over 4 languages
-// (lv, et, el, sw) on realistic Whisper noise, deepseek-v4-flash matched gpt-4.1
-// exactly (16/16 both) at 1/16th the price, so paying for the big model by
-// default buys nothing. On EXTREME degradation (invented non-words) flash
-// declines and gpt-4.1 still recovers — hence the escalation, which only fires
-// on UNCLEAR and therefore costs almost nothing.
+// ONE engine, and only this one. Measured over 4 languages (lv, et, el, sw) on
+// realistic Whisper noise, deepseek-v4-flash matched the big incumbent exactly
+// (16/16 both) at 1/16th the price, so paying for a second vendor by default
+// bought nothing.
+//
+// It used to escalate to that incumbent whenever flash declined, on the theory
+// that the case was rare. It was not: on a real call it fired on 3 of 10
+// phrases and cost ~2.2 s each — a chain of THREE sequential requests, because
+// the code could not tell "the model refused" from "the stream dropped" and
+// re-asked the same question before escalating. Production could not reproduce
+// a single decline on the same sentences minutes later, so what actually fired
+// it was an upstream wobble, not the text.
+//
+// The residue is handled without leaving this engine: when the repair prompt
+// declines, ask it to plainly translate what was heard (see `retryPrompt`).
+// That question has no refusal in it, so there is always an answer.
 const FIX_KEY = process.env.FIX_KEY?.trim();
 const FIX_BASE = (process.env.FIX_BASE?.trim() || 'https://api.deepseek.com')
   .replace(/\/$/, '');
 const FIX_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
-// The escalation runs on the incumbent OpenAI key/host, not on FIX_*.
-const FIX_ESCALATE_MODEL = process.env.FIX_ESCALATE_MODEL?.trim() || 'gpt-4.1';
-// Set to '0' to disable the escalation entirely (cheapest possible mode).
-const FIX_ESCALATE = process.env.FIX_ESCALATE?.trim() !== '0';
 
 /** The sentinel a model returns rather than inventing. Never spoken aloud. */
 const FIX_UNCLEAR = 'UNCLEAR';
@@ -1195,6 +1201,22 @@ function fixLanguageName(tag) {
 // 9/10, Czech 8/10 on the same sentences. Keyed by primary tag, so a regional
 // variant (pt-BR, zh-Hant) still gets its rule.
 const FIX_HINTS = {
+  // French liaison hides where one word ends and the next begins, so the
+  // recogniser cuts between the sounds and lands on REAL words that happen to
+  // fit nowhere: "ton loyer" -> "ton roi", "du judo" -> "du jeu doit",
+  // "du Doliprane" -> "du doli prenne". Measured against production without
+  // this rule, three of those five recover on context alone and "roi" does not
+  // — the sentence stays grammatical, so nothing contradicts it. Same shape as
+  // the Japanese rule below: name the failure mode and the sound stays fixed
+  // while the letters move.
+  //
+  // What it cannot do: recover a cut that produces a coherent sentence.
+  // "Champ de Mars" heard as "en mars" is gone — "on se retrouve en mars devant
+  // la tour" is perfectly ordinary French, and no rule reaches it.
+  fr: '\nFrench: liaison hides the word boundary — the recogniser cuts between '
+    + 'sounds and produces real words that fit nowhere ("ton loyer" -> "ton roi", '
+    + '"du judo" -> "du jeu doit"). A word that makes no sense where it stands is '
+    + 'a bad cut: re-cut the SOUNDS, keeping the pronunciation identical.',
   de: '\nGerman: umlauts change the word (nutzen/nützen, schon/schön).',
   it: '\nItalian: a final accented vowel marks the passato remoto (lasciò, tornò); '
     + 'without it the verb becomes present tense.',
@@ -1595,6 +1617,30 @@ app.post('/translation/fix', _limText, async (req, res) => {
       : r;
   };
 
+  // Last resort, and deliberately still the SAME engine — this replaces an
+  // escalation to a second vendor that fired on ~30% of a real call and cost
+  // ~2.2 s each time.
+  //
+  // The repair prompt hands the model an honest way out (UNCLEAR) for a good
+  // reason: its answer gets SPOKEN, and an invented repair is worse than
+  // silence. "Translate what you heard, as you heard it" is a far smaller
+  // claim — no repair, no guess at a homophone — so there is nothing left to
+  // decline, and the peer gets the sentence rather than nothing.
+  //
+  // Null when there is nothing left to try: no target language (repair-only,
+  // the phone translates on its own), or a route that IS already this prompt.
+  const retryPrompt = (toName && route !== 'translate')
+    ? fixTranslatePrompt({ text, toName, gender, hedge })
+    : null;
+
+  /** The retry answers in plain text, whatever shape the main route used. */
+  const usablePlain = (raw) => {
+    const t = (raw || '').trim();
+    return t && !t.toUpperCase().startsWith(FIX_UNCLEAR)
+      ? { out: t, fixed: '' }
+      : { out: '', fixed: '' };
+  };
+
   // Streaming (call path only). When the client asks, respond as NDJSON: one
   // {"out":...} line per SENTENCE, then a final {"done":true,...}. Only the
   // `translate` route actually streams — it is where a long turn produces
@@ -1623,18 +1669,36 @@ app.post('/translation/fix', _limText, async (req, res) => {
       });
       let engine = FIX_MODEL;
       let fixed = any && isJson ? (fixUnwrapJson(full).fixed || '') : '';
-      // Stream produced nothing usable (empty, or an in-JSON UNCLEAR decline).
-      // Fall back to one normal call — with the escalation — so a translatable
-      // phrase is never lost to a stream hiccup or a cheap-model refusal.
+      // The stream produced nothing usable — for one of two reasons that need
+      // opposite answers, and which this used to conflate into one retry:
+      //
+      //  * the model READ the text and declined (an explicit UNCLEAR came
+      //    back). Asking the same model the same question again buys a second
+      //    identical refusal, and on a live call it costs ~1.3 s before the
+      //    escalation has even started. Skip straight to the big model.
+      //  * nothing came back at all — a dropped stream, an upstream 5xx. Here
+      //    the retry is worth it: it usually succeeds and saves an escalation
+      //    that costs ~30x more.
+      //
+      // Measured on a real call, three of ten phrases went through the old
+      // chain (stream -> same model -> gpt-4.1) and each paid ~2.2 s over a
+      // normal turn. Production could not reproduce it minutes later on the
+      // same sentences, so what fires this is an upstream wobble, not the text.
+      const declined =
+        full.trim() !== '' && full.toUpperCase().includes(FIX_UNCLEAR);
       if (!any) {
-        let rr = usable(await fixCall({
-          base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
-        }));
-        if (!rr.out && FIX_ESCALATE && OPENAI_API_KEY) {
-          engine = FIX_ESCALATE_MODEL;
+        let rr = { out: '', fixed: '' };
+        if (!declined) {
           rr = usable(await fixCall({
-            base: 'https://api.openai.com/v1', key: OPENAI_API_KEY,
-            model: FIX_ESCALATE_MODEL, prompt, noThink: false,
+            base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt,
+            noThink: true,
+          }));
+        }
+        // Still nothing. Ask the same engine the one thing it cannot refuse.
+        if (!rr.out && retryPrompt) {
+          rr = usablePlain(await fixCall({
+            base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL,
+            prompt: retryPrompt, noThink: true,
           }));
         }
         if (rr.out) { send({ out: rr.out }); any = true; fixed = rr.fixed; }
@@ -1656,12 +1720,11 @@ app.post('/translation/fix', _limText, async (req, res) => {
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
       }));
     }
-    // Escalate when the cheap model failed outright OR honestly declined.
-    if (!r.out && FIX_ESCALATE && OPENAI_API_KEY) {
-      engine = FIX_ESCALATE_MODEL;
-      r = usable(await fixCall({
-        base: 'https://api.openai.com/v1', key: OPENAI_API_KEY,
-        model: FIX_ESCALATE_MODEL, prompt, noThink: false,
+    // Failed outright, or honestly declined: same engine, smaller question.
+    if (!r.out && FIX_KEY && retryPrompt) {
+      r = usablePlain(await fixCall({
+        base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL,
+        prompt: retryPrompt, noThink: true,
       }));
     }
     if (!r.out) return res.json({ text: '', engine, route, unclear: true });
