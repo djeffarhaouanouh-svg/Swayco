@@ -1162,9 +1162,10 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
 // a single decline on the same sentences minutes later, so what actually fired
 // it was an upstream wobble, not the text.
 //
-// The residue is handled without leaving this engine: when the repair prompt
-// declines, ask it to plainly translate what was heard (see `retryPrompt`).
-// That question has no refusal in it, so there is always an answer.
+// Nothing replaces it. When the repair prompt declines, the phrase is dropped
+// and the call stays quiet — that is the point of the UNCLEAR sentinel, and
+// coaxing an answer out of unreadable audio only buys an invented sentence
+// spoken in someone's voice.
 const FIX_KEY = process.env.FIX_KEY?.trim();
 const FIX_BASE = (process.env.FIX_BASE?.trim() || 'https://api.deepseek.com')
   .replace(/\/$/, '');
@@ -1617,29 +1618,12 @@ app.post('/translation/fix', _limText, async (req, res) => {
       : r;
   };
 
-  // Last resort, and deliberately still the SAME engine — this replaces an
-  // escalation to a second vendor that fired on ~30% of a real call and cost
-  // ~2.2 s each time.
-  //
-  // The repair prompt hands the model an honest way out (UNCLEAR) for a good
-  // reason: its answer gets SPOKEN, and an invented repair is worse than
-  // silence. "Translate what you heard, as you heard it" is a far smaller
-  // claim — no repair, no guess at a homophone — so there is nothing left to
-  // decline, and the peer gets the sentence rather than nothing.
-  //
-  // Null when there is nothing left to try: no target language (repair-only,
-  // the phone translates on its own), or a route that IS already this prompt.
-  const retryPrompt = (toName && route !== 'translate')
-    ? fixTranslatePrompt({ text, toName, gender, hedge })
-    : null;
-
-  /** The retry answers in plain text, whatever shape the main route used. */
-  const usablePlain = (raw) => {
-    const t = (raw || '').trim();
-    return t && !t.toUpperCase().startsWith(FIX_UNCLEAR)
-      ? { out: t, fixed: '' }
-      : { out: '', fixed: '' };
-  };
+  // A decline is FINAL. There is no second prompt that coaxes an answer out of
+  // unreadable audio — there is only a model inventing a sentence, and that
+  // sentence gets SPOKEN to the other person as if it had been said. Measured:
+  // asked to plainly translate the noise "brzzt kfml aaaa zzz", the model
+  // returned a fluent Japanese sentence about everything being hopeless. Silence
+  // is the correct output for nothing.
 
   // Streaming (call path only). When the client asks, respond as NDJSON: one
   // {"out":...} line per SENTENCE, then a final {"done":true,...}. Only the
@@ -1694,13 +1678,6 @@ app.post('/translation/fix', _limText, async (req, res) => {
             noThink: true,
           }));
         }
-        // Still nothing. Ask the same engine the one thing it cannot refuse.
-        if (!rr.out && retryPrompt) {
-          rr = usablePlain(await fixCall({
-            base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL,
-            prompt: retryPrompt, noThink: true,
-          }));
-        }
         if (rr.out) { send({ out: rr.out }); any = true; fixed = rr.fixed; }
       }
       send({ done: true, engine, route, fixed, unclear: !any });
@@ -1718,13 +1695,6 @@ app.post('/translation/fix', _limText, async (req, res) => {
       engine = FIX_MODEL;
       r = usable(await fixCall({
         base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL, prompt, noThink: true,
-      }));
-    }
-    // Failed outright, or honestly declined: same engine, smaller question.
-    if (!r.out && FIX_KEY && retryPrompt) {
-      r = usablePlain(await fixCall({
-        base: FIX_BASE, key: FIX_KEY, model: FIX_MODEL,
-        prompt: retryPrompt, noThink: true,
       }));
     }
     if (!r.out) return res.json({ text: '', engine, route, unclear: true });
