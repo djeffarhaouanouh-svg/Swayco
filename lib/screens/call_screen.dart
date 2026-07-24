@@ -960,7 +960,22 @@ class _CallScreenState extends State<CallScreen> {
           // carrying it. There is no way to keep one and drop the other through
           // this API. Echo cancellation is untouched.
           noiseSuppression: false,
-          autoGainControl: false,
+          // AGC back ON — this is what makes a call sound "flat and settled"
+          // rather than swelling and dipping: it levels every word, and it is
+          // the single biggest difference between our audio and a normal phone
+          // app's.
+          //
+          // It was turned off for a reason that no longer exists. AGC's job is
+          // to pull quiet things up, and what used to be quiet on this mic was
+          // the leak from the SECOND capture — so AGC amplified it until the
+          // audio ran away. That second capture is gone (the STT now reads
+          // WebRTC's own), and with a single clean capture there is no leak left
+          // to amplify.
+          //
+          // KNOWN RISK, on the record: an earlier build with AGC on produced
+          // crackling at idle. It is on its own here, so if that returns it is
+          // unambiguously this line — flip it back to false.
+          autoGainControl: true,
         ),
       );
       // First attach with whatever remote-lang we already know (often nothing
