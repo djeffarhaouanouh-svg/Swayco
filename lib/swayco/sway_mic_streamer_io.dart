@@ -135,10 +135,7 @@ class _IoSwayMicStreamer implements SwayMicStreamer {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
-        // echoCancel OFF — same reason as the on-device path: a second iOS
-        // voice-processing unit on a mic WebRTC already runs one on self-
-        // oscillates into a startup whistle. See the long note there.
-        echoCancel: false,
+        echoCancel: true,
         noiseSuppress: true,
         // AGC off, as on the on-device path: it amplifies whatever the echo
         // canceller leaves of our own loudspeaker until the leak transcribes.
