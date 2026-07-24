@@ -1020,8 +1020,9 @@ class _CallScreenState extends State<CallScreen> {
         unawaited(_rebindUntilRemoteLangKnown(room));
       }
       await _audio.bind(room);
-      // Call audio plays through the loudspeaker (AudioController's default);
-      // users route to earphones/AirPods themselves at the OS level.
+      // Call audio starts on the EARPIECE (AudioController's default), like an
+      // ordinary phone call; the loudspeaker is one tap away in the rail. A
+      // plugged-in headset overrides both, at the OS level.
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       // Reset the global mic-mute flag — it persists across re-attaches.
       setSendMuted(false);
@@ -1306,6 +1307,15 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _speakDeviceTts(String text, String lang) =>
       _enqueueSpeak(text, lang);
+
+  /// Loudspeaker ⇄ earpiece. Calls start on the earpiece (see AudioController's
+  /// default): against the ear the loudspeaker cannot reach the mic, so the
+  /// feedback loop that makes a call howl has no path to close. A plugged-in
+  /// headset still wins over both — `_applySpeaker` refuses to override the OS.
+  Future<void> _toggleSpeaker() async {
+    await _audio.setSpeakerOn(!_audio.speakerOn);
+    if (mounted) setState(() {});
+  }
 
   Future<void> _toggleCam() async {
     final room = _room;
@@ -2143,6 +2153,17 @@ class _CallScreenState extends State<CallScreen> {
                                             : AppStrings.t('call_unmute'),
                                         background: SC.accent,
                                         onTap: _toggleMic,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _RoundCallButton(
+                                        icon: _audio.speakerOn
+                                            ? Icons.volume_up_rounded
+                                            : Icons.phone_in_talk_rounded,
+                                        label: AppStrings.t(_audio.speakerOn
+                                            ? 'call_earpiece'
+                                            : 'call_speaker'),
+                                        background: SC.accent,
+                                        onTap: _toggleSpeaker,
                                       ),
                                       const SizedBox(height: 12),
                                       // Live keeps the camera on — no toggle.

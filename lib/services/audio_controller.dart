@@ -33,14 +33,18 @@ class AudioController extends ChangeNotifier {
   final RealtimeTranslationPort _translation;
   Room? _room;
 
+  // Calls start on the EARPIECE, like an ordinary phone call. Held to the ear,
+  // the loudspeaker cannot reach the microphone, so the feedback loop that makes
+  // a call howl never gets a path to close — the same reason every phone app
+  // starts this way. The loudspeaker stays one tap away.
   AudioPrefs _prefs = const AudioPrefs(
     translatedVolume: 1.0,
     originalVolume: 1.0,
     duckingEnabled: true,
-    speakerOn: true,
+    speakerOn: false,
   );
 
-  AudioRoute _route = AudioRoute.speaker;
+  AudioRoute _route = AudioRoute.earpiece;
   double _micLevel = 0;
   bool _isDucking = false;
   Timer? _duckRelease;

@@ -190,7 +190,8 @@ abstract final class UserPrefs {
       translatedVolume: p.getDouble(keyTranslatedVolume) ?? 1.0,
       originalVolume: p.getDouble(keyOriginalVolume) ?? 1.0,
       duckingEnabled: p.getBool(keyDuckingEnabled) ?? true,
-      speakerOn: p.getBool(keySpeakerOn) ?? true,
+      // Earpiece by default — see AudioController's own default for why.
+      speakerOn: p.getBool(keySpeakerOn) ?? false,
     );
   }
 
