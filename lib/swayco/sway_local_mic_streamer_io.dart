@@ -559,7 +559,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       encoder: AudioEncoder.pcm16bits,
       sampleRate: _sampleRate,
       numChannels: 1,
-      echoCancel: true,
+      // echoCancel OFF, on purpose. On iOS this flag makes `record` turn on its
+      // OWN voice-processing I/O unit (setVoiceProcessingEnabled), a SECOND echo
+      // canceller on a mic WebRTC already runs one on. Two AEC units on one
+      // input feed each other and self-oscillate — the high whistle that builds
+      // to infinity the instant the call opens, before anyone speaks, only with
+      // translation on (i.e. only when this second capture exists). With it off
+      // there is a single canceller (WebRTC's) and nothing to oscillate against.
+      // The reason it was on — keeping our own loudspeaker's TTS out of the
+      // transcript — is already covered by the half-duplex gate, which drops STT
+      // audio for the whole time the TTS is playing.
+      echoCancel: false,
       noiseSuppress: true,
       // Android: match the call, don't fight it. Every default here is wrong for
       // a capture opened *during* a WebRTC call:
