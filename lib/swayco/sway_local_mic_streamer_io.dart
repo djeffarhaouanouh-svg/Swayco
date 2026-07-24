@@ -275,46 +275,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   static const double _vadThreshold = 0.0002;
   static const int _silenceFlushMs = 700;
 
-  /// What the recogniser and the VAD run at. Every duration in this class is
-  /// derived from it, so it stays 16 kHz whatever the microphone is opened at.
   static const int _sampleRate = 16000;
-
-  /// What the MICROPHONE is opened at — the hardware's own rate.
-  ///
-  /// Asking `record` for 16 kHz made it reconfigure a shared audio session that
-  /// LiveKit had already set to the hardware rate, mid-call. A phone runs one
-  /// hardware rate at a time, so the two captures were pulling it in opposite
-  /// directions, and an output that misses its deadline does not go silent — the
-  /// driver repeats the last buffer it has. That is the stutter the peer hears:
-  /// the same fragment three or four times inside a second and a half.
-  ///
-  /// 48 kHz rather than a queried value because `record` exposes no way to ask
-  /// what it actually got (`startStream` returns bytes, nothing else), and 48 kHz
-  /// is the native rate of iOS and of every modern Android. A device that is
-  /// really 44.1 kHz resamples inside the OS, as it did before this change.
-  static const int _captureRate = 48000;
-
-  /// 48000 / 16000. Exact, which is why the capture rate is worth pinning: a
-  /// whole-number ratio decimates without interpolation error.
-  static const int _decimation = _captureRate ~/ _sampleRate;
-
-  /// Samples left over when a buffer does not divide evenly by [_decimation],
-  /// carried into the next one. Dropping them instead would shift every
-  /// following window by a fraction of a sample and, over a call, walk the
-  /// audio out of alignment with the VAD's own clock.
-  final List<double> _decimCarry = <double>[];
-
-  /// Bytes seen and when counting started, to check what the microphone is
-  /// ACTUALLY delivering.
-  ///
-  /// [RecordConfig.sampleRate] is a request, not a contract, and `record` gives
-  /// no way to read back what it got. If a device were to hand us 16 kHz anyway,
-  /// decimating by three would feed the recogniser 5.3 kHz audio and nothing
-  /// would ever transcribe — with no clue as to why. Measuring the byte rate
-  /// costs an addition per buffer and turns that into one obvious log line.
-  int _rateBytes = 0;
-  int _rateStartMs = 0;
-  bool _rateChecked = false;
 
   @override
   bool get isRunning => _fallback?.isRunning ?? _running;
@@ -593,15 +554,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     } catch (_) {
       // Not iOS, or an older plugin: the config below still applies.
     }
-    _decimCarry.clear();
-    _rateBytes = 0;
-    _rateStartMs = 0;
-    _rateChecked = false;
     final stream = await _rec.startStream(const RecordConfig(
       encoder: AudioEncoder.pcm16bits,
-      // The hardware's rate, NOT the recogniser's — see [_captureRate]. The
-      // decimation to 16 kHz happens in [_toFloat32].
-      sampleRate: _captureRate,
+      sampleRate: _sampleRate,
       numChannels: 1,
       echoCancel: true,
       noiseSuppress: true,
@@ -628,8 +583,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       autoGain: false,
     ));
     _captureOpen = true;
-    DebugOverlay.log('stt capture started — ${_captureRate ~/ 1000} kHz pcm16 '
-        '→ ${_sampleRate ~/ 1000} kHz, aec+ns on, agc OFF');
+    DebugOverlay.log('stt capture started — 16 kHz pcm16, aec+ns on, agc OFF');
     _audioSub = stream.listen(
       (bytes) => _onPcm(bytes, _onTranslation!, _onError),
       onError: (Object e) => DebugOverlay.log('stt capture stream error: $e'),
@@ -648,7 +602,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError,
   ) {
-    _checkCaptureRate(bytes.length);
     // Two reasons to throw this buffer away rather than transcribe it:
     //
     //  isSendMuted        — the user muted. Muting the LiveKit track only
@@ -1186,79 +1139,13 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     onTranslation(orig, trans, _targetLang, '');
   }
 
-  /// Measure what the microphone really delivers, once, over the first ~3 s.
-  ///
-  /// Only the ratio matters: everything downstream assumes the capture is
-  /// [_captureRate] and divides by [_decimation]. A device handing us a
-  /// different rate would still transcribe *something*, just at the wrong speed,
-  /// which reads as a bad model rather than a bad capture — so it is worth one
-  /// line in the log either way.
-  void _checkCaptureRate(int byteCount) {
-    if (_rateChecked) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (_rateStartMs == 0) {
-      _rateStartMs = now;
-      return; // the first buffer's own duration is not in the elapsed time yet
-    }
-    _rateBytes += byteCount;
-    final elapsed = now - _rateStartMs;
-    if (elapsed < 3000) return;
-    _rateChecked = true;
-    final measured = (_rateBytes / 2 * 1000 / elapsed).round();
-    // Generous: buffer scheduling makes this jitter by a few percent.
-    if ((measured - _captureRate).abs() > _captureRate * 0.15) {
-      DebugOverlay.log('stt capture rate MISMATCH — asked $_captureRate Hz, '
-          'measured ~$measured Hz. Decimation by $_decimation is wrong, '
-          'transcription will be garbage.');
-    } else {
-      DebugOverlay.log('stt capture rate ok — ~$measured Hz');
-    }
-  }
-
-  /// PCM16 at [_captureRate] in, Float32 at [_sampleRate] out.
-  ///
-  /// The decimation averages each group of [_decimation] samples rather than
-  /// keeping one and discarding the rest. Plain sample-dropping would fold every
-  /// frequency above 8 kHz back down into the speech band as aliasing — sibilants
-  /// smeared into hiss, which is precisely the kind of noise the recogniser turns
-  /// into words nobody said. Averaging is a 3-tap low-pass: crude, but it
-  /// attenuates what it is about to fold instead of ignoring it.
-  ///
-  /// A buffer rarely divides evenly, so the tail is carried into the next call —
-  /// see [_decimCarry].
   Float32List _toFloat32(Uint8List bytes) {
     final n = bytes.length ~/ 2;
+    final out = Float32List(n);
     final bd = ByteData.sublistView(bytes);
-    final total = _decimCarry.length + n;
-    final outLen = total ~/ _decimation;
-    final out = Float32List(outLen);
-
-    // One index space over carry-then-buffer, so a group may straddle the two
-    // without any special case.
-    final carry = _decimCarry.length;
-    double at(int i) => i < carry
-        ? _decimCarry[i]
-        : bd.getInt16((i - carry) * 2, Endian.little) / 32768.0;
-
-    var acc = 0.0;
-    var inGroup = 0;
-    var w = 0;
-    for (var i = 0; i < total; i++) {
-      acc += at(i);
-      if (++inGroup == _decimation) {
-        out[w++] = acc / _decimation;
-        acc = 0.0;
-        inGroup = 0;
-      }
+    for (var i = 0; i < n; i++) {
+      out[i] = bd.getInt16(i * 2, Endian.little) / 32768.0;
     }
-    // The tail that did not fill a group opens the next buffer. Averaging it
-    // short would make it louder per sample; dropping it would walk the audio
-    // off the VAD's clock over the length of a call. Read before the clear —
-    // these samples can still be sitting in the old carry.
-    final tail = <double>[for (var i = total - inGroup; i < total; i++) at(i)];
-    _decimCarry
-      ..clear()
-      ..addAll(tail);
     return out;
   }
 
