@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
 // Not re-exported by livekit's barrel, but we need them to make LiveKit's own
@@ -13,6 +14,7 @@ import 'package:livekit_client/src/support/native_audio.dart';
 import 'package:livekit_client/src/track/audio_management.dart';
 
 import '../swayco/realtime_translation_port.dart';
+import 'debug_overlay.dart';
 import 'livekit_web_audio.dart';
 import 'user_prefs.dart';
 
@@ -32,6 +34,17 @@ class AudioController extends ChangeNotifier {
 
   final RealtimeTranslationPort _translation;
   Room? _room;
+
+  /// Native audio channel (iOS only for now). See SceneDelegate's handler.
+  static const MethodChannel _audioChannel = MethodChannel('swayco/audio');
+
+  /// How far to pull the hardware input gain down when the device allows it.
+  /// A hot mic (reported on a 15 Pro: the peer hears the whole room, and the
+  /// caller's own voice comes back to them repeated once the far volume is up)
+  /// sends a signal so strong that the far end distorts on playback. 0.5 halves
+  /// the input; it still sits well above the recogniser's speech floor. Tunable
+  /// — the change is one number and its effect is audible on the peer's side.
+  static const double _kInputGain = 0.5;
 
   AudioPrefs _prefs = const AudioPrefs(
     translatedVolume: 1.0,
@@ -131,6 +144,15 @@ class AudioController extends ChangeNotifier {
     });
     _micTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
       _sampleMicLevel();
+    });
+
+    // Pull the hardware input gain down once the mic is up. Also re-applied a
+    // beat later: WebRTC (re)configures the session as the call connects, and a
+    // gain set before its last reconfig would be wiped. Best-effort — on a
+    // device that does not allow it the log says so and nothing else changes.
+    unawaited(_applyInputGain());
+    Timer(const Duration(milliseconds: 900), () {
+      if (_bound) unawaited(_applyInputGain());
     });
     _bound = true;
     notifyListeners();
@@ -242,6 +264,21 @@ class AudioController extends ChangeNotifier {
   // two translated sentences don't make the volume flap. 1400 ms kept the real
   // voice under water well after the translation was over.
   static const Duration _duckReleaseDelay = Duration(milliseconds: 700);
+
+  /// Ask iOS to lower the hardware input gain (see [_kInputGain]). No-op off
+  /// iOS; on iOS the native side reports whether the device allowed it, and
+  /// that line goes to the in-call DebugOverlay — most iPhones refuse, and this
+  /// is the only way to see that rather than wonder why nothing changed.
+  Future<void> _applyInputGain() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
+      final status = await _audioChannel
+          .invokeMethod<String>('setInputGain', {'gain': _kInputGain});
+      DebugOverlay.log('input gain: $status');
+    } catch (e) {
+      DebugOverlay.log('input gain: channel error $e');
+    }
+  }
 
   Future<void> _applyTranslatedVolume(double v) async {
     try {
