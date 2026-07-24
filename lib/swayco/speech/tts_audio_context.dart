@@ -19,7 +19,11 @@ final AudioContext kCallTtsAudioContext = AudioContext(
     options: const {
       // Mix, don't take over — LiveKit owns the call session.
       AVAudioSessionOptions.mixWithOthers,
-      AVAudioSessionOptions.defaultToSpeaker,
+      // NO defaultToSpeaker. It forced the translated voice out the
+      // loudspeaker while the call itself now runs on the earpiece, so the peer
+      // heard the translation and NOT the real voice — the two ended up on
+      // different routes. Without it this player rides whatever route the call
+      // is on, which is what the doc above always claimed it did.
       AVAudioSessionOptions.allowBluetooth,
       AVAudioSessionOptions.allowBluetoothA2DP,
     },
