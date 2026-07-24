@@ -449,30 +449,6 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     DebugOverlay.log('stt capture RELEASED (muted) — mic left to LiveKit alone');
   }
 
-  /// The tap can attach cleanly and still deliver nothing — that is exactly how
-  /// the first attempt (AddSink on the track source) failed, silently. Silence
-  /// is otherwise indistinguishable from "nobody spoke", so give it a few
-  /// seconds and fall back to `record` rather than run a whole call with no
-  /// translation at all. The log line is what tells the two apart.
-  void _armTapWatchdog() {
-    Timer(const Duration(seconds: 5), () {
-      if (!_running || !_tapActive) return;
-      if (SwayWebrtcMicTap.instance.receiving) return;
-      DebugOverlay.log('stt tap delivered NO audio in 5s — falling back to '
-          'record (the whistle may come back; this line is the reason)');
-      _captureChain = _captureChain.then((_) async {
-        if (!_running || !_tapActive) return;
-        await _audioSub?.cancel();
-        _audioSub = null;
-        await _stopCaptureSource(); // clears _tapActive
-        _captureOpen = false;
-        await _startCapture();
-      }).catchError((Object e) {
-        DebugOverlay.log('stt tap fallback error: $e');
-      });
-    });
-  }
-
   /// Tear down whichever capture source is live — the WebRTC tap or `record`.
   Future<void> _stopCaptureSource() async {
     if (_tapActive) {
@@ -581,6 +557,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
   }
 
+  /// The LiveKit local audio track's id, read fresh (it changes when the track
+  /// is restarted on unmute). Null when the track isn't published yet or the
+  /// object doesn't expose it — the caller then uses `record`.
+  String? _localTrackId() {
+    try {
+      final id = (_localTrack as dynamic)?.mediaStreamTrack?.id;
+      if (id is String && id.isNotEmpty) return id;
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _openMicStream() async {
     _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
 
@@ -588,25 +575,30 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // `record` capture. Two captures on one iOS mic self-oscillate into a
     // startup whistle (proven on-device: cutting translation, which closes this
     // capture, was the only thing that silenced it). The web build clones the
-    // LiveKit track for the same reason; native has no clone, so it taps the
-    // capture post-processing hook, which is global and so survives the track
-    // restart every unmute causes.
+    // LiveKit track for the same reason; native has no clone, so it taps.
+    // Falls through to `record` if the track id isn't up yet or the tap refuses,
+    // so the call is never left with no STT.
     if (!kIsWeb && Platform.isIOS) {
-      try {
-        await SwayWebrtcMicTap.instance.start();
-        _tapActive = true;
-        _captureOpen = true;
-        DebugOverlay.log('stt capture via WebRTC tap (no 2nd mic)');
-        _audioSub = SwayWebrtcMicTap.instance.pcm16k.listen(
-          (bytes) => _onPcm(bytes, _onTranslation!, _onError),
-          onError: (Object e) => DebugOverlay.log('stt tap stream error: $e'),
-          onDone: () => DebugOverlay.log('stt tap stream closed'),
-        );
-        _armTapWatchdog();
-        return;
-      } catch (e) {
-        DebugOverlay.log('stt WebRTC tap failed ($e) — falling back to record');
-        _tapActive = false;
+      final trackId = _localTrackId();
+      if (trackId != null) {
+        try {
+          await SwayWebrtcMicTap.instance.start(trackId);
+          _tapActive = true;
+          _captureOpen = true;
+          DebugOverlay.log('stt capture via WebRTC tap (no 2nd mic) — '
+              'track=$trackId');
+          _audioSub = SwayWebrtcMicTap.instance.pcm16k.listen(
+            (bytes) => _onPcm(bytes, _onTranslation!, _onError),
+            onError: (Object e) => DebugOverlay.log('stt tap stream error: $e'),
+            onDone: () => DebugOverlay.log('stt tap stream closed'),
+          );
+          return;
+        } catch (e) {
+          DebugOverlay.log('stt WebRTC tap failed ($e) — falling back to record');
+          _tapActive = false;
+        }
+      } else {
+        DebugOverlay.log('stt: local track id not ready — using record capture');
       }
     }
 
