@@ -53,13 +53,23 @@ class SwayWebrtcMicTap {
     }
   }
 
-  /// Attach the sink to the local audio track [trackId] and begin streaming.
-  Future<void> start(String trackId) async {
+  /// True once at least one PCM buffer has come through. The caller uses it as a
+  /// watchdog: an attach that reports success but delivers nothing is exactly
+  /// how the first (AddSink) attempt failed, and silence is otherwise
+  /// indistinguishable from "nobody spoke".
+  bool get receiving => _received > 0;
+  int _received = 0;
+
+  /// Attach to WebRTC's capture post-processing and begin streaming.
+  ///
+  /// No track id: the hook is global to the audio pipeline, so it keeps working
+  /// across the track restarts that every unmute causes.
+  Future<void> start() async {
     _out ??= StreamController<Uint8List>.broadcast();
     _resetResampler();
-    final res =
-        await _method.invokeMethod<String>('start', {'trackId': trackId});
-    DebugOverlay.log('mic tap start($trackId) → $res');
+    _received = 0;
+    final res = await _method.invokeMethod<String>('start');
+    DebugOverlay.log('mic tap start → $res');
     _rawSub = _event.receiveBroadcastStream().listen(
       (dynamic data) {
         if (data is Uint8List) _onRaw(data);
@@ -83,6 +93,7 @@ class SwayWebrtcMicTap {
   }
 
   void _onRaw(Uint8List bytes) {
+    _received++;
     final controller = _out;
     if (controller == null || controller.isClosed) return;
     controller.add(_resampleToPcm16(bytes));
