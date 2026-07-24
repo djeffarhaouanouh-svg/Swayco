@@ -93,7 +93,16 @@ class UniversalAsrEngine extends AsrEngine {
             tailPaddings: _tailPaddings,
           ),
           tokens: '$modelDir/${UniversalAsrSpec.tokensFile}',
-          numThreads: 2,
+          // ONE thread, not two, DURING a call on purpose. The decode is a burst
+          // of native CPU that runs while WebRTC's real-time audio thread also
+          // needs a core; with two decode threads the 15 Pro's outgoing voice
+          // came out warbled/robotic, and it cleared the instant translation was
+          // cut on both sides (call brutto = perfect). Confirmed by the user:
+          // the call alone is flawless, the two flows together are not. One
+          // thread leaves a core for the audio, at the cost of a slower decode —
+          // the decode was 0.38x realtime, so it has room. If the warble
+          // survives this, the cause is the second capture itself, not the CPU.
+          numThreads: 1,
           debug: false,
           provider: provider,
           modelType: 'whisper',
