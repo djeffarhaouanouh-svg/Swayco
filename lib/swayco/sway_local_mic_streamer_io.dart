@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import '../services/call_audio.dart';
 import '../services/debug_overlay.dart';
+import 'sway_webrtc_mic_tap.dart';
 import 'asr/asr_model_downloader.dart';
 import 'asr/asr_service.dart';
 import 'asr/transcript_guard.dart';
@@ -70,6 +73,10 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// the serialized worker converges on it.
   bool _captureOpen = false;
   bool _captureWanted = true;
+
+  /// True while the capture is the WebRTC tap (iOS) rather than a `record`
+  /// stream. Decides which one [_closeCapture] / [stop] must tear down.
+  bool _tapActive = false;
 
   /// Capture open/close operations, serialized. Deliberately separate from
   /// [_sttChain]: that one guards the native decoder, and a capture restart must
@@ -437,13 +444,27 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   Future<void> _closeCapture() async {
     await _audioSub?.cancel();
     _audioSub = null;
-    try {
-      await _rec.stop();
-    } catch (e) {
-      DebugOverlay.log('stt capture stop error: $e');
-    }
+    await _stopCaptureSource();
     _captureOpen = false;
     DebugOverlay.log('stt capture RELEASED (muted) — mic left to LiveKit alone');
+  }
+
+  /// Tear down whichever capture source is live — the WebRTC tap or `record`.
+  Future<void> _stopCaptureSource() async {
+    if (_tapActive) {
+      _tapActive = false;
+      try {
+        await SwayWebrtcMicTap.instance.stop();
+      } catch (e) {
+        DebugOverlay.log('stt tap stop error: $e');
+      }
+    } else {
+      try {
+        await _rec.stop();
+      } catch (e) {
+        DebugOverlay.log('stt capture stop error: $e');
+      }
+    }
   }
 
   /// Download the VAD once and build the detector. Its buffer holds
@@ -490,9 +511,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     await _audioSub?.cancel();
     _audioSub = null;
     _freeSegmenter();
-    try {
-      await _rec.stop();
-    } catch (_) {}
+    await _stopCaptureSource();
     // Ours is closed for good; from here the fallback owns the microphone, and
     // [_onSendMutedChanged] bows out to it.
     _captureOpen = false;
@@ -538,8 +557,51 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
   }
 
+  /// The LiveKit local audio track's id, read fresh (it changes when the track
+  /// is restarted on unmute). Null when the track isn't published yet or the
+  /// object doesn't expose it — the caller then uses `record`.
+  String? _localTrackId() {
+    try {
+      final id = (_localTrack as dynamic)?.mediaStreamTrack?.id;
+      if (id is String && id.isNotEmpty) return id;
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _openMicStream() async {
     _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
+
+    // iOS: tap WebRTC's ALREADY-OPEN mic capture instead of opening a second
+    // `record` capture. Two captures on one iOS mic self-oscillate into a
+    // startup whistle (proven on-device: cutting translation, which closes this
+    // capture, was the only thing that silenced it). The web build clones the
+    // LiveKit track for the same reason; native has no clone, so it taps.
+    // Falls through to `record` if the track id isn't up yet or the tap refuses,
+    // so the call is never left with no STT.
+    if (!kIsWeb && Platform.isIOS) {
+      final trackId = _localTrackId();
+      if (trackId != null) {
+        try {
+          await SwayWebrtcMicTap.instance.start(trackId);
+          _tapActive = true;
+          _captureOpen = true;
+          DebugOverlay.log('stt capture via WebRTC tap (no 2nd mic) — '
+              'track=$trackId');
+          _audioSub = SwayWebrtcMicTap.instance.pcm16k.listen(
+            (bytes) => _onPcm(bytes, _onTranslation!, _onError),
+            onError: (Object e) => DebugOverlay.log('stt tap stream error: $e'),
+            onDone: () => DebugOverlay.log('stt tap stream closed'),
+          );
+          return;
+        } catch (e) {
+          DebugOverlay.log('stt WebRTC tap failed ($e) — falling back to record');
+          _tapActive = false;
+        }
+      } else {
+        DebugOverlay.log('stt: local track id not ready — using record capture');
+      }
+    }
+
     // iOS: do NOT let `record` touch the shared AVAudioSession. Its own docs say
     // to turn this off "if another plugin is already managing the AVAudioSession"
     // — LiveKit is, from AppDelegate's RTCAudioSessionConfiguration. Left on (the
@@ -1199,9 +1261,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     }
     await _audioSub?.cancel();
     _audioSub = null;
-    try {
-      await _rec.stop();
-    } catch (_) {}
+    await _stopCaptureSource();
     _captureOpen = false;
   }
 }

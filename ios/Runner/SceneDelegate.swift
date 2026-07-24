@@ -24,6 +24,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // engine and leaves every plugin channel disconnected from the
     // scene's Flutter UI (confirmed by Railway pings on 6.1.2+15).
     GeneratedPluginRegistrant.register(with: flutterVC)
+
+    // STT taps WebRTC's existing mic capture through this channel instead of
+    // opening a second `record` capture (which self-oscillates on iOS). Must be
+    // registered AFTER GeneratedPluginRegistrant so flutter_webrtc's singleton
+    // exists by the time Dart calls start.
+    SwayMicTap.register(withMessenger: flutterVC.binaryMessenger)
     let window = UIWindow(windowScene: windowScene)
     window.rootViewController = flutterVC
     window.makeKeyAndVisible()
