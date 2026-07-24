@@ -4,6 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
+// Not re-exported by livekit's barrel, but we need them to make LiveKit's own
+// iOS audio-session config use mixWithOthers too (it otherwise overrides the
+// AppDelegate's mix config when the call connects).
+// ignore: implementation_imports
+import 'package:livekit_client/src/support/native_audio.dart';
+// ignore: implementation_imports
+import 'package:livekit_client/src/track/audio_management.dart';
 
 import '../swayco/realtime_translation_port.dart';
 import 'livekit_web_audio.dart';
@@ -75,13 +82,24 @@ class AudioController extends ChangeNotifier {
   /// drive ducking + VU-meter + route detection.
   Future<void> bind(Room room) async {
     _room = room;
-    // This override used to inject mixWithOthers into LiveKit's own iOS session
-    // config so it agreed with the AppDelegate's — both were needed to keep two
-    // WebRTC flows (LiveKit voice + the old OpenAI translation) mixing instead of
-    // one silencing the other. That second flow is gone (on-device TTS now), and
-    // mixWithOthers weakens the call's echo canceller — see AppDelegate.swift.
-    // With no override, LiveKit uses its default session config, which is exactly
-    // the AppDelegate's minus mixWithOthers: full echo cancellation restored.
+    // Make LiveKit's own iOS audio-session config use mixWithOthers too, so it
+    // doesn't override the AppDelegate's mix config when the call connects.
+    // BOTH configurators must agree for iOS to actually mix the two WebRTC
+    // flows (LiveKit original + the live engine translation) instead of silencing one.
+    if (!kIsWeb) {
+      onConfigureNativeAudio = (AudioTrackState state) async {
+        final base = await defaultNativeAudioConfigurationFunc(state);
+        if (base.appleAudioCategory == AppleAudioCategory.soloAmbient) {
+          return base; // mixWithOthers is invalid for soloAmbient
+        }
+        return base.copyWith(
+          appleAudioCategoryOptions: {
+            ...?base.appleAudioCategoryOptions,
+            AppleAudioCategoryOption.mixWithOthers,
+          },
+        );
+      };
+    }
     _prefs = await UserPrefs.loadAudio();
 
     await _applySpeaker(_prefs.speakerOn);
