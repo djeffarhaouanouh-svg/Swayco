@@ -33,16 +33,20 @@ import FirebaseMessaging
     voipRegistry.delegate = self
     voipRegistry.desiredPushTypes = [.voIP]
 
-    // Make the two live WebRTC audio flows on a call (the LiveKit original
-    // voice + the OpenAI translation) PLAY TOGETHER instead of iOS silencing
-    // one of them — the way the browser already mixes them on web. Setting
-    // mixWithOthers on WebRTC's shared audio-session config makes WebRTC apply
-    // it every time it (re)configures the session, on both incoming and
-    // outgoing calls.
+    // mixWithOthers was here to let TWO live WebRTC flows (the LiveKit voice +
+    // the old OpenAI translation) play together instead of iOS silencing one.
+    // That second WebRTC flow is gone — the translation is on-device TTS now — so
+    // the reason for it is gone, and its cost is not: mixWithOthers makes iOS
+    // hand the session to a shared, weakened voice-processing path, so its echo
+    // canceller no longer copes with a hot mic (the 15 Pro's) and leaks a
+    // decaying echo of the caller's own voice into the outgoing stream. WhatsApp
+    // takes the session for itself and keeps full echo cancellation; without
+    // mixWithOthers we do the same. Both configurators must agree — see the
+    // matching change in audio_controller.dart.
     let rtcConfig = RTCAudioSessionConfiguration.webRTC()
     rtcConfig.category = AVAudioSession.Category.playAndRecord.rawValue
     rtcConfig.categoryOptions = [
-      .mixWithOthers, .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP,
+      .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP,
     ]
     rtcConfig.mode = AVAudioSession.Mode.videoChat.rawValue
     RTCAudioSessionConfiguration.setWebRTC(rtcConfig)
