@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:record/record.dart';
@@ -828,7 +829,16 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     //
     // Chaining also keeps the phrases in order: unqueued, a short phrase decoded
     // after a long one could overtake it and reach the peer first.
+    // peak alone cannot tell a loud voice from a click: it is a maximum, so ONE
+    // full-scale sample out of sixteen thousand already reads 1.000. That is why
+    // speaking quietly never moved it. `clip` counts how many samples are at the
+    // rail and `rms` gives the actual loudness, which separates the two for good:
+    //   clip a handful, rms low   → clicks/glitches in the capture
+    //   clip in the thousands     → the signal really is saturated
+    final clipped = _clippedCount(samples);
+    final rms = math.sqrt(_meanSquare(samples));
     DebugOverlay.log('stt phrase ${ms}ms peak=${peak.toStringAsFixed(3)} '
+        'clip=$clipped/${samples.length} rms=${rms.toStringAsFixed(4)} '
         '($why) → queued');
     _asrQueue = _asrQueue
         .then((_) => _recognizeAndTranslate(samples, onTranslation, onError,
@@ -1147,6 +1157,17 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       out[i] = bd.getInt16(i * 2, Endian.little) / 32768.0;
     }
     return out;
+  }
+
+  /// Samples sitting at the rail. 0.99 rather than 1.0 because the conversion
+  /// from PCM16 lands on 32767/32768, and a sample the hardware already clipped
+  /// comes back a hair under one.
+  int _clippedCount(Float32List samples) {
+    var n = 0;
+    for (final s in samples) {
+      if (s.abs() >= 0.99) n++;
+    }
+    return n;
   }
 
   double _meanSquare(Float32List samples) {
