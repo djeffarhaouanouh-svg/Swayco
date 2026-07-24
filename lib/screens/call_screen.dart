@@ -951,7 +951,15 @@ class _CallScreenState extends State<CallScreen> {
         true,
         audioCaptureOptions: const AudioCaptureOptions(
           echoCancellation: true,
-          noiseSuppression: true,
+          // Noise suppression OFF, and the reason is not the noise: livekit
+          // sends `voiceIsolation` as a COPY of this flag
+          // ({'voiceIsolation': noiseSuppression} in AudioCaptureOptions), so
+          // leaving it on silently ran Apple's Voice Isolation over every
+          // captured word. That is what the peer heard as a hollow, reverberant
+          // "in a room" voice: the algorithm rebuilds the speech instead of
+          // carrying it. There is no way to keep one and drop the other through
+          // this API. Echo cancellation is untouched.
+          noiseSuppression: false,
           autoGainControl: false,
         ),
       );
