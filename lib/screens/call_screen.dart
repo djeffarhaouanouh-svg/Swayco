@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -132,6 +133,12 @@ class _CallScreenState extends State<CallScreen> {
 
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
+
+  /// Niveau de voix courant (0..1), toutes voix humaines confondues : le max
+  /// des [Participant.audioLevel] que LiveKit publie à chaque changement de
+  /// locuteur actif. C'est ce qui fait *légèrement* bouger la pastille de
+  /// traduction — la TTS, elle, la fait bouger fort ([ttsSpeaking]).
+  final ValueNotifier<double> _voiceLevel = ValueNotifier<double>(0);
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
@@ -1004,6 +1011,13 @@ class _CallScreenState extends State<CallScreen> {
         ..on<TrackUnmutedEvent>((_) {
           if (mounted) setState(() {});
         })
+        // Qui parle, et à quel volume — la liste arrive triée, le plus fort en
+        // tête. Sert uniquement à animer la pastille de traduction : aucune
+        // décision audio ne s'appuie dessus.
+        ..on<ActiveSpeakersChangedEvent>((e) {
+          final loudest = e.speakers.isEmpty ? 0.0 : e.speakers.first.audioLevel;
+          _voiceLevel.value = loudest.clamp(0.0, 1.0);
+        })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
         ..on<ParticipantConnectedEvent>((_) {
@@ -1798,6 +1812,7 @@ class _CallScreenState extends State<CallScreen> {
     _cancelQueuedSpeech();
     ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
+    _voiceLevel.dispose();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -2111,147 +2126,137 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Ce qui est dit, transcrit — en bas à gauche, à l'emplacement
-                // de l'ancienne zone de saisie. Deux bulles au repos ; un tap
-                // déplie les derniers tours.
-                if (_turns.isNotEmpty)
-                  Positioned(
-                    left: 16,
-                    right: 84,
-                    bottom: 0,
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 28),
-                        child: _SpokenTurnsPanel(
-                          turns: _turns,
-                          open: _turnsOpen,
-                          myName: widget.displayName,
-                          myAvatarUrl: '',
-                          peerName: _peerProfile?.displayName ?? '',
-                          peerAvatarUrl: _peerProfile?.avatarUrl ?? '',
-                          onToggle: () =>
-                              setState(() => _turnsOpen = !_turnsOpen),
-                        ),
-                      ),
-                    ),
-                  ),
-                // Controls as a vertical rail anchored to the BOTTOM-RIGHT, so
-                // they grow upward from the bottom and never reach the PiP
-                // self-view in the top-right corner.
+                // Le dock : une barre de verre posée en bas, dans laquelle tout
+                // vit. De gauche à droite : la zone de légende (un tap déplie
+                // ce qui se dit), la pastille de traduction, raccrocher, puis
+                // le chevron qui déplie les réglages. Ce qui se déplie —
+                // légende et réglages — pousse vers le HAUT, au-dessus de la
+                // barre, qui elle ne bouge jamais.
                 Positioned(
                   key: const ValueKey('call_controls'),
-                  // Un poil plus loin du bord : le rail frôlait la tranche et
-                  // se décalait à chaque pliage.
-                  right: 20,
+                  left: 0,
+                  right: 0,
                   bottom: 0,
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 28),
-                      child: SizedBox(
-                        // Largeur figée = le rail ne bouge plus d'un pixel
-                        // entre l'état plié et l'état déplié (la colonne se
-                        // re-centrait sur la largeur de son contenu).
-                        width: 48,
-                        child: Column(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // The blue controls — unfolded by the chevron below.
+                          // 1. La légende, dépliée depuis la zone de gauche.
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 240),
+                            curve: Curves.easeOutCubic,
+                            alignment: Alignment.bottomCenter,
+                            child: (_turnsOpen && _turns.isNotEmpty)
+                                ? Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 4,
+                                      right: 40,
+                                      bottom: 10,
+                                    ),
+                                    child: _SpokenTurnsPanel(
+                                      turns: _turns,
+                                      myName: widget.displayName,
+                                      myAvatarUrl: '',
+                                      peerName:
+                                          _peerProfile?.displayName ?? '',
+                                      peerAvatarUrl:
+                                          _peerProfile?.avatarUrl ?? '',
+                                      onToggle: () => setState(
+                                        () => _turnsOpen = false,
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox(width: double.infinity),
+                          ),
+                          // 2. Les réglages, dépliés par le chevron.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.bottomCenter,
                             child: !_controlsOpen
-                                ? const SizedBox(width: 48, height: 0)
-                                : Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _RoundCallButton(
-                                        icon: _micOn
-                                            ? Icons.mic_rounded
-                                            : Icons.mic_off_rounded,
-                                        label: _micOn
-                                            ? AppStrings.t('call_mute')
-                                            : AppStrings.t('call_unmute'),
-                                        background: SC.accent,
-                                        onTap: _toggleMic,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _RoundCallButton(
-                                        icon: _audio.speakerOn
-                                            ? Icons.volume_up_rounded
-                                            : Icons.phone_in_talk_rounded,
-                                        label: AppStrings.t(_audio.speakerOn
-                                            ? 'call_earpiece'
-                                            : 'call_speaker'),
-                                        background: SC.accent,
-                                        onTap: _toggleSpeaker,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      // Live keeps the camera on — no toggle.
-                                      if (_callKind != 'live') ...[
+                                ? const SizedBox(width: double.infinity)
+                                : Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: Wrap(
+                                      alignment: WrapAlignment.center,
+                                      spacing: 12,
+                                      runSpacing: 10,
+                                      children: [
                                         _RoundCallButton(
-                                          icon: _camOn
-                                              ? Icons.videocam_rounded
-                                              : Icons.videocam_off_rounded,
-                                          label: _camOn
-                                              ? AppStrings.t('call_video')
-                                              : AppStrings.t('call_video_off'),
+                                          icon: _micOn
+                                              ? Icons.mic_rounded
+                                              : Icons.mic_off_rounded,
+                                          label: _micOn
+                                              ? AppStrings.t('call_mute')
+                                              : AppStrings.t('call_unmute'),
                                           background: SC.accent,
-                                          onTap: _toggleCam,
+                                          onTap: _toggleMic,
                                         ),
-                                        const SizedBox(height: 12),
+                                        _RoundCallButton(
+                                          icon: _audio.speakerOn
+                                              ? Icons.volume_up_rounded
+                                              : Icons.phone_in_talk_rounded,
+                                          label: AppStrings.t(_audio.speakerOn
+                                              ? 'call_earpiece'
+                                              : 'call_speaker'),
+                                          background: SC.accent,
+                                          onTap: _toggleSpeaker,
+                                        ),
+                                        // Live keeps the camera on — no toggle.
+                                        if (_callKind != 'live')
+                                          _RoundCallButton(
+                                            icon: _camOn
+                                                ? Icons.videocam_rounded
+                                                : Icons.videocam_off_rounded,
+                                            label: _camOn
+                                                ? AppStrings.t('call_video')
+                                                : AppStrings.t(
+                                                    'call_video_off'),
+                                            background: SC.accent,
+                                            onTap: _toggleCam,
+                                          ),
+                                        _RoundCallButton(
+                                          icon: Icons.tune_rounded,
+                                          label: AppStrings.t('call_audio'),
+                                          background: SC.accent,
+                                          onTap: _openAudioSheet,
+                                        ),
+                                        _RoundCallButton(
+                                          icon: Icons.translate,
+                                          label: AppStrings.t(
+                                            'call_language_output',
+                                          ),
+                                          background: SC.accent,
+                                          onTap: _openLanguageSheet,
+                                        ),
                                       ],
-                                      _RoundCallButton(
-                                        icon: Icons.tune_rounded,
-                                        label: AppStrings.t('call_audio'),
-                                        background: SC.accent,
-                                        onTap: _openAudioSheet,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _RoundCallButton(
-                                        icon: Icons.translate,
-                                        label: AppStrings.t(
-                                          'call_language_output',
-                                        ),
-                                        background: SC.accent,
-                                        onTap: _openLanguageSheet,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _RoundCallButton(
-                                        icon: _translationEnabled
-                                            ? Icons.hearing_rounded
-                                            : Icons.hearing_disabled_rounded,
-                                        label: AppStrings.t(_translationEnabled
-                                            ? 'call_translation_cut'
-                                            : 'call_translation_resume'),
-                                        background: _translationEnabled
-                                            ? SC.accent
-                                            : Colors.white24,
-                                        onTap: _toggleTranslation,
-                                      ),
-                                      const SizedBox(height: 12),
-                                    ],
+                                    ),
                                   ),
                           ),
-                          // The chevron itself: points up while the rail is
-                          // folded (tap to unfold), flips down to close it.
-                          _RailToggleButton(
-                            open: _controlsOpen,
-                            onTap: () => setState(
+                          // 3. La barre elle-même.
+                          _CallDock(
+                            preview: _turns.isEmpty ? '' : _turns.last.text,
+                            turnsOpen: _turnsOpen,
+                            hasTurns: _turns.isNotEmpty,
+                            peerName: _peerProfile?.displayName ?? '',
+                            peerAvatarUrl: _peerProfile?.avatarUrl ?? '',
+                            translationOn: _translationEnabled,
+                            ttsSpeaking: ttsSpeaking,
+                            voiceLevel: _voiceLevel,
+                            controlsOpen: _controlsOpen,
+                            onToggleTurns: () =>
+                                setState(() => _turnsOpen = !_turnsOpen),
+                            onToggleTranslation: _toggleTranslation,
+                            onHangUp: _hangUp,
+                            onToggleControls: () => setState(
                               () => _controlsOpen = !_controlsOpen,
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _RoundCallButton(
-                            icon: Icons.call_end_rounded,
-                            label: AppStrings.t('call_end'),
-                            background: const Color(0xFFE53935),
-                            onTap: _hangUp,
-                          ),
                         ],
-                      ),
                       ),
                     ),
                   ),
@@ -2361,14 +2366,13 @@ class _SpokenTurn {
   final bool delivered;
 }
 
-/// La légende de l'appel. Au repos : les deux derniers tours, en bulles de
-/// verre. Un tap déplie les quatre derniers, le haut fondu en dégradé — on
-/// remonte plus loin en faisant défiler. Aucune saisie : ça ne fait que
-/// retranscrire la voix.
+/// La légende de l'appel, dépliée depuis la zone de gauche du dock : les quatre
+/// derniers tours en bulles de verre, le haut fondu en dégradé — on remonte
+/// plus loin en faisant défiler. Un tap la referme. Aucune saisie : ça ne fait
+/// que retranscrire la voix.
 class _SpokenTurnsPanel extends StatelessWidget {
   const _SpokenTurnsPanel({
     required this.turns,
-    required this.open,
     required this.onToggle,
     required this.myName,
     required this.myAvatarUrl,
@@ -2377,7 +2381,6 @@ class _SpokenTurnsPanel extends StatelessWidget {
   });
 
   final List<_SpokenTurn> turns;
-  final bool open;
   final VoidCallback onToggle;
   final String myName;
   final String myAvatarUrl;
@@ -2390,21 +2393,14 @@ class _SpokenTurnsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = open
-        ? turns
-        : turns.sublist(turns.length > 2 ? turns.length - 2 : 0);
-
     final list = ListView.builder(
       // Le plus récent en bas, et on remonte le temps en faisant défiler.
       reverse: true,
-      physics: open
-          ? const BouncingScrollPhysics()
-          : const NeverScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.zero,
-      shrinkWrap: !open,
-      itemCount: visible.length,
+      itemCount: turns.length,
       itemBuilder: (ctx, i) {
-        final turn = visible[visible.length - 1 - i];
+        final turn = turns[turns.length - 1 - i];
         return Padding(
           padding: const EdgeInsets.only(top: 8),
           child: _TurnBubble(
@@ -2419,41 +2415,34 @@ class _SpokenTurnsPanel extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onToggle,
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.bottomLeft,
-        child: SizedBox(
-          height: open ? _openHeight : null,
-          child: open
-              // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un
-              // ShaderMask — il isolerait le flou des bulles et le tuerait).
-              ? Stack(
-                  children: [
-                    Positioned.fill(child: list),
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 56,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.55),
-                                Colors.black.withValues(alpha: 0.0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+      child: SizedBox(
+        height: _openHeight,
+        // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un ShaderMask —
+        // il isolerait le flou des bulles et le tuerait).
+        child: Stack(
+          children: [
+            Positioned.fill(child: list),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 56,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.55),
+                        Colors.black.withValues(alpha: 0.0),
+                      ],
                     ),
-                  ],
-                )
-              : list,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2525,9 +2514,427 @@ class _TurnBubble extends StatelessWidget {
   }
 }
 
-/// The glass chevron that unfolds the blue control rail — the same pill as the
-/// one on a Discover card, a size up, and flipped: it points UP to open the
-/// rail (which grows upward) and DOWN to fold it away again.
+/// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
+/// tout ce dont on se sert en appel. De gauche à droite — la zone de légende
+/// (un tap déplie ce qui se dit), la pastille de traduction, raccrocher, et le
+/// chevron qui déplie les réglages au-dessus.
+class _CallDock extends StatelessWidget {
+  const _CallDock({
+    required this.preview,
+    required this.turnsOpen,
+    required this.hasTurns,
+    required this.peerName,
+    required this.peerAvatarUrl,
+    required this.translationOn,
+    required this.ttsSpeaking,
+    required this.voiceLevel,
+    required this.controlsOpen,
+    required this.onToggleTurns,
+    required this.onToggleTranslation,
+    required this.onHangUp,
+    required this.onToggleControls,
+  });
+
+  /// La dernière phrase dite, en une ligne — l'aperçu affiché dans la zone de
+  /// gauche tant qu'elle est repliée. Vide = on montre l'invite.
+  final String preview;
+  final bool turnsOpen;
+  final bool hasTurns;
+  final String peerName;
+  final String peerAvatarUrl;
+  final bool translationOn;
+  final ValueListenable<bool> ttsSpeaking;
+  final ValueListenable<double> voiceLevel;
+  final bool controlsOpen;
+  final VoidCallback onToggleTurns;
+  final VoidCallback onToggleTranslation;
+  final VoidCallback onHangUp;
+  final VoidCallback onToggleControls;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(34),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          decoration: BoxDecoration(
+            // Le gris translucide de la barre de commentaire : du blanc très
+            // dilué sur du flou, rien de coloré.
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(34),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _CaptionField(
+                  preview: preview,
+                  open: turnsOpen,
+                  hasTurns: hasTurns,
+                  peerName: peerName,
+                  peerAvatarUrl: peerAvatarUrl,
+                  onTap: onToggleTurns,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _TranslationOrb(
+                on: translationOn,
+                ttsSpeaking: ttsSpeaking,
+                voiceLevel: voiceLevel,
+                onTap: onToggleTranslation,
+              ),
+              const SizedBox(width: 8),
+              _DockCircleButton(
+                icon: Icons.call_end_rounded,
+                label: AppStrings.t('call_end'),
+                background: const Color(0xFFE53935),
+                onTap: onHangUp,
+              ),
+              const SizedBox(width: 6),
+              _RailToggleButton(open: controlsOpen, onTap: onToggleControls),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La zone de gauche du dock. Elle a la forme d'un champ de saisie — mais on
+/// n'y écrit pas : elle affiche la dernière phrase dite et, au tap, déplie la
+/// légende complète au-dessus du dock.
+class _CaptionField extends StatelessWidget {
+  const _CaptionField({
+    required this.preview,
+    required this.open,
+    required this.hasTurns,
+    required this.peerName,
+    required this.peerAvatarUrl,
+    required this.onTap,
+  });
+
+  final String preview;
+  final bool open;
+  final bool hasTurns;
+  final String peerName;
+  final String peerAvatarUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = preview.trim().isEmpty;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: hasTurns ? onTap : null,
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(23),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            ProfileAvatar(
+              displayName: peerName,
+              avatarUrl: peerAvatarUrl.isEmpty ? null : peerAvatarUrl,
+              size: 30,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                empty ? AppStrings.t('call_captions_hint') : preview,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: empty ? 0.55 : 0.92),
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+            if (hasTurns)
+              AnimatedRotation(
+                turns: open ? 0.5 : 0.0,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  size: 20,
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Un rond plein du dock (raccrocher). Volontairement sans flou : il est posé
+/// sur le verre du dock, qui a déjà flouté ce qu'il y a dessous.
+class _DockCircleButton extends StatelessWidget {
+  const _DockCircleButton({
+    required this.icon,
+    required this.label,
+    required this.background,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color background;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: label,
+      button: true,
+      child: Pressable(
+        bounce: true,
+        onTap: onTap,
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: background,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+/// La pastille de traduction, au centre du dock : un galet blanc irisé traversé
+/// de trois barres. Elles frémissent quand quelqu'un parle et s'agitent
+/// franchement quand la traduction est en train d'être dite — c'est le seul
+/// endroit de l'écran qui montre que la machine travaille.
+///
+/// Un tap coupe la traduction : la pastille vire alors au blanc pur et se fige.
+class _TranslationOrb extends StatefulWidget {
+  const _TranslationOrb({
+    required this.on,
+    required this.ttsSpeaking,
+    required this.voiceLevel,
+    required this.onTap,
+  });
+
+  /// La traduction tourne. False = coupée : galet blanc, barres immobiles.
+  final bool on;
+  final ValueListenable<bool> ttsSpeaking;
+  final ValueListenable<double> voiceLevel;
+  final VoidCallback onTap;
+
+  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
+  static const double size = 50;
+
+  @override
+  State<_TranslationOrb> createState() => _TranslationOrbState();
+}
+
+class _TranslationOrbState extends State<_TranslationOrb>
+    with SingleTickerProviderStateMixin {
+  /// Le battement des barres. Tourne en boucle tant qu'il y a quelque chose à
+  /// montrer, et s'arrête net au repos — pas de ticker qui brûle la batterie
+  /// pendant qu'on écoute en silence.
+  late final AnimationController _phase = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  /// Amplitude affichée, lissée vers [_target] frame par frame : une voix qui
+  /// s'arrête fait retomber les barres, elle ne les coupe pas.
+  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
+  double _target = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.ttsSpeaking.addListener(_retarget);
+    widget.voiceLevel.addListener(_retarget);
+    _phase.addListener(_tick);
+    _retarget();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TranslationOrb old) {
+    super.didUpdateWidget(old);
+    if (old.ttsSpeaking != widget.ttsSpeaking) {
+      old.ttsSpeaking.removeListener(_retarget);
+      widget.ttsSpeaking.addListener(_retarget);
+    }
+    if (old.voiceLevel != widget.voiceLevel) {
+      old.voiceLevel.removeListener(_retarget);
+      widget.voiceLevel.addListener(_retarget);
+    }
+    if (old.on != widget.on) _retarget();
+  }
+
+  /// Deux régimes, comme demandé : la TTS pousse les barres à fond, une voix
+  /// humaine ne fait que les faire frémir.
+  void _retarget() {
+    if (!widget.on) {
+      _target = 0;
+    } else if (widget.ttsSpeaking.value) {
+      _target = 1.0;
+    } else {
+      final v = widget.voiceLevel.value;
+      _target = v > 0.06 ? (0.16 + 0.24 * v).clamp(0.0, 0.4) : 0.0;
+    }
+    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
+  }
+
+  void _tick() {
+    final next = _amp.value + (_target - _amp.value) * 0.14;
+    if (_target == 0 && next < 0.01) {
+      _amp.value = 0;
+      _phase.stop();
+      return;
+    }
+    _amp.value = next;
+  }
+
+  @override
+  void dispose() {
+    widget.ttsSpeaking.removeListener(_retarget);
+    widget.voiceLevel.removeListener(_retarget);
+    _phase.removeListener(_tick);
+    _phase.dispose();
+    _amp.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: AppStrings.t(
+        widget.on ? 'call_translation_cut' : 'call_translation_resume',
+      ),
+      button: true,
+      child: Pressable(
+        bounce: true,
+        onTap: widget.onTap,
+        child: Container(
+          width: _TranslationOrb.size,
+          height: _TranslationOrb.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.28),
+                blurRadius: 14,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: CustomPaint(
+            painter: _OrbPainter(phase: _phase, amp: _amp, on: widget.on),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrbPainter extends CustomPainter {
+  _OrbPainter({required this.phase, required this.amp, required this.on})
+      : super(repaint: Listenable.merge([phase, amp]));
+
+  final Animation<double> phase;
+  final ValueListenable<double> amp;
+  final bool on;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = amp.value;
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final rect = Rect.fromCircle(center: c, radius: r);
+
+    // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
+    // coup d'œil qu'elle ne traduit plus.
+    final tint = on ? 1.0 : 0.0;
+
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.35, -0.45),
+          colors: [
+            Colors.white,
+            Color.lerp(Colors.white, SC.accent, 0.20 * tint)!,
+            Color.lerp(Colors.white, SC.meshViolet, 0.28 * tint)!,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(rect),
+    );
+
+    // Le liseré irisé.
+    canvas.drawCircle(
+      c,
+      r - 0.7,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..shader = SweepGradient(
+          colors: [
+            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
+            Color.lerp(Colors.white, SC.meshViolet, 0.55 * tint)!,
+            Color.lerp(Colors.white, SC.meshBlue, 0.45 * tint)!,
+            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
+          ],
+        ).createShader(rect),
+    );
+
+    // Les trois barres.
+    final barW = size.width * 0.105;
+    final gap = size.width * 0.095;
+    final baseH = size.height * 0.20;
+    final range = size.height * 0.30;
+    final p = phase.value * 2 * math.pi;
+    final bars = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color.lerp(SC.accentDeep, Colors.white, on ? 0.0 : 0.55)!,
+          Color.lerp(SC.meshViolet, Colors.white, on ? 0.0 : 0.55)!,
+        ],
+      ).createShader(rect);
+
+    for (var i = -1; i <= 1; i++) {
+      final wobble = 0.5 + 0.5 * math.sin(p + i * 1.1);
+      final h = baseH +
+          (i == 0 ? size.height * 0.05 : 0) +
+          range * a * wobble;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(c.dx + i * (barW + gap), c.dy),
+            width: barW,
+            height: h,
+          ),
+          Radius.circular(barW / 2),
+        ),
+        bars,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_OrbPainter old) => old.on != on;
+}
+
+/// The glass chevron that unfolds the blue controls above the dock — the same
+/// pill as the one on a Discover card, a size up, and flipped: it points UP to
+/// open them (they grow upward) and DOWN to fold them away again.
 class _RailToggleButton extends StatelessWidget {
   const _RailToggleButton({required this.open, required this.onTap});
 
@@ -2539,30 +2946,28 @@ class _RailToggleButton extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
-                width: 1,
-              ),
-            ),
-            child: AnimatedRotation(
-              turns: open ? 0.5 : 0.0,
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              child: const Icon(
-                Icons.keyboard_arrow_up_rounded,
-                color: Colors.white,
-                size: 26,
-              ),
-            ),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock, qui
+          // floute déjà le fond — un second flou ne verrait que du verre et
+          // coûterait une passe de plus.
+          color: Colors.white.withValues(alpha: 0.14),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.22),
+            width: 1,
+          ),
+        ),
+        child: AnimatedRotation(
+          turns: open ? 0.5 : 0.0,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          child: const Icon(
+            Icons.keyboard_arrow_up_rounded,
+            color: Colors.white,
+            size: 26,
           ),
         ),
       ),
