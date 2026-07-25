@@ -402,6 +402,28 @@ class _CallScreenState extends State<CallScreen> {
   /// universal model covers every language in [supportedLanguages]).
   late String _mySourceLang = widget.mySourceLang;
 
+  /// Ce qu'affiche la zone de légende tant que personne n'a parlé : « Parle
+  /// japonais » — la langue que CE téléphone s'est engagé à parler pour cet
+  /// appel. C'est le seul endroit où elle a besoin d'être rappelée, et il tombe
+  /// pile là où les phrases vont apparaître.
+  String get _speakLangHint {
+    final base = _mySourceLang.split('-').first.toLowerCase();
+    if (base.isEmpty) return '';
+    final named = AppStrings.t('lang_name_$base');
+    // Pas de nom traduit pour cette langue : son nom natif fait l'affaire.
+    final name = named.startsWith('lang_name_')
+        ? (findLanguageByCode(base)?.label ?? '')
+        : named;
+    if (name.isEmpty) return '';
+    // Ces langues-là écrivent les noms de langue en minuscule ; les autres
+    // (anglais, allemand, néerlandais…) les capitalisent.
+    const lowercasesLangNames = {'fr', 'es', 'it', 'pt'};
+    final shown = lowercasesLangNames.contains(AppStrings.currentBcp47.value)
+        ? name[0].toLowerCase() + name.substring(1)
+        : name;
+    return AppStrings.t('call_captions_hint', args: {'lang': shown});
+  }
+
 
   /// The language the local user currently *hears* the remote translated into.
   /// Starts at the user's own language; changeable mid-call via the language
@@ -2242,6 +2264,7 @@ class _CallScreenState extends State<CallScreen> {
                             preview: _turns.isEmpty ? '' : _turns.last.text,
                             previewMine:
                                 _turns.isNotEmpty && _turns.last.mine,
+                            hint: _speakLangHint,
                             turnsOpen: _turnsOpen,
                             hasTurns: _turns.isNotEmpty,
                             myName: widget.displayName,
@@ -2519,12 +2542,13 @@ class _TurnBubble extends StatelessWidget {
 
 /// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
 /// tout ce dont on se sert en appel. De gauche à droite — la zone de légende
-/// (un tap déplie ce qui se dit), la pastille de traduction, raccrocher, et le
-/// chevron qui déplie les réglages au-dessus.
+/// (un tap déplie ce qui se dit), la pastille de traduction, le chevron qui
+/// déplie les réglages au-dessus, et raccrocher tout au bout.
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.preview,
     required this.previewMine,
+    required this.hint,
     required this.turnsOpen,
     required this.hasTurns,
     required this.myName,
@@ -2547,6 +2571,9 @@ class _CallDock extends StatelessWidget {
   /// C'est moi qui l'ai dite : la zone porte alors MA pastille, pas celle du
   /// correspondant.
   final bool previewMine;
+
+  /// Affiché tant que rien n'a été dit : « Parle japonais ».
+  final String hint;
   final bool turnsOpen;
   final bool hasTurns;
   final String myName;
@@ -2581,6 +2608,7 @@ class _CallDock extends StatelessWidget {
               Expanded(
                 child: _CaptionField(
                   preview: preview,
+                  hint: hint,
                   open: turnsOpen,
                   hasTurns: hasTurns,
                   // La pastille de qui vient de parler — la conversation se lit
@@ -2598,14 +2626,14 @@ class _CallDock extends StatelessWidget {
                 onTap: onToggleTranslation,
               ),
               const SizedBox(width: 8),
+              _RailToggleButton(open: controlsOpen, onTap: onToggleControls),
+              const SizedBox(width: 6),
               _DockCircleButton(
                 icon: Icons.call_end_rounded,
                 label: AppStrings.t('call_end'),
                 background: const Color(0xFFE53935),
                 onTap: onHangUp,
               ),
-              const SizedBox(width: 6),
-              _RailToggleButton(open: controlsOpen, onTap: onToggleControls),
             ],
           ),
         ),
@@ -2620,6 +2648,7 @@ class _CallDock extends StatelessWidget {
 class _CaptionField extends StatelessWidget {
   const _CaptionField({
     required this.preview,
+    required this.hint,
     required this.open,
     required this.hasTurns,
     required this.authorName,
@@ -2628,6 +2657,7 @@ class _CaptionField extends StatelessWidget {
   });
 
   final String preview;
+  final String hint;
   final bool open;
   final bool hasTurns;
   final String authorName;
@@ -2658,7 +2688,7 @@ class _CaptionField extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                empty ? AppStrings.t('call_captions_hint') : preview,
+                empty ? hint : preview,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
