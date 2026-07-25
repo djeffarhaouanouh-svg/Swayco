@@ -2240,8 +2240,11 @@ class _CallScreenState extends State<CallScreen> {
                           // 3. La barre elle-même.
                           _CallDock(
                             preview: _turns.isEmpty ? '' : _turns.last.text,
+                            previewMine:
+                                _turns.isNotEmpty && _turns.last.mine,
                             turnsOpen: _turnsOpen,
                             hasTurns: _turns.isNotEmpty,
+                            myName: widget.displayName,
                             peerName: _peerProfile?.displayName ?? '',
                             peerAvatarUrl: _peerProfile?.avatarUrl ?? '',
                             translationOn: _translationEnabled,
@@ -2521,8 +2524,10 @@ class _TurnBubble extends StatelessWidget {
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.preview,
+    required this.previewMine,
     required this.turnsOpen,
     required this.hasTurns,
+    required this.myName,
     required this.peerName,
     required this.peerAvatarUrl,
     required this.translationOn,
@@ -2538,8 +2543,13 @@ class _CallDock extends StatelessWidget {
   /// La dernière phrase dite, en une ligne — l'aperçu affiché dans la zone de
   /// gauche tant qu'elle est repliée. Vide = on montre l'invite.
   final String preview;
+
+  /// C'est moi qui l'ai dite : la zone porte alors MA pastille, pas celle du
+  /// correspondant.
+  final bool previewMine;
   final bool turnsOpen;
   final bool hasTurns;
+  final String myName;
   final String peerName;
   final String peerAvatarUrl;
   final bool translationOn;
@@ -2573,8 +2583,10 @@ class _CallDock extends StatelessWidget {
                   preview: preview,
                   open: turnsOpen,
                   hasTurns: hasTurns,
-                  peerName: peerName,
-                  peerAvatarUrl: peerAvatarUrl,
+                  // La pastille de qui vient de parler — la conversation se lit
+                  // dans les deux sens, comme dans la légende dépliée.
+                  authorName: previewMine ? myName : peerName,
+                  authorAvatarUrl: previewMine ? '' : peerAvatarUrl,
                   onTap: onToggleTurns,
                 ),
               ),
@@ -2602,24 +2614,24 @@ class _CallDock extends StatelessWidget {
   }
 }
 
-/// La zone de gauche du dock. Elle a la forme d'un champ de saisie — mais on
-/// n'y écrit pas : elle affiche la dernière phrase dite et, au tap, déplie la
-/// légende complète au-dessus du dock.
+/// La zone de gauche du dock : là où les phrases s'affichent. Rien à y écrire —
+/// elle montre la dernière phrase dite et, au tap, déplie la conversation
+/// complète au-dessus du dock.
 class _CaptionField extends StatelessWidget {
   const _CaptionField({
     required this.preview,
     required this.open,
     required this.hasTurns,
-    required this.peerName,
-    required this.peerAvatarUrl,
+    required this.authorName,
+    required this.authorAvatarUrl,
     required this.onTap,
   });
 
   final String preview;
   final bool open;
   final bool hasTurns;
-  final String peerName;
-  final String peerAvatarUrl;
+  final String authorName;
+  final String authorAvatarUrl;
   final VoidCallback onTap;
 
   @override
@@ -2639,8 +2651,8 @@ class _CaptionField extends StatelessWidget {
         child: Row(
           children: [
             ProfileAvatar(
-              displayName: peerName,
-              avatarUrl: peerAvatarUrl.isEmpty ? null : peerAvatarUrl,
+              displayName: authorName,
+              avatarUrl: authorAvatarUrl.isEmpty ? null : authorAvatarUrl,
               size: 30,
             ),
             const SizedBox(width: 8),
