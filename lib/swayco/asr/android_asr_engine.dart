@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
@@ -79,6 +80,10 @@ class AndroidSttEngine extends AsrEngine {
     }
     final mode = onDevice ? 'ON-DEVICE' : 'CLOUD (test)';
     DebugOverlay.log('stt engine=ANDROID locale=$locale $mode for "$lang"');
+    // Warm the on-device service/model NOW, while the call is still connecting,
+    // so the first phrase pays ~440 ms instead of the ~1.4 s cold-start. Fire and
+    // forget — a failed warm-up just means the first phrase is cold, as before.
+    unawaited(ch.warmup(locale, requireOnDevice: onDevice));
     return AndroidSttEngine._(locale, onDevice);
   }
 
@@ -146,5 +151,7 @@ class AndroidSttEngine extends AsrEngine {
   @override
   Future<void> dispose() async {
     _ready = false;
+    // Tear down the persistent recogniser held natively for this call.
+    unawaited(AndroidSttChannel.instance.release());
   }
 }

@@ -36,11 +36,14 @@ import java.util.concurrent.Executors
 /// write the clip to a PCM16 temp file and pass its descriptor via
 /// `EXTRA_AUDIO_SOURCE` (API 33+). And the FINAL result comes back empty when
 /// audio is fed this way (the endpointer never sees trailing silence), so we
-/// keep the last partial and return that.
+/// keep the last partial.
 ///
-/// PRIVACY: on-device recognition is preferred and the caller only routes here
-/// for an installed on-device language; a missing model falls back to Whisper in
-/// Dart. `EXTRA_PREFER_OFFLINE` is set whenever the caller demands on-device.
+/// PERSISTENT + WARM-UP: measured on Firebase Test Lab, the FIRST recognition of
+/// a session pays a cold-start (~1.4 s on a Pixel 9 Pro XL) while the on-device
+/// service binds and loads the model; every subsequent one is ~440 ms. So we
+/// hold ONE recogniser alive for the whole call and expose `warmup`, which Dart
+/// calls at connect time to run a throwaway silent recognition — the model is
+/// then already loaded when the first real phrase lands.
 ///
 /// Channel is registered from `MainActivity.configureFlutterEngine`, the Android
 /// analogue of iOS's `SceneDelegate` registration.
@@ -63,6 +66,27 @@ class SwayAndroidStt(private val context: Context) {
   // _asrQueue, but a stray overlap must not crash: reject with "" while busy.
   @Volatile private var busy = false
 
+  // The persistent recogniser, kept alive for the whole call so only the first
+  // recognition pays the cold-start. Rebuilt if the on-device/cloud mode flips.
+  private var recognizer: SpeechRecognizer? = null
+  private var recognizerOnDevice = false
+
+  // The reply for the recognition currently in flight, invoked by the shared
+  // RecognitionListener. Touched only on the main thread.
+  private var pending: ((String) -> Unit)? = null
+  private var lastPartial = ""
+
+  private fun handle(call: MethodCall, result: MethodChannel.Result) {
+    when (call.method) {
+      "capable" -> result.success(onDeviceCapable())
+      "onDeviceLanguages" -> onDeviceLanguages(result)
+      "warmup" -> warmup(call, result)
+      "transcribe" -> transcribe(call, result)
+      "release" -> { releaseRecognizer(); result.success(null) }
+      else -> result.notImplemented()
+    }
+  }
+
   /// Whether this device can actually run the on-device recogniser.
   ///
   /// `isOnDeviceRecognitionAvailable` is necessary but NOT sufficient: budget
@@ -81,15 +105,6 @@ class SwayAndroidStt(private val context: Context) {
     }
     try { sr.destroy() } catch (_: Throwable) {}
     return true
-  }
-
-  private fun handle(call: MethodCall, result: MethodChannel.Result) {
-    when (call.method) {
-      "capable" -> result.success(onDeviceCapable())
-      "onDeviceLanguages" -> onDeviceLanguages(result)
-      "transcribe" -> transcribe(call, result)
-      else -> result.notImplemented()
-    }
   }
 
   /// Installed on-device languages, from checkRecognitionSupport (API 33+).
@@ -127,8 +142,125 @@ class SwayAndroidStt(private val context: Context) {
       } catch (t: Throwable) {
         reply(emptyList())
       }
-      // Watchdog: some builds never call back.
       main.postDelayed({ reply(emptyList()) }, 6000)
+    }
+  }
+
+  /// The shared listener for the persistent recogniser: routes each result to
+  /// whatever [pending] reply is in flight, keeping the last partial as the real
+  /// transcript (the final comes back empty when audio is fed by file).
+  private fun makeListener() = object : RecognitionListener {
+    override fun onResults(b: Bundle) {
+      val txt = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+      val p = pending; pending = null
+      p?.invoke(if (txt.isNotEmpty()) txt else lastPartial)
+    }
+    override fun onError(e: Int) {
+      // NO_MATCH / SPEECH_TIMEOUT after good partials is the empty-final quirk:
+      // return what the partials captured rather than dropping it.
+      val p = pending; pending = null
+      p?.invoke(lastPartial)
+    }
+    override fun onPartialResults(p: Bundle) {
+      val txt = p.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+      if (!txt.isNullOrEmpty()) lastPartial = txt
+    }
+    override fun onReadyForSpeech(params: Bundle?) {}
+    override fun onBeginningOfSpeech() {}
+    override fun onRmsChanged(rmsdB: Float) {}
+    override fun onBufferReceived(buffer: ByteArray?) {}
+    override fun onEndOfSpeech() {}
+    override fun onEvent(eventType: Int, params: Bundle?) {}
+  }
+
+  /// Return the live recogniser for [useOnDevice], building it (and its listener)
+  /// once and reusing it. Null when the on-device recogniser refuses to build
+  /// (budget device) — the caller then degrades gracefully. Main thread only.
+  private fun ensureRecognizer(useOnDevice: Boolean): SpeechRecognizer? {
+    val existing = recognizer
+    if (existing != null && recognizerOnDevice == useOnDevice) return existing
+    existing?.let { try { it.destroy() } catch (_: Throwable) {} }
+    recognizer = null
+    val sr = try {
+      if (useOnDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+      else SpeechRecognizer.createSpeechRecognizer(context)
+    } catch (t: Throwable) {
+      return null
+    }
+    sr.setRecognitionListener(makeListener())
+    recognizer = sr
+    recognizerOnDevice = useOnDevice
+    return sr
+  }
+
+  private fun releaseRecognizer() {
+    main.post {
+      pending = null
+      recognizer?.let { try { it.destroy() } catch (_: Throwable) {} }
+      recognizer = null
+    }
+  }
+
+  private fun intentFor(locale: String, pfd: ParcelFileDescriptor, sampleRate: Int, preferOffline: Boolean): Intent =
+    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+      putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, preferOffline)
+      putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pfd)
+      putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+      putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, sampleRate)
+      putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
+    }
+
+  /// Load the on-device model ahead of the first real phrase by running a
+  /// throwaway recognition on ~300 ms of silence. Called by Dart at call connect.
+  /// Args: locale, requireOnDevice. Returns true if the recogniser is up.
+  private fun warmup(call: MethodCall, result: MethodChannel.Result) {
+    val locale = call.argument<String>("locale") ?: return result.success(false)
+    val requireOnDevice = call.argument<Boolean>("requireOnDevice") ?: true
+    if (Build.VERSION.SDK_INT < 33) { result.success(false); return }
+    if (busy) { result.success(true); return } // already working ⇒ already warm
+
+    val file: File
+    try {
+      file = File.createTempFile("warm", ".pcm", context.cacheDir)
+      file.writeBytes(ByteArray(16000 * 2 * 300 / 1000)) // 300 ms of silence
+    } catch (t: Throwable) {
+      result.success(false); return
+    }
+
+    busy = true
+    main.post {
+      val sr = ensureRecognizer(requireOnDevice)
+      if (sr == null) {
+        busy = false; try { file.delete() } catch (_: Throwable) {}
+        result.success(false); return@post
+      }
+      lastPartial = ""
+      val pfd = try {
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+      } catch (t: Throwable) {
+        busy = false; try { file.delete() } catch (_: Throwable) {}
+        result.success(false); return@post
+      }
+      var done = false
+      val finish = fun(_: String) {
+        if (done) return
+        done = true
+        pending = null
+        busy = false
+        try { pfd.close() } catch (_: Throwable) {}
+        try { file.delete() } catch (_: Throwable) {}
+        result.success(true)
+      }
+      pending = finish
+      try {
+        sr.startListening(intentFor(locale, pfd, 16000, requireOnDevice))
+      } catch (t: Throwable) {
+        finish("")
+      }
+      // Cold-start can be ~1.4 s; give it room.
+      main.postDelayed({ finish("") }, 10000)
     }
   }
 
@@ -168,90 +300,49 @@ class SwayAndroidStt(private val context: Context) {
       result.error("io", t.message ?: "write failed", null); return
     }
 
-    val useOnDevice = requireOnDevice && onDeviceCapable()
+    val useOnDevice = requireOnDevice
     val t0 = SystemClock.elapsedRealtime()
 
     main.post {
-      val sr = try {
-        if (useOnDevice)
-          SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        else
-          SpeechRecognizer.createSpeechRecognizer(context)
-      } catch (t: Throwable) {
+      val sr = ensureRecognizer(useOnDevice)
+      if (sr == null) {
         // On-device recogniser refused to build (budget device that lies about
         // availability). Give up this clip gracefully; the language load already
         // fell back to Whisper via capable().
-        busy = false
-        try { file.delete() } catch (_: Throwable) {}
-        result.success(mapOf("text" to "", "ms" to 0, "onDevice" to false))
-        return@post
+        busy = false; try { file.delete() } catch (_: Throwable) {}
+        result.success(mapOf("text" to "", "ms" to 0, "onDevice" to false)); return@post
       }
-
-      var lastPartial = ""
-      var replied = false
-      val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-
-      val reply = { text: String ->
-        if (!replied) {
-          replied = true
-          busy = false
-          try { sr.destroy() } catch (_: Throwable) {}
-          try { pfd.close() } catch (_: Throwable) {}
-          try { file.delete() } catch (_: Throwable) {}
-          result.success(
-            mapOf(
-              "text" to text,
-              "ms" to (SystemClock.elapsedRealtime() - t0).toInt(),
-              "onDevice" to useOnDevice,
-            ),
-          )
-        }
-      }
-
-      sr.setRecognitionListener(object : RecognitionListener {
-        override fun onResults(b: Bundle) {
-          val txt = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-          // Feeding audio by file leaves the FINAL result empty on many builds
-          // (no trailing silence to close the endpointer); the last partial is
-          // the real transcript.
-          reply(if (txt.isNotEmpty()) txt else lastPartial)
-        }
-
-        override fun onError(e: Int) {
-          // NO_MATCH / SPEECH_TIMEOUT after good partials is the same empty-final
-          // quirk: return what the partials captured rather than dropping it.
-          reply(lastPartial)
-        }
-
-        override fun onPartialResults(p: Bundle) {
-          val txt = p.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-          if (!txt.isNullOrEmpty()) lastPartial = txt
-        }
-
-        override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
-        override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() {}
-        override fun onEvent(eventType: Int, params: Bundle?) {}
-      })
-
-      val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
-        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, requireOnDevice)
-        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pfd)
-        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, sampleRate)
-        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
-      }
-      try {
-        sr.startListening(intent)
+      lastPartial = ""
+      val pfd = try {
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
       } catch (t: Throwable) {
-        reply(lastPartial)
+        busy = false; try { file.delete() } catch (_: Throwable) {}
+        result.success(mapOf("text" to "", "ms" to 0, "onDevice" to false)); return@post
+      }
+      var replied = false
+      val finish = fun(text: String) {
+        if (replied) return
+        replied = true
+        pending = null
+        busy = false
+        try { pfd.close() } catch (_: Throwable) {}
+        try { file.delete() } catch (_: Throwable) {}
+        result.success(
+          mapOf(
+            "text" to text,
+            "ms" to (SystemClock.elapsedRealtime() - t0).toInt(),
+            "onDevice" to useOnDevice,
+          ),
+        )
+      }
+      pending = finish
+      try {
+        sr.startListening(intentFor(locale, pfd, sampleRate, requireOnDevice))
+      } catch (t: Throwable) {
+        finish(lastPartial)
       }
       // Watchdog: never let one clip wedge the queue if no callback fires.
-      main.postDelayed({ reply(lastPartial) }, 12000)
+      main.postDelayed({ finish(lastPartial) }, 12000)
     }
   }
 

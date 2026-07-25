@@ -59,6 +59,30 @@ class AndroidSttChannel {
     }
   }
 
+  /// Load the on-device model ahead of the first phrase by running a throwaway
+  /// silent recognition — kills the ~1.4 s cold-start so the first real phrase is
+  /// already warm (~440 ms). Best-effort; returns whether the recogniser is up.
+  Future<bool> warmup(String locale, {bool requireOnDevice = true}) async {
+    if (!_isAndroid) return false;
+    try {
+      return await _channel.invokeMethod<bool>('warmup', {
+            'locale': locale,
+            'requireOnDevice': requireOnDevice,
+          }) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Destroy the persistent recogniser at end of call.
+  Future<void> release() async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('release');
+    } catch (_) {}
+  }
+
   /// Transcribe one clip. [samples] are 16 kHz mono Float32 in [-1, 1] — exactly
   /// what the VAD hands the engine. When [requireOnDevice] the native side uses
   /// the on-device recogniser and sets `EXTRA_PREFER_OFFLINE`; otherwise it may
