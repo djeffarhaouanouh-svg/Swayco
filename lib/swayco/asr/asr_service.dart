@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../services/debug_overlay.dart';
+import 'apple_asr_engine.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine.dart';
 import 'asr_downloader.dart';
@@ -65,6 +66,29 @@ class AsrService {
   }
 
   Future<void> _load(String lang, void Function(double)? onProgress) async {
+    // iOS: prefer Apple's native STT. It runs fully on-device (so mic audio
+    // still never leaves the phone), needs no model download, and frees the
+    // ~244 MB Whisper fetch. Used ONLY when this phone has the language's
+    // dictation asset installed — [AppleSttEngine.tryLoad] returns null for a
+    // missing asset, a restricted/denied permission, or pre-iOS, and we then
+    // fall through to the bundled Whisper exactly as before.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        final apple = await AppleSttEngine.tryLoad(lang);
+        if (apple != null) {
+          final old = _engine;
+          _engine = apple;
+          _loadedLang = lang;
+          await old?.dispose();
+          DebugOverlay.log('stt engine=apple locale=${apple.locale} for "$lang"');
+          return;
+        }
+        DebugOverlay.log('stt Apple unavailable for "$lang" — using Whisper');
+      } catch (e) {
+        DebugOverlay.log('stt Apple probe failed ($e) — using Whisper');
+      }
+    }
+
     final spec = specForLang(lang);
     if (spec == null) {
       DebugOverlay.log('stt NO on-device model for "$lang"');
