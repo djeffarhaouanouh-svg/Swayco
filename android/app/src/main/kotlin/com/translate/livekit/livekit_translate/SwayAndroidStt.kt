@@ -63,8 +63,25 @@ class SwayAndroidStt(private val context: Context) {
   // _asrQueue, but a stray overlap must not crash: reject with "" while busy.
   @Volatile private var busy = false
 
-  private fun onDeviceCapable(): Boolean =
-    Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+  /// Whether this device can actually run the on-device recogniser.
+  ///
+  /// `isOnDeviceRecognitionAvailable` is necessary but NOT sufficient: budget
+  /// devices (seen on a Galaxy A03s, API 33) return true here yet throw
+  /// `UnsupportedOperationException: On-device recognition is not available`
+  /// from `createOnDeviceSpeechRecognizer`. So we actually try to build one —
+  /// a false here makes Dart fall back to Whisper instead of crashing.
+  /// Called on the platform (main) thread, where SpeechRecognizer must be built.
+  private fun onDeviceCapable(): Boolean {
+    if (Build.VERSION.SDK_INT < 33) return false
+    if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) return false
+    val sr = try {
+      SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    } catch (t: Throwable) {
+      return false
+    }
+    try { sr.destroy() } catch (_: Throwable) {}
+    return true
+  }
 
   private fun handle(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
@@ -81,7 +98,11 @@ class SwayAndroidStt(private val context: Context) {
       result.success(emptyList<String>()); return
     }
     main.post {
-      val sr = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+      val sr = try {
+        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+      } catch (t: Throwable) {
+        result.success(emptyList<String>()); return@post
+      }
       var replied = false
       val reply = { v: List<String> ->
         if (!replied) {
@@ -151,10 +172,20 @@ class SwayAndroidStt(private val context: Context) {
     val t0 = SystemClock.elapsedRealtime()
 
     main.post {
-      val sr = if (useOnDevice)
-        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-      else
-        SpeechRecognizer.createSpeechRecognizer(context)
+      val sr = try {
+        if (useOnDevice)
+          SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        else
+          SpeechRecognizer.createSpeechRecognizer(context)
+      } catch (t: Throwable) {
+        // On-device recogniser refused to build (budget device that lies about
+        // availability). Give up this clip gracefully; the language load already
+        // fell back to Whisper via capable().
+        busy = false
+        try { file.delete() } catch (_: Throwable) {}
+        result.success(mapOf("text" to "", "ms" to 0, "onDevice" to false))
+        return@post
+      }
 
       var lastPartial = ""
       var replied = false
