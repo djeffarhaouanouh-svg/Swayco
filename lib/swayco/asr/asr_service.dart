@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../services/debug_overlay.dart';
+import 'android_asr_engine.dart';
 import 'apple_asr_engine.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine.dart';
@@ -86,6 +87,29 @@ class AsrService {
         DebugOverlay.log('stt Apple unavailable for "$lang" — using Whisper');
       } catch (e) {
         DebugOverlay.log('stt Apple probe failed ($e) — using Whisper');
+      }
+    }
+
+    // Android: prefer Google's native on-device STT — the exact twin of the iOS
+    // path above. Runs on-device (mic audio stays on the phone), needs no model
+    // download, frees the ~244 MB Whisper fetch. Used ONLY when the phone has an
+    // installed on-device voice model — [AndroidSttEngine.tryLoad] returns null
+    // for a missing model, API < 33, or no recogniser, and we then fall through
+    // to the bundled Whisper exactly as before.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final android = await AndroidSttEngine.tryLoad(lang);
+        if (android != null) {
+          final old = _engine;
+          _engine = android;
+          _loadedLang = lang;
+          await old?.dispose();
+          DebugOverlay.log('stt engine=android locale=${android.locale} for "$lang"');
+          return;
+        }
+        DebugOverlay.log('stt Android unavailable for "$lang" — using Whisper');
+      } catch (e) {
+        DebugOverlay.log('stt Android probe failed ($e) — using Whisper');
       }
     }
 

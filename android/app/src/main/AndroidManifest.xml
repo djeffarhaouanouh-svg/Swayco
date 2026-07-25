@@ -125,5 +125,11 @@
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="mailto"/>
         </intent>
+        <!-- Android native STT (SwayAndroidStt): on Android 11+ the app must
+             declare the speech RecognitionService intent to bind to Google's
+             on-device recogniser. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
     </queries>
 </manifest>
