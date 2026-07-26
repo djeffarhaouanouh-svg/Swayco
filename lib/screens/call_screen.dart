@@ -2443,6 +2443,18 @@ class _CallScreenState extends State<CallScreen> {
                       ),
                     ),
                   ),
+                // Conversation dépliée : un tap n'importe où ailleurs la
+                // referme. La couche est posée par-dessus la vidéo, donc ce
+                // tap-là ne fait QUE fermer — il n'échange pas les deux
+                // images au passage.
+                if (_turnsOpen)
+                  Positioned.fill(
+                    key: const ValueKey('turns_dismiss'),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _turnsOpen = false),
+                    ),
+                  ),
                 if (widget.translation.translationListenable != null)
                   ListenableBuilder(
                     listenable: widget.translation.translationListenable!,
