@@ -30,6 +30,16 @@
   <title>Swayco</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Preload the on-device VAD model + ONNX runtime in the background so the
+       first call's speech recognition is ready immediately, instead of these
+       ~megabytes only starting to download once the call has connected (which
+       is why the first seconds of a call used to miss speech). Warms the
+       browser cache; harmless if no call is ever made. crossorigin matches the
+       CORS fetch the VAD/ORT actually use, so the cached bytes get reused. -->
+  <link rel="prefetch" as="fetch" crossorigin href="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/silero_vad_v5.onnx">
+  <link rel="prefetch" as="fetch" crossorigin href="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/vad.worklet.bundle.min.js">
+  <link rel="prefetch" as="fetch" crossorigin href="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort-wasm-simd-threaded.jsep.wasm">
+  <link rel="prefetch" as="fetch" crossorigin href="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort-wasm-simd-threaded.jsep.mjs">
   
   
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
@@ -124,16 +134,16 @@
   <script src="lottie.min.js"></script>
 
   <!--
-    Il y avait ici Silero v5 + onnxruntime-web, chargés du CDN, pour découper
-    les phrases dans le navigateur. Retirés : chaque appel construisait une
-    session WASM que la lib ne libérait jamais vraiment, jusqu'à
-    "RangeError: Out of memory" — et un runtime ONNX en échec le reste pour
-    toute la page, donc plus rien n'était transcrit ni traduit tant qu'on ne
-    rechargeait pas. Le découpage se fait maintenant sur l'énergie du signal
-    (Web Audio, aucun modèle) dans sway_vad_asr_streamer_web.dart ; la
-    reconnaissance et la traduction restent dans le cloud, où elles étaient
-    déjà. Le natif n'a jamais utilisé ces scripts.
+    TEST — non-streaming STT (Silero VAD + Whisper). WEB ONLY, TO BE REVERTED.
+    Silero v5 through @ricky0123/vad-web: it segments the live mic and hands us
+    one clean utterance per phrase, which we send to Whisper. Loaded from the CDN
+    on purpose — a throwaway experiment shouldn't drop ~3 MB of .onnx/.wasm blobs
+    into the repo. Deleting these two tags is most of the revert.
+    Exposes window.vad. Versions pinned: the ORT build and the VAD bundle must
+    agree or the worklet fails to instantiate.
   -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.wasm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/bundle.min.js"></script>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
       try { window.__splashAnim?.destroy(); } catch (e) {}
