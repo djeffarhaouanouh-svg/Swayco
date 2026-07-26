@@ -2480,7 +2480,7 @@ class _CallScreenState extends State<CallScreen> {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           // 1. La légende, dépliée depuis la zone de gauche.
                           AnimatedSize(
@@ -2997,6 +2997,12 @@ class _CallDock extends StatelessWidget {
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
 
+  /// Le chevron et le raccrochage, ensemble.
+  static const double _trailingWidth = 50 + 6 + 46;
+
+  /// La zone de texte au repos : exactement la largeur de ce qu'il y a de
+  /// l'autre côté, pour que la pastille tombe au milieu de la barre.
+  static const double _captionWidth = _trailingWidth;
   static const double _gap = 8;
 
   @override
@@ -3041,11 +3047,16 @@ class _CallDock extends StatelessWidget {
                   ),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // La zone de texte prend tout ce que les boutons laissent :
-                    // quand le chevron et le raccrochage se replient pour une
-                    // phrase, c'est elle qui récupère la place.
-                    Expanded(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      // Dépliée, elle récupère la place du chevron et du
+                      // raccrochage, gouttière comprise.
+                      width: messageOpen
+                          ? _captionWidth + _gap + _trailingWidth
+                          : _captionWidth,
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
@@ -3470,8 +3481,26 @@ class _RailToggleButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        width: 42,
-        height: 42,
+        width: 50,
+        height: 50,
+        // L'anneau de halo : large, presque transparent, et surtout VIDE au
+        // centre — c'est ce qui le distingue d'une ombre portée, qui elle
+        // passerait sous le bouton et se verrait par transparence.
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: open
+                ? Colors.white.withValues(alpha: 0.0)
+                : SC.accent.withValues(alpha: 0.22),
+            width: 4,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
           // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock, qui
           // floute déjà le fond — un second flou ne verrait que du verre et
@@ -3481,23 +3510,17 @@ class _RailToggleButton extends StatelessWidget {
           // les réglages sont ouverts, et ça se voit sans lire le chevron.
           color: open ? Colors.white : Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
-          // Le liseré cyan porte la lueur : le halo seul était rogné par le
-          // verre du dock, qui coupe tout ce qui dépasse de ses bords — le
-          // bouton n'en est qu'à quelques pixels, si bien que la lueur ne se
-          // voyait que du côté intérieur. Un contour, lui, est toujours dans
-          // le cadre, et le halo court qui l'accompagne tient dedans aussi.
+          // Le liseré porte la lueur à lui seul. Une ombre portée ne convient
+          // pas ici : elle est peinte DERRIÈRE le bouton, dont le fond est
+          // translucide — on la voyait donc au travers, à l'intérieur. Le halo
+          // est simulé par le second anneau, plus large et presque effacé,
+          // dessiné autour (voir le build ci-dessous).
           border: Border.all(
             color: open
                 ? Colors.white.withValues(alpha: 0.0)
                 : SC.accent.withValues(alpha: 0.85),
             width: 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: SC.accent.withValues(alpha: 0.45),
-              blurRadius: 7,
-            ),
-          ],
         ),
         child: AnimatedRotation(
           turns: open ? 0.5 : 0.0,
@@ -3506,8 +3529,9 @@ class _RailToggleButton extends StatelessWidget {
           child: Icon(
             Icons.keyboard_arrow_up_rounded,
             color: open ? Colors.black : Colors.white,
-            size: 26,
+            size: 24,
           ),
+        ),
         ),
       ),
     );
