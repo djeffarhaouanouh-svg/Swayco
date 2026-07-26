@@ -199,10 +199,22 @@ class _CallScreenState extends State<CallScreen> {
     _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
-  /// Le seuil au-delà duquel on considère que ça parle. Bas exprès : le
-  /// `audioLevel` que WebRTC calcule sur une source micro est une amplitude
-  /// normalisée, une voix normale y vaut quelques centièmes, pas la moitié.
-  static const double _kVoiceOn = 0.02;
+  /// Le plancher absolu sous lequel rien n'est jamais de la parole, quel que
+  /// soit le calme de la pièce.
+  static const double _kVoiceOn = 0.05;
+
+  /// Le bruit de la pièce, appris pendant l'appel : il descend vite vers le
+  /// silence et ne remonte que lentement, si bien qu'une voix ne le tire pas
+  /// vers le haut mais qu'un ventilateur qui démarre finit par y entrer.
+  ///
+  /// Sans lui, un seuil fixe est soit sourd dans une pièce bruyante, soit
+  /// déclenché en permanence par le souffle du micro — c'était le cas : la
+  /// barre s'ouvrait au moindre frémissement et ne se refermait plus.
+  double _noiseFloor = 0.02;
+
+  /// Combien de mesures d'affilée au-dessus du seuil avant de déclarer que ça
+  /// parle. Deux (~500 ms) : un choc sur la table en fait une, pas deux.
+  int _hotTicks = 0;
 
   /// Niveau de MON micro, mesuré ici même — pas au serveur.
   ///
@@ -266,9 +278,19 @@ class _CallScreenState extends State<CallScreen> {
         _micProbeSilentTicks = 0;
         DebugOverlay.log('mic probe: live (${level.toStringAsFixed(3)})');
       }
-      _localVoice = level.clamp(0.0, 1.0);
+      final lvl = level.clamp(0.0, 1.0);
+      // Le plancher suit le silence de près et la voix de très loin.
+      _noiseFloor = lvl < _noiseFloor
+          ? _noiseFloor * 0.7 + lvl * 0.3
+          : _noiseFloor * 0.995 + lvl * 0.005;
+      final threshold = math.max(_kVoiceOn, _noiseFloor * 3 + 0.015);
+      final hot = lvl > threshold;
+      _hotTicks = hot ? _hotTicks + 1 : 0;
+      // La pastille ne bat que sur de la vraie parole : lui donner le bruit de
+      // fond la ferait trembler tout l'appel.
+      _localVoice = hot ? lvl : 0.0;
       _publishVoiceLevel();
-      if (_localVoice > _kVoiceOn) {
+      if (_hotTicks >= 2) {
         _wakeDock();
         // C'est MA voix : la place se fait maintenant, avant même que la
         // transcription arrive.
