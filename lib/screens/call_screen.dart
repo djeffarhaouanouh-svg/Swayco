@@ -3528,10 +3528,10 @@ class _RailToggleButton extends StatelessWidget {
   }
 }
 
-/// Le contour irisé du chevron : cyan → bleu → violet balayés autour du
-/// bouton, doublés d'un même trait flouté qui fait la lueur.
+/// La lueur du chevron : un trait cyan autour du bouton, doublé du même trait
+/// flouté qui fait le halo.
 ///
-/// Il s'efface quand les réglages sont dépliés : le bouton est alors blanc
+/// Elle s'efface quand les réglages sont dépliés : le bouton est alors blanc
 /// plein, et deux signaux qui disent la même chose se gênent.
 class _ChevronRimPainter extends CustomPainter {
   const _ChevronRimPainter({required this.visible});
@@ -3544,15 +3544,6 @@ class _ChevronRimPainter extends CustomPainter {
     final c = Offset(size.width / 2, size.height / 2);
     // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
     final r = _RailToggleButton._size / 2 + 1.2;
-    final shader = SweepGradient(
-      colors: [
-        SC.accent,
-        SC.meshBlue,
-        SC.meshViolet,
-        SC.accent,
-      ],
-    ).createShader(Rect.fromCircle(center: c, radius: r));
-
     // La lueur d'abord : le même anneau, plus épais et flou, dessous.
     canvas.drawCircle(
       c,
@@ -3560,8 +3551,7 @@ class _ChevronRimPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5
-        ..shader = shader
-        ..color = Colors.white.withValues(alpha: 0.5)
+        ..color = SC.accent.withValues(alpha: 0.45)
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
     );
     // Puis le trait net.
@@ -3570,8 +3560,8 @@ class _ChevronRimPainter extends CustomPainter {
       r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..shader = shader,
+        ..strokeWidth = 1.4
+        ..color = SC.accent.withValues(alpha: 0.85),
     );
   }
 
