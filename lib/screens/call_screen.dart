@@ -154,22 +154,11 @@ class _CallScreenState extends State<CallScreen> {
   /// coupé). Passé ce délai sans rien, il se resserre de lui-même.
   static const Duration _kMessageSafety = Duration(seconds: 6);
 
-  /// Le nombre de tours que la pastille a faits depuis le début de l'appel.
-  /// Il ne fait que monter : chaque ouverture ajoute un tour, si bien qu'elle
-  /// tourne toujours dans le même sens et ne se dévisse jamais en revenant.
-  int _orbSpin = 0;
-
   /// Ça parle : on fait la place. Tant que la voix dure, rien ne se referme.
   void _openMessageZone() {
     _messageTimer?.cancel();
     _messageTimer = Timer(_kMessageSafety, _closeMessageZone);
-    if (!_messageOpen && mounted) {
-      setState(() {
-        _messageOpen = true;
-        // Un tour sur elle-même pendant qu'elle glisse.
-        _orbSpin++;
-      });
-    }
+    if (!_messageOpen && mounted) setState(() => _messageOpen = true);
   }
 
   /// Le temps laissé à la rétraction avant que le fond s'en aille : la durée de
@@ -2605,7 +2594,6 @@ class _CallScreenState extends State<CallScreen> {
                             voiceLevel: _voiceLevel,
                             controlsOpen: _controlsOpen,
                             messageOpen: _messageOpen,
-                            orbSpin: _orbSpin,
                             dimmed: _dockDimmed,
                             onWake: _wakeDock,
                             onToggleTurns: () {
@@ -2968,7 +2956,6 @@ class _CallDock extends StatelessWidget {
     required this.voiceLevel,
     required this.controlsOpen,
     required this.messageOpen,
-    required this.orbSpin,
     required this.dimmed,
     required this.onWake,
     required this.onToggleTurns,
@@ -2994,10 +2981,6 @@ class _CallDock extends StatelessWidget {
   /// Une phrase vient d'arriver : la zone de texte prend toute la barre, le
   /// chevron et le raccrochage s'effacent, la pastille glisse à droite.
   final bool messageOpen;
-
-  /// Combien de tours la pastille a faits. Monte d'un cran à chaque ouverture ;
-  /// elle rejoint cette valeur en glissant.
-  final int orbSpin;
 
   /// Silence : la barre s'estompe jusqu'à [_dimOpacity], et la pastille reste
   /// entière par-dessus. JAMAIS jusqu'à zéro : ce qui devient invisible devient
@@ -3045,7 +3028,9 @@ class _CallDock extends StatelessWidget {
                 sigmaY: 24 * live,
               ),
               child: Container(
-                padding: const EdgeInsets.all(8),
+                // 10 plutôt que 8 : de quoi laisser la lueur du chevron faire
+                // le tour du bouton sans toucher le bord.
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   // Le gris translucide de la barre de commentaire : du blanc
                   // très dilué sur du flou, rien de coloré.
@@ -3086,20 +3071,12 @@ class _CallDock extends StatelessWidget {
                     // quand tout le reste s'efface. En veille, la toucher
                     // rallume la barre au lieu de couper la traduction — on ne
                     // coupe pas la traduction sans l'avoir vue.
-                    // Le tour sur elle-même se joue pendant le glissement, et
-                    // dans le même temps : elle arrive à destination au moment
-                    // où elle finit son tour.
-                    AnimatedRotation(
-                      turns: orbSpin.toDouble(),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      child: _TranslationOrb(
-                        on: translationOn,
-                        ttsSpeaking: ttsSpeaking,
-                        voiceLevel: voiceLevel,
-                        onTap: dimmed ? onWake : onToggleTranslation,
-                        onLongPress: onOrbLongPress,
-                      ),
+                    _TranslationOrb(
+                      on: translationOn,
+                      ttsSpeaking: ttsSpeaking,
+                      voiceLevel: voiceLevel,
+                      onTap: dimmed ? onWake : onToggleTranslation,
+                      onLongPress: onOrbLongPress,
                     ),
                     // Le chevron et le raccrochage se replient pendant qu'une
                     // phrase occupe la barre — AnimatedSize rogne lui-même ce
@@ -3504,18 +3481,21 @@ class _RailToggleButton extends StatelessWidget {
           // les réglages sont ouverts, et ça se voit sans lire le chevron.
           color: open ? Colors.white : Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
+          // Le liseré cyan porte la lueur : le halo seul était rogné par le
+          // verre du dock, qui coupe tout ce qui dépasse de ses bords — le
+          // bouton n'en est qu'à quelques pixels, si bien que la lueur ne se
+          // voyait que du côté intérieur. Un contour, lui, est toujours dans
+          // le cadre, et le halo court qui l'accompagne tient dedans aussi.
           border: Border.all(
-            color: Colors.white.withValues(alpha: open ? 0.0 : 0.22),
-            width: 1,
+            color: open
+                ? Colors.white.withValues(alpha: 0.0)
+                : SC.accent.withValues(alpha: 0.85),
+            width: 1.5,
           ),
-          // Une lueur cyan, juste assez pour que l'œil le trouve : c'est le
-          // seul bouton du dock dont le rôle est de révéler le reste, et sur
-          // une vidéo sombre il se confondait avec le verre.
           boxShadow: [
             BoxShadow(
-              color: SC.accent.withValues(alpha: 0.34),
-              blurRadius: 14,
-              spreadRadius: 1,
+              color: SC.accent.withValues(alpha: 0.45),
+              blurRadius: 7,
             ),
           ],
         ),
