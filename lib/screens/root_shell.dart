@@ -332,7 +332,6 @@ class _RootShellState extends State<RootShell> {
             mySourceLang: me.sourceLang,
             // Incoming call: answer first, pick the spoken language once
             // the screen is up (the caller is waiting on the line).
-            askLanguageOnEntry: true,
             translation: widget.translation,
             // For the "call ended" summary card (peer PDP + flag).
             peerId: call.callerId,

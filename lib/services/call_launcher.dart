@@ -123,15 +123,12 @@ abstract final class CallLauncher {
         return false;
       }
 
-      // Which language will actually be spoken, asked every time. The account
-      // language is only the pre-selection — see [askSpokenLanguage]. This runs
-      // BEFORE the token is minted on purpose: the token carries the language
-      // into the LiveKit metadata, which is what tells the peer's app what to
-      // translate FROM. Asking after it would publish the wrong one.
+      // Which language will actually be spoken. Resolved BEFORE the token is
+      // minted on purpose: the token carries it into the LiveKit metadata,
+      // which is what tells the peer's app what to translate FROM. Nothing is
+      // asked — the language is changed mid-call on the dock instead.
+      final spokenLang = await resolveSpokenLanguage(preselect: mySourceLang);
       if (!context.mounted) return false;
-      final spokenLang =
-          await askSpokenLanguage(context, preselect: mySourceLang);
-      if (spokenLang == null || !context.mounted) return false;
 
       final room = roomNameFor(myId, peerDeviceId);
       final token = await fetchLiveKitToken(

@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:country_flags/country_flags.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -29,12 +30,12 @@ import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
 import '../services/usage_tracker.dart';
+import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/spoken_language_gate.dart';
 import 'paywall_screen.dart';
 
 class CallScreen extends StatefulWidget {
@@ -51,15 +52,7 @@ class CallScreen extends StatefulWidget {
     this.outgoingCallId,
     this.startWithCamera = false,
     this.peerId,
-    this.askLanguageOnEntry = false,
   });
-
-  /// Ask "which language will you speak?" once this screen is up, instead of
-  /// before it. Set on the INCOMING path only: there the phone is ringing and
-  /// the caller is waiting, so the callee answers first and picks after — the
-  /// pipeline simply re-attaches on the new [_mySourceLang]. Outgoing paths ask
-  /// before minting the token and leave this false.
-  final bool askLanguageOnEntry;
 
   final String wsUrl;
   final String jwt;
@@ -134,6 +127,50 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
+  /// Un tour vient d'arriver : le dock s'ouvre en grand pour le montrer, puis
+  /// se referme tout seul. Le chevron et le raccrochage s'effacent le temps que
+  /// la phrase tienne à l'écran, et la pastille glisse à leur place.
+  bool _messageOpen = false;
+  Timer? _messageTimer;
+
+  /// Combien de temps la phrase reste dépliée une fois affichée.
+  static const Duration _kMessageHold = Duration(milliseconds: 1500);
+
+  /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
+  /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
+  /// Un tap n'importe où dessus le ramène.
+  bool _dockDimmed = false;
+  Timer? _dockIdleTimer;
+
+  /// Le silence au bout duquel le dock disparaît.
+  static const Duration _kDockIdle = Duration(seconds: 4);
+
+  /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
+  /// se rallume et repart pour [_kDockIdle] de sursis.
+  void _wakeDock() {
+    _dockIdleTimer?.cancel();
+    _dockIdleTimer = Timer(_kDockIdle, () {
+      if (!mounted || _dockDimmed) return;
+      // Un panneau ouvert, la légende dépliée : on ne s'efface pas sous les
+      // doigts de quelqu'un qui est en train de s'en servir.
+      if (_turnsOpen || _controlsOpen) return;
+      setState(() => _dockDimmed = true);
+    });
+    if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
+  }
+
+  /// Une phrase vient de s'afficher : on la garde en grand [_kMessageHold],
+  /// puis le dock se resserre. Une phrase qui en chasse une autre relance le
+  /// compte à rebours plutôt que de le laisser expirer au milieu.
+  void _flashMessage() {
+    _messageTimer?.cancel();
+    if (!_messageOpen) setState(() => _messageOpen = true);
+    _messageTimer = Timer(_kMessageHold, () {
+      if (!mounted) return;
+      setState(() => _messageOpen = false);
+    });
+  }
+
   /// Niveau de voix courant (0..1), toutes voix humaines confondues : le max
   /// des [Participant.audioLevel] que LiveKit publie à chaque changement de
   /// locuteur actif. C'est ce qui fait *légèrement* bouger la pastille de
@@ -142,6 +179,8 @@ class _CallScreenState extends State<CallScreen> {
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
+    _wakeDock();
+    _flashMessage();
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -319,16 +358,6 @@ class _CallScreenState extends State<CallScreen> {
     markTranslationDone();
   }
 
-  /// Base codes (`fr`, `en`, …) the OS voice can actually speak on THIS phone,
-  /// from `getLanguages` — a Samsung and a Xiaomi do not ship the same set, so
-  /// it can only be known at runtime.
-  ///
-  /// Drives the in-call picker: a language the device cannot say is shown
-  /// disabled, because the pick is served by the OS voice with no download. Left
-  /// empty until the probe answers, and empty means "no constraint" — never grey
-  /// the whole list out on a device whose engine failed to enumerate.
-  Set<String> _deviceVoiceLangs = const {};
-
   /// Base code → the FULL tag the OS actually knows (`ja` → `ja-JP`).
   ///
   /// iOS resolves a voice with `AVSpeechSynthesisVoice(language:)`, which wants
@@ -356,10 +385,7 @@ class _CallScreenState extends State<CallScreen> {
       }
       if (!mounted || tags.isEmpty) return;
       DebugOverlay.log('device voices: ${tags.length} langs');
-      setState(() {
-        _deviceVoiceTags = tags;
-        _deviceVoiceLangs = tags.keys.toSet();
-      });
+      setState(() => _deviceVoiceTags = tags);
     } catch (e) {
       debugPrint('[speech] getLanguages failed: $e');
     }
@@ -566,23 +592,6 @@ class _CallScreenState extends State<CallScreen> {
     return '';
   }
 
-  /// The mandatory "which language will you speak?" gate, on the INCOMING
-  /// path. The callee answers the ringing call first and picks afterwards, so
-  /// the caller is not left waiting while a dialog is read.
-  ///
-  /// Changing [_mySourceLang] alone is not enough: the pipeline was already
-  /// attached with the old language, so re-run the binding — it compares
-  /// against [_attachedSourceLang] and restarts the recogniser on the new one.
-  Future<void> _askSpokenLangOnEntry() async {
-    if (!mounted) return;
-    final picked =
-        await askSpokenLanguage(context, preselect: _mySourceLang);
-    if (!mounted || picked == null || picked == _mySourceLang) return;
-    setState(() => _mySourceLang = picked);
-    final room = _room;
-    if (room != null) await _refreshTranslationBinding(room);
-  }
-
   /// Returns the first remote participant whose metadata carries a sourceLang.
   String _discoverRemoteLang(Room room) {
     for (final p in room.remoteParticipants.values) {
@@ -692,12 +701,7 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
     unawaited(_initUsageTracking());
-    // After the first frame: the dialog needs a mounted Navigator, and the room
-    // connection must not wait on the user reading a prompt.
-    if (widget.askLanguageOnEntry) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => unawaited(_askSpokenLangOnEntry()));
-    }
+    _wakeDock();
     UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
     // can close this screen instead of ringing into an empty room.
@@ -1039,6 +1043,7 @@ class _CallScreenState extends State<CallScreen> {
         ..on<ActiveSpeakersChangedEvent>((e) {
           final loudest = e.speakers.isEmpty ? 0.0 : e.speakers.first.audioLevel;
           _voiceLevel.value = loudest.clamp(0.0, 1.0);
+          if (loudest > 0.06) _wakeDock();
         })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
@@ -1430,13 +1435,23 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
-  void _openLanguageSheet() {
-    // Out of credits → translation is off; tapping the translate button opens
-    // the recharge paywall instead of the language picker.
+  /// Les deux langues de l'appel, dans un seul panneau : à gauche celle que je
+  /// parle, à droite celle que j'entends. Une roue par question, un drapeau à
+  /// la fois — rien à lire, on fait défiler jusqu'au bon.
+  void _openLanguagePairSheet() {
+    // Out of credits → translation is off; tapping the languages opens the
+    // recharge paywall instead of the picker.
     if (!UsageTracker.isDisabled && UsageTracker.creditsExhausted.value) {
       unawaited(_showOutOfCreditsDialog());
       return;
     }
+    // Le panneau n'a pas de bouton de validation : on note ce que les roues
+    // désignent, et on applique quand il se referme — peu importe comment il a
+    // été refermé. Appliquer à chaque cran relancerait le recogniser, ou
+    // annoncerait une langue au pair, pour des langues qu'on ne fait que
+    // survoler.
+    var spoken = _mySourceLang;
+    var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E0E0E),
@@ -1444,15 +1459,80 @@ class _CallScreenState extends State<CallScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      builder: (ctx) => _OutputLanguageSheet(
-        currentCode: _myOutputLang,
-        deviceVoiceLangs: _deviceVoiceLangs,
-        onSelected: (code) {
-          Navigator.of(ctx).pop();
-          _changeOutputLanguage(code);
+      builder: (ctx) => _LanguagePairSheet(
+        spokenCode: _mySourceLang,
+        heardCode: _myOutputLang,
+        onChanged: (s, h) {
+          spoken = s;
+          heard = h;
         },
       ),
-    );
+    ).whenComplete(() {
+      if (!mounted) return;
+      // Deux chemins bien distincts : la langue parlée relance notre
+      // recogniser, celle qu'on entend est annoncée au pair.
+      if (_baseLang(spoken) != _baseLang(_mySourceLang)) {
+        unawaited(_changeSpokenLanguage(spoken));
+      }
+      if (_baseLang(heard) != _baseLang(_myOutputLang)) {
+        unawaited(_changeOutputLanguage(heard));
+      }
+    });
+  }
+
+  /// Les deux panneaux de l'appel d'un coup — le son à gauche, les langues à
+  /// droite. C'est l'appui long sur la pastille qui l'ouvre : le geste rapide
+  /// reste réservé à couper la traduction.
+  void _openCallSettingsSheet() {
+    var spoken = _mySourceLang;
+    var heard = _myOutputLang;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0E0E0E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _CallSettingsSheet(
+        controller: _audio,
+        spokenCode: _mySourceLang,
+        heardCode: _myOutputLang,
+        onLanguagesChanged: (sp, hd) {
+          spoken = sp;
+          heard = hd;
+        },
+      ),
+    ).whenComplete(() {
+      if (!mounted) return;
+      if (_baseLang(spoken) != _baseLang(_mySourceLang)) {
+        unawaited(_changeSpokenLanguage(spoken));
+      }
+      if (_baseLang(heard) != _baseLang(_myOutputLang)) {
+        unawaited(_changeOutputLanguage(heard));
+      }
+    });
+  }
+
+  /// `fr-FR` et `fr` sont la même langue : comparer les tags bruts ferait
+  /// repartir le pipeline pour rien.
+  static String _baseLang(String code) =>
+      code.split('-').first.toLowerCase();
+
+  /// Change la langue que mon micro est censé entendre. Purement local : le
+  /// pair reçoit du texte déjà traduit, il n'a rien à savoir. Ce que ça coûte,
+  /// c'est un redémarrage du pipeline — [_refreshTranslationBinding] compare à
+  /// [_attachedSourceLang] et relance le recogniser sur la nouvelle langue.
+  Future<void> _changeSpokenLanguage(String code) async {
+    if (code.isEmpty || code == _mySourceLang) return;
+    setState(() => _mySourceLang = code);
+
+    // Le prochain appel repart sur ce choix, comme après le gate d'entrée —
+    // sans toucher au «ne plus me demander» déjà exprimé.
+    final saved = await UserPrefs.loadCallSpokenLang();
+    await UserPrefs.saveCallSpokenLang(code, dontAsk: saved.dontAsk);
+
+    final room = _room;
+    if (room != null) await _refreshTranslationBinding(room);
   }
 
   /// Change the language the local user hears the remote translated into.
@@ -1835,6 +1915,8 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
     _voiceLevel.dispose();
+    _messageTimer?.cancel();
+    _dockIdleTimer?.cancel();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -2165,7 +2247,7 @@ class _CallScreenState extends State<CallScreen> {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           // 1. La légende, dépliée depuis la zone de gauche.
                           AnimatedSize(
@@ -2250,13 +2332,20 @@ class _CallScreenState extends State<CallScreen> {
                                           tint: SC.accent,
                                           onTap: _openAudioSheet,
                                         ),
-                                        _RoundCallButton(
-                                          icon: Icons.translate,
-                                          label: AppStrings.t(
-                                            'call_language_output',
-                                          ),
-                                          tint: SC.accent,
-                                          onTap: _openLanguageSheet,
+                                        // Les deux langues de l'appel, côte à
+                                        // côte : ce que je parle, ce que
+                                        // j'entends. Chaque moitié ouvre son
+                                        // propre sélecteur.
+                                        _LanguagePairButton(
+                                          spokenCountry: findLanguageByCode(
+                                                _mySourceLang,
+                                              )?.countryCode ??
+                                              '',
+                                          heardCountry: findLanguageByCode(
+                                                _myOutputLang,
+                                              )?.countryCode ??
+                                              '',
+                                          onTap: _openLanguagePairSheet,
                                         ),
                                       ],
                                     ),
@@ -2277,13 +2366,22 @@ class _CallScreenState extends State<CallScreen> {
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
                             controlsOpen: _controlsOpen,
-                            onToggleTurns: () =>
-                                setState(() => _turnsOpen = !_turnsOpen),
+                            messageOpen: _messageOpen,
+                            dimmed: _dockDimmed,
+                            onWake: _wakeDock,
+                            onToggleTurns: () {
+                              _wakeDock();
+                              setState(() => _turnsOpen = !_turnsOpen);
+                            },
                             onToggleTranslation: _toggleTranslation,
+                            onOrbLongPress: _openCallSettingsSheet,
                             onHangUp: _hangUp,
-                            onToggleControls: () => setState(
-                              () => _controlsOpen = !_controlsOpen,
-                            ),
+                            onToggleControls: () {
+                              _wakeDock();
+                              setState(
+                                () => _controlsOpen = !_controlsOpen,
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -2543,6 +2641,108 @@ class _TurnBubble extends StatelessWidget {
   }
 }
 
+/// Les deux langues de l'appel dans une seule pastille, scindée en son milieu :
+/// à gauche celle que je PARLE — ce que le micro transcrit —, à droite celle
+/// que j'ENTENDS, dans laquelle la voix d'en face m'est dite. Les deux drapeaux
+/// sont souvent le même (je parle et j'écoute ma langue) : la micro-icône de
+/// chaque côté, micro et oreille, est ce qui les distingue alors.
+///
+/// Chaque moitié est un bouton : elle ouvre le sélecteur de SA langue.
+class _LanguagePairButton extends StatelessWidget {
+  const _LanguagePairButton({
+    required this.spokenCountry,
+    required this.heardCountry,
+    required this.onTap,
+  });
+
+  /// Codes ISO pays (`FR`, `JP`) — ceux des drapeaux, pas des langues.
+  final String spokenCountry;
+  final String heardCountry;
+  final VoidCallback onTap;
+
+  static const double _size = 45;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '${AppStrings.t('call_lang_me')} · '
+          '${AppStrings.t('call_lang_translation')}',
+      button: true,
+      child: Pressable(
+        bounce: true,
+        onTap: onTap,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: Stack(
+            children: [
+              ClipOval(
+                child: Stack(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _half(spokenCountry, Alignment.centerLeft),
+                        ),
+                        Expanded(
+                          child: _half(heardCountry, Alignment.centerRight),
+                        ),
+                      ],
+                    ),
+                    // Le trait de coupe, rogné par le disque comme le reste.
+                    Center(
+                      child: Container(
+                        width: 1.5,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // L'anneau, par-dessus : il détache la pastille de la vidéo.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Une moitié de disque : le drapeau rond en entier, dont on ne garde que la
+  /// moitié voulue. Rogner un disque plutôt qu'un rectangle évite d'étirer le
+  /// dessin — le package a déjà cadré le drapeau dans son cercle.
+  Widget _half(String country, Alignment side) {
+    return ClipRect(
+      child: Align(
+        alignment: side,
+        widthFactor: 0.5,
+        child: country.isEmpty
+            ? Container(width: _size, height: _size, color: SC.bubbleIn)
+            : CountryFlag.fromCountryCode(
+                country,
+                theme: const ImageTheme(
+                  width: _size,
+                  height: _size,
+                  shape: Circle(),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
 /// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
 /// tout ce dont on se sert en appel. De gauche à droite — la zone de légende
 /// (un tap déplie ce qui se dit), la pastille de traduction, le chevron qui
@@ -2561,8 +2761,12 @@ class _CallDock extends StatelessWidget {
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.controlsOpen,
+    required this.messageOpen,
+    required this.dimmed,
+    required this.onWake,
     required this.onToggleTurns,
     required this.onToggleTranslation,
+    required this.onOrbLongPress,
     required this.onHangUp,
     required this.onToggleControls,
   });
@@ -2575,7 +2779,7 @@ class _CallDock extends StatelessWidget {
   /// correspondant.
   final bool previewMine;
 
-  /// Affiché tant que rien n'a été dit : « Parle japonais ».
+  /// Affiché tant que rien n'a été dit.
   final String hint;
   final bool turnsOpen;
   final bool hasTurns;
@@ -2586,61 +2790,142 @@ class _CallDock extends StatelessWidget {
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
   final bool controlsOpen;
+
+  /// Une phrase vient d'arriver : la zone de texte prend toute la barre, le
+  /// chevron et le raccrochage s'effacent, la pastille glisse à droite.
+  final bool messageOpen;
+
+  /// Silence : il ne reste que la pastille, tout le reste s'efface.
+  final bool dimmed;
+  final VoidCallback onWake;
   final VoidCallback onToggleTurns;
   final VoidCallback onToggleTranslation;
+  final VoidCallback onOrbLongPress;
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
+  /// Le chevron et le raccrochage, ensemble.
+  static const double _trailingWidth = 42 + 6 + 46;
+
+  /// La zone de texte au repos : exactement la largeur de ce qu'il y a de
+  /// l'autre côté, pour que la pastille tombe au milieu de la barre.
+  static const double _captionWidth = _trailingWidth;
+  static const double _gap = 8;
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(34),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          decoration: BoxDecoration(
-            // Le gris translucide de la barre de commentaire : du blanc très
-            // dilué sur du flou, rien de coloré.
-            color: Colors.white.withValues(alpha: 0.14),
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+      builder: (context, dim, _) {
+        final live = 1 - dim;
+        return GestureDetector(
+          behavior: HitTestBehavior.deferToChild,
+          // Effacé, le dock ne fait plus qu'une chose : se rallumer. Ce qu'il
+          // porte est neutralisé — on ne raccroche pas en voulant le rallumer.
+          onTap: dimmed ? onWake : null,
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _CaptionField(
-                  preview: preview,
-                  hint: hint,
-                  open: turnsOpen,
-                  hasTurns: hasTurns,
-                  // La pastille de qui vient de parler — la conversation se lit
-                  // dans les deux sens, comme dans la légende dépliée.
-                  authorName: previewMine ? myName : peerName,
-                  authorAvatarUrl: previewMine ? '' : peerAvatarUrl,
-                  onTap: onToggleTurns,
+            child: BackdropFilter(
+              // Le flou s'en va avec le reste : un fond devenu transparent
+              // posé sur un BackdropFilter continuerait de brouiller la vidéo.
+              filter: ui.ImageFilter.blur(
+                sigmaX: 24 * live + 0.001,
+                sigmaY: 24 * live + 0.001,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  // Le gris translucide de la barre de commentaire : du blanc
+                  // très dilué sur du flou, rien de coloré.
+                  color: Colors.white.withValues(alpha: 0.14 * live),
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18 * live),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      // Dépliée, elle récupère la place du chevron et du
+                      // raccrochage, gouttière comprise.
+                      width: messageOpen
+                          ? _captionWidth + _gap + _trailingWidth
+                          : _captionWidth,
+                      child: Opacity(
+                        opacity: live,
+                        child: IgnorePointer(
+                          ignoring: dimmed,
+                          child: _CaptionField(
+                            preview: preview,
+                            hint: hint,
+                            open: turnsOpen,
+                            hasTurns: hasTurns,
+                            // La pastille de qui vient de parler — la
+                            // conversation se lit dans les deux sens, comme
+                            // dans la légende dépliée.
+                            authorName: previewMine ? myName : peerName,
+                            authorAvatarUrl: previewMine ? '' : peerAvatarUrl,
+                            onTap: onToggleTurns,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: _gap),
+                    _TranslationOrb(
+                      on: translationOn,
+                      ttsSpeaking: ttsSpeaking,
+                      voiceLevel: voiceLevel,
+                      onTap: onToggleTranslation,
+                      onLongPress: onOrbLongPress,
+                    ),
+                    // Le chevron et le raccrochage se replient sur eux-mêmes
+                    // pendant qu'une phrase occupe la barre.
+                    ClipRect(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        width: messageOpen ? 0 : _trailingWidth + _gap,
+                        child: Opacity(
+                          opacity: live,
+                          child: IgnorePointer(
+                            ignoring: dimmed,
+                            child: OverflowBox(
+                              alignment: Alignment.centerRight,
+                              maxWidth: _trailingWidth + _gap,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: _gap),
+                                  _RailToggleButton(
+                                    open: controlsOpen,
+                                    onTap: onToggleControls,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _DockCircleButton(
+                                    icon: Icons.call_end_rounded,
+                                    label: AppStrings.t('call_end'),
+                                    background: const Color(0xFFE53935),
+                                    onTap: onHangUp,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              _TranslationOrb(
-                on: translationOn,
-                ttsSpeaking: ttsSpeaking,
-                voiceLevel: voiceLevel,
-                onTap: onToggleTranslation,
-              ),
-              const SizedBox(width: 8),
-              _RailToggleButton(open: controlsOpen, onTap: onToggleControls),
-              const SizedBox(width: 6),
-              _DockCircleButton(
-                icon: Icons.call_end_rounded,
-                label: AppStrings.t('call_end'),
-                background: const Color(0xFFE53935),
-                onTap: onHangUp,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -2768,6 +3053,7 @@ class _TranslationOrb extends StatefulWidget {
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.onTap,
+    required this.onLongPress,
   });
 
   /// La traduction tourne. False = coupée : galet blanc, barres immobiles.
@@ -2775,6 +3061,9 @@ class _TranslationOrb extends StatefulWidget {
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
   final VoidCallback onTap;
+
+  /// Appui long : les deux panneaux de l'appel, côte à côte.
+  final VoidCallback onLongPress;
 
   /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
   static const double size = 50;
@@ -2865,6 +3154,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
       child: Pressable(
         bounce: true,
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         child: Container(
           width: _TranslationOrb.size,
           height: _TranslationOrb.size,
@@ -2991,17 +3281,22 @@ class _RailToggleButton extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
         width: 42,
         height: 42,
         decoration: BoxDecoration(
           // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock, qui
           // floute déjà le fond — un second flou ne verrait que du verre et
           // coûterait une passe de plus.
-          color: Colors.white.withValues(alpha: 0.14),
+          //
+          // Déplié = engagé, donc blanc plein comme les bascules au-dessus :
+          // les réglages sont ouverts, et ça se voit sans lire le chevron.
+          color: open ? Colors.white : Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.22),
+            color: Colors.white.withValues(alpha: open ? 0.0 : 0.22),
             width: 1,
           ),
         ),
@@ -3009,9 +3304,9 @@ class _RailToggleButton extends StatelessWidget {
           turns: open ? 0.5 : 0.0,
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
-          child: const Icon(
+          child: Icon(
             Icons.keyboard_arrow_up_rounded,
-            color: Colors.white,
+            color: open ? Colors.black : Colors.white,
             size: 26,
           ),
         ),
@@ -3096,41 +3391,30 @@ class _RoundCallButton extends StatelessWidget {
   }
 }
 
-/// Bottom sheet to change the language the local user hears the remote
-/// translated into. The pick is broadcast to the peer, who then translates into
-/// it — see [_CallScreenState._changeOutputLanguage].
+/// Les deux langues de l'appel dans un seul panneau : « Langue que je parle »
+/// à gauche, « Langue que j'entends » à droite, séparées par la flèche à deux
+/// têtes qui dit que l'une va vers l'autre.
 ///
-/// A language this phone has no voice for is shown disabled rather than hidden:
-/// the pick is spoken by the OS voice, so picking one the OS cannot say would
-/// land the peer's translation as text nobody reads out. That matters now the
-/// picker carries 17 languages — plenty of phones ship no Ukrainian or Hindi
-/// voice.
-///
-/// The account language stays selectable even when the OS lacks it — its premium
-/// bundle is installed and speaks it.
-class _OutputLanguageSheet extends StatelessWidget {
-  const _OutputLanguageSheet({
-    required this.currentCode,
-    required this.deviceVoiceLangs,
-    required this.onSelected,
+/// Une seule question par colonne, un seul drapeau affiché : on fait défiler la
+/// roue jusqu'à celui qu'on veut. Rien n'est appliqué tant qu'on n'a pas
+/// enregistré — chaque cran de la roue relancerait sinon le recogniser, ou
+/// annoncerait une langue au pair, pour rien.
+class _LanguagePairSheet extends StatelessWidget {
+  const _LanguagePairSheet({
+    required this.spokenCode,
+    required this.heardCode,
+    required this.onChanged,
   });
 
-  final String currentCode;
+  final String spokenCode;
+  final String heardCode;
 
-  /// Base codes the OS voice can speak here. Empty = the probe has not answered
-  /// (or failed), in which case nothing is disabled — better a language that
-  /// might not speak than a picker that greys out everything.
-  final Set<String> deviceVoiceLangs;
-  final ValueChanged<String> onSelected;
-
-  // TEMP (this build): the TTS-availability gate is disabled, so every language
-  // is selectable even when the device has no voice for it. RESTORE later with:
-  //   deviceVoiceLangs.isEmpty || deviceVoiceLangs.contains(code)
-  bool _canSpeak(String code) => true;
+  /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
+  /// d'appel qui le fera quand le panneau se refermera.
+  final void Function(String spoken, String heard) onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final current = findLanguageByCode(currentCode)?.code ?? '';
     return SafeArea(
       top: false,
       child: Padding(
@@ -3139,46 +3423,174 @@ class _OutputLanguageSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+            const _SheetHandle(),
+            _LanguageWheels(
+              spokenCode: spokenCode,
+              heardCode: heardCode,
+              onChanged: onChanged,
             ),
-            Text(
-              AppStrings.t('call_output_language_title'),
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              AppStrings.t('call_output_language_hint'),
-              style: const TextStyle(
-                color: SC.textMuted,
-                fontSize: 12,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// La poignée de tous les panneaux d'appel.
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 40,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 18),
+        decoration: BoxDecoration(
+          color: Colors.white24,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+}
+
+/// Les deux langues de l'appel : « Moi » à gauche, « Traduction » à droite,
+/// séparées par la flèche à deux têtes qui dit que l'une va vers l'autre.
+///
+/// Une seule question par colonne, un seul drapeau affiché : on fait défiler la
+/// roue jusqu'à celui qu'on veut. Rien n'est appliqué en direct — chaque cran
+/// relancerait sinon le recogniser, ou annoncerait une langue au pair, pour des
+/// drapeaux qu'on ne fait que survoler.
+class _LanguageWheels extends StatefulWidget {
+  const _LanguageWheels({
+    required this.spokenCode,
+    required this.heardCode,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final String spokenCode;
+  final String heardCode;
+  final void Function(String spoken, String heard) onChanged;
+
+  /// Serré : les deux roues partagent le panneau avec les réglages de son.
+  final bool compact;
+
+  @override
+  State<_LanguageWheels> createState() => _LanguageWheelsState();
+}
+
+class _LanguageWheelsState extends State<_LanguageWheels> {
+  late int _spoken = _indexOf(widget.spokenCode);
+  late int _heard = _indexOf(widget.heardCode);
+
+  void _report() => widget.onChanged(
+        supportedLanguages[_spoken].code,
+        supportedLanguages[_heard].code,
+      );
+
+  /// Une langue hors catalogue (ou vide) retombe sur la première : la roue doit
+  /// toujours montrer quelque chose.
+  static int _indexOf(String code) {
+    final base = code.split('-').first.toLowerCase();
+    final i = supportedLanguages.indexWhere((l) => l.code == base);
+    return i < 0 ? 0 : i;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _FlagWheel(
+            title: AppStrings.t('call_lang_me'),
+            icon: Icons.mic_rounded,
+            index: _spoken,
+            compact: widget.compact,
+            onChanged: (i) {
+              setState(() => _spoken = i);
+              _report();
+            },
+          ),
+        ),
+        // La flèche à deux têtes : ce qui se dit d'un côté ressort de l'autre.
+        // Posée à la hauteur des roues, pas des titres.
+        Padding(
+          padding: const EdgeInsets.only(top: 58),
+          child: Icon(
+            Icons.swap_horiz_rounded,
+            size: widget.compact ? 16 : 22,
+            color: Colors.white.withValues(alpha: 0.55),
+          ),
+        ),
+        Expanded(
+          child: _FlagWheel(
+            title: AppStrings.t('call_lang_translation'),
+            icon: Icons.hearing_rounded,
+            index: _heard,
+            compact: widget.compact,
+            onChanged: (i) {
+              setState(() => _heard = i);
+              _report();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Les deux panneaux d'un seul tenant, ouverts par un appui long sur la
+/// pastille : le son à gauche, les langues à droite.
+class _CallSettingsSheet extends StatelessWidget {
+  const _CallSettingsSheet({
+    required this.controller,
+    required this.spokenCode,
+    required this.heardCode,
+    required this.onLanguagesChanged,
+  });
+
+  final AudioController controller;
+  final String spokenCode;
+  final String heardCode;
+  final void Function(String spoken, String heard) onLanguagesChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHandle(),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final lang in supportedLanguages)
-                    _LanguageRow(
-                      lang: lang,
-                      selected: lang.code == current,
-                      available: _canSpeak(lang.code),
-                      onTap: () => onSelected(lang.code),
+                  Expanded(child: _AudioControls(controller: controller)),
+                  // Le trait qui sépare les deux panneaux.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      color: Colors.white.withValues(alpha: 0.12),
                     ),
+                  ),
+                  Expanded(
+                    child: _LanguageWheels(
+                      spokenCode: spokenCode,
+                      heardCode: heardCode,
+                      onChanged: onLanguagesChanged,
+                      compact: true,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -3189,58 +3601,118 @@ class _OutputLanguageSheet extends StatelessWidget {
   }
 }
 
-class _LanguageRow extends StatelessWidget {
-  const _LanguageRow({
-    required this.lang,
-    required this.selected,
-    required this.onTap,
-    this.available = true,
+/// Une roue de drapeaux : sa question au-dessus, un drapeau dans la fenêtre, le
+/// nom de la langue en dessous. Les voisins restent visibles du coin de l'œil,
+/// couchés par la perspective — c'est ce qui donne envie de faire défiler.
+class _FlagWheel extends StatefulWidget {
+  const _FlagWheel({
+    required this.title,
+    required this.icon,
+    required this.index,
+    required this.onChanged,
+    this.compact = false,
   });
 
-  final AppLanguage lang;
-  final bool selected;
-  final bool available;
-  final VoidCallback onTap;
+  final String title;
+
+  /// Ce que fait cette colonne : ma voix qui entre, la traduction qui sort.
+  final IconData icon;
+  final int index;
+  final ValueChanged<int> onChanged;
+
+  /// Serré : la roue partage la largeur avec les réglages de son.
+  final bool compact;
+
+  @override
+  State<_FlagWheel> createState() => _FlagWheelState();
+}
+
+class _FlagWheelState extends State<_FlagWheel> {
+  late final FixedExtentScrollController _ctrl =
+      FixedExtentScrollController(initialItem: widget.index);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: available ? onTap : null,
-        borderRadius: BorderRadius.circular(12),
-        child: Opacity(
-          opacity: available ? 1 : 0.38,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Row(
-              children: [
-                Text(lang.flag, style: const TextStyle(fontSize: 24)),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    lang.label,
-                    style: TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(widget.icon, size: 13, color: SC.textMuted),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: const TextStyle(
+                  color: SC.textMuted,
+                  fontSize: 12,
+                  height: 1.25,
                 ),
-                if (!available)
-                  Text(
-                    AppStrings.t('call_language_unavailable'),
-                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
-                  )
-                else if (selected)
-                  const Icon(Icons.check_rounded,
-                      color: SC.accent, size: 20),
-              ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          height: widget.compact ? 70 : 84,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: ListWheelScrollView.useDelegate(
+            controller: _ctrl,
+            itemExtent: widget.compact ? 46 : 56,
+            diameterRatio: 1.1,
+            perspective: 0.006,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: widget.onChanged,
+            childDelegate: ListWheelChildBuilderDelegate(
+              childCount: supportedLanguages.length,
+              // Sur le téléphone, l'emoji drapeau du système : c'est celui que
+              // l'utilisateur voit partout ailleurs sur son appareil. Le web n'a
+              // pas ce luxe — sous Windows le glyphe n'existe pas et Chrome
+              // écrirait «FR» — alors là, on dessine le SVG rond.
+              builder: (ctx, i) => Center(
+                child: kIsWeb
+                    ? CountryFlag.fromCountryCode(
+                        supportedLanguages[i].countryCode,
+                        theme: ImageTheme(
+                          width: widget.compact ? 32 : 40,
+                          height: widget.compact ? 32 : 40,
+                          shape: const Circle(),
+                        ),
+                      )
+                    : Text(
+                        supportedLanguages[i].flag,
+                        style: TextStyle(fontSize: widget.compact ? 30 : 38),
+                      ),
+              ),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          supportedLanguages[widget.index].label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: SC.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -3258,71 +3730,66 @@ class _AudioSettingsSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Text(
-                  AppStrings.t('call_audio'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _MicLevelStrip(level: controller.micLevel),
-                const SizedBox(height: 18),
-                _SheetLabel(
-                  icon: Icons.record_voice_over_rounded,
-                  text: AppStrings.t('call_translation_volume'),
-                ),
-                Slider(
-                  value: controller.translatedVolume,
-                  onChanged: (v) => controller.setTranslatedVolume(v),
-                  activeColor: SC.accent,
-                  inactiveColor: Colors.white24,
-                ),
-                const SizedBox(height: 6),
-                _SheetLabel(
-                  icon: Icons.person_outline_rounded,
-                  text: AppStrings.t('call_original_volume'),
-                ),
-                Slider(
-                  value: controller.originalVolume,
-                  onChanged: (v) => controller.setOriginalVolume(v),
-                  activeColor: SC.accent,
-                  inactiveColor: Colors.white24,
-                ),
-              ],
-            );
-          },
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHandle(),
+            _AudioControls(controller: controller),
+          ],
         ),
       ),
     );
   }
 }
 
+/// Les deux volumes de l'appel : la vraie voix d'abord, sa traduction ensuite —
+/// l'ordre dans lequel les deux arrivent à l'oreille. Le réglage s'entend
+/// pendant qu'on le bouge ; rien à valider.
+class _AudioControls extends StatelessWidget {
+  const _AudioControls({required this.controller});
+
+  final AudioController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SheetLabel(
+              icon: Icons.mic_rounded,
+              text: AppStrings.t('call_original_volume'),
+            ),
+            Slider(
+              value: controller.originalVolume.clamp(0.0, 1.0).toDouble(),
+              onChanged: controller.setOriginalVolume,
+              activeColor: SC.accent,
+              inactiveColor: Colors.white24,
+            ),
+            const SizedBox(height: 6),
+            _SheetLabel(
+              icon: Icons.hearing_rounded,
+              text: AppStrings.t('call_translation_volume'),
+            ),
+            Slider(
+              value: controller.translatedVolume.clamp(0.0, 1.0).toDouble(),
+              onChanged: controller.setTranslatedVolume,
+              activeColor: SC.accent,
+              inactiveColor: Colors.white24,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Le libellé d'un réglage : son icône, puis son nom.
 class _SheetLabel extends StatelessWidget {
   const _SheetLabel({required this.icon, required this.text});
   final IconData icon;
@@ -3339,7 +3806,10 @@ class _SheetLabel extends StatelessWidget {
           Text(
             text,
             style: const TextStyle(
-                color: SC.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+              color: SC.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -3347,39 +3817,6 @@ class _SheetLabel extends StatelessWidget {
   }
 }
 
-class _MicLevelStrip extends StatelessWidget {
-  const _MicLevelStrip({required this.level});
-  final double level;
-
-  @override
-  Widget build(BuildContext context) {
-    final clamped = level.clamp(0.0, 1.0).toDouble();
-    return Row(
-      children: [
-        const Icon(Icons.mic_rounded, size: 16, color: SC.textMuted),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: clamped,
-              minHeight: 6,
-              backgroundColor: Colors.white12,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                clamped > 0.85 ? const Color(0xFFE53935) : SC.accent,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Placeholder rendered in place of a video feed when the participant's
-/// camera is off (or the local user has theirs off in a self-main view).
-/// The call audio + translation keep running underneath; this just keeps
-/// the visual cell from collapsing when video drops mid-call.
 class _CameraOffTile extends StatelessWidget {
   const _CameraOffTile({this.label, this.compact = false, this.muted = false});
 

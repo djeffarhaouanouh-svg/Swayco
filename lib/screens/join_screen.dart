@@ -137,12 +137,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       _error = null;
     });
     try {
-      // Which language will be spoken, asked every time — it is minted into
-      // the token and tells the peer what to translate FROM.
+      // Which language will be spoken — minted into the token, which tells the
+      // peer what to translate FROM.
+      final spokenLang = await resolveSpokenLanguage(preselect: _mySourceLang);
       if (!mounted) return;
-      final spokenLang =
-          await askSpokenLanguage(context, preselect: _mySourceLang);
-      if (spokenLang == null || !mounted) return;
 
       final room = _roomNameFor(peer.id);
       final token = await fetchLiveKitToken(

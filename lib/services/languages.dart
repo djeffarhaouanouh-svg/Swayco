@@ -16,6 +16,24 @@ class AppLanguage {
 
   /// Native-script label shown in the picker.
   final String label;
+
+  /// ISO code of the country whose flag stands for this language (`ja` → `JP`),
+  /// derived from [flag] rather than kept in a second table: a flag emoji IS a
+  /// pair of regional indicators, i.e. two letters shifted up into their own
+  /// Unicode block. Empty if [flag] is not a flag.
+  ///
+  /// Needed wherever the flag must be DRAWN rather than typed — the round SVG
+  /// flags of the in-call language button, which don't depend on the system
+  /// emoji font.
+  String get countryCode {
+    const first = 0x1F1E6; // 🇦
+    final runes = flag.runes.toList();
+    if (runes.length < 2) return '';
+    final a = runes[0] - first;
+    final b = runes[1] - first;
+    if (a < 0 || a > 25 || b < 0 || b > 25) return '';
+    return String.fromCharCodes([0x41 + a, 0x41 + b]);
+  }
 }
 
 /// Every language that can be both TRANSCRIBED and SPOKEN on-device — i.e. the

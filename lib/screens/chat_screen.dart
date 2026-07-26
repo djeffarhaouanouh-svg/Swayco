@@ -468,12 +468,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           // re-share the link from there.
         }
       }
-      // Ask which language will be spoken before minting anything: the token
-      // carries it into the LiveKit metadata, which is what the peer translates
-      // FROM. The account language is only the pre-selection.
+      // Which language will be spoken, resolved before minting anything: the
+      // token carries it into the LiveKit metadata, which is what the peer
+      // translates FROM.
+      final spokenLang = await resolveSpokenLanguage(preselect: myLang);
       if (!mounted) return;
-      final spokenLang = await askSpokenLanguage(context, preselect: myLang);
-      if (spokenLang == null || !mounted) return;
 
       // Enter the waiting room — the call connects when the guest joins.
       final token = await fetchLiveKitToken(
