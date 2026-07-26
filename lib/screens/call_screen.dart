@@ -1390,6 +1390,15 @@ class _CallScreenState extends State<CallScreen> {
       // Without this, a TTS that started while the mic was muted would keep
       // blocking SEND until its timer fires (up to 15 s).
       markTranslationDone();
+    } else {
+      // On coupe : la barre se resserre DANS LE MÊME GESTE, sans attendre le
+      // maintien de la phrase ni le filet de sécurité. Plus rien ne sortira
+      // d'ici, la place n'a plus lieu d'être — et la pastille s'arrête net.
+      _messageTimer?.cancel();
+      _hotTicks = 0;
+      _localVoice = 0;
+      _publishVoiceLevel();
+      _closeMessageZone();
     }
     if (mounted) setState(() => _micOn = next);
     await room.localParticipant?.setMicrophoneEnabled(next);
