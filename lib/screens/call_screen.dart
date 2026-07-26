@@ -3483,6 +3483,16 @@ class _RailToggleButton extends StatelessWidget {
             color: Colors.white.withValues(alpha: open ? 0.0 : 0.22),
             width: 1,
           ),
+          // Une lueur cyan, juste assez pour que l'œil le trouve : c'est le
+          // seul bouton du dock dont le rôle est de révéler le reste, et sur
+          // une vidéo sombre il se confondait avec le verre.
+          boxShadow: [
+            BoxShadow(
+              color: SC.accent.withValues(alpha: 0.34),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ],
         ),
         child: AnimatedRotation(
           turns: open ? 0.5 : 0.0,
