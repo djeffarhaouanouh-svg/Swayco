@@ -1646,7 +1646,7 @@ class _CallScreenState extends State<CallScreen> {
   void _openAudioSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1674,7 +1674,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1708,7 +1708,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -2077,7 +2077,7 @@ class _CallScreenState extends State<CallScreen> {
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bg,
+        backgroundColor: SC.bubbleIn,
         title: Text(AppStrings.t('call_leave_q'),
             style: const TextStyle(color: SC.textPrimary)),
         content: Text(
