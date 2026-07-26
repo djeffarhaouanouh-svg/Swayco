@@ -2795,7 +2795,9 @@ class _CallDock extends StatelessWidget {
   /// chevron et le raccrochage s'effacent, la pastille glisse à droite.
   final bool messageOpen;
 
-  /// Silence : il ne reste que la pastille, tout le reste s'efface.
+  /// Silence : la barre s'estompe jusqu'à [_dimOpacity], et la pastille reste
+  /// entière par-dessus. JAMAIS jusqu'à zéro : ce qui devient invisible devient
+  /// introuvable, et on doit toujours pouvoir viser le raccrochage.
   final bool dimmed;
   final VoidCallback onWake;
   final VoidCallback onToggleTurns;
@@ -2803,6 +2805,10 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onOrbLongPress;
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
+
+  /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
+  /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
+  static const double _dimOpacity = 0.22;
 
   /// Le chevron et le raccrochage, ensemble.
   static const double _trailingWidth = 42 + 6 + 46;
@@ -2819,20 +2825,24 @@ class _CallDock extends StatelessWidget {
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOut,
       builder: (context, dim, _) {
-        final live = 1 - dim;
+        // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
+        final live = 1 - (1 - _dimOpacity) * dim;
         return GestureDetector(
-          behavior: HitTestBehavior.deferToChild,
-          // Effacé, le dock ne fait plus qu'une chose : se rallumer. Ce qu'il
-          // porte est neutralisé — on ne raccroche pas en voulant le rallumer.
+          // En veille, la barre entière devient une seule grande cible qui la
+          // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
+          // En pleine lumière elle ne capte rien, ce sont les boutons qui
+          // travaillent.
+          behavior:
+              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
             child: BackdropFilter(
-              // Le flou s'en va avec le reste : un fond devenu transparent
-              // posé sur un BackdropFilter continuerait de brouiller la vidéo.
+              // Le flou s'atténue avec le reste, sans jamais s'annuler : la
+              // barre reste une barre, en retrait.
               filter: ui.ImageFilter.blur(
-                sigmaX: 24 * live + 0.001,
-                sigmaY: 24 * live + 0.001,
+                sigmaX: 24 * live,
+                sigmaY: 24 * live,
               ),
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -2858,6 +2868,8 @@ class _CallDock extends StatelessWidget {
                           : _captionWidth,
                       child: Opacity(
                         opacity: live,
+                        // En veille, le premier tap rallume : il ne doit pas
+                        // aussi déplier la conversation.
                         child: IgnorePointer(
                           ignoring: dimmed,
                           child: _CaptionField(
@@ -2876,48 +2888,48 @@ class _CallDock extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: _gap),
+                    // La pastille ne s'estompe jamais : c'est elle qui reste
+                    // quand tout le reste s'efface. En veille, la toucher
+                    // rallume la barre au lieu de couper la traduction — on ne
+                    // coupe pas la traduction sans l'avoir vue.
                     _TranslationOrb(
                       on: translationOn,
                       ttsSpeaking: ttsSpeaking,
                       voiceLevel: voiceLevel,
-                      onTap: onToggleTranslation,
+                      onTap: dimmed ? onWake : onToggleTranslation,
                       onLongPress: onOrbLongPress,
                     ),
-                    // Le chevron et le raccrochage se replient sur eux-mêmes
-                    // pendant qu'une phrase occupe la barre.
-                    ClipRect(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                        width: messageOpen ? 0 : _trailingWidth + _gap,
-                        child: Opacity(
-                          opacity: live,
-                          child: IgnorePointer(
-                            ignoring: dimmed,
-                            child: OverflowBox(
-                              alignment: Alignment.centerRight,
-                              maxWidth: _trailingWidth + _gap,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(width: _gap),
-                                  _RailToggleButton(
-                                    open: controlsOpen,
-                                    onTap: onToggleControls,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _DockCircleButton(
-                                    icon: Icons.call_end_rounded,
-                                    label: AppStrings.t('call_end'),
-                                    background: const Color(0xFFE53935),
-                                    onTap: onHangUp,
-                                  ),
-                                ],
+                    // Le chevron et le raccrochage se replient pendant qu'une
+                    // phrase occupe la barre — AnimatedSize rogne lui-même ce
+                    // qui dépasse en chemin.
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      child: messageOpen
+                          ? const SizedBox(height: 46)
+                          : Opacity(
+                              opacity: live,
+                              child: IgnorePointer(
+                                ignoring: dimmed,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(width: _gap),
+                                    _RailToggleButton(
+                                      open: controlsOpen,
+                                      onTap: onToggleControls,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _DockCircleButton(
+                                      icon: Icons.call_end_rounded,
+                                      label: AppStrings.t('call_end'),
+                                      background: const Color(0xFFE53935),
+                                      onTap: onHangUp,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ],
                 ),
