@@ -1426,7 +1426,7 @@ class _CallScreenState extends State<CallScreen> {
   void _openAudioSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1454,7 +1454,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1488,7 +1488,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bubbleIn,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
