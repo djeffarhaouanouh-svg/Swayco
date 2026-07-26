@@ -3473,69 +3473,110 @@ class _RailToggleButton extends StatelessWidget {
   final bool open;
   final VoidCallback onTap;
 
+  /// Le bouton lui-même. L'anneau et son halo se peignent dans les quelques
+  /// pixels qui restent autour, d'où l'encombrement un peu plus large.
+  static const double _size = 42;
+  static const double _box = 50;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        width: 50,
-        height: 50,
-        // L'anneau de halo : large, presque transparent, et surtout VIDE au
-        // centre — c'est ce qui le distingue d'une ombre portée, qui elle
-        // passerait sous le bouton et se verrait par transparence.
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: open
-                ? Colors.white.withValues(alpha: 0.0)
-                : SC.accent.withValues(alpha: 0.22),
-            width: 4,
+      child: SizedBox(
+        width: _box,
+        height: _box,
+        child: CustomPaint(
+          // L'anneau irisé est PEINT, pas posé en décoration : un dégradé ne
+          // rentre pas dans un Border, et un disque dégradé placé dessous se
+          // verrait par transparence à travers le verre du bouton. Un trait
+          // circulaire n'a pas d'intérieur, donc rien ne traverse.
+          painter: _ChevronRimPainter(visible: !open),
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: _size,
+              height: _size,
+              decoration: BoxDecoration(
+                // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock,
+                // qui floute déjà le fond — un second flou ne verrait que du
+                // verre et coûterait une passe de plus.
+                //
+                // Déplié = engagé, donc blanc plein comme les bascules
+                // au-dessus : les réglages sont ouverts, et ça se voit sans
+                // lire le chevron.
+                color:
+                    open ? Colors.white : Colors.white.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: AnimatedRotation(
+                turns: open ? 0.5 : 0.0,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  color: open ? Colors.black : Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
           ),
-        ),
-        alignment: Alignment.center,
-        child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock, qui
-          // floute déjà le fond — un second flou ne verrait que du verre et
-          // coûterait une passe de plus.
-          //
-          // Déplié = engagé, donc blanc plein comme les bascules au-dessus :
-          // les réglages sont ouverts, et ça se voit sans lire le chevron.
-          color: open ? Colors.white : Colors.white.withValues(alpha: 0.14),
-          shape: BoxShape.circle,
-          // Le liseré porte la lueur à lui seul. Une ombre portée ne convient
-          // pas ici : elle est peinte DERRIÈRE le bouton, dont le fond est
-          // translucide — on la voyait donc au travers, à l'intérieur. Le halo
-          // est simulé par le second anneau, plus large et presque effacé,
-          // dessiné autour (voir le build ci-dessous).
-          border: Border.all(
-            color: open
-                ? Colors.white.withValues(alpha: 0.0)
-                : SC.accent.withValues(alpha: 0.85),
-            width: 1.5,
-          ),
-        ),
-        child: AnimatedRotation(
-          turns: open ? 0.5 : 0.0,
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-          child: Icon(
-            Icons.keyboard_arrow_up_rounded,
-            color: open ? Colors.black : Colors.white,
-            size: 24,
-          ),
-        ),
         ),
       ),
     );
   }
+}
+
+/// Le contour irisé du chevron : cyan → bleu → violet balayés autour du
+/// bouton, doublés d'un même trait flouté qui fait la lueur.
+///
+/// Il s'efface quand les réglages sont dépliés : le bouton est alors blanc
+/// plein, et deux signaux qui disent la même chose se gênent.
+class _ChevronRimPainter extends CustomPainter {
+  const _ChevronRimPainter({required this.visible});
+
+  final bool visible;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!visible) return;
+    final c = Offset(size.width / 2, size.height / 2);
+    // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
+    final r = _RailToggleButton._size / 2 + 1.2;
+    final shader = SweepGradient(
+      colors: [
+        SC.accent,
+        SC.meshBlue,
+        SC.meshViolet,
+        SC.accent,
+      ],
+    ).createShader(Rect.fromCircle(center: c, radius: r));
+
+    // La lueur d'abord : le même anneau, plus épais et flou, dessous.
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5
+        ..shader = shader
+        ..color = Colors.white.withValues(alpha: 0.5)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
+    );
+    // Puis le trait net.
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..shader = shader,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ChevronRimPainter old) => old.visible != visible;
 }
 
 /// Un réglage d'appel, au-dessus du dock.
