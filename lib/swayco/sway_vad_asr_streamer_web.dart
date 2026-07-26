@@ -60,6 +60,16 @@ extension type _MicVadClass(JSObject _) implements JSObject {
 extension type _MicVad(JSObject _) implements JSObject {
   external void start();
   external void pause();
+
+  /// Libère POUR DE BON : le worklet, l'AudioContext et la session ONNX.
+  ///
+  /// `pause()` ne fait que suspendre — l'instance, son worklet et sa mémoire
+  /// WASM restent en vie. Un appel qui s'ouvre en crée une nouvelle : au
+  /// troisième ou quatrième, onnxruntime n'a plus de quoi allouer et rend
+  /// «RangeError: Out of memory», après quoi son état global reste cassé
+  /// («previous call to initWasm() failed») jusqu'au rechargement de la page.
+  /// Plus aucune phrase n'est alors segmentée, donc plus rien n'est traduit.
+  external void destroy();
 }
 
 /// `{ isSpeech, notSpeech }` — the VAD's per-frame verdict, 0..1.
@@ -254,6 +264,7 @@ class _VadAsrStreamer implements SwayMicStreamer {
       if (!_running) {
         // stop() landed while the model was downloading.
         vad.pause();
+        _destroy(vad);
         return;
       }
       _vadInstance = vad;
@@ -262,6 +273,12 @@ class _VadAsrStreamer implements SwayMicStreamer {
       _log('VAD v5 listening — redemption 1400ms, pad 500ms, $_from→$_to');
     } catch (e) {
       _log('start FAILED: $e');
+      if (e.toString().contains('initWasm') ||
+          e.toString().contains('Out of memory')) {
+        // Sans mémoire, le runtime ONNX reste cassé pour toute la page : les
+        // appels suivants échoueront pareil tant qu'on ne recharge pas.
+        _log('the ONNX runtime is out for this page — RELOAD to translate again');
+      }
       onError?.call('start_failed: $e');
       await stop();
     }
@@ -414,14 +431,28 @@ class _VadAsrStreamer implements SwayMicStreamer {
     return bytes;
   }
 
+  /// destroy() n'existe que depuis peu dans la lib : sur un bundle plus ancien
+  /// l'appel n'est pas là, et ne pas libérer vaut mieux que planter.
+  void _destroy(_MicVad vad) {
+    try {
+      vad.destroy();
+    } catch (e) {
+      _log('destroy unavailable ($e) — worklet left to the GC');
+    }
+  }
+
   @override
   Future<void> stop() async {
     _running = false;
     _ready = false;
-    try {
-      _vadInstance?.pause();
-    } catch (_) {}
+    final vad = _vadInstance;
     _vadInstance = null;
+    if (vad != null) {
+      try {
+        vad.pause();
+      } catch (_) {}
+      _destroy(vad);
+    }
     // Only ever our own clone — never the track LiveKit is using for the call.
     if (_ownsMicStream) {
       try {
