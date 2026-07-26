@@ -199,9 +199,12 @@ class _CallScreenState extends State<CallScreen> {
     _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
-  /// Le plancher absolu sous lequel rien n'est jamais de la parole, quel que
-  /// soit le calme de la pièce.
-  static const double _kVoiceOn = 0.05;
+  /// Le plancher absolu sous lequel rien n'est jamais de la parole. Très bas
+  /// EXPRÈS : `media-source.audioLevel` ne vit pas du tout sur l'échelle que
+  /// j'avais supposée — mesuré sur le web, une voix normale y vaut quelques
+  /// millièmes, pas quelques centièmes. Le vrai seuil est celui qui suit le
+  /// bruit de la pièce ; celui-ci n'est là que contre le silence numérique.
+  static const double _kVoiceOn = 0.001;
 
   /// Le bruit de la pièce, appris pendant l'appel : il descend vite vers le
   /// silence et ne remonte que lentement, si bien qu'une voix ne le tire pas
@@ -215,6 +218,13 @@ class _CallScreenState extends State<CallScreen> {
   /// Combien de mesures d'affilée au-dessus du seuil avant de déclarer que ça
   /// parle. Deux (~500 ms) : un choc sur la table en fait une, pas deux.
   int _hotTicks = 0;
+
+  /// De quoi calibrer sans deviner : le plus haut niveau vu sur les 3 dernières
+  /// secondes et le seuil du moment, écrits dans le panneau de debug comme le
+  /// fait le VAD. C'est le seul moyen de savoir sur quelle échelle vit
+  /// vraiment cette mesure, sur le web comme sur l'appareil.
+  double _probePeak = 0;
+  int _probeTicks = 0;
 
   /// Niveau de MON micro, mesuré ici même — pas au serveur.
   ///
@@ -274,17 +284,24 @@ class _CallScreenState extends State<CallScreen> {
             'falling back to the server speaker list',
           );
         }
-      } else if (_micProbeSilentTicks != 0) {
+      } else {
         _micProbeSilentTicks = 0;
-        DebugOverlay.log('mic probe: live (${level.toStringAsFixed(3)})');
       }
       final lvl = level.clamp(0.0, 1.0);
       // Le plancher suit le silence de près et la voix de très loin.
       _noiseFloor = lvl < _noiseFloor
           ? _noiseFloor * 0.7 + lvl * 0.3
           : _noiseFloor * 0.995 + lvl * 0.005;
-      final threshold = math.max(_kVoiceOn, _noiseFloor * 3 + 0.015);
+      final threshold = math.max(_kVoiceOn, _noiseFloor * 3);
       final hot = lvl > threshold;
+      if (lvl > _probePeak) _probePeak = lvl;
+      if (++_probeTicks % 12 == 0) {
+        DebugOverlay.log(
+          'mic probe: peak over last 3s ${_probePeak.toStringAsFixed(4)} '
+          '(opens at ${threshold.toStringAsFixed(4)})',
+        );
+        _probePeak = 0;
+      }
       _hotTicks = hot ? _hotTicks + 1 : 0;
       // La pastille ne bat que sur de la vraie parole : lui donner le bruit de
       // fond la ferait trembler tout l'appel.
@@ -2496,8 +2513,11 @@ class _CallScreenState extends State<CallScreen> {
                                         // l'appel. Le panneau, lui, porte les
                                         // deux — celle que je parle aussi.
                                         _LanguageButton(
+                                          // La langue du COMPTE, celle de
+                                          // l'onboarding — pas celle qu'on a
+                                          // choisi de parler pour cet appel.
                                           country: findLanguageByCode(
-                                                _myOutputLang,
+                                                AppStrings.currentBcp47.value,
                                               )?.countryCode ??
                                               '',
                                           onTap: _openLanguagePairSheet,
