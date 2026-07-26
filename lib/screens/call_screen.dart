@@ -217,10 +217,23 @@ class _CallScreenState extends State<CallScreen> {
   double _remoteVoice = 0;
   Timer? _micProbe;
 
+  /// La sonde n'a jamais rien mesuré alors que le micro tournait : sur cette
+  /// plateforme, `media-source.audioLevel` n'est pas rempli. On repasse alors
+  /// sur la vue du serveur, moins fine mais présente partout.
+  ///
+  /// Ça existe parce que le champ est standard mais pas garanti : le rapport
+  /// natif d'iOS/Android peut l'omettre selon la version de libwebrtc, et un
+  /// dock qui ne bouge plus du tout serait pire qu'un dock en retard.
+  bool _micProbeDead = false;
+  int _micProbeSilentTicks = 0;
+
+  /// ~5 s de micro ouvert sans jamais une seule mesure : la sonde est muette.
+  static const int _kMicProbeGiveUp = 20;
+
   void _startMicProbe(Room room) {
     _micProbe?.cancel();
     _micProbe = Timer.periodic(const Duration(milliseconds: 250), (_) async {
-      if (!mounted) return;
+      if (!mounted || _micProbeDead) return;
       LocalAudioTrack? mic;
       for (final pub in room.localParticipant?.audioTrackPublications ??
           const <LocalTrackPublication>[]) {
@@ -240,6 +253,19 @@ class _CallScreenState extends State<CallScreen> {
         return;
       }
       if (!mounted) return;
+      if (level <= 0) {
+        // Micro coupé : c'est normal de ne rien mesurer, on ne compte pas.
+        if (_micOn && ++_micProbeSilentTicks >= _kMicProbeGiveUp) {
+          _micProbeDead = true;
+          DebugOverlay.log(
+            'mic probe: no media-source.audioLevel on this platform — '
+            'falling back to the server speaker list',
+          );
+        }
+      } else if (_micProbeSilentTicks != 0) {
+        _micProbeSilentTicks = 0;
+        DebugOverlay.log('mic probe: live (${level.toStringAsFixed(3)})');
+      }
       _localVoice = level.clamp(0.0, 1.0);
       _publishVoiceLevel();
       if (_localVoice > _kVoiceOn) {
@@ -1145,10 +1171,19 @@ class _CallScreenState extends State<CallScreen> {
         // décision audio ne s'appuie dessus.
         ..on<ActiveSpeakersChangedEvent>((e) {
           // Ma voix est mesurée en local (voir [_startMicProbe]) ; ici on ne
-          // retient que celle d'en face.
+          // retient que celle d'en face — sauf si la sonde locale s'est
+          // révélée muette sur cette plateforme, auquel cas le serveur
+          // redevient notre seule source pour les deux voix.
           var loudest = 0.0;
           for (final p in e.speakers) {
-            if (p is LocalParticipant) continue;
+            if (p is LocalParticipant) {
+              if (_micProbeDead && p.audioLevel > _kVoiceOn) {
+                _localVoice = p.audioLevel.clamp(0.0, 1.0);
+                _wakeDock();
+                _openMessageZone();
+              }
+              continue;
+            }
             if (p.audioLevel > loudest) loudest = p.audioLevel;
           }
           _remoteVoice = loudest.clamp(0.0, 1.0);
