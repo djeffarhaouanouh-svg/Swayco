@@ -161,13 +161,26 @@ class _CallScreenState extends State<CallScreen> {
     if (!_messageOpen && mounted) setState(() => _messageOpen = true);
   }
 
+  /// La durée d'une rétraction — celle des animations du dock.
+  static const Duration _kRetract = Duration(milliseconds: 260);
+
   void _closeMessageZone() {
     if (!mounted || !_messageOpen) return;
     setState(() => _messageOpen = false);
-    // Le compte à rebours de la veille repart D'ICI : le fond ne s'efface
-    // qu'une fois la barre resserrée, jamais pendant qu'elle est encore grande
-    // ouverte sur une phrase.
-    _wakeDock();
+    // Le fond s'efface DANS LA FOULÉE, pas après un délai : le seul temps
+    // qu'on laisse passer est celui de la rétraction elle-même, pour que le
+    // fond parte quand la pastille est revenue à sa place et pas pendant
+    // qu'elle glisse.
+    _dockIdleTimer?.cancel();
+    _dockIdleTimer = Timer(_kRetract, () {
+      if (!mounted || _dockDimmed) return;
+      // Sauf si on est en train de s'en servir : là, le sursis normal reprend.
+      if (_turnsOpen || _controlsOpen) {
+        _wakeDock();
+        return;
+      }
+      setState(() => _dockDimmed = true);
+    });
   }
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
