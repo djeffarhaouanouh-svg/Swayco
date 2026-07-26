@@ -127,6 +127,16 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
+  /// Ma dernière phrase à moi — la seule que la barre affiche. Vide tant que
+  /// je n'ai rien dit, même si le correspondant a déjà parlé : ce qu'il dit se
+  /// lit en dépliant la conversation.
+  String get _myLastLine {
+    for (var i = _turns.length - 1; i >= 0; i--) {
+      if (_turns[i].mine) return _turns[i].text;
+    }
+    return '';
+  }
+
   /// Le dock est ouvert en grand : le chevron et le raccrochage s'effacent, la
   /// pastille glisse à leur place et la zone de texte prend toute la barre.
   ///
@@ -198,7 +208,11 @@ class _CallScreenState extends State<CallScreen> {
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
     _wakeDock();
-    _flashMessage();
+    // La barre ne montre que CE QUE J'ENVOIE. Ce que je reçois se lit dans la
+    // conversation, en tapant la zone — l'afficher au passage volerait la
+    // place à ma propre phrase, celle que je viens de dire et que je veux
+    // vérifier.
+    if (turn.mine) _flashMessage();
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -565,12 +579,10 @@ class _CallScreenState extends State<CallScreen> {
     if (speaking == _lastTranslationSpeaking) return;
     _lastTranslationSpeaking = speaking;
     _audio.onTranslationSpeaking(speaking);
-    // La traduction se dit à voix haute : c'est aussi «ça parle», le dock
-    // reste ouvert tant qu'elle dure.
-    if (speaking) {
-      _wakeDock();
-      _openMessageZone();
-    }
+    // La traduction se dit à voix haute : le dock se rallume, mais il ne
+    // s'ouvre pas — ce qu'elle raconte vient d'en face, et la barre ne montre
+    // que ce que j'envoie.
+    if (speaking) _wakeDock();
   }
 
   /// Translation credits should only burn while the live pipeline is
@@ -1065,14 +1077,18 @@ class _CallScreenState extends State<CallScreen> {
         // tête. Sert uniquement à animer la pastille de traduction : aucune
         // décision audio ne s'appuie dessus.
         ..on<ActiveSpeakersChangedEvent>((e) {
+          // La pastille bat pour toutes les voix, la mienne comme la sienne.
           final loudest = e.speakers.isEmpty ? 0.0 : e.speakers.first.audioLevel;
           _voiceLevel.value = loudest.clamp(0.0, 1.0);
-          if (loudest > 0.06) {
-            _wakeDock();
-            // Quelqu'un parle : la place se fait maintenant, pas à l'arrivée
-            // de la transcription — sinon la barre se réorganise sous la
-            // phrase au moment même où on essaie de la lire.
-            _openMessageZone();
+          if (loudest > 0.06) _wakeDock();
+          // La place, elle, ne se fait que pour MA voix : c'est ma phrase qui
+          // va s'afficher là, et il faut que la place l'attende déjà — sinon
+          // la barre se réorganise sous la phrase au moment où je la lis.
+          for (final p in e.speakers) {
+            if (p is LocalParticipant && p.audioLevel > 0.06) {
+              _openMessageZone();
+              break;
+            }
           }
         })
         // In-call typed-chat messages from the peer.
@@ -2378,15 +2394,11 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                           // 3. La barre elle-même.
                           _CallDock(
-                            preview: _turns.isEmpty ? '' : _turns.last.text,
-                            previewMine:
-                                _turns.isNotEmpty && _turns.last.mine,
+                            preview: _myLastLine,
                             hint: _speakLangHint,
                             turnsOpen: _turnsOpen,
                             hasTurns: _turns.isNotEmpty,
                             myName: widget.displayName,
-                            peerName: _peerProfile?.displayName ?? '',
-                            peerAvatarUrl: _peerProfile?.avatarUrl ?? '',
                             translationOn: _translationEnabled,
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
@@ -2745,13 +2757,10 @@ class _LanguageButton extends StatelessWidget {
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.preview,
-    required this.previewMine,
     required this.hint,
     required this.turnsOpen,
     required this.hasTurns,
     required this.myName,
-    required this.peerName,
-    required this.peerAvatarUrl,
     required this.translationOn,
     required this.ttsSpeaking,
     required this.voiceLevel,
@@ -2766,21 +2775,14 @@ class _CallDock extends StatelessWidget {
     required this.onToggleControls,
   });
 
-  /// La dernière phrase dite, en une ligne — l'aperçu affiché dans la zone de
-  /// gauche tant qu'elle est repliée. Vide = on montre l'invite.
+  /// Ma dernière phrase, en une ligne. Vide = on montre l'invite.
   final String preview;
-
-  /// C'est moi qui l'ai dite : la zone porte alors MA pastille, pas celle du
-  /// correspondant.
-  final bool previewMine;
 
   /// Affiché tant que rien n'a été dit.
   final String hint;
   final bool turnsOpen;
   final bool hasTurns;
   final String myName;
-  final String peerName;
-  final String peerAvatarUrl;
   final bool translationOn;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -2861,11 +2863,10 @@ class _CallDock extends StatelessWidget {
                             hint: hint,
                             open: turnsOpen,
                             hasTurns: hasTurns,
-                            // La pastille de qui vient de parler — la
-                            // conversation se lit dans les deux sens, comme
-                            // dans la légende dépliée.
-                            authorName: previewMine ? myName : peerName,
-                            authorAvatarUrl: previewMine ? '' : peerAvatarUrl,
+                            // Toujours ma pastille : la barre ne porte que mes
+                            // phrases.
+                            authorName: myName,
+                            authorAvatarUrl: '',
                             onTap: onToggleTurns,
                           ),
                         ),
