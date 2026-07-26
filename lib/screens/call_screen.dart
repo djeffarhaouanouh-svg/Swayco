@@ -177,7 +177,7 @@ class _CallScreenState extends State<CallScreen> {
   Timer? _dockIdleTimer;
 
   /// Le silence au bout duquel le dock disparaît.
-  static const Duration _kDockIdle = Duration(seconds: 4);
+  static const Duration _kDockIdle = Duration(seconds: 2);
 
   /// Quelque chose vient de se passer (une voix, une phrase, un tap) : le dock
   /// se rallume et repart pour [_kDockIdle] de sursis.
