@@ -161,8 +161,11 @@ class _CallScreenState extends State<CallScreen> {
     if (!_messageOpen && mounted) setState(() => _messageOpen = true);
   }
 
-  /// La durée d'une rétraction — celle des animations du dock.
-  static const Duration _kRetract = Duration(milliseconds: 260);
+  /// Le temps laissé à la rétraction avant que le fond s'en aille : la durée de
+  /// l'animation, plus de quoi la voir finir. Les deux collées faisaient un
+  /// à-coup — le chevron et le raccrochage revenaient dans un fond déjà en
+  /// train de disparaître, donc ils clignotaient au lieu de revenir.
+  static const Duration _kRetract = Duration(milliseconds: 420);
 
   void _closeMessageZone() {
     if (!mounted || !_messageOpen) return;
@@ -1454,9 +1457,6 @@ class _CallScreenState extends State<CallScreen> {
         unawaited(_applyPeerWantsTranslation(xlateOn));
         return;
       }
-      // Translation is off: a packet still in flight from a peer on an older
-      // build must not speak over the conversation.
-      if (!_translationEnabled) return;
       if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -1467,7 +1467,8 @@ class _CallScreenState extends State<CallScreen> {
         // and reusing their exact wording keeps terms consistent both ways.
         widget.translation.notePeerUtterance(m['orig']?.toString() ?? '');
         _addTurn(_SpokenTurn(mine: false, text: trans));
-        if (trans.isNotEmpty) {
+        // Son coupé : la phrase s'écrit, elle ne se dit pas.
+        if (trans.isNotEmpty && _translationEnabled) {
           if (kIsWeb) {
             unawaited(_speakDeviceTts(trans, lang));
           } else {
@@ -1482,7 +1483,9 @@ class _CallScreenState extends State<CallScreen> {
         DebugOverlay.log('caption voiceOnly audio=${audioB64.length}b web=$kIsWeb');
         // On web: play via <audio> element so browser AEC can cancel the echo.
         // On native: audioplayers handles it.
-        if (audioB64.isNotEmpty) unawaited(_playTranslatedAudio(audioB64));
+        if (audioB64.isNotEmpty && _translationEnabled) {
+          unawaited(_playTranslatedAudio(audioB64));
+        }
         return;
       }
     } catch (_) {}
@@ -1497,25 +1500,20 @@ class _CallScreenState extends State<CallScreen> {
   ///
   /// Our own pipeline keeps running: we go on translating our voice for the
   /// peer, who still hears us translated unless THEY cut it on their side.
+  /// Couper la traduction, c'est en couper LE SON — rien d'autre.
+  ///
+  /// La chaîne continue de tourner exactement comme avant : le pair traduit
+  /// toujours, les phrases arrivent toujours et s'écrivent toujours dans la
+  /// conversation. Seule la voix se tait. Rien n'est annoncé au pair non plus :
+  /// ce qu'on entend chez soi ne le regarde pas, et lui couper sa traduction à
+  /// distance rendait le retour en arrière lent (il fallait qu'il redémarre son
+  /// moteur). Ici, reprendre est instantané : on remet le son.
   Future<void> _toggleTranslation() async {
     final want = !_translationEnabled;
-    final room = _room;
-    if (room == null) return;
     setState(() => _translationEnabled = want);
-
-    unawaited(room.localParticipant
-        ?.publishData(
-          Uint8List.fromList(
-            utf8.encode(jsonEncode({_kTranslationOnKey: want})),
-          ),
-          reliable: true,
-          topic: _captionTopic,
-        )
-        .catchError((_) {}));
-
     if (!want) {
-      // Whatever the voice is mid-sentence on is no longer wanted, and neither is
-      // anything queued behind it. The peer's ducked voice comes straight back up.
+      // La phrase en cours de lecture s'arrête avec le reste : on a demandé le
+      // silence, pas «le silence après celle-ci».
       _cancelQueuedSpeech();
     }
   }
@@ -1648,7 +1646,7 @@ class _CallScreenState extends State<CallScreen> {
   void _openAudioSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1676,7 +1674,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1710,7 +1708,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -2079,7 +2077,7 @@ class _CallScreenState extends State<CallScreen> {
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
+        backgroundColor: SC.bg,
         title: Text(AppStrings.t('call_leave_q'),
             style: const TextStyle(color: SC.textPrimary)),
         content: Text(
@@ -2993,8 +2991,10 @@ class _CallDock extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOut,
+      // Plus long et plus mou que les mouvements du dock : le fond s'en va,
+      // il ne claque pas.
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOut,
       builder: (context, dim, _) {
         // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
         final live = 1 - (1 - _dimOpacity) * dim;
