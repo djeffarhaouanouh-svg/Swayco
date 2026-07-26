@@ -2247,7 +2247,7 @@ class _CallScreenState extends State<CallScreen> {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // 1. La légende, dépliée depuis la zone de gauche.
                           AnimatedSize(
@@ -2324,28 +2324,23 @@ class _CallScreenState extends State<CallScreen> {
                                             active: !_camOn,
                                             onTap: _toggleCam,
                                           ),
-                                        // Ceux-là ouvrent un panneau : pas de
-                                        // bascule, donc pas d'état blanc.
-                                        _RoundCallButton(
-                                          icon: Icons.tune_rounded,
-                                          label: AppStrings.t('call_audio'),
-                                          tint: SC.accent,
-                                          onTap: _openAudioSheet,
-                                        ),
-                                        // Les deux langues de l'appel, côte à
-                                        // côte : ce que je parle, ce que
-                                        // j'entends. Chaque moitié ouvre son
-                                        // propre sélecteur.
-                                        _LanguagePairButton(
-                                          spokenCountry: findLanguageByCode(
-                                                _mySourceLang,
-                                              )?.countryCode ??
-                                              '',
-                                          heardCountry: findLanguageByCode(
+                                        // La langue dans laquelle j'entends
+                                        // l'appel. Le panneau, lui, porte les
+                                        // deux — celle que je parle aussi.
+                                        _LanguageButton(
+                                          country: findLanguageByCode(
                                                 _myOutputLang,
                                               )?.countryCode ??
                                               '',
                                           onTap: _openLanguagePairSheet,
+                                        ),
+                                        // Il ouvre un panneau, il ne bascule
+                                        // rien : jamais d'état blanc, et le
+                                        // même verre que les autres.
+                                        _RoundCallButton(
+                                          icon: Icons.tune_rounded,
+                                          label: AppStrings.t('call_audio'),
+                                          onTap: _openAudioSheet,
                                         ),
                                       ],
                                     ),
@@ -2648,16 +2643,11 @@ class _TurnBubble extends StatelessWidget {
 /// chaque côté, micro et oreille, est ce qui les distingue alors.
 ///
 /// Chaque moitié est un bouton : elle ouvre le sélecteur de SA langue.
-class _LanguagePairButton extends StatelessWidget {
-  const _LanguagePairButton({
-    required this.spokenCountry,
-    required this.heardCountry,
-    required this.onTap,
-  });
+class _LanguageButton extends StatelessWidget {
+  const _LanguageButton({required this.country, required this.onTap});
 
-  /// Codes ISO pays (`FR`, `JP`) — ceux des drapeaux, pas des langues.
-  final String spokenCountry;
-  final String heardCountry;
+  /// Code ISO pays (`FR`, `JP`) — celui du drapeau, pas de la langue.
+  final String country;
   final VoidCallback onTap;
 
   static const double _size = 45;
@@ -2665,8 +2655,7 @@ class _LanguagePairButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '${AppStrings.t('call_lang_me')} · '
-          '${AppStrings.t('call_lang_translation')}',
+      label: AppStrings.t('call_output_language_title'),
       button: true,
       child: Pressable(
         bounce: true,
@@ -2676,30 +2665,28 @@ class _LanguagePairButton extends StatelessWidget {
           height: _size,
           child: Stack(
             children: [
-              ClipOval(
-                child: Stack(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _half(spokenCountry, Alignment.centerLeft),
+              Positioned.fill(
+                child: ClipOval(
+                  child: country.isEmpty
+                      ? Container(
+                          color: SC.bubbleIn,
+                          child: const Icon(
+                            Icons.translate,
+                            size: 21,
+                            color: Colors.white,
+                          ),
+                        )
+                      : CountryFlag.fromCountryCode(
+                          country,
+                          theme: const ImageTheme(
+                            width: _size,
+                            height: _size,
+                            shape: Circle(),
+                          ),
                         ),
-                        Expanded(
-                          child: _half(heardCountry, Alignment.centerRight),
-                        ),
-                      ],
-                    ),
-                    // Le trait de coupe, rogné par le disque comme le reste.
-                    Center(
-                      child: Container(
-                        width: 1.5,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-              // L'anneau, par-dessus : il détache la pastille de la vidéo.
+              // L'anneau : il détache le drapeau de la vidéo.
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
@@ -2716,28 +2703,6 @@ class _LanguagePairButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  /// Une moitié de disque : le drapeau rond en entier, dont on ne garde que la
-  /// moitié voulue. Rogner un disque plutôt qu'un rectangle évite d'étirer le
-  /// dessin — le package a déjà cadré le drapeau dans son cercle.
-  Widget _half(String country, Alignment side) {
-    return ClipRect(
-      child: Align(
-        alignment: side,
-        widthFactor: 0.5,
-        child: country.isEmpty
-            ? Container(width: _size, height: _size, color: SC.bubbleIn)
-            : CountryFlag.fromCountryCode(
-                country,
-                theme: const ImageTheme(
-                  width: _size,
-                  height: _size,
-                  shape: Circle(),
-                ),
-              ),
       ),
     );
   }
@@ -2810,12 +2775,6 @@ class _CallDock extends StatelessWidget {
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
 
-  /// Le chevron et le raccrochage, ensemble.
-  static const double _trailingWidth = 42 + 6 + 46;
-
-  /// La zone de texte au repos : exactement la largeur de ce qu'il y a de
-  /// l'autre côté, pour que la pastille tombe au milieu de la barre.
-  static const double _captionWidth = _trailingWidth;
   static const double _gap = 8;
 
   @override
@@ -2856,16 +2815,11 @@ class _CallDock extends StatelessWidget {
                   ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      // Dépliée, elle récupère la place du chevron et du
-                      // raccrochage, gouttière comprise.
-                      width: messageOpen
-                          ? _captionWidth + _gap + _trailingWidth
-                          : _captionWidth,
+                    // La zone de texte prend tout ce que les boutons laissent :
+                    // quand le chevron et le raccrochage se replient pour une
+                    // phrase, c'est elle qui récupère la place.
+                    Expanded(
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
@@ -3342,34 +3296,27 @@ class _RoundCallButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
-    this.tint,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  /// L'état que porte ce bouton est engagé.
+  /// L'état que porte ce bouton est engagé. Un bouton qui ouvre un panneau ne
+  /// l'est jamais : il garde son verre.
   final bool active;
-
-  /// Couleur de repos. Null = le verre, pour les bascules ; l'accent pour les
-  /// boutons qui ouvrent un réglage (audio, langue) — eux ne sont jamais
-  /// «engagés», ils n'ont donc pas d'état blanc à montrer.
-  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
-    final fill = active
-        ? Colors.white
-        : (tint?.withValues(alpha: 0.55) ??
-            Colors.white.withValues(alpha: 0.14));
+    final fill =
+        active ? Colors.white : Colors.white.withValues(alpha: 0.14);
     // The label is no longer shown under the button (the icons speak for
     // themselves), but it is kept on Semantics so screen readers still
     // announce each control.
     return Semantics(
       label: label,
       button: true,
-      toggled: tint == null ? active : null,
+      toggled: active,
       child: Pressable(
         bounce: true,
         onTap: onTap,
