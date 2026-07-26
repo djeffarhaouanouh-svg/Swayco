@@ -2208,6 +2208,7 @@ class _CallScreenState extends State<CallScreen> {
                                       spacing: 12,
                                       runSpacing: 10,
                                       children: [
+                                        // Muet = engagé : le bouton se remplit.
                                         _RoundCallButton(
                                           icon: _micOn
                                               ? Icons.mic_rounded
@@ -2215,7 +2216,7 @@ class _CallScreenState extends State<CallScreen> {
                                           label: _micOn
                                               ? AppStrings.t('call_mute')
                                               : AppStrings.t('call_unmute'),
-                                          background: SC.accent,
+                                          active: !_micOn,
                                           onTap: _toggleMic,
                                         ),
                                         _RoundCallButton(
@@ -2225,7 +2226,7 @@ class _CallScreenState extends State<CallScreen> {
                                           label: AppStrings.t(_audio.speakerOn
                                               ? 'call_earpiece'
                                               : 'call_speaker'),
-                                          background: SC.accent,
+                                          active: _audio.speakerOn,
                                           onTap: _toggleSpeaker,
                                         ),
                                         // Live keeps the camera on — no toggle.
@@ -2238,13 +2239,15 @@ class _CallScreenState extends State<CallScreen> {
                                                 ? AppStrings.t('call_video')
                                                 : AppStrings.t(
                                                     'call_video_off'),
-                                            background: SC.accent,
+                                            active: !_camOn,
                                             onTap: _toggleCam,
                                           ),
+                                        // Ceux-là ouvrent un panneau : pas de
+                                        // bascule, donc pas d'état blanc.
                                         _RoundCallButton(
                                           icon: Icons.tune_rounded,
                                           label: AppStrings.t('call_audio'),
-                                          background: SC.accent,
+                                          tint: SC.accent,
                                           onTap: _openAudioSheet,
                                         ),
                                         _RoundCallButton(
@@ -2252,7 +2255,7 @@ class _CallScreenState extends State<CallScreen> {
                                           label: AppStrings.t(
                                             'call_language_output',
                                           ),
-                                          background: SC.accent,
+                                          tint: SC.accent,
                                           onTap: _openLanguageSheet,
                                         ),
                                       ],
@@ -3017,47 +3020,73 @@ class _RailToggleButton extends StatelessWidget {
   }
 }
 
+/// Un réglage d'appel, au-dessus du dock.
+///
+/// Les bascules suivent le geste natif (Téléphone / FaceTime d'iOS, WhatsApp) :
+/// verre translucide au repos, **blanc plein et icône noire dès que l'état est
+/// engagé** — muet, caméra coupée, haut-parleur. L'icône, elle, continue de
+/// montrer l'état courant (micro barré quand on est muet) : le remplissage seul
+/// est ambigu, on ne se souvient pas de la couleur "de repos" d'un bouton
+/// (Nielsen Norman, «State-Switch Controls»). Les deux ensemble se lisent sans
+/// rien avoir à retenir.
 class _RoundCallButton extends StatelessWidget {
   const _RoundCallButton({
     required this.icon,
     required this.label,
-    required this.background,
     required this.onTap,
+    this.active = false,
+    this.tint,
   });
 
   final IconData icon;
   final String label;
-  final Color background;
   final VoidCallback onTap;
+
+  /// L'état que porte ce bouton est engagé.
+  final bool active;
+
+  /// Couleur de repos. Null = le verre, pour les bascules ; l'accent pour les
+  /// boutons qui ouvrent un réglage (audio, langue) — eux ne sont jamais
+  /// «engagés», ils n'ont donc pas d'état blanc à montrer.
+  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
+    final fill = active
+        ? Colors.white
+        : (tint?.withValues(alpha: 0.55) ??
+            Colors.white.withValues(alpha: 0.14));
     // The label is no longer shown under the button (the icons speak for
     // themselves), but it is kept on Semantics so screen readers still
     // announce each control.
     return Semantics(
       label: label,
       button: true,
+      toggled: tint == null ? active : null,
       child: Pressable(
         bounce: true,
         onTap: onTap,
         // Stable Flutter frosted-glass circle (NOT a platform view): the
-        // native glass flickered/reset under the keyboard animation. Tinted
-        // with the button colour (cyan / red).
+        // native glass flickered/reset under the keyboard animation.
         child: ClipOval(
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: 45,
+              height: 45,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: background.withValues(alpha: 0.55),
+                color: fill,
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.22),
+                  color: Colors.white.withValues(alpha: active ? 0.0 : 0.22),
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Icon(icon, color: Colors.white, size: 21),
+              child: Icon(
+                icon,
+                color: active ? Colors.black : Colors.white,
+                size: 21,
               ),
             ),
           ),
