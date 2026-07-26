@@ -127,14 +127,34 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
-  /// Un tour vient d'arriver : le dock s'ouvre en grand pour le montrer, puis
-  /// se referme tout seul. Le chevron et le raccrochage s'effacent le temps que
-  /// la phrase tienne à l'écran, et la pastille glisse à leur place.
+  /// Le dock est ouvert en grand : le chevron et le raccrochage s'effacent, la
+  /// pastille glisse à leur place et la zone de texte prend toute la barre.
+  ///
+  /// Il s'ouvre DÈS QU'ON PARLE — la phrase, elle, n'arrive qu'une fois
+  /// l'énoncé fini, et la place doit déjà l'attendre. Il se referme
+  /// [_kMessageHold] après qu'elle s'est affichée.
   bool _messageOpen = false;
   Timer? _messageTimer;
 
   /// Combien de temps la phrase reste dépliée une fois affichée.
   static const Duration _kMessageHold = Duration(milliseconds: 1500);
+
+  /// Le filet : ouvert par une voix, le dock ne peut pas rester grand ouvert
+  /// indéfiniment si aucune phrase n'arrive derrière (STT muette, réseau
+  /// coupé). Passé ce délai sans rien, il se resserre de lui-même.
+  static const Duration _kMessageSafety = Duration(seconds: 6);
+
+  /// Ça parle : on fait la place. Tant que la voix dure, rien ne se referme.
+  void _openMessageZone() {
+    _messageTimer?.cancel();
+    _messageTimer = Timer(_kMessageSafety, _closeMessageZone);
+    if (!_messageOpen && mounted) setState(() => _messageOpen = true);
+  }
+
+  void _closeMessageZone() {
+    if (!mounted || !_messageOpen) return;
+    setState(() => _messageOpen = false);
+  }
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
   /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
@@ -159,16 +179,14 @@ class _CallScreenState extends State<CallScreen> {
     if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
   }
 
-  /// Une phrase vient de s'afficher : on la garde en grand [_kMessageHold],
-  /// puis le dock se resserre. Une phrase qui en chasse une autre relance le
-  /// compte à rebours plutôt que de le laisser expirer au milieu.
+  /// La phrase est à l'écran : à partir de maintenant, [_kMessageHold] et le
+  /// dock se resserre. Une phrase qui en chasse une autre relance le compte à
+  /// rebours plutôt que de le laisser expirer au milieu — et si la personne
+  /// repart à parler, [_openMessageZone] l'annule.
   void _flashMessage() {
     _messageTimer?.cancel();
     if (!_messageOpen) setState(() => _messageOpen = true);
-    _messageTimer = Timer(_kMessageHold, () {
-      if (!mounted) return;
-      setState(() => _messageOpen = false);
-    });
+    _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
   /// Niveau de voix courant (0..1), toutes voix humaines confondues : le max
@@ -547,6 +565,12 @@ class _CallScreenState extends State<CallScreen> {
     if (speaking == _lastTranslationSpeaking) return;
     _lastTranslationSpeaking = speaking;
     _audio.onTranslationSpeaking(speaking);
+    // La traduction se dit à voix haute : c'est aussi «ça parle», le dock
+    // reste ouvert tant qu'elle dure.
+    if (speaking) {
+      _wakeDock();
+      _openMessageZone();
+    }
   }
 
   /// Translation credits should only burn while the live pipeline is
@@ -1043,7 +1067,13 @@ class _CallScreenState extends State<CallScreen> {
         ..on<ActiveSpeakersChangedEvent>((e) {
           final loudest = e.speakers.isEmpty ? 0.0 : e.speakers.first.audioLevel;
           _voiceLevel.value = loudest.clamp(0.0, 1.0);
-          if (loudest > 0.06) _wakeDock();
+          if (loudest > 0.06) {
+            _wakeDock();
+            // Quelqu'un parle : la place se fait maintenant, pas à l'arrivée
+            // de la transcription — sinon la barre se réorganise sous la
+            // phrase au moment même où on essaie de la lire.
+            _openMessageZone();
+          }
         })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
