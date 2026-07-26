@@ -1,30 +1,35 @@
-/// TEST — non-streaming STT: VAD in the browser, recognition on the backend.
-/// WEB ONLY, MEANT TO BE REVERTED.
+/// STT non-continu sur le WEB : le découpage des phrases se fait dans le
+/// navigateur, la reconnaissance et la traduction dans le cloud.
 ///
-/// Replaces the continuous PCM-over-WebSocket streamer for the duration of the
-/// experiment. The trade it makes:
+///   micro ouvert pendant tout l'appel
+///        ↓
+///   l'énergie du signal est mesurée par blocs de 128 ms (Web Audio)
+///        ↓
+///   «Bonjour…» → la parole commence (avec 512 ms de pré-roll, la première
+///                 syllabe n'est jamais coupée)
+///        ↓
+///   ~1 s sous le seuil → la phrase est close et découpée
+///        ↓
+///   ce segment-là part au cloud → traduction → pair
 ///
-///   mic open for the whole call
-///        ↓
-///   VAD v5 listens (frames of 512 samples @ 16 kHz)
-///        ↓
-///   "Bonjour…"  → speech starts (with 500 ms of pre-roll, so the first
-///                 syllable is never clipped)
-///        ↓
-///   300 ms of silence → the utterance is closed and clipped
-///        ↓
-///   only that segment goes to the recogniser → translation → peer
+/// Rien ne quitte le navigateur pendant les silences, et le moteur de
+/// reconnaissance reçoit une phrase entière plutôt que des mots isolés.
 ///
-/// Nothing leaves the browser while the user is silent, and the recogniser sees a whole
-/// phrase at once instead of guessing word by word. The cost is latency: no
-/// translation can start before the phrase has ended.
+/// LE DÉCOUPAGE NE DÉPEND PLUS D'UN MODÈLE LOCAL. Il tournait avant sur Silero
+/// v5 via onnxruntime-web : chaque appel construisait une session WASM, et
+/// comme la lib n'était que mise en pause, elles s'accumulaient jusqu'à
+/// «RangeError: Out of memory» — après quoi le runtime restait cassé pour toute
+/// la page et plus une seule phrase n'était segmentée. Un détecteur d'énergie
+/// n'a ni modèle, ni WASM, ni mémoire à fuir : il ne peut pas tomber en panne
+/// de cette façon. Il distingue moins finement la voix d'un bruit continu, ce
+/// que compense un seuil calé sur le bruit ambiant de la pièce.
 ///
-/// The VAD comes from `@ricky0123/vad-web`, loaded from the CDN in
-/// `web/index.html` (it exposes `window.vad`).
+/// Le natif n'est pas concerné : il segmente avec son propre moteur.
 library;
 
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
@@ -38,81 +43,43 @@ import 'sway_mic_streamer_base.dart';
 SwayMicStreamer createSwayMicStreamer() => _VadAsrStreamer();
 
 void _log(String m) {
-  web.console.log('[vad-asr] $m'.toJS);
-  DebugOverlay.log('[vad] $m');
+  web.console.log('[stt] $m'.toJS);
+  DebugOverlay.log('[stt] $m');
 }
 
-// ── window.vad (@ricky0123/vad-web 0.0.29) ────────────────────────────────
-@JS('vad')
-external _VadNamespace? get _vad;
-
-extension type _VadNamespace(JSObject _) implements JSObject {
-  // ignore: non_constant_identifier_names — the JS class is named MicVAD.
-  external _MicVadClass get MicVAD;
-}
-
-extension type _MicVadClass(JSObject _) implements JSObject {
-  /// `MicVAD.new(options)` — a static factory literally named `new`.
-  @JS('new')
-  external JSPromise<_MicVad> create(_MicVadOptions options);
-}
-
-extension type _MicVad(JSObject _) implements JSObject {
-  external void start();
-  external void pause();
-
-  /// Libère POUR DE BON : le worklet, l'AudioContext et la session ONNX.
-  ///
-  /// `pause()` ne fait que suspendre — l'instance, son worklet et sa mémoire
-  /// WASM restent en vie. Un appel qui s'ouvre en crée une nouvelle : au
-  /// troisième ou quatrième, onnxruntime n'a plus de quoi allouer et rend
-  /// «RangeError: Out of memory», après quoi son état global reste cassé
-  /// («previous call to initWasm() failed») jusqu'au rechargement de la page.
-  /// Plus aucune phrase n'est alors segmentée, donc plus rien n'est traduit.
-  external void destroy();
-}
-
-/// `{ isSpeech, notSpeech }` — the VAD's per-frame verdict, 0..1.
-extension type _VadProbs(JSObject _) implements JSObject {
-  external double get isSpeech;
-}
-
-extension type _MicVadOptions._(JSObject _) implements JSObject {
-  external factory _MicVadOptions({
-    JSFunction getStream,
-    JSFunction onSpeechStart,
-    JSFunction onSpeechEnd,
-    JSFunction onVADMisfire,
-    JSFunction onFrameProcessed,
-    String model,
-    double positiveSpeechThreshold,
-    double negativeSpeechThreshold,
-    int redemptionMs,
-    int preSpeechPadMs,
-    int minSpeechMs,
-    String baseAssetPath,
-    String onnxWASMBasePath,
-  });
-}
-
-const String _kVadAssets =
-    'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/';
-const String _kOrtAssets =
-    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 
 class _VadAsrStreamer implements SwayMicStreamer {
-  _MicVad? _vadInstance;
   web.MediaStream? _micStream;
   bool _ownsMicStream = false;
+
+  /// La chaîne Web Audio qui écoute le micro : contexte, prise de son,
+  /// processeur de blocs, et le gain à zéro qui ferme la boucle sans rien
+  /// renvoyer dans les haut-parleurs (le connecter à la sortie ferait un
+  /// larsen immédiat, mais sans connexion le processeur ne tourne pas).
+  web.AudioContext? _ctx;
+  web.MediaStreamAudioSourceNode? _source;
+  web.ScriptProcessorNode? _processor;
+  web.GainNode? _mute;
 
   bool _running = false;
   bool _ready = false;
   int _segments = 0;
 
-  /// VAD diagnostics: highest score seen since the last report, and the
-  /// frame counter that paces those reports.
+  /// Diagnostic : le plus fort niveau vu depuis le dernier rapport, et le
+  /// compteur de blocs qui rythme ces rapports.
   double _peak = 0;
   int _frames = 0;
+
+  /// Le bruit de la pièce, appris en continu : il descend vite vers le silence
+  /// et remonte lentement, si bien qu'une voix ne le tire pas vers le haut.
+  double _noiseFloor = 0.004;
+
+  /// La phrase en cours de constitution, bloc par bloc, et ce qui la précède.
+  final List<Float32List> _phrase = <Float32List>[];
+  final List<Float32List> _preroll = <Float32List>[];
+  bool _inSpeech = false;
+  int _hotBlocks = 0;
+  int _silentBlocks = 0;
 
   /// Set when the current phrase began while our own speaker was playing a
   /// translation — i.e. it is echo, and must not be sent back to the peer.
@@ -175,13 +142,6 @@ class _VadAsrStreamer implements SwayMicStreamer {
     _cbTranslation = onTranslation;
     _cbError = onError;
 
-    if (_vad == null) {
-      _log('window.vad missing — is the CDN script tag in web/index.html?');
-      onError?.call('vad_not_loaded');
-      _running = false;
-      return;
-    }
-
     try {
       final stream = await _acquireMic(localTrack);
       if (stream == null) {
@@ -190,98 +150,149 @@ class _VadAsrStreamer implements SwayMicStreamer {
         return;
       }
       _micStream = stream;
-
-      final vad = await _vad!.MicVAD
-          .create(_MicVadOptions(
-            // Hand the VAD the mic we already have instead of letting it open a
-            // second getUserMedia: this stream is a clone of the track LiveKit
-            // publishes, so it carries the browser's AEC. Without that, the VAD
-            // hears the peer's voice coming out of the speaker and we translate
-            // our own output back to them.
-            getStream: (() => Future<web.MediaStream>.value(stream).toJS).toJS,
-            model: 'v5',
-            // How long a lull must last before a phrase is closed. NOT silence
-            // alone: the VAD also closes when its speech probability dips (a
-            // softer syllable, a trailing vowel), so a real spoken sentence
-            // whose middle drops in energy gets cut into fragments — each then
-            // translated on its own, which is the "chopped sentence" bug. 700 ms
-            // was half the library's own default and cut too eagerly; back to
-            // the library default keeps whole sentences together through the
-            // dips. This is the library's tuned value, not a guess.
-            redemptionMs: 1400,
-            // The VAD needs a few frames to be sure speech started. Without
-            // pre-roll the first syllable would be cut, so re-attach the half
-            // second that precedes the trigger — the mic is always open, that
-            // buffer is always there.
-            preSpeechPadMs: 500,
-            // Shorter than this is a cough, a click, a chair — and, crucially, a
-            // scrap of our own loudspeaker. The recogniser invents subtitle boilerplate
-            // in direct proportion to how little speech it is handed.
-            minSpeechMs: 400,
-            // The library defaults. An earlier 0.5/0.35 — "a call is noisy, and
-            // every false positive costs a recogniser round-trip" — misfired on
-            // EVERY utterance: with AGC off the mic is quiet, the VAD's score
-            // hovers near 0.4, so it crossed 0.5 for a frame or two, fell back
-            // under 0.35, and the 300 ms window closed before 200 ms of speech
-            // had accumulated. Tighten these again only with the peak-score log
-            // below in hand.
-            positiveSpeechThreshold: 0.3,
-            negativeSpeechThreshold: 0.25,
-            // The anti-echo gate is decided HERE, at the first syllable — not
-            // when the phrase ends. Echo starts while our speaker is talking;
-            // your own next sentence starts after it has stopped. Judging at the
-            // end instead threw away a whole 3 s phrase whenever a translation
-            // happened to still be playing as you finished it, which is what
-            // "I can't talk any more while the translation plays" was.
-            onSpeechStart: (() {
-              _tainted = isTranslationPlaying;
-              _log('speech start${_tainted ? ' — DURING playback, will drop as echo' : ''}');
-            }).toJS,
-            onVADMisfire: (() {
-              _log('misfire — speech shorter than 200ms, dropped '
-                  '(peak score ${_peak.toStringAsFixed(2)})');
-              _peak = 0;
-            }).toJS,
-            // the VAD's score on every frame (32 ms). We only surface the peak,
-            // every ~3 s: it is the one number that says whether the thresholds
-            // are wrong or the mic is simply too quiet.
-            onFrameProcessed: ((_VadProbs p, JSFloat32Array _) {
-              if (p.isSpeech > _peak) _peak = p.isSpeech;
-              if (++_frames % 100 == 0) {
-                _log('peak score over last 3s: ${_peak.toStringAsFixed(2)} '
-                    '(speech starts at 0.30)');
-                _peak = 0;
-              }
-            }).toJS,
-            onSpeechEnd: ((JSFloat32Array audio) {
-              _onSegment(audio.toDart);
-            }).toJS,
-            baseAssetPath: _kVadAssets,
-            onnxWASMBasePath: _kOrtAssets,
-          ))
-          .toDart;
-
-      if (!_running) {
-        // stop() landed while the model was downloading.
-        vad.pause();
-        _destroy(vad);
-        return;
-      }
-      _vadInstance = vad;
-      vad.start();
+      _startEnergyDetector(stream);
       _ready = true;
-      _log('VAD v5 listening — redemption 1400ms, pad 500ms, $_from→$_to');
+      _log('listening — energy gate, $_kBlock-sample blocks, $_from→$_to');
     } catch (e) {
       _log('start FAILED: $e');
-      if (e.toString().contains('initWasm') ||
-          e.toString().contains('Out of memory')) {
-        // Sans mémoire, le runtime ONNX reste cassé pour toute la page : les
-        // appels suivants échoueront pareil tant qu'on ne recharge pas.
-        _log('the ONNX runtime is out for this page — RELOAD to translate again');
-      }
       onError?.call('start_failed: $e');
       await stop();
     }
+  }
+
+  /// Taille d'un bloc : 2048 échantillons à 16 kHz, soit 128 ms. Assez court
+  /// pour attraper le début d'un mot, assez long pour que le RMS d'un bloc
+  /// veuille dire quelque chose.
+  static const int _kBlock = 2048;
+  static const int _kRate = 16000;
+
+  /// Deux blocs (~256 ms) au-dessus du seuil ouvrent une phrase : un claquement
+  /// de porte en fait un, pas deux.
+  static const int _kHotToOpen = 2;
+
+  /// Huit blocs (~1 s) sous le seuil la referment. C'est la valeur qui laisse
+  /// une phrase respirer sans la couper à chaque virgule.
+  static const int _kSilentToClose = 8;
+
+  /// Sous 400 ms, ce n'est pas une phrase : une toux, un choc, un raclement.
+  static const int _kMinSpeechMs = 400;
+
+  /// Au-delà, on découpe d'office — une phrase qui n'en finit pas garderait sa
+  /// traduction en otage.
+  static const int _kMaxSpeechMs = 15000;
+
+  /// Le pré-roll rattaché à chaque phrase : quatre blocs, soit ~512 ms. Sans
+  /// lui, la première syllabe manque — le seuil n'est franchi qu'une fois le
+  /// mot commencé.
+  static const int _kPrerollBlocks = 4;
+
+  /// Écoute le micro par blocs et en tire des phrases.
+  ///
+  /// ScriptProcessorNode est déprécié au profit d'AudioWorklet, et c'est
+  /// délibéré : le worklet demande un fichier séparé servi à part, là où ceci
+  /// tient dans le bundle et fonctionne sur tous les navigateurs visés. Le
+  /// coût — le traitement passe par le thread principal — se compte en
+  /// microsecondes par bloc pour un calcul de moyenne quadratique.
+  void _startEnergyDetector(web.MediaStream stream) {
+    final ctx = web.AudioContext(
+      web.AudioContextOptions(sampleRate: _kRate.toDouble()),
+    );
+    _ctx = ctx;
+    final source = ctx.createMediaStreamSource(stream);
+    _source = source;
+    final processor = ctx.createScriptProcessor(_kBlock, 1, 1);
+    _processor = processor;
+    final mute = ctx.createGain();
+    mute.gain.value = 0;
+    _mute = mute;
+
+    processor.onaudioprocess = ((web.AudioProcessingEvent e) {
+      if (!_running) return;
+      final block = e.inputBuffer.getChannelData(0).toDart;
+      _onBlock(block);
+    }).toJS;
+
+    source.connect(processor);
+    processor.connect(mute);
+    mute.connect(ctx.destination);
+  }
+
+  /// Un bloc de 128 ms : mesure, décision, accumulation.
+  void _onBlock(Float32List block) {
+    var sum = 0.0;
+    for (final v in block) {
+      sum += v * v;
+    }
+    final rms = sum <= 0 ? 0.0 : math.sqrt(sum / block.length);
+
+    // Le plancher suit le silence de près et la voix de très loin.
+    _noiseFloor = rms < _noiseFloor
+        ? _noiseFloor * 0.7 + rms * 0.3
+        : _noiseFloor * 0.995 + rms * 0.005;
+    final threshold = math.max(0.006, _noiseFloor * 3);
+    final hot = rms > threshold;
+
+    if (rms > _peak) _peak = rms;
+    if (++_frames % 24 == 0) {
+      _log('peak over last 3s ${_peak.toStringAsFixed(4)} '
+          '(speech starts at ${threshold.toStringAsFixed(4)})');
+      _peak = 0;
+    }
+
+    // Une copie : le tampon que WebAudio nous prête est réutilisé au bloc
+    // suivant, le garder tel quel donnerait une phrase faite du même son
+    // répété.
+    final copy = Float32List.fromList(block);
+
+    if (!_inSpeech) {
+      _preroll.add(copy);
+      if (_preroll.length > _kPrerollBlocks) _preroll.removeAt(0);
+      _hotBlocks = hot ? _hotBlocks + 1 : 0;
+      if (_hotBlocks >= _kHotToOpen) {
+        _inSpeech = true;
+        _silentBlocks = 0;
+        _phrase
+          ..clear()
+          ..addAll(_preroll);
+        _preroll.clear();
+        // La garde anti-écho se décide ICI, à la première syllabe — pas à la
+        // fin. L'écho commence pendant que notre haut-parleur parle ; votre
+        // phrase suivante, elle, commence après qu'il s'est tu.
+        _tainted = isTranslationPlaying;
+        _log('speech start${_tainted ? ' — DURING playback, will drop as echo' : ''}');
+      }
+      return;
+    }
+
+    _phrase.add(copy);
+    _silentBlocks = hot ? 0 : _silentBlocks + 1;
+    final ms = _phrase.length * _kBlock * 1000 ~/ _kRate;
+    if (_silentBlocks >= _kSilentToClose || ms >= _kMaxSpeechMs) {
+      _closePhrase(ms);
+    }
+  }
+
+  void _closePhrase(int ms) {
+    _inSpeech = false;
+    _hotBlocks = 0;
+    _silentBlocks = 0;
+    final blocks = List<Float32List>.from(_phrase);
+    _phrase.clear();
+    if (ms < _kMinSpeechMs) {
+      _log('misfire — $ms ms, too short to be a phrase');
+      return;
+    }
+    var n = 0;
+    for (final b in blocks) {
+      n += b.length;
+    }
+    final samples = Float32List(n);
+    var at = 0;
+    for (final b in blocks) {
+      samples.setAll(at, b);
+      at += b.length;
+    }
+    _onSegment(samples);
   }
 
   /// The LiveKit track, cloned. Falls back to our own getUserMedia only when
@@ -431,28 +442,24 @@ class _VadAsrStreamer implements SwayMicStreamer {
     return bytes;
   }
 
-  /// destroy() n'existe que depuis peu dans la lib : sur un bundle plus ancien
-  /// l'appel n'est pas là, et ne pas libérer vaut mieux que planter.
-  void _destroy(_MicVad vad) {
-    try {
-      vad.destroy();
-    } catch (e) {
-      _log('destroy unavailable ($e) — worklet left to the GC');
-    }
-  }
-
   @override
   Future<void> stop() async {
     _running = false;
     _ready = false;
-    final vad = _vadInstance;
-    _vadInstance = null;
-    if (vad != null) {
-      try {
-        vad.pause();
-      } catch (_) {}
-      _destroy(vad);
-    }
+    _inSpeech = false;
+    _phrase.clear();
+    _preroll.clear();
+    try {
+      _processor?.onaudioprocess = null;
+      _processor?.disconnect();
+      _source?.disconnect();
+      _mute?.disconnect();
+      _ctx?.close();
+    } catch (_) {}
+    _processor = null;
+    _source = null;
+    _mute = null;
+    _ctx = null;
     // Only ever our own clone — never the track LiveKit is using for the call.
     if (_ownsMicStream) {
       try {
