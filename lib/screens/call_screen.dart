@@ -199,6 +199,64 @@ class _CallScreenState extends State<CallScreen> {
     _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
+  /// Le seuil au-delà duquel on considère que ça parle. Bas exprès : le
+  /// `audioLevel` que WebRTC calcule sur une source micro est une amplitude
+  /// normalisée, une voix normale y vaut quelques centièmes, pas la moitié.
+  static const double _kVoiceOn = 0.02;
+
+  /// Niveau de MON micro, mesuré ici même — pas au serveur.
+  ///
+  /// `ActiveSpeakersChangedEvent` dépend du SFU : il n'arrive qu'aux
+  /// changements de locuteur, et rien ne garantit qu'il porte notre propre
+  /// voix. Les stats de l'émetteur, elles, viennent de la couche WebRTC
+  /// locale : `media-source.audioLevel` est la voix telle qu'elle sort du
+  /// micro, à la milliseconde, que le serveur suive ou non.
+  double _localVoice = 0;
+
+  /// Idem pour la voix d'en face, elle par contre ne peut venir que du serveur.
+  double _remoteVoice = 0;
+  Timer? _micProbe;
+
+  void _startMicProbe(Room room) {
+    _micProbe?.cancel();
+    _micProbe = Timer.periodic(const Duration(milliseconds: 250), (_) async {
+      if (!mounted) return;
+      LocalAudioTrack? mic;
+      for (final pub in room.localParticipant?.audioTrackPublications ??
+          const <LocalTrackPublication>[]) {
+        final t = pub.track;
+        if (t is LocalAudioTrack) {
+          mic = t;
+          break;
+        }
+      }
+      if (mic == null) return;
+      double level = 0;
+      try {
+        final stats = await mic.getSenderStats();
+        level = (stats?.audioSourceStats?.audioLevel ?? 0).toDouble();
+      } catch (_) {
+        // Une sonde qui échoue ne doit rien casser : on garde l'ancien niveau.
+        return;
+      }
+      if (!mounted) return;
+      _localVoice = level.clamp(0.0, 1.0);
+      _publishVoiceLevel();
+      if (_localVoice > _kVoiceOn) {
+        _wakeDock();
+        // C'est MA voix : la place se fait maintenant, avant même que la
+        // transcription arrive.
+        _openMessageZone();
+      }
+    });
+  }
+
+  /// La pastille bat pour toutes les voix — la mienne comme la sienne.
+  void _publishVoiceLevel() {
+    final v = _localVoice > _remoteVoice ? _localVoice : _remoteVoice;
+    if ((v - _voiceLevel.value).abs() > 0.005) _voiceLevel.value = v;
+  }
+
   /// Niveau de voix courant (0..1), toutes voix humaines confondues : le max
   /// des [Participant.audioLevel] que LiveKit publie à chaque changement de
   /// locuteur actif. C'est ce qui fait *légèrement* bouger la pastille de
@@ -742,13 +800,21 @@ class _CallScreenState extends State<CallScreen> {
     // Caller waiting for pickup: listen for the callee declining so we
     // can close this screen instead of ringing into an empty room.
     final callId = widget.outgoingCallId;
-    if (widget.isCaller && callId != null && callId.isNotEmpty) {
-      _declineChannel = IncomingCallApi.subscribeDecline(
-        callId: callId,
-        onDeclined: _onDeclinedByCallee,
-      );
+    if (widget.isCaller) {
+      if (callId != null && callId.isNotEmpty) {
+        _declineChannel = IncomingCallApi.subscribeDecline(
+          callId: callId,
+          onDeclined: _onDeclinedByCallee,
+        );
+      }
       // Safety net for the lost-broadcast / powered-off-callee cases above:
       // leave the waiting room after the ring window if nobody joined.
+      //
+      // Armed even WITHOUT a call id. That id comes from the `incoming_calls`
+      // insert, and when that insert fails nobody is being rung at all — which
+      // is exactly when the caller must not be left listening to a dial tone
+      // forever. The one case that needs the timeout most was the one case
+      // that used to skip it.
       _ringTimeout = Timer(const Duration(seconds: 25), _onRingTimeout);
     }
   }
@@ -1051,6 +1117,7 @@ class _CallScreenState extends State<CallScreen> {
       // yet). Refreshed dynamically as participants join / metadata arrives.
       await _refreshTranslationBinding(room);
       room.addListener(_onRoomChanged);
+      _startMicProbe(room);
       _roomEvents = room.createListener()
         ..on<TrackSubscribedEvent>((_) {
           // The peer's audio (and the participant metadata carrying their
@@ -1077,19 +1144,16 @@ class _CallScreenState extends State<CallScreen> {
         // tête. Sert uniquement à animer la pastille de traduction : aucune
         // décision audio ne s'appuie dessus.
         ..on<ActiveSpeakersChangedEvent>((e) {
-          // La pastille bat pour toutes les voix, la mienne comme la sienne.
-          final loudest = e.speakers.isEmpty ? 0.0 : e.speakers.first.audioLevel;
-          _voiceLevel.value = loudest.clamp(0.0, 1.0);
-          if (loudest > 0.06) _wakeDock();
-          // La place, elle, ne se fait que pour MA voix : c'est ma phrase qui
-          // va s'afficher là, et il faut que la place l'attende déjà — sinon
-          // la barre se réorganise sous la phrase au moment où je la lis.
+          // Ma voix est mesurée en local (voir [_startMicProbe]) ; ici on ne
+          // retient que celle d'en face.
+          var loudest = 0.0;
           for (final p in e.speakers) {
-            if (p is LocalParticipant && p.audioLevel > 0.06) {
-              _openMessageZone();
-              break;
-            }
+            if (p is LocalParticipant) continue;
+            if (p.audioLevel > loudest) loudest = p.audioLevel;
           }
+          _remoteVoice = loudest.clamp(0.0, 1.0);
+          _publishVoiceLevel();
+          if (_remoteVoice > _kVoiceOn) _wakeDock();
         })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
@@ -1963,6 +2027,7 @@ class _CallScreenState extends State<CallScreen> {
     _voiceLevel.dispose();
     _messageTimer?.cancel();
     _dockIdleTimer?.cancel();
+    _micProbe?.cancel();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
@@ -3111,7 +3176,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
   /// dite par la machine —, les barres partent à fond. La pastille dit «il y a
   /// du son», pas «qui parle».
   void _retarget() {
-    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.06;
+    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
     _target = (widget.on && talking) ? 1.0 : 0.0;
     if (_target > 0 && !_phase.isAnimating) _phase.repeat();
   }
