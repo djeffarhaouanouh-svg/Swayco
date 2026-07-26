@@ -2944,7 +2944,7 @@ class _LanguageButton extends StatelessWidget {
 /// tout ce dont on se sert en appel. De gauche à droite — la zone de légende
 /// (un tap déplie ce qui se dit), la pastille de traduction, le chevron qui
 /// déplie les réglages au-dessus, et raccrocher tout au bout.
-class _CallDock extends StatelessWidget {
+class _CallDock extends StatefulWidget {
   const _CallDock({
     required this.preview,
     required this.hint,
@@ -2993,6 +2993,12 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
+  @override
+  State<_CallDock> createState() => _CallDockState();
+}
+
+class _CallDockState extends State<_CallDock>
+    with SingleTickerProviderStateMixin {
   /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
@@ -3005,10 +3011,51 @@ class _CallDock extends StatelessWidget {
   static const double _captionWidth = _trailingWidth;
   static const double _gap = 8;
 
+  /// L'épaisseur du liseré irisé qui entoure la barre.
+  static const double _kRim = 1.6;
+  static const double _kRadius = 34;
+
+  /// Le tour complet du dégradé. Lent : c'est une respiration, pas un gyrophare.
+  late final AnimationController _aura = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _syncAura();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CallDock old) {
+    super.didUpdateWidget(old);
+    _syncAura();
+  }
+
+  /// Le liseré ne tourne QUE pendant qu'on parle. Une animation qui tournerait
+  /// tout l'appel repeindrait la barre soixante fois par seconde pour rien —
+  /// et le téléphone qui la porte est déjà en train d'encoder de la vidéo et
+  /// de faire tourner une reconnaissance vocale.
+  void _syncAura() {
+    final shouldSpin = widget.messageOpen && !widget.dimmed;
+    if (shouldSpin && !_aura.isAnimating) {
+      _aura.repeat();
+    } else if (!shouldSpin && _aura.isAnimating) {
+      _aura.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _aura.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
+      tween: Tween<double>(begin: 0, end: widget.dimmed ? 1 : 0),
       // Plus long et plus mou que les mouvements du dock : le fond s'en va,
       // il ne claque pas.
       duration: const Duration(milliseconds: 450),
@@ -3022,10 +3069,46 @@ class _CallDock extends StatelessWidget {
           // En pleine lumière elle ne capte rien, ce sont les boutons qui
           // travaillent.
           behavior:
-              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-          onTap: dimmed ? onWake : null,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(34),
+              widget.dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+          onTap: widget.dimmed ? widget.onWake : null,
+          // Le liseré irisé qui fait le tour de la barre, et sa lueur.
+          //
+          // Un dégradé ne se met pas dans un Border : il est peint par le
+          // conteneur du dessous, dont la barre ne laisse dépasser que
+          // l'épaisseur d'un trait. Et comme il vit À L'EXTÉRIEUR du verre, sa
+          // lueur n'est pas rognée — contrairement à celle du chevron, qui
+          // elle est enfermée dedans.
+          child: AnimatedBuilder(
+            animation: _aura,
+            builder: (context, child) => Container(
+              padding: const EdgeInsets.all(_kRim),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_kRadius + _kRim),
+                gradient: SweepGradient(
+                  transform: GradientRotation(_aura.value * 2 * math.pi),
+                  colors: [
+                    SC.accent.withValues(alpha: 0.85 * live),
+                    SC.meshBlue.withValues(alpha: 0.80 * live),
+                    SC.meshViolet.withValues(alpha: 0.85 * live),
+                    SC.accent.withValues(alpha: 0.55 * live),
+                    SC.accent.withValues(alpha: 0.85 * live),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: SC.accent.withValues(alpha: 0.22 * live),
+                    blurRadius: 18,
+                  ),
+                  BoxShadow(
+                    color: SC.meshViolet.withValues(alpha: 0.20 * live),
+                    blurRadius: 26,
+                  ),
+                ],
+              ),
+              child: child,
+            ),
+            child: ClipRRect(
+            borderRadius: BorderRadius.circular(_kRadius),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
               // barre reste une barre, en retrait.
@@ -3054,7 +3137,7 @@ class _CallDock extends StatelessWidget {
                       curve: Curves.easeOutCubic,
                       // Dépliée, elle récupère la place du chevron et du
                       // raccrochage, gouttière comprise.
-                      width: messageOpen
+                      width: widget.messageOpen
                           ? _captionWidth + _gap + _trailingWidth
                           : _captionWidth,
                       child: Opacity(
@@ -3062,17 +3145,17 @@ class _CallDock extends StatelessWidget {
                         // En veille, le premier tap rallume : il ne doit pas
                         // aussi déplier la conversation.
                         child: IgnorePointer(
-                          ignoring: dimmed,
+                          ignoring: widget.dimmed,
                           child: _CaptionField(
-                            preview: preview,
-                            hint: hint,
-                            open: turnsOpen,
-                            hasTurns: hasTurns,
+                            preview: widget.preview,
+                            hint: widget.hint,
+                            open: widget.turnsOpen,
+                            hasTurns: widget.hasTurns,
                             // Toujours ma pastille : la barre ne porte que mes
                             // phrases.
-                            authorName: myName,
+                            authorName: widget.myName,
                             authorAvatarUrl: '',
-                            onTap: onToggleTurns,
+                            onTap: widget.onToggleTurns,
                           ),
                         ),
                       ),
@@ -3083,11 +3166,11 @@ class _CallDock extends StatelessWidget {
                     // rallume la barre au lieu de couper la traduction — on ne
                     // coupe pas la traduction sans l'avoir vue.
                     _TranslationOrb(
-                      on: translationOn,
-                      ttsSpeaking: ttsSpeaking,
-                      voiceLevel: voiceLevel,
-                      onTap: dimmed ? onWake : onToggleTranslation,
-                      onLongPress: onOrbLongPress,
+                      on: widget.translationOn,
+                      ttsSpeaking: widget.ttsSpeaking,
+                      voiceLevel: widget.voiceLevel,
+                      onTap: widget.dimmed ? widget.onWake : widget.onToggleTranslation,
+                      onLongPress: widget.onOrbLongPress,
                     ),
                     // Le chevron et le raccrochage se replient pendant qu'une
                     // phrase occupe la barre — AnimatedSize rogne lui-même ce
@@ -3095,26 +3178,26 @@ class _CallDock extends StatelessWidget {
                     AnimatedSize(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
-                      child: messageOpen
+                      child: widget.messageOpen
                           ? const SizedBox(height: 46)
                           : Opacity(
                               opacity: live,
                               child: IgnorePointer(
-                                ignoring: dimmed,
+                                ignoring: widget.dimmed,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const SizedBox(width: _gap),
                                     _RailToggleButton(
-                                      open: controlsOpen,
-                                      onTap: onToggleControls,
+                                      open: widget.controlsOpen,
+                                      onTap: widget.onToggleControls,
                                     ),
                                     const SizedBox(width: 6),
                                     _DockCircleButton(
                                       icon: Icons.call_end_rounded,
                                       label: AppStrings.t('call_end'),
                                       background: const Color(0xFFE53935),
-                                      onTap: onHangUp,
+                                      onTap: widget.onHangUp,
                                     ),
                                   ],
                                 ),
@@ -3124,6 +3207,7 @@ class _CallDock extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
             ),
           ),
         );
