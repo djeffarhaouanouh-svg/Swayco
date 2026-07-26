@@ -164,6 +164,10 @@ class _CallScreenState extends State<CallScreen> {
   void _closeMessageZone() {
     if (!mounted || !_messageOpen) return;
     setState(() => _messageOpen = false);
+    // Le compte à rebours de la veille repart D'ICI : le fond ne s'efface
+    // qu'une fois la barre resserrée, jamais pendant qu'elle est encore grande
+    // ouverte sur une phrase.
+    _wakeDock();
   }
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
@@ -181,9 +185,14 @@ class _CallScreenState extends State<CallScreen> {
     _dockIdleTimer?.cancel();
     _dockIdleTimer = Timer(_kDockIdle, () {
       if (!mounted || _dockDimmed) return;
-      // Un panneau ouvert, la légende dépliée : on ne s'efface pas sous les
-      // doigts de quelqu'un qui est en train de s'en servir.
-      if (_turnsOpen || _controlsOpen) return;
+      // On ne s'efface pas sous les doigts de quelqu'un qui s'en sert, ni sous
+      // une phrase encore dépliée : la barre se resserre d'abord, elle s'efface
+      // ensuite. On ne laisse pas tomber pour autant — le sursis est simplement
+      // reconduit, sinon la veille ne reviendrait jamais.
+      if (_turnsOpen || _controlsOpen || _messageOpen) {
+        _wakeDock();
+        return;
+      }
       setState(() => _dockDimmed = true);
     });
     if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
