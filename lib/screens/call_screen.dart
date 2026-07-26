@@ -3076,17 +3076,12 @@ class _TranslationOrbState extends State<_TranslationOrb>
     if (old.on != widget.on) _retarget();
   }
 
-  /// Deux régimes, comme demandé : la TTS pousse les barres à fond, une voix
-  /// humaine ne fait que les faire frémir.
+  /// Un seul régime : dès que ça parle — une voix humaine comme la traduction
+  /// dite par la machine —, les barres partent à fond. La pastille dit «il y a
+  /// du son», pas «qui parle».
   void _retarget() {
-    if (!widget.on) {
-      _target = 0;
-    } else if (widget.ttsSpeaking.value) {
-      _target = 1.0;
-    } else {
-      final v = widget.voiceLevel.value;
-      _target = v > 0.06 ? (0.16 + 0.24 * v).clamp(0.0, 0.4) : 0.0;
-    }
+    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.06;
+    _target = (widget.on && talking) ? 1.0 : 0.0;
     if (_target > 0 && !_phase.isAnimating) _phase.repeat();
   }
 
