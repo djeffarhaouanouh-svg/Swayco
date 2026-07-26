@@ -1377,7 +1377,13 @@ class _CallScreenState extends State<CallScreen> {
     final room = _room;
     if (room == null) return;
     final next = !_micOn;
-    await room.localParticipant?.setMicrophoneEnabled(next);
+    // Le bouton bascule TOUT DE SUITE, et la couche audio suit.
+    //
+    // `setMicrophoneEnabled` traverse WebRTC et prend le temps qu'elle prend ;
+    // attendre son retour pour redessiner faisait un bouton qui répond après
+    // coup — sur un mute, c'est la seule chose qu'on regarde. Le flag d'envoi
+    // part avec le dessin : ce qui est dit après l'appui ne doit plus sortir,
+    // même si la piste n'est pas encore coupée en dessous.
     setSendMuted(!next);
     if (next) {
       // Unmuting: immediately clear the TTS gate so SEND resumes at once.
@@ -1386,6 +1392,7 @@ class _CallScreenState extends State<CallScreen> {
       markTranslationDone();
     }
     if (mounted) setState(() => _micOn = next);
+    await room.localParticipant?.setMicrophoneEnabled(next);
   }
 
   /// Data channel packet from the peer: local-TTS native or streamed web path,
@@ -3494,7 +3501,9 @@ class _RoundCallButton extends StatelessWidget {
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              // Court exprès : c'est un interrupteur, pas une transition. Au-
+              // delà, le blanc «arrive» au lieu d'être déjà là.
+              duration: const Duration(milliseconds: 90),
               curve: Curves.easeOut,
               width: 45,
               height: 45,
