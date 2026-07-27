@@ -168,10 +168,10 @@ class _GlassNavBarState extends State<GlassNavBar>
         badge: unreadChat,
       ),
       _NavItemData(
-        // Coconut — Discover. No Material glyph comes close, so the tab wears
-        // its own SVG pair (filled when selected, outlined otherwise).
-        assetIcon: 'assets/icons/coconut_outline.svg',
-        assetSelectedIcon: 'assets/icons/coconut_filled.svg',
+        // Card-stack glyph (Discover deck metaphor) — l'icône d'avant la noix
+        // de coco. Le couple SVG reste dans le repo si on veut y revenir.
+        icon: Icons.style_outlined,
+        selectedIcon: Icons.style,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
