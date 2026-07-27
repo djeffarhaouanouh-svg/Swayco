@@ -737,7 +737,7 @@ class _IncomingCallDialogState extends State<_IncomingCallDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.menu,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: Column(

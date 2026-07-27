@@ -124,7 +124,7 @@ class _LikedPhotosScreenState extends State<LikedPhotosScreen> {
             )
           : RefreshIndicator(
               color: SC.accent,
-              backgroundColor: SC.bubbleIn,
+              backgroundColor: SC.menu,
               onRefresh: _load,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

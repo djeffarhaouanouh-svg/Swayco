@@ -229,7 +229,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     }
     return RefreshIndicator(
       color: SC.accent,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.menu,
       onRefresh: _bootstrap,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),

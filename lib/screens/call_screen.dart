@@ -2076,7 +2076,7 @@ class _CallScreenState extends State<CallScreen> {
     final leave = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: SC.bubbleIn,
+        backgroundColor: SC.menu,
         title: Text(AppStrings.t('call_leave_q'),
             style: const TextStyle(color: SC.textPrimary)),
         content: Text(

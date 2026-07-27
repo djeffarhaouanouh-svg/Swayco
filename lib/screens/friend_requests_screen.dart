@@ -354,7 +354,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         final fill = constraints.maxHeight - 26 - navBody;
         return RefreshIndicator(
           color: SC.accent,
-          backgroundColor: SC.bubbleIn,
+          backgroundColor: SC.menu,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),

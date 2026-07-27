@@ -74,7 +74,7 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
               ? const _EmptyState()
               : RefreshIndicator(
                   color: SC.accent,
-                  backgroundColor: SC.bubbleIn,
+                  backgroundColor: SC.menu,
                   onRefresh: _load,
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

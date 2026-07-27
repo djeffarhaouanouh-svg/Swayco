@@ -357,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: SC.bubbleIn,
+        backgroundColor: SC.menu,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -794,7 +794,7 @@ class _BlockedUsersScreenState extends State<_BlockedUsersScreen> {
             ? const _BlockedEmptyState()
             : RefreshIndicator(
                 color: SC.accent,
-                backgroundColor: SC.bubbleIn,
+                backgroundColor: SC.menu,
                 onRefresh: _load,
                 child: ListView.separated(
                   // extendBodyBehindAppBar puts the body (and this list) at

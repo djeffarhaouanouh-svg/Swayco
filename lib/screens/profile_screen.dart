@@ -735,7 +735,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               bottom: false,
               child: RefreshIndicator(
                 color: SC.accent,
-                backgroundColor: SC.bubbleIn,
+                backgroundColor: SC.menu,
                 onRefresh: _reload,
                 child: _loading
                     ? ListView(

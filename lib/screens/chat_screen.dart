@@ -619,7 +619,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final fill = constraints.maxHeight - 12 - navBody;
         return RefreshIndicator(
           color: SC.accent,
-          backgroundColor: SC.bubbleIn,
+          backgroundColor: SC.menu,
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -816,7 +816,7 @@ class _FriendChatRow extends StatelessWidget {
   void _showRowActions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.menu,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
