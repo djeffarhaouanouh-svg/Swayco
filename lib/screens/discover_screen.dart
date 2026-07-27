@@ -1823,7 +1823,9 @@ class _SwipeActionBar extends StatelessWidget {
             size: 58,
             iconSize: 27,
             icon: Icons.close_rounded,
-            color: const Color(0xFFFF4458),
+            // Croix blanche : le rouge est réservé au cœur, sinon les deux
+            // boutons se ressemblaient trop.
+            color: Colors.white,
             onTap: onNope,
           ),
           const SizedBox(width: 28),
@@ -1842,10 +1844,11 @@ class _SwipeActionBar extends StatelessWidget {
   }
 }
 
-/// Les deux boutons de match : des ronds en verre cyan flouté, une icône
-/// colorée au centre (✕ rouge pour passer, ❤️ vert pour liker) et un halo de
-/// la même couleur derrière. Le rendu d'avant les capsules.
-class _GlassButton extends StatelessWidget {
+/// Les deux boutons de match : des ronds en verre nu, une icône colorée au
+/// centre (✕ blanche pour passer, ❤️ rouge pour liker) et un halo discret
+/// derrière. Au clic, une onde de la couleur de l'icône part du cercle et se
+/// dissipe — le geste reste visible même quand le pouce couvre le bouton.
+class _GlassButton extends StatefulWidget {
   const _GlassButton({
     required this.size,
     required this.iconSize,
@@ -1861,10 +1864,64 @@ class _GlassButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_GlassButton> createState() => _GlassButtonState();
+}
+
+class _GlassButtonState extends State<_GlassButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ripple = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+
+  @override
+  void dispose() {
+    _ripple.dispose();
+    super.dispose();
+  }
+
+  void _fire() {
+    _ripple.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Pressable(
+    final size = widget.size;
+    final color = widget.color;
+    return Stack(
+      // L'onde déborde du bouton : surtout ne pas la rogner.
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        AnimatedBuilder(
+          animation: _ripple,
+          builder: (_, _) {
+            final t = _ripple.value;
+            if (t == 0) return SizedBox(width: size, height: size);
+            // L'anneau grandit de moitié, s'affine et s'efface.
+            final d = size * (1 + 0.9 * t);
+            return IgnorePointer(
+              child: Opacity(
+                opacity: (1 - t) * 0.55,
+                child: Container(
+                  width: d,
+                  height: d,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color,
+                      width: 0.5 + 2.5 * (1 - t),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        Pressable(
       bounce: true,
-      onTap: onTap,
+      onTap: _fire,
       child: DecoratedBox(
         // Depth + coloured glow sit OUTSIDE the clip so they aren't cut off.
         decoration: BoxDecoration(
@@ -1898,11 +1955,15 @@ class _GlassButton extends StatelessWidget {
                   width: 0.8,
                 ),
               ),
-              child: Center(child: Icon(icon, color: color, size: iconSize)),
+              child: Center(
+                child: Icon(widget.icon, color: color, size: widget.iconSize),
+              ),
             ),
           ),
         ),
       ),
+        ),
+      ],
     );
   }
 }
