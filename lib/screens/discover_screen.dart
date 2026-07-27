@@ -938,7 +938,6 @@ class _ProfileInfoPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = profile;
-    final lang = findLanguageByCode(p.language);
     final place = [p.city.trim(), p.country.trim()]
         .where((e) => e.isNotEmpty)
         .join(', ');
@@ -956,8 +955,8 @@ class _ProfileInfoPanel extends StatelessWidget {
         (emoji: kFactEmojiLookingFor, label: p.lookingFor.trim()),
       if (place.isNotEmpty)
         (emoji: kFactEmojiPlace, label: place),
-      if (lang != null)
-        (emoji: kFactEmojiLanguage, label: '${lang.flag}  ${lang.label}'),
+      // Pas de ligne "langue" : le drapeau est déjà sur la photo, et l'app
+      // traduit — savoir ce que l'autre parle ne change rien.
     ];
 
     return GestureDetector(

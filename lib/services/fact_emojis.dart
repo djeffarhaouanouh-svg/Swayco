@@ -14,4 +14,3 @@ const String kFactEmojiZodiac = '🔮';
 const String kFactEmojiLookingFor = '💘';
 const String kFactEmojiInterests = '🎯';
 const String kFactEmojiPlace = '📍';
-const String kFactEmojiLanguage = '🗣️';
