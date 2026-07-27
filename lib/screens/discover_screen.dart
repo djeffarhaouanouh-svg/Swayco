@@ -522,8 +522,6 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                           final card = _TinderCard(
                             profile: me,
                             photos: _photos,
-                            onInfoTap: () =>
-                                setState(() => _infoOpen = !_infoOpen),
                           );
                           final country =
                               flagCountryForLanguage(me.language);
@@ -1394,14 +1392,9 @@ class _TinderCard extends StatefulWidget {
     super.key,
     required this.profile,
     required this.photos,
-    this.onInfoTap,
   });
   final RemoteProfile profile;
   final List<String> photos;
-
-  /// Bouton coin bas-droit. Par défaut il ouvre la page profil du pair ; en
-  /// aperçu de ma propre carte il déplie simplement le panneau d'infos.
-  final VoidCallback? onInfoTap;
 
   @override
   State<_TinderCard> createState() => _TinderCardState();
@@ -1603,41 +1596,84 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Info button — plus petit et plus discret ────────────────────
+          // ── Repère "tire vers le haut" — chevrons animés, centrés en bas de
+          //    la photo. C'est le seul repère qui reste (le bouton en verre du
+          //    coin a disparu), donc il est dessiné en grand.
           Positioned(
-            right: 14,
-            bottom: 24,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.onInfoTap ??
-                  () => Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ProfileScreen(userId: p.id),
-                        ),
-                      ),
-              child: ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        width: 1,
-                      ),
-                    ),
-                    child: const Icon(Icons.keyboard_arrow_up_rounded,
-                        color: Colors.white, size: 24),
-                  ),
-                ),
-              ),
+            left: 0,
+            right: 0,
+            bottom: 10,
+            child: IgnorePointer(
+              child: Center(child: _ScrollHintChevrons()),
             ),
           ),
         ],
       );
+  }
+}
+
+/// Deux chevrons qui défilent vers le haut en boucle : le repère "il y a des
+/// infos à découvrir, tire vers le haut". Centré en bas de la photo.
+class _ScrollHintChevrons extends StatefulWidget {
+  const _ScrollHintChevrons();
+
+  @override
+  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
+}
+
+class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: SizedBox(
+        width: 48,
+        height: 44,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            return Stack(
+              alignment: Alignment.center,
+              // Deux chevrons décalés d'une demi-phase : l'un monte pendant que
+              // l'autre réapparaît en bas → effet de défilement continu.
+              children: [
+                _chevron((_c.value) % 1.0),
+                _chevron((_c.value + 0.5) % 1.0),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _chevron(double t) {
+    // t: 0 → en bas et transparent, 0.5 → centre plein, 1 → en haut et fondu.
+    final dy = 14.0 - 28.0 * t; // de +14 (bas) à -14 (haut)
+    final opacity = (1.0 - (2.0 * t - 1.0).abs()).clamp(0.0, 1.0);
+    return Transform.translate(
+      offset: Offset(0, dy),
+      child: Opacity(
+        opacity: opacity,
+        child: const Icon(
+          Icons.keyboard_arrow_up_rounded,
+          color: Colors.white,
+          size: 38,
+          shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+        ),
+      ),
+    );
   }
 }
 
