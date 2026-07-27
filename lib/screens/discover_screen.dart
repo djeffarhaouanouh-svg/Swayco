@@ -654,7 +654,7 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swayco.ai — ".ai" en cyan. Il s'efface pendant la
+              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
               // recherche pour laisser le champ s'étirer sur toute la barre.
               if (!searchExpanded)
               GestureDetector(
@@ -665,9 +665,9 @@ class _TopTabBar extends StatelessWidget {
                   child: Text.rich(
                     TextSpan(
                       children: [
-                        TextSpan(text: 'swayco'),
+                        TextSpan(text: 'swayc'),
                         TextSpan(
-                          text: '.ai',
+                          text: 'ø',
                           style: TextStyle(color: Color(0xFF22D3EE)),
                         ),
                       ],

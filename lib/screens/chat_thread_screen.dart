@@ -620,7 +620,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               ),
                             ),
                             // Floating "local time at the peer's place" bubble.
-                            // Centred under the swayco.ai logo, not the screen:
+                            // Centred under the swaycø logo, not the screen:
                             // the header's logo sits in an Expanded offset by
                             // the back+avatar cluster on the left (18 padding +
                             // 40 + 8 + 36 + 10 = 112) and the call button on the
@@ -848,7 +848,7 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: the swayco.ai logo CENTRED between the PDP and the
+            // Middle zone: the swaycø logo CENTRED between the PDP and the
             // call button (its own, larger size), with the peer name small and
             // left-aligned, nudged up. The logo is dropped for a long name so
             // the two never collide.
@@ -873,7 +873,7 @@ class _ThreadHeader extends StatelessWidget {
                     textDirection: TextDirection.ltr,
                   )..layout()).width;
                   final nameW = widthOf(title, nameStyle);
-                  final logoW = widthOf('swayco.ai', logoStyle);
+                  final logoW = widthOf('swaycø', logoStyle);
                   // Logo is centred over [0, c.maxWidth]; the name is left-
                   // aligned [0, nameW]. Show the logo ONLY if the name's right
                   // edge clears the logo's left edge with a 14px gap — measured,
@@ -906,9 +906,9 @@ class _ThreadHeader extends StatelessWidget {
                           child: Text.rich(
                             TextSpan(
                               children: [
-                                TextSpan(text: 'swayco'),
+                                TextSpan(text: 'swayc'),
                                 TextSpan(
-                                  text: '.ai',
+                                  text: 'ø',
                                   style: TextStyle(color: SC.accent),
                                 ),
                               ],

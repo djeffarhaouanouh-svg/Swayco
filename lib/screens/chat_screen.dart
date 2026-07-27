@@ -556,7 +556,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// The band pinned at the top of the page — the same swayco.ai wordmark as
+  /// The band pinned at the top of the page — the same swaycø wordmark as
   /// the Discover header (".ai" in cyan), where the "Messages" title used to be.
   Widget get _titleBar => const Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -565,9 +565,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           child: Text.rich(
             TextSpan(
               children: [
-                TextSpan(text: 'swayco'),
+                TextSpan(text: 'swayc'),
                 TextSpan(
-                  text: '.ai',
+                  text: 'ø',
                   style: TextStyle(color: Color(0xFF22D3EE)),
                 ),
               ],

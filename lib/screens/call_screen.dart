@@ -1928,10 +1928,10 @@ class _CallScreenState extends State<CallScreen> {
                           child: Text.rich(
                             TextSpan(
                               children: [
-                                TextSpan(text: 'swayco'),
+                                TextSpan(text: 'swayc'),
                                 // ".ai" in cyan accent.
                                 TextSpan(
-                                  text: '.ai',
+                                  text: 'ø',
                                   style: TextStyle(color: SC.accent),
                                 ),
                               ],
@@ -2629,9 +2629,9 @@ class _CallScreenState extends State<CallScreen> {
                             child: Text.rich(
                               const TextSpan(
                                 children: [
-                                  TextSpan(text: 'swayco'),
+                                  TextSpan(text: 'swayc'),
                                   TextSpan(
-                                    text: '.ai',
+                                    text: 'ø',
                                     style: TextStyle(color: SC.accent),
                                   ),
                                 ],
