@@ -1510,20 +1510,12 @@ class _TinderCardState extends State<_TinderCard> {
             left: 14,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Le bloc identité est revenu en bas de la carte. Les chevrons ne
-            // sont plus sous lui mais AU-DESSUS, premier élément de la même
-            // colonne : plus rien ne peut leur passer dessus.
-            bottom: 18,
+            // Posé au-dessus des chevrons, qui sont revenus tout en bas.
+            bottom: 66,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 6),
-                  child: IgnorePointer(
-                    child: Center(child: _ScrollHintChevrons()),
-                  ),
-                ),
                 // Name + flag + online dot
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1631,6 +1623,16 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
+          // ── Repère "tire vers le haut" : les deux chevrons qui sautent,
+          //    centrés tout en bas de la photo.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 10,
+            child: IgnorePointer(
+              child: Center(child: _ScrollHintChevrons()),
+            ),
+          ),
         ],
       );
   }
