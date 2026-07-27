@@ -229,7 +229,11 @@ class _CallScreenState extends State<CallScreen> {
   /// j'avais supposée — mesuré sur le web, une voix normale y vaut quelques
   /// millièmes, pas quelques centièmes. Le vrai seuil est celui qui suit le
   /// bruit de la pièce ; celui-ci n'est là que contre le silence numérique.
-  static const double _kVoiceOn = 0.001;
+  /// Le niveau à partir duquel on considère que quelqu'un parle vraiment.
+  /// Mesuré sur un iPhone 16 : le bruit de fond d'une pièce calme plafonne
+  /// vers 0.005, une voix normale monte entre 0.05 et 0.6. À 0.001 — la valeur
+  /// d'avant — un souffle suffisait à déplier la barre.
+  static const double _kVoiceOn = 0.02;
 
   /// Le bruit de la pièce, appris pendant l'appel : il descend vite vers le
   /// silence et ne remonte que lentement, si bien qu'une voix ne le tire pas
@@ -317,7 +321,9 @@ class _CallScreenState extends State<CallScreen> {
       _noiseFloor = lvl < _noiseFloor
           ? _noiseFloor * 0.7 + lvl * 0.3
           : _noiseFloor * 0.995 + lvl * 0.005;
-      final threshold = math.max(_kVoiceOn, _noiseFloor * 3);
+      // Le plancher de bruit compte quadruple : dans une pièce bruyante il
+      // faut dépasser franchement l'ambiance, pas la frôler.
+      final threshold = math.max(_kVoiceOn, _noiseFloor * 4);
       final hot = lvl > threshold;
       if (lvl > _probePeak) _probePeak = lvl;
       if (++_probeTicks % 12 == 0) {
@@ -332,7 +338,9 @@ class _CallScreenState extends State<CallScreen> {
       // fond la ferait trembler tout l'appel.
       _localVoice = hot ? lvl : 0.0;
       _publishVoiceLevel();
-      if (_hotTicks >= 2) {
+      // Trois relevés consécutifs (~750 ms) plutôt que deux : une porte qui
+      // claque ou un raclement de gorge ne tient pas aussi longtemps.
+      if (_hotTicks >= 3) {
         _wakeDock();
         // C'est MA voix : la place se fait maintenant, avant même que la
         // transcription arrive.
@@ -2608,6 +2616,7 @@ class _CallScreenState extends State<CallScreen> {
                                 () => _controlsOpen = !_controlsOpen,
                               );
                             },
+                            onCollapse: _closeMessageZone,
                           ),
                         ],
                       ),
@@ -2962,6 +2971,7 @@ class _CallDock extends StatelessWidget {
     required this.onOrbLongPress,
     required this.onHangUp,
     required this.onToggleControls,
+    required this.onCollapse,
   });
 
   /// Ma dernière phrase, en une ligne. Vide = on montre l'invite.
@@ -2992,6 +3002,12 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
+  /// Un glissement vers la GAUCHE sur la barre dépliée : elle se resserre tout
+  /// de suite, sans attendre la fin du délai. La zone de texte s'ouvre vers la
+  /// droite, donc on la repousse dans le sens inverse — le geste va dans le
+  /// sens du mouvement qu'on annule.
+  final VoidCallback onCollapse;
+
   /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
@@ -3018,11 +3034,21 @@ class _CallDock extends StatelessWidget {
         return GestureDetector(
           // En veille, la barre entière devient une seule grande cible qui la
           // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
-          // En pleine lumière elle ne capte rien, ce sont les boutons qui
-          // travaillent.
-          behavior:
-              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+          // Dépliée, elle écoute aussi le glissement qui la referme — d'où le
+          // translucide, qui laisse les boutons continuer de travailler.
+          behavior: dimmed
+              ? HitTestBehavior.opaque
+              : (messageOpen
+                  ? HitTestBehavior.translucent
+                  : HitTestBehavior.deferToChild),
           onTap: dimmed ? onWake : null,
+          // Vers la gauche = referme. Seuil à 250 px/s : un simple appui qui
+          // dérape de deux pixels ne compte pas.
+          onHorizontalDragEnd: messageOpen
+              ? (d) {
+                  if ((d.primaryVelocity ?? 0) < -250) onCollapse();
+                }
+              : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
             child: BackdropFilter(
