@@ -1011,13 +1011,25 @@ class _ProfileInfoPanel extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: ListView(
-                    // Rien à faire défiler : le panneau est dimensionné pour
-                    // tout contenir (bio plafonnée à 80 caractères, un seul
-                    // centre d'intérêt).
-                    physics: const NeverScrollableScrollPhysics(),
+                  // Ceinture : le panneau est taillé pour tout contenir (bio
+                  // plafonnée à 80 caractères, un seul centre d'intérêt), donc
+                  // il ne défile pas. Mais sur un très petit écran — ou pour un
+                  // ancien profil à plusieurs intérêts — le contenu peut
+                  // dépasser : la hauteur minimale rend alors la vue défilable
+                  // au lieu de couper la fin.
+                  child: LayoutBuilder(
+                    builder: (ctx, c) => SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
-                    children: [
+                    child: ConstrainedBox(
+                      // 102 = le padding vertical ci-dessus ; sans lui la
+                      // hauteur minimale déborderait toujours d'autant.
+                      constraints: BoxConstraints(
+                        minHeight: (c.maxHeight - 102).clamp(0.0, double.infinity),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                       if (p.bio.trim().isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_bio')),
                         const SizedBox(height: 8),
@@ -1101,7 +1113,10 @@ class _ProfileInfoPanel extends StatelessWidget {
                             ),
                           ),
                         ),
-                    ],
+                      ],
+                      ),
+                    ),
+                    ),
                   ),
                 ),
               ],
