@@ -18,6 +18,7 @@ import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
@@ -253,60 +254,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Interface-language picker — a simple bottom sheet listing the available
-  /// UI languages (flag + native label), no longer the whole profile editor.
+  /// Interface-language picker — la même roulette que la taille : une liste
+  /// à format imposé, drapeau + nom dans la langue elle-même.
   Future<void> _openLanguagePicker() async {
     final current = AppStrings.currentBcp47.value;
-    final picked = await showModalBottomSheet<String>(
+    final langs = supportedLanguages;
+    final start = langs.indexWhere((l) => l.code == current);
+    final picked = await showWheelPicker(
       context: context,
-      backgroundColor: SC.bubbleIn,
-      isScrollControlled: true,
-      // Keep the sheet below the status bar / Dynamic Island — with the full
-      // language list it grows tall enough to otherwise reach the very top.
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppStrings.t('settings_lang_interface'),
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final lang in supportedLanguages)
-                    _LanguageOption(
-                      flag: lang.flag,
-                      label: lang.label,
-                      selected: current == lang.code,
-                      onTap: () => Navigator.of(ctx).pop(lang.code),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
+      title: AppStrings.t('settings_lang_interface'),
+      emoji: '🌍',
+      labels: [for (final l in langs) '${l.flag}  ${l.label}'],
+      initialIndex: start < 0 ? 0 : start,
     );
-    if (picked != null && picked != current) {
-      await _setInterfaceLanguage(picked);
-    }
+    if (picked == null) return;
+    final code = langs[picked].code;
+    if (code != current) await _setInterfaceLanguage(code);
   }
 
   /// Apply + persist the chosen UI language. The app's locale follows the
@@ -749,48 +712,6 @@ class _SubtleText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(color: SC.textMuted, fontSize: 13),
-    );
-  }
-}
-
-/// One row in the interface-language picker (flag + native label + check).
-class _LanguageOption extends StatelessWidget {
-  const _LanguageOption({
-    required this.flag,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String flag;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Text(flag, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 15,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ),
-            if (selected) const Icon(Icons.check, color: SC.accent),
-          ],
-        ),
-      ),
     );
   }
 }
