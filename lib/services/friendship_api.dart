@@ -247,7 +247,11 @@ abstract final class FriendshipApi {
   /// My matches, newest first — the order the Messages page shows the match
   /// bubbles in. Reads my own rows (so the timestamps come along) instead of
   /// the peers RPC, then hydrates the profiles in that order.
-  static Future<List<RemoteProfile>> fetchMatchesNewestFirst(String meId) async {
+  ///
+  /// [matchedAt] rides along because the bubble rail keeps a match for a fixed
+  /// window after it happened, not until the first message.
+  static Future<List<({RemoteProfile profile, DateTime? matchedAt})>>
+      fetchMatchesNewestFirst(String meId) async {
     if (!isSupabaseReady || meId.isEmpty) return const [];
     try {
       final mine = await fetchMine(meId);
@@ -261,10 +265,12 @@ abstract final class FriendshipApi {
           return tb.compareTo(ta);
         });
       final ids = <String>[];
+      final timeById = <String, DateTime?>{};
       for (final f in accepted) {
         final peer = f.peerOf(meId);
         if (peer.isNotEmpty && peer != meId && !ids.contains(peer)) {
           ids.add(peer);
+          timeById[peer] = f.matchedAt;
         }
       }
       if (ids.isEmpty) return const [];
@@ -272,7 +278,8 @@ abstract final class FriendshipApi {
       final byId = {for (final p in profiles) p.id: p};
       return [
         for (final id in ids)
-          if (byId[id] != null) byId[id]!,
+          if (byId[id] != null)
+            (profile: byId[id]!, matchedAt: timeById[id]),
       ];
     } catch (e) {
       debugPrint('FriendshipApi.fetchMatchesNewestFirst failed: $e');

@@ -36,6 +36,11 @@ import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
+/// Combien de temps un match reste dans le rail "Nouveaux matchs". Le compte
+/// part du match, pas du premier message : la bulle et la ligne coexistent
+/// pendant toute cette fenêtre.
+const Duration _kMatchBubbleLife = Duration(days: 7);
+
 /// WhatsApp-style chat home: lists every accepted friend (union of followers
 /// + following). Tapping a row opens the direct-message thread; the trailing
 /// video icon launches a call directly with that friend.
@@ -54,8 +59,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String _myId = '';
   List<RemoteProfile> _friends = const [];
-  /// Matches with no message yet, newest first — the bubble row under the
-  /// wordmark. Once a conversation starts they move down into the list.
+  /// Matchs des 7 derniers jours, du plus récent au plus ancien — le rail de
+  /// bulles sous le logo. Ils ont AUSSI leur ligne dans Messages ; la bulle
+  /// disparaît quand la fenêtre expire, pas quand la conversation démarre.
   List<RemoteProfile> _newMatches = const [];
   /// Matches the user has already laid eyes on — they stay in the rail but
   /// stop counting toward the badge.
@@ -213,7 +219,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Recent inbound messages — counted per conversation for the badge.
         ChatApi.fetchInboundForUnread(id),
       ]);
-      final matches = results[0] as List<RemoteProfile>;
+      final matchRows =
+          results[0] as List<({RemoteProfile profile, DateTime? matchedAt})>;
+      final matches = [for (final m in matchRows) m.profile];
+      final matchedAtById = {
+        for (final m in matchRows)
+          if (m.matchedAt != null) m.profile.id: m.matchedAt!,
+      };
       final latest = results[1] as Map<String, ChatMessage>;
       final seen = results[2] as Map<String, DateTime>;
       final cleared = results[3] as Map<String, DateTime>;
@@ -256,20 +268,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final lm = latest[convIdFor(p.id)];
         return lm != null && lm.createdAt.isAfter(clearedAt);
       }).toSet();
-      // A match with no message yet is a BUBBLE, not a row (Tinder split).
-      // `matches` already comes newest-first, so the freshest match leads.
+      // Une bulle ET une ligne, pas l'un OU l'autre. La bulle tient
+      // [_kMatchBubbleLife] à partir du match (qu'on ait écrit ou non), puis
+      // elle s'efface ; la ligne, elle, reste. `matches` arrive déjà du plus
+      // récent au plus ancien, donc le dernier match ouvre le rail.
+      final now = DateTime.now();
       final newMatches = [
         for (final p in matches)
-          if (visible.contains(p) && latest[convIdFor(p.id)] == null) p,
+          if (visible.contains(p))
+            if (matchedAtById[p.id] case final t?)
+              if (now.difference(t) < _kMatchBubbleLife) p,
       ];
       final seenMatches = await MatchSeen.load();
-      final friends = visible
-          .where((p) => latest[convIdFor(p.id)] != null)
-          .toList()
+      // Tout le monde a sa ligne : un match sans message compris. Les rangées
+      // muettes descendent sous les conversations, du match le plus récent au
+      // plus ancien.
+      final friends = visible.toList()
         ..sort((a, b) {
           final la = latest[convIdFor(a.id)]?.createdAt;
           final lb = latest[convIdFor(b.id)]?.createdAt;
           if (la == null && lb == null) {
+            final ma = matchedAtById[a.id];
+            final mb = matchedAtById[b.id];
+            if (ma != null && mb != null) return mb.compareTo(ma);
+            if (ma != null) return -1;
+            if (mb != null) return 1;
             return a.displayName
                 .toLowerCase()
                 .compareTo(b.displayName.toLowerCase());
