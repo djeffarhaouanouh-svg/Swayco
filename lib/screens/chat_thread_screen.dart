@@ -1,14 +1,8 @@
 import 'dart:async';
-import 'dart:io' show File;
-import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 
 import '../services/analytics.dart';
 import '../services/app_settings.dart';
@@ -18,7 +12,6 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
-import '../services/giphy_api.dart';
 import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
@@ -26,7 +19,6 @@ import '../services/supabase_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
-import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
@@ -437,44 +429,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  /// Upload a recorded voice message via the backend STT pipeline. The
-  /// backend persists the audio, transcribes it and inserts the row;
-  /// the realtime stream will surface the new message to both sides so
-  /// we don't have to optimistically inject it here.
-  Future<void> _sendVoice({
-    required Uint8List bytes,
-    required String mimeType,
-    required int durationMs,
-  }) async {
-    if (_myId.isEmpty || _sending) return;
-    if (!isSupabaseReady) {
-      setState(() => _error = 'Supabase non configuré.');
-      return;
-    }
-    setState(() => _sending = true);
-    try {
-      await uploadVoiceMessage(
-        audioBytes: bytes,
-        mimeType: mimeType,
-        durationMs: durationMs,
-        conversationId: widget.conversationId,
-        recipientId: widget.peerDeviceId,
-        senderName: _myName.isEmpty ? 'Moi' : _myName,
-        hintLanguage: _myLang.isEmpty ? null : _myLang,
-      );
-      Analytics.track(
-        'message_sent',
-        props: {'source': 'chat', 'type': 'voice'},
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _error = 'Envoi vocal échoué: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
   /// Pick an image from the gallery and send it as an image message.
   Future<void> _sendImage() async {
     if (_myId.isEmpty || _sending) return;
@@ -703,7 +657,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           controller: _inputCtrl,
                           sending: _sending,
                           onSend: _send,
-                          onSendVoice: _sendVoice,
                           onSendImage: _sendImage,
                           onSendGif: _sendGif,
                           autoTranslate: _autoTranslate,
@@ -1528,11 +1481,6 @@ class _VoicePlayerState extends State<_VoicePlayer> {
   }
 }
 
-/// Maximum recording length. Aligned with the DB CHECK constraint on
-/// `messages.audio_duration_ms` (120000 ms) but capped lower in the UI
-/// so users see a clear ceiling. Mirrors WhatsApp's UX.
-const Duration _kMaxVoiceMessage = Duration(seconds: 60);
-
 /// Replaces the composer when the peer has blocked me — a flat, disabled
 /// notice bar so it's obvious messages can't be sent (they'd go nowhere).
 class _BlockedComposerNotice extends StatelessWidget {
@@ -1573,7 +1521,6 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
-    required this.onSendVoice,
     required this.onSendImage,
     required this.onSendGif,
     required this.autoTranslate,
@@ -1589,14 +1536,6 @@ class _Composer extends StatefulWidget {
   /// placeholder — "Écrivez en Français" instead of a generic "Message".
   final String myLang;
 
-  /// Hand the parent the raw recording so it can run the backend upload.
-  final Future<void> Function({
-    required Uint8List bytes,
-    required String mimeType,
-    required int durationMs,
-  })
-  onSendVoice;
-
   /// Pick + send an image. Wired to the image button on the left.
   final Future<void> Function() onSendImage;
 
@@ -1610,19 +1549,10 @@ class _Composer extends StatefulWidget {
 }
 
 class _ComposerState extends State<_Composer> {
-  final AudioRecorder _recorder = AudioRecorder();
-
-  /// True while the recorder is active. The composer collapses into a
-  /// "recording UI" with timer + cancel/send buttons during this state.
-  bool _recording = false;
-
   /// True while the input field has any text — in that case we render
   /// the send button (instead of the mic) so the gesture matches the
   /// user's clear intent.
   bool _hasText = false;
-  DateTime? _recordStart;
-  Timer? _tick;
-  Duration _elapsed = Duration.zero;
 
   /// Typewriter reveal of the placeholder when the chat opens — the hint
   /// fills in one character at a time ("W", "Wr", "Wri"…).
@@ -1647,15 +1577,7 @@ class _ComposerState extends State<_Composer> {
   @override
   void dispose() {
     widget.controller.removeListener(_onTextChanged);
-    _tick?.cancel();
     _hintTimer?.cancel();
-    // Best-effort: drop any in-flight recording when the chat is closed.
-    unawaited(() async {
-      try {
-        if (await _recorder.isRecording()) await _recorder.cancel();
-      } catch (_) {}
-      await _recorder.dispose();
-    }());
     super.dispose();
   }
 
@@ -1713,126 +1635,8 @@ class _ComposerState extends State<_Composer> {
     });
   }
 
-  /// Resolved path passed to `record.start`. Native gets a real file in
-  /// the temp directory; on web the package ignores the path and writes
-  /// to a Blob URL we read back via `_recorder.stop()`.
-  Future<String> _recordingPath() async {
-    if (kIsWeb) return ''; // ignored by the web backend
-    final dir = await getTemporaryDirectory();
-    final name = 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    return '${dir.path}/$name';
-  }
-
-  Future<void> _startRecording() async {
-    if (_recording || widget.sending) return;
-    try {
-      if (!await _recorder.hasPermission()) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.t('voice_mic_denied'))),
-        );
-        return;
-      }
-      final path = await _recordingPath();
-      // AAC-LC inside an MP4 container = .m4a — natively decodable by
-      // iOS / Android / Chrome / Safari. On web the package transparently
-      // falls back to the closest available codec (WebM/Opus on Chrome).
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 64000,
-          sampleRate: 16000,
-          numChannels: 1,
-        ),
-        path: path,
-      );
-      _recordStart = DateTime.now();
-      _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
-        if (!mounted || _recordStart == null) return;
-        final el = DateTime.now().difference(_recordStart!);
-        // Hard stop at the cap so an idle user can't blow past the DB
-        // constraint or rack up STT bills accidentally.
-        if (el >= _kMaxVoiceMessage) {
-          unawaited(_stopAndSend());
-          return;
-        }
-        setState(() => _elapsed = el);
-      });
-      setState(() {
-        _recording = true;
-        _elapsed = Duration.zero;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur micro: $e')));
-    }
-  }
-
-  Future<void> _cancelRecording() async {
-    if (!_recording) return;
-    _tick?.cancel();
-    try {
-      await _recorder.cancel();
-    } catch (_) {}
-    if (mounted) {
-      setState(() {
-        _recording = false;
-        _elapsed = Duration.zero;
-        _recordStart = null;
-      });
-    }
-  }
-
-  Future<void> _stopAndSend() async {
-    if (!_recording) return;
-    _tick?.cancel();
-    final ms = _elapsed.inMilliseconds;
-    String? out;
-    try {
-      out = await _recorder.stop();
-    } catch (_) {
-      out = null;
-    }
-    if (!mounted) return;
-    setState(() {
-      _recording = false;
-      _elapsed = Duration.zero;
-      _recordStart = null;
-    });
-    if (out == null || ms <= 500) {
-      // Sub-half-second recording is almost certainly a misfire — skip.
-      return;
-    }
-    Uint8List bytes;
-    try {
-      if (kIsWeb) {
-        // On web, `stop()` returns a blob: URL; fetch it to read bytes.
-        final res = await http.get(Uri.parse(out));
-        bytes = res.bodyBytes;
-      } else {
-        bytes = await File(out).readAsBytes();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lecture audio échouée: $e')));
-      }
-      return;
-    }
-    if (bytes.isEmpty) return;
-    // Best-guess mime: native = m4a, web = webm.
-    final mime = kIsWeb ? 'audio/webm' : 'audio/m4a';
-    await widget.onSendVoice(bytes: bytes, mimeType: mime, durationMs: ms);
-  }
-
   @override
-  Widget build(BuildContext context) {
-    if (_recording) return _buildRecordingBar();
-    return _buildIdleBar();
-  }
+  Widget build(BuildContext context) => _buildIdleBar();
 
   /// Placeholder shown in the empty input. Adapts to the user's spoken
   /// language — "Écrivez en Français" for a French user — falling back to the
@@ -1918,29 +1722,21 @@ class _ComposerState extends State<_Composer> {
                       ),
                     ),
                     const SizedBox(width: 6),
+                    // Le bouton rond : envoyer quand il y a du texte, sinon
+                    // ouvrir les GIF. Il a remplacé le micro — le chat
+                    // n'enregistre plus de vocaux.
                     _CircleActionButton(
-                      icon: _hasText ? Icons.send : Icons.mic,
+                      icon: _hasText ? Icons.send : Icons.gif_box_rounded,
                       busy: widget.sending,
                       onTap: widget.sending
                           ? null
-                          : (_hasText ? widget.onSend : _startRecording),
+                          : (_hasText ? widget.onSend : widget.onSendGif),
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(width: 4),
-            // GIF — même cercle de verre que la photo, juste à sa gauche.
-            // Absent tant qu'aucune clé Giphy n'est fournie.
-            if (GiphyApi.isConfigured) ...[
-              GlassIconButton(
-                icon: Icons.gif_box_outlined,
-                onTap: widget.sending ? null : widget.onSendGif,
-                size: 46,
-                iconSize: 24,
-              ),
-              const SizedBox(width: 4),
-            ],
             // Photo (add image) button — OUTSIDE the glass bar, so it gets its
             // own glass circle + spring bounce (like the header buttons).
             GlassIconButton(
@@ -1954,82 +1750,6 @@ class _ComposerState extends State<_Composer> {
       );
   }
 
-  Widget _buildRecordingBar() {
-    final secs = _elapsed.inSeconds;
-    final m = (secs ~/ 60).toString().padLeft(1, '0');
-    final s = (secs % 60).toString().padLeft(2, '0');
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-        child: GlassPanel(
-          borderRadius: 28,
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-          child: Row(
-            children: [
-              // Cancel — drops the recording without sending.
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _cancelRecording,
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.delete_outline,
-                      color: Color(0xFFE57373),
-                      size: 26,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE53935),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '$m:$s',
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        AppStrings.t('voice_recording_hint'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: SC.textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _CircleActionButton(
-                icon: Icons.send,
-                busy: false,
-                onTap: _stopAndSend,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _CircleActionButton extends StatelessWidget {
