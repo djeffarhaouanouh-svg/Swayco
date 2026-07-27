@@ -87,7 +87,9 @@ class _ReportDialogState extends State<_ReportDialog> {
           const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Container(
         decoration: BoxDecoration(
-          color: SC.bubbleIn,
+          // Le gris des menus : ce dialogue s'ouvre depuis le ⋮, il porte la
+          // même surface que lui.
+          color: SC.menu,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: SC.glassBorderStrong),
           boxShadow: [
