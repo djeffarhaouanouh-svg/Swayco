@@ -883,10 +883,9 @@ class _TipDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      // Near-black surface (the original WhatsApp-scaffold tone) —
-      // the navy SC.bg the rest of the app uses bled the popup into
-      // the mesh background. Kept hardcoded so a future Midnight
-      // tweak doesn't accidentally lift this surface again.
+      // Surface propre à la popup, plus sombre que la page : elle doit se
+      // détacher du fond, pas s'y fondre. Codée en dur exprès — elle ne suit
+      // PAS SC.bg.
       backgroundColor: const Color(0xFF0A0A0A),
       insetPadding: const EdgeInsets.symmetric(horizontal: 36),
       shape: RoundedRectangleBorder(

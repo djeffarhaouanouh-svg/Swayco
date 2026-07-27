@@ -517,7 +517,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       body: GestureDetector(
         // Swipe right anywhere to leave the conversation (back).
         onHorizontalDragEnd: (d) {
@@ -526,7 +526,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         child: Stack(
           children: [
             ColoredBox(
-              color: const Color(0xFF0E0E0E),
+              color: SC.bg,
               child: SafeArea(
                 bottom: false,
                 child: Column(
@@ -1508,7 +1508,7 @@ class _BlockedComposerNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF0E0E0E),
+      color: SC.bg,
       padding: EdgeInsets.fromLTRB(
         16,
         14,

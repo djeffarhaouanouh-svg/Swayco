@@ -272,7 +272,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     return Scaffold(
       // Same dark grey as the ListPanel, now filling the whole page —
       // no more pure black behind the header / footer.
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       body: SafeArea(
         bottom: false,
         child: Column(
