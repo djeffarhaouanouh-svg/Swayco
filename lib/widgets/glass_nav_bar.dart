@@ -56,8 +56,9 @@ class GlassNavBar extends StatefulWidget {
   /// Height of the pill content area.
   static const double height = 56;
 
-  /// Gap between the pill bottom and the screen safe-area top.
-  static const double floatBottom = 16.0;
+  /// Gap between the pill bottom and the screen safe-area top. Volontairement
+  /// court : la barre est posée bas, près du pouce.
+  static const double floatBottom = 8.0;
 
   /// Total vertical space to reserve below content (height + float gap).
   static const double totalReservedHeight = height + floatBottom;

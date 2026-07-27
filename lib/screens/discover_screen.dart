@@ -1484,8 +1484,11 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Bottom info (net, en bas de la carte photo) ──────────────────
           Positioned(
             left: 14,
-            right: 56,
-            bottom: 20,
+            // Plus de bouton dans le coin : le bloc peut aller au bord.
+            right: 20,
+            // Posé AU-DESSUS des chevrons animés (bas 10 + 44 de haut), sinon
+            // les chips d'intérêt leur passent dessus.
+            bottom: 66,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1693,16 +1696,21 @@ class _PhotoDots extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < count; i++) ...[
-          if (i > 0) const SizedBox(width: 3),
+          if (i > 0) const SizedBox(width: 5),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 18,
-            height: 2.5,
+            // Assez épais pour se voir sur une photo claire : c'est le seul
+            // signe qu'il y a d'autres photos derrière celle-ci.
+            width: 30,
+            height: 5,
             decoration: BoxDecoration(
               color: i == active
                   ? Colors.white
-                  : Colors.white.withValues(alpha: 0.38),
-              borderRadius: BorderRadius.circular(2),
+                  : Colors.white.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66000000), blurRadius: 4),
+              ],
             ),
           ),
         ],
