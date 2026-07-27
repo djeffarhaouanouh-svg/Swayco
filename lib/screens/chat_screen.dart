@@ -1383,7 +1383,8 @@ class _MatchBubbleRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 100,
+      // La hauteur d'une bulle, plus rien : les prénoms ne sont plus dessous.
+      height: 66,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1406,37 +1407,14 @@ class _MatchBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = profile.displayName.trim().isNotEmpty
-        ? profile.displayName
-        : (profile.handle.isNotEmpty
-              ? '@${profile.handle}'
-              : AppStrings.t('chat_no_name'));
+    // Pas de prénom sous la bulle : le rail ne montre que les visages.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ProfileAvatar(
-              displayName: profile.displayName,
-              avatarUrl: profile.avatarUrl,
-              size: 66,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+      child: ProfileAvatar(
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        size: 66,
       ),
     );
   }
