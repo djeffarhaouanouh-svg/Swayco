@@ -1243,7 +1243,9 @@ class _IdentitySection extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(width: 68),
+            // 76 = le bouton (44) + sa marge droite (32) : le prénom reste
+            // centré malgré le bouton d'un seul côté.
+            const SizedBox(width: 76),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1280,8 +1282,9 @@ class _IdentitySection extends StatelessWidget {
                 child: Tooltip(
                   message: AppStrings.t('settings_title'),
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    // Même gabarit que l'œil : 44 de côté, icône 21.
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -1290,7 +1293,7 @@ class _IdentitySection extends StatelessWidget {
                     ),
                     child: const Icon(
                       Icons.settings_outlined,
-                      size: 16,
+                      size: 21,
                       color: SC.textPrimary,
                     ),
                   ),
