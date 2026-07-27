@@ -20,7 +20,7 @@ abstract final class PermissionPriming {
   }) async {
     final res = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

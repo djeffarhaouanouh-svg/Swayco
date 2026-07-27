@@ -48,13 +48,13 @@
   <style id="splash-screen-style">
     html {
       height: 100%;
-      background-color: #000000;
+      background-color: #0E0E0E;
     }
 
     body {
       margin: 0;
       min-height: 100%;
-      background-color: #000000;
+      background-color: #0E0E0E;
           background-size: 100% 100%;
     }
 
@@ -106,11 +106,11 @@
 
     @media (prefers-color-scheme: dark) {
       body {
-        background-color: #000000;
+        background-color: #0E0E0E;
           }
     }
 
-    /* Boot splash: the Traduction.json Lottie, centred on pure black.
+    /* Boot splash: the Traduction.json Lottie, centred on the app background.
        Shown immediately while the Flutter engine downloads + boots, then
        removed by removeSplashFromWeb() once the first Flutter frame renders
        (the in-app SplashScreenAnimation plays the SAME Lottie, so the hand-off
@@ -119,7 +119,7 @@
       position: fixed;
       inset: 0;
       margin: 0;
-      background-color: #000000;
+      background-color: #0E0E0E;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -149,8 +149,8 @@
       try { window.__splashAnim?.destroy(); } catch (e) {}
       document.getElementById("splash")?.remove();
       document.getElementById("splash-branding")?.remove();
-      // Stay deep black behind Flutter (no white flash on first frame).
-      document.body.style.background = "#000000";
+      // Stay on the app background behind Flutter (no white flash on first frame).
+      document.body.style.background = "#0E0E0E";
     }
     // Flutter fires "flutter-first-frame" once its first frame is painted —
     // that's our cue to pull the HTML boot splash so the (identical) in-app

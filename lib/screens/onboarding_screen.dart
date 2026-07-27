@@ -284,7 +284,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // bar with the back button + title, glass inputs with cyan focus,
       // and a SC.accent "Save" pill.
       return Scaffold(
-        backgroundColor: const Color(0xFF0E0E0E),
+        backgroundColor: SC.bg,
         body: SafeArea(
           child: Column(
             children: [

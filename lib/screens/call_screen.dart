@@ -1023,10 +1023,9 @@ class _CallScreenState extends State<CallScreen> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
-        // Match the _TipDialog surface (root_shell.dart) — SC.bg would
-        // bleed the popup into the mesh background, so we anchor to the
-        // same near-black the post-onboarding tips use.
-        backgroundColor: const Color(0xFF0A0A0A),
+        // Même surface que _TipDialog (root_shell.dart) : le fond de l'app,
+        // détaché de la page par sa bordure blanche.
+        backgroundColor: SC.bg,
         insetPadding: const EdgeInsets.symmetric(horizontal: 36),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
@@ -1646,7 +1645,7 @@ class _CallScreenState extends State<CallScreen> {
   void _openAudioSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1674,7 +1673,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1708,7 +1707,7 @@ class _CallScreenState extends State<CallScreen> {
     var heard = _myOutputLang;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -1908,7 +1907,7 @@ class _CallScreenState extends State<CallScreen> {
     final dur = _finalDuration ?? Duration.zero;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: SC.bg,
       body: SafeArea(
         child: Stack(
           children: [
@@ -1917,7 +1916,7 @@ class _CallScreenState extends State<CallScreen> {
               child: RepaintBoundary(
                 key: _shareCardKey,
                 child: Container(
-                  color: const Color(0xFF0E0E0E),
+                  color: SC.bg,
                   child: Stack(
                     children: [
                       // Brand wordmark — top-centre, like the in-call screen.
@@ -2212,9 +2211,9 @@ class _CallScreenState extends State<CallScreen> {
       // that only the caller's monthly credits are debited (the peer
       // listens free). Keeps the spinner so the user still has motion
       // feedback that something is happening. Held for >= 5s (see
-      // _minSplashDone) and on the app's black, to match the logo.
+      // _minSplashDone) et sur le fond de l'app, comme partout ailleurs.
       return Scaffold(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: SC.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
@@ -2277,11 +2276,11 @@ class _CallScreenState extends State<CallScreen> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light.copyWith(
           statusBarColor: Colors.transparent,
-          systemNavigationBarColor: Colors.black,
+          systemNavigationBarColor: SC.bg,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
         child: Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: SC.bg,
           // Don't shrink the video when the keyboard opens — keep it full
           // screen; only the chat composer lifts above the keyboard (it adds
           // viewInsets.bottom itself).
