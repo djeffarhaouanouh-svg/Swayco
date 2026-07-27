@@ -22,6 +22,24 @@ class AsrService {
   AsrService._();
   static final instance = AsrService._();
 
+  /// Le système d'exploitation a refusé de transcrire, et il refusera pour
+  /// tout le reste de l'appel : Siri / la Dictée sont désactivés, ou bloqués
+  /// par Temps d'écran ou un profil de configuration.
+  ///
+  /// C'est une panne SILENCIEUSE sans ce signal : le moteur rend une chaîne
+  /// vide, le pipeline la jette comme hallucination, et l'utilisateur ne voit
+  /// jamais que sa voix n'est plus transcrite. L'écran d'appel écoute ce
+  /// notifieur pour le dire, une fois. Porte la CLÉ de traduction, pas un
+  /// message tout fait — le texte se lit dans la langue de l'interface.
+  static final ValueNotifier<String?> osRefusedKey =
+      ValueNotifier<String?>(null);
+
+  /// Appelé par un moteur natif quand le système claque la porte.
+  static void reportOsRefusal(String messageKey) {
+    if (osRefusedKey.value == messageKey) return;
+    osRefusedKey.value = messageKey;
+  }
+
   final _downloader = AsrModelDownloader();
 
   AsrEngine? _engine;

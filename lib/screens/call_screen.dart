@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../swayco/asr/asr_service.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_audio.dart';
@@ -647,6 +648,26 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// Déjà dit pendant cet appel : le bandeau ne revient pas à chaque phrase.
+  bool _sttRefusalShown = false;
+
+  /// Le système a refusé la reconnaissance vocale. On le dit UNE fois, en clair
+  /// et longuement — c'est la moitié de la fonctionnalité qui vient de tomber,
+  /// et l'utilisateur n'a aucun autre moyen de le savoir : sa voix part bien,
+  /// simplement plus rien ne la transcrit.
+  void _onSttRefused() {
+    final key = AsrService.osRefusedKey.value;
+    if (key == null || _sttRefusalShown || !mounted) return;
+    _sttRefusalShown = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppStrings.t(key)),
+        duration: const Duration(seconds: 8),
+        backgroundColor: SC.bubbleIn,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -659,6 +680,10 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
+    // fil, la panne serait totalement muette côté utilisateur.
+    AsrService.osRefusedKey.addListener(_onSttRefused);
+    _onSttRefused();
     _wireDeviceTtsSignal();
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
@@ -1767,6 +1792,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
+    AsrService.osRefusedKey.removeListener(_onSttRefused);
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()

@@ -402,6 +402,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'En attente de l’autre personne…',
     'call_waiting_body': 'Partage le même nom de salle sur un autre appareil.',
     'call_leave_q': 'Quitter l’appel ?',
+    'stt_os_refused_ios':
+        'Ton iPhone refuse la reconnaissance vocale : active Siri et la Dictée dans Réglages (et vérifie Temps d’écran → Restrictions). Ta voix n’est pas traduite tant que c’est bloqué.',
     'call_leave_body': 'Tu seras déconnecté de cette salle.',
     'call_stay': 'Rester',
     'call_leave': 'Quitter',
@@ -963,6 +965,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'Waiting for the other person…',
     'call_waiting_body': 'Share the same room name on another device.',
     'call_leave_q': 'Leave call?',
+    'stt_os_refused_ios':
+        'Your iPhone is refusing speech recognition: turn on Siri and Dictation in Settings (and check Screen Time → Restrictions). Your voice isn’t translated while it’s blocked.',
     'call_leave_body': 'You will disconnect from this room.',
     'call_stay': 'Stay',
     'call_leave': 'Leave',
@@ -1478,6 +1482,8 @@ abstract final class AppStrings {
     'call_waiting_body':
         'Comparte el mismo nombre de sala en otro dispositivo.',
     'call_leave_q': '¿Salir de la llamada?',
+    'stt_os_refused_ios':
+        'Tu iPhone rechaza el reconocimiento de voz: activa Siri y el Dictado en Ajustes (y revisa Tiempo de uso → Restricciones). Tu voz no se traduce mientras esté bloqueado.',
     'call_leave_body': 'Te desconectarás de esta sala.',
     'call_stay': 'Quedarse',
     'call_leave': 'Salir',
@@ -1958,6 +1964,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'Warten auf die andere Person…',
     'call_waiting_body': 'Teile denselben Raumnamen auf einem anderen Gerät.',
     'call_leave_q': 'Anruf verlassen?',
+    'stt_os_refused_ios':
+        'Dein iPhone verweigert die Spracherkennung: Aktiviere Siri und Diktat in den Einstellungen (und prüfe Bildschirmzeit → Beschränkungen). Solange es blockiert ist, wird deine Stimme nicht übersetzt.',
     'call_leave_body': 'Du wirst von diesem Raum getrennt.',
     'call_stay': 'Bleiben',
     'call_leave': 'Verlassen',
@@ -2516,6 +2524,8 @@ abstract final class AppStrings {
     'call_waiting_body':
         'Condividi lo stesso nome stanza su un altro dispositivo.',
     'call_leave_q': 'Uscire dalla chiamata?',
+    'stt_os_refused_ios':
+        'Il tuo iPhone rifiuta il riconoscimento vocale: attiva Siri e la Dettatura in Impostazioni (e controlla Tempo di utilizzo → Restrizioni). La tua voce non viene tradotta finché è bloccato.',
     'call_leave_body': 'Verrai disconnesso da questa stanza.',
     'call_stay': 'Resta',
     'call_leave': 'Esci',
@@ -3069,6 +3079,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'À espera da outra pessoa…',
     'call_waiting_body': 'Partilha o mesmo nome de sala noutro dispositivo.',
     'call_leave_q': 'Sair da chamada?',
+    'stt_os_refused_ios':
+        'O teu iPhone recusa o reconhecimento de voz: ativa a Siri e o Ditado nos Ajustes (e verifica Tempo de Ecrã → Restrições). A tua voz não é traduzida enquanto estiver bloqueado.',
     'call_leave_body': 'Vais ser desligado desta sala.',
     'call_stay': 'Ficar',
     'call_leave': 'Sair',
@@ -3623,6 +3635,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'Wachten op de andere persoon…',
     'call_waiting_body': 'Deel dezelfde kamernaam op een ander apparaat.',
     'call_leave_q': 'Oproep verlaten?',
+    'stt_os_refused_ios':
+        'Je iPhone weigert spraakherkenning: zet Siri en Dicteren aan in Instellingen (en controleer Schermtijd → Beperkingen). Zolang het geblokkeerd is, wordt je stem niet vertaald.',
     'call_leave_body': 'Je wordt losgekoppeld van deze kamer.',
     'call_stay': 'Blijven',
     'call_leave': 'Verlaten',
@@ -4166,6 +4180,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'في انتظار الشخص الآخر…',
     'call_waiting_body': 'شارك اسم الغرفة نفسه على جهاز آخر.',
     'call_leave_q': 'مغادرة المكالمة؟',
+    'stt_os_refused_ios':
+        'يرفض iPhone التعرف على الكلام: فعّل Siri والإملاء في الإعدادات (وتحقق من مدة استخدام الجهاز ← القيود). لن تُترجم أثناء الحظر.',
     'call_leave_body': 'سيتم قطع اتصالك بهذه الغرفة.',
     'call_stay': 'البقاء',
     'call_leave': 'مغادرة',
@@ -4707,6 +4723,8 @@ abstract final class AppStrings {
     'call_waiting_title': 'Ожидание другого участника…',
     'call_waiting_body': 'Откройте то же имя комнаты на другом устройстве.',
     'call_leave_q': 'Покинуть звонок?',
+    'stt_os_refused_ios':
+        'iPhone отказывается распознавать речь: включите Siri и Диктовку в Настройках (и проверьте Экранное время → Ограничения). Пока это заблокировано, ваш голос не переводится.',
     'call_leave_body': 'Вы будете отключены от этой комнаты.',
     'call_stay': 'Остаться',
     'call_leave': 'Покинуть',
@@ -5242,6 +5260,8 @@ abstract final class AppStrings {
     'call_waiting_title': '正在等待对方…',
     'call_waiting_body': '在另一台设备上使用相同的房间名。',
     'call_leave_q': '离开通话？',
+    'stt_os_refused_ios':
+        'iPhone 拒绝语音识别：请在“设置”中开启 Siri 和听写（并检查“屏幕使用时间 → 内容和隐私访问限制”）。被禁用期间，你的语音不会被翻译。',
     'call_leave_body': '你将断开与该房间的连接。',
     'call_stay': '留下',
     'call_leave': '离开',
@@ -5737,6 +5757,8 @@ abstract final class AppStrings {
     'call_waiting_title': '相手を待っています…',
     'call_waiting_body': '別の端末で同じルーム名を使ってください。',
     'call_leave_q': '通話から退出しますか？',
+    'stt_os_refused_ios':
+        'iPhoneが音声認識を拒否しています。設定でSiriと音声入力をオンにしてください（スクリーンタイム → 制限も確認）。ブロックされている間は音声が翻訳されません。',
     'call_leave_body': 'このルームから切断されます。',
     'call_stay': '残る',
     'call_leave': '退出',
@@ -6238,6 +6260,8 @@ abstract final class AppStrings {
     'call_waiting_title': '상대방을 기다리는 중…',
     'call_waiting_body': '다른 기기에서 같은 방 이름을 사용하세요.',
     'call_leave_q': '통화를 나갈까요?',
+    'stt_os_refused_ios':
+        'iPhone이 음성 인식을 거부하고 있어요. 설정에서 Siri와 받아쓰기를 켜세요(스크린 타임 → 제한도 확인). 차단된 동안에는 목소리가 번역되지 않아요.',
     'call_leave_body': '이 방에서 연결이 끊어집니다.',
     'call_stay': '머무르기',
     'call_leave': '나가기',

@@ -2,11 +2,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../../services/debug_overlay.dart';
 import 'apple_stt_channel.dart';
 import 'asr_catalogue.dart' show normalizeLang;
 import 'asr_engine.dart';
+import 'asr_service.dart';
 
 /// Apple's native `SFSpeechRecognizer` as a drop-in clip recogniser.
 ///
@@ -139,6 +141,21 @@ class AppleSttEngine extends AsrEngine {
       DebugOverlay.log('stt apple native=${res.ms}ms '
           '${_localeOnDevice ? "on-device" : "CLOUD"} → "${res.text}"');
       return res.text.trim();
+    } on PlatformException catch (e) {
+      // « Siri and Dictation are disabled » : ce n'est pas un raté ponctuel,
+      // c'est un refus définitif du démon système (Réglages → Siri, ou Temps
+      // d'écran → Restrictions → Siri et Dictée, ou un profil MDM). Réessayer
+      // à chaque phrase ne donnerait que des chaînes vides, jetées ensuite
+      // comme hallucinations — l'utilisateur n'aurait AUCUNE transcription et
+      // aucune explication. On s'arrête et on le dit.
+      final refused = (e.message ?? '').toLowerCase().contains('disabled');
+      DebugOverlay.log('stt Apple transcribe error: $e');
+      if (refused) {
+        _ready = false;
+        DebugOverlay.log('stt Apple REFUSED by the OS — engine stopped');
+        AsrService.reportOsRefusal('stt_os_refused_ios');
+      }
+      return '';
     } catch (e) {
       DebugOverlay.log('stt Apple transcribe error: $e');
       return '';
