@@ -310,10 +310,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final cardBottom = btnBottom + actionH + 14;
     final tabBarH = safeTop + _TopTabBar.height;
 
-    // Panneau ouvert : la carte descend dans l'espace libéré par la nav, et le
-    // panneau occupe sa moitié basse — la photo reste visible au-dessus.
+    // Panneau ouvert : la carte prend toute la hauteur — elle monte sous la
+    // barre d'onglets et descend dans l'espace libéré par la nav. Le panneau y
+    // gagne assez de place pour tout montrer sans qu'on ait à faire défiler.
     final openCardBottom = safeBottom + 12;
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
+    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8;
 
     return Scaffold(
       backgroundColor: SC.bg,
@@ -324,7 +326,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
-            top: tabBarH + 8,
+            top: currentCardTop,
             left: 8,
             right: 8,
             bottom: currentCardBottom,
@@ -521,7 +523,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                       )
                     : LayoutBuilder(
                         builder: (context, c) {
-                          final panelH = c.maxHeight * 0.58;
+                          final panelH = c.maxHeight * 0.76;
                           final card = _TinderCard(
                             profile: me,
                             photos: _photos,
@@ -828,9 +830,10 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 
     return LayoutBuilder(
       builder: (context, c) {
-        // The panel takes a bit over half the card — the photo has to keep
-        // reading as the subject, and the fold-back drag needs a target.
-        final panelH = c.maxHeight * 0.58;
+        // Le panneau prend les trois quarts de la carte : assez pour poser la
+        // bio, les faits et les intérêts d'un coup. La bande de photo qui
+        // reste au-dessus sert de poignée pour le rabattre.
+        final panelH = c.maxHeight * 0.76;
         return Stack(
         children: [
           // Back card (3rd)
@@ -1009,6 +1012,10 @@ class _ProfileInfoPanel extends StatelessWidget {
                 ),
                 Expanded(
                   child: ListView(
+                    // Rien à faire défiler : le panneau est dimensionné pour
+                    // tout contenir (bio plafonnée à 80 caractères, un seul
+                    // centre d'intérêt).
+                    physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
                     children: [
                       if (p.bio.trim().isNotEmpty) ...[
