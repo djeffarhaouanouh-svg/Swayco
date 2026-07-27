@@ -8,6 +8,7 @@ import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
 import '../services/device_id.dart';
+import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
 import '../services/interests.dart';
 import '../services/languages.dart';
@@ -15,6 +16,7 @@ import '../services/locations.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
+import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -940,21 +942,22 @@ class _ProfileInfoPanel extends StatelessWidget {
     final place = [p.city.trim(), p.country.trim()]
         .where((e) => e.isNotEmpty)
         .join(', ');
-    final facts = <({IconData icon, String label})>[
+    final facts = <({String emoji, String label})>[
       if (p.age != null)
-        (icon: Icons.cake_outlined, label: AppStrings.t('info_age_value', args: {'n': '${p.age}'})),
+        (emoji: kFactEmojiAge, label: AppStrings.t('info_age_value', args: {'n': '${p.age}'})),
       if (p.heightCm != null)
-        (icon: Icons.straighten_rounded, label: '${p.heightCm} cm'),
+        // Pieds/pouces pour un profil américain, centimètres ailleurs.
+        (emoji: kFactEmojiHeight, label: formatHeight(p.heightCm!, country: p.country)),
       if (p.job.trim().isNotEmpty)
-        (icon: Icons.work_outline_rounded, label: p.job.trim()),
+        (emoji: kFactEmojiJob, label: p.job.trim()),
       if (p.zodiac.trim().isNotEmpty)
-        (icon: Icons.auto_awesome_outlined, label: p.zodiac.trim()),
+        (emoji: kFactEmojiZodiac, label: p.zodiac.trim()),
       if (p.lookingFor.trim().isNotEmpty)
-        (icon: Icons.favorite_outline_rounded, label: p.lookingFor.trim()),
+        (emoji: kFactEmojiLookingFor, label: p.lookingFor.trim()),
       if (place.isNotEmpty)
-        (icon: Icons.place_outlined, label: place),
+        (emoji: kFactEmojiPlace, label: place),
       if (lang != null)
-        (icon: Icons.translate_rounded, label: '${lang.flag}  ${lang.label}'),
+        (emoji: kFactEmojiLanguage, label: '${lang.flag}  ${lang.label}'),
     ];
 
     return GestureDetector(
@@ -1030,7 +1033,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               children: [
-                                Icon(f.icon, size: 18, color: Colors.black87),
+                                Text(f.emoji, style: const TextStyle(fontSize: 17)),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(

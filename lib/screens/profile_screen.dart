@@ -20,6 +20,7 @@ import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/fact_emojis.dart';
 import '../services/interests.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
@@ -28,10 +29,12 @@ import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
+import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
+import '../widgets/height_picker_sheet.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
@@ -1528,26 +1531,27 @@ class _PeerInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     if (p == null) return const SizedBox.shrink();
-    final rows = <({IconData icon, String label, String value})>[
+    final rows = <({String emoji, String label, String value})>[
       if (p.age != null)
-        (icon: Icons.cake_outlined, label: AppStrings.t('info_age'), value: '${p.age}'),
+        (emoji: kFactEmojiAge, label: AppStrings.t('info_age'), value: '${p.age}'),
       if (p.heightCm != null)
         (
-          icon: Icons.straighten_rounded,
+          emoji: kFactEmojiHeight,
           label: AppStrings.t('info_height'),
-          value: '${p.heightCm} cm',
+          // Pieds/pouces pour un profil américain, centimètres ailleurs.
+          value: formatHeight(p.heightCm!, country: p.country),
         ),
       if (p.job.trim().isNotEmpty)
-        (icon: Icons.work_outline_rounded, label: AppStrings.t('info_job'), value: p.job.trim()),
+        (emoji: kFactEmojiJob, label: AppStrings.t('info_job'), value: p.job.trim()),
       if (p.zodiac.trim().isNotEmpty)
         (
-          icon: Icons.auto_awesome_outlined,
+          emoji: kFactEmojiZodiac,
           label: AppStrings.t('info_zodiac'),
           value: p.zodiac.trim(),
         ),
       if (p.lookingFor.trim().isNotEmpty)
         (
-          icon: Icons.favorite_outline_rounded,
+          emoji: kFactEmojiLookingFor,
           label: AppStrings.t('info_looking_for'),
           value: p.lookingFor.trim(),
         ),
@@ -1569,7 +1573,7 @@ class _PeerInfoCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 15),
               child: Row(
                 children: [
-                  Icon(r.icon, size: 20, color: SC.accent),
+                  Text(r.emoji, style: const TextStyle(fontSize: 19)),
                   const SizedBox(width: 14),
                   Text(r.label, style: const TextStyle(color: SC.textMuted, fontSize: 15)),
                   const Spacer(),
@@ -2112,33 +2116,45 @@ class _PersonalInfoSection extends StatelessWidget {
             _divider,
           ],
           _PersonalInfoRow(
-            icon: Icons.cake_outlined,
+            emoji: kFactEmojiAge,
             label: AppStrings.t('info_age'),
             value: p?.age?.toString() ?? '',
             numeric: true,
             onSave: (v) => save(age: v.isEmpty ? null : int.tryParse(v)),
           ),
+          // Taille : plus de champ libre. Une roulette, graduée en cm ou en
+          // pieds/pouces selon le pays — c'est elle qui garantit le format,
+          // la base ne stocke que des centimètres.
           _PersonalInfoRow(
-            icon: Icons.straighten_rounded,
+            emoji: kFactEmojiHeight,
             label: AppStrings.t('info_height'),
-            value: p?.heightCm?.toString() ?? '',
-            numeric: true,
-            onSave: (v) => save(heightCm: v.isEmpty ? null : int.tryParse(v)),
+            value: p?.heightCm == null
+                ? ''
+                : formatHeight(p!.heightCm!, country: p.country),
+            onPick: (ctx) async {
+              final picked = await showHeightPicker(
+                ctx,
+                country: p?.country ?? '',
+                current: p?.heightCm,
+              );
+              if (picked == null) return;
+              await save(heightCm: picked == 0 ? null : picked);
+            },
           ),
           _PersonalInfoRow(
-            icon: Icons.work_outline_rounded,
+            emoji: kFactEmojiJob,
             label: AppStrings.t('info_job'),
             value: p?.job ?? '',
             onSave: (v) => save(job: v),
           ),
           _PersonalInfoRow(
-            icon: Icons.auto_awesome_outlined,
+            emoji: kFactEmojiZodiac,
             label: AppStrings.t('info_zodiac'),
             value: p?.zodiac ?? '',
             onSave: (v) => save(zodiac: v),
           ),
           _PersonalInfoRow(
-            icon: Icons.favorite_outline_rounded,
+            emoji: kFactEmojiLookingFor,
             label: AppStrings.t('info_looking_for'),
             value: p?.lookingFor ?? '',
             onSave: (v) => save(lookingFor: v),
@@ -2159,30 +2175,38 @@ class _PersonalInfoSection extends StatelessWidget {
 
 class _PersonalInfoRow extends StatelessWidget {
   const _PersonalInfoRow({
-    required this.icon,
+    required this.emoji,
     required this.label,
     required this.value,
-    required this.onSave,
+    this.onSave,
+    this.onPick,
     this.numeric = false,
     this.last = false,
-  });
+  }) : assert(onSave != null || onPick != null);
 
-  final IconData icon;
+  final String emoji;
   final String label;
   final String value;
   final bool numeric;
   final bool last;
-  final Future<void> Function(String) onSave;
+
+  /// Champ libre : la valeur s'édite en place.
+  final Future<void> Function(String)? onSave;
+
+  /// Valeur à format imposé : un tap ouvre un sélecteur, il n'y a rien à
+  /// taper. [onSave] est alors inutile.
+  final Future<void> Function(BuildContext)? onPick;
 
   @override
   Widget build(BuildContext context) {
+    final pick = onPick;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: SC.accent),
+              Text(emoji, style: const TextStyle(fontSize: 17)),
               const SizedBox(width: 12),
               Text(
                 label,
@@ -2190,18 +2214,40 @@ class _PersonalInfoRow extends StatelessWidget {
               ),
               const Spacer(),
               Flexible(
-                child: _InlineEditable(
-                  value: value,
-                  placeholder: AppStrings.t('info_add'),
-                  onSave: onSave,
-                  maxLength: 60,
-                  keyboardType: numeric ? TextInputType.number : null,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: pick != null
+                    ? GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => pick(context),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            value.isEmpty ? AppStrings.t('info_add') : value,
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              color: value.isEmpty
+                                  ? SC.textMuted
+                                  : SC.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              fontStyle: value.isEmpty
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                            ),
+                          ),
+                        ),
+                      )
+                    : _InlineEditable(
+                        value: value,
+                        placeholder: AppStrings.t('info_add'),
+                        onSave: onSave!,
+                        maxLength: 60,
+                        keyboardType: numeric ? TextInputType.number : null,
+                        style: const TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ],
           ),
@@ -2487,18 +2533,17 @@ class _InterestsSection extends StatefulWidget {
 
 class _InterestsSectionState extends State<_InterestsSection> {
   late Set<String> _sel = {...widget.interests};
-  bool _expanded = false;
-  // Shared so a tap on the chips above isn't treated as "outside" the picker:
-  // otherwise tapping the open "Add" chip would fire the picker's
-  // onTapOutside (close) AND the chip's onTap (reopen) → it never closes.
-  final Object _pickerGroup = Object();
+
+  /// Vrai pendant que la feuille est ouverte : la sélection en cours est celle
+  /// de l'utilisateur, on ne la réaligne pas sur le parent tant qu'il choisit.
+  bool _picking = false;
 
   @override
   void didUpdateWidget(covariant _InterestsSection old) {
     super.didUpdateWidget(old);
-    // Resync with the parent's saved list while folded (e.g. after a save
-    // round-trip). While unfolded we keep the user's in-progress selection.
-    if (!_expanded && !_sameSet(_sel, widget.interests)) {
+    // Resync with the parent's saved list while closed (e.g. after a save
+    // round-trip). While the sheet is open we keep the in-progress selection.
+    if (!_picking && !_sameSet(_sel, widget.interests)) {
       _sel = {...widget.interests};
     }
   }
@@ -2517,26 +2562,41 @@ class _InterestsSectionState extends State<_InterestsSection> {
     widget.onSave?.call(_sel.toList());
   }
 
-  Future<void> _close() async {
-    setState(() => _expanded = false);
+  /// Le sélecteur s'ouvre PAR-DESSUS la page, dans une feuille modale. En
+  /// ligne, il poussait tout le contenu vers le bas et débordait sous la barre
+  /// de navigation.
+  Future<void> _openPicker() async {
+    setState(() => _picking = true);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        // La feuille a son propre cycle de rendu : sans ce setState local, les
+        // chips cochés ne changeraient d'état qu'à la fermeture.
+        // Pas de hauteur imposée : la feuille prend celle du panneau, qui est
+        // fixe (une page de catégorie + les points + le bouton).
+        builder: (sheetCtx, setSheetState) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: _InlineInterestPicker(
+              sel: _sel,
+              onToggle: (tag) {
+                _toggle(tag);
+                setSheetState(() {});
+              },
+              onDone: () => Navigator.of(sheetCtx).pop(),
+              country: widget.country,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _picking = false);
     final save = widget.onSave;
     if (save != null) await save(_sel.toList());
-  }
-
-  void _toggleExpanded() {
-    setState(() => _expanded = !_expanded);
-    if (!_expanded) return;
-    // Once the picker unfolds, scroll it up to the top of the viewport so the
-    // pins are fully in view (it would otherwise open below the fold).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Scrollable.ensureVisible(
-        context,
-        alignment: 0.0,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    });
   }
 
   @override
@@ -2549,7 +2609,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
             padding: const EdgeInsets.only(bottom: 10, left: 2),
             child: Row(
               children: [
-                const Icon(Icons.interests_outlined, size: 18, color: SC.accent),
+                const Text(kFactEmojiInterests, style: TextStyle(fontSize: 17)),
                 const SizedBox(width: 12),
                 Text(
                   AppStrings.t('profile_interests_section'),
@@ -2565,49 +2625,21 @@ class _InterestsSectionState extends State<_InterestsSection> {
           ),
           const SizedBox(height: 12),
         ],
-        // The picked chips + the add/toggle chip. Tapping any of them folds
-        // or unfolds the inline picker below. In the same TapRegion group as
-        // the picker so tapping a chip while open doesn't count as "outside".
-        TapRegion(
-          groupId: _pickerGroup,
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final tag in _sel)
-                _InterestChip(
-                  label: tag,
-                  color: interestColor(tag),
-                  onTap: _toggleExpanded,
-                ),
-              if (_sel.length < profileInterestsMax)
-                _InterestAddChip(onTap: _toggleExpanded),
-            ],
-          ),
-        ),
-        // The category picker, unfolding right here (no overlay). A tap
-        // anywhere outside the panel folds it back (auto-saved already).
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity, height: 0),
-          secondChild: TapRegion(
-            groupId: _pickerGroup,
-            onTapOutside: (_) {
-              if (_expanded) _close();
-            },
-            child: _InlineInterestPicker(
-              sel: _sel,
-              onToggle: _toggle,
-              onDone: _close,
-              country: widget.country,
-            ),
-          ),
-          crossFadeState: _expanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 240),
-          sizeCurve: Curves.easeOutCubic,
-          firstCurve: Curves.easeOut,
-          secondCurve: Curves.easeIn,
+        // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
+        // feuille de sélection, qui se pose PAR-DESSUS la page.
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final tag in _sel)
+              _InterestChip(
+                label: tag,
+                color: interestColor(tag),
+                onTap: _openPicker,
+              ),
+            if (_sel.length < profileInterestsMax)
+              _InterestAddChip(onTap: _openPicker),
+          ],
         ),
       ],
     );
