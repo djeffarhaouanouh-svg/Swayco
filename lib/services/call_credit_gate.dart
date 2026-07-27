@@ -47,7 +47,7 @@ abstract final class CallCreditGate {
     return showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: SC.bg,
+        backgroundColor: const Color(0xFF0A0A0A),
         insetPadding: const EdgeInsets.symmetric(horizontal: 36),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),

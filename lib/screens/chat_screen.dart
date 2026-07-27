@@ -512,7 +512,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       // Classic flat black, matching the conversation thread — no blue mesh.
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       body: SafeArea(
         bottom: false,
         // Fixed "Messages" band at the top; the conversation list scrolls

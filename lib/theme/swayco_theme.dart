@@ -7,13 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// retired.
 abstract final class SC {
   // Backgrounds
-  // Un seul fond pour toute l'app : le gris quasi-noir que portaient déjà
-  // Profil / Messages / Demandes. Discover était en noir pur et les pages
-  // secondaires en bleu nuit — passer d'un onglet à l'autre se voyait.
-  // Toute surface de fond passe par [bg] : ne pas recoder la valeur en dur.
-  static const bg            = Color(0xFF0E0E0E);
-  // Encre sombre posée SUR l'accent cyan (texte des badges / boutons pleins),
-  // pas un fond : elle reste bleu nuit.
+  static const bg            = Color(0xFF0A1024);
   static const bgDeep        = Color(0xFF050817);
 
   // Mesh halo colors (used by MeshBackground).

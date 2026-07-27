@@ -17,7 +17,6 @@ import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
-import '../theme/swayco_theme.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass.dart';
@@ -314,7 +313,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
 
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: Colors.black,
       extendBody: true,
       body: Stack(
         children: [
@@ -491,7 +490,7 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
     final me = _me;
 
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           Positioned(

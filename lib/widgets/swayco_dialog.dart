@@ -51,7 +51,7 @@ class _SwaycoConfirmDialog extends StatelessWidget {
         decoration: BoxDecoration(
           // Site black (same surface as the profile / chat) instead of the
           // lighter bubble grey.
-          color: SC.bg,
+          color: const Color(0xFF0E0E0E),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: SC.glassBorderStrong),
           boxShadow: [

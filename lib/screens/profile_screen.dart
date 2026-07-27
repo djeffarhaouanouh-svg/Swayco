@@ -719,13 +719,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         lang?.flag ??
         '';
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: const Color(0xFF0E0E0E),
       // No header bar. When viewing someone else, the back button + ⋮ menu
       // float directly over the content (added to the Stack below) so the
       // whole profile reads as one continuous page. The "my profile" tab is
       // mounted in IndexedStack, so it never needed a back affordance.
       body: ColoredBox(
-        color: SC.bg,
+        color: const Color(0xFF0E0E0E),
         child: Stack(
           children: [
             SafeArea(
@@ -2663,7 +2663,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: SC.bg,
+        color: const Color(0xFF0E0E0E),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: SC.glassBorderStrong),
       ),
