@@ -33,12 +33,13 @@ class AudioController extends ChangeNotifier {
   final RealtimeTranslationPort _translation;
   Room? _room;
 
-  /// Le volume de la voix d'origine au démarrage de CHAQUE appel : aux trois
-  /// quarts, pour qu'elle reste présente sans couvrir la traduction.
+  /// Volume de la voix d'origine tant que personne n'a bougé le curseur : aux
+  /// trois quarts, pour qu'elle reste présente sans couvrir la traduction.
   static const double kStartOriginalVolume = 0.75;
 
   /// Et la traduction à moitié : elle passe par-dessus la voix, donc elle n'a
-  /// pas besoin d'être aussi forte pour s'entendre.
+  /// pas besoin d'être aussi forte pour s'entendre. Réglable en appel, et le
+  /// réglage tient d'un appel à l'autre.
   static const double kStartTranslatedVolume = 0.5;
 
   // Un appel normal démarre sur l'ÉCOUTEUR, comme n'importe quel téléphone :
@@ -115,14 +116,12 @@ class AudioController extends ChangeNotifier {
       };
     }
     _prefs = await UserPrefs.loadAudio();
-    // Les niveaux sont RÉINITIALISÉS à chaque appel : on repart des mêmes 3/4
-    // et 1/2, et la route dépend du mode. Ce qu'on a réglé pendant un appel ne
-    // s'impose donc plus au suivant — seul le ducking reste une préférence.
-    _prefs = _prefs.copyWith(
-      originalVolume: kStartOriginalVolume,
-      translatedVolume: kStartTranslatedVolume,
-      speakerOn: video,
-    );
+    // Les volumes NE sont pas réinitialisés : les 3/4 et le 1/2 ne sont que le
+    // point de départ d'un utilisateur qui n'y a jamais touché. Qui a trouvé
+    // son équilibre le retrouve à l'appel suivant.
+    // La route, elle, suit le mode : c'est le bouton pressé qui décide, pas
+    // l'appel d'avant.
+    _prefs = _prefs.copyWith(speakerOn: video);
 
     await _applySpeaker(_prefs.speakerOn);
     await _applyTranslatedVolume(_prefs.translatedVolume);

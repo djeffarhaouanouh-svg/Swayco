@@ -187,8 +187,10 @@ abstract final class UserPrefs {
   static Future<AudioPrefs> loadAudio() async {
     final p = await SharedPreferences.getInstance();
     return AudioPrefs(
-      translatedVolume: p.getDouble(keyTranslatedVolume) ?? 1.0,
-      originalVolume: p.getDouble(keyOriginalVolume) ?? 1.0,
+      // Mêmes valeurs de départ que AudioController (3/4 et 1/2) : c'est ici
+      // que tombe l'utilisateur qui n'a jamais touché aux curseurs.
+      translatedVolume: p.getDouble(keyTranslatedVolume) ?? 0.5,
+      originalVolume: p.getDouble(keyOriginalVolume) ?? 0.75,
       duckingEnabled: p.getBool(keyDuckingEnabled) ?? true,
       // Earpiece by default — see AudioController's own default for why.
       speakerOn: p.getBool(keySpeakerOn) ?? false,
