@@ -33,13 +33,21 @@ class AudioController extends ChangeNotifier {
   final RealtimeTranslationPort _translation;
   Room? _room;
 
-  // Calls start on the EARPIECE, like an ordinary phone call. Held to the ear,
-  // the loudspeaker cannot reach the microphone, so the feedback loop that makes
-  // a call howl never gets a path to close — the same reason every phone app
-  // starts this way. The loudspeaker stays one tap away.
+  /// Le volume de la voix d'origine au démarrage de CHAQUE appel : aux trois
+  /// quarts, pour qu'elle reste présente sans couvrir la traduction.
+  static const double kStartOriginalVolume = 0.75;
+
+  /// Et la traduction à moitié : elle passe par-dessus la voix, donc elle n'a
+  /// pas besoin d'être aussi forte pour s'entendre.
+  static const double kStartTranslatedVolume = 0.5;
+
+  // Un appel normal démarre sur l'ÉCOUTEUR, comme n'importe quel téléphone :
+  // collé à l'oreille, le haut-parleur n'atteint pas le micro, donc la boucle
+  // de larsen n'a pas de chemin pour se refermer. La visio, elle, se tient à
+  // distance du visage — elle démarre sur le haut-parleur (voir [bind]).
   AudioPrefs _prefs = const AudioPrefs(
-    translatedVolume: 1.0,
-    originalVolume: 1.0,
+    translatedVolume: kStartTranslatedVolume,
+    originalVolume: kStartOriginalVolume,
     duckingEnabled: true,
     speakerOn: false,
   );
@@ -84,7 +92,9 @@ class AudioController extends ChangeNotifier {
   /// Wire up to a connected room. Loads persisted prefs, applies them
   /// to LiveKit + translation port, and starts the listeners that
   /// drive ducking + VU-meter + route detection.
-  Future<void> bind(Room room) async {
+  /// [video] : un appel visio démarre sur le haut-parleur, un appel normal sur
+  /// l'écouteur.
+  Future<void> bind(Room room, {bool video = false}) async {
     _room = room;
     // Make LiveKit's own iOS audio-session config use mixWithOthers too, so it
     // doesn't override the AppDelegate's mix config when the call connects.
@@ -105,6 +115,14 @@ class AudioController extends ChangeNotifier {
       };
     }
     _prefs = await UserPrefs.loadAudio();
+    // Les niveaux sont RÉINITIALISÉS à chaque appel : on repart des mêmes 3/4
+    // et 1/2, et la route dépend du mode. Ce qu'on a réglé pendant un appel ne
+    // s'impose donc plus au suivant — seul le ducking reste une préférence.
+    _prefs = _prefs.copyWith(
+      originalVolume: kStartOriginalVolume,
+      translatedVolume: kStartTranslatedVolume,
+      speakerOn: video,
+    );
 
     await _applySpeaker(_prefs.speakerOn);
     await _applyTranslatedVolume(_prefs.translatedVolume);

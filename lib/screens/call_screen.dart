@@ -1291,10 +1291,10 @@ class _CallScreenState extends State<CallScreen> {
         // fires for us, so keep re-binding until their language is known.
         unawaited(_rebindUntilRemoteLangKnown(room));
       }
-      await _audio.bind(room);
-      // Call audio starts on the EARPIECE (AudioController's default), like an
-      // ordinary phone call; the loudspeaker is one tap away in the rail. A
-      // plugged-in headset overrides both, at the OS level.
+      // La visio démarre sur le haut-parleur (on tient le téléphone devant
+      // soi), l'appel normal sur l'écouteur. Un casque branché prime sur les
+      // deux, au niveau de l'OS.
+      await _audio.bind(room, video: widget.startWithCamera);
       widget.translation.translationListenable?.addListener(_onTranslationStateChanged);
       // Reset the global mic-mute flag — it persists across re-attaches.
       setSendMuted(false);
