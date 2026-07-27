@@ -1819,15 +1819,19 @@ class _SwipeActionBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _PillActionButton(
+          _GlassButton(
+            size: 58,
+            iconSize: 27,
             icon: Icons.close_rounded,
-            color: const Color(0xFFE0245E),
+            color: const Color(0xFFFF4458),
             onTap: onNope,
           ),
-          const SizedBox(width: 22),
-          _PillActionButton(
+          const SizedBox(width: 28),
+          _GlassButton(
+            size: 58,
+            iconSize: 27,
             icon: Icons.favorite_rounded,
-            color: const Color(0xFF2BB673),
+            color: const Color(0xFF3DCA72),
             onTap: onLike,
           ),
         ],
@@ -1836,15 +1840,20 @@ class _SwipeActionBar extends StatelessWidget {
   }
 }
 
-/// Un large bouton blanc arrondi (capsule) portant une pastille de couleur au
-/// centre — ✕ rouge pour passer, ✓ vert pour liker.
-class _PillActionButton extends StatelessWidget {
-  const _PillActionButton({
+/// Les deux boutons de match : des ronds en verre cyan flouté, une icône
+/// colorée au centre (✕ rouge pour passer, ❤️ vert pour liker) et un halo de
+/// la même couleur derrière. Le rendu d'avant les capsules.
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({
+    required this.size,
+    required this.iconSize,
     required this.icon,
     required this.color,
     required this.onTap,
   });
 
+  final double size;
+  final double iconSize;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
@@ -1854,25 +1863,71 @@ class _PillActionButton extends StatelessWidget {
     return Pressable(
       bounce: true,
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: 132,
-            height: 60,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      child: DecoratedBox(
+        // Depth + coloured glow sit OUTSIDE the clip so they aren't cut off.
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            // Ombres plus discrètes — effet léger/premium.
+            BoxShadow(
+              color: color.withValues(alpha: 0.16),
+              blurRadius: 12,
             ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white, size: 25),
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // Corps verre CYAN — glossy top-left -> plus sombre en bas.
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0x7022D3EE), // cyan ~0.44
+                    Color(0x3322D3EE), // cyan ~0.20
+                    Color(0x1F22D3EE), // cyan ~0.12
+                  ],
+                  stops: [0.0, 0.55, 1.0],
+                ),
+                // Liseré cyan discret.
+                border: Border.all(
+                  color: const Color(0x8022D3EE),
+                  width: 0.8,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Specular highlight: a soft white sheen up top-left.
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          center: const Alignment(-0.35, -0.65),
+                          radius: 0.95,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.45),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                          stops: const [0.0, 0.6],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Icon(icon, color: color, size: iconSize),
+                ],
+              ),
             ),
           ),
         ),
