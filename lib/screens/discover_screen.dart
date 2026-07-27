@@ -1831,7 +1831,9 @@ class _SwipeActionBar extends StatelessWidget {
             size: 58,
             iconSize: 27,
             icon: Icons.favorite_rounded,
-            color: const Color(0xFF3DCA72),
+            // Le rouge des cœurs partout ailleurs dans l'app (profil, likes
+            // reçus) — un cœur vert ne ressemblait à rien.
+            color: const Color(0xFFFF3B5C),
             onTap: onLike,
           ),
         ],
@@ -1888,46 +1890,15 @@ class _GlassButton extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                // Corps verre CYAN — glossy top-left -> plus sombre en bas.
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0x7022D3EE), // cyan ~0.44
-                    Color(0x3322D3EE), // cyan ~0.20
-                    Color(0x1F22D3EE), // cyan ~0.12
-                  ],
-                  stops: [0.0, 0.55, 1.0],
-                ),
-                // Liseré cyan discret.
+                // Verre nu : ni teinte cyan, ni reflet. Seule l'icône est
+                // colorée, le cercle laisse passer la photo.
+                color: Colors.white.withValues(alpha: 0.12),
                 border: Border.all(
-                  color: const Color(0x8022D3EE),
+                  color: Colors.white.withValues(alpha: 0.25),
                   width: 0.8,
                 ),
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Specular highlight: a soft white sheen up top-left.
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          center: const Alignment(-0.35, -0.65),
-                          radius: 0.95,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.45),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.6],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Icon(icon, color: color, size: iconSize),
-                ],
-              ),
+              child: Center(child: Icon(icon, color: color, size: iconSize)),
             ),
           ),
         ),
