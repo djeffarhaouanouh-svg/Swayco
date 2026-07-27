@@ -1510,13 +1510,20 @@ class _TinderCardState extends State<_TinderCard> {
             left: 14,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Posé AU-DESSUS des chevrons animés (bas 10 + 44 de haut), sinon
-            // les chips d'intérêt leur passent dessus.
-            bottom: 66,
+            // Le bloc identité est revenu en bas de la carte. Les chevrons ne
+            // sont plus sous lui mais AU-DESSUS, premier élément de la même
+            // colonne : plus rien ne peut leur passer dessus.
+            bottom: 18,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: IgnorePointer(
+                    child: Center(child: _ScrollHintChevrons()),
+                  ),
+                ),
                 // Name + flag + online dot
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1624,24 +1631,17 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Repère "tire vers le haut" — chevrons animés, centrés en bas de
-          //    la photo. C'est le seul repère qui reste (le bouton en verre du
-          //    coin a disparu), donc il est dessiné en grand.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 10,
-            child: IgnorePointer(
-              child: Center(child: _ScrollHintChevrons()),
-            ),
-          ),
         ],
       );
   }
 }
 
-/// Deux chevrons qui défilent vers le haut en boucle : le repère "il y a des
-/// infos à découvrir, tire vers le haut". Centré en bas de la photo.
+/// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
+/// marquent une pause avant de recommencer. Le repère "il y a des infos à
+/// découvrir, tire vers le haut", posé au-dessus du bloc identité.
+///
+/// (L'ancienne version faisait défiler les chevrons en boucle, façon
+/// escalator ; le saut se lit mieux et n'attire pas l'œil en permanence.)
 class _ScrollHintChevrons extends StatefulWidget {
   const _ScrollHintChevrons();
 
@@ -1664,40 +1664,46 @@ class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: SizedBox(
-        width: 48,
-        height: 44,
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, _) {
-            return Stack(
-              alignment: Alignment.center,
-              // Deux chevrons décalés d'une demi-phase : l'un monte pendant que
-              // l'autre réapparaît en bas → effet de défilement continu.
-              children: [
-                _chevron((_c.value) % 1.0),
-                _chevron((_c.value + 0.5) % 1.0),
-              ],
-            );
-          },
-        ),
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Le chevron du bas part une fraction de seconde après celui du
+          // haut : les deux sautent ensemble sans être collés.
+          _chevron(0.0),
+          Transform.translate(
+            offset: const Offset(0, -14),
+            child: _chevron(0.10),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _chevron(double t) {
-    // t: 0 → en bas et transparent, 0.5 → centre plein, 1 → en haut et fondu.
-    final dy = 14.0 - 28.0 * t; // de +14 (bas) à -14 (haut)
-    final opacity = (1.0 - (2.0 * t - 1.0).abs()).clamp(0.0, 1.0);
+  /// Un chevron, [delay] tours de retard sur le cycle. Le saut occupe la
+  /// première moitié du cycle, le reste est une pause.
+  Widget _chevron(double delay) {
+    final u = (_c.value - delay) % 1.0;
+    double lift;
+    if (u < 0.25) {
+      // Montée franche.
+      lift = Curves.easeOutCubic.transform(u / 0.25);
+    } else if (u < 0.5) {
+      // Retombée.
+      lift = 1 - Curves.easeInCubic.transform((u - 0.25) / 0.25);
+    } else {
+      lift = 0; // pause
+    }
     return Transform.translate(
-      offset: Offset(0, dy),
+      offset: Offset(0, -12 * lift),
       child: Opacity(
-        opacity: opacity,
+        // À peine plus vif en haut du saut.
+        opacity: 0.75 + 0.25 * lift,
         child: const Icon(
           Icons.keyboard_arrow_up_rounded,
           color: Colors.white,
-          size: 38,
+          size: 34,
           shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
         ),
       ),
