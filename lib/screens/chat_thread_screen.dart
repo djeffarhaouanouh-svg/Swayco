@@ -469,6 +469,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// Lance l'appel. [withCamera] distingue les deux boutons de l'en-tête :
+  /// le téléphone appelle caméra coupée, la caméra ouvre le mode visio.
+  void _startCall({required bool withCamera}) {
+    if (_peerBlockedMe) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('chat_blocked_by_peer'))),
+      );
+      return;
+    }
+    CallLauncher.startCall(
+      context,
+      peerDeviceId: widget.peerDeviceId,
+      translation: widget.translation,
+      startWithCamera: withCamera,
+    );
+  }
+
   /// Choisit un GIF dans le catalogue Giphy et l'envoie. Rien n'est uploadé :
   /// le message porte l'URL Giphy, comme une image distante.
   Future<void> _sendGif() async {
@@ -522,20 +539,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       title: widget.title,
                       peer: _peer,
                       blockedByPeer: _peerBlockedMe,
-                      onCall: _peerBlockedMe
-                          ? () => ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  AppStrings.t('chat_blocked_by_peer'),
-                                ),
-                              ),
-                            )
-                          : () => CallLauncher.startCall(
-                              context,
-                              peerDeviceId: widget.peerDeviceId,
-                              translation: widget.translation,
-                              startWithCamera: true,
-                            ),
+                      onCall: () => _startCall(withCamera: false),
+                      onVideoCall: () => _startCall(withCamera: true),
                       onViewProfile: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
                           builder: (_) =>
@@ -752,6 +757,7 @@ class _ThreadHeader extends StatelessWidget {
     required this.title,
     required this.peer,
     required this.onCall,
+    required this.onVideoCall,
     required this.onViewProfile,
     this.peerBlocked = false,
     this.blockedByPeer = false,
@@ -764,8 +770,11 @@ class _ThreadHeader extends StatelessWidget {
   /// True when the peer has blocked ME — greys out the call button.
   final bool blockedByPeer;
 
-  /// Call button — starts a video call (camera on).
+  /// Téléphone : appel normal, caméra coupée des deux côtés.
   final VoidCallback onCall;
+
+  /// Caméra : mode visio, la mienne s'allume dès l'entrée en appel.
+  final VoidCallback onVideoCall;
 
   final VoidCallback onViewProfile;
 
@@ -913,17 +922,31 @@ class _ThreadHeader extends StatelessWidget {
                 },
               ),
             ),
-            // Single call button — a tap starts a video call (camera on).
-            // Greyed when the peer has blocked me (the call can't connect).
+            // Deux boutons d'appel : le téléphone démarre un appel normal
+            // (caméras coupées), la caméra démarre le mode visio. Grisés
+            // quand le pair m'a bloqué — l'appel ne passerait pas.
             Opacity(
               opacity: blockedByPeer ? 0.4 : 1.0,
-              child: GlassIconButton(
-                icon: Icons.phone_rounded,
-                size: 40,
-                iconSize: 20,
-                // Marked pop on tap (matches the back button / nav bar).
-                popScale: 1.25,
-                onTap: onCall,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GlassIconButton(
+                    icon: Icons.phone_rounded,
+                    size: 40,
+                    iconSize: 20,
+                    // Marked pop on tap (matches the back button / nav bar).
+                    popScale: 1.25,
+                    onTap: onCall,
+                  ),
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    icon: Icons.videocam_rounded,
+                    size: 40,
+                    iconSize: 20,
+                    popScale: 1.25,
+                    onTap: onVideoCall,
+                  ),
+                ],
               ),
             ),
           ],
