@@ -36,6 +36,10 @@ abstract final class SC {
   static const textSecondary = Color(0xB3F5F7FF);
   static const textMuted     = Color(0x80F5F7FF);
 
+  // Surface des menus contextuels (⋮ Signaler / Bloquer) : un gris neutre,
+  // détaché du bleu nuit des bulles — un menu n'est pas une bulle de chat.
+  static const menu          = Color(0xFF2B2B2B);
+
   // Bubble (incoming) — opaque, no blur, for legibility against the mesh.
   static const bubbleIn      = Color(0xFF1A2138);
   static const bubbleInBorder = Color(0x14FFFFFF);

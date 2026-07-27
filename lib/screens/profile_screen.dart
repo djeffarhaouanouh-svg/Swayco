@@ -852,7 +852,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             Icons.more_vert,
                             color: SC.textPrimary,
                           ),
-                          color: SC.bubbleIn,
+                          color: SC.menu,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                             side: const BorderSide(color: SC.glassBorder),
