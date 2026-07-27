@@ -419,6 +419,40 @@ abstract final class ChatApi {
     ));
   }
 
+  /// Envoie un GIF : le fichier reste chez Giphy, on ne stocke que son URL
+  /// dans `image_url`. Le rendu et la notification sont ceux d'une image —
+  /// pour le reste de l'app, un GIF EST une image.
+  static Future<void> sendGif({
+    required String conversationId,
+    required String senderId,
+    required String senderName,
+    required String recipientId,
+    required String gifUrl,
+    String recipientLang = '',
+  }) async {
+    if (gifUrl.isEmpty) throw ArgumentError('GIF sans URL');
+    // Self-heal my profiles row before the FK-bound insert (see sendMessage).
+    await ProfileApi.ensureMyProfileRow();
+    await _client.from('messages').insert({
+      'conversation_id': conversationId,
+      'sender': senderId,
+      'recipient': recipientId,
+      'sender_name': senderName,
+      'body': '',
+      // `language` est NOT NULL sans défaut : un GIF n'a pas de langue.
+      'language': '',
+      'image_url': gifUrl,
+    });
+    unawaited(_notifyMessage(
+      recipientId: recipientId,
+      recipientLang: recipientLang,
+      senderName: senderName,
+      conversationId: conversationId,
+      senderId: senderId,
+      imageBody: true,
+    ));
+  }
+
   /// Delete a single message by id. Used by "long-press → delete" on a
   /// message the user sent — it removes the row, so the message is gone
   /// for both sides (an "unsend"). RLS decides what the caller may

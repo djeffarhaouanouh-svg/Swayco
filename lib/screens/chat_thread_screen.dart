@@ -18,6 +18,7 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/giphy_api.dart';
 import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
@@ -29,6 +30,7 @@ import '../services/voice_message_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
+import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/profile_avatar.dart';
@@ -513,6 +515,37 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// Choisit un GIF dans le catalogue Giphy et l'envoie. Rien n'est uploadé :
+  /// le message porte l'URL Giphy, comme une image distante.
+  Future<void> _sendGif() async {
+    if (_myId.isEmpty || _sending) return;
+    if (!isSupabaseReady) {
+      setState(() => _error = 'Supabase non configuré.');
+      return;
+    }
+    final gif = await showGifPicker(context);
+    if (gif == null || !mounted) return;
+    setState(() => _sending = true);
+    try {
+      await ChatApi.sendGif(
+        conversationId: widget.conversationId,
+        senderId: _myId,
+        senderName: _myName.isEmpty ? 'Moi' : _myName,
+        recipientId: widget.peerDeviceId,
+        gifUrl: gif.sendUrl,
+        recipientLang: _peer?.language ?? '',
+      );
+      Analytics.track(
+        'message_sent',
+        props: {'source': 'chat', 'type': 'gif'},
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Envoi GIF échoué: $e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
@@ -672,6 +705,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           onSend: _send,
                           onSendVoice: _sendVoice,
                           onSendImage: _sendImage,
+                          onSendGif: _sendGif,
                           autoTranslate: _autoTranslate,
                           onToggleTranslate: _toggleAutoTranslate,
                           myLang: _myLang,
@@ -1541,6 +1575,7 @@ class _Composer extends StatefulWidget {
     required this.onSend,
     required this.onSendVoice,
     required this.onSendImage,
+    required this.onSendGif,
     required this.autoTranslate,
     required this.onToggleTranslate,
     required this.myLang,
@@ -1564,6 +1599,9 @@ class _Composer extends StatefulWidget {
 
   /// Pick + send an image. Wired to the image button on the left.
   final Future<void> Function() onSendImage;
+
+  /// Ouvre le catalogue Giphy et envoie le GIF choisi.
+  final Future<void> Function() onSendGif;
   final bool autoTranslate;
   final VoidCallback onToggleTranslate;
 
@@ -1892,6 +1930,17 @@ class _ComposerState extends State<_Composer> {
               ),
             ),
             const SizedBox(width: 4),
+            // GIF — même cercle de verre que la photo, juste à sa gauche.
+            // Absent tant qu'aucune clé Giphy n'est fournie.
+            if (GiphyApi.isConfigured) ...[
+              GlassIconButton(
+                icon: Icons.gif_box_outlined,
+                onTap: widget.sending ? null : widget.onSendGif,
+                size: 46,
+                iconSize: 24,
+              ),
+              const SizedBox(width: 4),
+            ],
             // Photo (add image) button — OUTSIDE the glass bar, so it gets its
             // own glass circle + spring bounce (like the header buttons).
             GlassIconButton(
