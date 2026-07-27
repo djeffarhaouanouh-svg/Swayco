@@ -39,6 +39,9 @@ import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import 'chat_thread_screen.dart';
+// L'aperçu "ma carte" vit dans le Discover : il réutilise le widget de carte
+// du feed pour que l'aperçu soit le rendu réel, pas une copie qui dérive.
+import 'discover_screen.dart' show MyCardPreviewScreen;
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
@@ -388,12 +391,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     await _reload();
   }
 
-  /// Bouton œil : ouvre mon profil rendu comme un pair le voit (aperçu).
+  /// Bouton œil : ouvre MA CARTE Discover telle que les autres la voient —
+  /// mes photos, mon nom, et le panneau d'infos (bio / âge / intérêts) tel
+  /// qu'il se déplie chez eux. Pas la page profil : c'est la carte qui décide
+  /// si on te like.
   Future<void> _openSelfPreview() async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const ProfileScreen(preview: true),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const MyCardPreviewScreen()),
     );
   }
 

@@ -19,6 +19,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
+import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
@@ -425,6 +426,180 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MyCardPreviewScreen — ma carte Discover, telle que les autres la voient
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// L'œil du profil ouvre ceci : MA carte, rendue avec exactement le même widget
+/// que le feed ([_TinderCard] + [_ProfileInfoPanel]), donc avec mes photos, mon
+/// nom, mon drapeau, ma ville et — panneau déplié — ma bio, mes infos et mes
+/// centres d'intérêt. Pas de swipe, pas de X / cœur : on ne se matche pas
+/// soi-même.
+class MyCardPreviewScreen extends StatefulWidget {
+  const MyCardPreviewScreen({super.key});
+
+  @override
+  State<MyCardPreviewScreen> createState() => _MyCardPreviewScreenState();
+}
+
+class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
+  RemoteProfile? _me;
+  bool _loading = true;
+  bool _infoOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final id = await DeviceId.getOrCreate();
+    final me = isSupabaseReady ? await ProfileApi.fetchById(id) : null;
+    if (!mounted) return;
+    setState(() {
+      _me = me;
+      _loading = false;
+    });
+  }
+
+  /// Même repli que le feed : la galerie d'abord, sinon la photo Discover,
+  /// sinon la PDP. Une liste vide reste possible (aucune photo encore) — la
+  /// carte se rend alors sur son fond sombre, ce qui EST ce que les autres
+  /// verraient.
+  List<String> get _photos {
+    final p = _me;
+    if (p == null) return const [];
+    final gallery = p.photos.where((u) => u.isNotEmpty).toList();
+    if (gallery.isNotEmpty) return gallery;
+    if (p.discoverPhotoUrl.isNotEmpty) return [p.discoverPhotoUrl];
+    if (p.avatarUrl.isNotEmpty) return [p.avatarUrl];
+    return const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final safeTop = MediaQuery.paddingOf(context).top;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final me = _me;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned(
+            top: safeTop + 64,
+            left: 8,
+            right: 8,
+            bottom: safeBottom + 12,
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : me == null
+                    ? Center(
+                        child: Text(
+                          AppStrings.t('info_empty'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, c) {
+                          final panelH = c.maxHeight * 0.58;
+                          final card = _TinderCard(
+                            profile: me,
+                            photos: _photos,
+                            onInfoTap: () =>
+                                setState(() => _infoOpen = !_infoOpen),
+                          );
+                          final country =
+                              flagCountryForLanguage(me.language);
+                          return Stack(
+                            children: [
+                              Positioned.fill(
+                                child: country != null
+                                    ? FlagBorder(
+                                        country: country,
+                                        radius: 24,
+                                        child: card,
+                                      )
+                                    : ClipRRect(
+                                        borderRadius:
+                                            BorderRadius.circular(24),
+                                        child: card,
+                                      ),
+                              ),
+                              // Tirer la photo vers le haut déplie le panneau,
+                              // exactement comme dans le feed.
+                              if (!_infoOpen)
+                                Positioned.fill(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onVerticalDragEnd: (d) {
+                                      if ((d.primaryVelocity ?? 0) < -120) {
+                                        setState(() => _infoOpen = true);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              AnimatedPositioned(
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeOutCubic,
+                                left: 0,
+                                right: 0,
+                                height: panelH,
+                                bottom: _infoOpen ? 0 : -panelH,
+                                child: _ProfileInfoPanel(
+                                  profile: me,
+                                  onClose: () =>
+                                      setState(() => _infoOpen = false),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+          ),
+          // Retour + bandeau "voici ta carte telle que les autres la voient".
+          Positioned(
+            top: safeTop + 8,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                GlassIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    AppStrings.t('profile_preview_banner'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.70),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1219,9 +1394,14 @@ class _TinderCard extends StatefulWidget {
     super.key,
     required this.profile,
     required this.photos,
+    this.onInfoTap,
   });
   final RemoteProfile profile;
   final List<String> photos;
+
+  /// Bouton coin bas-droit. Par défaut il ouvre la page profil du pair ; en
+  /// aperçu de ma propre carte il déplie simplement le panneau d'infos.
+  final VoidCallback? onInfoTap;
 
   @override
   State<_TinderCard> createState() => _TinderCardState();
@@ -1429,11 +1609,12 @@ class _TinderCardState extends State<_TinderCard> {
             bottom: 24,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => ProfileScreen(userId: p.id),
-                ),
-              ),
+              onTap: widget.onInfoTap ??
+                  () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ProfileScreen(userId: p.id),
+                        ),
+                      ),
               child: ClipOval(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -1455,84 +1636,8 @@ class _TinderCardState extends State<_TinderCard> {
               ),
             ),
           ),
-
-          // ── Repère "tire vers le haut" — chevrons animés, centrés en bas de
-          //    la photo. Distinct du bouton coin (qui ouvre le profil).
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 14,
-            child: IgnorePointer(
-              child: Center(child: _ScrollHintChevrons()),
-            ),
-          ),
         ],
       );
-  }
-}
-
-/// Deux petits chevrons qui défilent vers le haut en boucle : le repère "il y a
-/// une carte / des infos à découvrir, tire vers le haut". Rendu dans le petit
-/// bouton en verre, coin bas-droit de la photo.
-class _ScrollHintChevrons extends StatefulWidget {
-  const _ScrollHintChevrons();
-
-  @override
-  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
-}
-
-class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRect(
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, _) {
-            return Stack(
-              alignment: Alignment.center,
-              // Deux chevrons décalés d'une demi-phase : l'un monte pendant que
-              // l'autre réapparaît en bas → effet de défilement continu.
-              children: [
-                _chevron((_c.value) % 1.0),
-                _chevron((_c.value + 0.5) % 1.0),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _chevron(double t) {
-    // t: 0 → en bas et transparent, 0.5 → centre plein, 1 → en haut et fondu.
-    final dy = 8.0 - 16.0 * t; // de +8 (bas) à -8 (haut)
-    final opacity = (1.0 - (2.0 * t - 1.0).abs()).clamp(0.0, 1.0);
-    return Transform.translate(
-      offset: Offset(0, dy),
-      child: Opacity(
-        opacity: opacity,
-        child: const Icon(
-          Icons.keyboard_arrow_up_rounded,
-          color: Colors.white,
-          size: 20,
-        ),
-      ),
-    );
   }
 }
 
