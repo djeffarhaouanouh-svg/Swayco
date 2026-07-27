@@ -1894,30 +1894,44 @@ class _GlassButtonState extends State<_GlassButton>
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        AnimatedBuilder(
-          animation: _ripple,
-          builder: (_, _) {
-            final t = _ripple.value;
-            if (t == 0) return SizedBox(width: size, height: size);
-            // L'anneau grandit de moitié, s'affine et s'efface.
-            final d = size * (1 + 0.9 * t);
-            return IgnorePointer(
-              child: Opacity(
-                opacity: (1 - t) * 0.55,
-                child: Container(
-                  width: d,
-                  height: d,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: color,
-                      width: 0.5 + 2.5 * (1 - t),
+        // L'onde vit dans une boîte de la TAILLE DU BOUTON et déborde en
+        // peinture seulement (OverflowBox) : sans ça l'anneau élargissait le
+        // Stack, la Row s'étirait, et les deux boutons s'écartaient à chaque
+        // clic — l'animation restant à sa valeur finale, ils ne revenaient
+        // même pas.
+        SizedBox(
+          width: size,
+          height: size,
+          child: IgnorePointer(
+            child: OverflowBox(
+              maxWidth: double.infinity,
+              maxHeight: double.infinity,
+              child: AnimatedBuilder(
+                animation: _ripple,
+                builder: (_, _) {
+                  final t = _ripple.value;
+                  // Au repos (jamais joué, ou terminé) : rien à dessiner.
+                  if (t == 0 || t == 1) return const SizedBox.shrink();
+                  // L'anneau grandit de moitié, s'affine et s'efface.
+                  final d = size * (1 + 0.9 * t);
+                  return Opacity(
+                    opacity: (1 - t) * 0.55,
+                    child: Container(
+                      width: d,
+                      height: d,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: color,
+                          width: 0.5 + 2.5 * (1 - t),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ),
         ),
         Pressable(
       bounce: true,
