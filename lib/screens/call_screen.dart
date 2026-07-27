@@ -224,16 +224,19 @@ class _CallScreenState extends State<CallScreen> {
     _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
-  /// Le plancher absolu sous lequel rien n'est jamais de la parole. Très bas
-  /// EXPRÈS : `media-source.audioLevel` ne vit pas du tout sur l'échelle que
-  /// j'avais supposée — mesuré sur le web, une voix normale y vaut quelques
-  /// millièmes, pas quelques centièmes. Le vrai seuil est celui qui suit le
-  /// bruit de la pièce ; celui-ci n'est là que contre le silence numérique.
-  /// Le niveau à partir duquel on considère que quelqu'un parle vraiment.
-  /// Mesuré sur un iPhone 16 : le bruit de fond d'une pièce calme plafonne
-  /// vers 0.005, une voix normale monte entre 0.05 et 0.6. À 0.001 — la valeur
-  /// d'avant — un souffle suffisait à déplier la barre.
-  static const double _kVoiceOn = 0.02;
+  /// Le plancher absolu sous lequel rien n'est jamais de la parole.
+  ///
+  /// Il DÉPEND DE LA PLATEFORME, parce que `media-source.audioLevel` ne vit pas
+  /// sur la même échelle des deux côtés :
+  ///  • natif, mesuré sur un iPhone 16 — pièce calme ~0.005, voix 0.05 à 0.6,
+  ///    donc 0.01 laisse passer la voix et arrête la pièce ;
+  ///  • web, mesuré plus tôt — une voix normale n'y vaut que quelques
+  ///    millièmes. Y poser 0.01 fermerait la barre pour toujours, d'où le
+  ///    plancher d'origine conservé.
+  ///
+  /// Le vrai seuil reste celui qui suit le bruit de la pièce (voir plus bas) ;
+  /// celui-ci n'est là que contre le silence numérique.
+  static final double _kVoiceOn = kIsWeb ? 0.001 : 0.01;
 
   /// Le bruit de la pièce, appris pendant l'appel : il descend vite vers le
   /// silence et ne remonte que lentement, si bien qu'une voix ne le tire pas
