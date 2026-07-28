@@ -3315,12 +3315,15 @@ class _DockCircleButton extends StatelessWidget {
   }
 }
 
-/// La pastille de traduction, au centre du dock : un galet blanc irisé traversé
-/// de trois barres. Elles frémissent quand quelqu'un parle et s'agitent
-/// franchement quand la traduction est en train d'être dite — c'est le seul
+/// La pastille de traduction, au centre du dock : l'orbe « Prisme ». Une goutte
+/// nacrée qui se déforme lentement, cerclée d'un halo cyan/magenta qui tourne.
+/// Quand ça parle — une voix humaine comme la traduction dite par la machine —
+/// elle respire, le halo accélère et une onde part du bord : c'est le seul
 /// endroit de l'écran qui montre que la machine travaille.
 ///
-/// Un tap coupe la traduction : la pastille vire alors au blanc pur et se fige.
+/// Un tap coupe la traduction : tout se fige et la goutte se désature en
+/// douceur, sans jamais devenir noire. Elle ne se DÉPLACE jamais — le
+/// glissement du modèle d'origine a été laissé de côté exprès.
 class _TranslationOrb extends StatefulWidget {
   const _TranslationOrb({
     required this.on,
@@ -3330,7 +3333,7 @@ class _TranslationOrb extends StatefulWidget {
     required this.onLongPress,
   });
 
-  /// La traduction tourne. False = coupée : galet blanc, barres immobiles.
+  /// La traduction tourne. False = coupée : goutte désaturée, tout est figé.
   final bool on;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -3347,26 +3350,36 @@ class _TranslationOrb extends StatefulWidget {
 }
 
 class _TranslationOrbState extends State<_TranslationOrb>
-    with SingleTickerProviderStateMixin {
-  /// Le battement des barres. Tourne en boucle tant qu'il y a quelque chose à
-  /// montrer, et s'arrête net au repos — pas de ticker qui brûle la batterie
-  /// pendant qu'on écoute en silence.
-  late final AnimationController _phase = AnimationController(
+    with TickerProviderStateMixin {
+  /// La déformation de la goutte, et le halo qui tourne. Les deux accélèrent
+  /// quand ça parle, et ne tournent QUE si la traduction est active : coupée,
+  /// plus un ticker ne brûle la batterie pendant qu'on écoute en silence.
+  late final AnimationController _morph = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: const Duration(milliseconds: 4500),
+  );
+  late final AnimationController _halo = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 6000),
   );
 
-  /// Amplitude affichée, lissée vers [_target] frame par frame : une voix qui
-  /// s'arrête fait retomber les barres, elle ne les coupe pas.
-  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
-  double _target = 0;
+  /// La respiration et l'onde de choc — seulement pendant qu'une voix passe.
+  late final AnimationController _breathe = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+  late final AnimationController _shock = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  );
+
+  bool _speaking = false;
 
   @override
   void initState() {
     super.initState();
     widget.ttsSpeaking.addListener(_retarget);
     widget.voiceLevel.addListener(_retarget);
-    _phase.addListener(_tick);
     _retarget();
   }
 
@@ -3384,37 +3397,51 @@ class _TranslationOrbState extends State<_TranslationOrb>
     if (old.on != widget.on) _retarget();
   }
 
-  /// Un seul régime : dès que ça parle — une voix humaine comme la traduction
-  /// dite par la machine —, les barres partent à fond. La pastille dit «il y a
-  /// du son», pas «qui parle».
+  /// Un seul régime : dès que ça parle, l'orbe s'anime. Il dit « il y a du
+  /// son », pas « qui parle ».
   void _retarget() {
-    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
-    _target = (widget.on && talking) ? 1.0 : 0.0;
-    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
-  }
-
-  void _tick() {
-    final next = _amp.value + (_target - _amp.value) * 0.14;
-    if (_target == 0 && next < 0.01) {
-      _amp.value = 0;
-      _phase.stop();
+    final talking = widget.on &&
+        (widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02);
+    if (talking == _speaking && widget.on == _morph.isAnimating) return;
+    _speaking = talking;
+    if (!widget.on) {
+      _morph.stop();
+      _halo.stop();
+      _breathe.stop();
+      _shock.stop();
+      if (mounted) setState(() {});
       return;
     }
-    _amp.value = next;
+    // Le rythme de fond double quand une voix passe.
+    _morph.duration = Duration(milliseconds: talking ? 1800 : 4500);
+    _halo.duration = Duration(milliseconds: talking ? 2400 : 6000);
+    _morph.repeat();
+    _halo.repeat();
+    if (talking) {
+      _breathe.repeat(reverse: true);
+      _shock.repeat();
+    } else {
+      _breathe.stop();
+      _breathe.value = 0;
+      _shock.stop();
+    }
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     widget.ttsSpeaking.removeListener(_retarget);
     widget.voiceLevel.removeListener(_retarget);
-    _phase.removeListener(_tick);
-    _phase.dispose();
-    _amp.dispose();
+    _morph.dispose();
+    _halo.dispose();
+    _breathe.dispose();
+    _shock.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const size = _TranslationOrb.size;
     return Semantics(
       label: AppStrings.t(
         widget.on ? 'call_translation_cut' : 'call_translation_resume',
@@ -3424,116 +3451,140 @@ class _TranslationOrbState extends State<_TranslationOrb>
         bounce: true,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        child: Container(
-          width: _TranslationOrb.size,
-          height: _TranslationOrb.size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.28),
-                blurRadius: 14,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: CustomPaint(
-            painter: _OrbPainter(phase: _phase, amp: _amp, on: widget.on),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_morph, _halo, _breathe, _shock]),
+            builder: (context, _) {
+              final breathe = 1 + 0.09 * math.sin(_breathe.value * math.pi);
+              final glow = widget.on ? (_speaking ? 1.0 : 0.4) : 0.0;
+              final orb = Transform.scale(
+                scale: _speaking ? breathe : 1,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    // Le halo cyan / magenta qui tourne derrière la goutte.
+                    Opacity(
+                      opacity: glow,
+                      child: Transform.rotate(
+                        angle: -_halo.value * 2 * math.pi,
+                        child: Container(
+                          width: size + 16,
+                          height: size + 16,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: SweepGradient(colors: [
+                              Color(0xB32CE0FF),
+                              Color(0xB3FF4FC3),
+                              Color(0x99A078FF),
+                              Color(0xB32CE0FF),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // La goutte : ses quatre rayons s'interpolent, ce qui la
+                    // fait onduler sans jamais cesser d'être ronde.
+                    Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        borderRadius: _morphRadius(_morph.value),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFFFFFFF),
+                            Color(0xFF7FF0FF),
+                            Color(0xFFFF6AD5),
+                          ],
+                          stops: [0.0, 0.42, 1.0],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFFF5AC8).withValues(alpha: 0.42),
+                            blurRadius: 26,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // L'onde qui part du bord pendant qu'une voix passe.
+                    if (_speaking)
+                      Opacity(
+                        opacity: (1 - _shock.value).clamp(0.0, 1.0) * 0.85,
+                        child: Container(
+                          width: size * (0.85 + 1.25 * _shock.value),
+                          height: size * (0.85 + 1.25 * _shock.value),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xD9D2DEFF),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+
+              // Extinction douce : désaturation + léger assombrissement, jamais
+              // le noir — une pastille éteinte doit rester visible et cliquable.
+              return TweenAnimationBuilder<double>(
+                tween: Tween<double>(end: widget.on ? 0 : 1),
+                duration: const Duration(milliseconds: 750),
+                curve: Curves.easeInOutCubic,
+                builder: (context, m, child) => ColorFiltered(
+                  colorFilter: ColorFilter.matrix(_softMute(m)),
+                  child: child,
+                ),
+                child: orb,
+              );
+            },
           ),
         ),
       ),
     );
   }
-}
 
-class _OrbPainter extends CustomPainter {
-  _OrbPainter({required this.phase, required this.amp, required this.on})
-      : super(repaint: Listenable.merge([phase, amp]));
-
-  final Animation<double> phase;
-  final ValueListenable<double> amp;
-  final bool on;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final a = amp.value;
-    final r = size.width / 2;
-    final c = Offset(r, r);
-    final rect = Rect.fromCircle(center: c, radius: r);
-
-    // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
-    // coup d'œil qu'elle ne traduit plus.
-    final tint = on ? 1.0 : 0.0;
-
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.35, -0.45),
-          colors: [
-            Colors.white,
-            Color.lerp(Colors.white, SC.accent, 0.20 * tint)!,
-            Color.lerp(Colors.white, SC.meshViolet, 0.28 * tint)!,
-          ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(rect),
-    );
-
-    // Le liseré irisé.
-    canvas.drawCircle(
-      c,
-      r - 0.7,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..shader = SweepGradient(
-          colors: [
-            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
-            Color.lerp(Colors.white, SC.meshViolet, 0.55 * tint)!,
-            Color.lerp(Colors.white, SC.meshBlue, 0.45 * tint)!,
-            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
-          ],
-        ).createShader(rect),
-    );
-
-    // Les trois barres.
-    final barW = size.width * 0.105;
-    final gap = size.width * 0.095;
-    final baseH = size.height * 0.20;
-    final range = size.height * 0.30;
-    final p = phase.value * 2 * math.pi;
-    final bars = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color.lerp(SC.accentDeep, Colors.white, on ? 0.0 : 0.55)!,
-          Color.lerp(SC.meshViolet, Colors.white, on ? 0.0 : 0.55)!,
-        ],
-      ).createShader(rect);
-
-    for (var i = -1; i <= 1; i++) {
-      final wobble = 0.5 + 0.5 * math.sin(p + i * 1.1);
-      final h = baseH +
-          (i == 0 ? size.height * 0.05 : 0) +
-          range * a * wobble;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(c.dx + i * (barW + gap), c.dy),
-            width: barW,
-            height: h,
-          ),
-          Radius.circular(barW / 2),
-        ),
-        bars,
-      );
-    }
+  /// Matrice de couleur : désature à 72 % et assombrit de 18 % quand m = 1.
+  List<double> _softMute(double m) {
+    final s = 1 - 0.72 * m;
+    final b = 1 - 0.18 * m;
+    const lr = 0.2126, lg = 0.7152, lb = 0.0722;
+    return <double>[
+      (lr + s * (1 - lr)) * b, (lg - lg * s) * b, (lb - lb * s) * b, 0, 0,
+      (lr - lr * s) * b, (lg + s * (1 - lg)) * b, (lb - lb * s) * b, 0, 0,
+      (lr - lr * s) * b, (lg - lg * s) * b, (lb + s * (1 - lb)) * b, 0, 0,
+      0, 0, 0, 1, 0,
+    ];
   }
 
-  @override
-  bool shouldRepaint(_OrbPainter old) => old.on != on;
+  /// Interpole les quatre rayons pour l'effet « goutte » qui se déforme :
+  /// rond → déformé A → déformé B → rond.
+  BorderRadius _morphRadius(double t) {
+    double lerp(double a, double b, double k) => a + (b - a) * k;
+    const keys = <List<double>>[
+      [26, 26, 26, 26],
+      [32, 20, 23, 29],
+      [21, 31, 30, 22],
+      [26, 26, 26, 26],
+    ];
+    final seg = (t * 3).clamp(0.0, 2.999);
+    final i = seg.floor();
+    final k = Curves.easeInOut.transform(seg - i);
+    final a = keys[i], b = keys[i + 1];
+    return BorderRadius.only(
+      topLeft: Radius.circular(lerp(a[0], b[0], k)),
+      topRight: Radius.circular(lerp(a[1], b[1], k)),
+      bottomRight: Radius.circular(lerp(a[2], b[2], k)),
+      bottomLeft: Radius.circular(lerp(a[3], b[3], k)),
+    );
+  }
 }
 
 /// The glass chevron that unfolds the blue controls above the dock — the same
