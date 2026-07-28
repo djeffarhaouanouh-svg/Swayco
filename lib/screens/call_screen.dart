@@ -3315,24 +3315,12 @@ class _DockCircleButton extends StatelessWidget {
   }
 }
 
-/// La pastille de traduction, au centre du dock : l'orbe « Halo ». Un noyau
-/// sombre, un cœur clair qui se déforme lentement à l'intérieur, et un anneau
-/// spectral qui tourne autour — bleu, violet, blanc.
+/// La pastille de traduction, au centre du dock : un galet blanc irisé traversé
+/// de trois barres. Elles frémissent quand quelqu'un parle et s'agitent
+/// franchement quand la traduction est en train d'être dite — c'est le seul
+/// endroit de l'écran qui montre que la machine travaille.
 ///
-/// Elle tourne EN PERMANENCE, du début à la fin de l'appel. Quand une voix
-/// passe — une personne comme la traduction dite par la machine — le rythme
-/// double, le cœur respire et une onde part du bord.
-///
-/// Un tap coupe la traduction : l'agitation s'arrête et tout se désature en
-/// douceur, jamais jusqu'au noir, pour qu'une pastille éteinte reste visible
-/// et cliquable.
-///
-/// Elle ne se déplace pas d'elle-même : le modèle d'origine embarquait un
-/// `AnimatedPositioned` qui la faisait glisser dans sa propre barre, inutile
-/// ici puisque le dock produit déjà ce mouvement — la zone de texte s'élargit
-/// et pousse l'orbe vers la droite. Ce glissement-là est intact tant que la
-/// traduction tourne ; il ne s'arrête que sur une pastille grisée (voir
-/// [_CallScreenState._openMessageZone]).
+/// Un tap coupe la traduction : la pastille vire alors au blanc pur et se fige.
 class _TranslationOrb extends StatefulWidget {
   const _TranslationOrb({
     required this.on,
@@ -3342,7 +3330,7 @@ class _TranslationOrb extends StatefulWidget {
     required this.onLongPress,
   });
 
-  /// La traduction tourne. False = coupée : orbe désaturé, agitation à l'arrêt.
+  /// La traduction tourne. False = coupée : galet blanc, barres immobiles.
   final bool on;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -3351,9 +3339,7 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// La taille de la pastille d'origine — le plus gros élément du dock, celui
-  /// qu'on vise sans regarder. Le modèle proposait 46 ; on garde 50 pour ne
-  /// rien déplacer autour.
+  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
   static const double size = 50;
 
   @override
@@ -3361,38 +3347,26 @@ class _TranslationOrb extends StatefulWidget {
 }
 
 class _TranslationOrbState extends State<_TranslationOrb>
-    with TickerProviderStateMixin {
-  /// L'anneau qui tourne et le cœur qui se déforme. Ils tournent du début à la
-  /// fin de l'appel et accélèrent quand une voix passe.
-  late final AnimationController _halo = AnimationController(
+    with SingleTickerProviderStateMixin {
+  /// Le battement des barres. Tourne en boucle tant qu'il y a quelque chose à
+  /// montrer, et s'arrête net au repos — pas de ticker qui brûle la batterie
+  /// pendant qu'on écoute en silence.
+  late final AnimationController _phase = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 3400),
-  );
-  late final AnimationController _morph = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 5000),
+    duration: const Duration(milliseconds: 1400),
   );
 
-  /// La respiration et l'onde — seulement pendant qu'une voix passe.
-  late final AnimationController _breathe = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1000),
-  );
-  late final AnimationController _shock = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-
-  bool _speaking = false;
+  /// Amplitude affichée, lissée vers [_target] frame par frame : une voix qui
+  /// s'arrête fait retomber les barres, elle ne les coupe pas.
+  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
+  double _target = 0;
 
   @override
   void initState() {
     super.initState();
     widget.ttsSpeaking.addListener(_retarget);
     widget.voiceLevel.addListener(_retarget);
-    // Le fond tourne tout de suite et ne s'arrêtera plus.
-    _halo.repeat();
-    _morph.repeat();
+    _phase.addListener(_tick);
     _retarget();
   }
 
@@ -3410,45 +3384,37 @@ class _TranslationOrbState extends State<_TranslationOrb>
     if (old.on != widget.on) _retarget();
   }
 
-  /// L'agitation n'a lieu que si la traduction tourne : une pastille grisée ne
-  /// réagit plus à la voix. La rotation de fond, elle, ne s'arrête jamais.
+  /// Un seul régime : dès que ça parle — une voix humaine comme la traduction
+  /// dite par la machine —, les barres partent à fond. La pastille dit «il y a
+  /// du son», pas «qui parle».
   void _retarget() {
-    final talking = widget.on &&
-        (widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02);
-    if (talking == _speaking) return;
-    _speaking = talking;
-    _halo.duration = Duration(milliseconds: talking ? 1500 : 3400);
-    _morph.duration = Duration(milliseconds: talking ? 2200 : 5000);
-    _halo.repeat();
-    _morph.repeat();
-    if (talking) {
-      _breathe.repeat(reverse: true);
-      _shock.repeat();
-    } else {
-      _breathe
-        ..stop()
-        ..value = 0;
-      _shock.stop();
+    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
+    _target = (widget.on && talking) ? 1.0 : 0.0;
+    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
+  }
+
+  void _tick() {
+    final next = _amp.value + (_target - _amp.value) * 0.14;
+    if (_target == 0 && next < 0.01) {
+      _amp.value = 0;
+      _phase.stop();
+      return;
     }
-    if (mounted) setState(() {});
+    _amp.value = next;
   }
 
   @override
   void dispose() {
     widget.ttsSpeaking.removeListener(_retarget);
     widget.voiceLevel.removeListener(_retarget);
-    _halo.dispose();
-    _morph.dispose();
-    _breathe.dispose();
-    _shock.dispose();
+    _phase.removeListener(_tick);
+    _phase.dispose();
+    _amp.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    const size = _TranslationOrb.size;
-    // Le cœur clair, à l'intérieur du noyau — le rapport du modèle, à l'échelle.
-    const core = size - 18;
     return Semantics(
       label: AppStrings.t(
         widget.on ? 'call_translation_cut' : 'call_translation_resume',
@@ -3458,147 +3424,116 @@ class _TranslationOrbState extends State<_TranslationOrb>
         bounce: true,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_halo, _morph, _breathe, _shock]),
-            builder: (context, _) {
-              final breathe = 1 + 0.08 * math.sin(_breathe.value * math.pi);
-              final glow = widget.on ? (_speaking ? 1.0 : 0.75) : 0.0;
-              final orb = Transform.scale(
-                scale: _speaking ? breathe : 1,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    // L'anneau spectral, qui tourne derrière le noyau.
-                    Opacity(
-                      opacity: glow,
-                      child: Transform.rotate(
-                        angle: _halo.value * 2 * math.pi,
-                        child: Container(
-                          width: size + 6,
-                          height: size + 6,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: SweepGradient(colors: [
-                              Color(0xFF7EE8FF),
-                              Color(0xFF6B7BFF),
-                              Color(0xFFC08CFF),
-                              Color(0xFFFFFFFF),
-                              Color(0xFF7EE8FF),
-                            ]),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Le noyau sombre, qui masque l'anneau en son centre.
-                    Container(
-                      width: size,
-                      height: size,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          center: Alignment(0, -0.25),
-                          radius: 0.85,
-                          colors: [Color(0xFF232333), Color(0xFF0A0A12)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0xA6000000),
-                            blurRadius: 22,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Le cœur clair : ses quatre rayons s'interpolent, il passe
-                    // du rond au galet déformé sans jamais faire d'angle.
-                    Container(
-                      width: core,
-                      height: core,
-                      decoration: BoxDecoration(
-                        borderRadius: _morphRadius(_morph.value, core),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFE8ECFF), Color(0xFF8F9DFF)],
-                        ),
-                      ),
-                    ),
-                    // L'onde qui part du bord pendant qu'une voix passe.
-                    if (_speaking)
-                      Opacity(
-                        opacity: (1 - _shock.value).clamp(0.0, 1.0) * 0.7,
-                        child: Container(
-                          width: (size + 8) * (0.8 + 1.2 * _shock.value),
-                          height: (size + 8) * (0.8 + 1.2 * _shock.value),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0x8096A8FF),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-
-              // Extinction douce : désaturation + léger assombrissement, jamais
-              // le noir — une pastille éteinte doit rester visible et cliquable.
-              return TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: widget.on ? 0 : 1),
-                duration: const Duration(milliseconds: 750),
-                curve: Curves.easeInOutCubic,
-                builder: (context, m, child) => ColorFiltered(
-                  colorFilter: ColorFilter.matrix(_softMute(m)),
-                  child: child,
-                ),
-                child: orb,
-              );
-            },
+        child: Container(
+          width: _TranslationOrb.size,
+          height: _TranslationOrb.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.28),
+                blurRadius: 14,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: CustomPaint(
+            painter: _OrbPainter(phase: _phase, amp: _amp, on: widget.on),
           ),
         ),
       ),
     );
   }
+}
 
-  /// Matrice de couleur : désature à 72 % et assombrit de 18 % quand m = 1.
-  List<double> _softMute(double m) {
-    final s = 1 - 0.72 * m;
-    final b = 1 - 0.18 * m;
-    const lr = 0.2126, lg = 0.7152, lb = 0.0722;
-    return <double>[
-      (lr + s * (1 - lr)) * b, (lg - lg * s) * b, (lb - lb * s) * b, 0, 0,
-      (lr - lr * s) * b, (lg + s * (1 - lg)) * b, (lb - lb * s) * b, 0, 0,
-      (lr - lr * s) * b, (lg - lg * s) * b, (lb + s * (1 - lb)) * b, 0, 0,
-      0, 0, 0, 1, 0,
-    ];
-  }
+class _OrbPainter extends CustomPainter {
+  _OrbPainter({required this.phase, required this.amp, required this.on})
+      : super(repaint: Listenable.merge([phase, amp]));
 
-  /// Rayons interpolés : rond → galet déformé A → galet déformé B → rond.
-  BorderRadius _morphRadius(double t, double size) {
-    final r = size / 2;
-    double lerp(double a, double b, double k) => a + (b - a) * k;
-    final keys = <List<double>>[
-      [r, r, r, r],
-      [r * 1.24, r * 0.76, r * 0.9, r * 1.1],
-      [r * 0.8, r * 1.2, r * 1.16, r * 0.84],
-      [r, r, r, r],
-    ];
-    final seg = (t * 3).clamp(0.0, 2.999);
-    final i = seg.floor();
-    final k = Curves.easeInOut.transform(seg - i);
-    final a = keys[i], b = keys[i + 1];
-    return BorderRadius.only(
-      topLeft: Radius.circular(lerp(a[0], b[0], k)),
-      topRight: Radius.circular(lerp(a[1], b[1], k)),
-      bottomRight: Radius.circular(lerp(a[2], b[2], k)),
-      bottomLeft: Radius.circular(lerp(a[3], b[3], k)),
+  final Animation<double> phase;
+  final ValueListenable<double> amp;
+  final bool on;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = amp.value;
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final rect = Rect.fromCircle(center: c, radius: r);
+
+    // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
+    // coup d'œil qu'elle ne traduit plus.
+    final tint = on ? 1.0 : 0.0;
+
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.35, -0.45),
+          colors: [
+            Colors.white,
+            Color.lerp(Colors.white, SC.accent, 0.20 * tint)!,
+            Color.lerp(Colors.white, SC.meshViolet, 0.28 * tint)!,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(rect),
     );
+
+    // Le liseré irisé.
+    canvas.drawCircle(
+      c,
+      r - 0.7,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..shader = SweepGradient(
+          colors: [
+            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
+            Color.lerp(Colors.white, SC.meshViolet, 0.55 * tint)!,
+            Color.lerp(Colors.white, SC.meshBlue, 0.45 * tint)!,
+            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
+          ],
+        ).createShader(rect),
+    );
+
+    // Les trois barres.
+    final barW = size.width * 0.105;
+    final gap = size.width * 0.095;
+    final baseH = size.height * 0.20;
+    final range = size.height * 0.30;
+    final p = phase.value * 2 * math.pi;
+    final bars = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color.lerp(SC.accentDeep, Colors.white, on ? 0.0 : 0.55)!,
+          Color.lerp(SC.meshViolet, Colors.white, on ? 0.0 : 0.55)!,
+        ],
+      ).createShader(rect);
+
+    for (var i = -1; i <= 1; i++) {
+      final wobble = 0.5 + 0.5 * math.sin(p + i * 1.1);
+      final h = baseH +
+          (i == 0 ? size.height * 0.05 : 0) +
+          range * a * wobble;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(c.dx + i * (barW + gap), c.dy),
+            width: barW,
+            height: h,
+          ),
+          Radius.circular(barW / 2),
+        ),
+        bars,
+      );
+    }
   }
+
+  @override
+  bool shouldRepaint(_OrbPainter old) => old.on != on;
 }
 
 /// The glass chevron that unfolds the blue controls above the dock — the same
