@@ -218,7 +218,19 @@ class SwayAppleStt: NSObject {
         if ns.domain == "kAFAssistantErrorDomain" {
           reply(["text": "", "ms": Int(Date().timeIntervalSince(t0) * 1000)])
         } else {
-          reply(FlutterError(code: "recognition", message: error.localizedDescription, details: nil))
+          // Le message d'Apple seul ne dit pas QUI refuse : « Siri and
+          // Dictation are disabled » sort de plusieurs sous-systèmes, et on
+          // finit par accuser un réglage au hasard. On joint le domaine, le
+          // code et l'état du recogniser au moment du refus — c'est ce triplet
+          // qui désigne le coupable sans avoir à fouiller les Réglages.
+          let auth = SFSpeechRecognizer.authorizationStatus().rawValue
+          let diag = "[\(ns.domain) \(ns.code)] auth=\(auth) " +
+            "available=\(rec.isAvailable) onDevice=\(rec.supportsOnDeviceRecognition) " +
+            "required=\(request.requiresOnDeviceRecognition) locale=\(locale)"
+          reply(FlutterError(
+            code: "recognition",
+            message: "\(error.localizedDescription) \(diag)",
+            details: nil))
         }
         return
       }
