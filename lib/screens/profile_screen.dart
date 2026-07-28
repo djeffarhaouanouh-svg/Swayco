@@ -2570,28 +2570,27 @@ class _InterestsSectionState extends State<_InterestsSection> {
   /// de navigation.
   Future<void> _openPicker() async {
     setState(() => _picking = true);
-    await showModalBottomSheet<void>(
+    // Une POP-UP, pas une feuille : la feuille modale montait du bas et prenait
+    // toute la hauteur de l'écran, contenu collé en haut et grand vide noir en
+    // dessous. Un dialogue se pose au centre et fait exactement la taille du
+    // panneau, qui est fixe (une page de catégorie + les points + le bouton).
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => StatefulBuilder(
-        // La feuille a son propre cycle de rendu : sans ce setState local, les
+      builder: (dialogCtx) => StatefulBuilder(
+        // Le dialogue a son propre cycle de rendu : sans ce setState local, les
         // chips cochés ne changeraient d'état qu'à la fermeture.
-        // Pas de hauteur imposée : la feuille prend celle du panneau, qui est
-        // fixe (une page de catégorie + les points + le bouton).
-        builder: (sheetCtx, setSheetState) => SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: _InlineInterestPicker(
-              sel: _sel,
-              onToggle: (tag) {
-                _toggle(tag);
-                setSheetState(() {});
-              },
-              onDone: () => Navigator.of(sheetCtx).pop(),
-              country: widget.country,
-            ),
+        builder: (dialogCtx, setSheetState) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _InlineInterestPicker(
+            sel: _sel,
+            onToggle: (tag) {
+              _toggle(tag);
+              setSheetState(() {});
+            },
+            onDone: () => Navigator.of(dialogCtx).pop(),
+            country: widget.country,
           ),
         ),
       ),
@@ -2695,7 +2694,8 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
     final full = widget.sel.length >= profileInterestsMax;
     final cats = interestCategoriesFor(widget.country);
     return Container(
-      margin: const EdgeInsets.only(top: 14),
+      // Plus de marge haute : elle datait du temps où ce panneau se dépliait
+      // sous les chips. Dans une pop-up centrée, elle décentrait le contenu.
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: SC.bg,
