@@ -147,9 +147,9 @@ class _CallScreenState extends State<CallScreen> {
   bool _messageOpen = false;
   Timer? _messageTimer;
 
-  /// Combien de temps la phrase reste dépliée une fois affichée. 1,5 s était
-  /// le temps de la voir, pas de la lire : la barre se refermait pendant que
-  /// la traduction était encore en train d'être dite.
+  /// Combien de temps MA phrase reste dépliée une fois affichée — la barre ne
+  /// montre que la mienne, jamais celle du pair. 1,5 s était le temps de la
+  /// voir, pas de la lire.
   static const Duration _kMessageHold = Duration(milliseconds: 4000);
 
   /// Refermé à la main : pendant ce délai, plus rien ne rouvre la barre. Sans
@@ -248,20 +248,7 @@ class _CallScreenState extends State<CallScreen> {
     }
     _messageTimer?.cancel();
     if (!_messageOpen) setState(() => _messageOpen = true);
-    _messageTimer = Timer(_kMessageHold, _holdOrClose);
-  }
-
-  /// Fin du maintien : on ne referme QUE si plus rien n'est en train d'être
-  /// dit. Tant que la traduction parle, la phrase qu'on est en train
-  /// d'entendre reste lisible à l'écran — on reprogramme un maintien.
-  void _holdOrClose() {
-    if (!mounted) return;
-    final speaking = ttsSpeaking.value || widget.translation.translationSpeaking;
-    if (speaking) {
-      _messageTimer = Timer(_kMessageHold, _holdOrClose);
-      return;
-    }
-    _closeMessageZone();
+    _messageTimer = Timer(_kMessageHold, _closeMessageZone);
   }
 
   /// Refermé par un glissement du doigt : on note l'heure pour que la barre

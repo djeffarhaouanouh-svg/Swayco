@@ -1491,7 +1491,8 @@ class _TinderCardState extends State<_TinderCard> {
           // ── Photo dots — petits, centrés en haut ────────────────────────
           if (photos.length > 1)
             Positioned(
-              top: 10,
+              // Descendues : collées au bord elles se perdaient dans l'encoche.
+              top: 20,
               left: 0,
               right: 0,
               child: Center(
@@ -1510,8 +1511,10 @@ class _TinderCardState extends State<_TinderCard> {
             left: 14,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Posé au-dessus des chevrons, qui sont revenus tout en bas.
-            bottom: 66,
+            // Le bloc descend au ras de l'image : les intérêts en occupent la
+            // dernière ligne, et les chevrons se glissent juste au-dessus
+            // d'eux — sous le prénom et la ville.
+            bottom: 16,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1586,6 +1589,12 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
+                // Le repère « tire vers le haut », entre l'identité et les
+                // centres d'intérêt.
+                const SizedBox(height: 6),
+                const IgnorePointer(
+                  child: Center(child: _ScrollHintChevrons()),
+                ),
                 // Interests — données réelles Supabase uniquement
                 if (p.interests.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -1623,16 +1632,6 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Repère "tire vers le haut" : les deux chevrons qui sautent,
-          //    centrés tout en bas de la photo.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 10,
-            child: IgnorePointer(
-              child: Center(child: _ScrollHintChevrons()),
-            ),
-          ),
         ],
       );
   }
@@ -1728,13 +1727,13 @@ class _PhotoDots extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < count; i++) ...[
-          if (i > 0) const SizedBox(width: 5),
+          if (i > 0) const SizedBox(width: 4),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            // Assez épais pour se voir sur une photo claire : c'est le seul
-            // signe qu'il y a d'autres photos derrière celle-ci.
-            width: 30,
-            height: 5,
+            // Assez épais pour se voir sur une photo claire — c'est le seul
+            // signe qu'il y a d'autres photos derrière — sans faire barre.
+            width: 24,
+            height: 4,
             decoration: BoxDecoration(
               color: i == active
                   ? Colors.white
