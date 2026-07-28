@@ -147,8 +147,16 @@ class _CallScreenState extends State<CallScreen> {
   bool _messageOpen = false;
   Timer? _messageTimer;
 
-  /// Combien de temps la phrase reste dépliée une fois affichée.
-  static const Duration _kMessageHold = Duration(milliseconds: 1500);
+  /// Combien de temps la phrase reste dépliée une fois affichée. 1,5 s était
+  /// le temps de la voir, pas de la lire : la barre se refermait pendant que
+  /// la traduction était encore en train d'être dite.
+  static const Duration _kMessageHold = Duration(milliseconds: 4000);
+
+  /// Refermé à la main : pendant ce délai, plus rien ne rouvre la barre. Sans
+  /// ça, la voix qui suit — souvent la sienne, une demi-seconde plus tard — la
+  /// rouvrait aussitôt, et le geste ne servait à rien.
+  static const Duration _kManualCloseGrace = Duration(seconds: 4);
+  DateTime? _manualCloseAt;
 
   /// Le filet : ouvert par une voix, le dock ne peut pas rester grand ouvert
   /// indéfiniment si aucune phrase n'arrive derrière (STT muette, réseau
@@ -164,6 +172,11 @@ class _CallScreenState extends State<CallScreen> {
   /// bouton éteint qui bouge encore.
   void _openMessageZone() {
     if (!_translationEnabled) return;
+    final closed = _manualCloseAt;
+    if (closed != null &&
+        DateTime.now().difference(closed) < _kManualCloseGrace) {
+      return;
+    }
     _messageTimer?.cancel();
     _messageTimer = Timer(_kMessageSafety, _closeMessageZone);
     if (!_messageOpen && mounted) setState(() => _messageOpen = true);
@@ -228,9 +241,35 @@ class _CallScreenState extends State<CallScreen> {
   /// repart à parler, [_openMessageZone] l'annule.
   void _flashMessage() {
     if (!_translationEnabled) return;
+    final closed = _manualCloseAt;
+    if (closed != null &&
+        DateTime.now().difference(closed) < _kManualCloseGrace) {
+      return;
+    }
     _messageTimer?.cancel();
     if (!_messageOpen) setState(() => _messageOpen = true);
-    _messageTimer = Timer(_kMessageHold, _closeMessageZone);
+    _messageTimer = Timer(_kMessageHold, _holdOrClose);
+  }
+
+  /// Fin du maintien : on ne referme QUE si plus rien n'est en train d'être
+  /// dit. Tant que la traduction parle, la phrase qu'on est en train
+  /// d'entendre reste lisible à l'écran — on reprogramme un maintien.
+  void _holdOrClose() {
+    if (!mounted) return;
+    final speaking = ttsSpeaking.value || widget.translation.translationSpeaking;
+    if (speaking) {
+      _messageTimer = Timer(_kMessageHold, _holdOrClose);
+      return;
+    }
+    _closeMessageZone();
+  }
+
+  /// Refermé par un glissement du doigt : on note l'heure pour que la barre
+  /// reste fermée le temps de la grâce.
+  void _collapseByGesture() {
+    _manualCloseAt = DateTime.now();
+    _messageTimer?.cancel();
+    _closeMessageZone();
   }
 
   /// Le plancher absolu sous lequel rien n'est jamais de la parole.
@@ -2701,7 +2740,7 @@ class _CallScreenState extends State<CallScreen> {
                                 () => _controlsOpen = !_controlsOpen,
                               );
                             },
-                            onCollapse: _closeMessageZone,
+                            onCollapse: _collapseByGesture,
                           ),
                         ],
                       ),
