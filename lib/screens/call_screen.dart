@@ -3322,8 +3322,14 @@ class _DockCircleButton extends StatelessWidget {
 /// endroit de l'écran qui montre que la machine travaille.
 ///
 /// Un tap coupe la traduction : tout se fige et la goutte se désature en
-/// douceur, sans jamais devenir noire. Elle ne se DÉPLACE jamais — le
-/// glissement du modèle d'origine a été laissé de côté exprès.
+/// douceur, sans jamais devenir noire.
+///
+/// Elle ne se déplace pas D'ELLE-MÊME : le modèle d'origine embarquait un
+/// `AnimatedPositioned` qui la faisait glisser de 104 px dans sa propre barre,
+/// inutile ici puisque le dock produit déjà ce mouvement — la zone de texte
+/// s'élargit et pousse l'orbe vers la droite. Ce glissement-là est intact tant
+/// que la traduction tourne ; il ne s'arrête que sur une pastille grisée (voir
+/// [_CallScreenState._openMessageZone]).
 class _TranslationOrb extends StatefulWidget {
   const _TranslationOrb({
     required this.on,
@@ -3351,9 +3357,10 @@ class _TranslationOrb extends StatefulWidget {
 
 class _TranslationOrbState extends State<_TranslationOrb>
     with TickerProviderStateMixin {
-  /// La déformation de la goutte, et le halo qui tourne. Les deux accélèrent
-  /// quand ça parle, et ne tournent QUE si la traduction est active : coupée,
-  /// plus un ticker ne brûle la batterie pendant qu'on écoute en silence.
+  /// La déformation de la goutte, et le halo qui tourne. Ils tournent EN
+  /// PERMANENCE, du début à la fin de l'appel — l'orbe est vivant, il ne
+  /// s'allume pas quand on lui parle. Ils accélèrent seulement quand une voix
+  /// passe.
   late final AnimationController _morph = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 4500),
@@ -3380,6 +3387,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
     super.initState();
     widget.ttsSpeaking.addListener(_retarget);
     widget.voiceLevel.addListener(_retarget);
+    // Le fond tourne tout de suite et ne s'arrêtera plus.
+    _morph.repeat();
+    _halo.repeat();
     _retarget();
   }
 
@@ -3400,18 +3410,13 @@ class _TranslationOrbState extends State<_TranslationOrb>
   /// Un seul régime : dès que ça parle, l'orbe s'anime. Il dit « il y a du
   /// son », pas « qui parle ».
   void _retarget() {
+    // L'agitation — respiration et onde — n'a lieu que si la traduction
+    // tourne : une pastille grisée ne réagit plus à la voix. La rotation de
+    // fond, elle, ne s'arrête jamais.
     final talking = widget.on &&
         (widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02);
-    if (talking == _speaking && widget.on == _morph.isAnimating) return;
+    if (talking == _speaking) return;
     _speaking = talking;
-    if (!widget.on) {
-      _morph.stop();
-      _halo.stop();
-      _breathe.stop();
-      _shock.stop();
-      if (mounted) setState(() {});
-      return;
-    }
     // Le rythme de fond double quand une voix passe.
     _morph.duration = Duration(milliseconds: talking ? 1800 : 4500);
     _halo.duration = Duration(milliseconds: talking ? 2400 : 6000);
