@@ -354,6 +354,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// entre deux ouvertures de la page.
   Future<void> _refreshPresence() async {
     if (!mounted || !isSupabaseReady) return;
+    // Cet écran vit dans un IndexedStack : il est construit dès le lancement,
+    // même si l'utilisateur est sur Discover. Inutile d'interroger le réseau
+    // pour des pastilles que personne ne regarde.
+    if (NavTab.index.value != NavTab.chat) return;
     final ids = <String>{
       for (final p in _friends) p.id,
       for (final p in _newMatches) p.id,

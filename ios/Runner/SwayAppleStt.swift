@@ -37,6 +37,26 @@ class SwayAppleStt: NSObject {
     }
   }
 
+  /// Les sondes du framework Speech — énumérer les locales, construire un
+  /// `SFSpeechRecognizer`, demander s'il sait travailler hors ligne — passent
+  /// par le démon système et coûtent des centaines de millisecondes au premier
+  /// accès. Or un canal Flutter répond sur le THREAD PRINCIPAL : posées là,
+  /// elles gèlent l'interface, et elles tombent AU LANCEMENT puisque l'app
+  /// prépare la reconnaissance dès le boot.
+  ///
+  /// Cette file les sort du chemin critique, et sérialise du même coup l'accès
+  /// au cache [recognizers] qu'elles remplissent.
+  private let probeQueue = DispatchQueue(label: "fr.swayco.apple-stt.probe")
+
+  /// Exécute [work] hors du thread principal et rend son résultat dessus.
+  private func offMain(_ result: @escaping FlutterResult,
+                       _ work: @escaping () -> Any?) {
+    probeQueue.async {
+      let value = work()
+      DispatchQueue.main.async { result(value) }
+    }
+  }
+
   private func recognizer(for locale: String) -> SFSpeechRecognizer? {
     if let r = recognizers[locale] { return r }
     guard let r = SFSpeechRecognizer(locale: Locale(identifier: locale)) else { return nil }
@@ -55,23 +75,27 @@ class SwayAppleStt: NSObject {
       }
 
     case "supportedLocales":
-      let ids = SFSpeechRecognizer.supportedLocales().map { $0.identifier }.sorted()
-      result(ids)
+      offMain(result) {
+        SFSpeechRecognizer.supportedLocales().map { $0.identifier }.sorted()
+      }
 
     case "onDevice":
       guard let args = call.arguments as? [String: Any],
             let locale = args["locale"] as? String else {
         result(FlutterError(code: "bad_args", message: "locale required", details: nil)); return
       }
-      let rec = recognizer(for: locale)
-      result(rec?.supportsOnDeviceRecognition ?? false)
+      offMain(result) { [weak self] in
+        self?.recognizer(for: locale)?.supportsOnDeviceRecognition ?? false
+      }
 
     case "available":
       guard let args = call.arguments as? [String: Any],
             let locale = args["locale"] as? String else {
         result(FlutterError(code: "bad_args", message: "locale required", details: nil)); return
       }
-      result(recognizer(for: locale)?.isAvailable ?? false)
+      offMain(result) { [weak self] in
+        self?.recognizer(for: locale)?.isAvailable ?? false
+      }
 
     case "transcribe":
       transcribe(call, result)
