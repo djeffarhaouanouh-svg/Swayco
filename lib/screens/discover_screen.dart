@@ -1756,10 +1756,11 @@ class _SwipeActionBar extends StatelessWidget {
           _GlassButton(
             size: 58,
             iconSize: 27,
-            icon: Icons.favorite_rounded,
-            // Le rouge des cœurs partout ailleurs dans l'app (profil, likes
-            // reçus) — un cœur vert ne ressemblait à rien.
-            color: const Color(0xFFFF3B5C),
+            // Une coche, pas un cœur : on valide quelqu'un, et le geste se
+            // lit sans ambiguïté à côté de la croix.
+            icon: Icons.check_rounded,
+            // Le vert que ce bouton portait à l'origine.
+            color: const Color(0xFF3DCA72),
             onTap: onLike,
           ),
         ],
