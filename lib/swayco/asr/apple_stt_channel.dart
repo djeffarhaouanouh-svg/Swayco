@@ -23,11 +23,24 @@ AppleSttAuth _authFrom(int? raw) {
 
 /// One transcription result from Apple's on-device recogniser.
 class AppleSttResult {
-  const AppleSttResult(this.text, this.ms);
+  const AppleSttResult(
+    this.text,
+    this.ms, {
+    this.alternatives = const [],
+    this.lowConfidence = const [],
+  });
   final String text;
 
   /// Native decode time, milliseconds.
   final int ms;
+
+  /// The rival transcriptions of the same audio (`transcriptions` minus the
+  /// winner), best-first.
+  final List<String> alternatives;
+
+  /// Words of [text] Apple scored below its confidence threshold. Empty also
+  /// means "not scored" — an on-device asset does not always fill it in.
+  final List<String> lowConfidence;
 }
 
 /// Thin Dart wrapper over the native `SwayAppleStt` method channel (iOS).
@@ -122,6 +135,19 @@ class AppleSttChannel {
     });
     final text = (res?['text'] as String?) ?? '';
     final ms = (res?['ms'] as int?) ?? 0;
-    return AppleSttResult(text, ms);
+    return AppleSttResult(
+      text,
+      ms,
+      alternatives: _strings(res?['alts']),
+      lowConfidence: _strings(res?['lowConf']),
+    );
+  }
+
+  /// A list of strings out of the channel's loosely-typed map. The early-return
+  /// replies on the native side (busy, silence) carry no such key at all, and a
+  /// missing key must read as "nothing to report", not as an error.
+  static List<String> _strings(Object? raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<String>().where((s) => s.trim().isNotEmpty).toList();
   }
 }

@@ -21,6 +21,48 @@ class SttChunk {
   bool get hasFinal => finalText.trim().isNotEmpty;
 }
 
+/// One decoded utterance, plus everything the recogniser knew about it beyond
+/// its single best guess.
+///
+/// A recogniser does not pick a transcript, it RANKS several and hands over the
+/// top one. The rest is normally thrown away — and it is exactly what the repair
+/// model needs: told that "cardiologue" was scored against "radiologue" and
+/// "cardiologie", it can pick the one the sentence actually supports, instead of
+/// repairing a single frozen string with no idea where the doubt was.
+///
+/// The ONNX engines return [text] alone: their decoder is greedy, so there is no
+/// second hypothesis to report and no score to read. Everything downstream must
+/// therefore treat an empty [alternatives] as "no information", never as "the
+/// recogniser was certain".
+class AsrResult {
+  const AsrResult({
+    required this.text,
+    this.alternatives = const [],
+    this.lowConfidence = const [],
+  });
+
+  static const empty = AsrResult(text: '');
+
+  /// The best transcription — what the pipeline speaks and captions.
+  final String text;
+
+  /// Rival transcriptions of the SAME audio, best-first, never including [text].
+  final List<String> alternatives;
+
+  /// Words inside [text] the recogniser scored lowest. Empty when the engine
+  /// reports no per-word confidence at all, which is not the same as confident.
+  final List<String> lowConfidence;
+
+  /// Whether the recogniser gave us anything to be suspicious about.
+  bool get hasDoubt => alternatives.isNotEmpty || lowConfidence.isNotEmpty;
+
+  AsrResult copyWith({String? text}) => AsrResult(
+        text: text ?? this.text,
+        alternatives: alternatives,
+        lowConfidence: lowConfidence,
+      );
+}
+
 /// One on-device recogniser, already pointed at a downloaded model.
 ///
 /// Two shapes, distinguished by [isStreaming]:
@@ -56,6 +98,15 @@ abstract class AsrEngine {
   /// Transcribe one complete, VAD-clipped utterance. 16 kHz mono, [-1, 1].
   /// Returns '' when nothing was recognised. Only meaningful when ![isStreaming].
   Future<String> transcribe(Float32List samples16k);
+
+  /// [transcribe], plus the rival hypotheses and shaky words when the engine has
+  /// them (see [AsrResult]).
+  ///
+  /// Defaults to wrapping [transcribe], so an engine that knows nothing beyond
+  /// its best guess — every ONNX engine here — needs no code at all, and the
+  /// callers can use this one method everywhere.
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async =>
+      AsrResult(text: await transcribe(samples16k));
 
   Future<void> dispose();
 }

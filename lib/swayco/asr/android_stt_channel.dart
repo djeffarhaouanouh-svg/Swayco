@@ -6,7 +6,12 @@ import 'package:flutter/services.dart';
 
 /// One transcription result from Android's native recogniser.
 class AndroidSttResult {
-  const AndroidSttResult(this.text, this.ms, this.onDevice);
+  const AndroidSttResult(
+    this.text,
+    this.ms,
+    this.onDevice, {
+    this.alternatives = const [],
+  });
   final String text;
 
   /// Native recognition time, milliseconds.
@@ -14,6 +19,11 @@ class AndroidSttResult {
 
   /// Whether the recognition actually ran on-device (vs Google's cloud).
   final bool onDevice;
+
+  /// The rest of `RESULTS_RECOGNITION` — rival readings of the same audio,
+  /// best-first. There is no per-word counterpart on this platform:
+  /// `CONFIDENCE_SCORES` scores each whole hypothesis, not each word.
+  final List<String> alternatives;
 }
 
 /// Thin Dart wrapper over the native `SwayAndroidStt` method channel (Android).
@@ -109,6 +119,14 @@ class AndroidSttChannel {
     final text = (res?['text'] as String?) ?? '';
     final ms = (res?['ms'] as int?) ?? 0;
     final onDevice = (res?['onDevice'] as bool?) ?? false;
-    return AndroidSttResult(text, ms, onDevice);
+    final raw = res?['alts'];
+    return AndroidSttResult(
+      text,
+      ms,
+      onDevice,
+      alternatives: raw is List
+          ? raw.whereType<String>().where((s) => s.trim().isNotEmpty).toList()
+          : const [],
+    );
   }
 }

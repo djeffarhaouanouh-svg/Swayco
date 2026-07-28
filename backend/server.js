@@ -1279,7 +1279,7 @@ function fixNeedsRepair(fromTag, text) {
  * skip the step, and the same six pass 6/6. That field is billed output we throw
  * away; it is the price of the repair actually happening.
  */
-function fixRepairPrompt({ text, fromName, toName, hint, gender, hedge }) {
+function fixRepairPrompt({ text, fromName, toName, hint, gender, hedge, doubt }) {
   return (
     `Raw speech recognition, ${fromName}. Sounds right, letters often wrong.\n`
     + `Repair it (accents, word boundaries, and any word that does not fit -> the `
@@ -1297,8 +1297,48 @@ function fixRepairPrompt({ text, fromName, toName, hint, gender, hedge }) {
     // makes the repair happen, and it removes the option of saying nothing.
     // Give the refusal a shape the format allows and it comes back: 3/3.
     + `If you cannot read it with confidence, do not guess — return exactly `
-    + `{"fixed":"${FIX_UNCLEAR}","out":"${FIX_UNCLEAR}"}\n\n${text}`
+    + `{"fixed":"${FIX_UNCLEAR}","out":"${FIX_UNCLEAR}"}\n\n${text}${doubt}`
   );
+}
+
+/**
+ * The recogniser's own doubt, appended AFTER the transcript.
+ *
+ * A speech recogniser does not pick a sentence, it ranks several and hands over
+ * the top one. Those runners-up are the difference between repairing a frozen
+ * string and knowing where the audio was ambiguous: given "j'ai rendez-vous chez
+ * le cardiologie" with "cardiologue" ranked just below, the model has the
+ * evidence to choose; given the winner alone it can only guess from context.
+ *
+ * Three rules earn their place:
+ *  - It goes LAST, after the text. The instruction block above is identical on
+ *    every call and is what the provider caches; anything variable inserted into
+ *    it would move the prefix and multiply the input bill.
+ *  - The alternatives are labelled as MISHEARINGS of one utterance, not as
+ *    choices. Offered as a menu, a model picks the fluent one over the true one.
+ *  - It is emitted only when the recogniser actually reported something. Silence
+ *    here means "no information" (the ONNX engines produce none, and Apple
+ *    scores no words on some on-device assets) — never "it was certain", which
+ *    would be a false signal to trust the transcript.
+ */
+function fixDoubtBlock(alternatives, lowConfidence) {
+  const parts = [];
+  if (alternatives.length) {
+    parts.push(
+      `\n\nThe recogniser also heard this same audio as, in order of its own `
+      + `confidence:\n`
+      + alternatives.map((a) => `- ${a}`).join('\n')
+      + `\nThese are rival MISHEARINGS of one utterance, not options to choose `
+      + `from freely: use them only as evidence of which sounds were ambiguous.`,
+    );
+  }
+  if (lowConfidence.length) {
+    parts.push(
+      `\n\nIt was least sure of: ${lowConfidence.join(', ')}. `
+      + `Those words are the likeliest to be wrong.`,
+    );
+  }
+  return parts.join('');
 }
 
 /** Translate only — for the long, non-Japanese majority. Half the tokens. */
@@ -1310,13 +1350,13 @@ function fixTranslatePrompt({ text, toName, gender, hedge }) {
 }
 
 /** Repair only, same language — the phone translates it itself afterwards. */
-function fixRepairOnlyPrompt({ text, fromName, hint }) {
+function fixRepairOnlyPrompt({ text, fromName, hint, doubt }) {
   return (
     `Raw speech recognition, ${fromName}. Sounds right, letters often wrong.\n`
     + `Repair it (accents, word boundaries, and any word that does not fit -> the `
     + `HOMOPHONE that does)${hint}. Same language, same meaning, nothing added.\n`
     + `If you are not sure, output exactly ${FIX_UNCLEAR}. Return ONLY the text.`
-    + `\n\n${text}`
+    + `\n\n${text}${doubt}`
   );
 }
 
@@ -1613,13 +1653,32 @@ app.post('/translation/fix', _limText, async (req, res) => {
     ? ''
     : ' Never write a gender hedge like "ravi(e)" — pick one form.';
 
+  // The recogniser's runners-up and its shakiest words, when the caller's engine
+  // reports them (the OS recognisers do; the bundled ONNX one cannot). Capped
+  // hard: this is untrusted text from a phone, it lands inside a prompt, and an
+  // unbounded list would both blow up the bill and let a long "alternative" push
+  // the real instructions out of the model's attention.
+  const strList = (v, max, len) => (Array.isArray(v) ? v : [])
+    .filter((s) => typeof s === 'string')
+    .map((s) => s.trim().slice(0, len))
+    .filter(Boolean)
+    .slice(0, max);
+  const alternatives = strList(req.body?.alternatives, 3, 300)
+    // A rival identical to the transcript teaches nothing and still gets billed.
+    .filter((a) => a !== text);
+  const lowConfidence = strList(req.body?.lowConfidence, 6, 40);
+  const doubt = fixDoubtBlock(alternatives, lowConfidence);
+
   // No target language: repair only, the caller translates it itself.
   const repair = !toName || fixNeedsRepair(from, text);
   const route = !toName ? 'repair-only' : (repair ? 'repair' : 'translate');
   const prompt = !toName
-    ? fixRepairOnlyPrompt({ text, fromName, hint })
+    ? fixRepairOnlyPrompt({ text, fromName, hint, doubt })
     : repair
-      ? fixRepairPrompt({ text, fromName, toName, hint, gender, hedge })
+      ? fixRepairPrompt({ text, fromName, toName, hint, gender, hedge, doubt })
+      // The translate route gets no doubt block on purpose: it is the route for
+      // long, clean utterances that were judged NOT to need repair, and it is
+      // not asked to second-guess the transcript at all.
       : fixTranslatePrompt({ text, toName, gender, hedge });
 
   // Unwrap FIRST, judge after. The repair route answers in JSON, so a decline

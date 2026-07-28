@@ -128,8 +128,15 @@ class AppleSttEngine extends AsrEngine {
   bool get isStreaming => false;
 
   @override
-  Future<String> transcribe(Float32List samples16k) async {
-    if (!_ready || samples16k.isEmpty) return '';
+  Future<String> transcribe(Float32List samples16k) async =>
+      (await transcribeDetailed(samples16k)).text;
+
+  /// The full result, rival hypotheses included — this engine is the reason
+  /// [AsrResult] exists. Everything the OS scored is carried through to the
+  /// repair model instead of being reduced to one string here.
+  @override
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async {
+    if (!_ready || samples16k.isEmpty) return AsrResult.empty;
     try {
       // Enforce on-device only when we resolved an on-device locale; a cloud
       // locale (test phase) is allowed to use Apple's servers.
@@ -140,7 +147,20 @@ class AppleSttEngine extends AsrEngine {
       );
       DebugOverlay.log('stt apple native=${res.ms}ms '
           '${_localeOnDevice ? "on-device" : "CLOUD"} → "${res.text}"');
-      return res.text.trim();
+      // Logged separately and only when non-empty: on a clean phrase Apple
+      // returns one hypothesis and no shaky word, and a line saying so every
+      // utterance would push the real events out of the overlay's buffer.
+      if (res.alternatives.isNotEmpty) {
+        DebugOverlay.log('  alt    : ${res.alternatives.join(" | ")}');
+      }
+      if (res.lowConfidence.isNotEmpty) {
+        DebugOverlay.log('  doute  : ${res.lowConfidence.join(", ")}');
+      }
+      return AsrResult(
+        text: res.text.trim(),
+        alternatives: res.alternatives,
+        lowConfidence: res.lowConfidence,
+      );
     } on PlatformException catch (e) {
       // « Siri and Dictation are disabled » : ce n'est pas un raté ponctuel,
       // c'est un refus définitif du démon système (Réglages → Siri, ou Temps
@@ -155,10 +175,10 @@ class AppleSttEngine extends AsrEngine {
         DebugOverlay.log('stt Apple REFUSED by the OS — engine stopped');
         AsrService.reportOsRefusal('stt_os_refused_ios');
       }
-      return '';
+      return AsrResult.empty;
     } catch (e) {
       DebugOverlay.log('stt Apple transcribe error: $e');
-      return '';
+      return AsrResult.empty;
     }
   }
 

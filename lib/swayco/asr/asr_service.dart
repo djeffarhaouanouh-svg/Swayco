@@ -7,6 +7,11 @@ import 'asr_catalogue.dart';
 import 'asr_engine.dart';
 import 'asr_downloader.dart';
 
+// The shapes this service hands back. Callers (the mic streamer) talk to
+// AsrService alone and should not have to reach into the engine library to name
+// what it returned.
+export 'asr_engine.dart' show AsrResult, SttChunk;
+
 /// On-device speech-to-text — 100 % local inference, no audio leaves the phone.
 ///
 /// Deliberately shaped like [SpeechService]: the app ships the engines, the
@@ -210,18 +215,25 @@ class AsrService {
   /// a 5 s sentence took 1 s, and the number is comparable across phones,
   /// sentences and model builds. It is the one figure that says whether STT is
   /// what makes a call feel slow.
-  Future<String> transcribe(Float32List samples16k) async {
+  Future<String> transcribe(Float32List samples16k) async =>
+      (await transcribeDetailed(samples16k)).text;
+
+  /// [transcribe], keeping the rival hypotheses and shaky words the OS
+  /// recognisers report (see [AsrResult]). The ONNX engines return the text
+  /// alone, so callers must read an empty hypothesis list as "this engine has
+  /// nothing to say", never as certainty.
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async {
     final engine = _engine;
-    if (kIsWeb || engine == null || !engine.isReady) return '';
+    if (kIsWeb || engine == null || !engine.isReady) return AsrResult.empty;
     final started = DateTime.now();
-    final text = await engine.transcribe(samples16k);
+    final res = await engine.transcribeDetailed(samples16k);
     final decodeMs = DateTime.now().difference(started).inMilliseconds;
     final audioMs = samples16k.length * 1000 ~/ 16000;
     if (audioMs > 0) {
       DebugOverlay.log('stt decode ${decodeMs}ms for ${audioMs}ms audio '
           '(${(decodeMs / audioMs).toStringAsFixed(2)}x)');
     }
-    return text;
+    return res;
   }
 
   Future<void> dispose() async {

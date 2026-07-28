@@ -81,11 +81,58 @@ class SwayAppleStt: NSObject {
     }
   }
 
+  /// How many rival transcriptions to hand Dart. The repair model only needs
+  /// enough to see WHERE the recogniser hesitated; past two or three the extra
+  /// candidates are near-duplicates of each other and pure prompt cost.
+  private static let maxAlternatives = 3
+
+  /// Below this score a word is worth flagging to the repair model. Apple's
+  /// confidence runs 0...1 and is 0 for anything it did not score at all, which
+  /// is why the filter below demands a score strictly greater than zero: an
+  /// unscored word must read as "no information", never as "certainly wrong".
+  private static let shakyBelow: Float = 0.5
+
+  /// The rival transcriptions of the same audio, best excluded.
+  ///
+  /// `SFSpeechRecognitionResult.transcriptions` is the n-best list; only
+  /// `bestTranscription` used to be read and the rest was dropped on the floor.
+  /// Identical strings are filtered out — the list often repeats the winner with
+  /// different segment timings, which tells the repair model nothing.
+  private static func alternatives(of res: SFSpeechRecognitionResult) -> [String] {
+    let best = res.bestTranscription.formattedString
+    var seen: Set<String> = [best]
+    var out: [String] = []
+    for t in res.transcriptions {
+      let s = t.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+      if s.isEmpty || seen.contains(s) { continue }
+      seen.insert(s)
+      out.append(s)
+      if out.count >= maxAlternatives { break }
+    }
+    return out
+  }
+
+  /// The words in the winning transcription that Apple itself was least sure of,
+  /// read from each `SFTranscriptionSegment.confidence`.
+  ///
+  /// This is the per-word doubt signal the ONNX recogniser could not produce at
+  /// all: it says not just THAT the sentence may be wrong but WHERE. On-device
+  /// assets do not always score their segments — in that case every confidence
+  /// is 0, this returns empty, and downstream reads it as "no information".
+  private static func shakyWords(in t: SFTranscription) -> [String] {
+    t.segments
+      .filter { $0.confidence > 0 && $0.confidence < shakyBelow }
+      .map { $0.substring }
+      .filter { !$0.isEmpty }
+  }
+
   /// Transcribe one clip. Args:
   ///   locale: String (e.g. "fr-FR")
   ///   samples: FlutterStandardTypedData — Float32 little-endian, mono, [-1, 1]
   ///   sampleRate: Int (16000)
-  /// Returns { text: String, ms: Int } — ms is the native decode time.
+  /// Returns { text: String, ms: Int, alts: [String], lowConf: [String] } —
+  /// ms is the native decode time, `alts` the rival hypotheses (best excluded)
+  /// and `lowConf` the words scored below `shakyBelow`.
   private func transcribe(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     guard let args = call.arguments as? [String: Any],
           let locale = args["locale"] as? String,
@@ -177,7 +224,13 @@ class SwayAppleStt: NSObject {
       }
       guard let res = res, res.isFinal else { return }
       let ms = Int(Date().timeIntervalSince(t0) * 1000)
-      reply(["text": res.bestTranscription.formattedString, "ms": ms])
+      let best = res.bestTranscription
+      reply([
+        "text": best.formattedString,
+        "ms": ms,
+        "alts": Self.alternatives(of: res),
+        "lowConf": Self.shakyWords(in: best),
+      ])
     }
 
     // Watchdog: never let one clip wedge the queue if the callback never fires.

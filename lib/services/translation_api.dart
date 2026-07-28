@@ -507,6 +507,8 @@ Future<TranscriptFix> fetchTranscriptFixStream({
   String? to,
   String? authorGender,
   String? peerGender,
+  List<String> alternatives = const [],
+  List<String> lowConfidence = const [],
   required void Function(String sentence) onSentence,
 }) async {
   if (text.trim().isEmpty) return const TranscriptFix(text: '', unclear: true);
@@ -514,6 +516,13 @@ Future<TranscriptFix> fetchTranscriptFixStream({
   try {
     final body = <String, dynamic>{'text': text, 'from': from, 'stream': true};
     if (to != null && to.isNotEmpty) body['to'] = to;
+    // What the recogniser ranked BELOW [text], and the words it scored lowest.
+    // Sent only when there is something to send: on a clean phrase the OS
+    // returns one hypothesis, and an empty field every utterance would be pure
+    // prompt weight. Both are hints, never instructions — the backend keeps
+    // [text] as the sentence to repair.
+    if (alternatives.isNotEmpty) body['alternatives'] = alternatives;
+    if (lowConfidence.isNotEmpty) body['lowConfidence'] = lowConfidence;
     final ctx = <String, dynamic>{};
     if (authorGender != null && authorGender.isNotEmpty) {
       ctx['authorGender'] = authorGender;

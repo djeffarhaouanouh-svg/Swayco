@@ -72,9 +72,17 @@ class SwayAndroidStt(private val context: Context) {
   private var recognizerOnDevice = false
 
   // The reply for the recognition currently in flight, invoked by the shared
-  // RecognitionListener. Touched only on the main thread.
-  private var pending: ((String) -> Unit)? = null
+  // RecognitionListener with the hypotheses best-first (empty = nothing heard).
+  // Touched only on the main thread.
+  private var pending: ((List<String>) -> Unit)? = null
   private var lastPartial = ""
+
+  // How many hypotheses to ask the recogniser for, and how many rivals to pass
+  // on. Google ranks several transcriptions of the same audio and hands over
+  // only the top one unless asked; the rest is what lets the repair model see
+  // WHERE the recogniser hesitated. Past three they are near-duplicates.
+  private val maxResults = 4
+  private val maxAlternatives = 3
 
   private fun handle(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
@@ -151,15 +159,21 @@ class SwayAndroidStt(private val context: Context) {
   /// transcript (the final comes back empty when audio is fed by file).
   private fun makeListener() = object : RecognitionListener {
     override fun onResults(b: Bundle) {
-      val txt = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+      // The WHOLE ranked list now, not just its head. Everything after the first
+      // entry is a rival reading of the same audio, and it goes to the repair
+      // model so it can pick the one the sentence supports.
+      val hyps = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        ?.filter { it.isNotBlank() }
+        .orEmpty()
       val p = pending; pending = null
-      p?.invoke(if (txt.isNotEmpty()) txt else lastPartial)
+      p?.invoke(if (hyps.isNotEmpty()) hyps else listOfNotNull(lastPartial.ifBlank { null }))
     }
     override fun onError(e: Int) {
       // NO_MATCH / SPEECH_TIMEOUT after good partials is the empty-final quirk:
-      // return what the partials captured rather than dropping it.
+      // return what the partials captured rather than dropping it. Partials carry
+      // no ranked list, so this path has a best guess and nothing else.
       val p = pending; pending = null
-      p?.invoke(lastPartial)
+      p?.invoke(listOfNotNull(lastPartial.ifBlank { null }))
     }
     override fun onPartialResults(p: Bundle) {
       val txt = p.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
@@ -205,6 +219,9 @@ class SwayAndroidStt(private val context: Context) {
     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
       putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
       putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+      // Ask for the ranked list rather than the winner alone. Without this the
+      // recogniser is free to return a single hypothesis and the doubt is lost.
+      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, maxResults)
       putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, preferOffline)
       putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pfd)
       putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
@@ -244,7 +261,8 @@ class SwayAndroidStt(private val context: Context) {
         result.success(false); return@post
       }
       var done = false
-      val finish = fun(_: String) {
+      // The result is thrown away — this run exists only to load the model.
+      val finish = fun(_: List<String>) {
         if (done) return
         done = true
         pending = null
@@ -257,10 +275,10 @@ class SwayAndroidStt(private val context: Context) {
       try {
         sr.startListening(intentFor(locale, pfd, 16000, requireOnDevice))
       } catch (t: Throwable) {
-        finish("")
+        finish(emptyList())
       }
       // Cold-start can be ~1.4 s; give it room.
-      main.postDelayed({ finish("") }, 10000)
+      main.postDelayed({ finish(emptyList()) }, 10000)
     }
   }
 
@@ -320,7 +338,12 @@ class SwayAndroidStt(private val context: Context) {
         result.success(mapOf("text" to "", "ms" to 0, "onDevice" to false)); return@post
       }
       var replied = false
-      val finish = fun(text: String) {
+      // [hyps] is best-first; its head is what gets spoken, its tail is the
+      // doubt. `lowConf` stays empty on Android on purpose: CONFIDENCE_SCORES is
+      // one score per HYPOTHESIS, not per word, so this platform has no
+      // per-word doubt signal to send — and an empty list reads downstream as
+      // "no information", which is exactly true here.
+      val finish = fun(hyps: List<String>) {
         if (replied) return
         replied = true
         pending = null
@@ -329,9 +352,11 @@ class SwayAndroidStt(private val context: Context) {
         try { file.delete() } catch (_: Throwable) {}
         result.success(
           mapOf(
-            "text" to text,
+            "text" to hyps.firstOrNull().orEmpty(),
             "ms" to (SystemClock.elapsedRealtime() - t0).toInt(),
             "onDevice" to useOnDevice,
+            "alts" to hyps.drop(1).take(maxAlternatives),
+            "lowConf" to emptyList<String>(),
           ),
         )
       }
@@ -339,10 +364,10 @@ class SwayAndroidStt(private val context: Context) {
       try {
         sr.startListening(intentFor(locale, pfd, sampleRate, requireOnDevice))
       } catch (t: Throwable) {
-        finish(lastPartial)
+        finish(listOfNotNull(lastPartial.ifBlank { null }))
       }
       // Watchdog: never let one clip wedge the queue if no callback fires.
-      main.postDelayed({ finish(lastPartial) }, 12000)
+      main.postDelayed({ finish(listOfNotNull(lastPartial.ifBlank { null })) }, 12000)
     }
   }
 

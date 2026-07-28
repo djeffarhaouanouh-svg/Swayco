@@ -131,8 +131,15 @@ class AndroidSttEngine extends AsrEngine {
   bool get isStreaming => false;
 
   @override
-  Future<String> transcribe(Float32List samples16k) async {
-    if (!_ready || samples16k.isEmpty) return '';
+  Future<String> transcribe(Float32List samples16k) async =>
+      (await transcribeDetailed(samples16k)).text;
+
+  /// The full result, rival hypotheses included — the twin of the iOS engine.
+  /// [AsrResult.lowConfidence] is always empty here: Android scores whole
+  /// hypotheses, not words (see [AndroidSttResult.alternatives]).
+  @override
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async {
+    if (!_ready || samples16k.isEmpty) return AsrResult.empty;
     try {
       final res = await AndroidSttChannel.instance.transcribe(
         _locale,
@@ -141,10 +148,16 @@ class AndroidSttEngine extends AsrEngine {
       );
       DebugOverlay.log('stt android native=${res.ms}ms '
           '${res.onDevice ? "on-device" : "CLOUD"} → "${res.text}"');
-      return res.text.trim();
+      if (res.alternatives.isNotEmpty) {
+        DebugOverlay.log('  alt    : ${res.alternatives.join(" | ")}');
+      }
+      return AsrResult(
+        text: res.text.trim(),
+        alternatives: res.alternatives,
+      );
     } catch (e) {
       DebugOverlay.log('stt Android transcribe error: $e');
-      return '';
+      return AsrResult.empty;
     }
   }
 
