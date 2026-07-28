@@ -156,7 +156,14 @@ class _CallScreenState extends State<CallScreen> {
   static const Duration _kMessageSafety = Duration(seconds: 6);
 
   /// Ça parle : on fait la place. Tant que la voix dure, rien ne se referme.
+  ///
+  /// SAUF si la traduction est coupée : la pastille grisée dit «je ne traduis
+  /// plus», et la barre reste alors immobile. C'est elle qui glissait vers la
+  /// droite à chaque phrase, poussée par la zone de texte qui s'élargit —
+  /// couper la traduction doit aussi arrêter ce mouvement, sinon on regarde un
+  /// bouton éteint qui bouge encore.
   void _openMessageZone() {
+    if (!_translationEnabled) return;
     _messageTimer?.cancel();
     _messageTimer = Timer(_kMessageSafety, _closeMessageZone);
     if (!_messageOpen && mounted) setState(() => _messageOpen = true);
@@ -220,6 +227,7 @@ class _CallScreenState extends State<CallScreen> {
   /// rebours plutôt que de le laisser expirer au milieu — et si la personne
   /// repart à parler, [_openMessageZone] l'annule.
   void _flashMessage() {
+    if (!_translationEnabled) return;
     _messageTimer?.cancel();
     if (!_messageOpen) setState(() => _messageOpen = true);
     _messageTimer = Timer(_kMessageHold, _closeMessageZone);
@@ -1555,6 +1563,11 @@ class _CallScreenState extends State<CallScreen> {
       // La phrase en cours de lecture s'arrête avec le reste : on a demandé le
       // silence, pas «le silence après celle-ci».
       _cancelQueuedSpeech();
+      // Et la barre revient à sa place tout de suite. Un seul mouvement, celui
+      // du geste qu'on vient de faire — après quoi plus rien ne bouge tant que
+      // la pastille est grisée.
+      _messageTimer?.cancel();
+      _closeMessageZone();
     }
   }
 
