@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'call_alert.dart';
 import 'call_credit_gate.dart';
 import 'app_strings.dart';
 import 'device_id.dart';
+import 'last_interaction.dart';
 import 'friendship_api.dart';
 import 'incoming_call_api.dart';
 import 'profile_api.dart';
@@ -84,6 +86,9 @@ abstract final class CallLauncher {
     _starting = true;
     try {
       final myId = await DeviceId.getOrCreate();
+      // Appeler quelqu'un, c'est lui parler : sa ligne doit remonter en tête
+      // de la liste Messages, même si aucun message n'est échangé.
+      unawaited(LastInteraction.touch(peerDeviceId));
 
       // Sécurité : on n'appelle QUE ses matchs. Tant que les deux ne se sont
       // pas likés (arête 'accepted', peu importe qui a liké en premier), pas

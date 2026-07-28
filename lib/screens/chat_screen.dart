@@ -14,6 +14,7 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
+import '../services/last_interaction.dart';
 import '../services/match_seen.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
@@ -233,6 +234,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         BlockApi.fetchMyBlockerIds(),
         // Recent inbound messages — counted per conversation for the badge.
         ChatApi.fetchInboundForUnread(id),
+        // Les appels ne laissent pas de message : sans ce registre, appeler
+        // quelqu'un ne remonte pas sa ligne.
+        LastInteraction.load(),
       ]);
       final matchRows =
           results[0] as List<({RemoteProfile profile, DateTime? matchedAt})>;
@@ -248,6 +252,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final blockedMe = results[5] as Set<String>;
       final inbound =
           results[6] as List<({String conversationId, DateTime createdAt})>;
+      final touched = results[7] as Map<String, DateTime>;
 
       final byId = <String, RemoteProfile>{};
       for (final p in matches) {
@@ -298,10 +303,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Tout le monde a sa ligne : un match sans message compris. Les rangées
       // muettes descendent sous les conversations, du match le plus récent au
       // plus ancien.
+      // La date qui classe une ligne : le dernier message, ou le dernier appel
+      // si celui-ci est plus récent. Appeler quelqu'un le fait donc remonter en
+      // tête, comme lui écrire.
+      DateTime? lastTouch(String peerId) {
+        final msg = latest[convIdFor(peerId)]?.createdAt;
+        final call = touched[peerId];
+        if (msg == null) return call;
+        if (call == null) return msg;
+        return call.isAfter(msg) ? call : msg;
+      }
+
       final friends = visible.toList()
         ..sort((a, b) {
-          final la = latest[convIdFor(a.id)]?.createdAt;
-          final lb = latest[convIdFor(b.id)]?.createdAt;
+          final la = lastTouch(a.id);
+          final lb = lastTouch(b.id);
           if (la == null && lb == null) {
             final ma = matchedAtById[a.id];
             final mb = matchedAtById[b.id];
