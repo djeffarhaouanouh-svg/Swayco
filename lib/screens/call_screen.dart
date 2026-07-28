@@ -900,13 +900,51 @@ class _CallScreenState extends State<CallScreen> {
     final key = AsrService.osRefusedKey.value;
     if (key == null || _sttRefusalShown || !mounted) return;
     _sttRefusalShown = true;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.t(key)),
-        duration: const Duration(seconds: 8),
-        backgroundColor: SC.bubbleIn,
-      ),
-    );
+    // Une VRAIE pop-up, pas un bandeau. Le SnackBar se posait au bas de
+    // l'écran, exactement là où flotte la barre d'appel : recouvert, il
+    // n'apparaissait que comme un rectangle vide qu'on prend pour un bug.
+    // Ici c'est la moitié de l'appel qui vient de tomber — ça mérite qu'on
+    // s'arrête dessus et qu'on le referme d'un geste conscient.
+    //
+    // Reporté d'une frame : ce signal peut arriver depuis initState, et on
+    // n'ouvre pas de dialogue pendant une construction.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: SC.menu,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          icon: const Icon(
+            Icons.mic_off_rounded,
+            color: Color(0xFFE53935),
+            size: 34,
+          ),
+          content: Text(
+            AppStrings.t(key),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 15,
+              height: 1.45,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(AppStrings.t('tip_got_it')),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   @override
