@@ -19,3 +19,16 @@ abstract final class WebPoll {
     return Timer.periodic(interval, (_) => tick());
   }
 }
+
+/// Un battement périodique qui tourne sur TOUTES les plateformes.
+///
+/// [WebPoll] existe parce que le natif s'appuie sur les websockets Realtime.
+/// Mais certaines données n'ont AUCUN canal Realtime — la présence
+/// (`profiles.last_seen`) n'est écoutée nulle part —, et sans un rafraîchi
+/// périodique elles restent figées à la valeur du dernier chargement : sur
+/// mobile, personne ne passait jamais «en ligne» tant qu'on ne tirait pas la
+/// liste vers le bas.
+abstract final class AppPoll {
+  static Timer every(Duration interval, FutureOr<void> Function() tick) =>
+      Timer.periodic(interval, (_) => tick());
+}

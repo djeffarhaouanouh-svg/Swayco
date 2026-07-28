@@ -72,6 +72,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   StreamSubscription<List<ChatMessage>>? _sub;
   Timer? _pollTimer;
 
+  /// La présence du pair n'a pas de canal Realtime : sans ce battement, la
+  /// pastille verte de l'en-tête reste celle de l'ouverture du fil.
+  Timer? _presenceTimer;
+
   /// Ticks every minute so the peer's local-time bubble stays current
   /// without the user reopening the thread.
   Timer? _clockTimer;
@@ -352,6 +356,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       },
     );
 
+    // La présence du pair, rafraîchie sur toutes les plateformes (sur le web
+    // aussi : le poll ci-dessous ne relit que les messages).
+    _presenceTimer = AppPoll.every(const Duration(seconds: 30), () async {
+      if (!mounted || !isSupabaseReady || widget.peerDeviceId.isEmpty) return;
+      try {
+        final fresh = await ProfileApi.fetchById(widget.peerDeviceId);
+        if (!mounted || fresh == null) return;
+        setState(() => _peer = fresh);
+      } catch (_) {
+        // Confort d'affichage : un échec réseau ne casse rien.
+      }
+    });
+
     // Web build: even with the realtime subscription above, websockets
     // sometimes drop. Poll the last 200 messages every 5s as a safety
     // net so new arrivals always surface quickly.
@@ -391,6 +408,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   void dispose() {
     _sub?.cancel();
     _pollTimer?.cancel();
+    _presenceTimer?.cancel();
     _clockTimer?.cancel();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();

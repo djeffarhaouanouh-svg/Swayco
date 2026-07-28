@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -75,6 +76,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
+
+  /// Le rafraîchi de PRÉSENCE, lui, tourne aussi sur mobile : `last_seen` n'a
+  /// pas de canal Realtime, donc sans ce battement la pastille verte reste
+  /// celle du chargement initial — quelqu'un qui se connecte après coup
+  /// n'apparaissait jamais en ligne.
+  Timer? _presenceTimer;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
   bool _creatingInvite = false;
 
@@ -113,6 +120,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       const Duration(seconds: 7),
       () => _reload(silent: true),
     );
+    // Sur le web, le rechargement complet ci-dessus s'en charge déjà.
+    if (!kIsWeb) {
+      _presenceTimer = AppPoll.every(
+        const Duration(seconds: 30),
+        _refreshPresence,
+      );
+    }
     // NOTE: we deliberately do NOT call ChatUnread.markAllSeen() here.
     // ChatScreen lives inside IndexedStack, so initState fires at app
     // launch even when the user is on another tab — calling markAllSeen
@@ -128,6 +142,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     NavTab.index.removeListener(_onNavTabChanged);
     _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
+    _presenceTimer?.cancel();
     super.dispose();
   }
 
@@ -330,6 +345,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _error = 'Erreur de chargement : $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Recharge UNIQUEMENT les profils affichés, pour que leur présence soit à
+  /// jour. Bien plus léger que [_reload] (une requête au lieu de sept) et
+  /// suffisant : seuls `last_seen` et le drapeau «masquer mon statut» bougent
+  /// entre deux ouvertures de la page.
+  Future<void> _refreshPresence() async {
+    if (!mounted || !isSupabaseReady) return;
+    final ids = <String>{
+      for (final p in _friends) p.id,
+      for (final p in _newMatches) p.id,
+    }.toList();
+    if (ids.isEmpty) return;
+    try {
+      final fresh = await ProfileApi.fetchByIds(ids);
+      if (!mounted || fresh.isEmpty) return;
+      final byId = {for (final p in fresh) p.id: p};
+      setState(() {
+        _friends = [for (final p in _friends) byId[p.id] ?? p];
+        _newMatches = [for (final p in _newMatches) byId[p.id] ?? p];
+      });
+    } catch (_) {
+      // La présence est un confort : un échec réseau ne doit rien casser.
     }
   }
 
