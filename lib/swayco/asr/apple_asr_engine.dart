@@ -162,50 +162,19 @@ class AppleSttEngine extends AsrEngine {
         lowConfidence: res.lowConfidence,
       );
     } on PlatformException catch (e) {
-      DebugOverlay.log('stt Apple transcribe error: $e');
+      // « Siri and Dictation are disabled » : ce n'est pas un raté ponctuel,
+      // c'est un refus définitif du démon système (Réglages → Siri, ou Temps
+      // d'écran → Restrictions → Siri et Dictée, ou un profil MDM). Réessayer
+      // à chaque phrase ne donnerait que des chaînes vides, jetées ensuite
+      // comme hallucinations — l'utilisateur n'aurait AUCUNE transcription et
+      // aucune explication. On s'arrête et on le dit.
       final refused = (e.message ?? '').toLowerCase().contains('disabled');
-      if (!refused) return AsrResult.empty;
-
-      // `supportsOnDeviceRecognition` MENT. Il dit ce que le modèle d'iPhone
-      // sait faire, pas ce qui est réellement installé : mesuré sur un
-      // appareil qui répond `onDevice=true` pour fr-FR ET ja-JP, puis refuse
-      // les deux avec kLSRErrorDomain 201. Le service local n'a rien à
-      // charger, mais il ne le déclare nulle part.
-      //
-      // Alors on cesse de le croire : une fois, on rejoue le MÊME clip sans
-      // exiger le local. Apple le sert par ses serveurs — ce que la phase de
-      // test autorise déjà ([requireOnDevice] est à false — et c'est ce
-      // chemin-là qu'on n'atteignait jamais, justement parce qu'on croyait la
-      // reconnaissance locale disponible. Le basculement vaut pour la session :
-      // inutile de perdre un aller-retour à chaque phrase.
-      if (_localeOnDevice && !requireOnDevice) {
-        _localeOnDevice = false;
-        DebugOverlay.log(
-            'stt Apple: on-device refused for $_locale — retrying via CLOUD');
-        try {
-          final res = await AppleSttChannel.instance.transcribe(
-            _locale,
-            samples16k,
-            requireOnDevice: false,
-          );
-          DebugOverlay.log('stt apple native=${res.ms}ms CLOUD → "${res.text}"');
-          return AsrResult(
-            text: res.text.trim(),
-            alternatives: res.alternatives,
-            lowConfidence: res.lowConfidence,
-          );
-        } catch (e2) {
-          DebugOverlay.log('stt Apple cloud retry failed: $e2');
-        }
+      DebugOverlay.log('stt Apple transcribe error: $e');
+      if (refused) {
+        _ready = false;
+        DebugOverlay.log('stt Apple REFUSED by the OS — engine stopped');
+        AsrService.reportOsRefusal('stt_os_refused_ios');
       }
-
-      // Ni en local ni en ligne : là, c'est bien un refus du système. On
-      // s'arrête — réessayer à chaque phrase ne rendrait que des chaînes vides,
-      // jetées ensuite comme hallucinations, sans que personne ne sache
-      // pourquoi — et on le dit à l'écran.
-      _ready = false;
-      DebugOverlay.log('stt Apple REFUSED by the OS — engine stopped');
-      AsrService.reportOsRefusal('stt_os_refused_ios');
       return AsrResult.empty;
     } catch (e) {
       DebugOverlay.log('stt Apple transcribe error: $e');

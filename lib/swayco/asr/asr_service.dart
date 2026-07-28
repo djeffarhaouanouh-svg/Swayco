@@ -45,6 +45,11 @@ class AsrService {
     osRefusedKey.value = messageKey;
   }
 
+  /// Un moteur vient de se charger : la panne précédente n'a plus cours. Sans
+  /// ça le signal restait armé pour toute la vie du processus, et l'appel
+  /// suivant rouvrait la pop-up alors que la transcription remarchait.
+  static void clearOsRefusal() => osRefusedKey.value = null;
+
   final _downloader = AsrModelDownloader();
 
   AsrEngine? _engine;
@@ -98,6 +103,7 @@ class AsrService {
     // fall through to the bundled Whisper exactly as before.
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       try {
+        AsrService.clearOsRefusal();
         final apple = await AppleSttEngine.tryLoad(lang);
         if (apple != null) {
           final old = _engine;
@@ -121,6 +127,7 @@ class AsrService {
     // to the bundled Whisper exactly as before.
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       try {
+        AsrService.clearOsRefusal();
         final android = await AndroidSttEngine.tryLoad(lang);
         if (android != null) {
           final old = _engine;

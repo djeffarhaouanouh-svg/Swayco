@@ -940,6 +940,9 @@ class _CallScreenState extends State<CallScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: SC.menu,
+          // Material 3 reteinte toute surface élevée avec la couleur primaire :
+          // le gris du menu virait au bleu cyan. On coupe la teinte.
+          surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
             side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
