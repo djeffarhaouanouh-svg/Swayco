@@ -966,12 +966,12 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      // EC + NS on, AGC OFF. Rationale: the translation pipeline plays
-      // a second audio stream on the speakers that the browser's EC
-      // doesn't fully account for, so any captured leak goes back into
-      // LiveKit. AGC then amplifies that leak each loop and the
-      // feedback runs away to infinity. Without AGC the captured leak
-      // stays below its source and decays naturally.
+      // EC on, NS OFF, AGC OFF — each flag's own reason is on its line below.
+      // The oldest of the three: the translation pipeline plays a second audio
+      // stream on the speakers that EC doesn't fully account for, so any
+      // captured leak goes back into LiveKit. AGC then amplifies that leak each
+      // loop and the feedback runs away to infinity. Without AGC the captured
+      // leak stays below its source and decays naturally.
       await room.localParticipant?.setMicrophoneEnabled(
         true,
         audioCaptureOptions: const AudioCaptureOptions(
@@ -985,22 +985,27 @@ class _CallScreenState extends State<CallScreen> {
           // carrying it. There is no way to keep one and drop the other through
           // this API. Echo cancellation is untouched.
           noiseSuppression: false,
-          // AGC back ON — this is what makes a call sound "flat and settled"
-          // rather than swelling and dipping: it levels every word, and it is
-          // the single biggest difference between our audio and a normal phone
-          // app's.
+          // AGC OFF, and this time the reason is the line right above it.
           //
-          // It was turned off for a reason that no longer exists. AGC's job is
-          // to pull quiet things up, and what used to be quiet on this mic was
-          // the leak from the SECOND capture — so AGC amplified it until the
-          // audio ran away. That second capture is gone (the STT now reads
-          // WebRTC's own), and with a single clean capture there is no leak left
-          // to amplify.
+          // It was turned back on to make the voice "flat and settled" like a
+          // normal call app, on the grounds that the leak it used to amplify
+          // (the second capture) no longer exists. That part was true. What it
+          // missed is what the line above had just introduced: with noise
+          // suppression off, the room tone stays IN the signal — the commit that
+          // did it said so, and accepted it. AGC's job is to pull quiet things
+          // up, and between two words the quiet thing is now exactly that room
+          // tone and the reverberant tail of the previous word. So it levels the
+          // voice and lifts the room with it, and the peer hears the resonance
+          // the noise-suppression fix had just removed.
           //
-          // KNOWN RISK, on the record: an earlier build with AGC on produced
-          // crackling at idle. It is on its own here, so if that returns it is
-          // unambiguously this line — flip it back to false.
-          autoGainControl: true,
+          // The two are individually reasonable and cannot both be on. The voice
+          // sounding REAL wins over the voice sounding LEVELLED: a slightly
+          // swelling voice is still the caller's, a reverberant one is not.
+          //
+          // If a levelled voice is wanted back, it has to come from somewhere
+          // that does not touch the noise floor — a compressor on the captured
+          // stream with a gate under it, not the capture chain's own AGC.
+          autoGainControl: false,
         ),
       );
       // First attach with whatever remote-lang we already know (often nothing
