@@ -3315,20 +3315,23 @@ class _DockCircleButton extends StatelessWidget {
   }
 }
 
-/// La pastille de traduction, au centre du dock : l'orbe « Prisme ». Une goutte
-/// nacrée qui se déforme lentement, cerclée d'un halo cyan/magenta qui tourne.
-/// Quand ça parle — une voix humaine comme la traduction dite par la machine —
-/// elle respire, le halo accélère et une onde part du bord : c'est le seul
-/// endroit de l'écran qui montre que la machine travaille.
+/// La pastille de traduction, au centre du dock : l'orbe « Halo ». Un noyau
+/// sombre, un cœur clair qui se déforme lentement à l'intérieur, et un anneau
+/// spectral qui tourne autour — bleu, violet, blanc.
 ///
-/// Un tap coupe la traduction : tout se fige et la goutte se désature en
-/// douceur, sans jamais devenir noire.
+/// Elle tourne EN PERMANENCE, du début à la fin de l'appel. Quand une voix
+/// passe — une personne comme la traduction dite par la machine — le rythme
+/// double, le cœur respire et une onde part du bord.
 ///
-/// Elle ne se déplace pas D'ELLE-MÊME : le modèle d'origine embarquait un
-/// `AnimatedPositioned` qui la faisait glisser de 104 px dans sa propre barre,
-/// inutile ici puisque le dock produit déjà ce mouvement — la zone de texte
-/// s'élargit et pousse l'orbe vers la droite. Ce glissement-là est intact tant
-/// que la traduction tourne ; il ne s'arrête que sur une pastille grisée (voir
+/// Un tap coupe la traduction : l'agitation s'arrête et tout se désature en
+/// douceur, jamais jusqu'au noir, pour qu'une pastille éteinte reste visible
+/// et cliquable.
+///
+/// Elle ne se déplace pas d'elle-même : le modèle d'origine embarquait un
+/// `AnimatedPositioned` qui la faisait glisser dans sa propre barre, inutile
+/// ici puisque le dock produit déjà ce mouvement — la zone de texte s'élargit
+/// et pousse l'orbe vers la droite. Ce glissement-là est intact tant que la
+/// traduction tourne ; il ne s'arrête que sur une pastille grisée (voir
 /// [_CallScreenState._openMessageZone]).
 class _TranslationOrb extends StatefulWidget {
   const _TranslationOrb({
@@ -3339,7 +3342,7 @@ class _TranslationOrb extends StatefulWidget {
     required this.onLongPress,
   });
 
-  /// La traduction tourne. False = coupée : goutte désaturée, tout est figé.
+  /// La traduction tourne. False = coupée : orbe désaturé, agitation à l'arrêt.
   final bool on;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -3348,7 +3351,9 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
+  /// La taille de la pastille d'origine — le plus gros élément du dock, celui
+  /// qu'on vise sans regarder. Le modèle proposait 46 ; on garde 50 pour ne
+  /// rien déplacer autour.
   static const double size = 50;
 
   @override
@@ -3357,27 +3362,25 @@ class _TranslationOrb extends StatefulWidget {
 
 class _TranslationOrbState extends State<_TranslationOrb>
     with TickerProviderStateMixin {
-  /// La déformation de la goutte, et le halo qui tourne. Ils tournent EN
-  /// PERMANENCE, du début à la fin de l'appel — l'orbe est vivant, il ne
-  /// s'allume pas quand on lui parle. Ils accélèrent seulement quand une voix
-  /// passe.
-  late final AnimationController _morph = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 4500),
-  );
+  /// L'anneau qui tourne et le cœur qui se déforme. Ils tournent du début à la
+  /// fin de l'appel et accélèrent quand une voix passe.
   late final AnimationController _halo = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 6000),
+    duration: const Duration(milliseconds: 3400),
+  );
+  late final AnimationController _morph = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 5000),
   );
 
-  /// La respiration et l'onde de choc — seulement pendant qu'une voix passe.
+  /// La respiration et l'onde — seulement pendant qu'une voix passe.
   late final AnimationController _breathe = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 1000),
   );
   late final AnimationController _shock = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1300),
+    duration: const Duration(milliseconds: 1600),
   );
 
   bool _speaking = false;
@@ -3388,8 +3391,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
     widget.ttsSpeaking.addListener(_retarget);
     widget.voiceLevel.addListener(_retarget);
     // Le fond tourne tout de suite et ne s'arrêtera plus.
-    _morph.repeat();
     _halo.repeat();
+    _morph.repeat();
     _retarget();
   }
 
@@ -3407,27 +3410,24 @@ class _TranslationOrbState extends State<_TranslationOrb>
     if (old.on != widget.on) _retarget();
   }
 
-  /// Un seul régime : dès que ça parle, l'orbe s'anime. Il dit « il y a du
-  /// son », pas « qui parle ».
+  /// L'agitation n'a lieu que si la traduction tourne : une pastille grisée ne
+  /// réagit plus à la voix. La rotation de fond, elle, ne s'arrête jamais.
   void _retarget() {
-    // L'agitation — respiration et onde — n'a lieu que si la traduction
-    // tourne : une pastille grisée ne réagit plus à la voix. La rotation de
-    // fond, elle, ne s'arrête jamais.
     final talking = widget.on &&
         (widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02);
     if (talking == _speaking) return;
     _speaking = talking;
-    // Le rythme de fond double quand une voix passe.
-    _morph.duration = Duration(milliseconds: talking ? 1800 : 4500);
-    _halo.duration = Duration(milliseconds: talking ? 2400 : 6000);
-    _morph.repeat();
+    _halo.duration = Duration(milliseconds: talking ? 1500 : 3400);
+    _morph.duration = Duration(milliseconds: talking ? 2200 : 5000);
     _halo.repeat();
+    _morph.repeat();
     if (talking) {
       _breathe.repeat(reverse: true);
       _shock.repeat();
     } else {
-      _breathe.stop();
-      _breathe.value = 0;
+      _breathe
+        ..stop()
+        ..value = 0;
       _shock.stop();
     }
     if (mounted) setState(() {});
@@ -3437,8 +3437,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
   void dispose() {
     widget.ttsSpeaking.removeListener(_retarget);
     widget.voiceLevel.removeListener(_retarget);
-    _morph.dispose();
     _halo.dispose();
+    _morph.dispose();
     _breathe.dispose();
     _shock.dispose();
     super.dispose();
@@ -3447,6 +3447,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
   @override
   Widget build(BuildContext context) {
     const size = _TranslationOrb.size;
+    // Le cœur clair, à l'intérieur du noyau — le rapport du modèle, à l'échelle.
+    const core = size - 18;
     return Semantics(
       label: AppStrings.t(
         widget.on ? 'call_translation_cut' : 'call_translation_resume',
@@ -3460,75 +3462,82 @@ class _TranslationOrbState extends State<_TranslationOrb>
           width: size,
           height: size,
           child: AnimatedBuilder(
-            animation: Listenable.merge([_morph, _halo, _breathe, _shock]),
+            animation: Listenable.merge([_halo, _morph, _breathe, _shock]),
             builder: (context, _) {
-              final breathe = 1 + 0.09 * math.sin(_breathe.value * math.pi);
-              final glow = widget.on ? (_speaking ? 1.0 : 0.4) : 0.0;
+              final breathe = 1 + 0.08 * math.sin(_breathe.value * math.pi);
+              final glow = widget.on ? (_speaking ? 1.0 : 0.75) : 0.0;
               final orb = Transform.scale(
                 scale: _speaking ? breathe : 1,
                 child: Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    // Le halo cyan / magenta qui tourne derrière la goutte.
+                    // L'anneau spectral, qui tourne derrière le noyau.
                     Opacity(
                       opacity: glow,
                       child: Transform.rotate(
-                        angle: -_halo.value * 2 * math.pi,
+                        angle: _halo.value * 2 * math.pi,
                         child: Container(
-                          width: size + 16,
-                          height: size + 16,
+                          width: size + 6,
+                          height: size + 6,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: SweepGradient(colors: [
-                              Color(0xB32CE0FF),
-                              Color(0xB3FF4FC3),
-                              Color(0x99A078FF),
-                              Color(0xB32CE0FF),
+                              Color(0xFF7EE8FF),
+                              Color(0xFF6B7BFF),
+                              Color(0xFFC08CFF),
+                              Color(0xFFFFFFFF),
+                              Color(0xFF7EE8FF),
                             ]),
                           ),
                         ),
                       ),
                     ),
-                    // La goutte : ses quatre rayons s'interpolent, ce qui la
-                    // fait onduler sans jamais cesser d'être ronde.
+                    // Le noyau sombre, qui masque l'anneau en son centre.
                     Container(
                       width: size,
                       height: size,
-                      decoration: BoxDecoration(
-                        borderRadius: _morphRadius(_morph.value),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFFFFFFFF),
-                            Color(0xFF7FF0FF),
-                            Color(0xFFFF6AD5),
-                          ],
-                          stops: [0.0, 0.42, 1.0],
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          center: Alignment(0, -0.25),
+                          radius: 0.85,
+                          colors: [Color(0xFF232333), Color(0xFF0A0A12)],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFFFF5AC8).withValues(alpha: 0.42),
-                            blurRadius: 26,
-                            offset: const Offset(0, 10),
+                            color: Color(0xA6000000),
+                            blurRadius: 22,
+                            offset: Offset(0, 8),
                           ),
                         ],
+                      ),
+                    ),
+                    // Le cœur clair : ses quatre rayons s'interpolent, il passe
+                    // du rond au galet déformé sans jamais faire d'angle.
+                    Container(
+                      width: core,
+                      height: core,
+                      decoration: BoxDecoration(
+                        borderRadius: _morphRadius(_morph.value, core),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFE8ECFF), Color(0xFF8F9DFF)],
+                        ),
                       ),
                     ),
                     // L'onde qui part du bord pendant qu'une voix passe.
                     if (_speaking)
                       Opacity(
-                        opacity: (1 - _shock.value).clamp(0.0, 1.0) * 0.85,
+                        opacity: (1 - _shock.value).clamp(0.0, 1.0) * 0.7,
                         child: Container(
-                          width: size * (0.85 + 1.25 * _shock.value),
-                          height: size * (0.85 + 1.25 * _shock.value),
+                          width: (size + 8) * (0.8 + 1.2 * _shock.value),
+                          height: (size + 8) * (0.8 + 1.2 * _shock.value),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xD9D2DEFF),
-                              width: 1.5,
+                              color: const Color(0x8096A8FF),
                             ),
                           ),
                         ),
@@ -3569,15 +3578,15 @@ class _TranslationOrbState extends State<_TranslationOrb>
     ];
   }
 
-  /// Interpole les quatre rayons pour l'effet « goutte » qui se déforme :
-  /// rond → déformé A → déformé B → rond.
-  BorderRadius _morphRadius(double t) {
+  /// Rayons interpolés : rond → galet déformé A → galet déformé B → rond.
+  BorderRadius _morphRadius(double t, double size) {
+    final r = size / 2;
     double lerp(double a, double b, double k) => a + (b - a) * k;
-    const keys = <List<double>>[
-      [26, 26, 26, 26],
-      [32, 20, 23, 29],
-      [21, 31, 30, 22],
-      [26, 26, 26, 26],
+    final keys = <List<double>>[
+      [r, r, r, r],
+      [r * 1.24, r * 0.76, r * 0.9, r * 1.1],
+      [r * 0.8, r * 1.2, r * 1.16, r * 0.84],
+      [r, r, r, r],
     ];
     final seg = (t * 3).clamp(0.0, 2.999);
     final i = seg.floor();
