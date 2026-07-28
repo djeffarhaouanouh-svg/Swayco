@@ -997,7 +997,7 @@ class _PeerClockChipState extends State<_PeerClockChip> {
     setState(() => _open = !_open);
     _autoClose?.cancel();
     if (_open) {
-      _autoClose = Timer(const Duration(seconds: 4), () {
+      _autoClose = Timer(const Duration(seconds: 3), () {
         if (mounted) setState(() => _open = false);
       });
     }
@@ -1128,6 +1128,12 @@ class _MessageBubble extends StatelessWidget {
     // longer stretches the full width; media bubbles keep their own width.
     final hugContent =
         !message.isImage && !message.hasDiscoverPhoto && !message.isVoice;
+
+    // Une image ou un GIF envoyé seul se montre NU : pas de bulle, pas de
+    // cadre, pas de fond. L'image est déjà un objet à elle seule — l'enfermer
+    // dans un rectangle coloré ne fait que l'entourer de bord perdu. Il ne
+    // reste que l'heure, posée dessous.
+    final bareMedia = message.isImage && displayBody.trim().isEmpty;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1268,7 +1274,11 @@ class _MessageBubble extends StatelessWidget {
           child: Text(
             time,
             style: TextStyle(
-              color: bubbleText.withValues(alpha: 0.5),
+              // Sans bulle, l'heure se pose sur le fond noir de la page : le
+              // gris des bulles y serait illisible.
+              color: bareMedia
+                  ? SC.textMuted
+                  : bubbleText.withValues(alpha: 0.5),
               fontSize: 10,
             ),
           ),
@@ -1283,20 +1293,27 @@ class _MessageBubble extends StatelessWidget {
         onLongPress: onLongPressDelete,
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          padding: bareMedia
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(14, 10, 14, 8),
           constraints: BoxConstraints(
             // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
-            // proper bubble instead of a cramped little square.
-            minWidth: 110,
+            // proper bubble instead of a cramped little square. Une image nue
+            // n'a pas de plancher : elle fait sa taille.
+            minWidth: bareMedia ? 0 : 110,
             maxWidth: MediaQuery.of(context).size.width * 0.78,
           ),
-          decoration: BoxDecoration(
-            // Light "card" bubbles on the black message area: received =
-            // neutral grey, sent = pale cyan with a cyan border.
-            color: mine ? SC.msgOutBg : SC.msgInBg,
-            borderRadius: radius,
-            border: Border.all(color: mine ? SC.msgOutBorder : SC.msgInBorder),
-          ),
+          decoration: bareMedia
+              ? null
+              : BoxDecoration(
+                  // Light "card" bubbles on the black message area: received =
+                  // neutral grey, sent = pale cyan with a cyan border.
+                  color: mine ? SC.msgOutBg : SC.msgInBg,
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: mine ? SC.msgOutBorder : SC.msgInBorder,
+                  ),
+                ),
           child: hugContent ? IntrinsicWidth(child: content) : content,
         ),
       ),
