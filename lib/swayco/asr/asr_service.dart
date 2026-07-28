@@ -1,9 +1,16 @@
 import 'package:flutter/foundation.dart';
 
 import '../../services/debug_overlay.dart';
+import 'android_asr_engine.dart';
+import 'apple_asr_engine.dart';
 import 'asr_catalogue.dart';
 import 'asr_engine.dart';
 import 'asr_downloader.dart';
+
+// The shapes this service hands back. Callers (the mic streamer) talk to
+// AsrService alone and should not have to reach into the engine library to name
+// what it returned.
+export 'asr_engine.dart' show AsrResult, SttChunk;
 
 /// On-device speech-to-text — 100 % local inference, no audio leaves the phone.
 ///
@@ -19,6 +26,24 @@ import 'asr_downloader.dart';
 class AsrService {
   AsrService._();
   static final instance = AsrService._();
+
+  /// Le système d'exploitation a refusé de transcrire, et il refusera pour
+  /// tout le reste de l'appel : Siri / la Dictée sont désactivés, ou bloqués
+  /// par Temps d'écran ou un profil de configuration.
+  ///
+  /// C'est une panne SILENCIEUSE sans ce signal : le moteur rend une chaîne
+  /// vide, le pipeline la jette comme hallucination, et l'utilisateur ne voit
+  /// jamais que sa voix n'est plus transcrite. L'écran d'appel écoute ce
+  /// notifieur pour le dire, une fois. Porte la CLÉ de traduction, pas un
+  /// message tout fait — le texte se lit dans la langue de l'interface.
+  static final ValueNotifier<String?> osRefusedKey =
+      ValueNotifier<String?>(null);
+
+  /// Appelé par un moteur natif quand le système claque la porte.
+  static void reportOsRefusal(String messageKey) {
+    if (osRefusedKey.value == messageKey) return;
+    osRefusedKey.value = messageKey;
+  }
 
   final _downloader = AsrModelDownloader();
 
@@ -65,6 +90,52 @@ class AsrService {
   }
 
   Future<void> _load(String lang, void Function(double)? onProgress) async {
+    // iOS: prefer Apple's native STT. It runs fully on-device (so mic audio
+    // still never leaves the phone), needs no model download, and frees the
+    // ~244 MB Whisper fetch. Used ONLY when this phone has the language's
+    // dictation asset installed — [AppleSttEngine.tryLoad] returns null for a
+    // missing asset, a restricted/denied permission, or pre-iOS, and we then
+    // fall through to the bundled Whisper exactly as before.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        final apple = await AppleSttEngine.tryLoad(lang);
+        if (apple != null) {
+          final old = _engine;
+          _engine = apple;
+          _loadedLang = lang;
+          await old?.dispose();
+          DebugOverlay.log('stt engine=apple locale=${apple.locale} for "$lang"');
+          return;
+        }
+        DebugOverlay.log('stt Apple unavailable for "$lang" — using Whisper');
+      } catch (e) {
+        DebugOverlay.log('stt Apple probe failed ($e) — using Whisper');
+      }
+    }
+
+    // Android: prefer Google's native on-device STT — the exact twin of the iOS
+    // path above. Runs on-device (mic audio stays on the phone), needs no model
+    // download, frees the ~244 MB Whisper fetch. Used ONLY when the phone has an
+    // installed on-device voice model — [AndroidSttEngine.tryLoad] returns null
+    // for a missing model, API < 33, or no recogniser, and we then fall through
+    // to the bundled Whisper exactly as before.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final android = await AndroidSttEngine.tryLoad(lang);
+        if (android != null) {
+          final old = _engine;
+          _engine = android;
+          _loadedLang = lang;
+          await old?.dispose();
+          DebugOverlay.log('stt engine=android locale=${android.locale} for "$lang"');
+          return;
+        }
+        DebugOverlay.log('stt Android unavailable for "$lang" — using Whisper');
+      } catch (e) {
+        DebugOverlay.log('stt Android probe failed ($e) — using Whisper');
+      }
+    }
+
     final spec = specForLang(lang);
     if (spec == null) {
       DebugOverlay.log('stt NO on-device model for "$lang"');
@@ -144,18 +215,25 @@ class AsrService {
   /// a 5 s sentence took 1 s, and the number is comparable across phones,
   /// sentences and model builds. It is the one figure that says whether STT is
   /// what makes a call feel slow.
-  Future<String> transcribe(Float32List samples16k) async {
+  Future<String> transcribe(Float32List samples16k) async =>
+      (await transcribeDetailed(samples16k)).text;
+
+  /// [transcribe], keeping the rival hypotheses and shaky words the OS
+  /// recognisers report (see [AsrResult]). The ONNX engines return the text
+  /// alone, so callers must read an empty hypothesis list as "this engine has
+  /// nothing to say", never as certainty.
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async {
     final engine = _engine;
-    if (kIsWeb || engine == null || !engine.isReady) return '';
+    if (kIsWeb || engine == null || !engine.isReady) return AsrResult.empty;
     final started = DateTime.now();
-    final text = await engine.transcribe(samples16k);
+    final res = await engine.transcribeDetailed(samples16k);
     final decodeMs = DateTime.now().difference(started).inMilliseconds;
     final audioMs = samples16k.length * 1000 ~/ 16000;
     if (audioMs > 0) {
       DebugOverlay.log('stt decode ${decodeMs}ms for ${audioMs}ms audio '
           '(${(decodeMs / audioMs).toStringAsFixed(2)}x)');
     }
-    return text;
+    return res;
   }
 
   Future<void> dispose() async {

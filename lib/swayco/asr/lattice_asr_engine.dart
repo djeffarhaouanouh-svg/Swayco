@@ -222,6 +222,14 @@ class LatticeAsrEngine implements AsrEngine {
     return flush();
   }
 
+  /// Spelled out rather than inherited: this engine `implements` [AsrEngine]
+  /// instead of extending it, so it gets no default body. It reports the text
+  /// alone — the lattice holds rival paths internally but the C ABI bound here
+  /// exposes only the best one.
+  @override
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async =>
+      AsrResult(text: await transcribe(samples16k));
+
   Pointer<Float> _ensureBuf(int n) {
     final buf = _buf;
     if (buf != null && _bufLen >= n) return buf;

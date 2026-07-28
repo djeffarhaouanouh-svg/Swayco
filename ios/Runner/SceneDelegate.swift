@@ -29,7 +29,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // opening a second `record` capture (which self-oscillates on iOS). Must be
     // registered AFTER GeneratedPluginRegistrant so flutter_webrtc's singleton
     // exists by the time Dart calls start.
-    SwayMicTap.register(withMessenger: flutterVC.binaryMessenger)
+    SwayMicTap.register(with: flutterVC.binaryMessenger)
+
+    // Apple's native on-device STT, offered to Dart as a drop-in for the
+    // Whisper recogniser. Same timing constraint as SwayMicTap: registered on
+    // THIS engine's messenger, after the generated plugins.
+    SwayAppleStt.register(with: flutterVC.binaryMessenger)
+
     let window = UIWindow(windowScene: windowScene)
     window.rootViewController = flutterVC
     window.makeKeyAndVisible()

@@ -925,7 +925,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// (`if (_busy) return ''`), and a dropped one is how the second half of a cut
   /// sentence used to vanish. And only one is ever in flight, so a real phrase
   /// waits behind at most one speculative decode, never a queue of them.
-  Future<String>? _speculative;
+  Future<AsrResult>? _speculative;
 
   /// Sample count [_speculative] covers. A phrase that has grown since compares
   /// unequal and takes the slow path — the guard against speaking a translation
@@ -936,7 +936,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     if (_speculative != null || _pending.isEmpty) return;
     final samples = Float32List.fromList(_pending);
     _speculativeSamples = samples.length;
-    final f = _asrQueue.then((_) => AsrService.instance.transcribe(samples));
+    final f =
+        _asrQueue.then((_) => AsrService.instance.transcribeDetailed(samples));
     _speculative = f;
     // Keep the chain going whatever happens, so one failed speculation cannot
     // wedge every phrase after it.
@@ -1042,13 +1043,15 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError, {
     bool force = false,
-    Future<String>? decoded,
+    Future<AsrResult>? decoded,
   }) async {
     try {
       // [decoded] is the speculative decode started during the merge wait, and
       // it covers exactly these samples — awaiting it returns at once when it
       // finished inside the wait, which is the whole point of starting it early.
-      final orig = await (decoded ?? AsrService.instance.transcribe(samples));
+      final res =
+          await (decoded ?? AsrService.instance.transcribeDetailed(samples));
+      final orig = res.text;
       final durationMs = (samples.length / _sampleRate * 1000).round();
       if (decoded != null) DebugOverlay.log('stt decode reused (merge wait)');
 
@@ -1081,7 +1084,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
       _lastOrigMs = nowMs;
 
       DebugOverlay.log('stt orig="$orig" (${durationMs}ms)');
-      await _translateAndSend(orig, onTranslation, onError, force: force);
+      await _translateAndSend(orig, onTranslation, onError,
+          force: force, hypotheses: res);
     } catch (e) {
       onError?.call('stt:$e');
     }
@@ -1089,11 +1093,18 @@ class LocalSttMicStreamer implements SwayMicStreamer {
 
   /// [force] publishes even if the mic is muted by the time the backend answers.
   /// Set it for a flush triggered *by* the mute: those words predate the press.
+  ///
+  /// [hypotheses] carries what the recogniser knew beyond its best guess. It
+  /// travels with the transcript to the repair prompt: a rival reading of the
+  /// same audio is the one thing that tells the repair model WHERE to look, and
+  /// it costs nothing to obtain — the OS already computed it. Absent (ONNX
+  /// engines, streaming flush) it degrades to exactly the previous behaviour.
   Future<void> _translateAndSend(
     String orig,
     void Function(String, String, String, String) onTranslation,
     void Function(String)? onError, {
     bool force = false,
+    AsrResult hypotheses = AsrResult.empty,
   }) async {
     final TranscriptFix fixed;
     try {
@@ -1115,6 +1126,8 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         to: _targetLang,
         authorGender: _myGender.isEmpty ? null : _myGender,
         peerGender: _peerGender.isEmpty ? null : _peerGender,
+        alternatives: hypotheses.alternatives,
+        lowConfidence: hypotheses.lowConfidence,
         onSentence: (sentence) {
           _publish('', sentence, onTranslation, force: force);
         },

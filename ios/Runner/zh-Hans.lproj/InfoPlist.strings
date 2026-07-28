@@ -3,3 +3,4 @@
 "NSPhotoLibraryUsageDescription" = "用于从相册中选择你的个人头像和 Discover 照片。";
 "NSPhotoLibraryAddUsageDescription" = "用于将分享的照片保存到你的相册。";
 "NSUserTrackingUsageDescription" = "用于提供更相关的体验。你可以拒绝,不会失去任何功能的访问权限。";
+"NSSpeechRecognitionUsageDescription" = "Swayco 直接在你的 iPhone 上将你的语音转写为文字,以便在通话中实时翻译你所说的内容。";

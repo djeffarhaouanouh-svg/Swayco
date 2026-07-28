@@ -79,6 +79,8 @@
 		<string>Camera is used for video calls.</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>Microphone is used for video calls.</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>Swayco transcribes your voice directly on your iPhone to translate what you say in real time during a call.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>

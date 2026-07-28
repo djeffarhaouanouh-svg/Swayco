@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../swayco/asr/asr_service.dart';
 import '../services/audio_controller.dart';
 import '../services/auth_service.dart';
 import '../services/call_audio.dart';
@@ -880,6 +881,26 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// Déjà dit pendant cet appel : le bandeau ne revient pas à chaque phrase.
+  bool _sttRefusalShown = false;
+
+  /// Le système a refusé la reconnaissance vocale. On le dit UNE fois, en clair
+  /// et longuement — c'est la moitié de la fonctionnalité qui vient de tomber,
+  /// et l'utilisateur n'a aucun autre moyen de le savoir : sa voix part bien,
+  /// simplement plus rien ne la transcrit.
+  void _onSttRefused() {
+    final key = AsrService.osRefusedKey.value;
+    if (key == null || _sttRefusalShown || !mounted) return;
+    _sttRefusalShown = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppStrings.t(key)),
+        duration: const Duration(seconds: 8),
+        backgroundColor: SC.bubbleIn,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -892,6 +913,10 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
+    // fil, la panne serait totalement muette côté utilisateur.
+    AsrService.osRefusedKey.addListener(_onSttRefused);
+    _onSttRefused();
     _wireDeviceTtsSignal();
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
@@ -1176,12 +1201,12 @@ class _CallScreenState extends State<CallScreen> {
         _hadRemote = true;
       }
       await room.localParticipant?.setCameraEnabled(widget.startWithCamera);
-      // EC + NS on, AGC OFF. Rationale: the translation pipeline plays
-      // a second audio stream on the speakers that the browser's EC
-      // doesn't fully account for, so any captured leak goes back into
-      // LiveKit. AGC then amplifies that leak each loop and the
-      // feedback runs away to infinity. Without AGC the captured leak
-      // stays below its source and decays naturally.
+      // EC on, NS OFF, AGC OFF — each flag's own reason is on its line below.
+      // The oldest of the three: the translation pipeline plays a second audio
+      // stream on the speakers that EC doesn't fully account for, so any
+      // captured leak goes back into LiveKit. AGC then amplifies that leak each
+      // loop and the feedback runs away to infinity. Without AGC the captured
+      // leak stays below its source and decays naturally.
       await room.localParticipant?.setMicrophoneEnabled(
         true,
         audioCaptureOptions: const AudioCaptureOptions(
@@ -1195,22 +1220,27 @@ class _CallScreenState extends State<CallScreen> {
           // carrying it. There is no way to keep one and drop the other through
           // this API. Echo cancellation is untouched.
           noiseSuppression: false,
-          // AGC back ON — this is what makes a call sound "flat and settled"
-          // rather than swelling and dipping: it levels every word, and it is
-          // the single biggest difference between our audio and a normal phone
-          // app's.
+          // AGC OFF, and this time the reason is the line right above it.
           //
-          // It was turned off for a reason that no longer exists. AGC's job is
-          // to pull quiet things up, and what used to be quiet on this mic was
-          // the leak from the SECOND capture — so AGC amplified it until the
-          // audio ran away. That second capture is gone (the STT now reads
-          // WebRTC's own), and with a single clean capture there is no leak left
-          // to amplify.
+          // It was turned back on to make the voice "flat and settled" like a
+          // normal call app, on the grounds that the leak it used to amplify
+          // (the second capture) no longer exists. That part was true. What it
+          // missed is what the line above had just introduced: with noise
+          // suppression off, the room tone stays IN the signal — the commit that
+          // did it said so, and accepted it. AGC's job is to pull quiet things
+          // up, and between two words the quiet thing is now exactly that room
+          // tone and the reverberant tail of the previous word. So it levels the
+          // voice and lifts the room with it, and the peer hears the resonance
+          // the noise-suppression fix had just removed.
           //
-          // KNOWN RISK, on the record: an earlier build with AGC on produced
-          // crackling at idle. It is on its own here, so if that returns it is
-          // unambiguously this line — flip it back to false.
-          autoGainControl: true,
+          // The two are individually reasonable and cannot both be on. The voice
+          // sounding REAL wins over the voice sounding LEVELLED: a slightly
+          // swelling voice is still the caller's, a reverberant one is not.
+          //
+          // If a levelled voice is wanted back, it has to come from somewhere
+          // that does not touch the noise floor — a compressor on the captured
+          // stream with a gate under it, not the capture chain's own AGC.
+          autoGainControl: false,
         ),
       );
       // First attach with whatever remote-lang we already know (often nothing
@@ -2113,6 +2143,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
+    AsrService.osRefusedKey.removeListener(_onSttRefused);
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()

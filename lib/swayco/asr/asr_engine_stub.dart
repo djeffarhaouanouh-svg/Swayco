@@ -12,6 +12,24 @@ class SttChunk {
   bool get hasFinal => finalText.trim().isNotEmpty;
 }
 
+class AsrResult {
+  const AsrResult({
+    required this.text,
+    this.alternatives = const [],
+    this.lowConfidence = const [],
+  });
+  static const empty = AsrResult(text: '');
+  final String text;
+  final List<String> alternatives;
+  final List<String> lowConfidence;
+  bool get hasDoubt => alternatives.isNotEmpty || lowConfidence.isNotEmpty;
+  AsrResult copyWith({String? text}) => AsrResult(
+        text: text ?? this.text,
+        alternatives: alternatives,
+        lowConfidence: lowConfidence,
+      );
+}
+
 abstract class AsrEngine {
   Future<void> load(String modelDir, String lang);
   bool get isReady;
@@ -20,6 +38,8 @@ abstract class AsrEngine {
   Future<String> flush() async => '';
   Future<void> reset() async {}
   Future<String> transcribe(Float32List samples16k);
+  Future<AsrResult> transcribeDetailed(Float32List samples16k) async =>
+      AsrResult(text: await transcribe(samples16k));
   Future<void> dispose();
 }
 

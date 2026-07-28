@@ -3,3 +3,4 @@
 "NSPhotoLibraryUsageDescription" = "Usato per scegliere la tua foto profilo e le foto di Discover dalla galleria.";
 "NSPhotoLibraryAddUsageDescription" = "Usato per salvare le foto condivise nella tua galleria.";
 "NSUserTrackingUsageDescription" = "Usato per offrire un'esperienza più pertinente. Puoi rifiutare senza perdere l'accesso ad alcuna funzione.";
+"NSSpeechRecognitionUsageDescription" = "Swayco trascrive la tua voce direttamente sul tuo iPhone per tradurre in tempo reale ciò che dici durante una chiamata.";
