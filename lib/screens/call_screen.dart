@@ -316,6 +316,15 @@ class _CallScreenState extends State<CallScreen> {
   bool _micProbeDead = false;
   int _micProbeSilentTicks = 0;
 
+  /// La mesure précédente, pour reconnaître une sonde figée (micro coupé) et
+  /// cesser d'en nourrir le plancher de bruit.
+  double _lastProbeLevel = -1;
+
+  /// Le seuil d'ouverture ne monte jamais au-dessus : une voix normale vaut
+  /// 0.05 à 0.6 sur cette échelle, donc au-delà de 0.08 on ne filtrerait plus
+  /// le bruit, on refuserait la parole.
+  static const double _kVoiceCeiling = 0.08;
+
   /// ~5 s de micro ouvert sans jamais une seule mesure : la sonde est muette.
   static const int _kMicProbeGiveUp = 20;
 
@@ -355,13 +364,25 @@ class _CallScreenState extends State<CallScreen> {
         _micProbeSilentTicks = 0;
       }
       final lvl = level.clamp(0.0, 1.0);
-      // Le plancher suit le silence de près et la voix de très loin.
-      _noiseFloor = lvl < _noiseFloor
-          ? _noiseFloor * 0.7 + lvl * 0.3
-          : _noiseFloor * 0.995 + lvl * 0.005;
-      // Le plancher de bruit compte quadruple : dans une pièce bruyante il
-      // faut dépasser franchement l'ambiance, pas la frôler.
-      final threshold = math.max(_kVoiceOn, _noiseFloor * 4);
+      // Micro coupé ou capture relâchée : la sonde relit indéfiniment la même
+      // valeur. En la donnant à manger au plancher, celui-ci montait vers elle,
+      // le seuil (×4) passait au-dessus de la parole réelle, et plus une seule
+      // voix n'ouvrait la barre pour le reste de l'appel. Mesuré : un seuil
+      // parti de 0.021 à 0.159 pendant qu'un pic figé restait à 0.104.
+      // Une valeur au bit près identique à la précédente n'est pas une mesure.
+      final frozen = lvl == _lastProbeLevel;
+      _lastProbeLevel = lvl;
+      if (!frozen) {
+        // Le plancher suit le silence de près et la voix de très loin.
+        _noiseFloor = lvl < _noiseFloor
+            ? _noiseFloor * 0.7 + lvl * 0.3
+            : _noiseFloor * 0.995 + lvl * 0.005;
+      }
+      // Le plancher de bruit compte quadruple : dans une pièce bruyante il faut
+      // dépasser franchement l'ambiance, pas la frôler. Mais il est PLAFONNÉ :
+      // au-delà, on n'exige plus « plus fort que la pièce », on devient sourd.
+      final threshold =
+          math.max(_kVoiceOn, math.min(_noiseFloor * 4, _kVoiceCeiling));
       final hot = lvl > threshold;
       if (lvl > _probePeak) _probePeak = lvl;
       if (++_probeTicks % 12 == 0) {
