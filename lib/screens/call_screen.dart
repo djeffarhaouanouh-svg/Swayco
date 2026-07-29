@@ -2998,21 +2998,28 @@ class _TurnBubble extends StatelessWidget {
                   // faded version of one that landed, not as another kind of
                   // message. No new colour: the alpha carries it.
                   color: turn.mine
-                      ? SC.accent.withValues(alpha: turn.delivered ? 0.32 : 0.12)
+                      ? SC.accent.withValues(alpha: turn.delivered ? 0.32 : 0.06)
                       : Colors.black.withValues(alpha: 0.42),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: Colors.white
-                        .withValues(alpha: turn.delivered ? 0.18 : 0.10),
+                        .withValues(alpha: turn.delivered ? 0.18 : 0.06),
                   ),
                 ),
                 child: Text(
                   turn.text,
                   style: TextStyle(
+                    // Une phrase que personne n'a reçue s'efface franchement :
+                    // à 0.55 elle se lisait presque comme les autres, et on
+                    // croyait l'avoir envoyée. À 0.32 elle reste lisible — on
+                    // doit pouvoir la relire pour la redire — mais on voit
+                    // d'un coup d'œil qu'elle n'est pas partie.
                     color: Colors.white
-                        .withValues(alpha: turn.delivered ? 1.0 : 0.55),
+                        .withValues(alpha: turn.delivered ? 1.0 : 0.32),
                     fontSize: 14.5,
                     height: 1.35,
+                    fontStyle:
+                        turn.delivered ? FontStyle.normal : FontStyle.italic,
                   ),
                 ),
               ),
