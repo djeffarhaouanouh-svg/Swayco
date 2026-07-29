@@ -2703,6 +2703,10 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
         border: Border.all(color: SC.glassBorderStrong),
       ),
       child: Column(
+        // SANS ça, la colonne prend toute la hauteur qu'on lui offre : dans un
+        // dialogue, elle s'étirait jusqu'en bas de l'écran et le panneau
+        // devenait un grand rectangle noir. Elle fait sa taille, désormais.
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // One page per category — swipe sideways to switch category.

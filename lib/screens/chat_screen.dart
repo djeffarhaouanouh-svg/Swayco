@@ -1,14 +1,11 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
-import '../widgets/spoken_language_gate.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
@@ -18,13 +15,11 @@ import '../services/last_interaction.dart';
 import '../services/match_seen.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
-import '../services/guest_invite_api.dart';
 import '../services/nav_tab.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
-import '../services/token_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
@@ -34,7 +29,6 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
-import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -83,9 +77,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// celle du chargement initial — quelqu'un qui se connecte après coup
   /// n'apparaissait jamais en ligne.
   Timer? _presenceTimer;
-  /// UI lock while a guest-invite link is being minted (prevents double-tap).
-  bool _creatingInvite = false;
-
   /// True when OS notifications are off (never asked or refused). Drives the
   /// recovery banner at the top of the conversation list — the moment where a
   /// missed-message notification matters most. Dismissible per session.
@@ -493,103 +484,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     overlay.insert(entry);
   }
 
-  /// Random LiveKit identity for the host joining a guest-invite call.
-  String _newCallIdentity() {
-    final r = Random();
-    return 'u${DateTime.now().millisecondsSinceEpoch}${r.nextInt(999999)}';
-  }
-
-  /// Mint a guest-invite link, open the share sheet, then drop the host into
-  /// the call's waiting room. Whoever opens the link joins with no account;
-  /// the host (the caller) is the one billed for the call.
-  Future<void> _shareCallInvite() async {
-    if (_creatingInvite) return;
-    setState(() => _creatingInvite = true);
-    try {
-      // The host needs a name + spoken language for the call's translation
-      // route — the same profile fields onboarding collects. Resolved via
-      // the shared helper so the local→Supabase fallback is identical to a
-      // direct peer call (and can't drift out of sync).
-      final me = await CallLauncher.resolveMyIdentity();
-      final myName = me.name;
-      final myLang = me.sourceLang;
-      if (!me.isComplete) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.t('invite_call_need_profile'))),
-        );
-        return;
-      }
-      final invite = await GuestInviteApi.create();
-      if (invite == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.t('invite_call_failed'))),
-        );
-        return;
-      }
-      final shareText = AppStrings.t(
-        'invite_call_share_text',
-        args: {'link': invite.link},
-      );
-      // Open the OS share sheet so the host can send the link right away.
-      if (mounted) {
-        final box = context.findRenderObject() as RenderBox?;
-        try {
-          await SharePlus.instance.share(
-            ShareParams(
-              text: shareText,
-              subject: AppStrings.t('invite_to_call'),
-              sharePositionOrigin: box != null
-                  ? box.localToGlobal(Offset.zero) & box.size
-                  : null,
-            ),
-          );
-        } catch (_) {
-          // Sheet dismissed — still enter the waiting room; the host can
-          // re-share the link from there.
-        }
-      }
-      // Which language will be spoken, resolved before minting anything: the
-      // token carries it into the LiveKit metadata, which is what the peer
-      // translates FROM.
-      final spokenLang = await resolveSpokenLanguage(preselect: myLang);
-      if (!mounted) return;
-
-      // Enter the waiting room — the call connects when the guest joins.
-      final token = await fetchLiveKitToken(
-        roomName: invite.roomName,
-        identity: _newCallIdentity(),
-        displayName: myName,
-        sourceLang: spokenLang,
-        inviteSig: invite.sig,
-        inviteExp: invite.exp,
-      );
-      if (!mounted) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => CallScreen(
-            wsUrl: token.url,
-            jwt: token.token,
-            roomName: token.roomName,
-            displayName: myName,
-            mySourceLang: spokenLang,
-            translation: widget.translation,
-            inviteShareText: shareText,
-            isCaller: true,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('invite_call_failed'))),
-      );
-    } finally {
-      if (mounted) setState(() => _creatingInvite = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -755,12 +649,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ],
                           ),
                         ),
-                      _rowDivider,
-                      // "Invite to a call" — last section in the panel.
-                      _InviteToCallRow(
-                        onTap: _creatingInvite ? null : _shareCallInvite,
-                        creatingInvite: _creatingInvite,
-                      ),
                     ],
                   ),
                 ),
@@ -1296,91 +1184,6 @@ class _RowCallButton extends StatelessWidget {
   }
 }
 
-/// "Invite to a call" entry — now the first row inside the messages glass
-/// card (instead of a separate bar below the list). It mints a guest invite
-/// link (join a call with no account) and opens the native OS share sheet.
-/// Styled like a conversation row but with a cyan gradient video badge in
-/// place of an avatar so it reads as the primary action of the section.
-class _InviteToCallRow extends StatelessWidget {
-  const _InviteToCallRow({
-    required this.onTap,
-    required this.creatingInvite,
-  });
-
-  /// Null while a link is being minted — disables the row.
-  final VoidCallback? onTap;
-  final bool creatingInvite;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              // Cyan gradient badge, same 46 px footprint as a row avatar.
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [SC.accent, SC.meshBlue],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: SC.accent.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: creatingInvite
-                    ? const Padding(
-                        padding: EdgeInsets.all(13),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.videocam_rounded,
-                        color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  creatingInvite
-                      ? AppStrings.t('invite_call_creating')
-                      : AppStrings.t('invite_to_call'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: SCText.name.copyWith(color: SC.accent),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded,
-                  color: SC.textMuted, size: 22),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder list shown while the chat-list data is loading. Same
-/// glass card + same row geometry as the real list, with each row
-/// replaced by shimmering bars. Keeps the page layout stable so the
-/// content doesn't pop in / shift when the data lands.
-/// A section title on the Messages page — "NOUVEAUX MATCHS" / "MESSAGES" in
-/// the cyan accent, with the count in a filled pill next to it (Tinder-style,
 /// but cyan on black rather than red on white).
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label, required this.count});
