@@ -3217,10 +3217,12 @@ class _CallDock extends StatelessWidget {
                     // Un peu d'air à gauche : la zone de texte ne colle pas au
                     // bord du verre.
                     const SizedBox(width: 6),
-                    // Elle occupe deux parts sur cinq au repos. Quand une
-                    // phrase arrive, elle prend TOUT sauf la pastille : la
-                    // phrase a la barre entière, exactement comme avant.
+                    // Deux parts contre trois au repos — c'est ce rapport qui
+                    // règle la largeur de la zone de texte, ne pas le perdre en
+                    // touchant à ce bloc. Quand une phrase arrive, elle est le
+                    // seul Expanded restant et prend tout sauf la pastille.
                     Expanded(
+                      flex: 2,
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
