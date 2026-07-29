@@ -383,7 +383,11 @@ class _CallScreenState extends State<CallScreen> {
       // au-delà, on n'exige plus « plus fort que la pièce », on devient sourd.
       final threshold =
           math.max(_kVoiceOn, math.min(_noiseFloor * 4, _kVoiceCeiling));
-      final hot = lvl > threshold;
+      // Micro coupé, ou sonde figée sur la même valeur : il n'y a PAS de voix.
+      // Sans ça, une mesure gelée au-dessus du seuil faisait battre la pastille
+      // sans fin — on se met en muet et le bouton continue de vibrer, alors
+      // qu'on a précisément demandé le silence.
+      final hot = _micOn && !frozen && lvl > threshold;
       if (lvl > _probePeak) _probePeak = lvl;
       if (++_probeTicks % 12 == 0) {
         DebugOverlay.log(
@@ -2619,7 +2623,10 @@ class _CallScreenState extends State<CallScreen> {
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      // Mêmes marges que la barre de navigation de l'app
+                      // (root_shell, left/right 48) : les deux barres font la
+                      // même largeur d'un écran à l'autre.
+                      padding: const EdgeInsets.fromLTRB(48, 0, 48, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -3147,12 +3154,8 @@ class _CallDock extends StatelessWidget {
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
 
-  /// Le chevron et le raccrochage, ensemble.
-  static const double _trailingWidth = 50 + 6 + 46;
-
-  /// La zone de texte au repos : exactement la largeur de ce qu'il y a de
-  /// l'autre côté, pour que la pastille tombe au milieu de la barre.
-  static const double _captionWidth = _trailingWidth;
+  /// L'écart entre les trois blocs de la barre. La zone de texte, elle, n'a
+  /// plus de largeur à elle : elle prend ce que les autres laissent.
   static const double _gap = 8;
 
   @override
@@ -3207,16 +3210,15 @@ class _CallDock extends StatelessWidget {
                   ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  // La barre remplit la largeur qu'on lui donne — celle de la
+                  // nav de l'app — au lieu d'épouser son contenu.
+                  mainAxisSize: MainAxisSize.max,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      // Dépliée, elle récupère la place du chevron et du
-                      // raccrochage, gouttière comprise.
-                      width: messageOpen
-                          ? _captionWidth + _gap + _trailingWidth
-                          : _captionWidth,
+                    // La zone de texte prend TOUT ce que les autres laissent :
+                    // plus de largeur codée en dur, et quand le chevron et le
+                    // raccrochage se replient elle récupère leur place d'elle-
+                    // même. La phrase y gagne d'autant.
+                    Expanded(
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
@@ -3245,10 +3247,17 @@ class _CallDock extends StatelessWidget {
                       onTap: dimmed ? onWake : onToggleTranslation,
                       onLongPress: onOrbLongPress,
                     ),
-                    // Le chevron et le raccrochage se replient pendant qu'une
-                    // phrase occupe la barre — AnimatedSize rogne lui-même ce
-                    // qui dépasse en chemin.
-                    AnimatedSize(
+                    // Le chevron et le raccrochage. Ils occupent AUTANT que la
+                    // zone de texte — même flex — donc la pastille tombe
+                    // exactement au milieu de la barre, quelle que soit sa
+                    // largeur. Quand une phrase arrive, ce côté passe à flex 0 :
+                    // il rend toute sa place à la zone de texte, et la pastille
+                    // glisse vers la droite comme avant.
+                    Expanded(
+                      flex: messageOpen ? 0 : 1,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: AnimatedSize(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
                       child: messageOpen
@@ -3276,6 +3285,8 @@ class _CallDock extends StatelessWidget {
                                 ),
                               ),
                             ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
