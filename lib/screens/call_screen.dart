@@ -3223,10 +3223,6 @@ class _CallDock extends StatelessWidget {
                             hint: hint,
                             open: turnsOpen,
                             hasTurns: hasTurns,
-                            // Toujours ma pastille : la barre ne porte que mes
-                            // phrases.
-                            authorName: myName,
-                            authorAvatarUrl: '',
                             onTap: onToggleTurns,
                           ),
                         ),
@@ -3305,8 +3301,6 @@ class _CaptionField extends StatelessWidget {
     required this.hint,
     required this.open,
     required this.hasTurns,
-    required this.authorName,
-    required this.authorAvatarUrl,
     required this.onTap,
   });
 
@@ -3314,8 +3308,6 @@ class _CaptionField extends StatelessWidget {
   final String hint;
   final bool open;
   final bool hasTurns;
-  final String authorName;
-  final String authorAvatarUrl;
   final VoidCallback onTap;
 
   @override
@@ -3334,12 +3326,10 @@ class _CaptionField extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ProfileAvatar(
-              displayName: authorName,
-              avatarUrl: authorAvatarUrl.isEmpty ? null : authorAvatarUrl,
-              size: 30,
-            ),
-            const SizedBox(width: 8),
+            // Pas de pastille d'auteur : la barre ne porte QUE mes phrases,
+            // donc afficher mon propre visage à côté de mes propres mots ne
+            // désignait rien — c'était trente pixels de moins pour le texte.
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 empty ? hint : preview,
