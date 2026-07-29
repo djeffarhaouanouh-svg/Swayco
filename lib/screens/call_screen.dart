@@ -2710,11 +2710,17 @@ class _CallScreenState extends State<CallScreen> {
                                         // l'appel. Le panneau, lui, porte les
                                         // deux — celle que je parle aussi.
                                         _LanguageButton(
-                                          // La langue du COMPTE, celle de
-                                          // l'onboarding — pas celle qu'on a
-                                          // choisi de parler pour cet appel.
+                                          // Le drapeau de la langue qu'on
+                                          // ENTEND, celle que ce bouton sert à
+                                          // changer — il montrait celle du
+                                          // compte, donc il ne bougeait jamais.
+                                          // Repli sur la langue du compte tant
+                                          // que rien n'a été choisi.
                                           country: findLanguageByCode(
-                                                AppStrings.currentBcp47.value,
+                                                _myOutputLang.isNotEmpty
+                                                    ? _myOutputLang
+                                                    : AppStrings
+                                                        .currentBcp47.value,
                                               )?.countryCode ??
                                               '',
                                           onTap: _openLanguagePairSheet,
