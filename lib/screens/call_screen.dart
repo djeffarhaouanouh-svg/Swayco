@@ -2626,7 +2626,7 @@ class _CallScreenState extends State<CallScreen> {
                       // Mêmes marges que la barre de navigation de l'app
                       // (root_shell, left/right 48) : les deux barres font la
                       // même largeur d'un écran à l'autre.
-                      padding: const EdgeInsets.fromLTRB(48, 0, 48, 16),
+                      padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -3210,15 +3210,18 @@ class _CallDock extends StatelessWidget {
                   ),
                 ),
                 child: Row(
-                  // La barre remplit la largeur qu'on lui donne — celle de la
-                  // nav de l'app — au lieu d'épouser son contenu.
+                  // La barre remplit la largeur qu'on lui donne au lieu
+                  // d'épouser son contenu.
                   mainAxisSize: MainAxisSize.max,
                   children: [
-                    // La zone de texte prend TOUT ce que les autres laissent :
-                    // plus de largeur codée en dur, et quand le chevron et le
-                    // raccrochage se replient elle récupère leur place d'elle-
-                    // même. La phrase y gagne d'autant.
+                    // Un peu d'air à gauche : la zone de texte ne colle pas au
+                    // bord du verre.
+                    const SizedBox(width: 6),
+                    // Elle occupe deux parts sur cinq au repos. Quand une
+                    // phrase arrive, le côté droit se resserre et elle récupère
+                    // sa place : la phrase a toute la barre.
                     Expanded(
+                      flex: 2,
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
@@ -3236,56 +3239,55 @@ class _CallDock extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: _gap),
-                    // La pastille ne s'estompe jamais : c'est elle qui reste
-                    // quand tout le reste s'efface. En veille, la toucher
-                    // rallume la barre au lieu de couper la traduction — on ne
-                    // coupe pas la traduction sans l'avoir vue.
-                    _TranslationOrb(
-                      on: translationOn,
-                      ttsSpeaking: ttsSpeaking,
-                      voiceLevel: voiceLevel,
-                      onTap: dimmed ? onWake : onToggleTranslation,
-                      onLongPress: onOrbLongPress,
-                    ),
-                    // Le chevron et le raccrochage. Ils occupent AUTANT que la
-                    // zone de texte — même flex — donc la pastille tombe
-                    // exactement au milieu de la barre, quelle que soit sa
-                    // largeur. Quand une phrase arrive, ce côté passe à flex 0 :
-                    // il rend toute sa place à la zone de texte, et la pastille
-                    // glisse vers la droite comme avant.
+                    // Les trois boutons — pastille, chevron, raccrochage — se
+                    // répartissent également l'espace qui reste à droite, au
+                    // lieu d'être collés les uns aux autres au bout de la
+                    // barre. Pendant qu'une phrase occupe la barre, le chevron
+                    // et le raccrochage s'effacent et ce bloc se resserre à une
+                    // part : la pastille glisse vers la droite, la phrase prend
+                    // le reste.
                     Expanded(
-                      flex: messageOpen ? 0 : 1,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: AnimatedSize(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      child: messageOpen
-                          ? const SizedBox(height: 46)
-                          : Opacity(
+                      flex: messageOpen ? 1 : 3,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          // La pastille ne s'estompe jamais : c'est elle qui
+                          // reste quand tout le reste s'efface. En veille, la
+                          // toucher rallume la barre au lieu de couper la
+                          // traduction — on ne coupe pas la traduction sans
+                          // l'avoir vue.
+                          _TranslationOrb(
+                            on: translationOn,
+                            ttsSpeaking: ttsSpeaking,
+                            voiceLevel: voiceLevel,
+                            onTap: dimmed ? onWake : onToggleTranslation,
+                            onLongPress: onOrbLongPress,
+                          ),
+                          if (!messageOpen) ...[
+                            Opacity(
                               opacity: live,
                               child: IgnorePointer(
                                 ignoring: dimmed,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(width: _gap),
-                                    _RailToggleButton(
-                                      open: controlsOpen,
-                                      onTap: onToggleControls,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    _DockCircleButton(
-                                      icon: Icons.call_end_rounded,
-                                      label: AppStrings.t('call_end'),
-                                      background: const Color(0xFFE53935),
-                                      onTap: onHangUp,
-                                    ),
-                                  ],
+                                child: _RailToggleButton(
+                                  open: controlsOpen,
+                                  onTap: onToggleControls,
                                 ),
                               ),
                             ),
-                        ),
+                            Opacity(
+                              opacity: live,
+                              child: IgnorePointer(
+                                ignoring: dimmed,
+                                child: _DockCircleButton(
+                                  icon: Icons.call_end_rounded,
+                                  label: AppStrings.t('call_end'),
+                                  background: const Color(0xFFE53935),
+                                  onTap: onHangUp,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
