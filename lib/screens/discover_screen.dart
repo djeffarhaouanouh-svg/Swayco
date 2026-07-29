@@ -805,13 +805,48 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   GlobalKey<_DraggableCardState> _topKey = GlobalKey<_DraggableCardState>();
   final _progress = ValueNotifier<double>(0.0);
 
+  /// Ce qu'on a déjà demandé au réseau — inutile de redemander à chaque
+  /// reconstruction, le cache d'images de Flutter garde la suite.
+  final Set<String> _warmed = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _warmNext();
+  }
+
   @override
   void didUpdateWidget(_TinderCardStack old) {
     super.didUpdateWidget(old);
     if (old.currentIndex != widget.currentIndex) {
       _topKey = GlobalKey<_DraggableCardState>();
       _progress.value = 0.0;
+      _warmNext();
     }
+  }
+
+  /// Télécharge À L'AVANCE la photo des deux cartes suivantes.
+  ///
+  /// Une carte ne demandait son image qu'au moment de s'afficher : on balayait,
+  /// et on regardait un rectangle vide pendant que le réseau répondait. Ici la
+  /// photo d'après est déjà dans le cache quand la carte arrive — le balayage
+  /// ne montre plus d'attente. Deux cartes d'avance suffisent : au-delà on
+  /// télécharge des visages que la personne ne verra peut-être jamais.
+  void _warmNext() {
+    final n = widget.cards.length;
+    if (n == 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (var step = 1; step <= 2; step++) {
+        final card = widget.cards[(widget.currentIndex + step) % n];
+        final url = card.photos.isEmpty ? '' : card.photos.first;
+        if (url.isEmpty || !_warmed.add(url)) continue;
+        precacheImage(NetworkImage(url), context).catchError((_) {
+          // Une photo qui ne se charge pas ici se rechargera (ou échouera)
+          // à l'affichage, où l'erreur est déjà gérée.
+        });
+      }
+    });
   }
 
   @override
