@@ -1126,7 +1126,7 @@ class _MessageBubble extends StatelessWidget {
 
     // Text-only bubbles hug their content so a short "👋" or "Coucou !" no
     // longer stretches the full width; media bubbles keep their own width.
-    final hugContent =
+    var hugContent =
         !message.isImage && !message.hasDiscoverPhoto && !message.isVoice;
 
     // Une image ou un GIF envoyé seul se montre NU : pas de bulle, pas de
@@ -1134,6 +1134,11 @@ class _MessageBubble extends StatelessWidget {
     // dans un rectangle coloré ne fait que l'entourer de bord perdu. Il ne
     // reste que l'heure, posée dessous.
     final bareMedia = message.isImage && displayBody.trim().isEmpty;
+    // Sans bulle, la colonne doit épouser l'image. Sinon l'heure, qui est un
+    // Align, s'étire sur toute la largeur offerte (78 % de l'écran) et emporte
+    // la colonne avec elle : l'image se retrouvait calée à gauche d'un bloc
+    // trois fois plus large qu'elle, donc « au milieu » de l'écran.
+    if (bareMedia) hugContent = true;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
