@@ -691,11 +691,22 @@ class LocalSttMicStreamer implements SwayMicStreamer {
     // purpose, to be heard, so they are flushed and published with `force`
     // (which is what gets them past the mute re-check in _translateAndSend).
     // Everything captured after the edge is simply not fed to the VAD.
-    if (isSendMuted || isTranslationPlaying) {
+    // Le micro RESTE OUVERT pendant la traduction : on peut donc couper la
+    // parole, ce que le portillon interdisait.
+    //
+    // Ce portillon datait du temps où la STT ouvrait sa PROPRE capture, à côté
+    // de WebRTC : elle recevait le micro brut, synthèse vocale comprise, et
+    // l'écho se transcrivait proprement avant de repartir chez le
+    // correspondant. Depuis le 24 juillet la STT lit le PCM que WebRTC a déjà
+    // traité — annulation d'écho comprise —, donc la fuite qu'il fallait
+    // museler est traitée en amont.
+    //
+    // Reste le micro coupé, qui lui ferme toujours : quand on demande le
+    // silence, rien ne doit sortir.
+    if (isSendMuted) {
       if (!_gated) {
         _gated = true;
-        final gate = isSendMuted ? 'muted' : 'tts';
-        DebugOverlay.log('stt gate CLOSED ($gate)');
+        DebugOverlay.log('stt gate CLOSED (muted)');
         _flushForGateClose(onTranslation);
       }
       _lastVoiceMs = DateTime.now().millisecondsSinceEpoch;
