@@ -3218,10 +3218,9 @@ class _CallDock extends StatelessWidget {
                     // bord du verre.
                     const SizedBox(width: 6),
                     // Elle occupe deux parts sur cinq au repos. Quand une
-                    // phrase arrive, le côté droit se resserre et elle récupère
-                    // sa place : la phrase a toute la barre.
+                    // phrase arrive, elle prend TOUT sauf la pastille : la
+                    // phrase a la barre entière, exactement comme avant.
                     Expanded(
-                      flex: 2,
                       child: Opacity(
                         opacity: live,
                         // En veille, le premier tap rallume : il ne doit pas
@@ -3246,24 +3245,36 @@ class _CallDock extends StatelessWidget {
                     // et le raccrochage s'effacent et ce bloc se resserre à une
                     // part : la pastille glisse vers la droite, la phrase prend
                     // le reste.
-                    Expanded(
-                      flex: messageOpen ? 1 : 3,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          // La pastille ne s'estompe jamais : c'est elle qui
-                          // reste quand tout le reste s'efface. En veille, la
-                          // toucher rallume la barre au lieu de couper la
-                          // traduction — on ne coupe pas la traduction sans
-                          // l'avoir vue.
-                          _TranslationOrb(
-                            on: translationOn,
-                            ttsSpeaking: ttsSpeaking,
-                            voiceLevel: voiceLevel,
-                            onTap: dimmed ? onWake : onToggleTranslation,
-                            onLongPress: onOrbLongPress,
-                          ),
-                          if (!messageOpen) ...[
+                    // Une phrase occupe la barre : le chevron et le
+                    // raccrochage s'effacent, et la pastille se retrouve SEULE
+                    // au bout — même position, même écart qu'avant. Au repos,
+                    // les trois se partagent également l'espace de droite.
+                    if (messageOpen)
+                      _TranslationOrb(
+                        on: translationOn,
+                        ttsSpeaking: ttsSpeaking,
+                        voiceLevel: voiceLevel,
+                        onTap: dimmed ? onWake : onToggleTranslation,
+                        onLongPress: onOrbLongPress,
+                      )
+                    else
+                      Expanded(
+                        flex: 3,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // La pastille ne s'estompe jamais : c'est elle qui
+                            // reste quand tout le reste s'efface. En veille, la
+                            // toucher rallume la barre au lieu de couper la
+                            // traduction — on ne coupe pas la traduction sans
+                            // l'avoir vue.
+                            _TranslationOrb(
+                              on: translationOn,
+                              ttsSpeaking: ttsSpeaking,
+                              voiceLevel: voiceLevel,
+                              onTap: dimmed ? onWake : onToggleTranslation,
+                              onLongPress: onOrbLongPress,
+                            ),
                             Opacity(
                               opacity: live,
                               child: IgnorePointer(
@@ -3287,9 +3298,8 @@ class _CallDock extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
