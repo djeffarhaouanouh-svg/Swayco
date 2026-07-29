@@ -137,61 +137,70 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
     final deviceId = await DeviceId.getOrCreate();
     final targetId = widget.userId ?? deviceId;
-    // Local prefs only matter for my own profile (offline fallback). When
-    // viewing someone else there's no local cache to consult.
-    final local = _isViewingOther ? null : await UserPrefs.loadProfile();
-    final remote = isSupabaseReady
-        ? await ProfileApi.fetchById(targetId)
-        : null;
-    // Likes received are only meaningful (and visible) on my own profile.
-    // The peer's count would leak who liked them. Now keyed per photo URL.
-    final likesByPhoto = !_isViewingOther && isSupabaseReady
-        ? await LikeApi.countLikesPerPhoto(targetId)
-        : const <String, int>{};
-    final blocked = _isViewingOther && isSupabaseReady && deviceId.isNotEmpty
-        ? await BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
-        : false;
-    // Has the displayed peer blocked ME? If so, hide the relationship
-    // actions — the edge is dead on their side.
-    var peerBlockedMe = false;
-    if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
-      try {
-        peerBlockedMe = (await BlockApi.fetchMyBlockerIds()).contains(targetId);
-      } catch (_) {}
-    }
-    // In viewer mode we also need the set of the peer's photos I've liked so
-    // each photo's heart renders in the right state on first paint.
-    Set<String> likedPhotoUrls = const {};
-    if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
-      try {
-        likedPhotoUrls = await LikeApi.fetchMyLikedPhotos(deviceId);
-      } catch (_) {}
-    }
-    // Match state — drives the Matcher / Accepter / Matché button.
-    var matched = false;
-    var iLiked = false;
-    var peerLikedMe = false;
-    if (_isViewingOther && isSupabaseReady && deviceId.isNotEmpty) {
-      final rel = await FriendshipApi.matchStateWith(
-        meId: deviceId,
-        peerId: targetId,
-      );
-      matched = rel.matched;
-      iLiked = rel.iLiked;
-      peerLikedMe = rel.peerLikedMe;
-    }
+
+    // TOUT EN PARALLÈLE. Ces sept lectures s'attendaient les unes les autres :
+    // sept allers-retours réseau bout à bout, soit plusieurs secondes d'écran
+    // vide sur une connexion mobile ordinaire. Aucune ne dépend du résultat
+    // d'une autre — seule l'identité de l'appareil, obtenue au-dessus, leur est
+    // nécessaire. Elles partent donc ensemble : le temps d'attente devient
+    // celui de la plus lente, pas la somme.
+    final viewer = _isViewingOther;
+    final canQuery = isSupabaseReady && deviceId.isNotEmpty;
+    final results = await Future.wait<Object?>([
+      // Cache local (mon profil seulement) : instantané, mais il attendait
+      // quand même son tour derrière le réseau.
+      viewer ? Future<Object?>.value() : UserPrefs.loadProfile(),
+      isSupabaseReady
+          ? ProfileApi.fetchById(targetId)
+          : Future<Object?>.value(),
+      // Les likes reçus n'ont de sens que sur mon profil : le compte d'un pair
+      // trahirait qui l'a liké.
+      !viewer && isSupabaseReady
+          ? LikeApi.countLikesPerPhoto(targetId)
+          : Future<Object?>.value(const <String, int>{}),
+      viewer && canQuery
+          ? BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
+          : Future<Object?>.value(false),
+      // Ce pair m'a-t-il bloqué ? Si oui, les actions de match disparaissent —
+      // l'arête est morte de son côté.
+      viewer && canQuery
+          ? BlockApi.fetchMyBlockerIds().catchError(
+              (_) => <String>{},
+            )
+          : Future<Object?>.value(<String>{}),
+      // Ses photos que j'ai likées, pour que chaque cœur soit dans le bon état
+      // dès le premier rendu.
+      viewer && canQuery
+          ? LikeApi.fetchMyLikedPhotos(deviceId).catchError(
+              (_) => <String>{},
+            )
+          : Future<Object?>.value(<String>{}),
+      // L'état du match — c'est lui qui décide Matcher / Accepter / Matché.
+      viewer && canQuery
+          ? FriendshipApi.matchStateWith(meId: deviceId, peerId: targetId)
+          : Future<Object?>.value(),
+    ]);
+
     if (!mounted) return;
+    final local = results[0] as ProfileSnapshot?;
+    final remote = results[1] as RemoteProfile?;
+    final likesByPhoto = results[2] as Map<String, int>;
+    final blocked = results[3] as bool;
+    final blockerIds = results[4] as Set<String>;
+    final likedPhotoUrls = results[5] as Set<String>;
+    final rel = results[6] as ({bool matched, bool iLiked, bool peerLikedMe})?;
+
     setState(() {
       _deviceId = deviceId;
       _local = local;
       _remote = remote;
       _likesByPhoto = likesByPhoto;
       _peerBlocked = blocked;
-      _peerBlockedMe = peerBlockedMe;
+      _peerBlockedMe = blockerIds.contains(targetId);
       _likedPhotoUrls = likedPhotoUrls;
-      _matched = matched;
-      _iLiked = iLiked;
-      _peerLikedMe = peerLikedMe;
+      _matched = rel?.matched ?? false;
+      _iLiked = rel?.iLiked ?? false;
+      _peerLikedMe = rel?.peerLikedMe ?? false;
       _loading = false;
     });
   }
