@@ -97,6 +97,38 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
+/// Les couleurs de la lueur. Rien à voir avec la palette de l'app : celle-ci
+/// est faite de teintes de ruban LED — saturées à fond, lumineuses, celles
+/// qu'un bandeau RVB sait vraiment produire. Les tons d'interface (le cyan de
+/// l'accent, le bleu nuit des bulles) donnaient une lueur terne, parce qu'ils
+/// sont dessinés pour être lus, pas pour briller.
+class _GlowPalette {
+  const _GlowPalette._();
+
+  /// Le mode arc-en-ciel : la teinte défile en continu, comme un ruban en
+  /// mode « rainbow ». Ce n'est pas une couleur, c'est un drapeau — d'où
+  /// l'alpha nul, qu'aucun vrai choix ne peut porter.
+  static const Color rainbow = Color(0x00FFFFFF);
+
+  /// Le spectre d'un ruban, dans l'ordre où on le parcourt.
+  static const List<Color> swatches = [
+    Color(0xFF00E5FF), // cyan électrique
+    Color(0xFF2979FF), // bleu franc
+    Color(0xFF7C4DFF), // indigo
+    Color(0xFFB14DFF), // violet
+    Color(0xFFFF2DD4), // magenta
+    Color(0xFFFF4081), // rose
+    Color(0xFFFF1744), // rouge
+    Color(0xFFFF6D00), // orange
+    Color(0xFFFFC400), // ambre
+    Color(0xFFC6FF00), // citron
+    Color(0xFF00E676), // vert
+    Color(0xFF1DE9B6), // turquoise
+    Color(0xFFFFE9C4), // blanc chaud
+    rainbow,
+  ];
+}
+
 /// Comment la lueur parcourt le bord haut du panneau. L'ordre compte : c'est
 /// l'index qui est écrit dans les préférences.
 enum _GlowMotion {
@@ -143,7 +175,7 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Les trois réglages de la lueur. Ils survivent à l'appel : c'est un goût,
   /// pas un réglage d'appel — voir [UserPrefs.loadGlow].
-  Color _glowColor = SC.accent;
+  Color _glowColor = _GlowPalette.swatches.first;
   _GlowMotion _glowMotion = _GlowMotion.still;
   double _glowIntensity = 1.0;
 
@@ -3313,8 +3345,7 @@ class _DockAura extends StatefulWidget {
   State<_DockAura> createState() => _DockAuraState();
 }
 
-class _DockAuraState extends State<_DockAura>
-    with SingleTickerProviderStateMixin {
+class _DockAuraState extends State<_DockAura> with TickerProviderStateMixin {
   /// Le battement. Il tourne tant qu'il y a du son à montrer et s'arrête net au
   /// silence — pas de ticker qui brûle la batterie pendant qu'on écoute.
   late final AnimationController _phase = AnimationController(
@@ -3322,10 +3353,21 @@ class _DockAuraState extends State<_DockAura>
     duration: const Duration(milliseconds: 1100),
   );
 
+  /// Le défilé des teintes du mode arc-en-ciel. Bien plus lent que le
+  /// battement : une roue chromatique qui boucle en une seconde donne un
+  /// clignotement, pas un dégradé. Et il ne tourne QUE dans ce mode.
+  late final AnimationController _hue = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  );
+
   /// L'intensité affichée, lissée vers [_target] image par image : une voix qui
   /// s'arrête fait retomber la lueur, elle ne l'éteint pas d'un coup.
   final ValueNotifier<double> _amp = ValueNotifier<double>(0);
   double _target = 0;
+
+  bool get _isRainbow =>
+      widget.color.toARGB32() == _GlowPalette.rainbow.toARGB32();
 
   @override
   void initState() {
@@ -3347,6 +3389,10 @@ class _DockAuraState extends State<_DockAura>
       old.voiceLevel.removeListener(_retarget);
       widget.voiceLevel.addListener(_retarget);
     }
+    // On vient de passer en arc-en-ciel (ou d'en sortir) alors que ça parle
+    // déjà : la roue chromatique doit démarrer maintenant, pas au prochain
+    // silence suivi d'une reprise.
+    if (old.color != widget.color) _retarget();
   }
 
   /// Un seul régime, comme la pastille : dès que ça parle — une voix humaine
@@ -3355,7 +3401,10 @@ class _DockAuraState extends State<_DockAura>
   void _retarget() {
     final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
     _target = talking ? 1.0 : 0.0;
-    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
+    if (_target > 0) {
+      if (!_phase.isAnimating) _phase.repeat();
+      if (_isRainbow && !_hue.isAnimating) _hue.repeat();
+    }
   }
 
   void _tick() {
@@ -3363,6 +3412,7 @@ class _DockAuraState extends State<_DockAura>
     if (_target == 0 && next < 0.01) {
       _amp.value = 0;
       _phase.stop();
+      _hue.stop();
       return;
     }
     _amp.value = next;
@@ -3374,6 +3424,7 @@ class _DockAuraState extends State<_DockAura>
     widget.voiceLevel.removeListener(_retarget);
     _phase.removeListener(_tick);
     _phase.dispose();
+    _hue.dispose();
     _amp.dispose();
     super.dispose();
   }
@@ -3381,7 +3432,7 @@ class _DockAuraState extends State<_DockAura>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_phase, _amp]),
+      animation: Listenable.merge([_phase, _hue, _amp]),
       // L'enfant est construit UNE fois et passé au builder : la barre entière
       // ne se reconstruit pas soixante fois par seconde pour une ombre.
       child: widget.child,
@@ -3400,7 +3451,13 @@ class _DockAuraState extends State<_DockAura>
           painter: _AuraPainter(
             glow: glow,
             radius: widget.radius,
-            color: widget.color,
+            // Arc-en-ciel : la teinte est prise sur la roue au tour où elle en
+            // est. Saturation et valeur restent au maximum — une LED ne fait
+            // pas de pastel.
+            color: _isRainbow
+                ? HSVColor.fromAHSV(1, (_hue.value * 360) % 360, 0.92, 1.0)
+                    .toColor()
+                : widget.color,
             intensity: widget.intensity,
             // La position de la bande claire, 0 à gauche et 1 à droite. Le même
             // compteur que le souffle, lu dans un sens ou dans l'autre.
@@ -3560,19 +3617,6 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
   final ValueNotifier<bool> _previewOn = ValueNotifier<bool>(true);
   final ValueNotifier<double> _previewLevel = ValueNotifier<double>(0);
 
-  /// Les couleurs proposées, toutes déjà dans l'app : le cyan de l'accent, les
-  /// trois du halo de fond, le vert de présence, le rouge du raccrochage. Pas
-  /// de nuance inventée pour l'occasion.
-  static const List<Color> _palette = [
-    SC.accent,
-    SC.meshBlue,
-    SC.meshViolet,
-    SC.meshCyan,
-    SC.online,
-    Color(0xFFE53935),
-    Colors.white,
-  ];
-
   void _push() => widget.onChanged(_color, _motion, _intensity);
 
   @override
@@ -3644,37 +3688,7 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
               spacing: 12,
               runSpacing: 12,
               children: [
-                for (final c in _palette)
-                  Semantics(
-                    label: AppStrings.t('call_glow_color'),
-                    button: true,
-                    selected: c.toARGB32() == _color.toARGB32(),
-                    child: Pressable(
-                      bounce: true,
-                      onTap: () {
-                        setState(() => _color = c);
-                        _push();
-                      },
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: c,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            // Le choix courant se signale par un anneau blanc,
-                            // pas par une coche : sur une pastille de 38 px une
-                            // coche cache la couleur qu'on est en train de
-                            // juger.
-                            color: c.toARGB32() == _color.toARGB32()
-                                ? Colors.white
-                                : Colors.white24,
-                            width: c.toARGB32() == _color.toARGB32() ? 3 : 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                for (final c in _GlowPalette.swatches) _swatch(c),
               ],
             ),
             const SizedBox(height: 20),
@@ -3695,13 +3709,77 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
               value: _intensity,
               min: 0.15,
               max: 2.0,
-              activeColor: _color,
+              // En arc-en-ciel il n'y a pas de couleur à donner au curseur :
+              // il reprend le cyan, la teinte par défaut de la lueur.
+              activeColor: _color.toARGB32() == _GlowPalette.rainbow.toARGB32()
+                  ? _GlowPalette.swatches.first
+                  : _color,
               onChanged: (v) {
                 setState(() => _intensity = v);
                 _push();
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Une pastille de la palette. Celle de l'arc-en-ciel ne peut pas se peindre
+  /// d'une couleur — elle porte la roue entière.
+  Widget _swatch(Color c) {
+    final on = c.toARGB32() == _color.toARGB32();
+    final isRainbow = c.toARGB32() == _GlowPalette.rainbow.toARGB32();
+    return Semantics(
+      label: AppStrings.t('call_glow_color'),
+      button: true,
+      selected: on,
+      child: Pressable(
+        bounce: true,
+        onTap: () {
+          setState(() => _color = c);
+          _push();
+        },
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: isRainbow ? null : c,
+            gradient: isRainbow
+                ? const SweepGradient(
+                    colors: [
+                      Color(0xFFFF1744),
+                      Color(0xFFFFC400),
+                      Color(0xFFC6FF00),
+                      Color(0xFF00E676),
+                      Color(0xFF00E5FF),
+                      Color(0xFF2979FF),
+                      Color(0xFFB14DFF),
+                      Color(0xFFFF2DD4),
+                      Color(0xFFFF1744),
+                    ],
+                  )
+                : null,
+            shape: BoxShape.circle,
+            // Le choix courant se signale par un anneau blanc, pas par une
+            // coche : sur une pastille de 38 px, une coche cache la couleur
+            // qu'on est justement en train de juger.
+            border: Border.all(
+              color: on ? Colors.white : Colors.white24,
+              width: on ? 3 : 1,
+            ),
+            // La pastille brille de sa propre couleur : c'est ce qu'elle
+            // promet, autant le montrer sur place.
+            boxShadow: on && !isRainbow
+                ? [
+                    BoxShadow(
+                      color: c.withValues(alpha: 0.6),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
         ),
       ),
     );
