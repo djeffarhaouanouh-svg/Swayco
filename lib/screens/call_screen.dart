@@ -97,6 +97,19 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
+/// Comment la lueur parcourt le bord haut du panneau. L'ordre compte : c'est
+/// l'index qui est écrit dans les préférences.
+enum _GlowMotion {
+  /// Elle ne se déplace pas : elle respire sur toute la largeur à la fois.
+  still,
+
+  /// Une bande claire traverse le bord, vers la gauche.
+  leftward,
+
+  /// La même, dans l'autre sens.
+  rightward,
+}
+
 class _CallScreenState extends State<CallScreen> {
   Room? _room;
   String? _connectError;
@@ -127,6 +140,54 @@ class _CallScreenState extends State<CallScreen> {
 
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
+
+  /// Les trois réglages de la lueur. Ils survivent à l'appel : c'est un goût,
+  /// pas un réglage d'appel — voir [UserPrefs.loadGlow].
+  Color _glowColor = SC.accent;
+  _GlowMotion _glowMotion = _GlowMotion.still;
+  double _glowIntensity = 1.0;
+
+  Future<void> _loadGlowPrefs() async {
+    final g = await UserPrefs.loadGlow();
+    if (!mounted) return;
+    setState(() {
+      if (g.color != null) _glowColor = Color(g.color!);
+      if (g.motion != null && g.motion! < _GlowMotion.values.length) {
+        _glowMotion = _GlowMotion.values[g.motion!];
+      }
+      if (g.intensity != null) _glowIntensity = g.intensity!.clamp(0.15, 2.0);
+    });
+  }
+
+  /// Le panneau de la lueur : sa couleur, le sens dans lequel elle traverse le
+  /// bord, et sa force. Il s'applique en direct — d'où le [setState] à chaque
+  /// cran — et n'écrit dans les préférences qu'une fois refermé.
+  void _openGlowSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SC.bg,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _GlowSettingsSheet(
+        color: _glowColor,
+        motion: _glowMotion,
+        intensity: _glowIntensity,
+        onChanged: (c, m, i) => setState(() {
+          _glowColor = c;
+          _glowMotion = m;
+          _glowIntensity = i;
+        }),
+      ),
+    ).whenComplete(() {
+      unawaited(UserPrefs.saveGlow(
+        color: _glowColor.toARGB32(),
+        motion: _glowMotion.index,
+        intensity: _glowIntensity,
+      ));
+    });
+  }
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
   /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
@@ -874,6 +935,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
+    unawaited(_loadGlowPrefs());
     // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
     // fil, la panne serait totalement muette côté utilisateur.
     AsrService.osRefusedKey.addListener(_onSttRefused);
@@ -2601,13 +2663,19 @@ class _CallScreenState extends State<CallScreen> {
                                         // ont leur touche dans la barre, à
                                         // demeure — on en change trop souvent
                                         // pour avoir à déplier les réglages.
-                                        // Il ouvre un panneau, il ne bascule
-                                        // rien : jamais d'état blanc, et le
-                                        // même verre que les autres.
+                                        // Ils ouvrent un panneau, ils ne
+                                        // basculent rien : jamais d'état
+                                        // blanc, et le même verre que les
+                                        // autres.
                                         _RoundCallButton(
                                           icon: Icons.tune_rounded,
                                           label: AppStrings.t('call_audio'),
                                           onTap: _openAudioSheet,
+                                        ),
+                                        _RoundCallButton(
+                                          icon: Icons.auto_awesome_rounded,
+                                          label: AppStrings.t('call_glow'),
+                                          onTap: _openGlowSheet,
                                         ),
                                       ],
                                     ),
@@ -2619,6 +2687,9 @@ class _CallScreenState extends State<CallScreen> {
                           // 3. La barre elle-même.
                           _CallDock(
                             hasTurns: _turns.isNotEmpty,
+                            glowColor: _glowColor,
+                            glowMotion: _glowMotion,
+                            glowIntensity: _glowIntensity,
                             // Le drapeau de la langue qu'on ENTEND, celle que
                             // cette touche sert à changer. Repli sur la langue
                             // du compte tant que rien n'a été choisi.
@@ -2992,6 +3063,9 @@ class _LanguageButton extends StatelessWidget {
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.hasTurns,
+    required this.glowColor,
+    required this.glowMotion,
+    required this.glowIntensity,
     required this.flagCountry,
     required this.translationOn,
     required this.ttsSpeaking,
@@ -3008,6 +3082,11 @@ class _CallDock extends StatelessWidget {
   });
 
   final bool hasTurns;
+
+  /// Les trois réglages de la lueur, réglés depuis son propre panneau.
+  final Color glowColor;
+  final _GlowMotion glowMotion;
+  final double glowIntensity;
 
   /// Code ISO pays du drapeau de la langue que j'entends. Vide = rien de choisi
   /// encore : la touche montre alors l'icône de traduction.
@@ -3029,12 +3108,11 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
-  /// La veille va jusqu'à l'effacement complet : le panneau et ses quatre
-  /// touches disparaissent, il ne reste que la pastille et la lueur. Ce qui
-  /// devient invisible devient introuvable, d'ordinaire — ici non : la
-  /// pastille reste posée là où le panneau va revenir, et un tap n'importe où
-  /// sur l'écran le rappelle.
-  static const double _dimOpacity = 0.0;
+  /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
+  /// vidéo, assez haut pour qu'on voie encore où sont les touches. Jamais
+  /// zéro — même avec un tap qui rallume depuis n'importe où, on doit pouvoir
+  /// viser le raccrochage sans le chercher.
+  static const double _dimOpacity = 0.22;
 
   /// Le rayon des deux encoches du haut. Les coins ne sont pas arrondis vers
   /// l'INTÉRIEUR comme un bouton — ils sont creusés vers l'EXTÉRIEUR : le
@@ -3078,6 +3156,9 @@ class _CallDock extends StatelessWidget {
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
             radius: hugRadius,
+            color: glowColor,
+            motion: glowMotion,
+            intensity: glowIntensity,
             child: ClipPath(
             clipper: const _TopHugClipper(hugRadius),
             child: BackdropFilter(
@@ -3195,18 +3276,24 @@ class _CallDock extends StatelessWidget {
   }
 }
 
-/// La lueur cyan autour de la barre : elle s'allume dès que ça parle — ma voix,
-/// la sienne, ou la traduction que la machine est en train de dire — et elle
-/// respire tant que ça dure. C'est le même signal que les barres de la
-/// pastille, en plus grand : on le voit sans regarder la barre.
+/// La lueur autour de la barre : elle s'allume dès que ça parle — ma voix, la
+/// sienne, ou la traduction que la machine est en train de dire — et elle vit
+/// tant que ça dure. C'est le même signal que les barres de la pastille, en
+/// plus grand : on le voit sans regarder la barre.
 ///
-/// Elle se peint DEHORS, autour du verre : posée dedans, le ClipRRect de la
-/// barre la couperait au ras du bord.
+/// Sa couleur, son mouvement et sa force viennent de son panneau de réglage,
+/// pas d'ici : ce widget ne décide que du QUAND.
+///
+/// Elle se peint DEHORS, autour du verre : posée dedans, le clip de la barre la
+/// couperait au ras du bord.
 class _DockAura extends StatefulWidget {
   const _DockAura({
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.radius,
+    required this.color,
+    required this.motion,
+    required this.intensity,
     required this.child,
   });
 
@@ -3215,6 +3302,11 @@ class _DockAura extends StatefulWidget {
 
   /// Le rayon des encoches du panneau — la lueur suit la même découpe.
   final double radius;
+  final Color color;
+  final _GlowMotion motion;
+
+  /// 0,15 à 2 : en dessous elle ne se voit plus, au-dessus elle mange l'écran.
+  final double intensity;
   final Widget child;
 
   @override
@@ -3298,11 +3390,26 @@ class _DockAuraState extends State<_DockAura>
         // qui reste, avec la pastille, quand il a disparu.
         final a = _amp.value;
         if (a < 0.01) return child!;
-        // Le souffle : la lueur respire au lieu de rester posée.
+        // Immobile, elle respire : la force elle-même monte et redescend.
+        // En mouvement, elle garde une force constante — sinon le battement
+        // et le balayage se contrarient, et on ne lit plus ni l'un ni l'autre.
+        final still = widget.motion == _GlowMotion.still;
         final pulse = 0.5 + 0.5 * math.sin(_phase.value * 2 * math.pi);
-        final glow = a * (0.55 + 0.45 * pulse);
+        final glow = a * (still ? 0.55 + 0.45 * pulse : 1.0);
         return CustomPaint(
-          painter: _AuraPainter(glow: glow, radius: widget.radius),
+          painter: _AuraPainter(
+            glow: glow,
+            radius: widget.radius,
+            color: widget.color,
+            intensity: widget.intensity,
+            // La position de la bande claire, 0 à gauche et 1 à droite. Le même
+            // compteur que le souffle, lu dans un sens ou dans l'autre.
+            sweep: switch (widget.motion) {
+              _GlowMotion.still => null,
+              _GlowMotion.rightward => _phase.value,
+              _GlowMotion.leftward => 1 - _phase.value,
+            },
+          ),
           child: child,
         );
       },
@@ -3310,25 +3417,44 @@ class _DockAuraState extends State<_DockAura>
   }
 }
 
-/// La lueur elle-même : la découpe du panneau, peinte en cyan et floutée
-/// UNIQUEMENT vers l'extérieur ([ui.BlurStyle.outer]) — un halo qui déborderait
-/// aussi vers l'intérieur laverait le panneau au lieu d'en sortir, et à travers
-/// le verre ça se voyait.
+/// La lueur elle-même : la découpe du panneau, peinte et floutée UNIQUEMENT
+/// vers l'extérieur ([ui.BlurStyle.outer]) — un halo qui déborderait aussi vers
+/// l'intérieur laverait le panneau au lieu d'en sortir, et à travers le verre
+/// ça se voyait.
 ///
 /// Elle ne sort que par le HAUT : la toile est coupée au ras du bord haut du
 /// panneau, donc tout ce qui partirait sur les côtés ou vers le bas n'est
 /// jamais peint. C'est ce qui décide de l'angle de sortie — pas le flou, qui
 /// lui étale dans toutes les directions.
 class _AuraPainter extends CustomPainter {
-  const _AuraPainter({required this.glow, required this.radius});
+  const _AuraPainter({
+    required this.glow,
+    required this.radius,
+    required this.color,
+    required this.intensity,
+    required this.sweep,
+  });
 
   final double glow;
   final double radius;
+  final Color color;
+  final double intensity;
+
+  /// Où en est la bande claire, de 0 (bord gauche) à 1 (bord droit). Null =
+  /// pas de balayage : la lueur est la même sur toute la largeur.
+  final double? sweep;
+
+  /// La part du bord qu'éclaire la bande quand elle balaie. Trop étroite, on ne
+  /// voit qu'un point filer ; trop large, le balayage ne se lit plus.
+  static const double _bandWidth = 0.30;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final blur = 18 + 34 * glow;
+    // L'intensité joue sur les deux : ce qui brûle fort s'étale aussi plus
+    // loin. Une lueur plus opaque mais aussi serrée ne ferait qu'un trait.
+    final blur = (18 + 34 * glow) * intensity;
     final path = _TopHugClipper(radius).getClip(size);
+    final rect = Offset.zero & size;
     canvas.save();
     // La bande où la lueur a le droit d'exister : toute la largeur, des deux
     // bords de l'écran compris, et assez haut pour que le halo large ait la
@@ -3339,24 +3465,283 @@ class _AuraPainter extends CustomPainter {
     // Deux passes : un halo large et diffus qui monte loin, puis un liseré
     // serré et franc juste au-dessus du bord. Une seule passe donne soit un
     // trait dur, soit un brouillard — jamais les deux.
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = SC.accent.withValues(alpha: 0.45 * glow)
-        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur * 2),
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = SC.accent.withValues(alpha: 0.95 * glow)
-        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur * 0.45),
-    );
+    _stroke(canvas, path, rect, alpha: 0.45, blur: blur * 2);
+    _stroke(canvas, path, rect, alpha: 0.95, blur: blur * 0.45);
     canvas.restore();
+  }
+
+  void _stroke(
+    Canvas canvas,
+    Path path,
+    Rect rect, {
+    required double alpha,
+    required double blur,
+  }) {
+    final tint = color.withValues(
+      alpha: (alpha * glow * intensity).clamp(0.0, 1.0),
+    );
+    final paint = Paint()
+      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur);
+    final t = sweep;
+    if (t == null) {
+      paint.color = tint;
+    } else {
+      // La bande claire est un dégradé fixe qu'on FAIT GLISSER : les stops
+      // restent les mêmes, c'est la matrice qui les promène d'un bord à
+      // l'autre. Décaler les stops eux-mêmes obligerait à les garder
+      // croissants et à les rogner aux extrémités, où la bande se déformerait.
+      paint.shader = LinearGradient(
+        colors: [
+          tint.withValues(alpha: 0),
+          tint,
+          tint.withValues(alpha: 0),
+        ],
+        stops: const [
+          0.5 - _bandWidth / 2,
+          0.5,
+          0.5 + _bandWidth / 2,
+        ],
+        transform: _SweepShift(t),
+      ).createShader(rect);
+    }
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(_AuraPainter old) =>
-      old.glow != glow || old.radius != radius;
+      old.glow != glow ||
+      old.radius != radius ||
+      old.color != color ||
+      old.intensity != intensity ||
+      old.sweep != sweep;
+}
+
+/// Promène un dégradé horizontal d'un bord à l'autre de sa boîte : à t=0 il est
+/// entièrement sorti par la gauche, à t=1 par la droite.
+class _SweepShift extends GradientTransform {
+  const _SweepShift(this.t);
+
+  final double t;
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues((t * 2 - 1) * bounds.width, 0, 0);
+}
+
+/// Le panneau qui règle la lueur : sa couleur, le sens dans lequel elle
+/// traverse le bord, et sa force.
+///
+/// Tout s'applique en direct — mais la lueur vraie est cachée derrière ce
+/// panneau, alors il en porte un aperçu en haut : le même bord, le même
+/// peintre, allumé en permanence. Sans lui on règlerait à l'aveugle.
+class _GlowSettingsSheet extends StatefulWidget {
+  const _GlowSettingsSheet({
+    required this.color,
+    required this.motion,
+    required this.intensity,
+    required this.onChanged,
+  });
+
+  final Color color;
+  final _GlowMotion motion;
+  final double intensity;
+  final void Function(Color, _GlowMotion, double) onChanged;
+
+  @override
+  State<_GlowSettingsSheet> createState() => _GlowSettingsSheetState();
+}
+
+class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
+  late Color _color = widget.color;
+  late _GlowMotion _motion = widget.motion;
+  late double _intensity = widget.intensity;
+
+  /// L'aperçu ne bat pas au rythme d'une voix : il est allumé, point.
+  final ValueNotifier<bool> _previewOn = ValueNotifier<bool>(true);
+  final ValueNotifier<double> _previewLevel = ValueNotifier<double>(0);
+
+  /// Les couleurs proposées, toutes déjà dans l'app : le cyan de l'accent, les
+  /// trois du halo de fond, le vert de présence, le rouge du raccrochage. Pas
+  /// de nuance inventée pour l'occasion.
+  static const List<Color> _palette = [
+    SC.accent,
+    SC.meshBlue,
+    SC.meshViolet,
+    SC.meshCyan,
+    SC.online,
+    Color(0xFFE53935),
+    Colors.white,
+  ];
+
+  void _push() => widget.onChanged(_color, _motion, _intensity);
+
+  @override
+  void dispose() {
+    _previewOn.dispose();
+    _previewLevel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              AppStrings.t('call_glow'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // L'aperçu : le bord du panneau, en petit, avec sa lueur.
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                height: 108,
+                color: Colors.black,
+                alignment: Alignment.bottomCenter,
+                child: _DockAura(
+                  ttsSpeaking: _previewOn,
+                  voiceLevel: _previewLevel,
+                  radius: _CallDock.hugRadius,
+                  color: _color,
+                  motion: _motion,
+                  intensity: _intensity,
+                  child: ClipPath(
+                    clipper: const _TopHugClipper(_CallDock.hugRadius),
+                    child: Container(
+                      height: _CallDock.hugRadius + 26,
+                      width: double.infinity,
+                      color: Colors.white.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _label(AppStrings.t('call_glow_color')),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final c in _palette)
+                  Semantics(
+                    label: AppStrings.t('call_glow_color'),
+                    button: true,
+                    selected: c.toARGB32() == _color.toARGB32(),
+                    child: Pressable(
+                      bounce: true,
+                      onTap: () {
+                        setState(() => _color = c);
+                        _push();
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            // Le choix courant se signale par un anneau blanc,
+                            // pas par une coche : sur une pastille de 38 px une
+                            // coche cache la couleur qu'on est en train de
+                            // juger.
+                            color: c.toARGB32() == _color.toARGB32()
+                                ? Colors.white
+                                : Colors.white24,
+                            width: c.toARGB32() == _color.toARGB32() ? 3 : 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _label(AppStrings.t('call_glow_motion')),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _motionButton(_GlowMotion.leftward, Icons.west_rounded),
+                const SizedBox(width: 12),
+                _motionButton(_GlowMotion.still, Icons.blur_on_rounded),
+                const SizedBox(width: 12),
+                _motionButton(_GlowMotion.rightward, Icons.east_rounded),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _label(AppStrings.t('call_glow_intensity')),
+            Slider(
+              value: _intensity,
+              min: 0.15,
+              max: 2.0,
+              activeColor: _color,
+              onChanged: (v) {
+                setState(() => _intensity = v);
+                _push();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String text) => Text(
+        text,
+        style: TextStyle(
+          color: SC.textSecondary,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
+  Widget _motionButton(_GlowMotion m, IconData icon) {
+    final on = _motion == m;
+    return Semantics(
+      label: AppStrings.t('call_glow_motion'),
+      button: true,
+      selected: on,
+      child: Pressable(
+        bounce: true,
+        onTap: () {
+          setState(() => _motion = m);
+          _push();
+        },
+        child: Container(
+          width: 52,
+          height: 44,
+          decoration: BoxDecoration(
+            // Engagé = blanc plein, icône noire : la même bascule que les
+            // boutons de l'appel, on ne réapprend rien.
+            color: on ? Colors.white : Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: on ? Colors.black : Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
 }
 
 /// La découpe du panneau : les deux coins du HAUT creusés en quart de cercle

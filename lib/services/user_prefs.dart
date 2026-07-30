@@ -184,6 +184,37 @@ abstract final class UserPrefs {
     await p.setBool(keyCallSpokenLangDontAsk, false);
   }
 
+  /// The call panel's glow: its colour (ARGB int), how it travels along the
+  /// edge (0 = still, 1 = leftward, 2 = rightward) and how hard it burns
+  /// (0…1). Kept here rather than in the call screen so a taste survives the
+  /// call it was set in — it is a look, not a per-call setting.
+  static const String keyGlowColor = 'call_glow_color';
+  static const String keyGlowMotion = 'call_glow_motion';
+  static const String keyGlowIntensity = 'call_glow_intensity';
+
+  /// Nulls mean "never set" — the caller keeps its own defaults rather than
+  /// having them duplicated here.
+  static Future<({int? color, int? motion, double? intensity})>
+      loadGlow() async {
+    final p = await SharedPreferences.getInstance();
+    return (
+      color: p.getInt(keyGlowColor),
+      motion: p.getInt(keyGlowMotion),
+      intensity: p.getDouble(keyGlowIntensity),
+    );
+  }
+
+  static Future<void> saveGlow({
+    required int color,
+    required int motion,
+    required double intensity,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(keyGlowColor, color);
+    await p.setInt(keyGlowMotion, motion);
+    await p.setDouble(keyGlowIntensity, intensity);
+  }
+
   static Future<AudioPrefs> loadAudio() async {
     final p = await SharedPreferences.getInstance();
     return AudioPrefs(
