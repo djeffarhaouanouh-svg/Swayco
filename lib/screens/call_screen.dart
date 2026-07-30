@@ -871,8 +871,9 @@ class _CallScreenState extends State<CallScreen> {
     _syncUsageMeter();
   }
 
-  /// Silence the peer's real voice for exactly the window a translation is
-  /// audible, from EITHER source.
+  /// Duck the peer's real voice for exactly the window a translation is
+  /// audible, from EITHER source. Ducked, not silenced: it stays present
+  /// underneath — see [AudioController]'s note on the level.
   ///
   /// [RealtimeTranslationPort.translationSpeaking] only ever covers the cloud
   /// mp3 player, so on the local-TTS path — the default on mobile — nothing was
