@@ -3321,16 +3321,29 @@ class _AuraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final blur = 12 + 20 * glow;
+    final blur = 18 + 34 * glow;
+    final path = _TopHugClipper(radius).getClip(size);
     canvas.save();
+    // La bande où la lueur a le droit d'exister : toute la largeur, des deux
+    // bords de l'écran compris, et assez haut pour que le halo large ait la
+    // place de monter. En dessous du bord haut du panneau, rien.
     canvas.clipRect(
-      Rect.fromLTRB(-blur, -blur * 2, size.width + blur, radius),
+      Rect.fromLTRB(-blur, -blur * 3, size.width + blur, radius),
+    );
+    // Deux passes : un halo large et diffus qui monte loin, puis un liseré
+    // serré et franc juste au-dessus du bord. Une seule passe donne soit un
+    // trait dur, soit un brouillard — jamais les deux.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = SC.accent.withValues(alpha: 0.45 * glow)
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur * 2),
     );
     canvas.drawPath(
-      _TopHugClipper(radius).getClip(size),
+      path,
       Paint()
-        ..color = SC.accent.withValues(alpha: 0.55 * glow)
-        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur),
+        ..color = SC.accent.withValues(alpha: 0.95 * glow)
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur * 0.45),
     );
     canvas.restore();
   }
