@@ -128,85 +128,6 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
-  /// Ma dernière phrase à moi — la seule que la barre affiche. Vide tant que
-  /// je n'ai rien dit, même si le correspondant a déjà parlé : ce qu'il dit se
-  /// lit en dépliant la conversation.
-  String get _myLastLine {
-    for (var i = _turns.length - 1; i >= 0; i--) {
-      if (_turns[i].mine) return _turns[i].text;
-    }
-    return '';
-  }
-
-  /// Le dock est ouvert en grand : le chevron et le raccrochage s'effacent, la
-  /// pastille glisse à leur place et la zone de texte prend toute la barre.
-  ///
-  /// Il s'ouvre DÈS QU'ON PARLE — la phrase, elle, n'arrive qu'une fois
-  /// l'énoncé fini, et la place doit déjà l'attendre. Il se referme
-  /// [_kMessageHold] après qu'elle s'est affichée.
-  bool _messageOpen = false;
-  Timer? _messageTimer;
-
-  /// Combien de temps MA phrase reste dépliée une fois affichée — la barre ne
-  /// montre que la mienne, jamais celle du pair. 1,5 s était le temps de la
-  /// voir, pas de la lire.
-  static const Duration _kMessageHold = Duration(milliseconds: 4000);
-
-  /// Refermé à la main : pendant ce délai, plus rien ne rouvre la barre. Sans
-  /// ça, la voix qui suit — souvent la sienne, une demi-seconde plus tard — la
-  /// rouvrait aussitôt, et le geste ne servait à rien.
-  static const Duration _kManualCloseGrace = Duration(seconds: 4);
-  DateTime? _manualCloseAt;
-
-  /// Le filet : ouvert par une voix, le dock ne peut pas rester grand ouvert
-  /// indéfiniment si aucune phrase n'arrive derrière (STT muette, réseau
-  /// coupé). Passé ce délai sans rien, il se resserre de lui-même.
-  static const Duration _kMessageSafety = Duration(seconds: 6);
-
-  /// Ça parle : on fait la place. Tant que la voix dure, rien ne se referme.
-  ///
-  /// SAUF si la traduction est coupée : la pastille grisée dit «je ne traduis
-  /// plus», et la barre reste alors immobile. C'est elle qui glissait vers la
-  /// droite à chaque phrase, poussée par la zone de texte qui s'élargit —
-  /// couper la traduction doit aussi arrêter ce mouvement, sinon on regarde un
-  /// bouton éteint qui bouge encore.
-  void _openMessageZone() {
-    if (!_translationEnabled) return;
-    final closed = _manualCloseAt;
-    if (closed != null &&
-        DateTime.now().difference(closed) < _kManualCloseGrace) {
-      return;
-    }
-    _messageTimer?.cancel();
-    _messageTimer = Timer(_kMessageSafety, _closeMessageZone);
-    if (!_messageOpen && mounted) setState(() => _messageOpen = true);
-  }
-
-  /// Le temps laissé à la rétraction avant que le fond s'en aille : la durée de
-  /// l'animation, plus de quoi la voir finir. Les deux collées faisaient un
-  /// à-coup — le chevron et le raccrochage revenaient dans un fond déjà en
-  /// train de disparaître, donc ils clignotaient au lieu de revenir.
-  static const Duration _kRetract = Duration(milliseconds: 420);
-
-  void _closeMessageZone() {
-    if (!mounted || !_messageOpen) return;
-    setState(() => _messageOpen = false);
-    // Le fond s'efface DANS LA FOULÉE, pas après un délai : le seul temps
-    // qu'on laisse passer est celui de la rétraction elle-même, pour que le
-    // fond parte quand la pastille est revenue à sa place et pas pendant
-    // qu'elle glisse.
-    _dockIdleTimer?.cancel();
-    _dockIdleTimer = Timer(_kRetract, () {
-      if (!mounted || _dockDimmed) return;
-      // Sauf si on est en train de s'en servir : là, le sursis normal reprend.
-      if (_turnsOpen || _controlsOpen) {
-        _wakeDock();
-        return;
-      }
-      setState(() => _dockDimmed = true);
-    });
-  }
-
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
   /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
   /// Un tap n'importe où dessus le ramène.
@@ -222,41 +143,15 @@ class _CallScreenState extends State<CallScreen> {
     _dockIdleTimer?.cancel();
     _dockIdleTimer = Timer(_kDockIdle, () {
       if (!mounted || _dockDimmed) return;
-      // On ne s'efface pas sous les doigts de quelqu'un qui s'en sert, ni sous
-      // une phrase encore dépliée : la barre se resserre d'abord, elle s'efface
-      // ensuite. On ne laisse pas tomber pour autant — le sursis est simplement
-      // reconduit, sinon la veille ne reviendrait jamais.
-      if (_turnsOpen || _controlsOpen || _messageOpen) {
+      // On ne s'efface pas sous les doigts de quelqu'un qui s'en sert : le
+      // sursis est simplement reconduit, sinon la veille ne reviendrait jamais.
+      if (_turnsOpen || _controlsOpen) {
         _wakeDock();
         return;
       }
       setState(() => _dockDimmed = true);
     });
     if (_dockDimmed && mounted) setState(() => _dockDimmed = false);
-  }
-
-  /// La phrase est à l'écran : à partir de maintenant, [_kMessageHold] et le
-  /// dock se resserre. Une phrase qui en chasse une autre relance le compte à
-  /// rebours plutôt que de le laisser expirer au milieu — et si la personne
-  /// repart à parler, [_openMessageZone] l'annule.
-  void _flashMessage() {
-    if (!_translationEnabled) return;
-    final closed = _manualCloseAt;
-    if (closed != null &&
-        DateTime.now().difference(closed) < _kManualCloseGrace) {
-      return;
-    }
-    _messageTimer?.cancel();
-    if (!_messageOpen) setState(() => _messageOpen = true);
-    _messageTimer = Timer(_kMessageHold, _closeMessageZone);
-  }
-
-  /// Refermé par un glissement du doigt : on note l'heure pour que la barre
-  /// reste fermée le temps de la grâce.
-  void _collapseByGesture() {
-    _manualCloseAt = DateTime.now();
-    _messageTimer?.cancel();
-    _closeMessageZone();
   }
 
   /// Le plancher absolu sous lequel rien n'est jamais de la parole.
@@ -403,12 +298,7 @@ class _CallScreenState extends State<CallScreen> {
       _publishVoiceLevel();
       // Trois relevés consécutifs (~750 ms) plutôt que deux : une porte qui
       // claque ou un raclement de gorge ne tient pas aussi longtemps.
-      if (_hotTicks >= 3) {
-        _wakeDock();
-        // C'est MA voix : la place se fait maintenant, avant même que la
-        // transcription arrive.
-        _openMessageZone();
-      }
+      if (_hotTicks >= 3) _wakeDock();
     });
   }
 
@@ -427,11 +317,6 @@ class _CallScreenState extends State<CallScreen> {
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
     _wakeDock();
-    // La barre ne montre que CE QUE J'ENVOIE. Ce que je reçois se lit dans la
-    // conversation, en tapant la zone — l'afficher au passage volerait la
-    // place à ma propre phrase, celle que je viens de dire et que je veux
-    // vérifier.
-    if (turn.mine) _flashMessage();
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -678,29 +563,6 @@ class _CallScreenState extends State<CallScreen> {
   /// the on-device engine reloads with the new `language:` (no download — the
   /// universal model covers every language in [supportedLanguages]).
   late String _mySourceLang = widget.mySourceLang;
-
-  /// Ce qu'affiche la zone de légende tant que personne n'a parlé : « Parle
-  /// japonais » — la langue que CE téléphone s'est engagé à parler pour cet
-  /// appel. C'est le seul endroit où elle a besoin d'être rappelée, et il tombe
-  /// pile là où les phrases vont apparaître.
-  String get _speakLangHint {
-    final base = _mySourceLang.split('-').first.toLowerCase();
-    if (base.isEmpty) return '';
-    final named = AppStrings.t('lang_name_$base');
-    // Pas de nom traduit pour cette langue : son nom natif fait l'affaire.
-    final name = named.startsWith('lang_name_')
-        ? (findLanguageByCode(base)?.label ?? '')
-        : named;
-    if (name.isEmpty) return '';
-    // Ces langues-là écrivent les noms de langue en minuscule ; les autres
-    // (anglais, allemand, néerlandais…) les capitalisent.
-    const lowercasesLangNames = {'fr', 'es', 'it', 'pt'};
-    final shown = lowercasesLangNames.contains(AppStrings.currentBcp47.value)
-        ? name[0].toLowerCase() + name.substring(1)
-        : name;
-    return AppStrings.t('call_captions_hint', args: {'lang': shown});
-  }
-
 
   /// The language the local user currently *hears* the remote translated into.
   /// Starts at the user's own language; changeable mid-call via the language
@@ -1384,7 +1246,6 @@ class _CallScreenState extends State<CallScreen> {
               if (_micProbeDead && p.audioLevel > _kVoiceOn) {
                 _localVoice = p.audioLevel.clamp(0.0, 1.0);
                 _wakeDock();
-                _openMessageZone();
               }
               continue;
             }
@@ -1556,14 +1417,10 @@ class _CallScreenState extends State<CallScreen> {
       // blocking SEND until its timer fires (up to 15 s).
       markTranslationDone();
     } else {
-      // On coupe : la barre se resserre DANS LE MÊME GESTE, sans attendre le
-      // maintien de la phrase ni le filet de sécurité. Plus rien ne sortira
-      // d'ici, la place n'a plus lieu d'être — et la pastille s'arrête net.
-      _messageTimer?.cancel();
+      // On coupe : plus rien ne sortira d'ici, et la pastille s'arrête net.
       _hotTicks = 0;
       _localVoice = 0;
       _publishVoiceLevel();
-      _closeMessageZone();
     }
     if (mounted) setState(() => _micOn = next);
     await room.localParticipant?.setMicrophoneEnabled(next);
@@ -1655,11 +1512,6 @@ class _CallScreenState extends State<CallScreen> {
       // La phrase en cours de lecture s'arrête avec le reste : on a demandé le
       // silence, pas «le silence après celle-ci».
       _cancelQueuedSpeech();
-      // Et la barre revient à sa place tout de suite. Un seul mouvement, celui
-      // du geste qu'on vient de faire — après quoi plus rien ne bouge tant que
-      // la pastille est grisée.
-      _messageTimer?.cancel();
-      _closeMessageZone();
     }
   }
 
@@ -2281,7 +2133,6 @@ class _CallScreenState extends State<CallScreen> {
     ttsSpeaking.removeListener(_syncTranslationSpeaking);
     ttsSpeaking.dispose();
     _voiceLevel.dispose();
-    _messageTimer?.cancel();
     _dockIdleTimer?.cancel();
     _micProbe?.cancel();
     UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
@@ -2739,16 +2590,11 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                           // 3. La barre elle-même.
                           _CallDock(
-                            preview: _myLastLine,
-                            hint: _speakLangHint,
-                            turnsOpen: _turnsOpen,
                             hasTurns: _turns.isNotEmpty,
-                            myName: widget.displayName,
                             translationOn: _translationEnabled,
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
                             controlsOpen: _controlsOpen,
-                            messageOpen: _messageOpen,
                             dimmed: _dockDimmed,
                             onWake: _wakeDock,
                             onToggleTurns: () {
@@ -2764,7 +2610,6 @@ class _CallScreenState extends State<CallScreen> {
                                 () => _controlsOpen = !_controlsOpen,
                               );
                             },
-                            onCollapse: _collapseByGesture,
                           ),
                         ],
                       ),
@@ -3104,21 +2949,17 @@ class _LanguageButton extends StatelessWidget {
 }
 
 /// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
-/// tout ce dont on se sert en appel. De gauche à droite — la zone de légende
-/// (un tap déplie ce qui se dit), la pastille de traduction, le chevron qui
-/// déplie les réglages au-dessus, et raccrocher tout au bout.
+/// quatre touches à égale distance — la conversation (un tap déplie ce qui se
+/// dit), la pastille de traduction, le chevron qui déplie les réglages
+/// au-dessus, et raccrocher tout au bout. Elle ne bouge plus jamais : ni
+/// glissement, ni touche qui s'efface au passage d'une phrase.
 class _CallDock extends StatelessWidget {
   const _CallDock({
-    required this.preview,
-    required this.hint,
-    required this.turnsOpen,
     required this.hasTurns,
-    required this.myName,
     required this.translationOn,
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.controlsOpen,
-    required this.messageOpen,
     required this.dimmed,
     required this.onWake,
     required this.onToggleTurns,
@@ -3126,25 +2967,13 @@ class _CallDock extends StatelessWidget {
     required this.onOrbLongPress,
     required this.onHangUp,
     required this.onToggleControls,
-    required this.onCollapse,
   });
 
-  /// Ma dernière phrase, en une ligne. Vide = on montre l'invite.
-  final String preview;
-
-  /// Affiché tant que rien n'a été dit.
-  final String hint;
-  final bool turnsOpen;
   final bool hasTurns;
-  final String myName;
   final bool translationOn;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
   final bool controlsOpen;
-
-  /// Une phrase vient d'arriver : la zone de texte prend toute la barre, le
-  /// chevron et le raccrochage s'effacent, la pastille glisse à droite.
-  final bool messageOpen;
 
   /// Silence : la barre s'estompe jusqu'à [_dimOpacity], et la pastille reste
   /// entière par-dessus. JAMAIS jusqu'à zéro : ce qui devient invisible devient
@@ -3157,19 +2986,9 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
-  /// Un glissement vers la GAUCHE sur la barre dépliée : elle se resserre tout
-  /// de suite, sans attendre la fin du délai. La zone de texte s'ouvre vers la
-  /// droite, donc on la repousse dans le sens inverse — le geste va dans le
-  /// sens du mouvement qu'on annule.
-  final VoidCallback onCollapse;
-
   /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
-
-  /// L'écart entre les trois blocs de la barre. La zone de texte, elle, n'a
-  /// plus de largeur à elle : elle prend ce que les autres laissent.
-  static const double _gap = 8;
 
   @override
   Widget build(BuildContext context) {
@@ -3185,21 +3004,10 @@ class _CallDock extends StatelessWidget {
         return GestureDetector(
           // En veille, la barre entière devient une seule grande cible qui la
           // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
-          // Dépliée, elle écoute aussi le glissement qui la referme — d'où le
-          // translucide, qui laisse les boutons continuer de travailler.
-          behavior: dimmed
-              ? HitTestBehavior.opaque
-              : (messageOpen
-                  ? HitTestBehavior.translucent
-                  : HitTestBehavior.deferToChild),
+          // Réveillée, elle rend la main à ses touches.
+          behavior:
+              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
-          // Vers la gauche = referme. Seuil à 250 px/s : un simple appui qui
-          // dérape de deux pixels ne compte pas.
-          onHorizontalDragEnd: messageOpen
-              ? (d) {
-                  if ((d.primaryVelocity ?? 0) < -250) onCollapse();
-                }
-              : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
             child: BackdropFilter(
@@ -3224,97 +3032,64 @@ class _CallDock extends StatelessWidget {
                 ),
                 child: Row(
                   // La barre remplit la largeur qu'on lui donne au lieu
-                  // d'épouser son contenu.
+                  // d'épouser son contenu, et les quatre commandes s'y
+                  // répartissent également — plus de zone de texte qui mange
+                  // la moitié gauche : la dernière phrase se lit en dépliant
+                  // la conversation, comme avant.
                   mainAxisSize: MainAxisSize.max,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // Un peu d'air à gauche : la zone de texte ne colle pas au
-                    // bord du verre.
-                    const SizedBox(width: 6),
-                    // Deux parts contre trois au repos — c'est ce rapport qui
-                    // règle la largeur de la zone de texte, ne pas le perdre en
-                    // touchant à ce bloc. Quand une phrase arrive, elle est le
-                    // seul Expanded restant et prend tout sauf la pastille.
-                    Expanded(
-                      flex: 2,
-                      child: Opacity(
-                        opacity: live,
-                        // En veille, le premier tap rallume : il ne doit pas
-                        // aussi déplier la conversation.
-                        child: IgnorePointer(
-                          ignoring: dimmed,
-                          child: _CaptionField(
-                            preview: preview,
-                            hint: hint,
-                            open: turnsOpen,
-                            hasTurns: hasTurns,
-                            onTap: onToggleTurns,
-                          ),
+                    // La conversation, au premier cran. En veille, le premier
+                    // tap rallume : il ne doit pas aussi la déplier.
+                    Opacity(
+                      opacity: live,
+                      child: IgnorePointer(
+                        ignoring: dimmed,
+                        child: _DockKeyButton(
+                          icon: Icons.sms_rounded,
+                          label: AppStrings.t('messages_title'),
+                          // Le verre de l'ancienne zone de texte, à l'identique
+                          // — c'est la même commande, elle ne change que de
+                          // forme.
+                          background: Colors.white.withValues(alpha: 0.10),
+                          borderColor: Colors.white.withValues(alpha: 0.12),
+                          onTap: hasTurns ? onToggleTurns : null,
                         ),
                       ),
                     ),
-                    const SizedBox(width: _gap),
-                    // Les trois boutons — pastille, chevron, raccrochage — se
-                    // répartissent également l'espace qui reste à droite, au
-                    // lieu d'être collés les uns aux autres au bout de la
-                    // barre. Pendant qu'une phrase occupe la barre, le chevron
-                    // et le raccrochage s'effacent et ce bloc se resserre à une
-                    // part : la pastille glisse vers la droite, la phrase prend
-                    // le reste.
-                    // Une phrase occupe la barre : le chevron et le
-                    // raccrochage s'effacent, et la pastille se retrouve SEULE
-                    // au bout — même position, même écart qu'avant. Au repos,
-                    // les trois se partagent également l'espace de droite.
-                    if (messageOpen)
-                      _TranslationOrb(
-                        on: translationOn,
-                        ttsSpeaking: ttsSpeaking,
-                        voiceLevel: voiceLevel,
-                        onTap: dimmed ? onWake : onToggleTranslation,
-                        onLongPress: onOrbLongPress,
-                      )
-                    else
-                      Expanded(
-                        flex: 3,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            // La pastille ne s'estompe jamais : c'est elle qui
-                            // reste quand tout le reste s'efface. En veille, la
-                            // toucher rallume la barre au lieu de couper la
-                            // traduction — on ne coupe pas la traduction sans
-                            // l'avoir vue.
-                            _TranslationOrb(
-                              on: translationOn,
-                              ttsSpeaking: ttsSpeaking,
-                              voiceLevel: voiceLevel,
-                              onTap: dimmed ? onWake : onToggleTranslation,
-                              onLongPress: onOrbLongPress,
-                            ),
-                            Opacity(
-                              opacity: live,
-                              child: IgnorePointer(
-                                ignoring: dimmed,
-                                child: _RailToggleButton(
-                                  open: controlsOpen,
-                                  onTap: onToggleControls,
-                                ),
-                              ),
-                            ),
-                            Opacity(
-                              opacity: live,
-                              child: IgnorePointer(
-                                ignoring: dimmed,
-                                child: _DockCircleButton(
-                                  icon: Icons.call_end_rounded,
-                                  label: AppStrings.t('call_end'),
-                                  background: const Color(0xFFE53935),
-                                  onTap: onHangUp,
-                                ),
-                              ),
-                            ),
-                          ],
+                    // La pastille ne s'estompe jamais : c'est elle qui reste
+                    // quand tout le reste s'efface. En veille, la toucher
+                    // rallume la barre au lieu de couper la traduction — on ne
+                    // coupe pas la traduction sans l'avoir vue.
+                    _TranslationOrb(
+                      on: translationOn,
+                      ttsSpeaking: ttsSpeaking,
+                      voiceLevel: voiceLevel,
+                      onTap: dimmed ? onWake : onToggleTranslation,
+                      onLongPress: onOrbLongPress,
+                    ),
+                    Opacity(
+                      opacity: live,
+                      child: IgnorePointer(
+                        ignoring: dimmed,
+                        child: _RailToggleButton(
+                          open: controlsOpen,
+                          onTap: onToggleControls,
                         ),
                       ),
+                    ),
+                    Opacity(
+                      opacity: live,
+                      child: IgnorePointer(
+                        ignoring: dimmed,
+                        child: _DockKeyButton(
+                          icon: Icons.call_end_rounded,
+                          label: AppStrings.t('call_end'),
+                          background: const Color(0xFFE53935),
+                          onTap: onHangUp,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -3326,87 +3101,36 @@ class _CallDock extends StatelessWidget {
   }
 }
 
-/// La zone de gauche du dock : là où les phrases s'affichent. Rien à y écrire —
-/// elle montre la dernière phrase dite et, au tap, déplie la conversation
-/// complète au-dessus du dock.
-class _CaptionField extends StatelessWidget {
-  const _CaptionField({
-    required this.preview,
-    required this.hint,
-    required this.open,
-    required this.hasTurns,
-    required this.onTap,
-  });
-
-  final String preview;
-  final String hint;
-  final bool open;
-  final bool hasTurns;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final empty = preview.trim().isEmpty;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: hasTurns ? onTap : null,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(23),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            // Pas de pastille d'auteur : la barre ne porte QUE mes phrases,
-            // donc afficher mon propre visage à côté de mes propres mots ne
-            // désignait rien — c'était trente pixels de moins pour le texte.
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                empty ? hint : preview,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: empty ? 0.55 : 0.92),
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-            if (hasTurns)
-              AnimatedRotation(
-                turns: open ? 0.5 : 0.0,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  Icons.keyboard_arrow_up_rounded,
-                  size: 20,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Un rond plein du dock (raccrocher). Volontairement sans flou : il est posé
-/// sur le verre du dock, qui a déjà flouté ce qu'il y a dessous.
-class _DockCircleButton extends StatelessWidget {
-  const _DockCircleButton({
+/// Une touche pleine de la barre (conversation, raccrocher) : le rectangle très
+/// arrondi de la maquette — un peu plus large que haut, jamais un rond.
+/// Volontairement sans flou : elle est posée sur le verre du dock, qui a déjà
+/// flouté ce qu'il y a dessous.
+class _DockKeyButton extends StatelessWidget {
+  const _DockKeyButton({
     required this.icon,
     required this.label,
     required this.background,
     required this.onTap,
+    this.borderColor,
   });
 
   final IconData icon;
   final String label;
   final Color background;
-  final VoidCallback onTap;
+
+  /// Null = la touche est là mais n'a rien à ouvrir (aucune phrase encore
+  /// dite) : elle ne réagit pas, sans changer d'aspect.
+  final VoidCallback? onTap;
+
+  /// Le liseré, quand il n'est pas celui par défaut des touches pleines.
+  final Color? borderColor;
+
+  /// La géométrie commune à toutes les touches de la barre. Volontairement
+  /// serrée : à quatre de front, la barre doit encore tenir sur un écran de
+  /// 320 pt sans déborder.
+  static const double width = 52;
+  static const double height = 46;
+  static const double radius = 15;
 
   @override
   Widget build(BuildContext context) {
@@ -3417,12 +3141,14 @@ class _DockCircleButton extends StatelessWidget {
         bounce: true,
         onTap: onTap,
         child: Container(
-          width: 46,
-          height: 46,
+          width: width,
+          height: height,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
             color: background,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: borderColor ?? Colors.white.withValues(alpha: 0.22),
+            ),
           ),
           child: Icon(icon, color: Colors.white, size: 22),
         ),
@@ -3455,8 +3181,12 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
-  static const double size = 50;
+  /// La même touche que les autres : à quatre de front, une seule qui déborde
+  /// casserait l'alignement de la barre. Elle se distingue par ce qu'elle
+  /// montre — le galet blanc irisé —, pas par sa taille.
+  static const double width = _DockKeyButton.width;
+  static const double height = _DockKeyButton.height;
+  static const double radius = _DockKeyButton.radius;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
@@ -3541,10 +3271,10 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: Container(
-          width: _TranslationOrb.size,
-          height: _TranslationOrb.size,
+          width: _TranslationOrb.width,
+          height: _TranslationOrb.height,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(_TranslationOrb.radius),
             boxShadow: [
               BoxShadow(
                 color: Colors.white.withValues(alpha: 0.28),
@@ -3573,17 +3303,20 @@ class _OrbPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final a = amp.value;
-    final r = size.width / 2;
-    final c = Offset(r, r);
-    final rect = Rect.fromCircle(center: c, radius: r);
+    final c = Offset(size.width / 2, size.height / 2);
+    final rect = Offset.zero & size;
+    // Le même rectangle très arrondi que les autres touches de la barre.
+    final rr = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(_TranslationOrb.radius),
+    );
 
     // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
     // coup d'œil qu'elle ne traduit plus.
     final tint = on ? 1.0 : 0.0;
 
-    canvas.drawCircle(
-      c,
-      r,
+    canvas.drawRRect(
+      rr,
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-0.35, -0.45),
@@ -3597,9 +3330,8 @@ class _OrbPainter extends CustomPainter {
     );
 
     // Le liseré irisé.
-    canvas.drawCircle(
-      c,
-      r - 0.7,
+    canvas.drawRRect(
+      rr.deflate(0.7),
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
@@ -3661,10 +3393,14 @@ class _RailToggleButton extends StatelessWidget {
   final bool open;
   final VoidCallback onTap;
 
-  /// Le bouton lui-même. L'anneau et son halo se peignent dans les quelques
-  /// pixels qui restent autour, d'où l'encombrement un peu plus large.
-  static const double _size = 42;
-  static const double _box = 50;
+  /// Le bouton lui-même — la touche commune de la barre. Le liseré et son halo
+  /// se peignent dans les quelques pixels qui restent autour, d'où
+  /// l'encombrement un peu plus large.
+  static const double _w = _DockKeyButton.width;
+  static const double _h = _DockKeyButton.height;
+  static const double _r = _DockKeyButton.radius;
+  static const double _boxW = _w + 8;
+  static const double _boxH = _h + 8;
 
   @override
   Widget build(BuildContext context) {
@@ -3672,8 +3408,8 @@ class _RailToggleButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: _box,
-        height: _box,
+        width: _boxW,
+        height: _boxH,
         child: CustomPaint(
           // L'anneau irisé est PEINT, pas posé en décoration : un dégradé ne
           // rentre pas dans un Border, et un disque dégradé placé dessous se
@@ -3684,8 +3420,8 @@ class _RailToggleButton extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              width: _size,
-              height: _size,
+              width: _w,
+              height: _h,
               decoration: BoxDecoration(
                 // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock,
                 // qui floute déjà le fond — un second flou ne verrait que du
@@ -3696,7 +3432,7 @@ class _RailToggleButton extends StatelessWidget {
                 // lire le chevron.
                 color:
                     open ? Colors.white : Colors.white.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(_r),
               ),
               child: AnimatedRotation(
                 turns: open ? 0.5 : 0.0,
@@ -3729,13 +3465,19 @@ class _ChevronRimPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (!visible) return;
-    final c = Offset(size.width / 2, size.height / 2);
-    // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
-    final r = _RailToggleButton._size / 2 + 1.2;
-    // La lueur d'abord : le même anneau, plus épais et flou, dessous.
-    canvas.drawCircle(
-      c,
-      r,
+    // Le contour du bouton, plus un cheveu : le trait court juste à
+    // l'extérieur.
+    final rr = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2),
+        width: _RailToggleButton._w + 2.4,
+        height: _RailToggleButton._h + 2.4,
+      ),
+      const Radius.circular(_RailToggleButton._r + 1.2),
+    );
+    // La lueur d'abord : le même liseré, plus épais et flou, dessous.
+    canvas.drawRRect(
+      rr,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5
@@ -3743,9 +3485,8 @@ class _ChevronRimPainter extends CustomPainter {
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
     );
     // Puis le trait net.
-    canvas.drawCircle(
-      c,
-      r,
+    canvas.drawRRect(
+      rr,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
