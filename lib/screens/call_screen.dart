@@ -2877,10 +2877,6 @@ class _TurnBubble extends StatelessWidget {
 /// La touche des langues : le drapeau de celle que j'ENTENDS, dans laquelle la
 /// voix d'en face m'est dite. Un tap ouvre le panneau qui porte les deux — la
 /// langue que je parle et celle que j'entends.
-///
-/// Elle prend la forme des autres touches de la barre, drapeau compris : dans
-/// une rangée de rectangles arrondis, un rond serait le seul élément à ne pas
-/// s'aligner.
 class _LanguageButton extends StatelessWidget {
   const _LanguageButton({required this.country, required this.onTap});
 
@@ -2888,9 +2884,7 @@ class _LanguageButton extends StatelessWidget {
   final String country;
   final VoidCallback onTap;
 
-  static const double _w = _DockKeyButton.width;
-  static const double _h = _DockKeyButton.height;
-  static const double _r = _DockKeyButton.radius;
+  static const double _size = 45;
 
   @override
   Widget build(BuildContext context) {
@@ -2901,13 +2895,12 @@ class _LanguageButton extends StatelessWidget {
         bounce: true,
         onTap: onTap,
         child: SizedBox(
-          width: _w,
-          height: _h,
+          width: _size,
+          height: _size,
           child: Stack(
             children: [
               Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(_r),
+                child: ClipOval(
                   child: country.isEmpty
                       ? Container(
                           color: SC.bubbleIn,
@@ -2917,26 +2910,22 @@ class _LanguageButton extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
-                      // Le paquet recadre déjà le SVG en `cover` dans la boîte
-                      // qu'on lui donne : le drapeau, plus large que haut, est
-                      // rogné et jamais écrasé. L'arrondi, lui, vient du
-                      // ClipRRect au-dessus — d'où le rayon 0 ici.
                       : CountryFlag.fromCountryCode(
                           country,
                           theme: const ImageTheme(
-                            width: _w,
-                            height: _h,
-                            shape: RoundedRectangle(0),
+                            width: _size,
+                            height: _size,
+                            shape: Circle(),
                           ),
                         ),
                 ),
               ),
-              // Le liseré : il détache le drapeau de la vidéo.
+              // L'anneau : il détache le drapeau de la vidéo.
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(_r),
+                      shape: BoxShape.circle,
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.85),
                         width: 1.5,
@@ -3265,10 +3254,9 @@ class _DockAuraState extends State<_DockAura>
   }
 }
 
-/// Une touche pleine de la barre (conversation, raccrocher) : le rectangle très
-/// arrondi de la maquette — un peu plus large que haut, jamais un rond.
-/// Volontairement sans flou : elle est posée sur le verre du dock, qui a déjà
-/// flouté ce qu'il y a dessous.
+/// Un rond plein de la barre (conversation, raccrocher). Volontairement sans
+/// flou : il est posé sur le verre du dock, qui a déjà flouté ce qu'il y a
+/// dessous.
 class _DockKeyButton extends StatelessWidget {
   const _DockKeyButton({
     required this.icon,
@@ -3289,13 +3277,8 @@ class _DockKeyButton extends StatelessWidget {
   /// Le liseré, quand il n'est pas celui par défaut des touches pleines.
   final Color? borderColor;
 
-  /// La géométrie commune à toutes les touches de la barre. Volontairement
-  /// serrée : à cinq de front, elles doivent tenir dans la barre d'un petit
-  /// écran — et si vraiment elles n'y tiennent pas, la rangée entière rétrécit
-  /// d'un bloc plutôt que de déborder.
-  static const double width = 48;
-  static const double height = 46;
-  static const double radius = 14;
+  /// Le rond du dock, tel qu'il a toujours été.
+  static const double size = 46;
 
   /// L'écart entre deux touches.
   static const double gap = 8;
@@ -3309,11 +3292,11 @@ class _DockKeyButton extends StatelessWidget {
         bounce: true,
         onTap: onTap,
         child: Container(
-          width: width,
-          height: height,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
+            shape: BoxShape.circle,
             color: background,
-            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: borderColor ?? Colors.white.withValues(alpha: 0.22),
             ),
@@ -3349,12 +3332,8 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// La même touche que les autres : à quatre de front, une seule qui déborde
-  /// casserait l'alignement de la barre. Elle se distingue par ce qu'elle
-  /// montre — le galet blanc irisé —, pas par sa taille.
-  static const double width = _DockKeyButton.width;
-  static const double height = _DockKeyButton.height;
-  static const double radius = _DockKeyButton.radius;
+  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
+  static const double size = 50;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
@@ -3439,10 +3418,10 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: Container(
-          width: _TranslationOrb.width,
-          height: _TranslationOrb.height,
+          width: _TranslationOrb.size,
+          height: _TranslationOrb.size,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_TranslationOrb.radius),
+            shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
                 color: Colors.white.withValues(alpha: 0.28),
@@ -3471,20 +3450,17 @@ class _OrbPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final a = amp.value;
-    final c = Offset(size.width / 2, size.height / 2);
-    final rect = Offset.zero & size;
-    // Le même rectangle très arrondi que les autres touches de la barre.
-    final rr = RRect.fromRectAndRadius(
-      rect,
-      const Radius.circular(_TranslationOrb.radius),
-    );
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final rect = Rect.fromCircle(center: c, radius: r);
 
     // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
     // coup d'œil qu'elle ne traduit plus.
     final tint = on ? 1.0 : 0.0;
 
-    canvas.drawRRect(
-      rr,
+    canvas.drawCircle(
+      c,
+      r,
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-0.35, -0.45),
@@ -3498,8 +3474,9 @@ class _OrbPainter extends CustomPainter {
     );
 
     // Le liseré irisé.
-    canvas.drawRRect(
-      rr.deflate(0.7),
+    canvas.drawCircle(
+      c,
+      r - 0.7,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
@@ -3561,14 +3538,10 @@ class _RailToggleButton extends StatelessWidget {
   final bool open;
   final VoidCallback onTap;
 
-  /// Le bouton lui-même — la touche commune de la barre. Le liseré et son halo
-  /// se peignent dans les quelques pixels qui restent autour, d'où
-  /// l'encombrement un peu plus large.
-  static const double _w = _DockKeyButton.width;
-  static const double _h = _DockKeyButton.height;
-  static const double _r = _DockKeyButton.radius;
-  static const double _boxW = _w + 8;
-  static const double _boxH = _h + 8;
+  /// Le bouton lui-même. L'anneau et son halo se peignent dans les quelques
+  /// pixels qui restent autour, d'où l'encombrement un peu plus large.
+  static const double _size = 42;
+  static const double _box = 50;
 
   @override
   Widget build(BuildContext context) {
@@ -3576,8 +3549,8 @@ class _RailToggleButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: _boxW,
-        height: _boxH,
+        width: _box,
+        height: _box,
         child: CustomPaint(
           // L'anneau irisé est PEINT, pas posé en décoration : un dégradé ne
           // rentre pas dans un Border, et un disque dégradé placé dessous se
@@ -3588,8 +3561,8 @@ class _RailToggleButton extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              width: _w,
-              height: _h,
+              width: _size,
+              height: _size,
               decoration: BoxDecoration(
                 // Pas de BackdropFilter ici : le bouton est POSÉ sur le dock,
                 // qui floute déjà le fond — un second flou ne verrait que du
@@ -3600,7 +3573,7 @@ class _RailToggleButton extends StatelessWidget {
                 // lire le chevron.
                 color:
                     open ? Colors.white : Colors.white.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(_r),
+                shape: BoxShape.circle,
               ),
               child: AnimatedRotation(
                 turns: open ? 0.5 : 0.0,
@@ -3633,19 +3606,13 @@ class _ChevronRimPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (!visible) return;
-    // Le contour du bouton, plus un cheveu : le trait court juste à
-    // l'extérieur.
-    final rr = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(size.width / 2, size.height / 2),
-        width: _RailToggleButton._w + 2.4,
-        height: _RailToggleButton._h + 2.4,
-      ),
-      const Radius.circular(_RailToggleButton._r + 1.2),
-    );
-    // La lueur d'abord : le même liseré, plus épais et flou, dessous.
-    canvas.drawRRect(
-      rr,
+    final c = Offset(size.width / 2, size.height / 2);
+    // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
+    final r = _RailToggleButton._size / 2 + 1.2;
+    // La lueur d'abord : le même anneau, plus épais et flou, dessous.
+    canvas.drawCircle(
+      c,
+      r,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5
@@ -3653,8 +3620,9 @@ class _ChevronRimPainter extends CustomPainter {
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3.5),
     );
     // Puis le trait net.
-    canvas.drawRRect(
-      rr,
+    canvas.drawCircle(
+      c,
+      r,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
