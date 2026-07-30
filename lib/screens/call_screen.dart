@@ -2535,14 +2535,16 @@ class _CallScreenState extends State<CallScreen> {
                             child: !_controlsOpen
                                 ? const SizedBox(width: double.infinity)
                                 : Padding(
-                                    // Plus d'écart sous les réglages : ils
-                                    // descendent jusqu'au bord haut du panneau
-                                    // au lieu de flotter au-dessus.
+                                    // Les 10 d'origine sous les réglages. Avec
+                                    // la translation qui annule la bande des
+                                    // encoches, c'est bien 10 qu'on voit entre
+                                    // eux et le bord haut du panneau — l'écart
+                                    // qu'ils ont toujours eu.
                                     padding: const EdgeInsets.fromLTRB(
                                       40,
                                       0,
                                       40,
-                                      0,
+                                      10,
                                     ),
                                     child: Wrap(
                                       alignment: WrapAlignment.center,
