@@ -97,6 +97,14 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
+/// La marge de la carte d'appel : ce qui sépare la vidéo du bord de l'écran.
+/// La lueur cyan a besoin de cet air-là pour se voir déborder.
+const double _kCardInset = 12;
+
+/// Son arrondi. Le même que celui de la barre qui s'assoit dans son bord bas :
+/// posés l'un dans l'autre, deux rayons différents se verraient.
+const double _kCardRadius = 34;
+
 class _CallScreenState extends State<CallScreen> {
   Room? _room;
   String? _connectError;
@@ -2298,6 +2306,30 @@ class _CallScreenState extends State<CallScreen> {
                 child: SafeArea(
                   child: Stack(
                     fit: StackFit.expand,
+                    children: [
+                      // La carte : la vidéo, et la barre collée dans son bord
+                      // bas. Un seul bloc arrondi — la vidéo ne passe plus
+                      // derrière la barre, elle s'arrête dessus — et c'est lui
+                      // que la lueur cyan entoure quand ça parle.
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _kCardInset,
+                          0,
+                          _kCardInset,
+                          _kCardInset,
+                        ),
+                        child: _DockAura(
+                          ttsSpeaking: ttsSpeaking,
+                          voiceLevel: _voiceLevel,
+                          // La lueur s'en va avec la barre quand l'appel se
+                          // tait : les deux disent la même chose.
+                          live: _dockDimmed ? _CallDock.dimOpacity : 1.0,
+                          radius: _kCardRadius,
+                          child: ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(_kCardRadius),
+                            child: Stack(
+                              fit: StackFit.expand,
               children: [
                 // Main view priority:
                 //   1. Remote video, if the remote has a published camera.
@@ -2452,32 +2484,18 @@ class _CallScreenState extends State<CallScreen> {
                       onTap: () => setState(() => _turnsOpen = false),
                     ),
                   ),
-                if (widget.translation.translationListenable != null)
-                  ListenableBuilder(
-                    listenable: widget.translation.translationListenable!,
-                    builder: (context, _) {
-                      final overlay = widget.translation.buildTranslationAudioOverlay();
-                      return overlay ?? const SizedBox.shrink();
-                    },
-                  ),
-                // Le dock : une barre de verre posée en bas, dans laquelle tout
-                // vit. De gauche à droite : la zone de légende (un tap déplie
-                // ce qui se dit), la pastille de traduction, raccrocher, puis
-                // le chevron qui déplie les réglages. Ce qui se déplie —
-                // légende et réglages — pousse vers le HAUT, au-dessus de la
-                // barre, qui elle ne bouge jamais.
+                // La barre, assise dans le bord bas de la carte. Ce qui se
+                // déplie — conversation et réglages — pousse vers le HAUT,
+                // par-dessus la vidéo ; la barre, elle, ne bouge jamais.
                 Positioned(
                   key: const ValueKey('call_controls'),
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      // Mêmes marges que la barre de navigation de l'app
-                      // (root_shell, left/right 48) : les deux barres font la
-                      // même largeur d'un écran à l'autre.
-                      padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
+                  child: Padding(
+                      // Le peu qu'il faut pour que le verre ne soit pas coupé
+                      // au ras du bord de la carte.
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2612,7 +2630,6 @@ class _CallScreenState extends State<CallScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
@@ -2659,8 +2676,27 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 ),
               ],
-            ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // L'audio de la traduction : une vue d'un pixel qui DOIT
+                      // rester dans le viewport — iOS coupe une vue entièrement
+                      // hors écran et le son ne part jamais. Elle reste donc
+                      // hors de la carte, où aucun clip ne peut l'atteindre.
+                      if (widget.translation.translationListenable != null)
+                        ListenableBuilder(
+                          listenable:
+                              widget.translation.translationListenable!,
+                          builder: (context, _) {
+                            final overlay = widget.translation
+                                .buildTranslationAudioOverlay();
+                            return overlay ?? const SizedBox.shrink();
+                          },
+                        ),
+                    ],
                   ),
+                ),
                 );
               },
             ),
@@ -2975,7 +3011,7 @@ class _CallDock extends StatelessWidget {
   final ValueListenable<double> voiceLevel;
   final bool controlsOpen;
 
-  /// Silence : la barre s'estompe jusqu'à [_dimOpacity], et la pastille reste
+  /// Silence : la barre s'estompe jusqu'à [dimOpacity], et la pastille reste
   /// entière par-dessus. JAMAIS jusqu'à zéro : ce qui devient invisible devient
   /// introuvable, et on doit toujours pouvoir viser le raccrochage.
   final bool dimmed;
@@ -2988,8 +3024,9 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onToggleControls;
 
   /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
-  /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
-  static const double _dimOpacity = 0.22;
+  /// vidéo, assez haut pour qu'on voie encore où sont les boutons. La lueur de
+  /// la carte s'y accroche aussi — elle s'en va avec la barre.
+  static const double dimOpacity = 0.22;
 
   @override
   Widget build(BuildContext context) {
@@ -3000,8 +3037,8 @@ class _CallDock extends StatelessWidget {
       duration: const Duration(milliseconds: 450),
       curve: Curves.easeInOut,
       builder: (context, dim, _) {
-        // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
-        final live = 1 - (1 - _dimOpacity) * dim;
+        // 1 en pleine lumière, [dimOpacity] en veille — jamais moins.
+        final live = 1 - (1 - dimOpacity) * dim;
         return GestureDetector(
           // En veille, la barre entière devient une seule grande cible qui la
           // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
@@ -3009,13 +3046,9 @@ class _CallDock extends StatelessWidget {
           behavior:
               dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
-          // La lueur se peint DEHORS, autour du verre : posée dedans, le
-          // ClipRRect la couperait net au bord de la barre.
-          child: _DockAura(
-            ttsSpeaking: ttsSpeaking,
-            voiceLevel: voiceLevel,
-            live: live,
-            child: ClipRRect(
+          // La lueur cyan n'est plus ici : elle entoure la carte entière, la
+          // vidéo comprise.
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
@@ -3125,25 +3158,25 @@ class _CallDock extends StatelessWidget {
               ),
             ),
           ),
-          ),
         );
       },
     );
   }
 }
 
-/// La lueur cyan autour de la barre : elle s'allume dès que ça parle — ma voix,
+/// La lueur cyan autour de la carte : elle s'allume dès que ça parle — ma voix,
 /// la sienne, ou la traduction que la machine est en train de dire — et elle
 /// respire tant que ça dure. C'est le même signal que les barres de la
-/// pastille, en plus grand : on le voit sans regarder la barre.
+/// pastille, en beaucoup plus grand : on le voit sans regarder l'écran.
 ///
-/// Elle se peint DEHORS, autour du verre : posée dedans, le ClipRRect de la
-/// barre la couperait au ras du bord.
+/// Elle se peint DEHORS, autour du bloc : posée dedans, le ClipRRect de la
+/// carte la couperait au ras du bord.
 class _DockAura extends StatefulWidget {
   const _DockAura({
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.live,
+    required this.radius,
     required this.child,
   });
 
@@ -3152,6 +3185,9 @@ class _DockAura extends StatefulWidget {
 
   /// L'opacité courante de la barre : en veille, la lueur s'en va avec elle.
   final double live;
+
+  /// L'arrondi du bloc qu'elle entoure — la lueur en épouse le contour.
+  final double radius;
   final Widget child;
 
   @override
@@ -3238,12 +3274,12 @@ class _DockAuraState extends State<_DockAura>
         final glow = a * (0.55 + 0.45 * pulse);
         return DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(34),
+            borderRadius: BorderRadius.circular(widget.radius),
             boxShadow: [
               BoxShadow(
                 color: SC.accent.withValues(alpha: 0.55 * glow),
-                blurRadius: 14 + 16 * glow,
-                spreadRadius: 1 + 3 * glow,
+                blurRadius: 18 + 22 * glow,
+                spreadRadius: 1 + 4 * glow,
               ),
             ],
           ),
