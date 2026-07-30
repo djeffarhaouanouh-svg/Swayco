@@ -671,12 +671,18 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Speak with the installed premium on-device voice.
   ///
-  /// [speak] returns at playback *start*, and swallows its own errors — a
-  /// missing model just returns without playing and fires no completion. So the
-  /// gate and [ttsSpeaking] are never left waiting on an event that may not
-  /// come: the completion stream only *shortens* the gate's own safety timer,
-  /// it is never the sole signal. Subscribe before speaking — a short clip can
-  /// finish before the await returns.
+  /// [speak] returns at playback *START*, not at its end — so this awaits the
+  /// completion event too, and only then hands the queue back. Without that,
+  /// the queue moved on the instant playback began and the next utterance
+  /// called `stop()` on the player: each line cut the one before it a second
+  /// or two in, and in a burst of three only the last was heard whole.
+  ///
+  /// The wait is CAPPED, and that matters as much as the wait itself. [speak]
+  /// swallows its own errors — a missing model, a dropped overlapping call —
+  /// and then returns without playing anything, so the completion event never
+  /// comes. Waiting on it alone would wedge every remaining translation of the
+  /// call behind one silent utterance. Subscribe before speaking: a short clip
+  /// can finish before the await returns.
   Future<void> _speakPremium(String text, String lang) async {
     final speech = SpeechService.instance;
     DebugOverlay.log('speak lang=$lang (premium voice) text="$text"');
@@ -690,7 +696,13 @@ class _CallScreenState extends State<CallScreen> {
           .catchError((_) {/* the gate's safety timer reopens the mic */})
           .whenComplete(() => ttsSpeaking.value = false));
       await speech.speak(text: text, languageCode: lang);
+      DebugOverlay.log('speak started (premium)');
+      await done.timeout(const Duration(seconds: 15));
       DebugOverlay.log('speak done (premium)');
+    } on TimeoutException {
+      // Rien n'a joué, ou la fin ne s'est jamais annoncée. On rend la main :
+      // la suite de l'appel ne doit pas rester coincée derrière.
+      DebugOverlay.log('premium speak: no completion within 15s — moving on');
     } catch (e) {
       ttsSpeaking.value = false;
       markTranslationDone();

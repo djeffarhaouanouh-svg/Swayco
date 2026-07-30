@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
@@ -62,6 +62,9 @@ class NeuralTtsEngine {
   bool _configured = false;
   bool _inferring = false;
 
+  /// Le nom de fichier courant, alterné à chaque phrase (voir [speak]).
+  int _slot = 0;
+
   Future<void> _ensureSpawned() async {
     if (_isolate != null) return;
     final rp = ReceivePort();
@@ -110,7 +113,14 @@ class NeuralTtsEngine {
     double speed = 1.0,
   }) async {
     if (!_configured) throw StateError('sherpa TTS not configured');
-    if (_inferring) return;
+    if (_inferring) {
+      // Un abandon SILENCIEUX : la phrase ne sera jamais dite et personne ne le
+      // saura. Avec la file qui attend désormais la fin de la lecture ça ne
+      // devrait plus arriver — si ça arrive quand même, on veut le lire dans
+      // les logs plutôt que chercher une phrase disparue.
+      debugPrint('[tts] DROPPED (busy): "$text"');
+      return;
+    }
     if (text.trim().isEmpty) return;
     _inferring = true;
 
@@ -126,7 +136,11 @@ class NeuralTtsEngine {
 
       final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
-      final wavFile = File('${tmp.path}/speech_out.wav');
+      // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
+      // garde en cache ce qu'il a chargé PAR CHEMIN, et réécrire le fichier
+      // qu'il vient de lire lui fait rejouer l'ancien contenu — ou rien. Deux
+      // suffisent : on ne réécrit un nom qu'une fois l'autre passé dessus.
+      final wavFile = File('${tmp.path}/speech_out_${_slot = 1 - _slot}.wav');
       await wavFile.writeAsBytes(wav);
 
       await _player.stop();

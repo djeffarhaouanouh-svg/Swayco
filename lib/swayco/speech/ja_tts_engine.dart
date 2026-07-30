@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
@@ -68,6 +68,9 @@ class JaTtsEngine {
   bool _configured = false;
   bool _inferring = false;
 
+  /// Le nom de fichier courant, alterné à chaque phrase (voir [speak]).
+  int _slot = 0;
+
   Future<void> _ensureSpawned() async {
     if (_isolate != null) return;
     final rp = ReceivePort();
@@ -107,7 +110,10 @@ class JaTtsEngine {
 
   Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {
     if (!_configured) throw StateError('ja TTS not configured');
-    if (_inferring) return;
+    if (_inferring) {
+      debugPrint('[tts-ja] DROPPED (busy): "$text"');
+      return;
+    }
     if (text.trim().isEmpty) return;
     _inferring = true;
     try {
@@ -123,7 +129,9 @@ class JaTtsEngine {
       final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
       await tmp.create(recursive: true);
-      final wavFile = File('${tmp.path}/ja_speech_out.wav');
+      // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
+      // garde en cache ce qu'il a chargé PAR CHEMIN.
+      final wavFile = File('${tmp.path}/ja_speech_out_${_slot = 1 - _slot}.wav');
       await wavFile.writeAsBytes(wav);
 
       await _player.stop();
