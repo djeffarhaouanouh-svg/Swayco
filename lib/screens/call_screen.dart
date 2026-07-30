@@ -2296,6 +2296,10 @@ class _CallScreenState extends State<CallScreen> {
                   padding: mq.padding.copyWith(bottom: mq.viewPadding.bottom),
                 ),
                 child: SafeArea(
+                  // Pas en bas : le panneau descend jusqu'au bord de l'écran,
+                  // comme sur la maquette — il reprend la marge du bas à son
+                  // compte, dans son propre rembourrage.
+                  bottom: false,
                   child: Stack(
                     fit: StackFit.expand,
               children: [
@@ -2460,24 +2464,21 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Le dock : une barre de verre posée en bas, dans laquelle tout
-                // vit. De gauche à droite : la zone de légende (un tap déplie
-                // ce qui se dit), la pastille de traduction, raccrocher, puis
-                // le chevron qui déplie les réglages. Ce qui se déplie —
-                // légende et réglages — pousse vers le HAUT, au-dessus de la
-                // barre, qui elle ne bouge jamais.
+                // Le panneau : le bas de la page. Il tient toute la largeur et
+                // descend jusqu'au bord de l'écran, arrondi seulement en haut,
+                // là où la vidéo s'arrête. Ce qui se déplie — conversation et
+                // réglages — pousse vers le HAUT, par-dessus la vidéo ; le
+                // panneau, lui, ne bouge jamais.
                 Positioned(
                   key: const ValueKey('call_controls'),
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      // Mêmes marges que la barre de navigation de l'app
-                      // (root_shell, left/right 48) : les deux barres font la
-                      // même largeur d'un écran à l'autre.
-                      padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
+                  child: Padding(
+                      // Rien sur les côtés ni en bas : le panneau touche les
+                      // trois bords. Les panneaux dépliés, eux, gardent leur
+                      // air — ils sont posés sur la vidéo, pas sur le verre.
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2489,9 +2490,12 @@ class _CallScreenState extends State<CallScreen> {
                             alignment: Alignment.bottomCenter,
                             child: (_turnsOpen && _turns.isNotEmpty)
                                 ? Padding(
+                                    // Le panneau touche les bords, pas la
+                                    // conversation : elle garde les marges
+                                    // qu'elle a toujours eues.
                                     padding: const EdgeInsets.only(
-                                      left: 4,
-                                      right: 40,
+                                      left: 44,
+                                      right: 80,
                                       bottom: 10,
                                     ),
                                     child: _SpokenTurnsPanel(
@@ -2517,7 +2521,12 @@ class _CallScreenState extends State<CallScreen> {
                             child: !_controlsOpen
                                 ? const SizedBox(width: double.infinity)
                                 : Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      40,
+                                      0,
+                                      40,
+                                      10,
+                                    ),
                                     child: Wrap(
                                       alignment: WrapAlignment.center,
                                       spacing: 12,
@@ -2612,7 +2621,6 @@ class _CallScreenState extends State<CallScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
@@ -2991,8 +2999,17 @@ class _CallDock extends StatelessWidget {
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
 
+  /// La forme du panneau : le bas de la page. Arrondi seulement en haut, là où
+  /// la vidéo s'arrête — les trois autres côtés touchent le bord de l'écran, et
+  /// un coin arrondi contre un bord d'écran ne laisserait qu'un trou noir.
+  static const BorderRadius _shape =
+      BorderRadius.vertical(top: Radius.circular(34));
+
   @override
   Widget build(BuildContext context) {
+    // La marge du bas de l'écran (barre d'accueil) : le panneau descend
+    // dessous, ses touches non.
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
       // Plus long et plus mou que les mouvements du dock : le fond s'en va,
@@ -3010,13 +3027,15 @@ class _CallDock extends StatelessWidget {
               dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
           // La lueur se peint DEHORS, autour du verre : posée dedans, le
-          // ClipRRect la couperait net au bord de la barre.
+          // ClipRRect la couperait net au bord du panneau. Elle ne sort donc
+          // que par le haut — les trois autres côtés sont hors écran.
           child: _DockAura(
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
             live: live,
+            shape: _shape,
             child: ClipRRect(
-            borderRadius: BorderRadius.circular(34),
+            borderRadius: _shape,
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
               // barre reste une barre, en retrait.
@@ -3026,15 +3045,22 @@ class _CallDock extends StatelessWidget {
               ),
               child: Container(
                 // 10 plutôt que 8 : de quoi laisser la lueur du chevron faire
-                // le tour du bouton sans toucher le bord.
-                padding: const EdgeInsets.all(10),
+                // le tour du bouton sans toucher le bord. En bas, la marge de
+                // l'écran en plus : le panneau descend jusqu'au bord, mais les
+                // touches ne vont pas se mettre sous la barre d'accueil.
+                padding: EdgeInsets.fromLTRB(10, 10, 10, 10 + safeBottom),
                 decoration: BoxDecoration(
                   // Le gris translucide de la barre de commentaire : du blanc
                   // très dilué sur du flou, rien de coloré.
                   color: Colors.white.withValues(alpha: 0.14 * live),
-                  borderRadius: BorderRadius.circular(34),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18 * live),
+                  borderRadius: _shape,
+                  // Seulement le trait du haut : sur les trois autres côtés le
+                  // panneau touche le bord de l'écran, un liseré n'y aurait
+                  // rien à border.
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.18 * live),
+                    ),
                   ),
                 ),
                 // La barre garde la largeur qu'on lui donne, les touches se
@@ -3144,6 +3170,7 @@ class _DockAura extends StatefulWidget {
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.live,
+    required this.shape,
     required this.child,
   });
 
@@ -3152,6 +3179,9 @@ class _DockAura extends StatefulWidget {
 
   /// L'opacité courante de la barre : en veille, la lueur s'en va avec elle.
   final double live;
+
+  /// La forme du bloc qu'elle entoure — la lueur en épouse le contour.
+  final BorderRadius shape;
   final Widget child;
 
   @override
@@ -3238,12 +3268,12 @@ class _DockAuraState extends State<_DockAura>
         final glow = a * (0.55 + 0.45 * pulse);
         return DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(34),
+            borderRadius: widget.shape,
             boxShadow: [
               BoxShadow(
                 color: SC.accent.withValues(alpha: 0.55 * glow),
-                blurRadius: 14 + 16 * glow,
-                spreadRadius: 1 + 3 * glow,
+                blurRadius: 18 + 22 * glow,
+                spreadRadius: 1 + 4 * glow,
               ),
             ],
           ),
