@@ -2682,12 +2682,13 @@ class _CallScreenState extends State<CallScreen> {
                             alignment: Alignment.bottomCenter,
                             child: (_turnsOpen && _turns.isNotEmpty)
                                 ? Padding(
-                                    // Le panneau touche les bords, pas la
-                                    // conversation : elle garde les marges
-                                    // qu'elle a toujours eues.
+                                    // Au plus près des bords : les bulles
+                                    // avaient 44 à gauche et 80 à droite, ce
+                                    // qui les tassait au milieu alors qu'elles
+                                    // ont du texte à faire tenir.
                                     padding: const EdgeInsets.only(
-                                      left: 44,
-                                      right: 80,
+                                      left: 12,
+                                      right: 32,
                                       bottom: 10,
                                     ),
                                     child: _SpokenTurnsPanel(
@@ -2941,7 +2942,7 @@ class _SpokenTurn {
 /// derniers tours en bulles de verre, le haut fondu en dégradé — on remonte
 /// plus loin en faisant défiler. Un tap la referme. Aucune saisie : ça ne fait
 /// que retranscrire la voix.
-class _SpokenTurnsPanel extends StatelessWidget {
+class _SpokenTurnsPanel extends StatefulWidget {
   const _SpokenTurnsPanel({
     required this.turns,
     required this.onToggle,
@@ -2958,15 +2959,32 @@ class _SpokenTurnsPanel extends StatelessWidget {
   final String peerName;
   final String peerAvatarUrl;
 
-  /// Hauteur dépliée : quatre bulles tiennent dedans, la cinquième se devine
-  /// sous le dégradé — c'est ce qui invite à faire défiler.
+  /// Hauteur MAXIMALE : quatre bulles tiennent dedans, la cinquième se devine
+  /// sous le dégradé — c'est ce qui invite à faire défiler. En dessous de ça,
+  /// le panneau épouse ses bulles.
   static const double _openHeight = 232;
 
   @override
+  State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
+}
+
+class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
+  /// Y a-t-il vraiment de quoi faire défiler ? Le fondu du haut ne se peint que
+  /// dans ce cas : posé sur deux phrases qui ne remplissent même pas le
+  /// panneau, il faisait une barre noire flottante au milieu de la vidéo,
+  /// sans rien à estomper.
+  bool _scrollable = false;
+
+  @override
   Widget build(BuildContext context) {
+    final turns = widget.turns;
     final list = ListView.builder(
       // Le plus récent en bas, et on remonte le temps en faisant défiler.
       reverse: true,
+      // Le panneau ne réserve plus sa hauteur pleine : avec deux phrases il
+      // fait la taille de deux phrases, et l'air en trop ne traîne pas sur la
+      // vidéo.
+      shrinkWrap: true,
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.zero,
       itemCount: turns.length,
@@ -2976,8 +2994,8 @@ class _SpokenTurnsPanel extends StatelessWidget {
           padding: const EdgeInsets.only(top: 8),
           child: _TurnBubble(
             turn: turn,
-            name: turn.mine ? myName : peerName,
-            avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
+            name: turn.mine ? widget.myName : widget.peerName,
+            avatarUrl: turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
           ),
         );
       },
@@ -2985,35 +3003,52 @@ class _SpokenTurnsPanel extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onToggle,
-      child: SizedBox(
-        height: _openHeight,
-        // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un ShaderMask —
-        // il isolerait le flou des bulles et le tuerait).
-        child: Stack(
-          children: [
-            Positioned.fill(child: list),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 56,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.55),
-                        Colors.black.withValues(alpha: 0.0),
-                      ],
+      onTap: widget.onToggle,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxHeight: _SpokenTurnsPanel._openHeight,
+        ),
+        child: NotificationListener<ScrollMetricsNotification>(
+          // La liste dit elle-même si elle déborde. On ne peut pas le savoir
+          // avant la mise en page — d'où le report d'une image : changer d'état
+          // pendant qu'elle se construit est interdit.
+          onNotification: (n) {
+            final can = n.metrics.maxScrollExtent > 1;
+            if (can != _scrollable) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() => _scrollable = can);
+              });
+            }
+            return false;
+          },
+          // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un ShaderMask —
+          // il isolerait le flou des bulles et le tuerait).
+          child: Stack(
+            children: [
+              list,
+              if (_scrollable)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 56,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.55),
+                            Colors.black.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
