@@ -3048,23 +3048,37 @@ class _TurnBubble extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              // Plus franc qu'avant : la bulle du pair ne tient plus que par
+              // son flou, il faut qu'il travaille vraiment.
+              filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  // Same accent, thinner — a phrase nobody received reads as a
-                  // faded version of one that landed, not as another kind of
-                  // message. No new colour: the alpha carries it.
+                  // Les miennes gardent le bleu — c'est à ça qu'on reconnaît ce
+                  // qu'on a dit soi-même. Same accent, thinner when nobody
+                  // received it: a phrase that never landed reads as a faded
+                  // version of one that did, not as another kind of message.
+                  // No new colour, the alpha carries it.
+                  //
+                  // Celles du pair passent au verre : du blanc très dilué sur
+                  // un gros flou, comme les surfaces d'iOS. Le noir à 0.42
+                  // faisait une pastille opaque posée sur la vidéo ; là, la
+                  // vidéo continue de vivre dessous.
                   color: turn.mine
                       ? SC.accent.withValues(alpha: turn.delivered ? 0.32 : 0.06)
-                      : Colors.black.withValues(alpha: 0.42),
+                      : Colors.white.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white
-                        .withValues(alpha: turn.delivered ? 0.18 : 0.06),
+                    // Le liseré du verre attrape la lumière : plus net que
+                    // celui d'une bulle teintée, sinon la bulle du pair n'a
+                    // plus de contour du tout.
+                    color: turn.mine
+                        ? Colors.white
+                            .withValues(alpha: turn.delivered ? 0.18 : 0.06)
+                        : Colors.white.withValues(alpha: 0.30),
                   ),
                 ),
                 child: Text(
