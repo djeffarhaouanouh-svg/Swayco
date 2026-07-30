@@ -122,11 +122,9 @@ class JaTtsEngine {
       _toWorker!.send(['speak', text, sid, speed]);
       final res = await c.future;
       if (res.isEmpty || res[0] != 'audio') return;
-      final samples = res[1] as Float32List;
-      final sampleRate = res[2] as int;
-      if (samples.isEmpty) return;
+      final wav = res[1] as Uint8List;
+      if (wav.isEmpty) return;
 
-      final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
       await tmp.create(recursive: true);
       // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
@@ -271,7 +269,12 @@ void _jaTtsWorkerMain(SendPort toMain) {
             sid: sid,
             speed: speed,
           );
-          toMain.send(['audio', pcm.samples, pcm.sampleRate]);
+          // Le WAV est encodé ICI : la conversion boucle sur chaque
+          // échantillon, et sur le fil de l'UI ça se voyait à chaque phrase.
+          toMain.send([
+            'audio',
+            JaTtsEngine._float32ToWav(pcm.samples, pcm.sampleRate),
+          ]);
         } catch (e) {
           toMain.send(['error', e.toString()]);
         }

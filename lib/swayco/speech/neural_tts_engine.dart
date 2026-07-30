@@ -130,11 +130,9 @@ class NeuralTtsEngine {
       _toWorker!.send(['speak', text, sid, speed]);
       final res = await c.future;
       if (res.isEmpty || res[0] != 'audio') return;
-      final samples = res[1] as Float32List;
-      final sampleRate = res[2] as int;
-      if (samples.isEmpty) return;
+      final wav = res[1] as Uint8List;
+      if (wav.isEmpty) return;
 
-      final wav = _float32ToWav(samples, sampleRate);
       final tmp = await getTemporaryDirectory();
       // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
       // garde en cache ce qu'il a chargé PAR CHEMIN, et réécrire le fichier
@@ -209,7 +207,7 @@ class NeuralTtsEngine {
 // ─────────────────────────── Worker isolate ───────────────────────────────────
 // Owns the OfflineTts. initBindings() must run here too — the FFI bindings are
 // per-isolate. All native calls (create + generate) happen on this isolate, so
-// nothing blocks the UI. Only Float32List PCM crosses back.
+// nothing blocks the UI. Only the finished WAV bytes cross back.
 
 void _ttsWorkerMain(SendPort toMain) {
   final rp = ReceivePort();
@@ -251,7 +249,15 @@ void _ttsWorkerMain(SendPort toMain) {
             sid: msg[2] as int,
             speed: msg[3] as double,
           );
-          toMain.send(['audio', audio.samples, audio.sampleRate]);
+          // Le WAV est encodé ICI, pas côté principal : la conversion boucle
+          // sur chaque échantillon, et pour quelques secondes de parole ça
+          // faisait des dizaines de milliers de tours sur le fil de l'UI, à
+          // chaque phrase, pendant un appel. Le worker a déjà fait le gros du
+          // travail, autant lui laisser celui-là.
+          toMain.send([
+            'audio',
+            NeuralTtsEngine._float32ToWav(audio.samples, audio.sampleRate),
+          ]);
         } catch (e) {
           toMain.send(['error', e.toString()]);
         }
