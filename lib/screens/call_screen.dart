@@ -2557,25 +2557,10 @@ class _CallScreenState extends State<CallScreen> {
                                             active: !_camOn,
                                             onTap: _toggleCam,
                                           ),
-                                        // La langue dans laquelle j'entends
-                                        // l'appel. Le panneau, lui, porte les
-                                        // deux — celle que je parle aussi.
-                                        _LanguageButton(
-                                          // Le drapeau de la langue qu'on
-                                          // ENTEND, celle que ce bouton sert à
-                                          // changer — il montrait celle du
-                                          // compte, donc il ne bougeait jamais.
-                                          // Repli sur la langue du compte tant
-                                          // que rien n'a été choisi.
-                                          country: findLanguageByCode(
-                                                _myOutputLang.isNotEmpty
-                                                    ? _myOutputLang
-                                                    : AppStrings
-                                                        .currentBcp47.value,
-                                              )?.countryCode ??
-                                              '',
-                                          onTap: _openLanguagePairSheet,
-                                        ),
+                                        // Les langues ne sont plus ici : elles
+                                        // ont leur touche dans la barre, à
+                                        // demeure — on en change trop souvent
+                                        // pour avoir à déplier les réglages.
                                         // Il ouvre un panneau, il ne bascule
                                         // rien : jamais d'état blanc, et le
                                         // même verre que les autres.
@@ -2591,6 +2576,15 @@ class _CallScreenState extends State<CallScreen> {
                           // 3. La barre elle-même.
                           _CallDock(
                             hasTurns: _turns.isNotEmpty,
+                            // Le drapeau de la langue qu'on ENTEND, celle que
+                            // cette touche sert à changer. Repli sur la langue
+                            // du compte tant que rien n'a été choisi.
+                            flagCountry: findLanguageByCode(
+                                  _myOutputLang.isNotEmpty
+                                      ? _myOutputLang
+                                      : AppStrings.currentBcp47.value,
+                                )?.countryCode ??
+                                '',
                             translationOn: _translationEnabled,
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
@@ -2600,6 +2594,10 @@ class _CallScreenState extends State<CallScreen> {
                             onToggleTurns: () {
                               _wakeDock();
                               setState(() => _turnsOpen = !_turnsOpen);
+                            },
+                            onToggleLanguage: () {
+                              _wakeDock();
+                              _openLanguagePairSheet();
                             },
                             onToggleTranslation: _toggleTranslation,
                             onOrbLongPress: _openCallSettingsSheet,
@@ -2876,13 +2874,13 @@ class _TurnBubble extends StatelessWidget {
   }
 }
 
-/// Les deux langues de l'appel dans une seule pastille, scindée en son milieu :
-/// à gauche celle que je PARLE — ce que le micro transcrit —, à droite celle
-/// que j'ENTENDS, dans laquelle la voix d'en face m'est dite. Les deux drapeaux
-/// sont souvent le même (je parle et j'écoute ma langue) : la micro-icône de
-/// chaque côté, micro et oreille, est ce qui les distingue alors.
+/// La touche des langues : le drapeau de celle que j'ENTENDS, dans laquelle la
+/// voix d'en face m'est dite. Un tap ouvre le panneau qui porte les deux — la
+/// langue que je parle et celle que j'entends.
 ///
-/// Chaque moitié est un bouton : elle ouvre le sélecteur de SA langue.
+/// Elle prend la forme des autres touches de la barre, drapeau compris : dans
+/// une rangée de rectangles arrondis, un rond serait le seul élément à ne pas
+/// s'aligner.
 class _LanguageButton extends StatelessWidget {
   const _LanguageButton({required this.country, required this.onTap});
 
@@ -2890,7 +2888,9 @@ class _LanguageButton extends StatelessWidget {
   final String country;
   final VoidCallback onTap;
 
-  static const double _size = 45;
+  static const double _w = _DockKeyButton.width;
+  static const double _h = _DockKeyButton.height;
+  static const double _r = _DockKeyButton.radius;
 
   @override
   Widget build(BuildContext context) {
@@ -2901,12 +2901,13 @@ class _LanguageButton extends StatelessWidget {
         bounce: true,
         onTap: onTap,
         child: SizedBox(
-          width: _size,
-          height: _size,
+          width: _w,
+          height: _h,
           child: Stack(
             children: [
               Positioned.fill(
-                child: ClipOval(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_r),
                   child: country.isEmpty
                       ? Container(
                           color: SC.bubbleIn,
@@ -2916,22 +2917,26 @@ class _LanguageButton extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
+                      // Le paquet recadre déjà le SVG en `cover` dans la boîte
+                      // qu'on lui donne : le drapeau, plus large que haut, est
+                      // rogné et jamais écrasé. L'arrondi, lui, vient du
+                      // ClipRRect au-dessus — d'où le rayon 0 ici.
                       : CountryFlag.fromCountryCode(
                           country,
                           theme: const ImageTheme(
-                            width: _size,
-                            height: _size,
-                            shape: Circle(),
+                            width: _w,
+                            height: _h,
+                            shape: RoundedRectangle(0),
                           ),
                         ),
                 ),
               ),
-              // L'anneau : il détache le drapeau de la vidéo.
+              // Le liseré : il détache le drapeau de la vidéo.
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(_r),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.85),
                         width: 1.5,
@@ -2956,6 +2961,7 @@ class _LanguageButton extends StatelessWidget {
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.hasTurns,
+    required this.flagCountry,
     required this.translationOn,
     required this.ttsSpeaking,
     required this.voiceLevel,
@@ -2963,6 +2969,7 @@ class _CallDock extends StatelessWidget {
     required this.dimmed,
     required this.onWake,
     required this.onToggleTurns,
+    required this.onToggleLanguage,
     required this.onToggleTranslation,
     required this.onOrbLongPress,
     required this.onHangUp,
@@ -2970,6 +2977,10 @@ class _CallDock extends StatelessWidget {
   });
 
   final bool hasTurns;
+
+  /// Code ISO pays du drapeau de la langue que j'entends. Vide = rien de choisi
+  /// encore : la touche montre alors l'icône de traduction.
+  final String flagCountry;
   final bool translationOn;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -2981,6 +2992,7 @@ class _CallDock extends StatelessWidget {
   final bool dimmed;
   final VoidCallback onWake;
   final VoidCallback onToggleTurns;
+  final VoidCallback onToggleLanguage;
   final VoidCallback onToggleTranslation;
   final VoidCallback onOrbLongPress;
   final VoidCallback onHangUp;
@@ -3008,7 +3020,13 @@ class _CallDock extends StatelessWidget {
           behavior:
               dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
-          child: ClipRRect(
+          // La lueur se peint DEHORS, autour du verre : posée dedans, le
+          // ClipRRect la couperait net au bord de la barre.
+          child: _DockAura(
+            ttsSpeaking: ttsSpeaking,
+            voiceLevel: voiceLevel,
+            live: live,
+            child: ClipRRect(
             borderRadius: BorderRadius.circular(34),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
@@ -3030,71 +3048,217 @@ class _CallDock extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.18 * live),
                   ),
                 ),
-                child: Row(
-                  // La barre remplit la largeur qu'on lui donne au lieu
-                  // d'épouser son contenu, et les quatre commandes s'y
-                  // répartissent également — plus de zone de texte qui mange
-                  // la moitié gauche : la dernière phrase se lit en dépliant
-                  // la conversation, comme avant.
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // La conversation, au premier cran. En veille, le premier
-                    // tap rallume : il ne doit pas aussi la déplier.
-                    Opacity(
-                      opacity: live,
-                      child: IgnorePointer(
-                        ignoring: dimmed,
-                        child: _DockKeyButton(
-                          icon: Icons.sms_rounded,
-                          label: AppStrings.t('messages_title'),
-                          // Le verre de l'ancienne zone de texte, à l'identique
-                          // — c'est la même commande, elle ne change que de
-                          // forme.
-                          background: Colors.white.withValues(alpha: 0.10),
-                          borderColor: Colors.white.withValues(alpha: 0.12),
-                          onTap: hasTurns ? onToggleTurns : null,
+                // La barre garde la largeur qu'on lui donne, les touches se
+                // groupent en son milieu — et si l'écran est trop étroit pour
+                // les cinq, la rangée entière rétrécit d'un bloc plutôt que de
+                // déborder par la droite.
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // La conversation, au premier cran. En veille, le
+                        // premier tap rallume : il ne doit pas aussi la
+                        // déplier.
+                        Opacity(
+                          opacity: live,
+                          child: IgnorePointer(
+                            ignoring: dimmed,
+                            child: _DockKeyButton(
+                              icon: Icons.sms_rounded,
+                              label: AppStrings.t('messages_title'),
+                              // Le verre de l'ancienne zone de texte, à
+                              // l'identique — c'est la même commande, elle ne
+                              // change que de forme.
+                              background: Colors.white.withValues(alpha: 0.10),
+                              borderColor:
+                                  Colors.white.withValues(alpha: 0.12),
+                              onTap: hasTurns ? onToggleTurns : null,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    // La pastille ne s'estompe jamais : c'est elle qui reste
-                    // quand tout le reste s'efface. En veille, la toucher
-                    // rallume la barre au lieu de couper la traduction — on ne
-                    // coupe pas la traduction sans l'avoir vue.
-                    _TranslationOrb(
-                      on: translationOn,
-                      ttsSpeaking: ttsSpeaking,
-                      voiceLevel: voiceLevel,
-                      onTap: dimmed ? onWake : onToggleTranslation,
-                      onLongPress: onOrbLongPress,
-                    ),
-                    Opacity(
-                      opacity: live,
-                      child: IgnorePointer(
-                        ignoring: dimmed,
-                        child: _RailToggleButton(
-                          open: controlsOpen,
-                          onTap: onToggleControls,
+                        const SizedBox(width: _DockKeyButton.gap),
+                        // Les langues, juste avant la pastille : les deux
+                        // commandes de la traduction se touchent.
+                        Opacity(
+                          opacity: live,
+                          child: IgnorePointer(
+                            ignoring: dimmed,
+                            child: _LanguageButton(
+                              country: flagCountry,
+                              onTap: onToggleLanguage,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Opacity(
-                      opacity: live,
-                      child: IgnorePointer(
-                        ignoring: dimmed,
-                        child: _DockKeyButton(
-                          icon: Icons.call_end_rounded,
-                          label: AppStrings.t('call_end'),
-                          background: const Color(0xFFE53935),
-                          onTap: onHangUp,
+                        const SizedBox(width: _DockKeyButton.gap),
+                        // La pastille ne s'estompe jamais : c'est elle qui
+                        // reste quand tout le reste s'efface. En veille, la
+                        // toucher rallume la barre au lieu de couper la
+                        // traduction — on ne coupe pas la traduction sans
+                        // l'avoir vue.
+                        _TranslationOrb(
+                          on: translationOn,
+                          ttsSpeaking: ttsSpeaking,
+                          voiceLevel: voiceLevel,
+                          onTap: dimmed ? onWake : onToggleTranslation,
+                          onLongPress: onOrbLongPress,
                         ),
-                      ),
+                        const SizedBox(width: _DockKeyButton.gap),
+                        Opacity(
+                          opacity: live,
+                          child: IgnorePointer(
+                            ignoring: dimmed,
+                            child: _RailToggleButton(
+                              open: controlsOpen,
+                              onTap: onToggleControls,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: _DockKeyButton.gap),
+                        Opacity(
+                          opacity: live,
+                          child: IgnorePointer(
+                            ignoring: dimmed,
+                            child: _DockKeyButton(
+                              icon: Icons.call_end_rounded,
+                              label: AppStrings.t('call_end'),
+                              background: const Color(0xFFE53935),
+                              onTap: onHangUp,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// La lueur cyan autour de la barre : elle s'allume dès que ça parle — ma voix,
+/// la sienne, ou la traduction que la machine est en train de dire — et elle
+/// respire tant que ça dure. C'est le même signal que les barres de la
+/// pastille, en plus grand : on le voit sans regarder la barre.
+///
+/// Elle se peint DEHORS, autour du verre : posée dedans, le ClipRRect de la
+/// barre la couperait au ras du bord.
+class _DockAura extends StatefulWidget {
+  const _DockAura({
+    required this.ttsSpeaking,
+    required this.voiceLevel,
+    required this.live,
+    required this.child,
+  });
+
+  final ValueListenable<bool> ttsSpeaking;
+  final ValueListenable<double> voiceLevel;
+
+  /// L'opacité courante de la barre : en veille, la lueur s'en va avec elle.
+  final double live;
+  final Widget child;
+
+  @override
+  State<_DockAura> createState() => _DockAuraState();
+}
+
+class _DockAuraState extends State<_DockAura>
+    with SingleTickerProviderStateMixin {
+  /// Le battement. Il tourne tant qu'il y a du son à montrer et s'arrête net au
+  /// silence — pas de ticker qui brûle la batterie pendant qu'on écoute.
+  late final AnimationController _phase = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  /// L'intensité affichée, lissée vers [_target] image par image : une voix qui
+  /// s'arrête fait retomber la lueur, elle ne l'éteint pas d'un coup.
+  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
+  double _target = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.ttsSpeaking.addListener(_retarget);
+    widget.voiceLevel.addListener(_retarget);
+    _phase.addListener(_tick);
+    _retarget();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DockAura old) {
+    super.didUpdateWidget(old);
+    if (old.ttsSpeaking != widget.ttsSpeaking) {
+      old.ttsSpeaking.removeListener(_retarget);
+      widget.ttsSpeaking.addListener(_retarget);
+    }
+    if (old.voiceLevel != widget.voiceLevel) {
+      old.voiceLevel.removeListener(_retarget);
+      widget.voiceLevel.addListener(_retarget);
+    }
+  }
+
+  /// Un seul régime, comme la pastille : dès que ça parle — une voix humaine
+  /// comme la traduction dite par la machine —, la lueur part à fond. Elle dit
+  /// «il y a du son», pas «qui parle».
+  void _retarget() {
+    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
+    _target = talking ? 1.0 : 0.0;
+    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
+  }
+
+  void _tick() {
+    final next = _amp.value + (_target - _amp.value) * 0.12;
+    if (_target == 0 && next < 0.01) {
+      _amp.value = 0;
+      _phase.stop();
+      return;
+    }
+    _amp.value = next;
+  }
+
+  @override
+  void dispose() {
+    widget.ttsSpeaking.removeListener(_retarget);
+    widget.voiceLevel.removeListener(_retarget);
+    _phase.removeListener(_tick);
+    _phase.dispose();
+    _amp.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_phase, _amp]),
+      // L'enfant est construit UNE fois et passé au builder : la barre entière
+      // ne se reconstruit pas soixante fois par seconde pour une ombre.
+      child: widget.child,
+      builder: (context, child) {
+        final a = _amp.value * widget.live;
+        if (a < 0.01) return child!;
+        // Le souffle : la lueur respire au lieu de rester posée.
+        final pulse = 0.5 + 0.5 * math.sin(_phase.value * 2 * math.pi);
+        final glow = a * (0.55 + 0.45 * pulse);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(34),
+            boxShadow: [
+              BoxShadow(
+                color: SC.accent.withValues(alpha: 0.55 * glow),
+                blurRadius: 14 + 16 * glow,
+                spreadRadius: 1 + 3 * glow,
+              ),
+            ],
+          ),
+          child: child,
         );
       },
     );
@@ -3126,11 +3290,15 @@ class _DockKeyButton extends StatelessWidget {
   final Color? borderColor;
 
   /// La géométrie commune à toutes les touches de la barre. Volontairement
-  /// serrée : à quatre de front, la barre doit encore tenir sur un écran de
-  /// 320 pt sans déborder.
-  static const double width = 52;
+  /// serrée : à cinq de front, elles doivent tenir dans la barre d'un petit
+  /// écran — et si vraiment elles n'y tiennent pas, la rangée entière rétrécit
+  /// d'un bloc plutôt que de déborder.
+  static const double width = 48;
   static const double height = 46;
-  static const double radius = 15;
+  static const double radius = 14;
+
+  /// L'écart entre deux touches.
+  static const double gap = 8;
 
   @override
   Widget build(BuildContext context) {
