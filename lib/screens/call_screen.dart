@@ -560,10 +560,59 @@ class _CallScreenState extends State<CallScreen> {
   /// keep reciting sentences the user has just asked to stop hearing.
   int _ttsGeneration = 0;
 
+  /// Le pair est-il en train de parler, là, maintenant ?
+  bool get _peerTalking => _remoteVoice > _kVoiceOn;
+
+  /// Combien de silence CONTINU il faut pour le croire arrêté. En dessous, on
+  /// démarre entre deux mots — une respiration suffirait à ouvrir la porte.
+  static const Duration _kPeerSilenceHold = Duration(milliseconds: 400);
+
+  /// Le plafond de l'attente. Quelqu'un qui ne s'arrête jamais ne doit pas
+  /// pouvoir repousser sa traduction indéfiniment : passé ce délai on parle
+  /// par-dessus, ce qui est mauvais, mais moins qu'une traduction qui n'arrive
+  /// jamais. C'est aussi le filet contre un niveau resté bloqué en haut :
+  /// LiveKit ne publie un niveau qu'aux changements de locuteur actif, donc
+  /// rien ne garantit qu'il redescende.
+  static const Duration _kPeerSilenceMaxWait = Duration(seconds: 5);
+
+  /// Attendre qu'il ait fini sa phrase.
+  ///
+  /// Sans ça, une phrase envoyée à la première vraie pause — celle qui sépare
+  /// deux propositions, pas celle qui finit un tour de parole — déclenche la
+  /// traduction pendant qu'il enchaîne. Le ducking coupe alors sa voix EN
+  /// PLEIN MILIEU : à l'oreille l'appel s'interrompt brutalement, et on croit
+  /// que ça ne marche plus.
+  ///
+  /// Superposer les deux voix plutôt que couper ne règle rien — deux voix
+  /// simultanées ne se comprennent ni l'une ni l'autre. La seule sortie est
+  /// d'attendre.
+  Future<void> _awaitPeerSilence() async {
+    if (!_peerTalking) return;
+    final deadline = DateTime.now().add(_kPeerSilenceMaxWait);
+    var quietSince = DateTime.now();
+    while (mounted) {
+      final now = DateTime.now();
+      if (_peerTalking) {
+        quietSince = now;
+      } else if (now.difference(quietSince) >= _kPeerSilenceHold) {
+        return;
+      }
+      if (now.isAfter(deadline)) {
+        DebugOverlay.log('tts: peer still talking after cap — speaking over');
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+  }
+
   /// Speak [text] after everything already queued. Never interrupts.
   Future<void> _enqueueSpeak(String text, String lang) {
     final generation = _ttsGeneration;
     _ttsQueue = _ttsQueue.then((_) async {
+      if (!mounted || generation != _ttsGeneration) return;
+      await _awaitPeerSilence();
+      // Couper la traduction PENDANT l'attente doit la faire tomber : sans ce
+      // second contrôle, elle se dirait quand même à la fin du silence.
       if (!mounted || generation != _ttsGeneration) return;
       await _speakOne(text, lang);
     }).catchError((Object e) {
