@@ -298,7 +298,9 @@ class _CallScreenState extends State<CallScreen> {
       _publishVoiceLevel();
       // Trois relevés consécutifs (~750 ms) plutôt que deux : une porte qui
       // claque ou un raclement de gorge ne tient pas aussi longtemps.
-      if (_hotTicks >= 3) _wakeDock();
+      // Le panneau ne se rallume plus sur la voix : seul le doigt le rappelle.
+      // Ce que la parole allume, c'est la lueur — et elle, elle ne dépend pas
+      // de lui.
     });
   }
 
@@ -316,7 +318,6 @@ class _CallScreenState extends State<CallScreen> {
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
-    _wakeDock();
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -660,10 +661,8 @@ class _CallScreenState extends State<CallScreen> {
     if (speaking == _lastTranslationSpeaking) return;
     _lastTranslationSpeaking = speaking;
     _audio.onTranslationSpeaking(speaking);
-    // La traduction se dit à voix haute : le dock se rallume, mais il ne
-    // s'ouvre pas — ce qu'elle raconte vient d'en face, et la barre ne montre
-    // que ce que j'envoie.
-    if (speaking) _wakeDock();
+    // La traduction se dit à voix haute : ça fait monter la lueur, pas le
+    // panneau. Lui ne revient qu'au doigt.
   }
 
   /// Translation credits should only burn while the live pipeline is
@@ -1245,15 +1244,15 @@ class _CallScreenState extends State<CallScreen> {
             if (p is LocalParticipant) {
               if (_micProbeDead && p.audioLevel > _kVoiceOn) {
                 _localVoice = p.audioLevel.clamp(0.0, 1.0);
-                _wakeDock();
               }
               continue;
             }
             if (p.audioLevel > loudest) loudest = p.audioLevel;
           }
           _remoteVoice = loudest.clamp(0.0, 1.0);
+          // Là non plus, aucun réveil : la voix nourrit [_voiceLevel], donc la
+          // lueur. Le panneau, lui, attend le doigt.
           _publishVoiceLevel();
-          if (_remoteVoice > _kVoiceOn) _wakeDock();
         })
         // In-call typed-chat messages from the peer.
         ..on<DataReceivedEvent>(_onCaptionData)
@@ -2456,6 +2455,19 @@ class _CallScreenState extends State<CallScreen> {
                       onTap: () => setState(() => _turnsOpen = false),
                     ),
                   ),
+                // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
+                // permet de le laisser disparaître complètement — on n'a pas à
+                // retrouver une cible, il suffit de toucher n'importe où. Ce
+                // premier tap ne fait QUE rallumer : il n'échange pas les deux
+                // images au passage.
+                if (_dockDimmed && !_turnsOpen)
+                  Positioned.fill(
+                    key: const ValueKey('dock_wake'),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _wakeDock,
+                    ),
+                  ),
                 if (widget.translation.translationListenable != null)
                   ListenableBuilder(
                     listenable: widget.translation.translationListenable!,
@@ -3017,9 +3029,12 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
-  /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
-  /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
-  static const double _dimOpacity = 0.22;
+  /// La veille va jusqu'à l'effacement complet : le panneau et ses quatre
+  /// touches disparaissent, il ne reste que la pastille et la lueur. Ce qui
+  /// devient invisible devient introuvable, d'ordinaire — ici non : la
+  /// pastille reste posée là où le panneau va revenir, et un tap n'importe où
+  /// sur l'écran le rappelle.
+  static const double _dimOpacity = 0.0;
 
   /// Le rayon des deux encoches du haut. Les coins ne sont pas arrondis vers
   /// l'INTÉRIEUR comme un bouton — ils sont creusés vers l'EXTÉRIEUR : le
@@ -3062,7 +3077,6 @@ class _CallDock extends StatelessWidget {
           child: _DockAura(
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
-            live: live,
             radius: hugRadius,
             child: ClipPath(
             clipper: const _TopHugClipper(hugRadius),
@@ -3092,16 +3106,15 @@ class _CallDock extends StatelessWidget {
                   // Pas de liseré : la découpe dessine déjà le bord, et un
                   // trait droit posé dessus recouperait les encoches.
                 ),
-                // La barre garde la largeur qu'on lui donne, les touches se
-                // groupent en son milieu — et si l'écran est trop étroit pour
-                // les cinq, la rangée entière rétrécit d'un bloc plutôt que de
-                // déborder par la droite.
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                // Le panneau tient toute la largeur de l'écran : les touches
+                // s'y répartissent au lieu de se serrer au milieu. Elles
+                // gagnent l'air des bords, et la pastille reste au centre
+                // exact — c'est elle qu'on vise sans regarder.
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // La conversation, au premier cran. En veille, le
                         // premier tap rallume : il ne doit pas aussi la
@@ -3123,7 +3136,6 @@ class _CallDock extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: _DockKeyButton.gap),
                         // Les langues, juste avant la pastille : les deux
                         // commandes de la traduction se touchent.
                         Opacity(
@@ -3136,7 +3148,6 @@ class _CallDock extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: _DockKeyButton.gap),
                         // La pastille ne s'estompe jamais : c'est elle qui
                         // reste quand tout le reste s'efface. En veille, la
                         // toucher rallume la barre au lieu de couper la
@@ -3149,7 +3160,6 @@ class _CallDock extends StatelessWidget {
                           onTap: dimmed ? onWake : onToggleTranslation,
                           onLongPress: onOrbLongPress,
                         ),
-                        const SizedBox(width: _DockKeyButton.gap),
                         Opacity(
                           opacity: live,
                           child: IgnorePointer(
@@ -3160,7 +3170,6 @@ class _CallDock extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: _DockKeyButton.gap),
                         Opacity(
                           opacity: live,
                           child: IgnorePointer(
@@ -3180,7 +3189,6 @@ class _CallDock extends StatelessWidget {
               ),
             ),
           ),
-          ),
         );
       },
     );
@@ -3198,16 +3206,12 @@ class _DockAura extends StatefulWidget {
   const _DockAura({
     required this.ttsSpeaking,
     required this.voiceLevel,
-    required this.live,
     required this.radius,
     required this.child,
   });
 
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
-
-  /// L'opacité courante de la barre : en veille, la lueur s'en va avec elle.
-  final double live;
 
   /// Le rayon des encoches du panneau — la lueur suit la même découpe.
   final double radius;
@@ -3290,7 +3294,9 @@ class _DockAuraState extends State<_DockAura>
       // ne se reconstruit pas soixante fois par seconde pour une ombre.
       child: widget.child,
       builder: (context, child) {
-        final a = _amp.value * widget.live;
+        // La lueur ne suit PAS l'effacement du panneau : c'est même tout ce
+        // qui reste, avec la pastille, quand il a disparu.
+        final a = _amp.value;
         if (a < 0.01) return child!;
         // Le souffle : la lueur respire au lieu de rester posée.
         final pulse = 0.5 + 0.5 * math.sin(_phase.value * 2 * math.pi);
@@ -3415,8 +3421,6 @@ class _DockKeyButton extends StatelessWidget {
   /// Le rond du dock, tel qu'il a toujours été.
   static const double size = 46;
 
-  /// L'écart entre deux touches.
-  static const double gap = 8;
 
   @override
   Widget build(BuildContext context) {
