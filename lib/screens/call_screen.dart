@@ -2483,6 +2483,20 @@ class _CallScreenState extends State<CallScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          // Les deux dépliants redescendent de la hauteur des
+                          // encoches. Sans ça ils flottent trop haut : le
+                          // panneau porte au-dessus de son bord visible une
+                          // bande vide de [_CallDock.hugRadius] — celle que la
+                          // découpe creuse —, et tout ce qui s'empile dessus
+                          // était poussé d'autant. Ils viennent la recouvrir :
+                          // elle est transparente, c'est la vidéo qui est
+                          // dessous.
+                          Transform.translate(
+                            offset: const Offset(0, _CallDock.hugRadius),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
                           // 1. La légende, dépliée depuis la zone de gauche.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
@@ -2581,6 +2595,9 @@ class _CallScreenState extends State<CallScreen> {
                                       ],
                                     ),
                                   ),
+                          ),
+                              ],
+                            ),
                           ),
                           // 3. La barre elle-même.
                           _CallDock(
@@ -3006,7 +3023,11 @@ class _CallDock extends StatelessWidget {
   /// ce qu'on croit dessiner la première fois.
   ///
   /// 28 comme là-bas : c'est le rayon des cartes de l'app.
-  static const double _hugRadius = 28;
+  ///
+  /// C'est AUSSI la hauteur de bande vide que le panneau porte au-dessus de son
+  /// bord visible : ce qui s'empile dessus doit redescendre d'autant, sinon ça
+  /// flotte.
+  static const double hugRadius = 28;
 
   @override
   Widget build(BuildContext context) {
@@ -3037,9 +3058,9 @@ class _CallDock extends StatelessWidget {
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
             live: live,
-            radius: _hugRadius,
+            radius: hugRadius,
             child: ClipPath(
-            clipper: const _TopHugClipper(_hugRadius),
+            clipper: const _TopHugClipper(hugRadius),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
               // barre reste une barre, en retrait.
@@ -3054,7 +3075,7 @@ class _CallDock extends StatelessWidget {
                 // touches ne vont pas se mettre sous la barre d'accueil.
                 padding: EdgeInsets.fromLTRB(
                   10,
-                  10 + _hugRadius,
+                  10 + hugRadius,
                   10,
                   10 + safeBottom,
                 ),
