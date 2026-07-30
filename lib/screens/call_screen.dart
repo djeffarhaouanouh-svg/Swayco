@@ -105,10 +105,24 @@ class CallScreen extends StatefulWidget {
 class _GlowPalette {
   const _GlowPalette._();
 
-  /// Le mode arc-en-ciel : la teinte défile en continu, comme un ruban en
-  /// mode « rainbow ». Ce n'est pas une couleur, c'est un drapeau — d'où
+  /// Le mode multicolore. Ce n'est pas une couleur, c'est un drapeau — d'où
   /// l'alpha nul, qu'aucun vrai choix ne peut porter.
   static const Color rainbow = Color(0x00FFFFFF);
+
+  /// Le multicolore à la Google : les quatre teintes de leurs surfaces IA,
+  /// posées EN MÊME TEMPS le long du bord et qui coulent. Pas une teinte
+  /// unique qui vire lentement — ce qu'on reconnaît chez eux, c'est justement
+  /// de voir le bleu, le violet, le rose et l'ambre cohabiter.
+  ///
+  /// La dernière reprend la première : c'est ce qui permet au dégradé de
+  /// boucler sans couture quand il défile.
+  static const List<Color> multi = [
+    Color(0xFF4285F4),
+    Color(0xFF9B72CB),
+    Color(0xFFD96570),
+    Color(0xFFF9AB00),
+    Color(0xFF4285F4),
+  ];
 
   /// Le spectre d'un ruban, dans l'ordre où on le parcourt.
   static const List<Color> swatches = [
@@ -129,17 +143,65 @@ class _GlowPalette {
   ];
 }
 
-/// Comment la lueur parcourt le bord haut du panneau. L'ordre compte : c'est
-/// l'index qui est écrit dans les préférences.
+/// Les modes d'animation de la lueur — ceux d'un contrôleur de ruban LED, pas
+/// des directions. Deux familles :
+///
+///  • ceux qui jouent sur la FORCE, la même sur toute la largeur ([steady],
+///    [breathe], [strobe], [twinkle]) ;
+///  • ceux qui jouent sur la POSITION, une ou plusieurs bandes claires qui
+///    parcourent le bord ([chase], [bounce], [wave]) — eux seuls ont un sens.
+///
+/// L'ordre compte : c'est l'index qui est écrit dans les préférences.
 enum _GlowMotion {
-  /// Elle ne se déplace pas : elle respire sur toute la largeur à la fois.
-  still,
+  /// Allumée, sans rien faire.
+  steady,
 
-  /// Une bande claire traverse le bord, vers la gauche.
-  leftward,
+  /// Elle enfle et retombe, doucement, en boucle.
+  breathe,
 
-  /// La même, dans l'autre sens.
-  rightward,
+  /// Deux éclairs secs, puis le noir. Le mode « flash » des rubans.
+  strobe,
+
+  /// Une bande claire parcourt le bord et repart de l'autre côté.
+  chase,
+
+  /// La même bande, mais elle rebondit sur les deux bords au lieu de boucler.
+  bounce,
+
+  /// Plusieurs bandes qui se suivent sans fin — le mode « flow ».
+  wave,
+
+  /// Elle papillote de façon irrégulière, comme une guirlande.
+  twinkle;
+
+  /// Le mode a-t-il un sens de parcours ? Les autres ignorent la direction.
+  bool get isDirectional =>
+      this == _GlowMotion.chase ||
+      this == _GlowMotion.bounce ||
+      this == _GlowMotion.wave;
+
+  /// La durée d'un cycle. Chaque mode a la sienne : un stroboscope à la vitesse
+  /// d'une respiration n'est plus un stroboscope.
+  Duration get period => switch (this) {
+        _GlowMotion.steady => const Duration(milliseconds: 2000),
+        _GlowMotion.breathe => const Duration(milliseconds: 2600),
+        _GlowMotion.strobe => const Duration(milliseconds: 1400),
+        _GlowMotion.chase => const Duration(milliseconds: 1800),
+        _GlowMotion.bounce => const Duration(milliseconds: 2400),
+        _GlowMotion.wave => const Duration(milliseconds: 2600),
+        _GlowMotion.twinkle => const Duration(milliseconds: 900),
+      };
+
+  /// La clé du libellé montré dans le panneau.
+  String get labelKey => switch (this) {
+        _GlowMotion.steady => 'call_glow_steady',
+        _GlowMotion.breathe => 'call_glow_breathe',
+        _GlowMotion.strobe => 'call_glow_strobe',
+        _GlowMotion.chase => 'call_glow_chase',
+        _GlowMotion.bounce => 'call_glow_bounce',
+        _GlowMotion.wave => 'call_glow_wave',
+        _GlowMotion.twinkle => 'call_glow_twinkle',
+      };
 }
 
 class _CallScreenState extends State<CallScreen> {
@@ -173,21 +235,28 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
-  /// Les trois réglages de la lueur. Ils survivent à l'appel : c'est un goût,
-  /// pas un réglage d'appel — voir [UserPrefs.loadGlow].
+  /// Les réglages de la lueur. Ils survivent à l'appel : c'est un goût, pas un
+  /// réglage d'appel — voir [UserPrefs.loadGlow].
   Color _glowColor = _GlowPalette.swatches.first;
-  _GlowMotion _glowMotion = _GlowMotion.still;
+  _GlowMotion _glowMotion = _GlowMotion.breathe;
   double _glowIntensity = 1.0;
+
+  /// Le sens de parcours, pour les modes qui en ont un. False = vers la
+  /// gauche.
+  bool _glowRightward = true;
 
   Future<void> _loadGlowPrefs() async {
     final g = await UserPrefs.loadGlow();
     if (!mounted) return;
     setState(() {
       if (g.color != null) _glowColor = Color(g.color!);
-      if (g.motion != null && g.motion! < _GlowMotion.values.length) {
+      if (g.motion != null &&
+          g.motion! >= 0 &&
+          g.motion! < _GlowMotion.values.length) {
         _glowMotion = _GlowMotion.values[g.motion!];
       }
       if (g.intensity != null) _glowIntensity = g.intensity!.clamp(0.15, 2.0);
+      if (g.rightward != null) _glowRightward = g.rightward!;
     });
   }
 
@@ -206,10 +275,12 @@ class _CallScreenState extends State<CallScreen> {
         color: _glowColor,
         motion: _glowMotion,
         intensity: _glowIntensity,
-        onChanged: (c, m, i) => setState(() {
+        rightward: _glowRightward,
+        onChanged: (c, m, i, r) => setState(() {
           _glowColor = c;
           _glowMotion = m;
           _glowIntensity = i;
+          _glowRightward = r;
         }),
       ),
     ).whenComplete(() {
@@ -217,6 +288,7 @@ class _CallScreenState extends State<CallScreen> {
         color: _glowColor.toARGB32(),
         motion: _glowMotion.index,
         intensity: _glowIntensity,
+        rightward: _glowRightward,
       ));
     });
   }
@@ -2721,6 +2793,7 @@ class _CallScreenState extends State<CallScreen> {
                             hasTurns: _turns.isNotEmpty,
                             glowColor: _glowColor,
                             glowMotion: _glowMotion,
+                            glowRightward: _glowRightward,
                             glowIntensity: _glowIntensity,
                             // Le drapeau de la langue qu'on ENTEND, celle que
                             // cette touche sert à changer. Repli sur la langue
@@ -3097,6 +3170,7 @@ class _CallDock extends StatelessWidget {
     required this.hasTurns,
     required this.glowColor,
     required this.glowMotion,
+    required this.glowRightward,
     required this.glowIntensity,
     required this.flagCountry,
     required this.translationOn,
@@ -3115,9 +3189,10 @@ class _CallDock extends StatelessWidget {
 
   final bool hasTurns;
 
-  /// Les trois réglages de la lueur, réglés depuis son propre panneau.
+  /// Les réglages de la lueur, réglés depuis son propre panneau.
   final Color glowColor;
   final _GlowMotion glowMotion;
+  final bool glowRightward;
   final double glowIntensity;
 
   /// Code ISO pays du drapeau de la langue que j'entends. Vide = rien de choisi
@@ -3190,6 +3265,7 @@ class _CallDock extends StatelessWidget {
             radius: hugRadius,
             color: glowColor,
             motion: glowMotion,
+            rightward: glowRightward,
             intensity: glowIntensity,
             child: ClipPath(
             clipper: const _TopHugClipper(hugRadius),
@@ -3325,6 +3401,7 @@ class _DockAura extends StatefulWidget {
     required this.radius,
     required this.color,
     required this.motion,
+    required this.rightward,
     required this.intensity,
     required this.child,
   });
@@ -3337,6 +3414,9 @@ class _DockAura extends StatefulWidget {
   final Color color;
   final _GlowMotion motion;
 
+  /// Le sens de parcours des modes qui en ont un. Ignoré par les autres.
+  final bool rightward;
+
   /// 0,15 à 2 : en dessous elle ne se voit plus, au-dessus elle mange l'écran.
   final double intensity;
   final Widget child;
@@ -3346,19 +3426,21 @@ class _DockAura extends StatefulWidget {
 }
 
 class _DockAuraState extends State<_DockAura> with TickerProviderStateMixin {
-  /// Le battement. Il tourne tant qu'il y a du son à montrer et s'arrête net au
-  /// silence — pas de ticker qui brûle la batterie pendant qu'on écoute.
+  /// Le cycle du mode courant, de 0 à 1. Il tourne tant qu'il y a du son à
+  /// montrer et s'arrête net au silence — pas de ticker qui brûle la batterie
+  /// pendant qu'on écoute.
   late final AnimationController _phase = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: widget.motion.period,
   );
 
-  /// Le défilé des teintes du mode arc-en-ciel. Bien plus lent que le
-  /// battement : une roue chromatique qui boucle en une seconde donne un
-  /// clignotement, pas un dégradé. Et il ne tourne QUE dans ce mode.
+  /// La dérive lente du multicolore, quand aucun mode ne le fait déjà courir.
+  /// Bien plus lente que le cycle : posées sans bouger, les quatre teintes
+  /// auraient l'air peintes ; à cette vitesse-là, elles coulent. Elle ne tourne
+  /// QUE dans ce mode.
   late final AnimationController _hue = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 7),
+    duration: const Duration(seconds: 9),
   );
 
   /// L'intensité affichée, lissée vers [_target] image par image : une voix qui
@@ -3389,10 +3471,15 @@ class _DockAuraState extends State<_DockAura> with TickerProviderStateMixin {
       old.voiceLevel.removeListener(_retarget);
       widget.voiceLevel.addListener(_retarget);
     }
-    // On vient de passer en arc-en-ciel (ou d'en sortir) alors que ça parle
-    // déjà : la roue chromatique doit démarrer maintenant, pas au prochain
-    // silence suivi d'une reprise.
-    if (old.color != widget.color) _retarget();
+    // Le mode a changé : sa cadence n'est pas celle du précédent, et
+    // [AnimationController.repeat] a figé l'ancienne. Il faut la relancer.
+    // Idem pour l'arc-en-ciel : la roue chromatique doit démarrer maintenant,
+    // pas au prochain silence suivi d'une reprise.
+    if (old.motion != widget.motion) {
+      _phase.duration = widget.motion.period;
+      if (_phase.isAnimating) _phase.repeat();
+    }
+    if (old.motion != widget.motion || old.color != widget.color) _retarget();
   }
 
   /// Un seul régime, comme la pastille : dès que ça parle — une voix humaine
@@ -3441,31 +3528,58 @@ class _DockAuraState extends State<_DockAura> with TickerProviderStateMixin {
         // qui reste, avec la pastille, quand il a disparu.
         final a = _amp.value;
         if (a < 0.01) return child!;
-        // Immobile, elle respire : la force elle-même monte et redescend.
-        // En mouvement, elle garde une force constante — sinon le battement
-        // et le balayage se contrarient, et on ne lit plus ni l'un ni l'autre.
-        final still = widget.motion == _GlowMotion.still;
-        final pulse = 0.5 + 0.5 * math.sin(_phase.value * 2 * math.pi);
-        final glow = a * (still ? 0.55 + 0.45 * pulse : 1.0);
+        final p = _phase.value;
+        final m = widget.motion;
+        // Les modes qui jouent sur la FORCE. Ceux qui jouent sur la position
+        // gardent une force pleine : un battement et un défilé simultanés se
+        // contrarient, et on ne lit plus ni l'un ni l'autre.
+        final amp = switch (m) {
+          _GlowMotion.steady => 1.0,
+          // Une sinusoïde décalée d'un quart de tour : le cycle démarre au
+          // plus bas et enfle, plutôt que de naître déjà allumé.
+          _GlowMotion.breathe =>
+            0.30 + 0.70 * (0.5 + 0.5 * math.sin(p * 2 * math.pi - math.pi / 2)),
+          // Deux éclairs secs rapprochés, puis le noir jusqu'au tour suivant —
+          // c'est ce double-flash qui fait lire «stroboscope» plutôt que
+          // «clignotant».
+          _GlowMotion.strobe =>
+            (p < 0.06 || (p >= 0.14 && p < 0.20)) ? 1.0 : 0.04,
+          // Deux sinusoïdes de périodes incommensurables : leur somme ne se
+          // répète jamais à l'œil, d'où le papillotement irrégulier d'une
+          // guirlande. Une seule aurait donné un battement régulier de plus.
+          _GlowMotion.twinkle => 0.18 +
+              0.82 *
+                  (0.5 + 0.5 * math.sin(p * 2 * math.pi * 3)) *
+                  (0.5 + 0.5 * math.sin(p * 2 * math.pi * 7.3 + 1.1)),
+          _ => 1.0,
+        };
+        // La position des bandes, 0 à 1. Le va-et-vient lit le même compteur
+        // en triangle : il monte puis redescend au lieu de repartir de zéro.
+        final travel = switch (m) {
+          _GlowMotion.chase || _GlowMotion.wave => p,
+          _GlowMotion.bounce => p < 0.5 ? p * 2 : 2 - p * 2,
+          _ => null,
+        };
         return CustomPaint(
           painter: _AuraPainter(
-            glow: glow,
+            glow: a * amp,
             radius: widget.radius,
-            // Arc-en-ciel : la teinte est prise sur la roue au tour où elle en
-            // est. Saturation et valeur restent au maximum — une LED ne fait
-            // pas de pastel.
-            color: _isRainbow
-                ? HSVColor.fromAHSV(1, (_hue.value * 360) % 360, 0.92, 1.0)
-                    .toColor()
-                : widget.color,
+            // Multicolore : les quatre teintes Google d'un coup. Sinon, la
+            // couleur choisie, seule.
+            colors: _isRainbow ? _GlowPalette.multi : [widget.color],
             intensity: widget.intensity,
-            // La position de la bande claire, 0 à gauche et 1 à droite. Le même
-            // compteur que le souffle, lu dans un sens ou dans l'autre.
-            sweep: switch (widget.motion) {
-              _GlowMotion.still => null,
-              _GlowMotion.rightward => _phase.value,
-              _GlowMotion.leftward => 1 - _phase.value,
-            },
+            travel: travel == null
+                ? null
+                : (widget.rightward ? travel : 1 - travel),
+            // Le nombre de bandes qui se suivent. La vague en aligne
+            // plusieurs, le défilé et le va-et-vient n'en ont qu'une.
+            bands: m == _GlowMotion.wave ? 3 : 1,
+            // Le va-et-vient ne boucle pas : sa bande doit pouvoir sortir par
+            // un bord et revenir, donc pas de pavage.
+            repeating: m != _GlowMotion.bounce,
+            // Sans bande, le multicolore se pose quand même sur toute la
+            // largeur — et dérive doucement, sinon il aurait l'air peint.
+            drift: _hue.value,
           ),
           child: child,
         );
@@ -3487,23 +3601,35 @@ class _AuraPainter extends CustomPainter {
   const _AuraPainter({
     required this.glow,
     required this.radius,
-    required this.color,
+    required this.colors,
     required this.intensity,
-    required this.sweep,
+    required this.travel,
+    required this.bands,
+    required this.repeating,
+    required this.drift,
   });
 
   final double glow;
   final double radius;
-  final Color color;
+
+  /// Une seule couleur, ou la suite du multicolore. À plusieurs, elles se
+  /// posent le long du bord en même temps.
+  final List<Color> colors;
   final double intensity;
 
-  /// Où en est la bande claire, de 0 (bord gauche) à 1 (bord droit). Null =
-  /// pas de balayage : la lueur est la même sur toute la largeur.
-  final double? sweep;
+  /// Où en sont les bandes, de 0 à 1. Null = pas de parcours : la lueur est la
+  /// même sur toute la largeur.
+  final double? travel;
 
-  /// La part du bord qu'éclaire la bande quand elle balaie. Trop étroite, on ne
-  /// voit qu'un point filer ; trop large, le balayage ne se lit plus.
-  static const double _bandWidth = 0.30;
+  /// Combien de bandes se suivent sur la largeur.
+  final int bands;
+
+  /// La bande se répète-t-elle au-delà de son motif ? Faux pour le
+  /// va-et-vient, qui doit pouvoir sortir de l'écran par un bord.
+  final bool repeating;
+
+  /// La dérive lente du multicolore quand aucune bande ne le fait courir.
+  final double drift;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -3511,7 +3637,6 @@ class _AuraPainter extends CustomPainter {
     // loin. Une lueur plus opaque mais aussi serrée ne ferait qu'un trait.
     final blur = (18 + 34 * glow) * intensity;
     final path = _TopHugClipper(radius).getClip(size);
-    final rect = Offset.zero & size;
     canvas.save();
     // La bande où la lueur a le droit d'exister : toute la largeur, des deux
     // bords de l'écran compris, et assez haut pour que le halo large ait la
@@ -3522,67 +3647,87 @@ class _AuraPainter extends CustomPainter {
     // Deux passes : un halo large et diffus qui monte loin, puis un liseré
     // serré et franc juste au-dessus du bord. Une seule passe donne soit un
     // trait dur, soit un brouillard — jamais les deux.
-    _stroke(canvas, path, rect, alpha: 0.45, blur: blur * 2);
-    _stroke(canvas, path, rect, alpha: 0.95, blur: blur * 0.45);
+    _stroke(canvas, path, size, alpha: 0.45, blur: blur * 2);
+    _stroke(canvas, path, size, alpha: 0.95, blur: blur * 0.45);
     canvas.restore();
   }
 
   void _stroke(
     Canvas canvas,
     Path path,
-    Rect rect, {
+    Size size, {
     required double alpha,
     required double blur,
   }) {
-    final tint = color.withValues(
-      alpha: (alpha * glow * intensity).clamp(0.0, 1.0),
-    );
+    final a = (alpha * glow * intensity).clamp(0.0, 1.0);
+    final tints = [for (final c in colors) c.withValues(alpha: a)];
     final paint = Paint()
       ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur);
-    final t = sweep;
-    if (t == null) {
-      paint.color = tint;
-    } else {
-      // La bande claire est un dégradé fixe qu'on FAIT GLISSER : les stops
-      // restent les mêmes, c'est la matrice qui les promène d'un bord à
-      // l'autre. Décaler les stops eux-mêmes obligerait à les garder
-      // croissants et à les rogner aux extrémités, où la bande se déformerait.
-      paint.shader = LinearGradient(
-        colors: [
-          tint.withValues(alpha: 0),
-          tint,
-          tint.withValues(alpha: 0),
-        ],
-        stops: const [
-          0.5 - _bandWidth / 2,
-          0.5,
-          0.5 + _bandWidth / 2,
-        ],
-        transform: _SweepShift(t),
-      ).createShader(rect);
+    final t = travel;
+
+    if (t == null && tints.length == 1) {
+      // Rien à moduler : une couleur unie sur tout le bord.
+      paint.color = tints.first;
+      canvas.drawPath(path, paint);
+      return;
     }
+
+    // Le motif fait une fraction de la largeur, et on le FAIT GLISSER en
+    // déplaçant ses deux extrémités. Décaler les stops eux-mêmes obligerait à
+    // les garder croissants et à les rogner aux bords, là où le motif se
+    // déformerait justement.
+    final span = size.width / bands;
+    final double start;
+    final List<Color> ramp;
+    final List<double> stops;
+
+    if (t == null) {
+      // Multicolore posé, sans bande : les teintes couvrent toute la largeur
+      // et dérivent d'un motif par tour.
+      start = drift * size.width;
+      ramp = tints;
+      stops = _even(tints.length);
+    } else if (repeating) {
+      // Le motif est pavé : il ressort d'un bord au moment où il sort de
+      // l'autre, donc le parcours boucle sans couture.
+      start = t * span;
+      ramp = [tints.first.withValues(alpha: 0), ...tints, tints.last.withValues(alpha: 0)];
+      stops = _even(tints.length + 2);
+    } else {
+      // Le va-et-vient : le motif traverse de hors-champ à hors-champ, ce qui
+      // lui laisse la place de disparaître à chaque rebond.
+      start = t * (size.width + span) - span;
+      ramp = [tints.first.withValues(alpha: 0), ...tints, tints.last.withValues(alpha: 0)];
+      stops = _even(tints.length + 2);
+    }
+
+    paint.shader = ui.Gradient.linear(
+      Offset(start, 0),
+      Offset(start + (t == null ? size.width : span), 0),
+      ramp,
+      stops,
+      // Pavé quand le motif doit boucler, étalé quand il doit pouvoir sortir
+      // du cadre : ses deux extrémités sont transparentes, donc « étaler »
+      // revient à ne rien peindre au-delà.
+      (t != null && !repeating) ? TileMode.clamp : TileMode.repeated,
+    );
     canvas.drawPath(path, paint);
   }
+
+  /// n arrêts régulièrement espacés de 0 à 1.
+  static List<double> _even(int n) =>
+      [for (var i = 0; i < n; i++) n == 1 ? 0.0 : i / (n - 1)];
 
   @override
   bool shouldRepaint(_AuraPainter old) =>
       old.glow != glow ||
       old.radius != radius ||
-      old.color != color ||
       old.intensity != intensity ||
-      old.sweep != sweep;
-}
-
-/// Promène un dégradé horizontal d'un bord à l'autre de sa boîte : à t=0 il est
-/// entièrement sorti par la gauche, à t=1 par la droite.
-class _SweepShift extends GradientTransform {
-  const _SweepShift(this.t);
-
-  final double t;
-
-  @override
-  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
-      Matrix4.translationValues((t * 2 - 1) * bounds.width, 0, 0);
+      old.travel != travel ||
+      old.bands != bands ||
+      old.repeating != repeating ||
+      old.drift != drift ||
+      !listEquals(old.colors, colors);
 }
 
 /// Le panneau qui règle la lueur : sa couleur, le sens dans lequel elle
@@ -3596,13 +3741,15 @@ class _GlowSettingsSheet extends StatefulWidget {
     required this.color,
     required this.motion,
     required this.intensity,
+    required this.rightward,
     required this.onChanged,
   });
 
   final Color color;
   final _GlowMotion motion;
   final double intensity;
-  final void Function(Color, _GlowMotion, double) onChanged;
+  final bool rightward;
+  final void Function(Color, _GlowMotion, double, bool) onChanged;
 
   @override
   State<_GlowSettingsSheet> createState() => _GlowSettingsSheetState();
@@ -3612,12 +3759,14 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
   late Color _color = widget.color;
   late _GlowMotion _motion = widget.motion;
   late double _intensity = widget.intensity;
+  late bool _rightward = widget.rightward;
 
   /// L'aperçu ne bat pas au rythme d'une voix : il est allumé, point.
   final ValueNotifier<bool> _previewOn = ValueNotifier<bool>(true);
   final ValueNotifier<double> _previewLevel = ValueNotifier<double>(0);
 
-  void _push() => widget.onChanged(_color, _motion, _intensity);
+  void _push() =>
+      widget.onChanged(_color, _motion, _intensity, _rightward);
 
   @override
   void dispose() {
@@ -3669,6 +3818,7 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
                   radius: _CallDock.hugRadius,
                   color: _color,
                   motion: _motion,
+                  rightward: _rightward,
                   intensity: _intensity,
                   child: ClipPath(
                     clipper: const _TopHugClipper(_CallDock.hugRadius),
@@ -3694,14 +3844,38 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
             const SizedBox(height: 20),
             _label(AppStrings.t('call_glow_motion')),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                _motionButton(_GlowMotion.leftward, Icons.west_rounded),
-                const SizedBox(width: 12),
-                _motionButton(_GlowMotion.still, Icons.blur_on_rounded),
-                const SizedBox(width: 12),
-                _motionButton(_GlowMotion.rightward, Icons.east_rounded),
+                for (final m in _GlowMotion.values) _modeChip(m),
               ],
+            ),
+            // Le sens n'apparaît que pour les modes qui parcourent le bord :
+            // proposer une direction à un stroboscope ne veut rien dire.
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topLeft,
+              child: !_motion.isDirectional
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label(AppStrings.t('call_glow_direction')),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _directionButton(false, Icons.west_rounded),
+                              const SizedBox(width: 12),
+                              _directionButton(true, Icons.east_rounded),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
             ),
             const SizedBox(height: 20),
             _label(AppStrings.t('call_glow_intensity')),
@@ -3794,24 +3968,52 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
         ),
       );
 
-  Widget _motionButton(_GlowMotion m, IconData icon) {
+  /// Un mode d'animation. Nommé, pas iconifié : « va-et-vient » et « défilé »
+  /// ne se distinguent par aucun pictogramme qu'on lise du premier coup.
+  Widget _modeChip(_GlowMotion m) {
     final on = _motion == m;
+    return Pressable(
+      bounce: true,
+      onTap: () {
+        setState(() => _motion = m);
+        _push();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          // Engagé = blanc plein, texte noir : la même bascule que les boutons
+          // de l'appel, on ne réapprend rien.
+          color: on ? Colors.white : Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          AppStrings.t(m.labelKey),
+          style: TextStyle(
+            color: on ? Colors.black : Colors.white,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _directionButton(bool rightward, IconData icon) {
+    final on = _rightward == rightward;
     return Semantics(
-      label: AppStrings.t('call_glow_motion'),
+      label: AppStrings.t('call_glow_direction'),
       button: true,
       selected: on,
       child: Pressable(
         bounce: true,
         onTap: () {
-          setState(() => _motion = m);
+          setState(() => _rightward = rightward);
           _push();
         },
         child: Container(
           width: 52,
           height: 44,
           decoration: BoxDecoration(
-            // Engagé = blanc plein, icône noire : la même bascule que les
-            // boutons de l'appel, on ne réapprend rien.
             color: on ? Colors.white : Colors.white.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(14),
           ),

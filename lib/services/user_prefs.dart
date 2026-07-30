@@ -184,23 +184,31 @@ abstract final class UserPrefs {
     await p.setBool(keyCallSpokenLangDontAsk, false);
   }
 
-  /// The call panel's glow: its colour (ARGB int), how it travels along the
-  /// edge (0 = still, 1 = leftward, 2 = rightward) and how hard it burns
-  /// (0…1). Kept here rather than in the call screen so a taste survives the
-  /// call it was set in — it is a look, not a per-call setting.
+  /// The call panel's glow: its colour (ARGB int), its animation mode (the
+  /// index of the call screen's motion enum), how hard it burns and, for the
+  /// modes that travel, which way it runs. Kept here rather than in the call
+  /// screen so a taste survives the call it was set in — it is a look, not a
+  /// per-call setting.
   static const String keyGlowColor = 'call_glow_color';
   static const String keyGlowMotion = 'call_glow_motion';
   static const String keyGlowIntensity = 'call_glow_intensity';
+  static const String keyGlowRightward = 'call_glow_rightward';
 
   /// Nulls mean "never set" — the caller keeps its own defaults rather than
   /// having them duplicated here.
-  static Future<({int? color, int? motion, double? intensity})>
-      loadGlow() async {
+  static Future<
+      ({
+        int? color,
+        int? motion,
+        double? intensity,
+        bool? rightward,
+      })> loadGlow() async {
     final p = await SharedPreferences.getInstance();
     return (
       color: p.getInt(keyGlowColor),
       motion: p.getInt(keyGlowMotion),
       intensity: p.getDouble(keyGlowIntensity),
+      rightward: p.getBool(keyGlowRightward),
     );
   }
 
@@ -208,11 +216,13 @@ abstract final class UserPrefs {
     required int color,
     required int motion,
     required double intensity,
+    required bool rightward,
   }) async {
     final p = await SharedPreferences.getInstance();
     await p.setInt(keyGlowColor, color);
     await p.setInt(keyGlowMotion, motion);
     await p.setDouble(keyGlowIntensity, intensity);
+    await p.setBool(keyGlowRightward, rightward);
   }
 
   static Future<AudioPrefs> loadAudio() async {
