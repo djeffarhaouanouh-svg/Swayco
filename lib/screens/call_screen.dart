@@ -2999,11 +2999,14 @@ class _CallDock extends StatelessWidget {
   /// vidéo, assez haut pour qu'on voie encore où sont les boutons.
   static const double _dimOpacity = 0.22;
 
-  /// La forme du panneau : le bas de la page. Arrondi seulement en haut, là où
-  /// la vidéo s'arrête — les trois autres côtés touchent le bord de l'écran, et
-  /// un coin arrondi contre un bord d'écran ne laisserait qu'un trou noir.
-  static const BorderRadius _shape =
-      BorderRadius.vertical(top: Radius.circular(34));
+  /// Le rayon des deux encoches du haut. Les coins ne sont pas arrondis vers
+  /// l'INTÉRIEUR comme un bouton — ils sont creusés vers l'EXTÉRIEUR : le
+  /// panneau monte le long des bords de l'écran et redescend en courbe
+  /// concave. C'est le « hug » des barres de Discover (e889c70), à l'envers de
+  /// ce qu'on croit dessiner la première fois.
+  ///
+  /// 28 comme là-bas : c'est le rayon des cartes de l'app.
+  static const double _hugRadius = 28;
 
   @override
   Widget build(BuildContext context) {
@@ -3026,16 +3029,17 @@ class _CallDock extends StatelessWidget {
           behavior:
               dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
-          // La lueur se peint DEHORS, autour du verre : posée dedans, le
-          // ClipRRect la couperait net au bord du panneau. Elle ne sort donc
-          // que par le haut — les trois autres côtés sont hors écran.
+          // La lueur se peint DEHORS, le long de la même découpe : posée
+          // dedans, le clip la couperait net au bord du panneau. Elle ne sort
+          // donc que par le haut, en épousant les deux encoches — les trois
+          // autres côtés sont hors écran.
           child: _DockAura(
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
             live: live,
-            shape: _shape,
-            child: ClipRRect(
-            borderRadius: _shape,
+            radius: _hugRadius,
+            child: ClipPath(
+            clipper: const _TopHugClipper(_hugRadius),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
               // barre reste une barre, en retrait.
@@ -3044,24 +3048,24 @@ class _CallDock extends StatelessWidget {
                 sigmaY: 24 * live,
               ),
               child: Container(
-                // 10 plutôt que 8 : de quoi laisser la lueur du chevron faire
-                // le tour du bouton sans toucher le bord. En bas, la marge de
-                // l'écran en plus : le panneau descend jusqu'au bord, mais les
+                // En haut, la hauteur des encoches : c'est la bande que la
+                // découpe creuse, et rien ne doit s'y trouver. En bas, la marge
+                // de l'écran : le panneau descend jusqu'au bord, mais les
                 // touches ne vont pas se mettre sous la barre d'accueil.
-                padding: EdgeInsets.fromLTRB(10, 10, 10, 10 + safeBottom),
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  10 + _hugRadius,
+                  10,
+                  10 + safeBottom,
+                ),
                 decoration: BoxDecoration(
-                  // Le gris translucide de la barre de commentaire : du blanc
-                  // très dilué sur du flou, rien de coloré.
-                  color: Colors.white.withValues(alpha: 0.14 * live),
-                  borderRadius: _shape,
-                  // Seulement le trait du haut : sur les trois autres côtés le
-                  // panneau touche le bord de l'écran, un liseré n'y aurait
-                  // rien à border.
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.18 * live),
-                    ),
-                  ),
+                  // Plein, plus translucide : la lueur cyan traversait le verre
+                  // et venait remplir le panneau au lieu d'en sortir. Le gris
+                  // neutre de l'app — celui des menus contextuels. Il ne
+                  // s'efface qu'en veille, où l'alpha le reprend.
+                  color: SC.menu.withValues(alpha: live),
+                  // Pas de liseré : la découpe dessine déjà le bord, et un
+                  // trait droit posé dessus recouperait les encoches.
                 ),
                 // La barre garde la largeur qu'on lui donne, les touches se
                 // groupent en son milieu — et si l'écran est trop étroit pour
@@ -3170,7 +3174,7 @@ class _DockAura extends StatefulWidget {
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.live,
-    required this.shape,
+    required this.radius,
     required this.child,
   });
 
@@ -3180,8 +3184,8 @@ class _DockAura extends StatefulWidget {
   /// L'opacité courante de la barre : en veille, la lueur s'en va avec elle.
   final double live;
 
-  /// La forme du bloc qu'elle entoure — la lueur en épouse le contour.
-  final BorderRadius shape;
+  /// Le rayon des encoches du panneau — la lueur suit la même découpe.
+  final double radius;
   final Widget child;
 
   @override
@@ -3266,22 +3270,76 @@ class _DockAuraState extends State<_DockAura>
         // Le souffle : la lueur respire au lieu de rester posée.
         final pulse = 0.5 + 0.5 * math.sin(_phase.value * 2 * math.pi);
         final glow = a * (0.55 + 0.45 * pulse);
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: widget.shape,
-            boxShadow: [
-              BoxShadow(
-                color: SC.accent.withValues(alpha: 0.55 * glow),
-                blurRadius: 18 + 22 * glow,
-                spreadRadius: 1 + 4 * glow,
-              ),
-            ],
-          ),
+        return CustomPaint(
+          painter: _AuraPainter(glow: glow, radius: widget.radius),
           child: child,
         );
       },
     );
   }
+}
+
+/// La lueur elle-même : la découpe du panneau, peinte en cyan et floutée
+/// UNIQUEMENT vers l'extérieur ([ui.BlurStyle.outer]). Un halo qui déborderait
+/// aussi vers l'intérieur laverait le gris du panneau au lieu d'en sortir.
+class _AuraPainter extends CustomPainter {
+  const _AuraPainter({required this.glow, required this.radius});
+
+  final double glow;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      _TopHugClipper(radius).getClip(size),
+      Paint()
+        ..color = SC.accent.withValues(alpha: 0.55 * glow)
+        ..maskFilter = ui.MaskFilter.blur(
+          ui.BlurStyle.outer,
+          12 + 20 * glow,
+        ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_AuraPainter old) =>
+      old.glow != glow || old.radius != radius;
+}
+
+/// La découpe du panneau : les deux coins du HAUT creusés en quart de cercle
+/// concave, pas arrondis vers l'intérieur. Le panneau monte à pleine hauteur le
+/// long des bords de l'écran et redescend en courbe jusqu'à son bord haut — le
+/// même « hug » que les barres de Discover (e889c70).
+class _TopHugClipper extends CustomClipper<Path> {
+  const _TopHugClipper(this.radius);
+
+  final double radius;
+
+  @override
+  Path getClip(Size size) {
+    final r = radius;
+    final w = size.width;
+    final h = size.height;
+    // Chaque encoche : le carré du coin MOINS le disque qui le mange. Ce qui
+    // reste est la petite corne concave qui longe le bord de l'écran.
+    final leftNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(0, 0, r, r)),
+      Path()..addOval(Rect.fromCircle(center: Offset(r, 0), radius: r)),
+    );
+    final rightNotch = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTRB(w - r, 0, w, r)),
+      Path()..addOval(Rect.fromCircle(center: Offset(w - r, 0), radius: r)),
+    );
+    var path = Path()..addRect(Rect.fromLTRB(0, r, w, h));
+    path = Path.combine(PathOperation.union, path, leftNotch);
+    path = Path.combine(PathOperation.union, path, rightNotch);
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_TopHugClipper old) => old.radius != radius;
 }
 
 /// Un rond plein de la barre (conversation, raccrocher). Volontairement sans
