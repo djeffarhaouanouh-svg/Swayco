@@ -2535,11 +2535,14 @@ class _CallScreenState extends State<CallScreen> {
                             child: !_controlsOpen
                                 ? const SizedBox(width: double.infinity)
                                 : Padding(
+                                    // Plus d'écart sous les réglages : ils
+                                    // descendent jusqu'au bord haut du panneau
+                                    // au lieu de flotter au-dessus.
                                     padding: const EdgeInsets.fromLTRB(
                                       40,
                                       0,
                                       40,
-                                      10,
+                                      0,
                                     ),
                                     child: Wrap(
                                       alignment: WrapAlignment.center,
@@ -3080,11 +3083,10 @@ class _CallDock extends StatelessWidget {
                   10 + safeBottom,
                 ),
                 decoration: BoxDecoration(
-                  // Plein, plus translucide : la lueur cyan traversait le verre
-                  // et venait remplir le panneau au lieu d'en sortir. Le gris
-                  // neutre de l'app — celui des menus contextuels. Il ne
-                  // s'efface qu'en veille, où l'alpha le reprend.
-                  color: SC.menu.withValues(alpha: live),
+                  // Le verre d'origine, retrouvé : la lueur ne le remplit plus
+                  // depuis qu'elle est bridée au-dessus du bord haut, donc
+                  // rien n'oblige plus le panneau à être plein.
+                  color: Colors.white.withValues(alpha: 0.14 * live),
                   // Pas de liseré : la découpe dessine déjà le bord, et un
                   // trait droit posé dessus recouperait les encoches.
                 ),
@@ -3301,8 +3303,14 @@ class _DockAuraState extends State<_DockAura>
 }
 
 /// La lueur elle-même : la découpe du panneau, peinte en cyan et floutée
-/// UNIQUEMENT vers l'extérieur ([ui.BlurStyle.outer]). Un halo qui déborderait
-/// aussi vers l'intérieur laverait le gris du panneau au lieu d'en sortir.
+/// UNIQUEMENT vers l'extérieur ([ui.BlurStyle.outer]) — un halo qui déborderait
+/// aussi vers l'intérieur laverait le panneau au lieu d'en sortir, et à travers
+/// le verre ça se voyait.
+///
+/// Elle ne sort que par le HAUT : la toile est coupée au ras du bord haut du
+/// panneau, donc tout ce qui partirait sur les côtés ou vers le bas n'est
+/// jamais peint. C'est ce qui décide de l'angle de sortie — pas le flou, qui
+/// lui étale dans toutes les directions.
 class _AuraPainter extends CustomPainter {
   const _AuraPainter({required this.glow, required this.radius});
 
@@ -3311,15 +3319,18 @@ class _AuraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final blur = 12 + 20 * glow;
+    canvas.save();
+    canvas.clipRect(
+      Rect.fromLTRB(-blur, -blur * 2, size.width + blur, radius),
+    );
     canvas.drawPath(
       _TopHugClipper(radius).getClip(size),
       Paint()
         ..color = SC.accent.withValues(alpha: 0.55 * glow)
-        ..maskFilter = ui.MaskFilter.blur(
-          ui.BlurStyle.outer,
-          12 + 20 * glow,
-        ),
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur),
     );
+    canvas.restore();
   }
 
   @override
