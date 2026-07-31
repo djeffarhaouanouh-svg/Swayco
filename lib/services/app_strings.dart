@@ -600,12 +600,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} sélectionnés',
     'onb_interests_pick_one': 'Choisis un centre d\'intérêt',
     'onb_interests_max': 'Maximum {n} centres d\'intérêt.',
-    'onb_gift_title': 'Cadeau de bienvenue',
-    'onb_gift_subtitle': "C'est cadeau, profites-en pour ton premier appel.",
-    'onb_gift_headline': 'Bienvenue{hi} 🎉',
-    'onb_gift_body':
-        'On t\'offre 15 minutes d\'appel traduit pour démarrer. Aucune carte requise.',
-    'onb_gift_cta': "C'est parti 📞",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
@@ -1180,12 +1174,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} selected',
     'onb_interests_pick_one': 'Pick one interest',
     'onb_interests_max': 'Up to {n} interests.',
-    'onb_gift_title': 'Welcome gift',
-    'onb_gift_subtitle': "It's on us — enjoy it on your first call.",
-    'onb_gift_headline': 'Welcome{hi} 🎉',
-    'onb_gift_body':
-        "We're giving you 15 minutes of translated calling to get started. No card required.",
-    'onb_gift_cta': "Let's go 📞",
 
     // Voice messages — chat composer + bubble.
     'voice_mic_denied':
@@ -1780,13 +1768,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} seleccionados',
     'onb_interests_pick_one': 'Elige un interés',
     'onb_interests_max': 'Hasta {n} intereses.',
-    'onb_gift_title': 'Regalo de bienvenida',
-    'onb_gift_subtitle':
-        'Corre por nuestra cuenta — disfrútalo en tu primera llamada.',
-    'onb_gift_headline': 'Bienvenido{hi} 🎉',
-    'onb_gift_body':
-        'Te regalamos 15 minutos de llamadas con traducción para empezar. Sin tarjeta.',
-    'onb_gift_cta': '¡Vamos! 📞',
     'voice_mic_denied':
         'Acceso al micrófono denegado. Actívalo en los ajustes de la app.',
     'voice_recording_hint': 'Toca para enviar, o borra para cancelar',
@@ -2363,12 +2344,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} ausgewählt',
     'onb_interests_pick_one': 'Wähle ein Interesse',
     'onb_interests_max': 'Bis zu {n} Interessen.',
-    'onb_gift_title': 'Willkommensgeschenk',
-    'onb_gift_subtitle': 'Geht auf uns — genieße es bei deinem ersten Anruf.',
-    'onb_gift_headline': 'Willkommen{hi} 🎉',
-    'onb_gift_body':
-        'Wir schenken dir 15 Minuten übersetzte Anrufzeit für den Start. Keine Karte erforderlich.',
-    'onb_gift_cta': 'Los geht\'s 📞',
     'voice_mic_denied':
         'Mikrofonzugriff verweigert. Aktiviere ihn in den App-Einstellungen.',
     'voice_recording_hint': 'Tippe zum Senden oder lösche zum Abbrechen',
@@ -2939,12 +2914,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} selezionati',
     'onb_interests_pick_one': 'Scegli un interesse',
     'onb_interests_max': 'Fino a {n} interessi.',
-    'onb_gift_title': 'Regalo di benvenuto',
-    'onb_gift_subtitle': 'Offre la casa — goditelo alla tua prima chiamata.',
-    'onb_gift_headline': 'Benvenuto{hi} 🎉',
-    'onb_gift_body':
-        'Ti regaliamo 15 minuti di chiamate tradotte per iniziare. Nessuna carta richiesta.',
-    'onb_gift_cta': 'Iniziamo 📞',
     'voice_mic_denied':
         'Accesso al microfono negato. Attivalo nelle impostazioni dell\'app.',
     'voice_recording_hint': 'Tocca per inviare, oppure elimina per annullare',
@@ -3515,13 +3484,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} selecionados',
     'onb_interests_pick_one': 'Escolhe um interesse',
     'onb_interests_max': 'Até {n} interesses.',
-    'onb_gift_title': 'Presente de boas-vindas',
-    'onb_gift_subtitle':
-        'É por nossa conta — aproveite-o na sua primeira chamada.',
-    'onb_gift_headline': 'Bem-vindo{hi} 🎉',
-    'onb_gift_body':
-        'Estamos a oferecer-lhe 15 minutos de chamadas com tradução para começar. Não é necessário cartão.',
-    'onb_gift_cta': 'Vamos lá 📞',
     'voice_mic_denied':
         'Acesso ao microfone negado. Ative-o nas definições da aplicação.',
     'voice_recording_hint': 'Toque para enviar ou elimine para cancelar',
@@ -4091,12 +4053,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} geselecteerd',
     'onb_interests_pick_one': 'Kies één interesse',
     'onb_interests_max': 'Maximaal {n} interesses.',
-    'onb_gift_title': 'Welkomstcadeau',
-    'onb_gift_subtitle': 'Van ons — geniet ervan tijdens je eerste gesprek.',
-    'onb_gift_headline': 'Welkom{hi} 🎉',
-    'onb_gift_body':
-        'We geven je 15 minuten vertaald bellen om te beginnen. Geen kaart nodig.',
-    'onb_gift_cta': 'We gaan 📞',
     'voice_mic_denied':
         'Toegang tot de microfoon geweigerd. Schakel het in bij de app-instellingen.',
     'voice_recording_hint': 'Tik om te versturen, of verwijder om te annuleren',
@@ -4650,12 +4606,6 @@ abstract final class AppStrings {
     'onb_interests_count': 'تم اختيار {n} / {max}',
     'onb_interests_pick_one': 'اختر اهتماماً واحداً',
     'onb_interests_max': 'حتى {n} من الاهتمامات.',
-    'onb_gift_title': 'هدية الترحيب',
-    'onb_gift_subtitle': 'إنها على حسابنا — استمتع بها في مكالمتك الأولى.',
-    'onb_gift_headline': 'مرحبًا{hi} 🎉',
-    'onb_gift_body':
-        'نهديك 15 دقيقة من المكالمات المترجمة للبدء. دون الحاجة إلى بطاقة.',
-    'onb_gift_cta': 'لننطلق 📞',
     'voice_mic_denied':
         'تم رفض الوصول إلى الميكروفون. فعّله من إعدادات التطبيق.',
     'voice_recording_hint': 'اضغط للإرسال، أو احذف للإلغاء',
@@ -5221,13 +5171,6 @@ abstract final class AppStrings {
     'onb_interests_count': 'Выбрано {n} / {max}',
     'onb_interests_pick_one': 'Выберите один интерес',
     'onb_interests_max': 'До {n} интересов.',
-    'onb_gift_title': 'Приветственный подарок',
-    'onb_gift_subtitle':
-        'Это за наш счёт — насладитесь им во время первого звонка.',
-    'onb_gift_headline': 'Добро пожаловать{hi} 🎉',
-    'onb_gift_body':
-        'Дарим вам 15 минут переводимых звонков для начала. Карта не нужна.',
-    'onb_gift_cta': 'Поехали 📞',
     'voice_mic_denied':
         'Доступ к микрофону запрещён. Включите его в настройках приложения.',
     'voice_recording_hint':
@@ -5746,11 +5689,6 @@ abstract final class AppStrings {
     'onb_interests_count': '已选 {n} / {max}',
     'onb_interests_pick_one': '选择一个兴趣',
     'onb_interests_max': '最多 {n} 个兴趣。',
-    'onb_gift_title': '欢迎礼物',
-    'onb_gift_subtitle': '这是我们送你的 — 在你的第一次通话中尽情享用吧。',
-    'onb_gift_headline': '欢迎{hi} 🎉',
-    'onb_gift_body': '我们送你 15 分钟翻译通话作为开始，无需绑定银行卡。',
-    'onb_gift_cta': '出发吧 📞',
     'voice_mic_denied': '麦克风访问被拒绝。请在应用设置中开启。',
     'voice_recording_hint': '点击发送，或删除以取消',
     'voice_message': '语音消息',
@@ -6270,11 +6208,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} 選択中',
     'onb_interests_pick_one': '興味を1つ選んでください',
     'onb_interests_max': '興味は{n}個まで。',
-    'onb_gift_title': 'ようこそギフト',
-    'onb_gift_subtitle': '私たちからのプレゼント — 最初の通話でお使いください。',
-    'onb_gift_headline': 'ようこそ{hi} 🎉',
-    'onb_gift_body': 'まずは翻訳通話を15分プレゼントします。カード登録は不要です。',
-    'onb_gift_cta': 'はじめる 📞',
     'voice_mic_denied': 'マイクへのアクセスが拒否されました。アプリの設定で有効にしてください。',
     'voice_recording_hint': 'タップで送信、削除でキャンセル',
     'voice_message': 'ボイスメッセージ',
@@ -6792,11 +6725,6 @@ abstract final class AppStrings {
     'onb_interests_count': '{n} / {max} 선택됨',
     'onb_interests_pick_one': '관심사 하나를 선택하세요',
     'onb_interests_max': '관심사는 최대 {n}개까지예요.',
-    'onb_gift_title': '환영 선물',
-    'onb_gift_subtitle': '저희가 드려요 — 첫 통화에서 사용해 보세요.',
-    'onb_gift_headline': '환영해요{hi} 🎉',
-    'onb_gift_body': '시작을 위해 번역 통화 15분을 드려요. 카드 등록은 필요 없어요.',
-    'onb_gift_cta': '시작하기 📞',
     'voice_mic_denied': '마이크 접근이 거부됐어요. 앱 설정에서 허용해 주세요.',
     'voice_recording_hint': '탭하면 전송, 삭제하면 취소돼요',
     'voice_message': '음성 메시지',

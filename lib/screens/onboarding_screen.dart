@@ -64,7 +64,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _page = 0;
 
   /// Total pages shown in the first-run wizard:
-  ///   Welcome(0) · Language(1) · [Gender(2)] · City · Interests · Welcome-gift
+  ///   Welcome(0) · Language(1) · [Gender(2)] · City · Interests
   /// Gender is omitted once already known, so the count flexes by one.
   int get _pageCount => 4 + (_genderAlreadySet ? 0 : 1);
 
@@ -484,11 +484,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       categories: interestCategoriesFor(_countryCtrl.text),
                       onToggle: _toggleInterest,
                       onBack: _back,
-                      onNext: _next,
-                    ),
-                    _StepGift(
-                      firstName: _nameCtrl.text.trim(),
-                      onFinish: _finish,
+                      onNext: _finish,
                     ),
                   ],
                 ),
@@ -569,15 +565,12 @@ class _OnboardingHeader extends StatelessWidget {
     if (page == 2 + genderOffset) {
       return ('onb_city_title', 'onb_city_subtitle');
     }
-    if (page == 3 + genderOffset) {
-      return (
-        interestsAboutFrance
-            ? 'onb_interests_title_france'
-            : 'onb_interests_title_japan',
-        'onb_interests_subtitle',
-      );
-    }
-    return ('onb_gift_title', 'onb_gift_subtitle');
+    return (
+      interestsAboutFrance
+          ? 'onb_interests_title_france'
+          : 'onb_interests_title_japan',
+      'onb_interests_subtitle',
+    );
   }
 
   String get _titleKey => _keys.$1;
@@ -990,7 +983,7 @@ class _StepInterestsState extends State<_StepInterests> {
           child: _StepNav(
             onBack: widget.onBack,
             onNext: widget.onNext,
-            nextLabelKey: anySelected ? 'onb_next' : 'onb_skip',
+            nextLabelKey: anySelected ? 'onb_finish' : 'onb_skip',
           ),
         ),
       ],
@@ -1052,81 +1045,6 @@ class _InterestChip extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Final celebratory step: announces the 15 free welcome minutes and the
-/// single CTA that actually completes onboarding.
-class _StepGift extends StatelessWidget {
-  const _StepGift({required this.firstName, required this.onFinish});
-
-  final String firstName;
-  final VoidCallback onFinish;
-
-  @override
-  Widget build(BuildContext context) {
-    final hi = firstName.isEmpty ? '' : ', $firstName';
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: SC.accent.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.accent, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.card_giftcard_rounded,
-                color: SC.accent,
-                size: 46,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            AppStrings.t('onb_gift_headline', args: {'hi': hi}),
-            textAlign: TextAlign.center,
-            style: SCText.h2.copyWith(fontSize: 24),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            AppStrings.t('onb_gift_body'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: SC.textSecondary,
-              fontSize: 15,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 32),
-          FilledButton(
-            onPressed: onFinish,
-            style: FilledButton.styleFrom(
-              backgroundColor: SC.accent,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Text(
-              AppStrings.t('onb_gift_cta'),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
