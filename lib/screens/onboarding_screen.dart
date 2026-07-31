@@ -665,13 +665,13 @@ class _StepWelcome extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Same destinations as Settings → the www host is mandatory,
-                // the apex answers 402 on every path.
+                // Same footer pair as the paywall — short labels, same www
+                // destinations (the apex answers 402 on every path).
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _LegalLink(
-                      label: AppStrings.t('settings_terms'),
+                      label: AppStrings.t('paywall_terms'),
                       onTap: () => _open('https://www.swayco.fr/terms'),
                     ),
                     const Text(
@@ -679,7 +679,7 @@ class _StepWelcome extends StatelessWidget {
                       style: TextStyle(color: SC.textMuted, fontSize: 12),
                     ),
                     _LegalLink(
-                      label: AppStrings.t('settings_privacy'),
+                      label: AppStrings.t('paywall_privacy'),
                       onTap: () => _open('https://www.swayco.fr/privacy'),
                     ),
                   ],
