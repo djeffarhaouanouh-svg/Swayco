@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../swayco/asr/asr_service.dart';
 import '../services/app_strings.dart';
@@ -406,14 +407,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     final showGenderStep = !_genderAlreadySet;
 
+    // The welcome page is a full-bleed hero: its photo runs under the status
+    // bar and it carries its own title, so both the top inset and the shared
+    // header step aside for it.
+    final heroPage = _page == 0;
+
     return Scaffold(
       backgroundColor: SC.bg,
       body: MeshBackground(
         child: SafeArea(
+          top: !heroPage,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _OnboardingHeader(page: _page, pageCount: _pageCount),
+              if (!heroPage)
+                _OnboardingHeader(page: _page, pageCount: _pageCount),
               Expanded(
                 child: PageView(
                   controller: _pageController,
@@ -563,47 +571,148 @@ class _Dot extends StatelessWidget {
   }
 }
 
+/// Welcome step — a full-bleed group selfie running under the status bar,
+/// dissolving into the app background, then the title / subtitle, the first
+/// name field and the CTA. No step dots here: the shared header is hidden on
+/// this page so the photo can reach the very top of the screen.
 class _StepWelcome extends StatelessWidget {
   const _StepWelcome({required this.nameCtrl, required this.onNext});
 
   final TextEditingController nameCtrl;
   final VoidCallback onNext;
 
+  Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Hero height follows the screen rather than a fixed value so the photo
+    // keeps the same presence on a small SE and on a Pro Max.
+    final heroHeight = MediaQuery.sizeOf(context).height * 0.46;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _GlassTextField(
-            controller: nameCtrl,
-            textCapitalization: TextCapitalization.words,
-            label: AppStrings.t('onb_first_name_label'),
-            hint: AppStrings.t('onb_first_name_hint'),
-            icon: Icons.badge_outlined,
-          ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: onNext,
-            style: FilledButton.styleFrom(
-              backgroundColor: SC.accent,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          // The photo fades ITSELF out (dstIn) rather than being covered by a
+          // solid gradient — the page background shows through untouched, so
+          // there is no seam where the hero ends and the vignette resumes.
+          SizedBox(
+            height: heroHeight,
+            child: ShaderMask(
+              shaderCallback: (rect) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white, Colors.white, Colors.transparent],
+                stops: [0, 0.5, 1],
+              ).createShader(rect),
+              blendMode: BlendMode.dstIn,
+              child: Image.asset(
+                'assets/bienvenue.jpg',
+                fit: BoxFit.cover,
+                // Faces sit in the upper third of the 1023x1537 source —
+                // bias the crop up so they survive a short hero.
+                alignment: const Alignment(0, -0.35),
               ),
             ),
-            child: Text(
-              AppStrings.t('onb_next'),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  AppStrings.t('onb_welcome_title'),
+                  textAlign: TextAlign.center,
+                  style: SCText.h1.copyWith(fontSize: 34, height: 1.1),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  AppStrings.t('onb_welcome_subtitle'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: SC.textSecondary,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                _GlassTextField(
+                  controller: nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  label: AppStrings.t('onb_first_name_label'),
+                  hint: AppStrings.t('onb_first_name_hint'),
+                  icon: Icons.badge_outlined,
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: onNext,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SC.accent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(27),
+                    ),
+                  ),
+                  child: Text(
+                    AppStrings.t('onb_next'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Same destinations as Settings → the www host is mandatory,
+                // the apex answers 402 on every path.
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _LegalLink(
+                      label: AppStrings.t('settings_terms'),
+                      onTap: () => _open('https://www.swayco.fr/terms'),
+                    ),
+                    const Text(
+                      '  ·  ',
+                      style: TextStyle(color: SC.textMuted, fontSize: 12),
+                    ),
+                    _LegalLink(
+                      label: AppStrings.t('settings_privacy'),
+                      onTap: () => _open('https://www.swayco.fr/privacy'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Muted, underlined text link — the Terms / Privacy pair under the welcome
+/// CTA. Kept small and low-contrast so it never competes with the button.
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: SC.textMuted,
+          fontSize: 12,
+          decoration: TextDecoration.underline,
+          decorationColor: SC.textMuted,
+        ),
       ),
     );
   }

@@ -199,6 +199,8 @@ flutter:
   assets:
     # Illustration shown in the "add your photo" profile tip dialog.
     - assets/add-picture.png
+    # Group-selfie photo heading the onboarding welcome step.
+    - assets/bienvenue.jpg
     # Transparent logo mark — shown on the "call ended" summary card.
     - assets/icon-fg-transparent.png
     # White "S" mark — centre of the premium boot splash (SplashScreenAnimation).
