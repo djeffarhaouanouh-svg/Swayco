@@ -618,81 +618,58 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Combien de phrases sont en file, celle qu'on lit comprise. C'est la mesure
-  /// du RETARD : à 1 on est à jour, au-delà on a pris du retard sur la
-  /// conversation.
-  int _ttsPending = 0;
+  /// Combien de temps on accepte d'attendre une synthèse avant de renoncer.
+  ///
+  /// Ce n'est PAS un réglage de confort : mesurée, la synthèse rend la main en
+  /// 25 à 75 ms. C'est le filet contre un moteur qui se serait bloqué — sans
+  /// lui, l'attente n'a aucune borne et toute la traduction de l'appel reste
+  /// coincée derrière une phrase qui ne viendra jamais. Dix secondes, c'est
+  /// cent fois le temps normal : on n'y arrive que si quelque chose est cassé.
+  static const Duration _kSynthCap = Duration(seconds: 10);
 
   /// Speak [text] after everything already queued. Never interrupts.
   ///
-  /// Deux choses se décident ICI, avant même que la file y arrive.
+  /// UNE SEULE VOIX, toujours la même. Il y a eu un temps où on basculait sur
+  /// celle du système dès qu'une phrase attendait, pour rattraper le retard :
+  /// c'était nécessaire quand la synthèse mettait dix secondes, et c'est devenu
+  /// absurde depuis qu'elle en met quarante millisecondes. Ça ne faisait plus
+  /// que changer la voix du pair au milieu d'une conversation — onze fois en
+  /// quatre-vingt-dix secondes sur l'appel de référence. On prête une identité
+  /// à une voix ; elle ne doit pas bouger.
   ///
-  /// La VOIX : la voix premium est belle mais lente — mesurée en appel à ~3x
-  /// plus lent que l'audio qu'elle produit, soit une dizaine de secondes pour
-  /// une phrase. Tant qu'on est à jour, on la garde. Dès qu'une phrase attend
-  /// déjà, on bascule sur celle du système, qui démarre tout de suite et
-  /// rattrape le retard. Oui, ça change la voix du pair au milieu d'une rafale
-  /// — c'est un appel : une belle voix qui arrive vingt secondes trop tard ne
-  /// sert plus à rien.
+  /// Le repli ne sert donc plus qu'aux cas où il n'y a rien d'autre à faire :
+  /// aucune voix embarquée pour cette langue, bundle pas encore téléchargé, ou
+  /// synthèse qui n'a rien rendu. Aucun de ces cas ne change de voix EN COURS
+  /// de conversation — ils valent pour tout l'appel.
   ///
-  /// La SYNTHÈSE : elle démarre maintenant, pas quand la file arrivera à cette
-  /// phrase. Elle tourne donc pendant que la précédente se lit ET pendant
-  /// qu'on attend que le pair se taise — deux attentes qu'on ne payait
-  /// jusqu'ici qu'à la suite.
+  /// La SYNTHÈSE démarre ici, pas quand la file arrivera à cette phrase. Elle
+  /// tourne donc pendant que la précédente se lit ET pendant qu'on attend que
+  /// le pair se taise — deux attentes qu'on ne payait jusqu'ici qu'à la suite,
+  /// et c'est ce qui rend les 40 ms possibles.
   Future<void> _enqueueSpeak(String text, String lang) {
     final generation = _ttsGeneration;
-    final behind = _ttsPending > 0;
-    _ttsPending++;
-    final premium = !behind && _premiumReadyFor(lang);
-    final Future<String?>? synth = premium
+    final Future<String?>? synth = _premiumReadyFor(lang)
         ? SpeechService.instance.synthesise(text: text, languageCode: lang)
         : null;
-    if (behind) {
-      DebugOverlay.log('tts behind ($_ttsPending queued) — OS voice');
-    }
     _ttsQueue = _ttsQueue.then((_) async {
       if (!mounted || generation != _ttsGeneration) return;
       await _awaitPeerSilence();
       // Couper la traduction PENDANT l'attente doit la faire tomber : sans ce
       // second contrôle, elle se dirait quand même à la fin du silence.
       if (!mounted || generation != _ttsGeneration) return;
-      if (synth != null) {
-        await _speakPremium(await _synthUnlessBehind(synth), text, lang);
-      } else {
+      if (synth == null) {
         await _speakOsVoice(text, lang);
+        return;
       }
+      final path = await synth.timeout(_kSynthCap, onTimeout: () {
+        DebugOverlay.log('tts: synthesis over ${_kSynthCap.inSeconds}s — OS voice');
+        return null;
+      });
+      await _speakPremium(path, text, lang);
     }).catchError((Object e) {
       DebugOverlay.log('tts queue error: $e');
-    }).whenComplete(() {
-      if (_ttsPending > 0) _ttsPending--;
     });
     return _ttsQueue;
-  }
-
-  /// Attendre la synthèse premium — mais y renoncer si la conversation a pris
-  /// de l'avance pendant qu'elle tournait.
-  ///
-  /// Sans ça, la bascule sur la voix du système ne servait à rien au début
-  /// d'une rafale : la première phrase, décidée « premium » alors qu'on était à
-  /// jour, bloquait toute la file pendant ses dix secondes de synthèse, et les
-  /// suivantes attendaient derrière elle même en voix système. On rend null,
-  /// l'appelant prend le relais, et la synthèse abandonnée finit dans le vide —
-  /// un fichier que personne ne lit.
-  Future<String?> _synthUnlessBehind(Future<String?> synth) async {
-    String? out;
-    var done = false;
-    unawaited(synth.then((p) {
-      out = p;
-      done = true;
-    }, onError: (_) => done = true));
-    while (!done) {
-      if (_ttsPending > 1) {
-        DebugOverlay.log('tts: $_ttsPending queued — abandoning premium synth');
-        return null;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    return out;
   }
 
   /// La voix premium embarquée (appariée au genre) est COUPÉE : tout l'appel
