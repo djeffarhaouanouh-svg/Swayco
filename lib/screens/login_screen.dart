@@ -1,4 +1,4 @@
-﻿import 'dart:io' show Platform;
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -30,12 +30,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPassword = false;
   String? _error;
   String? _info;
+
   /// True once we know the entered email exists but isn't confirmed yet â€”
   /// drives the "Resend confirmation email" affordance.
   bool _showResendConfirmation = false;
 
-  static final _emailRegex =
-      RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+  static final _emailRegex = RegExp(
+    r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
+  );
 
   @override
   void dispose() {
@@ -235,214 +237,293 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       // Solid black login backdrop (no navy / mesh) — on request.
       backgroundColor: SC.bg,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isSignUp
-                        ? AppStrings.t('login_title_signup')
-                        : AppStrings.t('login_title_signin'),
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    isSignUp
-                        ? AppStrings.t('login_subtitle_signup')
-                        : AppStrings.t('login_subtitle_signin'),
-                    style: const TextStyle(
-                      color: SC.textMuted,
-                      fontSize: 14,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  TextField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    autocorrect: false,
-                    enabled: !_busy,
-                    textCapitalization: TextCapitalization.none,
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: AppStrings.t('login_email_label'),
-                      hintText: AppStrings.t('login_email_hint'),
-                      prefixIcon: const Icon(Icons.alternate_email,
-                          color: SC.textMuted),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _passwordCtrl,
-                    obscureText: !_showPassword,
-                    enabled: !_busy,
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: AppStrings.t('login_password_label'),
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: SC.textMuted),
-                      suffixIcon: IconButton(
-                        onPressed: () =>
-                            setState(() => _showPassword = !_showPassword),
-                        icon: Icon(
-                          _showPassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: SC.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!isSignUp) ...[
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _busy ? null : _forgotPassword,
-                        child: Text(AppStrings.t('login_forgot')),
-                      ),
-                    ),
-                  ],
-                  if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: Color(0xFFFFAB91),
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                  if (_info != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _info!,
-                      style: const TextStyle(
-                        color: SC.accent,
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                  if (_showResendConfirmation) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: _busy ? null : _resendConfirmation,
-                        icon: const Icon(Icons.mark_email_unread_outlined,
-                            size: 18),
-                        label: Text(AppStrings.t('login_resend_confirm')),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: SC.accent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: _busy
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            isSignUp
-                                ? AppStrings.t('login_btn_signup')
-                                : AppStrings.t('login_btn_signin'),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        isSignUp
-                            ? AppStrings.t('login_have_account')
-                            : AppStrings.t('login_no_account'),
-                        style: const TextStyle(
-                          color: SC.textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _busy ? null : _toggleMode,
-                        child: Text(
+      // No top SafeArea: the hero photo is meant to run under the status bar.
+      // The form below re-applies the bottom inset.
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _LoginHero(height: MediaQuery.sizeOf(context).height * 0.30),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Centred under the photo, in the app's display face —
+                        // the hero carries the screen now, so the title reads
+                        // as its caption rather than a left-aligned form label.
+                        Text(
                           isSignUp
-                              ? AppStrings.t('login_btn_signin')
-                              : AppStrings.t('login_btn_signup'),
+                              ? AppStrings.t('login_title_signup')
+                              : AppStrings.t('login_title_signin'),
+                          textAlign: TextAlign.center,
+                          style: SCText.h1.copyWith(fontSize: 32, height: 1.1),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: SC.glassBorder)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          AppStrings.t('login_or'),
+                        const SizedBox(height: 10),
+                        Text(
+                          isSignUp
+                              ? AppStrings.t('login_subtitle_signup')
+                              : AppStrings.t('login_subtitle_signin'),
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: SC.textMuted,
-                            fontSize: 12,
+                            fontSize: 14,
+                            height: 1.35,
                           ),
                         ),
-                      ),
-                      const Expanded(child: Divider(color: SC.glassBorder)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _SocialButton(
-                    leading: SvgPicture.asset(
-                      'assets/google-logo-search-new-svgrepo-com.svg',
-                      width: 22,
-                      height: 22,
+                        const SizedBox(height: 26),
+                        TextField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          enabled: !_busy,
+                          textCapitalization: TextCapitalization.none,
+                          style: const TextStyle(
+                            color: SC.textPrimary,
+                            fontSize: 16,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: AppStrings.t('login_email_label'),
+                            hintText: AppStrings.t('login_email_hint'),
+                            prefixIcon: const Icon(
+                              Icons.alternate_email,
+                              color: SC.textMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _passwordCtrl,
+                          obscureText: !_showPassword,
+                          enabled: !_busy,
+                          style: const TextStyle(
+                            color: SC.textPrimary,
+                            fontSize: 16,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: AppStrings.t('login_password_label'),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline,
+                              color: SC.textMuted,
+                            ),
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                () => _showPassword = !_showPassword,
+                              ),
+                              icon: Icon(
+                                _showPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: SC.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!isSignUp) ...[
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _busy ? null : _forgotPassword,
+                              child: Text(AppStrings.t('login_forgot')),
+                            ),
+                          ),
+                        ],
+                        if (_error != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                              color: Color(0xFFFFAB91),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        if (_info != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _info!,
+                            style: const TextStyle(
+                              color: SC.accent,
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        if (_showResendConfirmation) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _busy ? null : _resendConfirmation,
+                              icon: const Icon(
+                                Icons.mark_email_unread_outlined,
+                                size: 18,
+                              ),
+                              label: Text(AppStrings.t('login_resend_confirm')),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          onPressed: _busy ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: SC.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: _busy
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  isSignUp
+                                      ? AppStrings.t('login_btn_signup')
+                                      : AppStrings.t('login_btn_signin'),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isSignUp
+                                  ? AppStrings.t('login_have_account')
+                                  : AppStrings.t('login_no_account'),
+                              style: const TextStyle(
+                                color: SC.textMuted,
+                                fontSize: 13,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _busy ? null : _toggleMode,
+                              child: Text(
+                                isSignUp
+                                    ? AppStrings.t('login_btn_signin')
+                                    : AppStrings.t('login_btn_signup'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Divider(color: SC.glassBorder),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                AppStrings.t('login_or'),
+                                style: const TextStyle(
+                                  color: SC.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const Expanded(
+                              child: Divider(color: SC.glassBorder),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _SocialButton(
+                          leading: SvgPicture.asset(
+                            'assets/google-logo-search-new-svgrepo-com.svg',
+                            width: 22,
+                            height: 22,
+                          ),
+                          label: AppStrings.t('login_continue_google'),
+                          onPressed: _busy ? null : _signInWithGoogle,
+                        ),
+                        if (_showApple) ...[
+                          const SizedBox(height: 12),
+                          _SocialButton(
+                            icon: Icons.apple,
+                            label: AppStrings.t('login_continue_apple'),
+                            onPressed: _busy ? null : _signInWithApple,
+                          ),
+                        ],
+                      ],
                     ),
-                    label: AppStrings.t('login_continue_google'),
-                    onPressed: _busy ? null : _signInWithGoogle,
                   ),
-                  if (_showApple) ...[
-                    const SizedBox(height: 12),
-                    _SocialButton(
-                      icon: Icons.apple,
-                      label: AppStrings.t('login_continue_apple'),
-                      onPressed: _busy ? null : _signInWithApple,
-                    ),
-                  ],
-                ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-bleed group-selfie header for the login screen. The photo runs under
+/// the status bar and fades ITSELF out (dstIn) at the bottom, so the page
+/// background shows through with no seam. A short dark scrim at the very top
+/// keeps the system status-bar glyphs readable over the bright sky.
+class _LoginHero extends StatelessWidget {
+  const _LoginHero({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ShaderMask(
+            shaderCallback: (rect) => const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.white, Colors.white, Colors.transparent],
+              stops: [0, 0.45, 1],
+            ).createShader(rect),
+            blendMode: BlendMode.dstIn,
+            child: Image.asset(
+              'assets/bienvenue.jpg',
+              fit: BoxFit.cover,
+              // Faces sit in the upper third of the 1023x1537 source — bias
+              // the crop up so they survive a short hero.
+              alignment: const Alignment(0, -0.3),
+            ),
+          ),
+          const Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: 110,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x59000000), Colors.transparent],
+                  ),
+                ),
+                child: SizedBox(width: double.infinity),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -483,9 +564,7 @@ class _SocialButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(50),
         side: const BorderSide(color: SC.glassBorder),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
