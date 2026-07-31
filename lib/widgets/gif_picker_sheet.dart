@@ -142,7 +142,6 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
                       prefixIcon: const Icon(Icons.search, color: SC.textMuted),
                       isDense: true,
                       filled: true,
-                      fillColor: SC.bubbleIn,
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),

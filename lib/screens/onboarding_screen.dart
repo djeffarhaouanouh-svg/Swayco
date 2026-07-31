@@ -988,7 +988,6 @@ class _GlassTextField extends StatelessWidget {
           hintStyle: const TextStyle(color: SC.textMuted),
           prefixIcon: Icon(icon, color: SC.textMuted),
           filled: true,
-          fillColor: SC.bubbleIn,
           alignLabelWithHint: alignLabelWithHint,
           counterStyle: const TextStyle(color: SC.textMuted),
           border: OutlineInputBorder(

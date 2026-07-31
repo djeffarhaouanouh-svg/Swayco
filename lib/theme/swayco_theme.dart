@@ -97,7 +97,9 @@ abstract final class SC {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: bubbleIn,
+        // Neutral grey, not the navy [bubbleIn] the chat bubbles use: a blue
+        // cast on every input read as a foreign surface on the dark screens.
+        fillColor: menu,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: glassBorder),

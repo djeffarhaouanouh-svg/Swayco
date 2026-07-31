@@ -2376,9 +2376,6 @@ class _InlineEditableState extends State<_InlineEditable> {
         hintStyle: const TextStyle(color: SC.textMuted),
         counterText: '',
         filled: true,
-        // Neutral grey rather than the navy bubble fill — the inline editor
-        // sits on a dark card, where the blue cast reads as a foreign surface.
-        fillColor: SC.menu,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
