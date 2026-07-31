@@ -353,6 +353,10 @@ class _CallScreenState extends State<CallScreen> {
   double _probePeak = 0;
   int _probeTicks = 0;
 
+  /// Au moins une mesure NEUVE dans la fenêtre courante. Faux = le tampon ne
+  /// bouge plus, le pic affiché serait un reste.
+  bool _probeFresh = false;
+
   /// Niveau de MON micro, mesuré ici même — pas au serveur.
   ///
   /// `ActiveSpeakersChangedEvent` dépend du SFU : il n'arrive qu'aux
@@ -449,12 +453,21 @@ class _CallScreenState extends State<CallScreen> {
       // qu'on a précisément demandé le silence.
       final hot = _micOn && !frozen && lvl > threshold;
       if (lvl > _probePeak) _probePeak = lvl;
+      if (!frozen) _probeFresh = true;
       if (++_probeTicks % 12 == 0) {
+        // Une sonde qui n'a rien mesuré de neuf de toute la fenêtre republiait
+        // son dernier pic, à la quatrième décimale près, ligne après ligne :
+        // dans un log ça se lit comme une application bloquée, alors que le
+        // micro est simplement coupé et que plus rien n'alimente le tampon.
         DebugOverlay.log(
-          'mic probe: peak over last 3s ${_probePeak.toStringAsFixed(4)} '
-          '(opens at ${threshold.toStringAsFixed(4)})',
+          _probeFresh
+              ? 'mic probe: peak over last 3s '
+                  '${_probePeak.toStringAsFixed(4)} '
+                  '(opens at ${threshold.toStringAsFixed(4)})'
+              : 'mic probe: no capture (${_micOn ? "buffer stalled" : "muted"})',
         );
         _probePeak = 0;
+        _probeFresh = false;
       }
       _hotTicks = hot ? _hotTicks + 1 : 0;
       // La pastille ne bat que sur de la vraie parole : lui donner le bruit de
@@ -799,22 +812,57 @@ class _CallScreenState extends State<CallScreen> {
 
   /// Ask the OS which languages it can speak. `getLanguages` returns BCP-47 tags
   /// (`fr-FR`, `en-US`, …); the picker works in base codes.
+  /// Les régions qu'on veut voir gagner quand l'appareil en propose plusieurs
+  /// pour une même langue.
+  ///
+  /// `getLanguages` NE rend PAS un ordre de préférence, contrairement à ce
+  /// qu'on croyait : sur iPhone, l'anglais sortait en `en-ZA`, et toutes les
+  /// traductions se lisaient avec l'accent sud-africain. Ce sont les régions
+  /// les plus neutres à l'oreille d'un non-anglophone qui passent devant.
+  ///
+  /// La première présente sur l'appareil gagne ; si aucune ne l'est, on retombe
+  /// sur ce que la liste donnait — mieux vaut un accent inattendu que pas de
+  /// voix du tout.
+  static const Map<String, List<String>> _preferredVoiceRegions = {
+    'en': ['en-US', 'en-GB'],
+  };
+
   Future<void> _loadDeviceVoiceLangs() async {
     try {
       final raw = await _deviceTts.getLanguages;
       if (raw is! List) return;
       final tags = <String, String>{};
+      final all = <String, List<String>>{};
       for (final t in raw) {
         if (t == null) continue;
         final full = t.toString().trim();
         if (full.isEmpty) continue;
         final base = full.toLowerCase().split(RegExp(r'[-_]')).first;
         if (base.isEmpty) continue;
-        // First one wins: getLanguages lists the device's own preferred order.
+        (all[base] ??= <String>[]).add(full);
         tags.putIfAbsent(base, () => full);
       }
+      // Les préférées passent devant ce que la liste avait donné.
+      _preferredVoiceRegions.forEach((base, wanted) {
+        final have = all[base];
+        if (have == null) return;
+        for (final w in wanted) {
+          final hit = have.firstWhere(
+            (t) => t.toLowerCase().replaceAll('_', '-') == w.toLowerCase(),
+            orElse: () => '',
+          );
+          if (hit.isNotEmpty) {
+            tags[base] = hit;
+            return;
+          }
+        }
+      });
       if (!mounted || tags.isEmpty) return;
-      DebugOverlay.log('device voices: ${tags.length} langs');
+      // La région retenue pour l'anglais est écrite : c'est celle qu'on a vue
+      // partir en `en-ZA` sans qu'aucune ligne ne dise pourquoi.
+      DebugOverlay.log(
+        'device voices: ${tags.length} langs (en=${tags['en'] ?? '—'})',
+      );
       setState(() => _deviceVoiceTags = tags);
     } catch (e) {
       debugPrint('[speech] getLanguages failed: $e');
