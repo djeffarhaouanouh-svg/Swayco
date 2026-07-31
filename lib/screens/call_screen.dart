@@ -695,9 +695,22 @@ class _CallScreenState extends State<CallScreen> {
     return out;
   }
 
-  /// Kill-switch for the premium on-device (gender-matched) voice. Left as a
-  /// switch so a build can force the OS voice for a clean audio test.
-  static const bool _kPremiumVoiceEnabled = true;
+  /// La voix premium embarquée (appariée au genre) est COUPÉE : tout l'appel
+  /// passe par flutter_tts.
+  ///
+  /// Elle marchait pourtant, et vite — mesurée à 25-75 ms entre la demande et
+  /// le premier son, la synthèse étant déjà faite en avance. Ce n'est pas la
+  /// latence qui l'a fait tomber, c'est le mélange : dès qu'une deuxième
+  /// phrase attendait, le repli sur la voix du système s'enclenchait, et sur
+  /// une conversation normale ça bascule d'une voix à l'autre toutes les
+  /// quelques phrases — onze fois en quatre-vingt-dix secondes sur l'appel de
+  /// référence. On prête une identité à une voix ; l'entendre changer au
+  /// milieu d'un échange coûte plus que ce que la belle voix apporte.
+  ///
+  /// Une seule voix, toujours la même, quel que soit le retard. Repasser à
+  /// `true` rallume tout le chemin premium tel quel — il est intact, seulement
+  /// débranché.
+  static const bool _kPremiumVoiceEnabled = false;
 
   /// Premium on-device voice, but ONLY for the one language whose bundle is
   /// already installed — the account language, downloaded at boot. A language
