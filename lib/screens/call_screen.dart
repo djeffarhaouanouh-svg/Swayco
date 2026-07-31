@@ -4864,9 +4864,9 @@ class _RoundCallButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final fill =
         active ? Colors.white : Colors.white.withValues(alpha: 0.14);
-    // The label is no longer shown under the button (the icons speak for
-    // themselves), but it is kept on Semantics so screen readers still
-    // announce each control.
+    // Le libellé s'écrit sous le bouton. Il existait déjà — il ne servait
+    // qu'aux lecteurs d'écran — donc il n'y a rien à traduire de plus : ce sont
+    // les mêmes clés, dans les douze langues.
     return Semantics(
       label: label,
       button: true,
@@ -4874,32 +4874,54 @@ class _RoundCallButton extends StatelessWidget {
       child: Pressable(
         bounce: true,
         onTap: onTap,
-        // Stable Flutter frosted-glass circle (NOT a platform view): the
-        // native glass flickered/reset under the keyboard animation.
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: AnimatedContainer(
-              // Court exprès : c'est un interrupteur, pas une transition. Au-
-              // delà, le blanc «arrive» au lieu d'être déjà là.
-              duration: const Duration(milliseconds: 90),
-              curve: Curves.easeOut,
-              width: 45,
-              height: 45,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: fill,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: active ? 0.0 : 0.22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Stable Flutter frosted-glass circle (NOT a platform view): the
+            // native glass flickered/reset under the keyboard animation.
+            ClipOval(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: AnimatedContainer(
+                  // Court exprès : c'est un interrupteur, pas une transition.
+                  // Au-delà, le blanc «arrive» au lieu d'être déjà là.
+                  duration: const Duration(milliseconds: 90),
+                  curve: Curves.easeOut,
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: fill,
+                    border: Border.all(
+                      color:
+                          Colors.white.withValues(alpha: active ? 0.0 : 0.22),
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: active ? Colors.black : Colors.white,
+                    size: 21,
+                  ),
                 ),
               ),
-              child: Icon(
-                icon,
-                color: active ? Colors.black : Colors.white,
-                size: 21,
+            ),
+            const SizedBox(height: 6),
+            // Le libellé prend la largeur qu'il lui faut — « Haut-parleur » est
+            // plus large que son rond. Le lui rogner à la taille du cercle le
+            // couperait ; c'est l'écart du Wrap qui absorbe la différence.
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                // Engagé, le libellé passe au blanc plein comme son bouton :
+                // les deux disent la même chose, ils doivent le dire ensemble.
+                color: Colors.white.withValues(alpha: active ? 1.0 : 0.6),
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                height: 1.1,
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
