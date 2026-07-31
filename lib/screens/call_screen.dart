@@ -2614,10 +2614,6 @@ class _CallScreenState extends State<CallScreen> {
                   padding: mq.padding.copyWith(bottom: mq.viewPadding.bottom),
                 ),
                 child: SafeArea(
-                  // Pas en bas : le panneau descend jusqu'au bord de l'écran,
-                  // comme sur la maquette — il reprend la marge du bas à son
-                  // compte, dans son propre rembourrage.
-                  bottom: false,
                   child: Stack(
                     fit: StackFit.expand,
               children: [
@@ -2808,39 +2804,26 @@ class _CallScreenState extends State<CallScreen> {
                     onLongPress: _openCallSettingsSheet,
                   ),
                 ),
-                // Le panneau : le bas de la page. Il tient toute la largeur et
-                // descend jusqu'au bord de l'écran, arrondi seulement en haut,
-                // là où la vidéo s'arrête. Ce qui se déplie — conversation et
-                // réglages — pousse vers le HAUT, par-dessus la vidéo ; le
-                // panneau, lui, ne bouge jamais.
+                // Le dock : une barre de verre posée en bas, qui flotte
+                // au-dessus de la vidéo. Ce qui se déplie — conversation et
+                // réglages — pousse vers le HAUT, au-dessus d'elle ; la barre,
+                // elle, ne bouge jamais.
                 Positioned(
                   key: const ValueKey('call_controls'),
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: Padding(
-                      // Rien sur les côtés ni en bas : le panneau touche les
-                      // trois bords. Les panneaux dépliés, eux, gardent leur
-                      // air — ils sont posés sur la vidéo, pas sur le verre.
-                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      // Mêmes marges que la barre de navigation de l'app
+                      // (root_shell, left/right 48) : les deux barres font la
+                      // même largeur d'un écran à l'autre.
+                      padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Les deux dépliants redescendent de la hauteur des
-                          // encoches. Sans ça ils flottent trop haut : le
-                          // panneau porte au-dessus de son bord visible une
-                          // bande vide de [_CallDock.hugRadius] — celle que la
-                          // découpe creuse —, et tout ce qui s'empile dessus
-                          // était poussé d'autant. Ils viennent la recouvrir :
-                          // elle est transparente, c'est la vidéo qui est
-                          // dessous.
-                          Transform.translate(
-                            offset: const Offset(0, _CallDock.hugRadius),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
                           // 1. La légende, dépliée depuis la zone de gauche.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
@@ -2848,13 +2831,9 @@ class _CallScreenState extends State<CallScreen> {
                             alignment: Alignment.bottomCenter,
                             child: (_turnsOpen && _turns.isNotEmpty)
                                 ? Padding(
-                                    // Au plus près des bords : les bulles
-                                    // avaient 44 à gauche et 80 à droite, ce
-                                    // qui les tassait au milieu alors qu'elles
-                                    // ont du texte à faire tenir.
                                     padding: const EdgeInsets.only(
-                                      left: 12,
-                                      right: 32,
+                                      left: 4,
+                                      right: 40,
                                       bottom: 10,
                                     ),
                                     child: _SpokenTurnsPanel(
@@ -2880,17 +2859,7 @@ class _CallScreenState extends State<CallScreen> {
                             child: !_controlsOpen
                                 ? const SizedBox(width: double.infinity)
                                 : Padding(
-                                    // Les 10 d'origine sous les réglages. Avec
-                                    // la translation qui annule la bande des
-                                    // encoches, c'est bien 10 qu'on voit entre
-                                    // eux et le bord haut du panneau — l'écart
-                                    // qu'ils ont toujours eu.
-                                    padding: const EdgeInsets.fromLTRB(
-                                      40,
-                                      0,
-                                      40,
-                                      10,
-                                    ),
+                                    padding: const EdgeInsets.only(bottom: 10),
                                     child: Wrap(
                                       alignment: WrapAlignment.center,
                                       spacing: 12,
@@ -2952,9 +2921,6 @@ class _CallScreenState extends State<CallScreen> {
                                     ),
                                   ),
                           ),
-                              ],
-                            ),
-                          ),
                           // 3. La barre elle-même.
                           _CallDock(
                             hasTurns: _turns.isNotEmpty,
@@ -2995,6 +2961,7 @@ class _CallScreenState extends State<CallScreen> {
                         ],
                       ),
                     ),
+                  ),
                 ),
                 // Brand watermark — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
@@ -3428,24 +3395,12 @@ class _CallDock extends StatelessWidget {
   /// viser le raccrochage sans le chercher.
   static const double _dimOpacity = 0.22;
 
-  /// Le rayon des deux encoches du haut. Les coins ne sont pas arrondis vers
-  /// l'INTÉRIEUR comme un bouton — ils sont creusés vers l'EXTÉRIEUR : le
-  /// panneau monte le long des bords de l'écran et redescend en courbe
-  /// concave. C'est le « hug » des barres de Discover (e889c70), à l'envers de
-  /// ce qu'on croit dessiner la première fois.
-  ///
-  /// 28 comme là-bas : c'est le rayon des cartes de l'app.
-  ///
-  /// C'est AUSSI la hauteur de bande vide que le panneau porte au-dessus de son
-  /// bord visible : ce qui s'empile dessus doit redescendre d'autant, sinon ça
-  /// flotte.
-  static const double hugRadius = 28;
+  /// L'arrondi de la barre. Elle flotte : il fait tout le tour.
+  static const double radius = 34;
+
 
   @override
   Widget build(BuildContext context) {
-    // La marge du bas de l'écran (barre d'accueil) : le panneau descend
-    // dessous, ses touches non.
-    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
       // Plus long et plus mou que les mouvements du dock : le fond s'en va,
@@ -3462,20 +3417,19 @@ class _CallDock extends StatelessWidget {
           behavior:
               dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
           onTap: dimmed ? onWake : null,
-          // La lueur se peint DEHORS, le long de la même découpe : posée
-          // dedans, le clip la couperait net au bord du panneau. Elle ne sort
-          // donc que par le haut, en épousant les deux encoches — les trois
-          // autres côtés sont hors écran.
+          // La lueur se peint DEHORS, autour du verre : posée dedans, le
+          // ClipRRect la couperait net au bord de la barre. La barre flottant
+          // de nouveau, elle en fait tout le tour.
           child: _DockAura(
             ttsSpeaking: ttsSpeaking,
             voiceLevel: voiceLevel,
-            radius: hugRadius,
+            radius: radius,
             color: glowColor,
             motion: glowMotion,
             rightward: glowRightward,
             intensity: glowIntensity,
-            child: ClipPath(
-            clipper: const _TopHugClipper(hugRadius),
+            child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
             child: BackdropFilter(
               // Le flou s'atténue avec le reste, sans jamais s'annuler : la
               // barre reste une barre, en retrait.
@@ -3484,33 +3438,21 @@ class _CallDock extends StatelessWidget {
                 sigmaY: 24 * live,
               ),
               child: Container(
-                // En haut, la hauteur des encoches : c'est la bande que la
-                // découpe creuse, et rien ne doit s'y trouver. En bas, la marge
-                // de l'écran : le panneau descend jusqu'au bord, mais les
-                // touches ne vont pas se mettre sous la barre d'accueil.
-                padding: EdgeInsets.fromLTRB(
-                  10,
-                  10 + hugRadius,
-                  10,
-                  10 + safeBottom,
-                ),
+                // 10 plutôt que 8 : de quoi laisser la lueur du chevron faire
+                // le tour du bouton sans toucher le bord.
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  // Le verre d'origine, retrouvé : la lueur ne le remplit plus
-                  // depuis qu'elle est bridée au-dessus du bord haut, donc
-                  // rien n'oblige plus le panneau à être plein.
+                  // Le gris translucide de la barre de commentaire : du blanc
+                  // très dilué sur du flou, rien de coloré.
                   color: Colors.white.withValues(alpha: 0.14 * live),
-                  // Pas de liseré : la découpe dessine déjà le bord, et un
-                  // trait droit posé dessus recouperait les encoches.
+                  borderRadius: BorderRadius.circular(radius),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18 * live),
+                  ),
                 ),
-                // Le panneau tient toute la largeur de l'écran : les touches
-                // s'y répartissent au lieu de se serrer au milieu. Elles
-                // gagnent l'air des bords, et la pastille reste au centre
-                // exact — c'est elle qu'on vise sans regarder.
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
+                child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         // La conversation, au premier cran. En veille, le
                         // premier tap rallume : il ne doit pas aussi la
@@ -3571,10 +3513,9 @@ class _CallDock extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                ),
               ),
             ),
+          ),
           ),
         );
       },
@@ -3834,20 +3775,22 @@ class _AuraPainter extends CustomPainter {
     // L'intensité joue sur les deux : ce qui brûle fort s'étale aussi plus
     // loin. Une lueur plus opaque mais aussi serrée ne ferait qu'un trait.
     final blur = (18 + 34 * glow) * intensity;
-    final path = _TopHugClipper(radius).getClip(size);
-    canvas.save();
-    // La bande où la lueur a le droit d'exister : toute la largeur, des deux
-    // bords de l'écran compris, et assez haut pour que le halo large ait la
-    // place de monter. En dessous du bord haut du panneau, rien.
-    canvas.clipRect(
-      Rect.fromLTRB(-blur, -blur * 3, size.width + blur, radius),
-    );
-    // Deux passes : un halo large et diffus qui monte loin, puis un liseré
-    // serré et franc juste au-dessus du bord. Une seule passe donne soit un
-    // trait dur, soit un brouillard — jamais les deux.
+    // La barre flotte de nouveau : ses quatre côtés sont à l'écran, donc la
+    // lueur en fait le tour au lieu de ne sortir que par le haut. Plus de
+    // découpe à suivre ni de toile à rogner — c'était le temps où elle était
+    // collée au bord bas.
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(radius),
+        ),
+      );
+    // Deux passes : un halo large et diffus qui porte loin, puis un liseré
+    // serré et franc au ras du bord. Une seule passe donne soit un trait dur,
+    // soit un brouillard — jamais les deux.
     _stroke(canvas, path, size, alpha: 0.45, blur: blur * 2);
     _stroke(canvas, path, size, alpha: 0.95, blur: blur * 0.45);
-    canvas.restore();
   }
 
   void _stroke(
@@ -4007,23 +3950,27 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                height: 108,
+                height: 116,
                 color: Colors.black,
-                alignment: Alignment.bottomCenter,
-                child: _DockAura(
-                  ttsSpeaking: _previewOn,
-                  voiceLevel: _previewLevel,
-                  radius: _CallDock.hugRadius,
-                  color: _color,
-                  motion: _motion,
-                  rightward: _rightward,
-                  intensity: _intensity,
-                  child: ClipPath(
-                    clipper: const _TopHugClipper(_CallDock.hugRadius),
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: _DockAura(
+                    ttsSpeaking: _previewOn,
+                    voiceLevel: _previewLevel,
+                    radius: _CallDock.radius,
+                    color: _color,
+                    motion: _motion,
+                    rightward: _rightward,
+                    intensity: _intensity,
                     child: Container(
-                      height: _CallDock.hugRadius + 26,
+                      height: 56,
                       width: double.infinity,
-                      color: Colors.white.withValues(alpha: 0.14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius:
+                            BorderRadius.circular(_CallDock.radius),
+                      ),
                     ),
                   ),
                 ),
@@ -4222,41 +4169,6 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
   }
 }
 
-/// La découpe du panneau : les deux coins du HAUT creusés en quart de cercle
-/// concave, pas arrondis vers l'intérieur. Le panneau monte à pleine hauteur le
-/// long des bords de l'écran et redescend en courbe jusqu'à son bord haut — le
-/// même « hug » que les barres de Discover (e889c70).
-class _TopHugClipper extends CustomClipper<Path> {
-  const _TopHugClipper(this.radius);
-
-  final double radius;
-
-  @override
-  Path getClip(Size size) {
-    final r = radius;
-    final w = size.width;
-    final h = size.height;
-    // Chaque encoche : le carré du coin MOINS le disque qui le mange. Ce qui
-    // reste est la petite corne concave qui longe le bord de l'écran.
-    final leftNotch = Path.combine(
-      PathOperation.difference,
-      Path()..addRect(Rect.fromLTRB(0, 0, r, r)),
-      Path()..addOval(Rect.fromCircle(center: Offset(r, 0), radius: r)),
-    );
-    final rightNotch = Path.combine(
-      PathOperation.difference,
-      Path()..addRect(Rect.fromLTRB(w - r, 0, w, r)),
-      Path()..addOval(Rect.fromCircle(center: Offset(w - r, 0), radius: r)),
-    );
-    var path = Path()..addRect(Rect.fromLTRB(0, r, w, h));
-    path = Path.combine(PathOperation.union, path, leftNotch);
-    path = Path.combine(PathOperation.union, path, rightNotch);
-    return path;
-  }
-
-  @override
-  bool shouldReclip(_TopHugClipper old) => old.radius != radius;
-}
 
 /// Un rond plein de la barre (conversation, raccrocher). Volontairement sans
 /// flou : il est posé sur le verre du dock, qui a déjà flouté ce qu'il y a
