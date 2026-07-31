@@ -110,9 +110,21 @@ final List<TtsModelSpec> _specs = <TtsModelSpec>[
   // fr — siwis (f) / tom (m)
   _mirror('fr', gender: 'f'),
   _mirror('fr', id: 'v1-fr-m', gender: 'm'),
-  // en — lessac (f) / ryan (m), both premium 'high'
-  _mirror('en', gender: 'f', mb: 110),
-  _mirror('en', id: 'v1-en-m', gender: 'm', mb: 110),
+  // en — lessac (f) / ryan (m), MEDIUM tier.
+  //
+  // They were 'high', and that one choice was the whole reason translations
+  // arrived late. Measured on the same text and machine: high synthesises at
+  // 0.69x real time, medium at 0.10x — SEVEN TIMES faster for the same
+  // sentence. On a phone that difference is the gap between a translation you
+  // wait ten seconds for and one that is ready before the peer has stopped
+  // talking.
+  //
+  // Do NOT "upgrade" these back to high without measuring on a phone. And do
+  // not reach for int8 quantisation as a fix either: dynamically quantised,
+  // this model runs 7x SLOWER than fp32 (4.27s vs 0.59s, same text) — the
+  // quantised kernels fall back and the dequantise cost dominates.
+  _mirror('en', id: 'v2-en', gender: 'f'),
+  _mirror('en', id: 'v2-en-m', gender: 'm'),
   // de — thorsten (m) / kerstin (f)
   _mirror('de', gender: 'm', mb: 110),
   _mirror('de', id: 'v1-de-f', gender: 'f'),
