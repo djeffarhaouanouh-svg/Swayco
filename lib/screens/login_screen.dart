@@ -290,6 +290,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: AppStrings.t('login_email_label'),
                             hintText: AppStrings.t('login_email_hint'),
+                            // Neutral grey instead of the theme's navy fill —
+                            // this screen only (see also the password field).
+                            fillColor: SC.menu,
                             prefixIcon: const Icon(
                               Icons.alternate_email,
                               color: SC.textMuted,
@@ -307,6 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           decoration: InputDecoration(
                             labelText: AppStrings.t('login_password_label'),
+                            fillColor: SC.menu,
                             prefixIcon: const Icon(
                               Icons.lock_outline,
                               color: SC.textMuted,
