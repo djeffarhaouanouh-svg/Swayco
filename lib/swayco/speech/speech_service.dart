@@ -70,6 +70,24 @@ class SpeechService {
     _jaEngine.onPlaybackComplete.listen((_) => _playbackComplete.add(null));
   }
 
+  /// La voix embarquée est COUPÉE — tout passe par flutter_tts.
+  ///
+  /// Elle marchait, et vite : 40 ms entre la demande et le premier son une fois
+  /// passée en palier medium. Ce n'est pas la vitesse qui l'a fait tomber, c'est
+  /// qu'elle n'apportait pas assez pour justifier ce qu'elle coûte — 67 MB par
+  /// voix à télécharger, une étape de synthèse, et un second moteur audio à
+  /// tenir. La voix du système fait le travail, et une conversation entière s'y
+  /// est déroulée sans qu'on entende la différence.
+  ///
+  /// Coupé ICI plutôt qu'au point d'appel : les téléchargements partent du
+  /// démarrage de l'app, de l'onboarding et de l'écran d'appel. Une seule porte
+  /// fermée vaut mieux que sept, et personne ne peut la contourner par
+  /// inadvertance.
+  ///
+  /// Repasser à `true` rallume tout — moteurs, bundles medium, synthèse
+  /// anticipée. Rien n'a été supprimé, seulement débranché.
+  static const bool enabled = false;
+
   static const _prefKeySelectedLang = 'speech_selected_lang';
   static const _prefKeySelectedVoice = 'speech_selected_voice';
 
@@ -78,7 +96,7 @@ class SpeechService {
   /// Call once at app start. Restores the previously installed language so the
   /// first call is not cold. Idempotent; a no-op on web.
   Future<void> init({void Function(double)? onProgress}) async {
-    if (kIsWeb) return;
+    if (kIsWeb || !enabled) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final lang = prefs.getString(_prefKeySelectedLang);
@@ -126,7 +144,7 @@ class SpeechService {
     String gender = '',
     void Function(double)? onProgress,
   }) {
-    if (kIsWeb) return Future.value();
+    if (kIsWeb || !enabled) return Future.value();
     final lang = normalizeLang(langCode);
     // Already speaking this language in a voice that matches → nothing to do.
     if (isLoadedFor(lang, gender: gender)) return Future.value();
@@ -140,7 +158,7 @@ class SpeechService {
   /// when a call starts — the only thing left to do then is configure it, which
   /// is fast. Fire-and-forget; failures fall back to the OS voice later.
   Future<void> prefetchLanguage(String langCode) async {
-    if (kIsWeb) return;
+    if (kIsWeb || !enabled) return;
     for (final spec in ttsSpecsForLang(langCode)) {
       try {
         await _downloader.ensureBundle(spec);
