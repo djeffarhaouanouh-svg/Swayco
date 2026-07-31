@@ -53,17 +53,19 @@ class NeuralTtsEngine {
   SendPort? _toWorker;
   ReceivePort? _fromWorker;
 
-  /// The single in-flight request (configure or speak). Both are serialised by
-  /// the caller (SpeechService awaits configure; speak drops while inferring),
-  /// so one pending completer is enough.
+  /// The single in-flight request (configure or synthesise). Both are
+  /// serialised — SpeechService awaits configure, [_synthQueue] lines the
+  /// syntheses up — so one pending completer is enough.
   Completer<List<dynamic>>? _pending;
 
   final AudioPlayer _player = AudioPlayer();
   bool _configured = false;
-  bool _inferring = false;
 
-  /// Le nom de fichier courant, alterné à chaque phrase (voir [speak]).
+  /// Le nom de fichier courant, tourné à chaque phrase (voir [_synthesiseOne]).
   int _slot = 0;
+
+  /// Les synthèses se suivent une par une : le worker n'a qu'un moteur.
+  Future<void> _synthQueue = Future<void>.value();
 
   Future<void> _ensureSpawned() async {
     if (_isolate != null) return;
@@ -104,48 +106,71 @@ class NeuralTtsEngine {
 
   bool get isReady => _configured;
 
-  /// Synthesise [text] in the worker and play the returned PCM. Returns as soon
-  /// as playback *starts*. Overlapping calls are dropped, matching the old
-  /// player: a stale utterance decoded late would land after the one after it.
+  /// Synthesise [text] and play it. Returns as soon as playback *starts*.
+  ///
+  /// Kept as one call for the places that just want a voice (a preview in the
+  /// settings). In a call the two halves are driven separately — see
+  /// [synthesiseToFile] — so the next sentence can be synthesised while the
+  /// current one is still being heard.
   Future<void> speak(
     String text, {
     int sid = 0,
     double speed = 1.0,
   }) async {
-    if (!_configured) throw StateError('sherpa TTS not configured');
-    if (_inferring) {
-      // Un abandon SILENCIEUX : la phrase ne sera jamais dite et personne ne le
-      // saura. Avec la file qui attend désormais la fin de la lecture ça ne
-      // devrait plus arriver — si ça arrive quand même, on veut le lire dans
-      // les logs plutôt que chercher une phrase disparue.
-      debugPrint('[tts] DROPPED (busy): "$text"');
-      return;
-    }
-    if (text.trim().isEmpty) return;
-    _inferring = true;
+    final path = await synthesiseToFile(text, sid: sid, speed: speed);
+    if (path == null) return;
+    await playFile(path);
+  }
 
-    try {
+  /// Synthesise [text] to a WAV on disk and return its path — nothing is
+  /// played. Null when there was nothing to synthesise.
+  ///
+  /// Calls QUEUE rather than drop. Dropping was the old behaviour and it was
+  /// silent: a sentence overtaken by the next simply never existed. Now that
+  /// the caller can start the next synthesis while the current one plays, an
+  /// overlap is the normal case, not an accident.
+  Future<String?> synthesiseToFile(
+    String text, {
+    int sid = 0,
+    double speed = 1.0,
+  }) {
+    if (!_configured) throw StateError('sherpa TTS not configured');
+    if (text.trim().isEmpty) return Future<String?>.value();
+    // Le worker n'a qu'un moteur : deux synthèses en même temps se
+    // marcheraient dessus sur le [_pending] partagé. On les met à la queue leu
+    // leu, sans en perdre.
+    final job = _synthQueue.then((_) => _synthesiseOne(text, sid, speed));
+    _synthQueue = job.then((_) {}, onError: (_) {});
+    return job;
+  }
+
+  Future<String?> _synthesiseOne(String text, int sid, double speed) async {
+    {
       final c = Completer<List<dynamic>>();
       _pending = c;
       _toWorker!.send(['speak', text, sid, speed]);
       final res = await c.future;
-      if (res.isEmpty || res[0] != 'audio') return;
+      if (res.isEmpty || res[0] != 'audio') return null;
       final wav = res[1] as Uint8List;
-      if (wav.isEmpty) return;
+      if (wav.isEmpty) return null;
 
       final tmp = await getTemporaryDirectory();
-      // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
-      // garde en cache ce qu'il a chargé PAR CHEMIN, et réécrire le fichier
-      // qu'il vient de lire lui fait rejouer l'ancien contenu — ou rien. Deux
-      // suffisent : on ne réécrit un nom qu'une fois l'autre passé dessus.
-      final wavFile = File('${tmp.path}/speech_out_${_slot = 1 - _slot}.wav');
+      // Un nom qui tourne sur quatre, jamais le même deux fois de suite : le
+      // lecteur garde en cache ce qu'il a chargé PAR CHEMIN, et réécrire le
+      // fichier qu'il vient de lire lui fait rejouer l'ancien contenu — ou
+      // rien. Quatre plutôt que deux depuis qu'une synthèse peut tourner
+      // pendant une lecture : à un instant donné, deux fichiers sont vivants.
+      _slot = (_slot + 1) % 4;
+      final wavFile = File('${tmp.path}/speech_out_$_slot.wav');
       await wavFile.writeAsBytes(wav);
-
-      await _player.stop();
-      await _player.play(DeviceFileSource(wavFile.path));
-    } finally {
-      _inferring = false;
+      return wavFile.path;
     }
+  }
+
+  /// Play a WAV already on disk. Returns when playback *starts*.
+  Future<void> playFile(String path) async {
+    await _player.stop();
+    await _player.play(DeviceFileSource(path));
   }
 
   /// Fires when the current utterance finishes playing — the in-call half-duplex
@@ -278,8 +303,19 @@ sherpa.OfflineTtsModelConfig _buildModelConfig(NeuralTtsModel m) {
       tokens: m.tokens,
       dataDir: m.dataDir,
     ),
-    numThreads: 2,
+    // Ce que la machine peut donner, moins un cœur laissé au reste — l'appel
+    // WebRTC, la reconnaissance et l'interface tournent en même temps. Plafonné
+    // à 4 : au-delà, la synthèse ne gagne plus grand-chose et commence à
+    // disputer ses cœurs à l'appel lui-même. 2 en dur laissait la moitié de
+    // l'appareil inutilisée pendant que la synthèse traînait.
+    numThreads: _inferenceThreads,
     debug: false,
     provider: 'cpu',
   );
+}
+
+/// Combien de cœurs la synthèse a le droit d'utiliser.
+int get _inferenceThreads {
+  final n = Platform.numberOfProcessors - 1;
+  return n < 2 ? 2 : (n > 4 ? 4 : n);
 }

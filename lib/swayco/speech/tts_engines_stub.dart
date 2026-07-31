@@ -33,6 +33,10 @@ class NeuralTtsEngine {
   Stream<void> get onPlaybackComplete => const Stream<void>.empty();
   Future<void> configure(NeuralTtsModel m) async {}
   Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {}
+  Future<String?> synthesiseToFile(String text,
+          {int sid = 0, double speed = 1.0}) async =>
+      null;
+  Future<void> playFile(String path) async {}
   Future<void> stop() async {}
   Future<void> dispose() async {}
 }
@@ -42,6 +46,10 @@ class JaTtsEngine {
   Stream<void> get onPlaybackComplete => const Stream<void>.empty();
   Future<void> configure(JaTtsModel m) async {}
   Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {}
+  Future<String?> synthesiseToFile(String text,
+          {int sid = 0, double speed = 1.0}) async =>
+      null;
+  Future<void> playFile(String path) async {}
   Future<void> stop() async {}
   Future<void> dispose() async {}
 }

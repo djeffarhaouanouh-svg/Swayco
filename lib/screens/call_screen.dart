@@ -605,47 +605,108 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  /// Combien de phrases sont en file, celle qu'on lit comprise. C'est la mesure
+  /// du RETARD : à 1 on est à jour, au-delà on a pris du retard sur la
+  /// conversation.
+  int _ttsPending = 0;
+
   /// Speak [text] after everything already queued. Never interrupts.
+  ///
+  /// Deux choses se décident ICI, avant même que la file y arrive.
+  ///
+  /// La VOIX : la voix premium est belle mais lente — mesurée en appel à ~3x
+  /// plus lent que l'audio qu'elle produit, soit une dizaine de secondes pour
+  /// une phrase. Tant qu'on est à jour, on la garde. Dès qu'une phrase attend
+  /// déjà, on bascule sur celle du système, qui démarre tout de suite et
+  /// rattrape le retard. Oui, ça change la voix du pair au milieu d'une rafale
+  /// — c'est un appel : une belle voix qui arrive vingt secondes trop tard ne
+  /// sert plus à rien.
+  ///
+  /// La SYNTHÈSE : elle démarre maintenant, pas quand la file arrivera à cette
+  /// phrase. Elle tourne donc pendant que la précédente se lit ET pendant
+  /// qu'on attend que le pair se taise — deux attentes qu'on ne payait
+  /// jusqu'ici qu'à la suite.
   Future<void> _enqueueSpeak(String text, String lang) {
     final generation = _ttsGeneration;
+    final behind = _ttsPending > 0;
+    _ttsPending++;
+    final premium = !behind && _premiumReadyFor(lang);
+    final Future<String?>? synth = premium
+        ? SpeechService.instance.synthesise(text: text, languageCode: lang)
+        : null;
+    if (behind) {
+      DebugOverlay.log('tts behind ($_ttsPending queued) — OS voice');
+    }
     _ttsQueue = _ttsQueue.then((_) async {
       if (!mounted || generation != _ttsGeneration) return;
       await _awaitPeerSilence();
       // Couper la traduction PENDANT l'attente doit la faire tomber : sans ce
       // second contrôle, elle se dirait quand même à la fin du silence.
       if (!mounted || generation != _ttsGeneration) return;
-      await _speakOne(text, lang);
+      if (synth != null) {
+        await _speakPremium(await _synthUnlessBehind(synth), text, lang);
+      } else {
+        await _speakOsVoice(text, lang);
+      }
     }).catchError((Object e) {
       DebugOverlay.log('tts queue error: $e');
+    }).whenComplete(() {
+      if (_ttsPending > 0) _ttsPending--;
     });
     return _ttsQueue;
+  }
+
+  /// Attendre la synthèse premium — mais y renoncer si la conversation a pris
+  /// de l'avance pendant qu'elle tournait.
+  ///
+  /// Sans ça, la bascule sur la voix du système ne servait à rien au début
+  /// d'une rafale : la première phrase, décidée « premium » alors qu'on était à
+  /// jour, bloquait toute la file pendant ses dix secondes de synthèse, et les
+  /// suivantes attendaient derrière elle même en voix système. On rend null,
+  /// l'appelant prend le relais, et la synthèse abandonnée finit dans le vide —
+  /// un fichier que personne ne lit.
+  Future<String?> _synthUnlessBehind(Future<String?> synth) async {
+    String? out;
+    var done = false;
+    unawaited(synth.then((p) {
+      out = p;
+      done = true;
+    }, onError: (_) => done = true));
+    while (!done) {
+      if (_ttsPending > 1) {
+        DebugOverlay.log('tts: $_ttsPending queued — abandoning premium synth');
+        return null;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return out;
   }
 
   /// Kill-switch for the premium on-device (gender-matched) voice. Left as a
   /// switch so a build can force the OS voice for a clean audio test.
   static const bool _kPremiumVoiceEnabled = true;
 
-  /// One utterance, start to finish. The timeout is the queue's safety net:
-  /// flutter_tts can return without ever playing (a missing voice, a browser that
-  /// suspended speechSynthesis), and then the completion event never comes — which
-  /// would wedge every translation behind it for the rest of the call.
-  Future<void> _speakOne(String text, String lang) async {
-    // Premium on-device voice, but ONLY for the one language whose bundle is
-    // already installed — the account language, downloaded at boot. A language
-    // picked mid-call is never loaded (a live call can't wait on a 110 MB
-    // download), so it falls straight through to the OS voice below. That is the
-    // whole "one downloadable language, everything else flutter_tts" rule.
-    // Match the voice to the SPEAKER (the peer): a woman's line comes out in a
-    // woman's voice. The gender rides on the peer's profile, already loaded for
-    // the call — no need to send it over the wire. A language with no gender
-    // pair, or an unknown gender, just uses whatever voice is loaded.
-    final peerGender = _peerProfile?.gender ?? '';
-    if (_kPremiumVoiceEnabled &&
-        !kIsWeb &&
-        SpeechService.instance.isLoadedFor(lang, gender: peerGender)) {
-      await _speakPremium(text, lang);
-      return;
-    }
+  /// Premium on-device voice, but ONLY for the one language whose bundle is
+  /// already installed — the account language, downloaded at boot. A language
+  /// picked mid-call is never loaded (a live call can't wait on a 110 MB
+  /// download), so it falls straight through to the OS voice. That is the whole
+  /// "one downloadable language, everything else flutter_tts" rule.
+  ///
+  /// Match the voice to the SPEAKER (the peer): a woman's line comes out in a
+  /// woman's voice. The gender rides on the peer's profile, already loaded for
+  /// the call — no need to send it over the wire. A language with no gender
+  /// pair, or an unknown gender, just uses whatever voice is loaded.
+  bool _premiumReadyFor(String lang) =>
+      _kPremiumVoiceEnabled &&
+      !kIsWeb &&
+      SpeechService.instance
+          .isLoadedFor(lang, gender: _peerProfile?.gender ?? '');
+
+  /// The OS voice. The timeout is the queue's safety net: flutter_tts can return
+  /// without ever playing (a missing voice, a browser that suspended
+  /// speechSynthesis), and then the completion event never comes — which would
+  /// wedge every translation behind it for the rest of the call.
+  Future<void> _speakOsVoice(String text, String lang) async {
     final tag = _voiceTagFor(lang);
     DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
     markTranslationPlaying(textLength: text.length);
@@ -669,25 +730,33 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Speak with the installed premium on-device voice.
+  /// Play the WAV the premium voice already synthesised, and hold the queue
+  /// until it has finished being heard.
   ///
-  /// [speak] returns at playback *START*, not at its end — so this awaits the
-  /// completion event too, and only then hands the queue back. Without that,
-  /// the queue moved on the instant playback began and the next utterance
-  /// called `stop()` on the player: each line cut the one before it a second
-  /// or two in, and in a burst of three only the last was heard whole.
+  /// The synthesis happened at enqueue time — that is the whole point, it is
+  /// the slow half. [wavPath] is null when it produced nothing (no engine, an
+  /// error): we fall back to the OS voice rather than skip the sentence.
   ///
-  /// The wait is CAPPED, and that matters as much as the wait itself. [speak]
-  /// swallows its own errors — a missing model, a dropped overlapping call —
-  /// and then returns without playing anything, so the completion event never
-  /// comes. Waiting on it alone would wedge every remaining translation of the
-  /// call behind one silent utterance. Subscribe before speaking: a short clip
+  /// Ducking starts HERE, not before, because here is where sound starts. It
+  /// used to be armed before synthesising, which on this model cut the peer's
+  /// real voice for ten seconds with nothing coming out of the speaker.
+  ///
+  /// The wait for the end is CAPPED, and that matters as much as the wait: a
+  /// playback that never announces its end would wedge every remaining
+  /// translation of the call behind it. Subscribe before playing — a short clip
   /// can finish before the await returns.
-  Future<void> _speakPremium(String text, String lang) async {
+  Future<void> _speakPremium(String? wavPath, String text, String lang) async {
+    if (wavPath == null) {
+      DebugOverlay.log('premium synthesis empty — OS voice');
+      await _speakOsVoice(text, lang);
+      return;
+    }
     final speech = SpeechService.instance;
     DebugOverlay.log('speak lang=$lang (premium voice) text="$text"');
     try {
       final done = speech.onPlaybackComplete.first;
+      await speech.playFile(wavPath);
+      DebugOverlay.log('speak started (premium)');
       markTranslationPlaying(textLength: text.length);
       ttsSpeaking.value = true;
       unawaited(done
@@ -695,8 +764,6 @@ class _CallScreenState extends State<CallScreen> {
           .then((_) => markTranslationDone())
           .catchError((_) {/* the gate's safety timer reopens the mic */})
           .whenComplete(() => ttsSpeaking.value = false));
-      await speech.speak(text: text, languageCode: lang);
-      DebugOverlay.log('speak started (premium)');
       await done.timeout(const Duration(seconds: 15));
       DebugOverlay.log('speak done (premium)');
     } on TimeoutException {

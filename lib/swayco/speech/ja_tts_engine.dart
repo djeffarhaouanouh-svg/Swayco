@@ -66,10 +66,11 @@ class JaTtsEngine {
 
   final AudioPlayer _player = AudioPlayer();
   bool _configured = false;
-  bool _inferring = false;
-
-  /// Le nom de fichier courant, alterné à chaque phrase (voir [speak]).
+  /// Le nom de fichier courant, tourné à chaque phrase.
   int _slot = 0;
+
+  /// Les synthèses se suivent une par une : le worker n'a qu'un moteur.
+  Future<void> _synthQueue = Future<void>.value();
 
   Future<void> _ensureSpawned() async {
     if (_isolate != null) return;
@@ -108,35 +109,53 @@ class JaTtsEngine {
 
   bool get isReady => _configured;
 
+  /// Synthétise et lit. Gardé d'un bloc pour les appelants qui veulent juste
+  /// une voix ; en appel, les deux moitiés sont pilotées séparément.
   Future<void> speak(String text, {int sid = 0, double speed = 1.0}) async {
+    final path = await synthesiseToFile(text, sid: sid, speed: speed);
+    if (path == null) return;
+    await playFile(path);
+  }
+
+  /// Synthétise vers un WAV sur disque et rend son chemin — rien n'est lu. Les
+  /// appels se mettent à la queue leu leu au lieu d'être abandonnés : le worker
+  /// n'a qu'un moteur, mais une phrase perdue en silence est pire qu'une
+  /// phrase qui attend son tour.
+  Future<String?> synthesiseToFile(
+    String text, {
+    int sid = 0,
+    double speed = 1.0,
+  }) {
     if (!_configured) throw StateError('ja TTS not configured');
-    if (_inferring) {
-      debugPrint('[tts-ja] DROPPED (busy): "$text"');
-      return;
-    }
-    if (text.trim().isEmpty) return;
-    _inferring = true;
-    try {
-      final c = Completer<List<dynamic>>();
-      _pending = c;
-      _toWorker!.send(['speak', text, sid, speed]);
-      final res = await c.future;
-      if (res.isEmpty || res[0] != 'audio') return;
-      final wav = res[1] as Uint8List;
-      if (wav.isEmpty) return;
+    if (text.trim().isEmpty) return Future<String?>.value();
+    final job = _synthQueue.then((_) => _synthesiseOne(text, sid, speed));
+    _synthQueue = job.then((_) {}, onError: (_) {});
+    return job;
+  }
 
-      final tmp = await getTemporaryDirectory();
-      await tmp.create(recursive: true);
-      // Deux noms en alternance, jamais le même deux fois de suite : le lecteur
-      // garde en cache ce qu'il a chargé PAR CHEMIN.
-      final wavFile = File('${tmp.path}/ja_speech_out_${_slot = 1 - _slot}.wav');
-      await wavFile.writeAsBytes(wav);
+  Future<String?> _synthesiseOne(String text, int sid, double speed) async {
+    final c = Completer<List<dynamic>>();
+    _pending = c;
+    _toWorker!.send(['speak', text, sid, speed]);
+    final res = await c.future;
+    if (res.isEmpty || res[0] != 'audio') return null;
+    final wav = res[1] as Uint8List;
+    if (wav.isEmpty) return null;
 
-      await _player.stop();
-      await _player.play(DeviceFileSource(wavFile.path));
-    } finally {
-      _inferring = false;
-    }
+    final tmp = await getTemporaryDirectory();
+    await tmp.create(recursive: true);
+    // Un nom qui tourne sur quatre, jamais le même deux fois de suite : le
+    // lecteur garde en cache ce qu'il a chargé PAR CHEMIN.
+    _slot = (_slot + 1) % 4;
+    final wavFile = File('${tmp.path}/ja_speech_out_$_slot.wav');
+    await wavFile.writeAsBytes(wav);
+    return wavFile.path;
+  }
+
+  /// Lit un WAV déjà sur disque. Rend la main au DÉMARRAGE de la lecture.
+  Future<void> playFile(String path) async {
+    await _player.stop();
+    await _player.play(DeviceFileSource(path));
   }
 
   Stream<void> get onPlaybackComplete => _player.onPlayerComplete;
@@ -231,7 +250,9 @@ void _jaTtsWorkerMain(SendPort toMain) {
                   noiseScaleW: 0.8,
                   lengthScale: 1.0,
                 ),
-                numThreads: 2,
+                // Ce que la machine peut donner, moins un cœur laissé au
+                // reste (appel WebRTC, reconnaissance, interface).
+                numThreads: _inferenceThreads,
                 debug: false,
                 provider: 'cpu',
               ),
@@ -288,4 +309,10 @@ void _jaTtsWorkerMain(SendPort toMain) {
         break;
     }
   });
+}
+
+/// Combien de cœurs la synthèse a le droit d'utiliser.
+int get _inferenceThreads {
+  final n = Platform.numberOfProcessors - 1;
+  return n < 2 ? 2 : (n > 4 ? 4 : n);
 }

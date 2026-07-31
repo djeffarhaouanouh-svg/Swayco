@@ -235,6 +235,48 @@ class SpeechService {
     }
   }
 
+  /// Synthesise [text] to a WAV on disk and return its path — nothing plays.
+  /// Null when no engine is ready or there was nothing to say.
+  ///
+  /// Split out from [speak] so a call can synthesise the NEXT sentence while
+  /// the current one is still being heard. On this hardware synthesis is the
+  /// slow half by a wide margin, so overlapping it with playback — and with
+  /// the wait for the peer to stop talking — is most of what there is to win.
+  Future<String?> synthesise({
+    required String text,
+    required String languageCode,
+  }) async {
+    if (kIsWeb || !isReady) return null;
+    if (text.trim().isEmpty) return null;
+    final spec = _loadedSpec;
+    if (spec == null) return null;
+    try {
+      return _useJa
+          ? await _jaEngine.synthesiseToFile(text,
+              sid: spec.sid, speed: spec.speed)
+          : await _engine.synthesiseToFile(text,
+              sid: spec.sid, speed: spec.speed);
+    } catch (e) {
+      debugPrint('[speech] synthesise error: $e');
+      return null;
+    }
+  }
+
+  /// Play a WAV [synthesise] produced. Returns at playback *start*; the end is
+  /// announced on [onPlaybackComplete].
+  Future<void> playFile(String path) async {
+    if (kIsWeb) return;
+    try {
+      if (_useJa) {
+        await _jaEngine.playFile(path);
+      } else {
+        await _engine.playFile(path);
+      }
+    } catch (e) {
+      debugPrint('[speech] playFile error: $e');
+    }
+  }
+
   /// Fires when a [speak] utterance finishes playing. [speak] returns at
   /// playback *start*, so this is the only signal for "the speaker is quiet".
   /// Wiring happens here, on first subscription, so the stream is live even when
