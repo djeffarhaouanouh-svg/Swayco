@@ -4600,37 +4600,64 @@ class _OrbPainter extends CustomPainter {
         ]),
     );
 
-    // 5. Les deux lueurs internes : un liseré blanc en haut, un bleu qui remonte
-    //    du bas. Ce sont les ombres portées intérieures de la maquette, qu'un
-    //    dégradé ne rend pas — on les pose en disques flous, rognés à la bille.
+    // 5. Les deux ombres portées INTÉRIEURES de la maquette :
+    //
+    //      inset 0   2px 22px rgba(255,255,255,0.55)
+    //      inset 0 -14px 32px rgba(122,162,255,0.35)
+    //
+    //    Une ombre intérieure suit le BORD de la forme, décalé et flouté — pas
+    //    un disque posé au milieu. Je les avais faites en gros disques flous
+    //    décalés vers le haut et vers le bas : ça donnait une tache dont la
+    //    courbure se lisait comme un cercle en travers de la bille, au lieu
+    //    d'une lumière accrochée au pourtour.
+    //
+    //    Un trait épais et flou le long du bord, décalé du même offset, rend
+    //    ce que fait le navigateur : le rognage à la bille supprime la moitié
+    //    extérieure du trait, il ne reste que la lueur intérieure, plus forte
+    //    du côté d'où vient le décalage.
     canvas.save();
     canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: gr)));
     canvas.drawCircle(
-      c.translate(0, -gr * 0.62),
-      gr * 0.7,
+      c.translate(0, 2 * k),
+      gr,
       Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 22 * k
         ..color = Colors.white.withValues(alpha: 0.55)
-        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 22 * k),
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 11 * k),
     );
     canvas.drawCircle(
-      c.translate(0, gr * 0.78),
-      gr * 0.75,
+      c.translate(0, -14 * k),
+      gr,
       Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 32 * k
         ..color = _blue.withValues(alpha: 0.35)
-        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 32 * k),
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 16 * k),
     );
     canvas.restore();
 
-    // 6. Le reflet qui tourne : un arc clair sur le pourtour de la bille. La
-    //    maquette le découpe au masque ; un trait épais sur un cercle donne le
-    //    même anneau pour un appel de dessin au lieu d'une passe de masque.
+    // 6. Le reflet qui tourne : un arc clair sur le pourtour de la bille.
+    //
+    //    Son bord INTÉRIEUR est fondu, pas coupé. La maquette le masque par un
+    //    dégradé qui passe de transparent à opaque entre 68 % et 72 % du rayon
+    //    — quatre pour cent de transition. Un trait net à la place dessinait un
+    //    cercle blanc parfaitement lisible à l'intérieur de la bille, là où il
+    //    ne devrait y avoir qu'une lumière qui s'éteint.
+    //
+    //    Le flou adoucit les deux bords ; le rognage à la bille rend au bord
+    //    extérieur la netteté qu'il doit garder — il se confond avec le bord du
+    //    verre, donc il ne se lit pas comme un trait.
     final ringR = gr * 0.85;
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: gr)));
     canvas.drawCircle(
       c,
       ringR,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = gr * 0.30
+        ..strokeWidth = gr * 0.34
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, gr * 0.09)
         ..shader = SweepGradient(
           colors: [
             Colors.white.withValues(alpha: 0),
@@ -4643,6 +4670,7 @@ class _OrbPainter extends CustomPainter {
           ),
         ).createShader(Rect.fromCircle(center: c, radius: ringR)),
     );
+    canvas.restore();
 
     // 7. Les quatre barres. Chacune part avec un retard propre — c'est ce
     //    décalage qui fait une vague plutôt qu'un clignotement à l'unisson.
