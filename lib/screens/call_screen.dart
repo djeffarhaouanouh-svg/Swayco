@@ -3837,20 +3837,26 @@ class _AuraPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // L'intensité joue sur les deux : ce qui brûle fort s'étale aussi plus
     // loin. Une lueur plus opaque mais aussi serrée ne ferait qu'un trait.
-    final blur = (18 + 34 * glow) * intensity;
+    final blur = (24 + 46 * glow) * intensity;
     final path = _TopHugClipper(radius).getClip(size);
     canvas.save();
     // La bande où la lueur a le droit d'exister : toute la largeur, des deux
     // bords de l'écran compris, et assez haut pour que le halo large ait la
     // place de monter. En dessous du bord haut du panneau, rien.
     canvas.clipRect(
-      Rect.fromLTRB(-blur, -blur * 3, size.width + blur, radius),
+      Rect.fromLTRB(-blur, -blur * 5, size.width + blur, radius),
     );
-    // Deux passes : un halo large et diffus qui monte loin, puis un liseré
-    // serré et franc juste au-dessus du bord. Une seule passe donne soit un
-    // trait dur, soit un brouillard — jamais les deux.
-    _stroke(canvas, path, size, alpha: 0.45, blur: blur * 2);
-    _stroke(canvas, path, size, alpha: 0.95, blur: blur * 0.45);
+    // TROIS passes, et c'est ce qui fait « LED » plutôt que « trait coloré ».
+    // Une vraie diode ne se voit pas comme une couleur uniforme : elle a un
+    // cœur si intense qu'il vire au blanc, et autour un halo large et saturé
+    // qui, lui, garde la teinte. Les deux ensemble donnent la brûlure ; l'un
+    // sans l'autre donne soit un trait dur, soit du brouillard.
+    //
+    // De la plus large à la plus serrée — l'ordre compte, chaque passe se pose
+    // sur la précédente et c'est le cœur qui doit rester au-dessus.
+    _stroke(canvas, path, size, alpha: 0.40, blur: blur * 2.6);
+    _stroke(canvas, path, size, alpha: 0.85, blur: blur * 0.9);
+    _stroke(canvas, path, size, alpha: 1.00, blur: blur * 0.22, whiten: 0.55);
     canvas.restore();
   }
 
@@ -3860,9 +3866,18 @@ class _AuraPainter extends CustomPainter {
     Size size, {
     required double alpha,
     required double blur,
+    double whiten = 0,
   }) {
     final a = (alpha * glow * intensity).clamp(0.0, 1.0);
-    final tints = [for (final c in colors) c.withValues(alpha: a)];
+    final tints = [
+      for (final c in colors)
+        // Le cœur tire vers le blanc sans PERDRE sa teinte : à 0.55 il reste
+        // reconnaissablement rouge ou cyan, il est juste porté au-delà de ce
+        // que la couleur seule peut rendre. À 1 on n'aurait qu'un trait blanc,
+        // et la couleur choisie ne servirait plus à rien.
+        (whiten > 0 ? Color.lerp(c, Colors.white, whiten)! : c)
+            .withValues(alpha: a),
+    ];
     final paint = Paint()
       ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur);
     final t = travel;
