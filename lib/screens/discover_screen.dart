@@ -741,7 +741,14 @@ class _TopTabBar extends StatelessWidget {
                                 color: Colors.white54,
                                 fontSize: 15,
                               ),
+                              // The pill already draws the surface. Without
+                              // these the theme paints its navy fill and cyan
+                              // focus ring INSIDE the pill — a square box on
+                              // top of a rounded one.
+                              filled: false,
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(
                                 vertical: 8,
                               ),
