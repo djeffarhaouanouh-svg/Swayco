@@ -2795,6 +2795,19 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
+                // Le galet, au milieu de l'écran. Posé sur la vidéo, au-dessus
+                // de la couche qui rallume le panneau — sinon un tap dessus se
+                // contenterait de réveiller la barre au lieu de couper la
+                // traduction.
+                Center(
+                  child: _TranslationOrb(
+                    on: _translationEnabled,
+                    ttsSpeaking: ttsSpeaking,
+                    voiceLevel: _voiceLevel,
+                    onTap: _toggleTranslation,
+                    onLongPress: _openCallSettingsSheet,
+                  ),
+                ),
                 // Le panneau : le bas de la page. Il tient toute la largeur et
                 // descend jusqu'au bord de l'écran, arrondi seulement en haut,
                 // là où la vidéo s'arrête. Ce qui se déplie — conversation et
@@ -2958,7 +2971,6 @@ class _CallScreenState extends State<CallScreen> {
                                       : AppStrings.currentBcp47.value,
                                 )?.countryCode ??
                                 '',
-                            translationOn: _translationEnabled,
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
                             controlsOpen: _controlsOpen,
@@ -2972,8 +2984,6 @@ class _CallScreenState extends State<CallScreen> {
                               _wakeDock();
                               _openLanguagePairSheet();
                             },
-                            onToggleTranslation: _toggleTranslation,
-                            onOrbLongPress: _openCallSettingsSheet,
                             onHangUp: _hangUp,
                             onToggleControls: () {
                               _wakeDock();
@@ -3364,9 +3374,10 @@ class _LanguageButton extends StatelessWidget {
 
 /// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
 /// quatre touches à égale distance — la conversation (un tap déplie ce qui se
-/// dit), la pastille de traduction, le chevron qui déplie les réglages
-/// au-dessus, et raccrocher tout au bout. Elle ne bouge plus jamais : ni
-/// glissement, ni touche qui s'efface au passage d'une phrase.
+/// dit), les langues, le chevron qui déplie les réglages au-dessus, et
+/// raccrocher tout au bout. La traduction, elle, a quitté la barre : c'est le
+/// galet au milieu de l'écran. Elle ne bouge plus jamais : ni glissement, ni
+/// touche qui s'efface au passage d'une phrase.
 class _CallDock extends StatelessWidget {
   const _CallDock({
     required this.hasTurns,
@@ -3375,7 +3386,6 @@ class _CallDock extends StatelessWidget {
     required this.glowRightward,
     required this.glowIntensity,
     required this.flagCountry,
-    required this.translationOn,
     required this.ttsSpeaking,
     required this.voiceLevel,
     required this.controlsOpen,
@@ -3383,8 +3393,6 @@ class _CallDock extends StatelessWidget {
     required this.onWake,
     required this.onToggleTurns,
     required this.onToggleLanguage,
-    required this.onToggleTranslation,
-    required this.onOrbLongPress,
     required this.onHangUp,
     required this.onToggleControls,
   });
@@ -3400,7 +3408,6 @@ class _CallDock extends StatelessWidget {
   /// Code ISO pays du drapeau de la langue que j'entends. Vide = rien de choisi
   /// encore : la touche montre alors l'icône de traduction.
   final String flagCountry;
-  final bool translationOn;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
   final bool controlsOpen;
@@ -3412,8 +3419,6 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onWake;
   final VoidCallback onToggleTurns;
   final VoidCallback onToggleLanguage;
-  final VoidCallback onToggleTranslation;
-  final VoidCallback onOrbLongPress;
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
@@ -3539,18 +3544,9 @@ class _CallDock extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // La pastille ne s'estompe jamais : c'est elle qui
-                        // reste quand tout le reste s'efface. En veille, la
-                        // toucher rallume la barre au lieu de couper la
-                        // traduction — on ne coupe pas la traduction sans
-                        // l'avoir vue.
-                        _TranslationOrb(
-                          on: translationOn,
-                          ttsSpeaking: ttsSpeaking,
-                          voiceLevel: voiceLevel,
-                          onTap: dimmed ? onWake : onToggleTranslation,
-                          onLongPress: onOrbLongPress,
-                        ),
+                        // Le galet n'est plus dans la barre : il a sa place au
+                        // milieu de l'écran, où il est assez grand pour se
+                        // regarder. La barre garde ses quatre touches.
                         Opacity(
                           opacity: live,
                           child: IgnorePointer(
@@ -4314,12 +4310,18 @@ class _DockKeyButton extends StatelessWidget {
   }
 }
 
-/// La pastille de traduction, au centre du dock : un galet blanc irisé traversé
-/// de trois barres. Elles frémissent quand quelqu'un parle et s'agitent
-/// franchement quand la traduction est en train d'être dite — c'est le seul
-/// endroit de l'écran qui montre que la machine travaille.
+/// Le galet de traduction : la pièce vivante de l'écran d'appel.
 ///
-/// Un tap coupe la traduction : la pastille vire alors au blanc pur et se fige.
+/// Peint d'un seul bloc, du fond vers l'avant : deux ondes qui s'échappent, un
+/// halo qui respire, l'anneau irisé qui tourne, la bille de verre et son
+/// reflet, puis les quatre barres. Tout est dessiné dans UN painter — empiler
+/// autant de widgets flous, un par couche, coûterait une passe de composition
+/// chacune, sur un écran qui fait déjà tourner une visio.
+///
+/// Coupée, la traduction le montre par une pierre éteinte : verre dépoli, bord
+/// pointillé, un simple triangle de lecture. Rien ne bouge, et les tickers sont
+/// arrêtés — pas d'animation qui brûle la batterie pour dire « je ne fais
+/// rien ».
 class _TranslationOrb extends StatefulWidget {
   const _TranslationOrb({
     required this.on,
@@ -4329,7 +4331,7 @@ class _TranslationOrb extends StatefulWidget {
     required this.onLongPress,
   });
 
-  /// La traduction tourne. False = coupée : galet blanc, barres immobiles.
+  /// La traduction tourne. False = coupée : pierre endormie.
   final bool on;
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -4338,34 +4340,62 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// Le plus gros élément du dock : c'est lui qu'on vise sans regarder.
-  static const double size = 50;
+  /// La taille de référence. Toutes les cotes du dessin sont données pour
+  /// celle-ci puis mises à l'échelle, donc changer ce seul nombre redimensionne
+  /// l'ensemble sans rien déformer.
+  static const double size = 130;
+
+  /// La pierre endormie est plus petite que le galet vivant : couper la
+  /// traduction se voit à sa taille avant même qu'on lise l'icône.
+  static const double dormantSize = 104;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
 }
 
 class _TranslationOrbState extends State<_TranslationOrb>
-    with SingleTickerProviderStateMixin {
-  /// Le battement des barres. Tourne en boucle tant qu'il y a quelque chose à
-  /// montrer, et s'arrête net au repos — pas de ticker qui brûle la batterie
-  /// pendant qu'on écoute en silence.
-  late final AnimationController _phase = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
+    with TickerProviderStateMixin {
+  /// Six mouvements, six périodes sans rapport entre elles (9 s, 5 s, 6,5 s,
+  /// 3,8 s, 3,4 s, 1 s). Les faire dériver d'une seule horloge demanderait une
+  /// période commune énorme, avec un saut visible à chaque bouclage ; six
+  /// contrôleurs sur le même vsync coûtent moins que ce saut.
+  late final AnimationController _spin = _ctrl(9000);
+  late final AnimationController _spec = _ctrl(5000);
+  late final AnimationController _ripple = _ctrl(3400);
+  late final AnimationController _bars = _ctrl(1000);
+  late final AnimationController _float = _ctrl(6500);
+  late final AnimationController _breathe = _ctrl(3800);
 
-  /// Amplitude affichée, lissée vers [_target] frame par frame : une voix qui
-  /// s'arrête fait retomber les barres, elle ne les coupe pas.
-  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
-  double _target = 0;
+  /// Ces deux-là font l'aller-retour ; les autres tournent en boucle.
+  late final List<AnimationController> _swinging = [_float, _breathe];
+  late final List<AnimationController> _all = [
+    _spin,
+    _spec,
+    _ripple,
+    _bars,
+    _float,
+    _breathe,
+  ];
+
+  AnimationController _ctrl(int ms) =>
+      AnimationController(vsync: this, duration: Duration(milliseconds: ms));
+
+  /// L'amplitude des barres, lissée. Une voix qui s'arrête les fait retomber,
+  /// elle ne les coupe pas.
+  final ValueNotifier<double> _amp = ValueNotifier<double>(_idleAmp);
+  double _target = _idleAmp;
+
+  /// Le plancher : même dans le silence le galet vit un peu, sinon il a l'air
+  /// en panne. La parole le fait monter, elle ne le fait pas exister.
+  static const double _idleAmp = 0.3;
 
   @override
   void initState() {
     super.initState();
     widget.ttsSpeaking.addListener(_retarget);
     widget.voiceLevel.addListener(_retarget);
-    _phase.addListener(_tick);
+    _bars.addListener(_tick);
+    _syncRunning();
     _retarget();
   }
 
@@ -4380,34 +4410,43 @@ class _TranslationOrbState extends State<_TranslationOrb>
       old.voiceLevel.removeListener(_retarget);
       widget.voiceLevel.addListener(_retarget);
     }
-    if (old.on != widget.on) _retarget();
+    if (old.on != widget.on) _syncRunning();
   }
 
-  /// Un seul régime : dès que ça parle — une voix humaine comme la traduction
-  /// dite par la machine —, les barres partent à fond. La pastille dit «il y a
-  /// du son», pas «qui parle».
+  /// Endormie, la pierre ne bouge pas : on arrête les six tickers plutôt que de
+  /// repeindre soixante fois par seconde une image identique.
+  void _syncRunning() {
+    for (final c in _all) {
+      if (!widget.on) {
+        c.stop();
+      } else if (!c.isAnimating) {
+        if (_swinging.contains(c)) {
+          c.repeat(reverse: true);
+        } else {
+          c.repeat();
+        }
+      }
+    }
+  }
+
   void _retarget() {
     final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
-    _target = (widget.on && talking) ? 1.0 : 0.0;
-    if (_target > 0 && !_phase.isAnimating) _phase.repeat();
+    _target = talking ? 1.0 : _idleAmp;
   }
 
   void _tick() {
-    final next = _amp.value + (_target - _amp.value) * 0.14;
-    if (_target == 0 && next < 0.01) {
-      _amp.value = 0;
-      _phase.stop();
-      return;
-    }
-    _amp.value = next;
+    final next = _amp.value + (_target - _amp.value) * 0.12;
+    if ((next - _amp.value).abs() > 0.001) _amp.value = next;
   }
 
   @override
   void dispose() {
     widget.ttsSpeaking.removeListener(_retarget);
     widget.voiceLevel.removeListener(_retarget);
-    _phase.removeListener(_tick);
-    _phase.dispose();
+    _bars.removeListener(_tick);
+    for (final c in _all) {
+      c.dispose();
+    }
     _amp.dispose();
     super.dispose();
   }
@@ -4419,25 +4458,58 @@ class _TranslationOrbState extends State<_TranslationOrb>
         widget.on ? 'call_translation_cut' : 'call_translation_resume',
       ),
       button: true,
+      toggled: widget.on,
       child: Pressable(
         bounce: true,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        child: Container(
+        child: SizedBox(
           width: _TranslationOrb.size,
           height: _TranslationOrb.size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.28),
-                blurRadius: 14,
-                spreadRadius: 1,
+          child: widget.on ? _live() : _dormant(),
+        ),
+      ),
+    );
+  }
+
+  Widget _live() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([..._all, _amp]),
+      builder: (context, _) => CustomPaint(
+        painter: _OrbPainter(
+          spin: _spin.value,
+          spec: _spec.value,
+          ripple: _ripple.value,
+          bars: _bars.value,
+          float: _float.value,
+          breathe: _breathe.value,
+          amp: _amp.value,
+        ),
+      ),
+    );
+  }
+
+  /// La pierre endormie : du verre dépoli, un bord pointillé, un triangle de
+  /// lecture. Le flou vient d'un [BackdropFilter] et pas du painter — un
+  /// painter ne peut pas flouter ce qu'il y a DERRIÈRE lui.
+  Widget _dormant() {
+    return Center(
+      child: SizedBox(
+        width: _TranslationOrb.dormantSize,
+        height: _TranslationOrb.dormantSize,
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: CustomPaint(
+              painter: const _DormantOrbPainter(),
+              child: Center(
+                child: Icon(
+                  Icons.play_arrow_rounded,
+                  size: 30,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
               ),
-            ],
-          ),
-          child: CustomPaint(
-            painter: _OrbPainter(phase: _phase, amp: _amp, on: widget.on),
+            ),
           ),
         ),
       ),
@@ -4445,94 +4517,254 @@ class _TranslationOrbState extends State<_TranslationOrb>
   }
 }
 
-class _OrbPainter extends CustomPainter {
-  _OrbPainter({required this.phase, required this.amp, required this.on})
-      : super(repaint: Listenable.merge([phase, amp]));
-
-  final Animation<double> phase;
-  final ValueListenable<double> amp;
-  final bool on;
+/// Le bord pointillé de la pierre endormie. Flutter n'a pas de style pointillé
+/// sur un cercle : on pose les tirets à la main.
+class _DormantOrbPainter extends CustomPainter {
+  const _DormantOrbPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final a = amp.value;
     final r = size.width / 2;
     final c = Offset(r, r);
-    final rect = Rect.fromCircle(center: c, radius: r);
-
-    // Coupée, la pastille perd ses reflets et devient blanc pur — on voit d'un
-    // coup d'œil qu'elle ne traduit plus.
-    final tint = on ? 1.0 : 0.0;
-
     canvas.drawCircle(
       c,
       r,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.35, -0.45),
-          colors: [
-            Colors.white,
-            Color.lerp(Colors.white, SC.accent, 0.20 * tint)!,
-            Color.lerp(Colors.white, SC.meshViolet, 0.28 * tint)!,
-          ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(rect),
+      Paint()..color = Colors.white.withValues(alpha: 0.10),
     );
-
-    // Le liseré irisé.
-    canvas.drawCircle(
-      c,
-      r - 0.7,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..shader = SweepGradient(
-          colors: [
-            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
-            Color.lerp(Colors.white, SC.meshViolet, 0.55 * tint)!,
-            Color.lerp(Colors.white, SC.meshBlue, 0.45 * tint)!,
-            Color.lerp(Colors.white, SC.accent, 0.55 * tint)!,
-          ],
-        ).createShader(rect),
-    );
-
-    // Les trois barres.
-    final barW = size.width * 0.105;
-    final gap = size.width * 0.095;
-    final baseH = size.height * 0.20;
-    final range = size.height * 0.30;
-    final p = phase.value * 2 * math.pi;
-    final bars = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color.lerp(SC.accentDeep, Colors.white, on ? 0.0 : 0.55)!,
-          Color.lerp(SC.meshViolet, Colors.white, on ? 0.0 : 0.55)!,
-        ],
-      ).createShader(rect);
-
-    for (var i = -1; i <= 1; i++) {
-      final wobble = 0.5 + 0.5 * math.sin(p + i * 1.1);
-      final h = baseH +
-          (i == 0 ? size.height * 0.05 : 0) +
-          range * a * wobble;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(c.dx + i * (barW + gap), c.dy),
-            width: barW,
-            height: h,
-          ),
-          Radius.circular(barW / 2),
-        ),
-        bars,
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: 0.34);
+    // Des tirets d'environ 6 px séparés de 5 : assez serrés pour lire un
+    // cercle, assez espacés pour lire « en pause ».
+    const dash = 6.0, gap = 5.0;
+    final circumference = 2 * math.pi * (r - 0.5);
+    final count = (circumference / (dash + gap)).floor();
+    if (count <= 0) return;
+    final step = 2 * math.pi / count;
+    final arc = step * dash / (dash + gap);
+    for (var i = 0; i < count; i++) {
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: r - 0.5),
+        i * step,
+        arc,
+        false,
+        stroke,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_OrbPainter old) => old.on != on;
+  bool shouldRepaint(_DormantOrbPainter old) => false;
+}
+
+/// Le galet vivant, peint du fond vers l'avant.
+class _OrbPainter extends CustomPainter {
+  const _OrbPainter({
+    required this.spin,
+    required this.spec,
+    required this.ripple,
+    required this.bars,
+    required this.float,
+    required this.breathe,
+    required this.amp,
+  });
+
+  /// Chacune de 0 à 1 : la phase de son propre mouvement.
+  final double spin;
+  final double spec;
+  final double ripple;
+  final double bars;
+  final double float;
+  final double breathe;
+
+  /// L'amplitude courante des barres (0,3 au repos, 1 quand ça parle).
+  final double amp;
+
+  /// Les six teintes de l'anneau. La dernière reprend la première : c'est ce
+  /// qui permet à la roue de boucler sans couture.
+  static const List<Color> _ring = [
+    Color(0xFF5FE3D0),
+    Color(0xFF7AA2FF),
+    Color(0xFFC9B7FF),
+    Color(0xFFFF9EC4),
+    Color(0xFFFFD479),
+    Color(0xFF5FE3D0),
+  ];
+
+  static const Color _violet = Color(0xFFC9B7FF);
+  static const Color _teal = Color(0xFF5FE3D0);
+  static const Color _blue = Color(0xFF7AA2FF);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Toutes les cotes ci-dessous sont données pour un galet de 130 ; k les
+    // reporte à la taille réelle.
+    final k = size.width / _TranslationOrb.size;
+    final r = size.width / 2;
+
+    // Le flottement : tout le galet monte de 13 px et redescend. Le contrôleur
+    // fait déjà l'aller-retour, on n'a qu'à suivre sa valeur.
+    final c = Offset(r, r - 13 * k * float);
+
+    // 1. Les deux ondes. La seconde est décalée d'une demi-période — d'où le
+    //    modulo : une seule horloge sert aux deux.
+    _wave(canvas, c, r, ripple, _violet, 0.5);
+    _wave(canvas, c, r, (ripple + 0.5) % 1.0, _teal, 0.45);
+
+    // 2. Le halo qui respire, débordant de 18 px.
+    final grow = 0.97 + 0.06 * breathe;
+    final haloR = (r + 18 * k) * grow;
+    final haloFade = 0.5 + 0.5 * breathe;
+    canvas.drawCircle(
+      c,
+      haloR,
+      Paint()
+        ..shader = ui.Gradient.radial(c, haloR, [
+          _violet.withValues(alpha: 0.42 * haloFade),
+          _teal.withValues(alpha: 0.16 * haloFade),
+          _teal.withValues(alpha: 0.0),
+        ], [
+          0.0,
+          0.56,
+          0.74,
+        ])
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 11 * k),
+    );
+
+    // 3. L'anneau irisé qui tourne, flouté : c'est lui qui donne la couleur.
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = SweepGradient(
+          colors: _ring,
+          transform: GradientRotation(spin * 2 * math.pi),
+        ).createShader(Rect.fromCircle(center: c, radius: r))
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 9 * k),
+    );
+
+    // 4. La bille de verre, rentrée de 9 px. Sa lumière vient d'en haut à
+    //    gauche — c'est ce point de fuite qui la fait lire comme une sphère et
+    //    non comme un disque.
+    final gr = r - 9 * k;
+    final light = Offset(c.dx - gr * 0.32, c.dy - gr * 0.48);
+    canvas.drawCircle(
+      c,
+      gr,
+      Paint()
+        ..shader = ui.Gradient.radial(light, gr * 1.5, [
+          Colors.white.withValues(alpha: 0.95),
+          Colors.white.withValues(alpha: 0.30),
+          Colors.white.withValues(alpha: 0.05),
+          Colors.white.withValues(alpha: 0.13),
+        ], [
+          0.0,
+          0.26,
+          0.54,
+          1.0,
+        ]),
+    );
+
+    // 5. Les deux lueurs internes : un liseré blanc en haut, un bleu qui remonte
+    //    du bas. Ce sont les ombres portées intérieures de la maquette, qu'un
+    //    dégradé ne rend pas — on les pose en disques flous, rognés à la bille.
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: gr)));
+    canvas.drawCircle(
+      c.translate(0, -gr * 0.62),
+      gr * 0.7,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.55)
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 22 * k),
+    );
+    canvas.drawCircle(
+      c.translate(0, gr * 0.78),
+      gr * 0.75,
+      Paint()
+        ..color = _blue.withValues(alpha: 0.35)
+        ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 32 * k),
+    );
+    canvas.restore();
+
+    // 6. Le reflet qui tourne : un arc clair sur le pourtour de la bille. La
+    //    maquette le découpe au masque ; un trait épais sur un cercle donne le
+    //    même anneau pour un appel de dessin au lieu d'une passe de masque.
+    final ringR = gr * 0.85;
+    canvas.drawCircle(
+      c,
+      ringR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = gr * 0.30
+        ..shader = SweepGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0),
+            Colors.white.withValues(alpha: 0.7),
+            Colors.white.withValues(alpha: 0),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+          transform: GradientRotation(
+            spec * 2 * math.pi + 210 * math.pi / 180,
+          ),
+        ).createShader(Rect.fromCircle(center: c, radius: ringR)),
+    );
+
+    // 7. Les quatre barres. Chacune part avec un retard propre — c'est ce
+    //    décalage qui fait une vague plutôt qu'un clignotement à l'unisson.
+    const heights = [12.0, 22.0, 30.0, 18.0];
+    const delays = [0.0, 0.12, 0.24, 0.36];
+    final barW = 3.5 * k;
+    final gap = 4 * k;
+    final totalW = barW * 4 + gap * 3;
+    var x = c.dx - totalW / 2 + barW / 2;
+    final white = Paint()..color = Colors.white.withValues(alpha: 0.95);
+    for (var i = 0; i < 4; i++) {
+      final phase = (bars - delays[i]) % 1.0;
+      // Un aller-retour sur le cycle : 0,35 → 1 → 0,35.
+      final swing = 0.35 + 0.65 * (1 - (2 * phase - 1).abs());
+      final h = heights[i] * k * swing * amp;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(x, c.dy), width: barW, height: h),
+          Radius.circular(2 * k),
+        ),
+        white,
+      );
+      x += barW + gap;
+    }
+  }
+
+  /// Une onde : un cercle fin qui s'élargit jusqu'à 2,4 fois le galet en
+  /// s'effaçant.
+  void _wave(
+    Canvas canvas,
+    Offset c,
+    double r,
+    double t,
+    Color color,
+    double from,
+  ) {
+    canvas.drawCircle(
+      c,
+      r * (1 + 1.4 * t),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = color.withValues(alpha: from * (1 - t)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_OrbPainter old) =>
+      old.spin != spin ||
+      old.spec != spec ||
+      old.ripple != ripple ||
+      old.bars != bars ||
+      old.float != float ||
+      old.breathe != breathe ||
+      old.amp != amp;
 }
 
 /// The glass chevron that unfolds the blue controls above the dock — the same
