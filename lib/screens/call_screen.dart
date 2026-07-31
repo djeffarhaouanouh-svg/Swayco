@@ -4333,6 +4333,7 @@ class _TranslationOrb extends StatefulWidget {
 
   /// La traduction tourne. False = coupée : pierre endormie.
   final bool on;
+
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
   final VoidCallback onTap;
@@ -4348,6 +4349,15 @@ class _TranslationOrb extends StatefulWidget {
   /// La pierre endormie est plus petite que le galet vivant : couper la
   /// traduction se voit à sa taille avant même qu'on lise l'icône.
   static const double dormantSize = 104;
+
+  /// La place réservée AUTOUR du galet. Le halo déborde de 18 px et les ondes
+  /// montent jusqu'à 2,4 fois le disque : sans cette marge, elles sont peintes
+  /// hors des limites du widget. Ça passe tant qu'aucun ancêtre ne rogne —
+  /// c'est une chance, pas une garantie, et ça fausse la mise en page.
+  static const double boxFactor = 1.9;
+
+  /// L'encombrement réel du widget.
+  static const double box = size * boxFactor;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
@@ -4464,8 +4474,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: SizedBox(
-          width: _TranslationOrb.size,
-          height: _TranslationOrb.size,
+          width: _TranslationOrb.box,
+          height: _TranslationOrb.box,
           child: widget.on ? _live() : _dormant(),
         ),
       ),
@@ -4479,11 +4489,19 @@ class _TranslationOrbState extends State<_TranslationOrb>
         painter: _OrbPainter(
           spin: _spin.value,
           spec: _spec.value,
-          ripple: _ripple.value,
+          // Les courbes du CSS : `ease-out` sur les ondes, `ease-in-out` sur
+          // la lévitation et la respiration. Un contrôleur rend une rampe
+          // droite — sans ça, l'onde part trop lentement et la lévitation
+          // rebondit sèchement en haut et en bas.
+          ripple: Curves.easeOut.transform(_ripple.value),
           bars: _bars.value,
-          float: _float.value,
-          breathe: _breathe.value,
+          float: Curves.easeInOut.transform(_float.value),
+          breathe: Curves.easeInOut.transform(_breathe.value),
           amp: _amp.value,
+          // Le painter sait déjà se taire : poser une icône au centre à la
+          // place des barres — la « pierre réduite » de la maquette — ne
+          // demandera que de passer false ici et un Icon en enfant.
+          showBars: true,
         ),
       ),
     );
@@ -4569,6 +4587,7 @@ class _OrbPainter extends CustomPainter {
     required this.float,
     required this.breathe,
     required this.amp,
+    required this.showBars,
   });
 
   /// Chacune de 0 à 1 : la phase de son propre mouvement.
@@ -4581,6 +4600,9 @@ class _OrbPainter extends CustomPainter {
 
   /// L'amplitude courante des barres (0,3 au repos, 1 quand ça parle).
   final double amp;
+
+  /// Faux quand une icône occupe le centre à leur place.
+  final bool showBars;
 
   /// Les six teintes de l'anneau. La dernière reprend la première : c'est ce
   /// qui permet à la roue de boucler sans couture.
@@ -4599,14 +4621,13 @@ class _OrbPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Toutes les cotes ci-dessous sont données pour un galet de 130 ; k les
-    // reporte à la taille réelle.
-    final k = size.width / _TranslationOrb.size;
-    final r = size.width / 2;
+    // La toile fait [boxFactor] fois le galet : la marge est là pour le halo et
+    // les ondes. Le galet, lui, se dessine au CENTRE, à sa taille propre.
+    final k = size.width / _TranslationOrb.box;
+    final r = _TranslationOrb.size * k / 2;
 
-    // Le flottement : tout le galet monte de 13 px et redescend. Le contrôleur
-    // fait déjà l'aller-retour, on n'a qu'à suivre sa valeur.
-    final c = Offset(r, r - 13 * k * float);
+    // Le flottement : tout le galet monte de 13 px et redescend.
+    final c = Offset(size.width / 2, size.height / 2 - 13 * k * float);
 
     // 1. Les deux ondes. La seconde est décalée d'une demi-période — d'où le
     //    modulo : une seule horloge sert aux deux.
@@ -4713,6 +4734,7 @@ class _OrbPainter extends CustomPainter {
 
     // 7. Les quatre barres. Chacune part avec un retard propre — c'est ce
     //    décalage qui fait une vague plutôt qu'un clignotement à l'unisson.
+    if (!showBars) return;
     const heights = [12.0, 22.0, 30.0, 18.0];
     const delays = [0.0, 0.12, 0.24, 0.36];
     final barW = 3.5 * k;
@@ -4764,7 +4786,8 @@ class _OrbPainter extends CustomPainter {
       old.bars != bars ||
       old.float != float ||
       old.breathe != breathe ||
-      old.amp != amp;
+      old.amp != amp ||
+      old.showBars != showBars;
 }
 
 /// The glass chevron that unfolds the blue controls above the dock — the same
