@@ -3677,6 +3677,15 @@ class _TranslationOrbState extends State<_TranslationOrb>
   /// peu pour qu'on le regarde au lieu du visage.
   static const double _maxSwell = 1.10;
 
+  /// La présence du galet : [_idleOpacity] dans le silence, 1 dès que ça
+  /// parle. Comme les touches qui s'effacent, mais lui ne va PAS jusqu'à zéro —
+  /// c'est la seule chose qui reste à viser quand tout le reste a disparu.
+  final ValueNotifier<double> _presence = ValueNotifier<double>(1);
+  double _presenceTarget = 1;
+
+  /// Le plancher, le même que celui qu'avait la barre.
+  static const double _idleOpacity = 0.22;
+
   /// Le niveau à partir duquel le galet a fini de grossir.
   ///
   /// Bas EXPRÈS. Une voix de conversation normale l'atteint déjà, donc parler
@@ -3743,6 +3752,10 @@ class _TranslationOrbState extends State<_TranslationOrb>
         ? 0.0
         : (widget.voiceLevel.value / _swellCeiling).clamp(0.0, 1.0);
     _swellTarget = 1 + (_maxSwell - 1) * level;
+    // Il revient pour TOUT son, la traduction comprise : c'est lui qui montre
+    // qu'elle est en train d'être dite. S'effacer pendant qu'elle parle
+    // reviendrait à cacher le seul témoin du travail en cours.
+    _presenceTarget = (voice || speaking) ? 1.0 : _idleOpacity;
   }
 
   void _tick() {
@@ -3750,6 +3763,12 @@ class _TranslationOrbState extends State<_TranslationOrb>
     // pas la traîner.
     final swell = _swell.value + (_swellTarget - _swell.value) * 0.22;
     if ((swell - _swell.value).abs() > 0.001) _swell.value = swell;
+    // La présence revient VITE et s'en va lentement : on ne doit pas rater le
+    // début d'une phrase, et un galet qui clignote entre deux mots serait pire
+    // que pas de retour du tout.
+    final rate = _presenceTarget > _presence.value ? 0.35 : 0.06;
+    final pres = _presence.value + (_presenceTarget - _presence.value) * rate;
+    if ((pres - _presence.value).abs() > 0.001) _presence.value = pres;
     for (final pair in [(_voice, _voiceTarget), (_tts, _ttsTarget)]) {
       final n = pair.$1;
       final next = n.value + (pair.$2 - n.value) * 0.12;
@@ -3768,6 +3787,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
     _voice.dispose();
     _tts.dispose();
     _swell.dispose();
+    _presence.dispose();
     super.dispose();
   }
 
@@ -3792,10 +3812,18 @@ class _TranslationOrbState extends State<_TranslationOrb>
     );
   }
 
+  /// La pierre endormie ne s'efface JAMAIS, elle. Rien ne la ferait revenir :
+  /// la traduction coupée, il n'y a plus ni voix ni lecture pour la rallumer,
+  /// et un galet à 0,22 qu'on ne peut plus réveiller serait un bouton perdu.
   Widget _live() {
     return AnimatedBuilder(
-      animation: Listenable.merge([..._all, _voice, _tts, _swell]),
-      builder: (context, _) => Transform.scale(
+      animation: Listenable.merge([..._all, _voice, _tts, _swell, _presence]),
+      builder: (context, _) => Opacity(
+        // PAS quand un panneau est ouvert : le galet y sert d'en-tête, il doit
+        // être franc même si personne ne parle. [ripples] vaut faux dans ce
+        // cas-là et nulle part ailleurs.
+        opacity: widget.ripples ? _presence.value : 1.0,
+        child: Transform.scale(
         // Une transformation, pas une taille qui change : la boîte garde ses
         // dimensions, donc rien autour ne bouge quand le galet respire.
         scale: _swell.value,
@@ -3818,6 +3846,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
           // place des barres — la « pierre réduite » de la maquette — ne
           // demandera que de passer false ici et un Icon en enfant.
           showBars: true,
+        ),
         ),
         ),
       ),
