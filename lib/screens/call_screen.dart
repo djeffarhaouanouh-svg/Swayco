@@ -4064,8 +4064,22 @@ class _OrbPainter extends CustomPainter {
 
     // 1. Les deux ondes. La seconde est décalée d'une demi-période — d'où le
     //    modulo : une seule horloge sert aux deux.
-    _wave(canvas, c, r, ripple, _violet, 0.5 * waveAmp);
-    _wave(canvas, c, r, (ripple + 0.5) % 1.0, _teal, 0.45 * waveAmp);
+    // Quatre ondes plutôt que deux, décalées d'un quart de tour chacune : il en
+    // part une deux fois plus souvent, et il y en a toujours deux ou trois en
+    // vol. Deux seulement laissaient un trou entre chaque départ, et une
+    // traduction longue avait l'air de s'essouffler.
+    //
+    // Les couleurs alternent, comme les deux d'origine.
+    for (var i = 0; i < 4; i++) {
+      _wave(
+        canvas,
+        c,
+        r,
+        (ripple + i * 0.25) % 1.0,
+        i.isEven ? _violet : _teal,
+        (i.isEven ? 0.5 : 0.45) * waveAmp,
+      );
+    }
 
     // 2. Le halo qui respire, débordant de 18 px.
     final grow = 0.97 + 0.06 * breathe;
