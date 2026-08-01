@@ -3241,10 +3241,6 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
                     name: turn.mine ? widget.myName : widget.peerName,
                     avatarUrl:
                         turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
-                    // La dernière phrase passe au blanc plein : c'est celle
-                    // qu'on est en train de lire. Les précédentes s'effacent
-                    // derrière elle au lieu de se disputer le regard.
-                    latest: i == 0,
                   ),
                 );
               },
@@ -3266,15 +3262,11 @@ class _TurnBubble extends StatelessWidget {
     required this.turn,
     required this.name,
     required this.avatarUrl,
-    required this.latest,
   });
 
   final _SpokenTurn turn;
   final String name;
   final String avatarUrl;
-
-  /// La plus récente. Elle seule est pleine et lisible d'un coup.
-  final bool latest;
 
   @override
   Widget build(BuildContext context) {
@@ -3284,21 +3276,14 @@ class _TurnBubble extends StatelessWidget {
       size: 26,
     );
 
-    // Trois états, du plus fort au plus discret : la dernière en blanc plein,
-    // les miennes dans le cyan des bulles envoyées de l'app, celles du pair en
-    // verre sombre.
-    final Color fill;
-    final Color ink;
-    if (latest) {
-      fill = Colors.white;
-      ink = Colors.black.withValues(alpha: 0.88);
-    } else if (turn.mine) {
-      fill = SC.outBubbleEnd.withValues(alpha: 0.75);
-      ink = Colors.white.withValues(alpha: 0.92);
-    } else {
-      fill = Colors.black.withValues(alpha: 0.42);
-      ink = Colors.white.withValues(alpha: 0.78);
-    }
+    // Deux états, et deux seulement : les miennes dans le cyan des bulles
+    // envoyées de l'app, celles du pair en verre sombre. La plus récente ne se
+    // distingue plus — elle passait en blanc plein, ce qui faisait changer de
+    // couleur une bulle déjà lue dès que la suivante arrivait.
+    final Color fill = turn.mine
+        ? SC.outBubbleEnd.withValues(alpha: 0.75)
+        : Colors.black.withValues(alpha: 0.42);
+    final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
 
     final bubble = Flexible(
       child: ClipRRect(
@@ -3310,11 +3295,9 @@ class _TurnBubble extends StatelessWidget {
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(18),
-              border: latest
-                  ? null
-                  : Border.all(
-                      color: Colors.white.withValues(alpha: 0.14),
-                    ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.14),
+              ),
             ),
             child: Text(
               turn.text,
@@ -3325,7 +3308,7 @@ class _TurnBubble extends StatelessWidget {
                 color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
                 fontSize: 14.5,
                 height: 1.3,
-                fontWeight: latest ? FontWeight.w500 : FontWeight.w400,
+                fontWeight: FontWeight.w400,
                 fontStyle:
                     turn.delivered ? FontStyle.normal : FontStyle.italic,
               ),
