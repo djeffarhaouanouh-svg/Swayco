@@ -3416,12 +3416,12 @@ class _CallDock extends StatelessWidget {
                       label: AppStrings.t(
                         speakerOn ? 'call_earpiece' : 'call_speaker',
                       ),
-                      // Haut-parleur = engagé : la touche se remplit, comme
-                      // les deux bascules d'à côté.
+                      // Inversé : c'est l'ÉCOUTEUR qui remplit la touche, pas
+                      // le haut-parleur.
                       background: speakerOn
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.14),
-                      iconColor: speakerOn ? Colors.black : Colors.white,
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white,
+                      iconColor: speakerOn ? Colors.white : Colors.black,
                       onTap: onToggleSpeaker,
                     ),
                   ),
@@ -3460,10 +3460,12 @@ class _CallDock extends StatelessWidget {
                     _DockKeyButton(
                       icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
                       label: AppStrings.t(micOn ? 'call_mute' : 'call_unmute'),
+                      // Inversé aussi : la touche est pleine quand le micro
+                      // OUVERT, vide quand il est coupé.
                       background: micOn
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.white,
-                      iconColor: micOn ? Colors.white : Colors.black,
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.14),
+                      iconColor: micOn ? Colors.black : Colors.white,
                       onTap: onToggleMic,
                     ),
                   ),
