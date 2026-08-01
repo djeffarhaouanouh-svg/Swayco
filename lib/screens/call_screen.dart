@@ -2765,6 +2765,7 @@ class _CallScreenState extends State<CallScreen> {
                           // pour rien.
                           ripples: !_sheetOpen,
                           on: _translationEnabled,
+                          micOn: _micOn,
                           ttsSpeaking: ttsSpeaking,
                           voiceLevel: _voiceLevel,
                           onTap: _toggleTranslation,
@@ -3628,11 +3629,17 @@ class _TranslationOrb extends StatefulWidget {
     required this.voiceLevel,
     required this.onTap,
     required this.onLongPress,
+    required this.micOn,
     this.ripples = true,
   });
 
   /// La traduction tourne. False = coupée : pierre endormie.
   final bool on;
+
+  /// Le micro capte. Coupé, le galet ne réagit plus à AUCUNE voix : il enflait
+  /// encore sur celle d'en face, et un galet qui bouge pendant qu'on est muet
+  /// dit exactement le contraire de ce qui se passe — on croit être entendu.
+  final bool micOn;
 
   /// Les ondes qui s'échappent. Coupées quand le galet n'est plus le sujet de
   /// l'écran : sous un panneau, elles vont chercher l'œil pour rien.
@@ -3775,6 +3782,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
       widget.voiceLevel.addListener(_retarget);
     }
     if (old.on != widget.on) _syncRunning();
+    // Le micro vient de se couper : le galet doit retomber tout de suite, pas
+    // attendre le prochain changement de niveau — muet, il n'en viendra plus.
+    if (old.micOn != widget.micOn) _retarget();
   }
 
   /// Endormie, la pierre ne bouge pas : on arrête les six tickers plutôt que de
@@ -3795,7 +3805,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
 
   void _retarget() {
     final speaking = widget.ttsSpeaking.value;
-    final voice = widget.voiceLevel.value > 0.02;
+    final voice = widget.micOn && widget.voiceLevel.value > 0.02;
     // Pendant la traduction, la voix humaine ne doit pas emballer les barres :
     // c'est le tour de la machine, et deux choses qui s'agitent en même temps
     // ne désignent plus personne.
@@ -3803,7 +3813,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
     _ttsTarget = speaking ? 1.0 : _idleAmp;
     // La traduction ne fait pas enfler le galet : c'est la voix HUMAINE qu'on
     // renvoie à qui parle, pas le travail de la machine.
-    final level = speaking
+    final level = (speaking || !widget.micOn)
         ? 0.0
         : (widget.voiceLevel.value / _swellCeiling).clamp(0.0, 1.0);
     _swellTarget = 1 + (_maxSwell - 1) * level;
