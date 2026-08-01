@@ -3446,16 +3446,29 @@ class _CallDock extends StatelessWidget {
                       icon: speakerOn
                           ? Icons.volume_up_rounded
                           : Icons.phone_in_talk_rounded,
+                      // Le texte dit L'ÉTAT COURANT, comme l'icône. Il disait
+                      // l'action à faire, ce qui affichait « Écouteur » au
+                      // moment précis où le haut-parleur était allumé.
                       label: AppStrings.t(
-                        speakerOn ? 'call_earpiece' : 'call_speaker',
+                        speakerOn ? 'call_speaker' : 'call_earpiece',
                       ),
-                      // Pleine sur l'ÉCOUTEUR, c'est-à-dire quand le
-                      // haut-parleur est coupé — la même règle que les deux
-                      // autres.
+                      // LE BLANC MARQUE CE QUI N'EST PAS L'ORDINAIRE.
+                      //
+                      // Un appel normal, c'est : micro ouvert, caméra allumée,
+                      // haut-parleur éteint. Toute touche qui s'écarte de ça se
+                      // remplit. D'où l'apparente contradiction — blanc quand
+                      // le haut-parleur est ALLUMÉ, blanc quand le micro est
+                      // COUPÉ : dans les deux cas c'est l'écart qu'on signale,
+                      // pas l'état « actif ». C'est ce que fait FaceTime, et
+                      // c'est ce qu'on cherche du regard pendant un appel.
+                      //
+                      // L'ICÔNE et le TEXTE disent tous deux l'état courant :
+                      // micro barré + « Muet », micro plein + « Micro ». Les
+                      // trois signaux racontent la même chose.
                       background: speakerOn
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.white,
-                      iconColor: speakerOn ? Colors.white : Colors.black,
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.14),
+                      iconColor: speakerOn ? Colors.black : Colors.white,
                       onTap: onToggleSpeaker,
                     ),
                   ),
@@ -3467,7 +3480,7 @@ class _CallDock extends StatelessWidget {
                           ? Icons.videocam_rounded
                           : Icons.videocam_off_rounded,
                       label: AppStrings.t(
-                        camOn ? 'call_video' : 'call_video_off',
+                        camOn ? 'call_camera' : 'call_video_off',
                       ),
                       // Coupée = engagée : la touche se remplit de blanc,
                       // comme les bascules des réglages dépliés.
@@ -3493,12 +3506,7 @@ class _CallDock extends StatelessWidget {
                     dimmed,
                     _DockKeyButton(
                       icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-                      label: AppStrings.t(micOn ? 'call_mute' : 'call_unmute'),
-                      // Pleine quand le micro est COUPÉ. Les trois bascules
-                      // de la rangée disent la même chose de la même façon :
-                      // le blanc signale ce qui est coupé — micro, caméra,
-                      // haut-parleur. C'est ce qu'on cherche du regard en
-                      // appel, pas ce qui marche normalement.
+                      label: AppStrings.t(micOn ? 'call_mic' : 'call_mute'),
                       background: micOn
                           ? Colors.white.withValues(alpha: 0.14)
                           : Colors.white,
