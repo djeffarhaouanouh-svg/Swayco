@@ -2734,7 +2734,7 @@ class _CallScreenState extends State<CallScreen> {
                       // Plus bas, assumé : ses ondes atteignent les touches et
                       // c'est très bien — elles passent derrière, elles ne les
                       // gênent pas.
-                      : const Alignment(0, 0.52),
+                      : const Alignment(0, 0.66),
                   child: AnimatedScale(
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutCubic,
@@ -3678,10 +3678,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
   final ValueNotifier<double> _swell = ValueNotifier<double>(1);
   double _swellTarget = 1;
 
-  /// Le plafond. Un dixième, pas davantage : le galet est posé au milieu de la
-  /// vidéo et il enfle à chaque phrase. Assez pour qu'on le voie réagir, trop
-  /// peu pour qu'on le regarde au lieu du visage.
-  static const double _maxSwell = 1.10;
+  /// Le plafond. Un cinquième : assez pour qu'on le voie franchement réagir,
+  /// pas au point qu'il vienne manger le visage à chaque phrase.
+  static const double _maxSwell = 1.20;
 
   /// La présence du galet : [_idleOpacity] dans le silence, 1 dès que ça
   /// parle. Comme les touches qui s'effacent, mais lui ne va PAS jusqu'à zéro —
