@@ -2731,7 +2731,10 @@ class _CallScreenState extends State<CallScreen> {
                   curve: Curves.easeOutCubic,
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
-                      : const Alignment(0, 0.36),
+                      // Plus bas, assumé : ses ondes atteignent les touches et
+                      // c'est très bien — elles passent derrière, elles ne les
+                      // gênent pas.
+                      : const Alignment(0, 0.52),
                   child: AnimatedScale(
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutCubic,
@@ -2834,11 +2837,18 @@ class _CallScreenState extends State<CallScreen> {
                             child: !_controlsOpen
                                 ? const SizedBox(width: double.infinity)
                                 : Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: Wrap(
-                                      alignment: WrapAlignment.center,
-                                      spacing: 12,
-                                      runSpacing: 10,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      0,
+                                      12,
+                                      10,
+                                    ),
+                                    // Étalés, pas groupés au milieu : la même
+                                    // règle que la rangée du bas, sinon les
+                                    // deux ne se répondent pas.
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
                                       children: [
                                         // La conversation descend ici et le
                                         // haut-parleur monte dans la barre :
@@ -2879,6 +2889,18 @@ class _CallScreenState extends State<CallScreen> {
                                         // serait plus atteignable nulle part.
                                         _RoundCallButton(
                                           icon: Icons.translate_rounded,
+                                          // Le drapeau de la langue qu'on
+                                          // ENTEND — celle que cette touche
+                                          // sert à changer. Repli sur la langue
+                                          // du compte tant que rien n'a été
+                                          // choisi.
+                                          flagCountry: findLanguageByCode(
+                                                _myOutputLang.isNotEmpty
+                                                    ? _myOutputLang
+                                                    : AppStrings
+                                                        .currentBcp47.value,
+                                              )?.countryCode ??
+                                              '',
                                           label:
                                               AppStrings.t('call_language'),
                                           onTap: _openLanguagePairSheet,
@@ -3324,9 +3346,7 @@ class _CallDock extends StatelessWidget {
   final ValueListenable<double> voiceLevel;
   final bool controlsOpen;
 
-  /// Silence : la rangée s'estompe jusqu'à [_dimOpacity]. JAMAIS jusqu'à
-  /// zéro : ce qui devient invisible devient introuvable, et on doit toujours
-  /// pouvoir viser le raccrochage.
+  /// Silence : la rangée s'efface entièrement.
   final bool dimmed;
   final VoidCallback onWake;
   final VoidCallback onToggleCam;
@@ -3335,8 +3355,10 @@ class _CallDock extends StatelessWidget {
   final VoidCallback onHangUp;
   final VoidCallback onToggleControls;
 
-  /// Le plancher d'opacité de la veille.
-  static const double _dimOpacity = 0.22;
+  /// La veille va jusqu'à l'effacement complet. Ce qui devient invisible
+  /// devient introuvable, d'ordinaire — ici non : le galet reste posé au
+  /// milieu, et un tap N'IMPORTE OÙ sur l'écran ramène la rangée.
+  static const double _dimOpacity = 0.0;
 
   /// Une touche de la rangée : elle s'estompe avec la veille et cesse de
   /// répondre quand la barre est endormie — le premier tap la rallume, il ne
@@ -3369,7 +3391,10 @@ class _CallDock extends StatelessWidget {
               // Les touches ne touchent pas le bord de l'écran, et elles
               // respirent entre elles : c'est le seul rôle qui restait au
               // panneau.
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              // Presque rien sur les côtés : les deux touches extrêmes vont
+              // chercher le bord de l'écran. C'est la zone de clic qui les
+              // empêche de le toucher vraiment.
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3475,14 +3500,14 @@ class _DockKeyButton extends StatelessWidget {
   /// Noir quand la touche est engagée et se remplit de blanc.
   final Color? iconColor;
 
-  /// Le rond visible.
-  static const double size = 46;
+  /// Le rond visible. Agrandi : à 46 il fallait viser.
+  static const double size = 56;
 
   /// La zone qui répond au doigt, plus large que le rond. On visait un cercle
   /// de 46 et on ratait : Apple demande 44 MINIMUM, ce qui ne laisse aucune
   /// marge d'erreur, et un doigt ne tombe pas au pixel. Les 14 px de plus ne
   /// se voient pas — ils se sentent.
-  static const double hitSize = 60;
+  static const double hitSize = 68;
 
   @override
   Widget build(BuildContext context) {
@@ -3492,23 +3517,48 @@ class _DockKeyButton extends StatelessWidget {
       child: Pressable(
         bounce: true,
         onTap: onTap,
-        child: SizedBox(
-          width: hitSize,
-          height: hitSize,
-          child: Center(
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: background,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: hitSize,
+              height: hitSize,
+              child: Center(
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: background,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor ?? Colors.white,
+                    size: 24,
+                  ),
                 ),
               ),
-              child: Icon(icon, color: iconColor ?? Colors.white, size: 22),
             ),
-          ),
+            // Le titre, comme sur les touches du rail. Il manquait ici et
+            // nulle part ailleurs : cinq ronds muets en bas d'un appel se
+            // devinent, ils ne se lisent pas.
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.65),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+                height: 1.1,
+                shadows: const [
+                  Shadow(color: Colors.black, blurRadius: 6),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -3554,7 +3604,7 @@ class _TranslationOrb extends StatefulWidget {
   /// La taille par défaut. Toutes les cotes du dessin sont données pour 130
   /// puis mises à l'échelle, donc ce seul nombre redimensionne l'ensemble sans
   /// rien déformer.
-  static const double kSize = 65;
+  static const double kSize = 92;
 
   /// La pierre endormie est plus petite que le galet vivant : couper la
   /// traduction se voit à sa taille avant même qu'on lise l'icône. Même
@@ -4186,6 +4236,7 @@ class _RoundCallButton extends StatelessWidget {
     required this.onTap,
     this.active = false,
     this.ring = false,
+    this.flagCountry,
   });
 
   final IconData icon;
@@ -4195,6 +4246,11 @@ class _RoundCallButton extends StatelessWidget {
   /// L'anneau cyan du chevron, autour de ce bouton-ci : il désigne celui qu'on
   /// cherche en premier dans la rangée.
   final bool ring;
+
+  /// Code ISO pays. Non nul, le bouton montre CE DRAPEAU au lieu de [icon] —
+  /// on reconnaît une langue à son drapeau bien plus vite qu'à un pictogramme
+  /// de traduction, qui est le même pour toutes.
+  final String? flagCountry;
 
   /// L'état que porte ce bouton est engagé. Un bouton qui ouvre un panneau ne
   /// l'est jamais : il garde son verre.
@@ -4243,11 +4299,22 @@ class _RoundCallButton extends StatelessWidget {
                           Colors.white.withValues(alpha: active ? 0.0 : 0.22),
                     ),
                   ),
-                  child: Icon(
-                    icon,
-                    color: active ? Colors.black : Colors.white,
-                    size: 21,
-                  ),
+                  child: flagCountry == null || flagCountry!.isEmpty
+                      ? Icon(
+                          icon,
+                          color: active ? Colors.black : Colors.white,
+                          size: 21,
+                        )
+                      : ClipOval(
+                          child: CountryFlag.fromCountryCode(
+                            flagCountry!,
+                            theme: const ImageTheme(
+                              width: 45,
+                              height: 45,
+                              shape: Circle(),
+                            ),
+                          ),
+                        ),
                 ),
               ),
               ),
