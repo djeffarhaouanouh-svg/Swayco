@@ -3638,17 +3638,29 @@ class _DockKeyButton extends StatelessWidget {
             // Le titre, comme sur les touches du rail. Il manquait ici et
             // nulle part ailleurs : cinq ronds muets en bas d'un appel se
             // devinent, ils ne se lisent pas.
-            Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
-                height: 1.1,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 6),
-                ],
+            //
+            // Borné à la largeur de la touche et RÉTRÉCI pour y tenir. En
+            // français « Haut-parleur » fait déjà 12 signes, en portugais
+            // « Auscultador » 11, en allemand « Nachrichten » 11 : à cinq de
+            // front, la rangée débordait dans ces langues-là. Rétréci plutôt
+            // que coupé — « Haut-parl… » est pire qu'un mot un peu plus petit.
+            SizedBox(
+              width: hitSize + 6,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.1,
+                    shadows: const [
+                      Shadow(color: Colors.black, blurRadius: 6),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -4488,7 +4500,10 @@ class _RoundCallButton extends StatelessWidget {
               // L'anneau est PEINT autour, pas posé en bordure : un dégradé ne
               // rentre pas dans un Border, et il doit déborder du bouton.
               painter: ring
-                  ? const _ChevronRimPainter(visible: true, buttonSize: 45)
+                  ? const _ChevronRimPainter(
+                      visible: true,
+                      buttonSize: _DockKeyButton.size,
+                    )
                   : null,
               child: // Stable Flutter frosted-glass circle (NOT a platform
                   // view): the native glass flickered under the keyboard.
@@ -4500,8 +4515,8 @@ class _RoundCallButton extends StatelessWidget {
                   // Au-delà, le blanc «arrive» au lieu d'être déjà là.
                   duration: const Duration(milliseconds: 90),
                   curve: Curves.easeOut,
-                  width: 45,
-                  height: 45,
+                  width: _DockKeyButton.size,
+                  height: _DockKeyButton.size,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: fill,
@@ -4514,7 +4529,7 @@ class _RoundCallButton extends StatelessWidget {
                       ? Icon(
                           icon,
                           color: active ? Colors.black : Colors.white,
-                          size: 21,
+                          size: 24,
                         )
                       : ClipOval(
                           child: CountryFlag.fromCountryCode(
@@ -4531,10 +4546,12 @@ class _RoundCallButton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            // Le libellé prend la largeur qu'il lui faut — « Haut-parleur » est
-            // plus large que son rond. Le lui rogner à la taille du cercle le
-            // couperait ; c'est l'écart du Wrap qui absorbe la différence.
-            Text(
+            // Même règle qu'en bas : borné, et rétréci s'il le faut.
+            SizedBox(
+              width: 74,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
               label,
               maxLines: 1,
               style: TextStyle(
@@ -4544,6 +4561,8 @@ class _RoundCallButton extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                 height: 1.1,
+              ),
+                ),
               ),
             ),
           ],
