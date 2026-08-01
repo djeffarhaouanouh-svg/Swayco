@@ -3665,6 +3665,26 @@ class _TranslationOrbState extends State<_TranslationOrb>
   double _voiceTarget = _idleAmp;
   double _ttsTarget = _idleAmp;
 
+  /// L'enflure du galet quand ça parle : 1 au repos, [_maxSwell] au plus fort.
+  ///
+  /// Elle rend la capture VISIBLE — sans elle, un micro coupé ou qui capte mal
+  /// ne se remarque qu'à la traduction qui n'arrive pas.
+  final ValueNotifier<double> _swell = ValueNotifier<double>(1);
+  double _swellTarget = 1;
+
+  /// Le plafond. Un dixième, pas davantage : le galet est posé au milieu de la
+  /// vidéo et il enfle à chaque phrase. Assez pour qu'on le voie réagir, trop
+  /// peu pour qu'on le regarde au lieu du visage.
+  static const double _maxSwell = 1.10;
+
+  /// Le niveau à partir duquel le galet a fini de grossir.
+  ///
+  /// Bas EXPRÈS. Une voix de conversation normale l'atteint déjà, donc parler
+  /// plus fort n'ajoute plus rien de visible. Le galet dit « je t'entends », il
+  /// ne dit pas « plus fort » — récompenser le volume ferait crier, et un micro
+  /// saturé se transcrit moins bien, pas mieux.
+  static const double _swellCeiling = 0.22;
+
   /// Le plancher : même dans le silence le galet vit un peu, sinon il a l'air
   /// en panne. La parole le fait monter, elle ne le fait pas exister.
   static const double _idleAmp = 0.3;
@@ -3717,9 +3737,19 @@ class _TranslationOrbState extends State<_TranslationOrb>
     // ne désignent plus personne.
     _voiceTarget = (voice && !speaking) ? 1.0 : _idleAmp;
     _ttsTarget = speaking ? 1.0 : _idleAmp;
+    // La traduction ne fait pas enfler le galet : c'est la voix HUMAINE qu'on
+    // renvoie à qui parle, pas le travail de la machine.
+    final level = speaking
+        ? 0.0
+        : (widget.voiceLevel.value / _swellCeiling).clamp(0.0, 1.0);
+    _swellTarget = 1 + (_maxSwell - 1) * level;
   }
 
   void _tick() {
+    // L'enflure suit plus vite que les barres : elle doit coller à la voix,
+    // pas la traîner.
+    final swell = _swell.value + (_swellTarget - _swell.value) * 0.22;
+    if ((swell - _swell.value).abs() > 0.001) _swell.value = swell;
     for (final pair in [(_voice, _voiceTarget), (_tts, _ttsTarget)]) {
       final n = pair.$1;
       final next = n.value + (pair.$2 - n.value) * 0.12;
@@ -3737,6 +3767,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
     }
     _voice.dispose();
     _tts.dispose();
+    _swell.dispose();
     super.dispose();
   }
 
@@ -3763,8 +3794,12 @@ class _TranslationOrbState extends State<_TranslationOrb>
 
   Widget _live() {
     return AnimatedBuilder(
-      animation: Listenable.merge([..._all, _voice, _tts]),
-      builder: (context, _) => CustomPaint(
+      animation: Listenable.merge([..._all, _voice, _tts, _swell]),
+      builder: (context, _) => Transform.scale(
+        // Une transformation, pas une taille qui change : la boîte garde ses
+        // dimensions, donc rien autour ne bouge quand le galet respire.
+        scale: _swell.value,
+        child: CustomPaint(
         painter: _OrbPainter(
           spin: _spin.value,
           spec: _spec.value,
@@ -3783,6 +3818,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
           // place des barres — la « pierre réduite » de la maquette — ne
           // demandera que de passer false ici et un Icon en enfant.
           showBars: true,
+        ),
         ),
       ),
     );
