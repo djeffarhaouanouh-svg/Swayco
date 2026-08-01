@@ -3452,15 +3452,14 @@ class _CallDock extends StatelessWidget {
                       label: AppStrings.t(
                         speakerOn ? 'call_speaker' : 'call_earpiece',
                       ),
-                      // LE BLANC MARQUE CE QUI N'EST PAS L'ORDINAIRE.
+                      // LE BLANC MARQUE CE QU'ON VEUT VOIR D'UN COUP D'ŒIL.
                       //
-                      // Un appel normal, c'est : micro ouvert, caméra allumée,
-                      // haut-parleur éteint. Toute touche qui s'écarte de ça se
-                      // remplit. D'où l'apparente contradiction — blanc quand
-                      // le haut-parleur est ALLUMÉ, blanc quand le micro est
-                      // COUPÉ : dans les deux cas c'est l'écart qu'on signale,
-                      // pas l'état « actif ». C'est ce que fait FaceTime, et
-                      // c'est ce qu'on cherche du regard pendant un appel.
+                      // Haut-parleur et caméra : blancs quand ils sont ALLUMÉS.
+                      // Le micro : blanc quand il est COUPÉ. Il n'y a pas de
+                      // règle unique, et c'est assumé — d'un appel on veut
+                      // savoir « je diffuse » pour la caméra et le son, et
+                      // « on ne m'entend pas » pour le micro. Ce sont les deux
+                      // choses qu'on cherche, et ce sont elles qui s'allument.
                       //
                       // L'ICÔNE et le TEXTE disent tous deux l'état courant :
                       // micro barré + « Muet », micro plein + « Micro ». Les
@@ -3482,12 +3481,12 @@ class _CallDock extends StatelessWidget {
                       label: AppStrings.t(
                         camOn ? 'call_camera' : 'call_video_off',
                       ),
-                      // Coupée = engagée : la touche se remplit de blanc,
-                      // comme les bascules des réglages dépliés.
+                      // Blanche quand la caméra est ALLUMÉE, grise et barrée
+                      // quand elle est coupée.
                       background: camOn
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.white,
-                      iconColor: camOn ? Colors.white : Colors.black,
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.14),
+                      iconColor: camOn ? Colors.black : Colors.white,
                       onTap: onToggleCam,
                     ),
                   ),
