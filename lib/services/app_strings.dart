@@ -150,7 +150,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profil',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'Il est {time} chez {name}',
+    'chat_blocked_title': '{name} t\'a bloqué',
+    'chat_blocked_body':
+        'Tu ne peux plus lui écrire ni l\'appeler. La conversation reste consultable.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'Pas encore de demandes',
     'demandes_empty_body':
@@ -314,7 +316,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         "Va dans l'onglet Recherche pour trouver quelqu'un par son prénom, puis envoie une demande d'ami pour pouvoir discuter avec lui.",
     'chat_no_name': 'Sans nom',
-    'chat_tap_to_chat': 'Toucher pour discuter',
+    'chat_tap_to_chat': 'Vous ne vous êtes pas encore parlé',
+    'chat_unread_count': '{n} non lus',
     'gif_search_hint': 'Rechercher un GIF',
     'gif_none': 'Aucun GIF trouvé',
     'invite_friend': 'Inviter un ami sur Swayco',
@@ -719,7 +722,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profile',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'It\'s {time} at {name}\'s',
+    'chat_blocked_title': '{name} blocked you',
+    'chat_blocked_body':
+        'You can no longer message or call them. The conversation stays readable.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'No requests yet',
     'demandes_empty_body':
@@ -877,7 +882,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Go to the Search tab to find someone by their first name, then send a friend request to chat with them.',
     'chat_no_name': 'No name',
-    'chat_tap_to_chat': 'Tap to chat',
+    'chat_tap_to_chat': 'You haven\'t spoken yet',
+    'chat_unread_count': '{n} unread',
     'gif_search_hint': 'Search GIFs',
     'gif_none': 'No GIF found',
     'invite_friend': 'Invite a friend to Swayco',
@@ -1279,7 +1285,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Perfil',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'Son las {time} donde {name}',
+    'chat_blocked_title': '{name} te ha bloqueado',
+    'chat_blocked_body':
+        'Ya no puedes escribirle ni llamarle. La conversación sigue disponible.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'Aún no hay solicitudes',
     'demandes_empty_body':
@@ -1423,7 +1431,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Ve a la pestaña de búsqueda para encontrar a alguien por su nombre, luego envía una solicitud de amistad para poder chatear.',
     'chat_no_name': 'Sin nombre',
-    'chat_tap_to_chat': 'Toca para chatear',
+    'chat_tap_to_chat': 'Todavía no habéis hablado',
+    'chat_unread_count': '{n} sin leer',
     'gif_search_hint': 'Buscar GIF',
     'gif_none': 'Ningún GIF encontrado',
     'tooltip_more': 'Más',
@@ -1834,7 +1843,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profil',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'Es ist {time} bei {name}',
+    'chat_blocked_title': '{name} hat dich blockiert',
+    'chat_blocked_body':
+        'Du kannst nicht mehr schreiben oder anrufen. Das Gespräch bleibt lesbar.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'Noch keine Anfragen',
     'demandes_empty_body':
@@ -1903,7 +1914,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Gehe zum Suche-Tab, um jemanden mit Vornamen zu finden, und sende eine Freundschaftsanfrage, um zu chatten.',
     'chat_no_name': 'Kein Name',
-    'chat_tap_to_chat': 'Tippe zum Chatten',
+    'chat_tap_to_chat': 'Ihr habt noch nicht geschrieben',
+    'chat_unread_count': '{n} ungelesen',
     'gif_search_hint': 'GIFs suchen',
     'gif_none': 'Kein GIF gefunden',
     'tooltip_more': 'Mehr',
@@ -2393,7 +2405,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profilo',
     'nav_demandes': 'Like',
-    'peer_clock_phrase': 'Sono le {time} da {name}',
+    'chat_blocked_title': '{name} ti ha bloccato',
+    'chat_blocked_body':
+        'Non puoi più scrivere né chiamare. La conversazione resta consultabile.',
     'demandes_title': 'Like',
     'demandes_empty_title': 'Nessuna richiesta',
     'demandes_empty_body':
@@ -2462,7 +2476,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Vai alla scheda Cerca per trovare qualcuno tramite nome, poi invia una richiesta di amicizia per chattare.',
     'chat_no_name': 'Senza nome',
-    'chat_tap_to_chat': 'Tocca per chattare',
+    'chat_tap_to_chat': 'Non vi siete ancora parlati',
+    'chat_unread_count': '{n} non letti',
     'gif_search_hint': 'Cerca GIF',
     'gif_none': 'Nessuna GIF trovata',
     'tooltip_more': 'Altro',
@@ -2947,7 +2962,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Perfil',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'São {time} na casa de {name}',
+    'chat_blocked_title': '{name} bloqueou-te',
+    'chat_blocked_body':
+        'Já não podes escrever nem ligar. A conversa continua disponível.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'Ainda não há pedidos',
     'demandes_empty_body':
@@ -3016,7 +3033,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Vá à aba Pesquisa para encontrar alguém pelo nome, depois envie um pedido de amizade para conversar.',
     'chat_no_name': 'Sem nome',
-    'chat_tap_to_chat': 'Toque para conversar',
+    'chat_tap_to_chat': 'Ainda não falaram',
+    'chat_unread_count': '{n} por ler',
     'gif_search_hint': 'Pesquisar GIFs',
     'gif_none': 'Nenhum GIF encontrado',
     'tooltip_more': 'Mais',
@@ -3501,7 +3519,9 @@ abstract final class AppStrings {
     'nav_chat': 'Chat',
     'nav_tab3': 'Profiel',
     'nav_demandes': 'Likes',
-    'peer_clock_phrase': 'Het is {time} bij {name}',
+    'chat_blocked_title': '{name} heeft je geblokkeerd',
+    'chat_blocked_body':
+        'Je kunt niet meer schrijven of bellen. Het gesprek blijft leesbaar.',
     'demandes_title': 'Likes',
     'demandes_empty_title': 'Nog geen verzoeken',
     'demandes_empty_body':
@@ -3570,7 +3590,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Ga naar het tabblad Zoeken om iemand op voornaam te vinden, en stuur een vriendschapsverzoek om te chatten.',
     'chat_no_name': 'Geen naam',
-    'chat_tap_to_chat': 'Tik om te chatten',
+    'chat_tap_to_chat': 'Jullie hebben nog niet gepraat',
+    'chat_unread_count': '{n} ongelezen',
     'gif_search_hint': 'GIFs zoeken',
     'gif_none': 'Geen GIF gevonden',
     'tooltip_more': 'Meer',
@@ -4048,7 +4069,9 @@ abstract final class AppStrings {
     'nav_chat': 'دردشة',
     'nav_tab3': 'الملف الشخصي',
     'nav_demandes': 'الإعجابات',
-    'peer_clock_phrase': 'الساعة {time} عند {name}',
+    'chat_blocked_title': 'قام {name} بحظرك',
+    'chat_blocked_body':
+        'لم يعد بإمكانك المراسلة أو الاتصال. تبقى المحادثة متاحة للقراءة.',
     'demandes_title': 'الإعجابات',
     'demandes_empty_title': 'لا توجد طلبات بعد',
     'demandes_empty_body':
@@ -4117,7 +4140,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'اذهب إلى علامة التبويب البحث للعثور على شخص بالاسم، ثم أرسل طلب صداقة للدردشة معه.',
     'chat_no_name': 'بدون اسم',
-    'chat_tap_to_chat': 'اضغط للدردشة',
+    'chat_tap_to_chat': 'لم تتحدثا بعد',
+    'chat_unread_count': '{n} غير مقروءة',
     'gif_search_hint': 'ابحث عن GIF',
     'gif_none': 'لم يتم العثور على GIF',
     'tooltip_more': 'المزيد',
@@ -4588,7 +4612,9 @@ abstract final class AppStrings {
     'nav_chat': 'Чат',
     'nav_tab3': 'Профиль',
     'nav_demandes': 'Лайки',
-    'peer_clock_phrase': 'Сейчас {time} у {name}',
+    'chat_blocked_title': '{name} вас заблокировал',
+    'chat_blocked_body':
+        'Вы больше не можете писать или звонить. Переписка остаётся доступной для чтения.',
     'demandes_title': 'Лайки',
     'demandes_empty_title': 'Запросов пока нет',
     'demandes_empty_body':
@@ -4657,7 +4683,8 @@ abstract final class AppStrings {
     'chat_no_friends_body':
         'Перейди во вкладку Поиск, чтобы найти кого-то по имени, затем отправь запрос в друзья, чтобы общаться.',
     'chat_no_name': 'Без имени',
-    'chat_tap_to_chat': 'Нажми, чтобы поговорить',
+    'chat_tap_to_chat': 'Вы ещё не общались',
+    'chat_unread_count': '{n} непрочитанных',
     'gif_search_hint': 'Поиск GIF',
     'gif_none': 'GIF не найдены',
     'tooltip_more': 'Ещё',
@@ -5135,7 +5162,8 @@ abstract final class AppStrings {
     'nav_chat': '聊天',
     'nav_tab3': '个人资料',
     'nav_demandes': '喜欢',
-    'peer_clock_phrase': '{name} 那里现在是 {time}',
+    'chat_blocked_title': '{name} 已屏蔽你',
+    'chat_blocked_body': '你无法再发送消息或通话。对话仍可查看。',
     'demandes_title': '喜欢',
     'demandes_empty_title': '暂无请求',
     'demandes_empty_body': '当有人从发现或搜索中添加您时，他们的请求将显示在这里。',
@@ -5202,7 +5230,8 @@ abstract final class AppStrings {
     'chat_no_friends_title': '还没有朋友',
     'chat_no_friends_body': '前往搜索标签页，按名字找到某人，然后发送好友请求来聊天。',
     'chat_no_name': '无名字',
-    'chat_tap_to_chat': '点击聊天',
+    'chat_tap_to_chat': '你们还没聊过',
+    'chat_unread_count': '{n} 条未读',
     'gif_search_hint': '搜索 GIF',
     'gif_none': '未找到 GIF',
     'tooltip_more': '更多',
@@ -5633,7 +5662,8 @@ abstract final class AppStrings {
     'nav_chat': 'チャット',
     'nav_tab3': 'プロフィール',
     'nav_demandes': 'いいね',
-    'peer_clock_phrase': '{name} は {time} です',
+    'chat_blocked_title': '{name} さんにブロックされました',
+    'chat_blocked_body': 'メッセージも通話もできません。会話は引き続き読めます。',
     'demandes_title': 'いいね',
     'demandes_empty_title': 'リクエストはまだありません',
     'demandes_empty_body': '誰かが Discover や検索からあなたを追加すると、リクエストがここに表示されます。',
@@ -5700,7 +5730,8 @@ abstract final class AppStrings {
     'chat_no_friends_title': 'まだ友達がいません',
     'chat_no_friends_body': '検索タブで名前から相手を見つけ、友達リクエストを送ってチャットを始めましょう。',
     'chat_no_name': '名前なし',
-    'chat_tap_to_chat': 'タップしてチャット',
+    'chat_tap_to_chat': 'まだ話していません',
+    'chat_unread_count': '未読 {n} 件',
     'gif_search_hint': 'GIFを検索',
     'gif_none': 'GIFが見つかりません',
     'tooltip_more': 'もっと見る',
@@ -6138,7 +6169,8 @@ abstract final class AppStrings {
     'nav_chat': '채팅',
     'nav_tab3': '프로필',
     'nav_demandes': '좋아요',
-    'peer_clock_phrase': '{name}님은 {time}이에요',
+    'chat_blocked_title': '{name}님이 회원님을 차단했어요',
+    'chat_blocked_body': '더 이상 메시지나 통화를 보낼 수 없어요. 대화는 계속 볼 수 있어요.',
     'demandes_title': '좋아요',
     'demandes_empty_title': '아직 요청이 없습니다',
     'demandes_empty_body': '누군가가 Discover나 검색에서 회원님을 추가하면 요청이 여기에 표시됩니다.',
@@ -6205,7 +6237,8 @@ abstract final class AppStrings {
     'chat_no_friends_title': '아직 친구가 없습니다',
     'chat_no_friends_body': '검색 탭에서 이름으로 누군가를 찾고, 친구 요청을 보내서 대화를 시작하세요.',
     'chat_no_name': '이름 없음',
-    'chat_tap_to_chat': '대화하려면 탭하세요',
+    'chat_tap_to_chat': '아직 대화하지 않았어요',
+    'chat_unread_count': '안 읽음 {n}개',
     'gif_search_hint': 'GIF 검색',
     'gif_none': 'GIF를 찾을 수 없습니다',
     'tooltip_more': '더 보기',

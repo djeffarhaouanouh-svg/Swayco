@@ -24,7 +24,6 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/appear.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -36,6 +35,26 @@ import 'profile_screen.dart';
 /// part du match, pas du premier message : la bulle et la ligne coexistent
 /// pendant toute cette fenêtre.
 const Duration _kMatchBubbleLife = Duration(days: 7);
+
+/// La police des chiffres et des titres de section : une chasse fixe, pour que
+/// les heures d'une ligne à l'autre tombent sur la même colonne et que les
+/// libellés se lisent comme des étiquettes, pas comme du texte.
+const String _kMono = 'monospace';
+
+/// Le fil de cheveu qui sépare les sections — presque rien, juste de quoi dire
+/// que ce qui suit est autre chose.
+const Color _kHairline = Color(0x12FFFFFF);
+
+/// Cette personne est-elle joignable maintenant ? Vu il y a moins de deux
+/// minutes, et ni elle ni moi n'avons demandé à masquer le statut : celui qui
+/// se cache ne voit plus les autres non plus.
+bool isPeerOnline(RemoteProfile profile) {
+  if (AppSettings.hideOnlineLocal.value) return false;
+  final ls = profile.lastSeen;
+  return !profile.hideOnlineStatus &&
+      ls != null &&
+      DateTime.now().difference(ls) < const Duration(minutes: 2);
+}
 
 /// WhatsApp-style chat home: lists every accepted friend (union of followers
 /// + following). Tapping a row opens the direct-message thread; the trailing
@@ -509,29 +528,73 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// The band pinned at the top of the page — the same swaycø wordmark as
-  /// the Discover header (".ai" in cyan), where the "Messages" title used to be.
-  Widget get _titleBar => const Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: 'swayc'),
-                TextSpan(
-                  text: 'ø',
-                  style: TextStyle(color: Color(0xFF22D3EE)),
+  /// Amis joignables tout de suite — le compteur de la pastille verte.
+  int get _onlineFriends => _friends.where(isPeerOnline).length;
+
+  /// The band pinned at the top of the page — the swaycø wordmark on the left,
+  /// and on the right the count of friends who are online right now. Le seul
+  /// chiffre de la page qui ne parle pas du passé : tout le reste dit ce qui
+  /// s'est dit, celui-là dit qui est là.
+  Widget get _titleBar => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: 'swayc'),
+                  TextSpan(
+                    text: 'ø',
+                    style: TextStyle(color: SC.accent),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
+            ),
+            // Personne en ligne = pas de pastille : un « 0 en ligne » est une
+            // mauvaise nouvelle affichée en permanence.
+            if (_onlineFriends > 0)
+              Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: SC.menu,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-              ],
-            ),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
-            ),
-          ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: SC.online,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppStrings.t(
+                        'online_count',
+                        args: {'n': '$_onlineFriends'},
+                      ),
+                      style: const TextStyle(
+                        fontFamily: _kMono,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: SC.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       );
 
@@ -599,12 +662,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         _SectionHeader(
                           label: AppStrings.t('new_matches_section'),
                           count: _unseenMatches,
+                          countLeads: true,
                         ),
                         _MatchBubbleRail(
                           matches: _newMatches,
+                          seen: _seenMatches,
                           onTap: _openThread,
                         ),
-                        const SizedBox(height: 12),
+                        // Le trait qui referme le rail : sans lui les bulles et
+                        // la première conversation se touchent.
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 14),
+                          child: Divider(
+                            height: 37,
+                            thickness: 1,
+                            color: _kHairline,
+                          ),
+                        ),
                       ],
                       if (_friends.isNotEmpty)
                         _SectionHeader(
@@ -618,7 +692,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (i > 0) _rowDivider,
                               _FriendChatRow(
                                 profile: p,
                                 lastMessage:
@@ -659,16 +732,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       },
     );
   }
-
-  /// Hairline divider between sections on the white block — inset past the
-  /// avatar on the left, stopping before the time / call cluster on the right.
-  static Widget get _rowDivider => Divider(
-        height: 1,
-        thickness: 1,
-        indent: 70,
-        endIndent: 24,
-        color: Colors.white.withValues(alpha: 0.08),
-      );
 
   /// True when the peer's last message is newer than the last time I
   /// opened the thread (or I've never opened it). Drives the cyan dot.
@@ -728,13 +791,7 @@ class _FriendChatRow extends StatelessWidget {
   /// hidden their own online status, AND the local user has not
   /// opted out of presence (reciprocal rule — if I'm hiding I don't
   /// see anyone else's dot either).
-  bool get _peerOnline {
-    if (AppSettings.hideOnlineLocal.value) return false;
-    final ls = profile.lastSeen;
-    return !profile.hideOnlineStatus &&
-        ls != null &&
-        DateTime.now().difference(ls) < const Duration(minutes: 2);
-  }
+  bool get _peerOnline => isPeerOnline(profile);
 
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
@@ -855,18 +912,31 @@ class _FriendChatRow extends StatelessWidget {
       }
       subtitleParts.add(TextSpan(text: lastMessage!.body));
     } else {
+      // Jamais un mot échangé : on le dit, au lieu d'inviter à toucher — la
+      // ligne entière est déjà la touche.
       subtitleParts.add(TextSpan(text: AppStrings.t('chat_tap_to_chat')));
     }
 
     return Material(
-      color: unread ? SC.accent.withValues(alpha: 0.07) : Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: () => _showRowActions(context),
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Container(
+        // Non lu : un voile cyan qui s'éteint vers la droite. Il remplace le
+        // aplat uniforme — la ligne se signale du coin de l'œil, sans devenir
+        // un bloc de couleur qui écrase le texte posé dessus.
+        decoration: unread
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    SC.accent.withValues(alpha: 0.10),
+                    SC.accent.withValues(alpha: 0),
+                  ],
+                ),
+              )
+            : null,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
           children: [
             // Avatar — tap goes straight to the peer's profile. The light-
@@ -879,99 +949,101 @@ class _FriendChatRow extends StatelessWidget {
                   ProfileAvatar(
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
-                    size: 46,
+                    size: 52,
                   ),
                   if (_peerOnline)
                     Positioned(
-                      right: 0,
-                      bottom: 0,
+                      right: 1,
+                      bottom: 1,
                       child: Container(
-                        width: 12,
-                        height: 12,
+                        width: 13,
+                        height: 13,
                         decoration: BoxDecoration(
                           color: SC.online,
                           shape: BoxShape.circle,
-                          border: Border.all(color: SC.bg, width: 2),
+                          border: Border.all(color: SC.bg, width: 2.5),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // WhatsApp-style top line: name on the left, date on the
-                  // right (small & dim, cyan when unread).
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          softWrap: false,
-                          style: SCText.name.copyWith(
-                            fontWeight:
-                                unread ? FontWeight.w800 : FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        lastMessage != null
-                            ? _formatTime(lastMessage!.createdAt)
-                            : '',
-                        style: SCText.meta.copyWith(
-                          color: unread ? SC.accent : SC.textMuted,
-                        ),
-                      ),
-                    ],
+                  // Le prénom seul sur sa ligne : l'heure est partie à droite,
+                  // avec le compte, là où l'œil va chercher l'état de la
+                  // conversation.
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 16.5,
+                      height: 1.2,
+                      fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
+                      color: unread ? SC.textPrimary : SC.textSecondary,
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RichText(
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          softWrap: false,
-                          text: TextSpan(
-                            style: SCText.preview.copyWith(
-                              color: unread ? SC.textPrimary : SC.textMuted,
-                              fontWeight:
-                                  unread ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                            children: subtitleParts,
-                          ),
-                        ),
+                  const SizedBox(height: 4),
+                  RichText(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.3,
+                        color: unread ? SC.textSecondary : SC.textMuted,
                       ),
-                      if (unreadCount > 0) ...[
-                        const SizedBox(width: 8),
-                        _UnreadBadge(count: unreadCount),
-                      ] else if (unread) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: SC.accent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ],
+                      children: subtitleParts,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            // Quick audio-call shortcut. The 3-dots menu was removed — long-
-            // press the row for block / report / delete.
-            _RowCallButton(onTap: onCall),
+            const SizedBox(width: 12),
+            // La colonne de droite : l'heure, puis le compte non-lu OU la
+            // touche d'appel. Jamais les deux — une conversation qui attend
+            // une réponse ne propose pas d'appeler à la place, et une
+            // conversation à jour n'a pas de chiffre à montrer.
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (lastMessage != null) ...[
+                  Text(
+                    _formatTime(lastMessage!.createdAt),
+                    style: TextStyle(
+                      fontFamily: _kMono,
+                      fontSize: 11.5,
+                      fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
+                      color: unread ? SC.accent : SC.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                ],
+                if (unreadCount > 0)
+                  _UnreadBadge(count: unreadCount)
+                else if (unread)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: SC.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  )
+                else
+                  // Fil à jour : l'appel passe en touche fantôme. Il ne
+                  // dispute plus la ligne au prénom.
+                  _RowCallButton(onTap: onCall),
+              ],
+            ),
           ],
         ),
         ),
@@ -1165,6 +1237,10 @@ class _TopToastState extends State<_TopToast>
 }
 
 /// Small round audio-call shortcut at the far-right of every chat-list row.
+///
+/// Touche fantôme : un simple cercle tracé, l'icône en creux. Le verre et le
+/// cyan en faisaient le point le plus vif de la ligne, alors qu'il n'y est que
+/// pour les fils déjà lus — un raccourci, pas une invitation.
 class _RowCallButton extends StatelessWidget {
   const _RowCallButton({required this.onTap});
 
@@ -1172,63 +1248,84 @@ class _RowCallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Real glass circle + spring bounce (like the header / photo buttons),
-    // keeping the cyan phone glyph.
-    return GlassIconButton(
-      icon: Icons.phone_rounded,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      size: 38,
-      iconSize: 18,
-      iconColor: SC.accent,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Icon(
+          Icons.call_outlined,
+          size: 16,
+          color: Colors.white.withValues(alpha: 0.5),
+        ),
+      ),
     );
   }
 }
 
-/// but cyan on black rather than red on white).
+/// Le titre d'une section : une étiquette en petites capitales à chasse fixe,
+/// et son compte. La pastille pleine a disparu — deux badges cyan (celui de la
+/// section, celui de la ligne) se disputaient l'œil pour dire la même chose.
+///
+/// Deux formes selon ce que le compte veut dire. Pour les matchs il ouvre le
+/// titre ([countLeads]) — « 3 NOUVEAUX MATCHS », c'est un stock. Pour les
+/// messages il le suit en cyan — « MESSAGES · 3 non lus », c'est un reste à
+/// traiter, et le titre reste lisible quand il tombe à zéro.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label, required this.count});
+  const _SectionHeader({
+    required this.label,
+    required this.count,
+    this.countLeads = false,
+  });
 
   final String label;
   final int count;
+  final bool countLeads;
+
+  static const TextStyle _label = TextStyle(
+    fontFamily: _kMono,
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 1.1,
+  );
 
   @override
   Widget build(BuildContext context) {
+    final title = label.toUpperCase();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      child: Row(
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: SC.accent,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-            ),
-          ),
-          if (count > 0) ...[
-            const SizedBox(width: 8),
-            Container(
-              constraints: const BoxConstraints(minWidth: 18),
-              height: 18,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: const BoxDecoration(
-                color: SC.accent,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Color(0xFF0E0E0E),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: countLeads
+          ? Text(
+              count > 0 ? '$count $title' : title,
+              style: _label.copyWith(color: SC.accent),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  title,
+                  style: _label.copyWith(
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
                 ),
-              ),
+                if (count > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    AppStrings.t('chat_unread_count', args: {'n': '$count'}),
+                    style: _label.copyWith(
+                      color: SC.accent,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -1237,16 +1334,23 @@ class _SectionHeader extends StatelessWidget {
 /// written to yet, newest first, name underneath. Tapping one opens the
 /// conversation — which is exactly what moves it out of the rail.
 class _MatchBubbleRail extends StatelessWidget {
-  const _MatchBubbleRail({required this.matches, required this.onTap});
+  const _MatchBubbleRail({
+    required this.matches,
+    required this.seen,
+    required this.onTap,
+  });
 
   final List<RemoteProfile> matches;
+
+  /// Les matchs déjà regardés : ils restent dans le rail, sans anneau.
+  final Set<String> seen;
   final void Function(RemoteProfile) onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      // La hauteur d'une bulle, plus rien : les prénoms ne sont plus dessous.
-      height: 66,
+      // La bulle, son anneau, et le prénom dessous.
+      height: 92,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1254,6 +1358,7 @@ class _MatchBubbleRail extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (ctx, i) => _MatchBubble(
           profile: matches[i],
+          seen: seen.contains(matches[i].id),
           onTap: () => onTap(matches[i]),
         ),
       ),
@@ -1262,21 +1367,76 @@ class _MatchBubbleRail extends StatelessWidget {
 }
 
 class _MatchBubble extends StatelessWidget {
-  const _MatchBubble({required this.profile, required this.onTap});
+  const _MatchBubble({
+    required this.profile,
+    required this.seen,
+    required this.onTap,
+  });
 
   final RemoteProfile profile;
+
+  /// Déjà vu : l'anneau tombe et la bulle s'estompe. Elle reste là — le match
+  /// n'a pas disparu, c'est la nouveauté qui s'est éteinte.
+  final bool seen;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // Pas de prénom sous la bulle : le rail ne montre que les visages.
+    final firstName = profile.displayName.trim().split(RegExp(r'\s+')).first;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: ProfileAvatar(
-        displayName: profile.displayName,
-        avatarUrl: profile.avatarUrl,
-        size: 66,
+      child: Opacity(
+        opacity: seen ? 0.55 : 1,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // L'anneau cyan→vert du match pas encore regardé. Il est peint SOUS
+            // la photo, qui garde un liseré de fond entre les deux : sans ça
+            // le dégradé touche le visage et se lit comme une bordure.
+            Container(
+              width: 64,
+              height: 64,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: seen
+                    ? null
+                    : const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [SC.accent, SC.online],
+                      ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: SC.bg, width: 2),
+                ),
+                child: ProfileAvatar(
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                  size: 56,
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            SizedBox(
+              width: 64,
+              child: Text(
+                firstName,
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: seen ? SC.textMuted : SC.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

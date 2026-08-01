@@ -25,6 +25,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
@@ -117,6 +118,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       reportedId: widget.peerDeviceId,
       peerName: peerName,
     );
+  }
+
+  /// Efface la conversation de MA liste et me ramène en arrière — le même
+  /// geste que l'appui long sur la ligne dans les messages, offert ici parce
+  /// que c'est de cet écran qu'on ne peut plus rien faire d'autre.
+  Future<void> _deleteConversation() async {
+    final ok = await showSwaycoConfirm(
+      context: context,
+      title: AppStrings.t('delete_conversation'),
+      body: AppStrings.t('delete_conversation_body'),
+      confirmLabel: AppStrings.t('delete'),
+      destructive: true,
+    );
+    if (ok != true) return;
+    await ChatUnread.markConversationCleared(widget.conversationId);
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
   }
 
   Future<void> _toggleBlockPeer() async {
@@ -638,22 +656,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               ),
                             ),
                             // Floating "local time at the peer's place" bubble.
-                            // Centred under the swaycø logo, not the screen:
-                            // the header's logo sits in an Expanded offset by
-                            // the back+avatar cluster on the left (18 padding +
-                            // 40 + 8 + 36 + 10 = 112) and the call button on the
-                            // right (18 padding + 40 = 58). Matching those insets
-                            // here puts the bubble's centre on the logo's centre.
+                            // Alignée SOUS le prénom, pas centrée sous le logo :
+                            // l'heure et la ville se lisent avec le nom de la
+                            // personne dont elles parlent. Le 112 est le décalage
+                            // du prénom dans l'en-tête (18 de marge + 40 du
+                            // retour + 8 + 36 de la photo + 10) ; le 58 tient la
+                            // pastille à l'écart des boutons d'appel.
                             if (peerClock != null)
                               Positioned(
                                 top: 8,
                                 left: 112,
                                 right: 58,
                                 child: Align(
-                                  alignment: Alignment.topCenter,
+                                  alignment: Alignment.topLeft,
                                   child: _PeerClockChip(
                                     clock: peerClock,
-                                    name: widget.title,
+                                    place: _peer?.city ?? '',
                                   ),
                                 ),
                               ),
@@ -672,7 +690,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
               right: 0,
               bottom: 0,
               child: _peerBlockedMe
-                  ? const _BlockedComposerNotice()
+                  ? _BlockedComposerNotice(
+                      name: _peer?.displayName.isNotEmpty == true
+                          ? _peer!.displayName
+                          : widget.title,
+                      onReport: _reportPeer,
+                      onDelete: _deleteConversation,
+                    )
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -942,11 +966,23 @@ class _ThreadHeader extends StatelessWidget {
             ),
             // Deux boutons d'appel : la caméra démarre le mode visio, le
             // téléphone un appel normal (caméras coupées) — c'est lui qui est
-            // au bord, le plus près du pouce. Grisés quand le pair m'a
-            // bloqué : l'appel ne passerait pas.
-            Opacity(
-              opacity: blockedByPeer ? 0.4 : 1.0,
-              child: Row(
+            // au bord, le plus près du pouce.
+            //
+            // Bloqué par le pair, ils cessent d'être des boutons : plus de
+            // verre, plus de rebond, plus rien à toucher — il ne reste que les
+            // deux icônes en creux. Un bouton grisé se presse quand même ;
+            // une icône nue, non. Ce qu'on peut encore faire est en bas.
+            if (blockedByPeer)
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _DeadCallIcon(icon: Icons.videocam_rounded),
+                  SizedBox(width: 8),
+                  _DeadCallIcon(icon: Icons.phone_rounded),
+                ],
+              )
+            else
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GlassIconButton(
@@ -967,7 +1003,6 @@ class _ThreadHeader extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
           ],
         ),
       ),
@@ -975,40 +1010,40 @@ class _ThreadHeader extends StatelessWidget {
   }
 }
 
-/// Small floating bubble under the header showing the peer's local time, with
-/// a white sun (day) / moon (night) icon. Orange-tinted, darker border.
-class _PeerClockChip extends StatefulWidget {
-  const _PeerClockChip({required this.clock, required this.name});
+/// L'icône d'appel quand elle n'appelle plus : même gabarit que le bouton en
+/// verre qu'elle remplace, pour que l'en-tête ne bouge pas d'un pixel — mais
+/// sans fond, sans bord et sans geste. Elle dit ce qui existait ici, pas ce
+/// qu'on peut faire.
+class _DeadCallIcon extends StatelessWidget {
+  const _DeadCallIcon({required this.icon});
 
-  final PeerLocalTime clock;
-  final String name;
+  final IconData icon;
 
   @override
-  State<_PeerClockChip> createState() => _PeerClockChipState();
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.32)),
+    );
+  }
 }
 
-class _PeerClockChipState extends State<_PeerClockChip> {
-  // A tap stretches the pill open to spell out whose local time it is; it
-  // folds back on the next tap, or on its own after a few seconds.
-  bool _open = false;
-  Timer? _autoClose;
+/// Small floating bubble under the header showing the peer's local time, with
+/// a white sun (day) / moon (night) icon and the city it is that time in.
+/// Orange-tinted, darker border.
+///
+/// The city is the whole point of the line — an hour on its own says nothing
+/// about where the other person is. It replaces the tap-to-unfold phrase
+/// ("il est 11:15 chez Djeffar"), which said the same thing in more words and
+/// only after a tap nobody knew to make: the pill is now inert.
+class _PeerClockChip extends StatelessWidget {
+  const _PeerClockChip({required this.clock, required this.place});
 
-  void _toggle() {
-    if (!mounted) return;
-    setState(() => _open = !_open);
-    _autoClose?.cancel();
-    if (_open) {
-      _autoClose = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _open = false);
-      });
-    }
-  }
+  final PeerLocalTime clock;
 
-  @override
-  void dispose() {
-    _autoClose?.cancel();
-    super.dispose();
-  }
+  /// The peer's city (their country when no city is set); empty = time alone.
+  final String place;
 
   @override
   Widget build(BuildContext context) {
@@ -1022,57 +1057,46 @@ class _PeerClockChipState extends State<_PeerClockChip> {
       fontWeight: FontWeight.w700,
       shadows: shadows,
     );
-    final firstName = widget.name.trim().split(RegExp(r'\s+')).first;
+    final city = place.trim();
 
     final timeRow = Row(
-      key: const ValueKey('time'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          widget.clock.hhmm,
+          clock.hhmm,
           style: textStyle.copyWith(
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
         const SizedBox(width: 6),
         Icon(
-          widget.clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+          clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
           size: 14,
           color: Colors.white,
           shadows: shadows,
         ),
+        if (city.isNotEmpty) ...[
+          const SizedBox(width: 7),
+          // Capitales et un poil plus petit : la ville accompagne l'heure, elle
+          // ne lui dispute pas la place.
+          Flexible(
+            child: Text(
+              city.toUpperCase(),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: textStyle.copyWith(fontSize: 11.5, letterSpacing: 0.4),
+            ),
+          ),
+        ],
       ],
     );
-    final phrase = Text(
-      AppStrings.t(
-        'peer_clock_phrase',
-        args: {'time': widget.clock.hhmm, 'name': firstName},
-      ),
-      key: const ValueKey('phrase'),
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.fade,
-      style: textStyle,
-    );
 
-    return GestureDetector(
-      // One tap and it unfolds — no press-and-hold any more.
-      behavior: HitTestBehavior.opaque,
-      onTap: _toggle,
-      child: GlassPanel(
-        borderRadius: 999,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        color: const Color(0x55FFA726), // light orange — recording tint
-        // Stretch open/closed; the text cross-fades inside.
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutBack,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: _open ? phrase : timeRow,
-          ),
-        ),
-      ),
+    return GlassPanel(
+      borderRadius: 999,
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      color: const Color(0x55FFA726), // light orange — recording tint
+      child: timeRow,
     );
   }
 }
@@ -1545,36 +1569,111 @@ class _VoicePlayerState extends State<_VoicePlayer> {
   }
 }
 
-/// Replaces the composer when the peer has blocked me — a flat, disabled
-/// notice bar so it's obvious messages can't be sent (they'd go nowhere).
+/// Le panneau qui prend la place du composer quand le pair m'a bloqué.
+///
+/// Il ne se contente plus d'annoncer la mauvaise nouvelle : puisque écrire et
+/// appeler sont devenus impossibles, il porte les deux seules choses qui
+/// restent — signaler la personne, ou supprimer la conversation. C'est là que
+/// le pouce arrive, à la place exacte où il allait écrire.
 class _BlockedComposerNotice extends StatelessWidget {
-  const _BlockedComposerNotice();
+  const _BlockedComposerNotice({
+    required this.name,
+    required this.onReport,
+    required this.onDelete,
+  });
+
+  /// Prénom du pair — le titre le nomme, sinon on ne sait pas qui a bloqué qui.
+  final String name;
+  final VoidCallback onReport;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: SC.bg,
+    final firstName = name.trim().split(RegExp(r'\s+')).first;
+    return Padding(
       padding: EdgeInsets.fromLTRB(
-        16,
-        14,
-        16,
-        // Match the idle bar's slight upward nudge (was 14).
-        20 + MediaQuery.paddingOf(context).bottom,
+        12,
+        4,
+        12,
+        12 + MediaQuery.paddingOf(context).bottom * 0.4,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.block, size: 18, color: SC.textMuted),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              AppStrings.t('chat_blocked_by_peer'),
+      child: GlassPanel(
+        borderRadius: 22,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppStrings.t('chat_blocked_title', args: {'name': firstName}),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: SC.textMuted, fontSize: 13.5),
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.t('chat_blocked_body'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: SC.textMuted,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _BlockedAction(
+                  label: AppStrings.t('report'),
+                  onTap: onReport,
+                ),
+                const SizedBox(width: 10),
+                _BlockedAction(
+                  label: AppStrings.t('delete'),
+                  onTap: onDelete,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Une des deux touches du panneau de blocage : une pilule sobre, bordée, sans
+/// couleur d'alerte — ni l'une ni l'autre n'est le geste qu'on attend de
+/// quelqu'un, et rien ne doit pousser à en choisir une.
+class _BlockedAction extends StatelessWidget {
+  const _BlockedAction({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      bounce: true,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: SC.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        ],
+        ),
       ),
     );
   }
