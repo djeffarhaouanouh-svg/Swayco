@@ -119,8 +119,9 @@ class AudioController extends ChangeNotifier {
     // Les volumes NE sont pas réinitialisés : les 3/4 et le 1/2 ne sont que le
     // point de départ d'un utilisateur qui n'y a jamais touché. Qui a trouvé
     // son équilibre le retrouve à l'appel suivant.
-    // La route, elle, suit le mode : c'est le bouton pressé qui décide, pas
-    // l'appel d'avant.
+    // La route suit le mode : c'est le bouton pressé qui décide, pas l'appel
+    // d'avant. Un appel vidéo se tient à distance, donc haut-parleur ; un appel
+    // audio se prend à l'oreille.
     _prefs = _prefs.copyWith(speakerOn: video);
 
     await _applySpeaker(_prefs.speakerOn);

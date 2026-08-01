@@ -97,113 +97,6 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
-/// Les couleurs de la lueur. Rien à voir avec la palette de l'app : celle-ci
-/// est faite de teintes de ruban LED — saturées à fond, lumineuses, celles
-/// qu'un bandeau RVB sait vraiment produire. Les tons d'interface (le cyan de
-/// l'accent, le bleu nuit des bulles) donnaient une lueur terne, parce qu'ils
-/// sont dessinés pour être lus, pas pour briller.
-class _GlowPalette {
-  const _GlowPalette._();
-
-  /// Le mode multicolore. Ce n'est pas une couleur, c'est un drapeau — d'où
-  /// l'alpha nul, qu'aucun vrai choix ne peut porter.
-  static const Color rainbow = Color(0x00FFFFFF);
-
-  /// Le multicolore à la Google : les quatre teintes de leurs surfaces IA,
-  /// posées EN MÊME TEMPS le long du bord et qui coulent. Pas une teinte
-  /// unique qui vire lentement — ce qu'on reconnaît chez eux, c'est justement
-  /// de voir le bleu, le violet, le rose et l'ambre cohabiter.
-  ///
-  /// La dernière reprend la première : c'est ce qui permet au dégradé de
-  /// boucler sans couture quand il défile.
-  static const List<Color> multi = [
-    Color(0xFF4285F4),
-    Color(0xFF9B72CB),
-    Color(0xFFD96570),
-    Color(0xFFF9AB00),
-    Color(0xFF4285F4),
-  ];
-
-  /// Le spectre d'un ruban, dans l'ordre où on le parcourt.
-  static const List<Color> swatches = [
-    Color(0xFF00E5FF), // cyan électrique
-    Color(0xFF2979FF), // bleu franc
-    Color(0xFF7C4DFF), // indigo
-    Color(0xFFB14DFF), // violet
-    Color(0xFFFF2DD4), // magenta
-    Color(0xFFFF4081), // rose
-    Color(0xFFFF1744), // rouge
-    Color(0xFFFF6D00), // orange
-    Color(0xFFFFC400), // ambre
-    Color(0xFFC6FF00), // citron
-    Color(0xFF00E676), // vert
-    Color(0xFF1DE9B6), // turquoise
-    Color(0xFFFFE9C4), // blanc chaud
-    rainbow,
-  ];
-}
-
-/// Les modes d'animation de la lueur — ceux d'un contrôleur de ruban LED, pas
-/// des directions. Deux familles :
-///
-///  • ceux qui jouent sur la FORCE, la même sur toute la largeur ([steady],
-///    [breathe], [strobe], [twinkle]) ;
-///  • ceux qui jouent sur la POSITION, une ou plusieurs bandes claires qui
-///    parcourent le bord ([chase], [bounce], [wave]) — eux seuls ont un sens.
-///
-/// L'ordre compte : c'est l'index qui est écrit dans les préférences.
-enum _GlowMotion {
-  /// Allumée, sans rien faire.
-  steady,
-
-  /// Elle enfle et retombe, doucement, en boucle.
-  breathe,
-
-  /// Deux éclairs secs, puis le noir. Le mode « flash » des rubans.
-  strobe,
-
-  /// Une bande claire parcourt le bord et repart de l'autre côté.
-  chase,
-
-  /// La même bande, mais elle rebondit sur les deux bords au lieu de boucler.
-  bounce,
-
-  /// Plusieurs bandes qui se suivent sans fin — le mode « flow ».
-  wave,
-
-  /// Elle papillote de façon irrégulière, comme une guirlande.
-  twinkle;
-
-  /// Le mode a-t-il un sens de parcours ? Les autres ignorent la direction.
-  bool get isDirectional =>
-      this == _GlowMotion.chase ||
-      this == _GlowMotion.bounce ||
-      this == _GlowMotion.wave;
-
-  /// La durée d'un cycle. Chaque mode a la sienne : un stroboscope à la vitesse
-  /// d'une respiration n'est plus un stroboscope.
-  Duration get period => switch (this) {
-        _GlowMotion.steady => const Duration(milliseconds: 2000),
-        _GlowMotion.breathe => const Duration(milliseconds: 2600),
-        _GlowMotion.strobe => const Duration(milliseconds: 1400),
-        _GlowMotion.chase => const Duration(milliseconds: 1800),
-        _GlowMotion.bounce => const Duration(milliseconds: 2400),
-        _GlowMotion.wave => const Duration(milliseconds: 2600),
-        _GlowMotion.twinkle => const Duration(milliseconds: 900),
-      };
-
-  /// La clé du libellé montré dans le panneau.
-  String get labelKey => switch (this) {
-        _GlowMotion.steady => 'call_glow_steady',
-        _GlowMotion.breathe => 'call_glow_breathe',
-        _GlowMotion.strobe => 'call_glow_strobe',
-        _GlowMotion.chase => 'call_glow_chase',
-        _GlowMotion.bounce => 'call_glow_bounce',
-        _GlowMotion.wave => 'call_glow_wave',
-        _GlowMotion.twinkle => 'call_glow_twinkle',
-      };
-}
-
 class _CallScreenState extends State<CallScreen> {
   Room? _room;
   String? _connectError;
@@ -235,63 +128,14 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
-  /// Les réglages de la lueur. Ils survivent à l'appel : c'est un goût, pas un
-  /// réglage d'appel — voir [UserPrefs.loadGlow].
-  Color _glowColor = _GlowPalette.swatches.first;
-  _GlowMotion _glowMotion = _GlowMotion.breathe;
-  double _glowIntensity = 1.0;
+  /// Le panneau des langues est ouvert : le galet de l'écran s'efface, celui
+  /// du panneau prend le relais.
+  bool _langSheetOpen = false;
 
-  /// Le sens de parcours, pour les modes qui en ont un. False = vers la
-  /// gauche.
-  bool _glowRightward = true;
-
-  Future<void> _loadGlowPrefs() async {
-    final g = await UserPrefs.loadGlow();
-    if (!mounted) return;
-    setState(() {
-      if (g.color != null) _glowColor = Color(g.color!);
-      if (g.motion != null &&
-          g.motion! >= 0 &&
-          g.motion! < _GlowMotion.values.length) {
-        _glowMotion = _GlowMotion.values[g.motion!];
-      }
-      if (g.intensity != null) _glowIntensity = g.intensity!.clamp(0.15, 2.0);
-      if (g.rightward != null) _glowRightward = g.rightward!;
-    });
-  }
-
-  /// Le panneau de la lueur : sa couleur, le sens dans lequel elle traverse le
-  /// bord, et sa force. Il s'applique en direct — d'où le [setState] à chaque
-  /// cran — et n'écrit dans les préférences qu'une fois refermé.
-  void _openGlowSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: SC.bg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) => _GlowSettingsSheet(
-        color: _glowColor,
-        motion: _glowMotion,
-        intensity: _glowIntensity,
-        rightward: _glowRightward,
-        onChanged: (c, m, i, r) => setState(() {
-          _glowColor = c;
-          _glowMotion = m;
-          _glowIntensity = i;
-          _glowRightward = r;
-        }),
-      ),
-    ).whenComplete(() {
-      unawaited(UserPrefs.saveGlow(
-        color: _glowColor.toARGB32(),
-        motion: _glowMotion.index,
-        intensity: _glowIntensity,
-        rightward: _glowRightward,
-      ));
-    });
-  }
+  /// La conversation s'est ouverte d'elle-même une fois. Ensuite elle
+  /// n'insiste plus : c'est au premier tour de parole qu'on veut découvrir
+  /// qu'elle existe, pas à chaque phrase de l'appel.
+  bool _turnsAutoOpened = false;
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
   /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
@@ -496,6 +340,13 @@ class _CallScreenState extends State<CallScreen> {
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
+    // La toute première phrase de l'appel ouvre la conversation : sans ça,
+    // personne ne découvre qu'elle est là. Les suivantes ne forcent plus rien —
+    // si on l'a refermée, c'est qu'on voulait voir le visage.
+    if (!_turnsAutoOpened) {
+      _turnsAutoOpened = true;
+      _turnsOpen = true;
+    }
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -1192,7 +1043,6 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _minSplashDone = true);
     });
     unawaited(_loadPeerProfile());
-    unawaited(_loadGlowPrefs());
     // Le système peut refuser de transcrire (Siri / Dictée coupés) : sans ce
     // fil, la panne serait totalement muette côté utilisateur.
     AsrService.osRefusedKey.addListener(_onSttRefused);
@@ -1916,6 +1766,30 @@ class _CallScreenState extends State<CallScreen> {
     if (mounted) setState(() {});
   }
 
+  /// Retourner la caméra, avant / arrière.
+  ///
+  /// LiveKit expose l'échange sur la piste elle-même, pas sur le participant :
+  /// on va chercher la piste vidéo locale publiée et on lui demande de
+  /// basculer. Sans piste — caméra coupée, ou pas encore publiée — il n'y a
+  /// rien à retourner et on ne fait rien plutôt que de lever.
+  Future<void> _flipCamera() async {
+    final room = _room;
+    if (room == null) return;
+    final track = _localVideo(room);
+    if (track is! LocalVideoTrack) return;
+    try {
+      await track.setCameraPosition(
+        track.currentOptions is CameraCaptureOptions &&
+                (track.currentOptions as CameraCaptureOptions).cameraPosition ==
+                    CameraPosition.front
+            ? CameraPosition.back
+            : CameraPosition.front,
+      );
+    } catch (e) {
+      DebugOverlay.log('flip camera failed: $e');
+    }
+  }
+
   Future<void> _toggleCam() async {
     final room = _room;
     if (room == null) return;
@@ -1987,16 +1861,23 @@ class _CallScreenState extends State<CallScreen> {
     // survoler.
     var spoken = _mySourceLang;
     var heard = _myOutputLang;
+    // Le galet de l'appel s'efface pendant le panneau : celui-ci en montre un
+    // à lui, réduit et sans ondes. Deux galets dont un flouté derrière l'autre
+    // n'auraient rien voulu dire.
+    setState(() => _langSheetOpen = true);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bg,
+      // Le panneau se peint lui-même, sur toute la hauteur : le fond, le flou
+      // et le galet lui appartiennent.
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
       builder: (ctx) => _LanguagePairSheet(
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
+        translationOn: _translationEnabled,
+        ttsSpeaking: ttsSpeaking,
+        voiceLevel: _voiceLevel,
         onChanged: (s, h) {
           spoken = s;
           heard = h;
@@ -2004,6 +1885,7 @@ class _CallScreenState extends State<CallScreen> {
       ),
     ).whenComplete(() {
       if (!mounted) return;
+      setState(() => _langSheetOpen = false);
       // Deux chemins bien distincts : la langue parlée relance notre
       // recogniser, celle qu'on entend est annoncée au pair.
       if (_baseLang(spoken) != _baseLang(_mySourceLang)) {
@@ -2707,7 +2589,11 @@ class _CallScreenState extends State<CallScreen> {
                     right: 12,
                     width: 118,
                     height: 176,
-                    child: GestureDetector(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(
+                          child: GestureDetector(
                       onTap: () => setState(() => _selfMain = !_selfMain),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
@@ -2756,6 +2642,18 @@ class _CallScreenState extends State<CallScreen> {
                           }(),
                         ),
                       ),
+                          ),
+                        ),
+                        // Retourner la caméra, dans le coin de sa propre
+                        // vignette : c'est SON image qu'on retourne, le bouton
+                        // doit être posé dessus. Il déborde à demi du cadre —
+                        // d'où le [Clip.none] — pour ne pas manger la vidéo.
+                        Positioned(
+                          right: -6,
+                          bottom: -6,
+                          child: _PipFlipButton(onTap: _flipCamera),
+                        ),
+                      ],
                     ),
                   ),
                 // Conversation dépliée : un tap n'importe où ailleurs la
@@ -2791,19 +2689,54 @@ class _CallScreenState extends State<CallScreen> {
                       return overlay ?? const SizedBox.shrink();
                     },
                   ),
-                // Le galet, au milieu de l'écran. Posé sur la vidéo, au-dessus
-                // de la couche qui rallume le panneau — sinon un tap dessus se
-                // contenterait de réveiller la barre au lieu de couper la
-                // traduction.
-                Center(
-                  child: _TranslationOrb(
-                    on: _translationEnabled,
-                    ttsSpeaking: ttsSpeaking,
-                    voiceLevel: _voiceLevel,
-                    onTap: _toggleTranslation,
-                    onLongPress: _openCallSettingsSheet,
+                // Le galet, bas dans l'écran mais pas au ras des touches : ses
+                // ondes montent jusqu'à 2,4 fois son disque, et si elles
+                // atteignaient les réglages dépliés on ne saurait plus ce qui
+                // appartient à quoi. 0,68 le pose sous le milieu en laissant
+                // cette marge.
+                //
+                // Posé au-dessus de la couche qui rallume la barre — sinon un
+                // tap dessus se contenterait de la réveiller au lieu de couper
+                // la traduction.
+                if (!_langSheetOpen)
+                  Align(
+                    alignment: const Alignment(0, 0.36),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _TranslationOrb(
+                          on: _translationEnabled,
+                          ttsSpeaking: ttsSpeaking,
+                          voiceLevel: _voiceLevel,
+                          onTap: _toggleTranslation,
+                          onLongPress: _openCallSettingsSheet,
+                        ),
+                        // Coupée, la traduction le DIT. La pierre éteinte et
+                        // son triangle suffisent à qui connaît déjà le galet ;
+                        // pour tous les autres, un appel qui cesse de traduire
+                        // sans un mot ressemble à une panne.
+                        //
+                        // Hors du [Pressable] : ce n'est qu'une étiquette, elle
+                        // ne doit pas voler le tap destiné à reprendre.
+                        if (!_translationEnabled)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              AppStrings.t('call_translation_paused'),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.65),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.4,
+                                shadows: const [
+                                  Shadow(color: Colors.black, blurRadius: 8),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
                 // Le dock : une barre de verre posée en bas, qui flotte
                 // au-dessus de la vidéo. Ce qui se déplie — conversation et
                 // réglages — pousse vers le HAUT, au-dessus d'elle ; la barre,
@@ -2865,44 +2798,37 @@ class _CallScreenState extends State<CallScreen> {
                                       spacing: 12,
                                       runSpacing: 10,
                                       children: [
-                                        // Muet = engagé : le bouton se remplit.
+                                        // La conversation descend ici et le
+                                        // haut-parleur monte dans la barre :
+                                        // on change de sortie audio en pleine
+                                        // phrase, on relit le texte plus
+                                        // posément.
                                         _RoundCallButton(
-                                          icon: _micOn
-                                              ? Icons.mic_rounded
-                                              : Icons.mic_off_rounded,
-                                          label: _micOn
-                                              ? AppStrings.t('call_mute')
-                                              : AppStrings.t('call_unmute'),
-                                          active: !_micOn,
-                                          onTap: _toggleMic,
+                                          icon: Icons.sms_rounded,
+                                          label:
+                                              AppStrings.t('messages_title'),
+                                          active: _turnsOpen,
+                                          // L'anneau cyan : c'est le bouton
+                                          // qu'on cherche en ouvrant le rail.
+                                          ring: true,
+                                          onTap: () {
+                                            _wakeDock();
+                                            setState(
+                                              () => _turnsOpen = !_turnsOpen,
+                                            );
+                                          },
                                         ),
+                                        // Les langues reviennent ici : la barre
+                                        // du bas porte désormais le micro et
+                                        // la caméra à leur place, et sans ce
+                                        // retour le sélecteur de langues ne
+                                        // serait plus atteignable nulle part.
                                         _RoundCallButton(
-                                          icon: _audio.speakerOn
-                                              ? Icons.volume_up_rounded
-                                              : Icons.phone_in_talk_rounded,
-                                          label: AppStrings.t(_audio.speakerOn
-                                              ? 'call_earpiece'
-                                              : 'call_speaker'),
-                                          active: _audio.speakerOn,
-                                          onTap: _toggleSpeaker,
+                                          icon: Icons.translate_rounded,
+                                          label:
+                                              AppStrings.t('call_language'),
+                                          onTap: _openLanguagePairSheet,
                                         ),
-                                        // Live keeps the camera on — no toggle.
-                                        if (_callKind != 'live')
-                                          _RoundCallButton(
-                                            icon: _camOn
-                                                ? Icons.videocam_rounded
-                                                : Icons.videocam_off_rounded,
-                                            label: _camOn
-                                                ? AppStrings.t('call_video')
-                                                : AppStrings.t(
-                                                    'call_video_off'),
-                                            active: !_camOn,
-                                            onTap: _toggleCam,
-                                          ),
-                                        // Les langues ne sont plus ici : elles
-                                        // ont leur touche dans la barre, à
-                                        // demeure — on en change trop souvent
-                                        // pour avoir à déplier les réglages.
                                         // Ils ouvrent un panneau, ils ne
                                         // basculent rien : jamais d'état
                                         // blanc, et le même verre que les
@@ -2912,43 +2838,31 @@ class _CallScreenState extends State<CallScreen> {
                                           label: AppStrings.t('call_audio'),
                                           onTap: _openAudioSheet,
                                         ),
-                                        _RoundCallButton(
-                                          icon: Icons.auto_awesome_rounded,
-                                          label: AppStrings.t('call_glow'),
-                                          onTap: _openGlowSheet,
-                                        ),
                                       ],
                                     ),
                                   ),
                           ),
                           // 3. La barre elle-même.
                           _CallDock(
-                            hasTurns: _turns.isNotEmpty,
-                            glowColor: _glowColor,
-                            glowMotion: _glowMotion,
-                            glowRightward: _glowRightward,
-                            glowIntensity: _glowIntensity,
-                            // Le drapeau de la langue qu'on ENTEND, celle que
-                            // cette touche sert à changer. Repli sur la langue
-                            // du compte tant que rien n'a été choisi.
-                            flagCountry: findLanguageByCode(
-                                  _myOutputLang.isNotEmpty
-                                      ? _myOutputLang
-                                      : AppStrings.currentBcp47.value,
-                                )?.countryCode ??
-                                '',
+                            camOn: _camOn,
+                            micOn: _micOn,
+                            speakerOn: _audio.speakerOn,
                             ttsSpeaking: ttsSpeaking,
                             voiceLevel: _voiceLevel,
                             controlsOpen: _controlsOpen,
                             dimmed: _dockDimmed,
                             onWake: _wakeDock,
-                            onToggleTurns: () {
+                            onToggleCam: () {
                               _wakeDock();
-                              setState(() => _turnsOpen = !_turnsOpen);
+                              _toggleCam();
                             },
-                            onToggleLanguage: () {
+                            onToggleMic: () {
                               _wakeDock();
-                              _openLanguagePairSheet();
+                              _toggleMic();
+                            },
+                            onToggleSpeaker: () {
+                              _wakeDock();
+                              _toggleSpeaker();
                             },
                             onHangUp: _hangUp,
                             onToggleControls: () {
@@ -3089,1082 +3003,183 @@ class _SpokenTurnsPanel extends StatefulWidget {
   final String peerName;
   final String peerAvatarUrl;
 
-  /// Hauteur MAXIMALE : quatre bulles tiennent dedans, la cinquième se devine
-  /// sous le dégradé — c'est ce qui invite à faire défiler. En dessous de ça,
-  /// le panneau épouse ses bulles.
-  static const double _openHeight = 232;
+  /// Trois phrases à l'écran, pas plus. Au-delà on ne relit plus, on subit —
+  /// et la vidéo est ce qu'on est venu regarder. Les plus anciennes restent
+  /// atteignables en faisant défiler.
+  static const int visible = 3;
 
   @override
   State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
 }
 
 class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
-  /// Y a-t-il vraiment de quoi faire défiler ? Le fondu du haut ne se peint que
-  /// dans ce cas : posé sur deux phrases qui ne remplissent même pas le
-  /// panneau, il faisait une barre noire flottante au milieu de la vidéo,
-  /// sans rien à estomper.
-  bool _scrollable = false;
-
   @override
   Widget build(BuildContext context) {
     final turns = widget.turns;
-    final list = ListView.builder(
-      // Le plus récent en bas, et on remonte le temps en faisant défiler.
-      reverse: true,
-      // Le panneau ne réserve plus sa hauteur pleine : avec deux phrases il
-      // fait la taille de deux phrases, et l'air en trop ne traîne pas sur la
-      // vidéo.
-      shrinkWrap: true,
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: turns.length,
-      itemBuilder: (ctx, i) {
-        final turn = turns[turns.length - 1 - i];
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: _TurnBubble(
-            turn: turn,
-            name: turn.mine ? widget.myName : widget.peerName,
-            avatarUrl: turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
-          ),
-        );
-      },
-    );
+    final shown = turns.length <= _SpokenTurnsPanel.visible
+        ? turns
+        : turns.sublist(turns.length - _SpokenTurnsPanel.visible);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onToggle,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxHeight: _SpokenTurnsPanel._openHeight,
-        ),
-        child: NotificationListener<ScrollMetricsNotification>(
-          // La liste dit elle-même si elle déborde. On ne peut pas le savoir
-          // avant la mise en page — d'où le report d'une image : changer d'état
-          // pendant qu'elle se construit est interdit.
-          onNotification: (n) {
-            final can = n.metrics.maxScrollExtent > 1;
-            if (can != _scrollable) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() => _scrollable = can);
-              });
-            }
-            return false;
-          },
-          // Le fondu du haut : un dégradé posé PAR-DESSUS (pas un ShaderMask —
-          // il isolerait le flou des bulles et le tuerait).
-          child: Stack(
-            children: [
-              list,
-              if (_scrollable)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 56,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.55),
-                            Colors.black.withValues(alpha: 0.0),
-                          ],
-                        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // L'en-tête : ce que c'est à gauche, comment s'en débarrasser à
+          // droite. Le geste de fermeture ne se devine pas — un panneau qui
+          // recouvre un visage doit dire lui-même comment on le retire.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // La pastille du direct : le même point qu'on met devant un
+                    // « en cours » partout ailleurs. C'est elle qui fait lire
+                    // « live » plutôt que « journal ».
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(right: 7),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        // Le cyan bleu de l'app, pas le turquoise de l'accent :
+                        // plus bleu, moins vert.
+                        color: SC.meshCyan,
                       ),
                     ),
+                    Text(
+                      AppStrings.t('call_turns_title'),
+                      style: const TextStyle(
+                        color: SC.meshCyan,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  AppStrings.t('call_turns_close'),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 10.5,
+                    letterSpacing: 0.2,
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
-        ),
+          for (var i = 0; i < shown.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _TurnBubble(
+                turn: shown[i],
+                name: shown[i].mine ? widget.myName : widget.peerName,
+                avatarUrl:
+                    shown[i].mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
+                // La dernière phrase passe au blanc plein : c'est celle qu'on
+                // est en train de lire. Les précédentes s'effacent derrière
+                // elle au lieu de se disputer le regard.
+                latest: i == shown.length - 1,
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-/// Une bulle : la PDP de qui parle, puis sa phrase, sur du verre sombre.
+/// Une bulle : la PDP de qui parle, du côté de qui parle.
+///
+/// Les miennes vont à DROITE, les siennes à gauche — la même convention que
+/// n'importe quelle messagerie, et elle vaut ici aussi : on sait qui a dit quoi
+/// sans lire le nom.
 class _TurnBubble extends StatelessWidget {
   const _TurnBubble({
     required this.turn,
     required this.name,
     required this.avatarUrl,
+    required this.latest,
   });
 
   final _SpokenTurn turn;
   final String name;
   final String avatarUrl;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ProfileAvatar(
-          displayName: name,
-          avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-          size: 30,
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              // Plus franc qu'avant : la bulle du pair ne tient plus que par
-              // son flou, il faut qu'il travaille vraiment.
-              filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  // Les miennes gardent le bleu — c'est à ça qu'on reconnaît ce
-                  // qu'on a dit soi-même. Same accent, thinner when nobody
-                  // received it: a phrase that never landed reads as a faded
-                  // version of one that did, not as another kind of message.
-                  // No new colour, the alpha carries it.
-                  //
-                  // Celles du pair passent au verre : du blanc très dilué sur
-                  // un gros flou, comme les surfaces d'iOS. Le noir à 0.42
-                  // faisait une pastille opaque posée sur la vidéo ; là, la
-                  // vidéo continue de vivre dessous.
-                  color: turn.mine
-                      ? SC.accent.withValues(alpha: turn.delivered ? 0.32 : 0.06)
-                      : Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    // Le liseré du verre attrape la lumière : plus net que
-                    // celui d'une bulle teintée, sinon la bulle du pair n'a
-                    // plus de contour du tout.
-                    color: turn.mine
-                        ? Colors.white
-                            .withValues(alpha: turn.delivered ? 0.18 : 0.06)
-                        : Colors.white.withValues(alpha: 0.30),
-                  ),
-                ),
-                child: Text(
-                  turn.text,
-                  style: TextStyle(
-                    // Une phrase que personne n'a reçue s'efface franchement :
-                    // à 0.55 elle se lisait presque comme les autres, et on
-                    // croyait l'avoir envoyée. À 0.32 elle reste lisible — on
-                    // doit pouvoir la relire pour la redire — mais on voit
-                    // d'un coup d'œil qu'elle n'est pas partie.
-                    color: Colors.white
-                        .withValues(alpha: turn.delivered ? 1.0 : 0.32),
-                    fontSize: 14.5,
-                    height: 1.35,
-                    fontStyle:
-                        turn.delivered ? FontStyle.normal : FontStyle.italic,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// La touche des langues : le drapeau de celle que j'ENTENDS, dans laquelle la
-/// voix d'en face m'est dite. Un tap ouvre le panneau qui porte les deux — la
-/// langue que je parle et celle que j'entends.
-class _LanguageButton extends StatelessWidget {
-  const _LanguageButton({required this.country, required this.onTap});
-
-  /// Code ISO pays (`FR`, `JP`) — celui du drapeau, pas de la langue.
-  final String country;
-  final VoidCallback onTap;
-
-  static const double _size = 45;
+  /// La plus récente. Elle seule est pleine et lisible d'un coup.
+  final bool latest;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: AppStrings.t('call_output_language_title'),
-      button: true,
-      child: Pressable(
-        bounce: true,
-        onTap: onTap,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: ClipOval(
-                  child: country.isEmpty
-                      ? Container(
-                          color: SC.bubbleIn,
-                          child: const Icon(
-                            Icons.translate,
-                            size: 21,
-                            color: Colors.white,
-                          ),
-                        )
-                      : CountryFlag.fromCountryCode(
-                          country,
-                          theme: const ImageTheme(
-                            width: _size,
-                            height: _size,
-                            shape: Circle(),
-                          ),
-                        ),
-                ),
-              ),
-              // L'anneau : il détache le drapeau de la vidéo.
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final avatar = ProfileAvatar(
+      displayName: name,
+      avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+      size: 26,
     );
-  }
-}
 
-/// La barre du bas : une seule pièce de verre, posée sur la vidéo, qui porte
-/// quatre touches à égale distance — la conversation (un tap déplie ce qui se
-/// dit), les langues, le chevron qui déplie les réglages au-dessus, et
-/// raccrocher tout au bout. La traduction, elle, a quitté la barre : c'est le
-/// galet au milieu de l'écran. Elle ne bouge plus jamais : ni glissement, ni
-/// touche qui s'efface au passage d'une phrase.
-class _CallDock extends StatelessWidget {
-  const _CallDock({
-    required this.hasTurns,
-    required this.glowColor,
-    required this.glowMotion,
-    required this.glowRightward,
-    required this.glowIntensity,
-    required this.flagCountry,
-    required this.ttsSpeaking,
-    required this.voiceLevel,
-    required this.controlsOpen,
-    required this.dimmed,
-    required this.onWake,
-    required this.onToggleTurns,
-    required this.onToggleLanguage,
-    required this.onHangUp,
-    required this.onToggleControls,
-  });
-
-  final bool hasTurns;
-
-  /// Les réglages de la lueur, réglés depuis son propre panneau.
-  final Color glowColor;
-  final _GlowMotion glowMotion;
-  final bool glowRightward;
-  final double glowIntensity;
-
-  /// Code ISO pays du drapeau de la langue que j'entends. Vide = rien de choisi
-  /// encore : la touche montre alors l'icône de traduction.
-  final String flagCountry;
-  final ValueListenable<bool> ttsSpeaking;
-  final ValueListenable<double> voiceLevel;
-  final bool controlsOpen;
-
-  /// Silence : la barre s'estompe jusqu'à [_dimOpacity], et la pastille reste
-  /// entière par-dessus. JAMAIS jusqu'à zéro : ce qui devient invisible devient
-  /// introuvable, et on doit toujours pouvoir viser le raccrochage.
-  final bool dimmed;
-  final VoidCallback onWake;
-  final VoidCallback onToggleTurns;
-  final VoidCallback onToggleLanguage;
-  final VoidCallback onHangUp;
-  final VoidCallback onToggleControls;
-
-  /// Le plancher d'opacité de la veille : assez bas pour disparaître dans la
-  /// vidéo, assez haut pour qu'on voie encore où sont les touches. Jamais
-  /// zéro — même avec un tap qui rallume depuis n'importe où, on doit pouvoir
-  /// viser le raccrochage sans le chercher.
-  static const double _dimOpacity = 0.22;
-
-  /// L'arrondi de la barre. Elle flotte : il fait tout le tour.
-  static const double radius = 34;
-
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
-      // Plus long et plus mou que les mouvements du dock : le fond s'en va,
-      // il ne claque pas.
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeInOut,
-      builder: (context, dim, _) {
-        // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
-        final live = 1 - (1 - _dimOpacity) * dim;
-        return GestureDetector(
-          // En veille, la barre entière devient une seule grande cible qui la
-          // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
-          // Réveillée, elle rend la main à ses touches.
-          behavior:
-              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-          onTap: dimmed ? onWake : null,
-          // La lueur se peint DEHORS, autour du verre : posée dedans, le
-          // ClipRRect la couperait net au bord de la barre. La barre flottant
-          // de nouveau, elle en fait tout le tour.
-          child: _DockAura(
-            ttsSpeaking: ttsSpeaking,
-            voiceLevel: voiceLevel,
-            radius: radius,
-            color: glowColor,
-            motion: glowMotion,
-            rightward: glowRightward,
-            intensity: glowIntensity,
-            child: ClipRRect(
-            borderRadius: BorderRadius.circular(radius),
-            child: BackdropFilter(
-              // Le flou s'atténue avec le reste, sans jamais s'annuler : la
-              // barre reste une barre, en retrait.
-              filter: ui.ImageFilter.blur(
-                sigmaX: 24 * live,
-                sigmaY: 24 * live,
-              ),
-              child: Container(
-                // 10 plutôt que 8 : de quoi laisser la lueur du chevron faire
-                // le tour du bouton sans toucher le bord.
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  // Le gris translucide de la barre de commentaire : du blanc
-                  // très dilué sur du flou, rien de coloré.
-                  color: Colors.white.withValues(alpha: 0.14 * live),
-                  borderRadius: BorderRadius.circular(radius),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18 * live),
-                  ),
-                ),
-                child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // La conversation, au premier cran. En veille, le
-                        // premier tap rallume : il ne doit pas aussi la
-                        // déplier.
-                        Opacity(
-                          opacity: live,
-                          child: IgnorePointer(
-                            ignoring: dimmed,
-                            child: _DockKeyButton(
-                              icon: Icons.sms_rounded,
-                              label: AppStrings.t('messages_title'),
-                              // Le verre de l'ancienne zone de texte, à
-                              // l'identique — c'est la même commande, elle ne
-                              // change que de forme.
-                              background: Colors.white.withValues(alpha: 0.10),
-                              borderColor:
-                                  Colors.white.withValues(alpha: 0.12),
-                              onTap: hasTurns ? onToggleTurns : null,
-                            ),
-                          ),
-                        ),
-                        // Les langues, juste avant la pastille : les deux
-                        // commandes de la traduction se touchent.
-                        Opacity(
-                          opacity: live,
-                          child: IgnorePointer(
-                            ignoring: dimmed,
-                            child: _LanguageButton(
-                              country: flagCountry,
-                              onTap: onToggleLanguage,
-                            ),
-                          ),
-                        ),
-                        // Le galet n'est plus dans la barre : il a sa place au
-                        // milieu de l'écran, où il est assez grand pour se
-                        // regarder. La barre garde ses quatre touches.
-                        Opacity(
-                          opacity: live,
-                          child: IgnorePointer(
-                            ignoring: dimmed,
-                            child: _RailToggleButton(
-                              open: controlsOpen,
-                              onTap: onToggleControls,
-                            ),
-                          ),
-                        ),
-                        Opacity(
-                          opacity: live,
-                          child: IgnorePointer(
-                            ignoring: dimmed,
-                            child: _DockKeyButton(
-                              icon: Icons.call_end_rounded,
-                              label: AppStrings.t('call_end'),
-                              background: const Color(0xFFE53935),
-                              onTap: onHangUp,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-              ),
-            ),
-          ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// La lueur autour de la barre : elle s'allume dès que ça parle — ma voix, la
-/// sienne, ou la traduction que la machine est en train de dire — et elle vit
-/// tant que ça dure. C'est le même signal que les barres de la pastille, en
-/// plus grand : on le voit sans regarder la barre.
-///
-/// Sa couleur, son mouvement et sa force viennent de son panneau de réglage,
-/// pas d'ici : ce widget ne décide que du QUAND.
-///
-/// Elle se peint DEHORS, autour du verre : posée dedans, le clip de la barre la
-/// couperait au ras du bord.
-class _DockAura extends StatefulWidget {
-  const _DockAura({
-    required this.ttsSpeaking,
-    required this.voiceLevel,
-    required this.radius,
-    required this.color,
-    required this.motion,
-    required this.rightward,
-    required this.intensity,
-    required this.child,
-  });
-
-  final ValueListenable<bool> ttsSpeaking;
-  final ValueListenable<double> voiceLevel;
-
-  /// Le rayon des encoches du panneau — la lueur suit la même découpe.
-  final double radius;
-  final Color color;
-  final _GlowMotion motion;
-
-  /// Le sens de parcours des modes qui en ont un. Ignoré par les autres.
-  final bool rightward;
-
-  /// 0,15 à 2 : en dessous elle ne se voit plus, au-dessus elle mange l'écran.
-  final double intensity;
-  final Widget child;
-
-  @override
-  State<_DockAura> createState() => _DockAuraState();
-}
-
-class _DockAuraState extends State<_DockAura> with TickerProviderStateMixin {
-  /// Le cycle du mode courant, de 0 à 1. Il tourne tant qu'il y a du son à
-  /// montrer et s'arrête net au silence — pas de ticker qui brûle la batterie
-  /// pendant qu'on écoute.
-  late final AnimationController _phase = AnimationController(
-    vsync: this,
-    duration: widget.motion.period,
-  );
-
-  /// La dérive lente du multicolore, quand aucun mode ne le fait déjà courir.
-  /// Bien plus lente que le cycle : posées sans bouger, les quatre teintes
-  /// auraient l'air peintes ; à cette vitesse-là, elles coulent. Elle ne tourne
-  /// QUE dans ce mode.
-  late final AnimationController _hue = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 9),
-  );
-
-  /// L'intensité affichée, lissée vers [_target] image par image : une voix qui
-  /// s'arrête fait retomber la lueur, elle ne l'éteint pas d'un coup.
-  final ValueNotifier<double> _amp = ValueNotifier<double>(0);
-  double _target = 0;
-
-  bool get _isRainbow =>
-      widget.color.toARGB32() == _GlowPalette.rainbow.toARGB32();
-
-  @override
-  void initState() {
-    super.initState();
-    widget.ttsSpeaking.addListener(_retarget);
-    widget.voiceLevel.addListener(_retarget);
-    _phase.addListener(_tick);
-    _retarget();
-  }
-
-  @override
-  void didUpdateWidget(covariant _DockAura old) {
-    super.didUpdateWidget(old);
-    if (old.ttsSpeaking != widget.ttsSpeaking) {
-      old.ttsSpeaking.removeListener(_retarget);
-      widget.ttsSpeaking.addListener(_retarget);
-    }
-    if (old.voiceLevel != widget.voiceLevel) {
-      old.voiceLevel.removeListener(_retarget);
-      widget.voiceLevel.addListener(_retarget);
-    }
-    // Le mode a changé : sa cadence n'est pas celle du précédent, et
-    // [AnimationController.repeat] a figé l'ancienne. Il faut la relancer.
-    // Idem pour l'arc-en-ciel : la roue chromatique doit démarrer maintenant,
-    // pas au prochain silence suivi d'une reprise.
-    if (old.motion != widget.motion) {
-      _phase.duration = widget.motion.period;
-      if (_phase.isAnimating) _phase.repeat();
-    }
-    if (old.motion != widget.motion || old.color != widget.color) _retarget();
-  }
-
-  /// Un seul régime, comme la pastille : dès que ça parle — une voix humaine
-  /// comme la traduction dite par la machine —, la lueur part à fond. Elle dit
-  /// «il y a du son», pas «qui parle».
-  void _retarget() {
-    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
-    _target = talking ? 1.0 : 0.0;
-    if (_target > 0) {
-      if (!_phase.isAnimating) _phase.repeat();
-      if (_isRainbow && !_hue.isAnimating) _hue.repeat();
-    }
-  }
-
-  void _tick() {
-    final next = _amp.value + (_target - _amp.value) * 0.12;
-    if (_target == 0 && next < 0.01) {
-      _amp.value = 0;
-      _phase.stop();
-      _hue.stop();
-      return;
-    }
-    _amp.value = next;
-  }
-
-  @override
-  void dispose() {
-    widget.ttsSpeaking.removeListener(_retarget);
-    widget.voiceLevel.removeListener(_retarget);
-    _phase.removeListener(_tick);
-    _phase.dispose();
-    _hue.dispose();
-    _amp.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_phase, _hue, _amp]),
-      // L'enfant est construit UNE fois et passé au builder : la barre entière
-      // ne se reconstruit pas soixante fois par seconde pour une ombre.
-      child: widget.child,
-      builder: (context, child) {
-        // La lueur ne suit PAS l'effacement du panneau : c'est même tout ce
-        // qui reste, avec la pastille, quand il a disparu.
-        final a = _amp.value;
-        if (a < 0.01) return child!;
-        final p = _phase.value;
-        final m = widget.motion;
-        // Les modes qui jouent sur la FORCE. Ceux qui jouent sur la position
-        // gardent une force pleine : un battement et un défilé simultanés se
-        // contrarient, et on ne lit plus ni l'un ni l'autre.
-        final amp = switch (m) {
-          _GlowMotion.steady => 1.0,
-          // Une sinusoïde décalée d'un quart de tour : le cycle démarre au
-          // plus bas et enfle, plutôt que de naître déjà allumé.
-          _GlowMotion.breathe =>
-            0.30 + 0.70 * (0.5 + 0.5 * math.sin(p * 2 * math.pi - math.pi / 2)),
-          // Deux éclairs secs rapprochés, puis le noir jusqu'au tour suivant —
-          // c'est ce double-flash qui fait lire «stroboscope» plutôt que
-          // «clignotant».
-          _GlowMotion.strobe =>
-            (p < 0.06 || (p >= 0.14 && p < 0.20)) ? 1.0 : 0.04,
-          // Deux sinusoïdes de périodes incommensurables : leur somme ne se
-          // répète jamais à l'œil, d'où le papillotement irrégulier d'une
-          // guirlande. Une seule aurait donné un battement régulier de plus.
-          _GlowMotion.twinkle => 0.18 +
-              0.82 *
-                  (0.5 + 0.5 * math.sin(p * 2 * math.pi * 3)) *
-                  (0.5 + 0.5 * math.sin(p * 2 * math.pi * 7.3 + 1.1)),
-          _ => 1.0,
-        };
-        // La position des bandes, 0 à 1. Le va-et-vient lit le même compteur
-        // en triangle : il monte puis redescend au lieu de repartir de zéro.
-        final travel = switch (m) {
-          _GlowMotion.chase || _GlowMotion.wave => p,
-          _GlowMotion.bounce => p < 0.5 ? p * 2 : 2 - p * 2,
-          _ => null,
-        };
-        return CustomPaint(
-          painter: _AuraPainter(
-            glow: a * amp,
-            radius: widget.radius,
-            // Multicolore : les quatre teintes Google d'un coup. Sinon, la
-            // couleur choisie, seule.
-            colors: _isRainbow ? _GlowPalette.multi : [widget.color],
-            intensity: widget.intensity,
-            travel: travel == null
-                ? null
-                : (widget.rightward ? travel : 1 - travel),
-            // Le nombre de bandes qui se suivent. La vague en aligne
-            // plusieurs, le défilé et le va-et-vient n'en ont qu'une.
-            bands: m == _GlowMotion.wave ? 3 : 1,
-            // Le va-et-vient ne boucle pas : sa bande doit pouvoir sortir par
-            // un bord et revenir, donc pas de pavage.
-            repeating: m != _GlowMotion.bounce,
-            // Sans bande, le multicolore se pose quand même sur toute la
-            // largeur — et dérive doucement, sinon il aurait l'air peint.
-            drift: _hue.value,
-          ),
-          child: child,
-        );
-      },
-    );
-  }
-}
-
-/// La lueur elle-même : la découpe du panneau, peinte et floutée UNIQUEMENT
-/// vers l'extérieur ([ui.BlurStyle.outer]) — un halo qui déborderait aussi vers
-/// l'intérieur laverait le panneau au lieu d'en sortir, et à travers le verre
-/// ça se voyait.
-///
-/// Elle ne sort que par le HAUT : la toile est coupée au ras du bord haut du
-/// panneau, donc tout ce qui partirait sur les côtés ou vers le bas n'est
-/// jamais peint. C'est ce qui décide de l'angle de sortie — pas le flou, qui
-/// lui étale dans toutes les directions.
-class _AuraPainter extends CustomPainter {
-  const _AuraPainter({
-    required this.glow,
-    required this.radius,
-    required this.colors,
-    required this.intensity,
-    required this.travel,
-    required this.bands,
-    required this.repeating,
-    required this.drift,
-  });
-
-  final double glow;
-  final double radius;
-
-  /// Une seule couleur, ou la suite du multicolore. À plusieurs, elles se
-  /// posent le long du bord en même temps.
-  final List<Color> colors;
-  final double intensity;
-
-  /// Où en sont les bandes, de 0 à 1. Null = pas de parcours : la lueur est la
-  /// même sur toute la largeur.
-  final double? travel;
-
-  /// Combien de bandes se suivent sur la largeur.
-  final int bands;
-
-  /// La bande se répète-t-elle au-delà de son motif ? Faux pour le
-  /// va-et-vient, qui doit pouvoir sortir de l'écran par un bord.
-  final bool repeating;
-
-  /// La dérive lente du multicolore quand aucune bande ne le fait courir.
-  final double drift;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // L'intensité joue sur les deux : ce qui brûle fort s'étale aussi plus
-    // loin. Une lueur plus opaque mais aussi serrée ne ferait qu'un trait.
-    final blur = (18 + 34 * glow) * intensity;
-    // La barre flotte de nouveau : ses quatre côtés sont à l'écran, donc la
-    // lueur en fait le tour au lieu de ne sortir que par le haut. Plus de
-    // découpe à suivre ni de toile à rogner — c'était le temps où elle était
-    // collée au bord bas.
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          Radius.circular(radius),
-        ),
-      );
-    // Deux passes : un halo large et diffus qui porte loin, puis un liseré
-    // serré et franc au ras du bord. Une seule passe donne soit un trait dur,
-    // soit un brouillard — jamais les deux.
-    _stroke(canvas, path, size, alpha: 0.45, blur: blur * 2);
-    _stroke(canvas, path, size, alpha: 0.95, blur: blur * 0.45);
-  }
-
-  void _stroke(
-    Canvas canvas,
-    Path path,
-    Size size, {
-    required double alpha,
-    required double blur,
-  }) {
-    final a = (alpha * glow * intensity).clamp(0.0, 1.0);
-    final tints = [for (final c in colors) c.withValues(alpha: a)];
-    final paint = Paint()
-      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.outer, blur);
-    final t = travel;
-
-    if (t == null && tints.length == 1) {
-      // Rien à moduler : une couleur unie sur tout le bord.
-      paint.color = tints.first;
-      canvas.drawPath(path, paint);
-      return;
-    }
-
-    // Le motif fait une fraction de la largeur, et on le FAIT GLISSER en
-    // déplaçant ses deux extrémités. Décaler les stops eux-mêmes obligerait à
-    // les garder croissants et à les rogner aux bords, là où le motif se
-    // déformerait justement.
-    final span = size.width / bands;
-    final double start;
-    final List<Color> ramp;
-    final List<double> stops;
-
-    if (t == null) {
-      // Multicolore posé, sans bande : les teintes couvrent toute la largeur
-      // et dérivent d'un motif par tour.
-      start = drift * size.width;
-      ramp = tints;
-      stops = _even(tints.length);
-    } else if (repeating) {
-      // Le motif est pavé : il ressort d'un bord au moment où il sort de
-      // l'autre, donc le parcours boucle sans couture.
-      start = t * span;
-      ramp = [tints.first.withValues(alpha: 0), ...tints, tints.last.withValues(alpha: 0)];
-      stops = _even(tints.length + 2);
+    // Trois états, du plus fort au plus discret : la dernière en blanc plein,
+    // les miennes dans le cyan des bulles envoyées de l'app, celles du pair en
+    // verre sombre.
+    final Color fill;
+    final Color ink;
+    if (latest) {
+      fill = Colors.white;
+      ink = Colors.black.withValues(alpha: 0.88);
+    } else if (turn.mine) {
+      fill = SC.outBubbleEnd.withValues(alpha: 0.75);
+      ink = Colors.white.withValues(alpha: 0.92);
     } else {
-      // Le va-et-vient : le motif traverse de hors-champ à hors-champ, ce qui
-      // lui laisse la place de disparaître à chaque rebond.
-      start = t * (size.width + span) - span;
-      ramp = [tints.first.withValues(alpha: 0), ...tints, tints.last.withValues(alpha: 0)];
-      stops = _even(tints.length + 2);
+      fill = Colors.black.withValues(alpha: 0.42);
+      ink = Colors.white.withValues(alpha: 0.78);
     }
 
-    paint.shader = ui.Gradient.linear(
-      Offset(start, 0),
-      Offset(start + (t == null ? size.width : span), 0),
-      ramp,
-      stops,
-      // Pavé quand le motif doit boucler, étalé quand il doit pouvoir sortir
-      // du cadre : ses deux extrémités sont transparentes, donc « étaler »
-      // revient à ne rien peindre au-delà.
-      (t != null && !repeating) ? TileMode.clamp : TileMode.repeated,
-    );
-    canvas.drawPath(path, paint);
-  }
-
-  /// n arrêts régulièrement espacés de 0 à 1.
-  static List<double> _even(int n) =>
-      [for (var i = 0; i < n; i++) n == 1 ? 0.0 : i / (n - 1)];
-
-  @override
-  bool shouldRepaint(_AuraPainter old) =>
-      old.glow != glow ||
-      old.radius != radius ||
-      old.intensity != intensity ||
-      old.travel != travel ||
-      old.bands != bands ||
-      old.repeating != repeating ||
-      old.drift != drift ||
-      !listEquals(old.colors, colors);
-}
-
-/// Le panneau qui règle la lueur : sa couleur, le sens dans lequel elle
-/// traverse le bord, et sa force.
-///
-/// Tout s'applique en direct — mais la lueur vraie est cachée derrière ce
-/// panneau, alors il en porte un aperçu en haut : le même bord, le même
-/// peintre, allumé en permanence. Sans lui on règlerait à l'aveugle.
-class _GlowSettingsSheet extends StatefulWidget {
-  const _GlowSettingsSheet({
-    required this.color,
-    required this.motion,
-    required this.intensity,
-    required this.rightward,
-    required this.onChanged,
-  });
-
-  final Color color;
-  final _GlowMotion motion;
-  final double intensity;
-  final bool rightward;
-  final void Function(Color, _GlowMotion, double, bool) onChanged;
-
-  @override
-  State<_GlowSettingsSheet> createState() => _GlowSettingsSheetState();
-}
-
-class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
-  late Color _color = widget.color;
-  late _GlowMotion _motion = widget.motion;
-  late double _intensity = widget.intensity;
-  late bool _rightward = widget.rightward;
-
-  /// L'aperçu ne bat pas au rythme d'une voix : il est allumé, point.
-  final ValueNotifier<bool> _previewOn = ValueNotifier<bool>(true);
-  final ValueNotifier<double> _previewLevel = ValueNotifier<double>(0);
-
-  void _push() =>
-      widget.onChanged(_color, _motion, _intensity, _rightward);
-
-  @override
-  void dispose() {
-    _previewOn.dispose();
-    _previewLevel.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              AppStrings.t('call_glow'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // L'aperçu : le bord du panneau, en petit, avec sa lueur.
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                height: 116,
-                color: Colors.black,
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: _DockAura(
-                    ttsSpeaking: _previewOn,
-                    voiceLevel: _previewLevel,
-                    radius: _CallDock.radius,
-                    color: _color,
-                    motion: _motion,
-                    rightward: _rightward,
-                    intensity: _intensity,
-                    child: Container(
-                      height: 56,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.14),
-                        borderRadius:
-                            BorderRadius.circular(_CallDock.radius),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _label(AppStrings.t('call_glow_color')),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final c in _GlowPalette.swatches) _swatch(c),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _label(AppStrings.t('call_glow_motion')),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final m in _GlowMotion.values) _modeChip(m),
-              ],
-            ),
-            // Le sens n'apparaît que pour les modes qui parcourent le bord :
-            // proposer une direction à un stroboscope ne veut rien dire.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topLeft,
-              child: !_motion.isDirectional
-                  ? const SizedBox(width: double.infinity)
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _label(AppStrings.t('call_glow_direction')),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              _directionButton(false, Icons.west_rounded),
-                              const SizedBox(width: 12),
-                              _directionButton(true, Icons.east_rounded),
-                            ],
-                          ),
-                        ],
-                      ),
+    final bubble = Flexible(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(18),
+              border: latest
+                  ? null
+                  : Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
                     ),
             ),
-            const SizedBox(height: 20),
-            _label(AppStrings.t('call_glow_intensity')),
-            Slider(
-              value: _intensity,
-              min: 0.15,
-              max: 2.0,
-              // En arc-en-ciel il n'y a pas de couleur à donner au curseur :
-              // il reprend le cyan, la teinte par défaut de la lueur.
-              activeColor: _color.toARGB32() == _GlowPalette.rainbow.toARGB32()
-                  ? _GlowPalette.swatches.first
-                  : _color,
-              onChanged: (v) {
-                setState(() => _intensity = v);
-                _push();
-              },
+            child: Text(
+              turn.text,
+              style: TextStyle(
+                // Une phrase que personne n'a reçue s'efface franchement : on
+                // doit pouvoir la relire pour la redire, mais on voit d'un
+                // coup d'œil qu'elle n'est pas partie.
+                color: turn.delivered ? ink : ink.withValues(alpha: 0.4),
+                fontSize: 14.5,
+                height: 1.3,
+                fontWeight: latest ? FontWeight.w500 : FontWeight.w400,
+                fontStyle:
+                    turn.delivered ? FontStyle.normal : FontStyle.italic,
+              ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Une pastille de la palette. Celle de l'arc-en-ciel ne peut pas se peindre
-  /// d'une couleur — elle porte la roue entière.
-  Widget _swatch(Color c) {
-    final on = c.toARGB32() == _color.toARGB32();
-    final isRainbow = c.toARGB32() == _GlowPalette.rainbow.toARGB32();
-    return Semantics(
-      label: AppStrings.t('call_glow_color'),
-      button: true,
-      selected: on,
-      child: Pressable(
-        bounce: true,
-        onTap: () {
-          setState(() => _color = c);
-          _push();
-        },
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: isRainbow ? null : c,
-            gradient: isRainbow
-                ? const SweepGradient(
-                    colors: [
-                      Color(0xFFFF1744),
-                      Color(0xFFFFC400),
-                      Color(0xFFC6FF00),
-                      Color(0xFF00E676),
-                      Color(0xFF00E5FF),
-                      Color(0xFF2979FF),
-                      Color(0xFFB14DFF),
-                      Color(0xFFFF2DD4),
-                      Color(0xFFFF1744),
-                    ],
-                  )
-                : null,
-            shape: BoxShape.circle,
-            // Le choix courant se signale par un anneau blanc, pas par une
-            // coche : sur une pastille de 38 px, une coche cache la couleur
-            // qu'on est justement en train de juger.
-            border: Border.all(
-              color: on ? Colors.white : Colors.white24,
-              width: on ? 3 : 1,
-            ),
-            // La pastille brille de sa propre couleur : c'est ce qu'elle
-            // promet, autant le montrer sur place.
-            boxShadow: on && !isRainbow
-                ? [
-                    BoxShadow(
-                      color: c.withValues(alpha: 0.6),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
           ),
         ),
       ),
     );
-  }
 
-  Widget _label(String text) => Text(
-        text,
-        style: TextStyle(
-          color: SC.textSecondary,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-
-  /// Un mode d'animation. Nommé, pas iconifié : « va-et-vient » et « défilé »
-  /// ne se distinguent par aucun pictogramme qu'on lise du premier coup.
-  Widget _modeChip(_GlowMotion m) {
-    final on = _motion == m;
-    return Pressable(
-      bounce: true,
-      onTap: () {
-        setState(() => _motion = m);
-        _push();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          // Engagé = blanc plein, texte noir : la même bascule que les boutons
-          // de l'appel, on ne réapprend rien.
-          color: on ? Colors.white : Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          AppStrings.t(m.labelKey),
-          style: TextStyle(
-            color: on ? Colors.black : Colors.white,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _directionButton(bool rightward, IconData icon) {
-    final on = _rightward == rightward;
-    return Semantics(
-      label: AppStrings.t('call_glow_direction'),
-      button: true,
-      selected: on,
-      child: Pressable(
-        bounce: true,
-        onTap: () {
-          setState(() => _rightward = rightward);
-          _push();
-        },
-        child: Container(
-          width: 52,
-          height: 44,
-          decoration: BoxDecoration(
-            color: on ? Colors.white : Colors.white.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: on ? Colors.black : Colors.white, size: 22),
-        ),
-      ),
+    return Row(
+      mainAxisAlignment:
+          turn.mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: turn.mine
+          ? [bubble, const SizedBox(width: 8), avatar]
+          : [avatar, const SizedBox(width: 8), bubble],
     );
   }
 }
@@ -4173,13 +3188,221 @@ class _GlowSettingsSheetState extends State<_GlowSettingsSheet> {
 /// Un rond plein de la barre (conversation, raccrocher). Volontairement sans
 /// flou : il est posé sur le verre du dock, qui a déjà flouté ce qu'il y a
 /// dessous.
+/// Le petit rond qui retourne la caméra, posé dans le coin de la vignette de
+/// retour. Volontairement plus petit que les touches de la barre : il agit sur
+/// la vignette, pas sur l'appel.
+class _PipFlipButton extends StatelessWidget {
+  const _PipFlipButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: AppStrings.t('call_flip_camera'),
+      button: true,
+      child: Pressable(
+        bounce: true,
+        onTap: onTap,
+        // La cible déborde du rond visible, comme partout ailleurs : dans un
+        // coin de vignette, un doigt tombe rarement au centre.
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withValues(alpha: 0.55),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+              child: const Icon(
+                Icons.cameraswitch_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La rangée du bas : cinq touches posées À MÊME la vidéo, sans panneau
+/// derrière elles.
+///
+/// De gauche à droite — la conversation, couper la caméra, le chevron qui
+/// déplie les réglages, couper le micro, raccrocher. Le micro et la caméra sont
+/// ici et non derrière le chevron : on les coupe en pleine phrase, ça ne se
+/// déplie pas.
+class _CallDock extends StatelessWidget {
+  const _CallDock({
+    required this.camOn,
+    required this.micOn,
+    required this.speakerOn,
+    required this.ttsSpeaking,
+    required this.voiceLevel,
+    required this.controlsOpen,
+    required this.dimmed,
+    required this.onWake,
+    required this.onToggleCam,
+    required this.onToggleMic,
+    required this.onToggleSpeaker,
+    required this.onHangUp,
+    required this.onToggleControls,
+  });
+
+  /// L'état des deux bascules montées dans la rangée.
+  final bool camOn;
+  final bool micOn;
+  final bool speakerOn;
+  final ValueListenable<bool> ttsSpeaking;
+  final ValueListenable<double> voiceLevel;
+  final bool controlsOpen;
+
+  /// Silence : la rangée s'estompe jusqu'à [_dimOpacity]. JAMAIS jusqu'à
+  /// zéro : ce qui devient invisible devient introuvable, et on doit toujours
+  /// pouvoir viser le raccrochage.
+  final bool dimmed;
+  final VoidCallback onWake;
+  final VoidCallback onToggleCam;
+  final VoidCallback onToggleMic;
+  final VoidCallback onToggleSpeaker;
+  final VoidCallback onHangUp;
+  final VoidCallback onToggleControls;
+
+  /// Le plancher d'opacité de la veille.
+  static const double _dimOpacity = 0.22;
+
+  /// Une touche de la rangée : elle s'estompe avec la veille et cesse de
+  /// répondre quand la barre est endormie — le premier tap la rallume, il ne
+  /// déclenche rien d'autre.
+  Widget _live(double live, bool asleep, Widget child) => Opacity(
+        opacity: live,
+        child: IgnorePointer(ignoring: asleep, child: child),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: dimmed ? 1 : 0),
+      // Plus long et plus mou que les mouvements de la rangée : elle s'en va,
+      // elle ne claque pas.
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOut,
+      builder: (context, dim, _) {
+        // 1 en pleine lumière, [_dimOpacity] en veille — jamais moins.
+        final live = 1 - (1 - _dimOpacity) * dim;
+        return GestureDetector(
+          // En veille, la rangée entière devient une seule grande cible qui la
+          // rallume : opaque, sinon le tap traverse et personne ne l'attrape.
+          behavior:
+              dimmed ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+          onTap: dimmed ? onWake : null,
+          // Plus de barre de verre, et plus de lueur autour : les touches sont
+          // posées à même la vidéo, sans rien derrière elles.
+          child: Padding(
+              // Les touches ne touchent pas le bord de l'écran, et elles
+              // respirent entre elles : c'est le seul rôle qui restait au
+              // panneau.
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // À GAUCHE : la sortie audio, puis couper la caméra.
+                  _live(
+                    live,
+                    dimmed,
+                    _DockKeyButton(
+                      icon: speakerOn
+                          ? Icons.volume_up_rounded
+                          : Icons.phone_in_talk_rounded,
+                      label: AppStrings.t(
+                        speakerOn ? 'call_earpiece' : 'call_speaker',
+                      ),
+                      // Haut-parleur = engagé : la touche se remplit, comme
+                      // les deux bascules d'à côté.
+                      background: speakerOn
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.14),
+                      iconColor: speakerOn ? Colors.black : Colors.white,
+                      onTap: onToggleSpeaker,
+                    ),
+                  ),
+                  _live(
+                    live,
+                    dimmed,
+                    _DockKeyButton(
+                      icon: camOn
+                          ? Icons.videocam_rounded
+                          : Icons.videocam_off_rounded,
+                      label: AppStrings.t(
+                        camOn ? 'call_video' : 'call_video_off',
+                      ),
+                      // Coupée = engagée : la touche se remplit de blanc,
+                      // comme les bascules des réglages dépliés.
+                      background: camOn
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white,
+                      iconColor: camOn ? Colors.white : Colors.black,
+                      onTap: onToggleCam,
+                    ),
+                  ),
+                  // AU CENTRE : le chevron qui déplie le reste.
+                  _live(
+                    live,
+                    dimmed,
+                    _RailToggleButton(
+                      open: controlsOpen,
+                      onTap: onToggleControls,
+                    ),
+                  ),
+                  // À DROITE : le micro, puis raccrocher.
+                  _live(
+                    live,
+                    dimmed,
+                    _DockKeyButton(
+                      icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+                      label: AppStrings.t(micOn ? 'call_mute' : 'call_unmute'),
+                      background: micOn
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white,
+                      iconColor: micOn ? Colors.white : Colors.black,
+                      onTap: onToggleMic,
+                    ),
+                  ),
+                  _live(
+                    live,
+                    dimmed,
+                    _DockKeyButton(
+                      icon: Icons.call_end_rounded,
+                      label: AppStrings.t('call_end'),
+                      background: const Color(0xFFE53935),
+                      onTap: onHangUp,
+                    ),
+                  ),
+                ],
+              ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _DockKeyButton extends StatelessWidget {
   const _DockKeyButton({
     required this.icon,
     required this.label,
     required this.background,
     required this.onTap,
-    this.borderColor,
+    this.iconColor,
   });
 
   final IconData icon;
@@ -4190,12 +3413,17 @@ class _DockKeyButton extends StatelessWidget {
   /// dite) : elle ne réagit pas, sans changer d'aspect.
   final VoidCallback? onTap;
 
-  /// Le liseré, quand il n'est pas celui par défaut des touches pleines.
-  final Color? borderColor;
+  /// Noir quand la touche est engagée et se remplit de blanc.
+  final Color? iconColor;
 
-  /// Le rond du dock, tel qu'il a toujours été.
+  /// Le rond visible.
   static const double size = 46;
 
+  /// La zone qui répond au doigt, plus large que le rond. On visait un cercle
+  /// de 46 et on ratait : Apple demande 44 MINIMUM, ce qui ne laisse aucune
+  /// marge d'erreur, et un doigt ne tombe pas au pixel. Les 14 px de plus ne
+  /// se voient pas — ils se sentent.
+  static const double hitSize = 60;
 
   @override
   Widget build(BuildContext context) {
@@ -4205,17 +3433,23 @@ class _DockKeyButton extends StatelessWidget {
       child: Pressable(
         bounce: true,
         onTap: onTap,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: background,
-            border: Border.all(
-              color: borderColor ?? Colors.white.withValues(alpha: 0.22),
+        child: SizedBox(
+          width: hitSize,
+          height: hitSize,
+          child: Center(
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: background,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Icon(icon, color: iconColor ?? Colors.white, size: 22),
             ),
           ),
-          child: Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );
@@ -4241,10 +3475,20 @@ class _TranslationOrb extends StatefulWidget {
     required this.voiceLevel,
     required this.onTap,
     required this.onLongPress,
+    this.size = _kSize,
+    this.ripples = true,
   });
 
   /// La traduction tourne. False = coupée : pierre endormie.
   final bool on;
+
+  /// Sa taille à l'écran. Réduite, il devient l'en-tête d'un panneau plutôt que
+  /// la pièce centrale de l'appel.
+  final double size;
+
+  /// Les ondes qui s'échappent. Coupées quand le galet n'est plus le sujet de
+  /// l'écran : sous un panneau, elles vont chercher l'œil pour rien.
+  final bool ripples;
 
   final ValueListenable<bool> ttsSpeaking;
   final ValueListenable<double> voiceLevel;
@@ -4253,14 +3497,15 @@ class _TranslationOrb extends StatefulWidget {
   /// Appui long : les deux panneaux de l'appel, côte à côte.
   final VoidCallback onLongPress;
 
-  /// La taille de référence. Toutes les cotes du dessin sont données pour
-  /// celle-ci puis mises à l'échelle, donc changer ce seul nombre redimensionne
-  /// l'ensemble sans rien déformer.
-  static const double size = 130;
+  /// La taille par défaut. Toutes les cotes du dessin sont données pour 130
+  /// puis mises à l'échelle, donc ce seul nombre redimensionne l'ensemble sans
+  /// rien déformer.
+  static const double _kSize = 65;
 
   /// La pierre endormie est plus petite que le galet vivant : couper la
-  /// traduction se voit à sa taille avant même qu'on lise l'icône.
-  static const double dormantSize = 104;
+  /// traduction se voit à sa taille avant même qu'on lise l'icône. Même
+  /// rapport qu'avant — 104 sur 130.
+  static const double dormantRatio = 0.8;
 
   /// La place réservée AUTOUR du galet. Le halo déborde de 18 px et les ondes
   /// montent jusqu'à 2,4 fois le disque : sans cette marge, elles sont peintes
@@ -4269,7 +3514,7 @@ class _TranslationOrb extends StatefulWidget {
   static const double boxFactor = 1.9;
 
   /// L'encombrement réel du widget.
-  static const double box = size * boxFactor;
+  double get box => size * boxFactor;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
@@ -4302,10 +3547,19 @@ class _TranslationOrbState extends State<_TranslationOrb>
   AnimationController _ctrl(int ms) =>
       AnimationController(vsync: this, duration: Duration(milliseconds: ms));
 
-  /// L'amplitude des barres, lissée. Une voix qui s'arrête les fait retomber,
-  /// elle ne les coupe pas.
-  final ValueNotifier<double> _amp = ValueNotifier<double>(_idleAmp);
-  double _target = _idleAmp;
+  /// Deux amplitudes, lissées séparément, parce qu'elles ne disent pas la
+  /// même chose :
+  ///
+  ///   • [_voice] monte quand QUELQU'UN PARLE — ce sont les quatre barres du
+  ///     centre qui s'agitent ;
+  ///   • [_tts] monte quand la TRADUCTION est dite — ce sont les ondes qui
+  ///     partent fort, pendant que les barres reprennent leur rythme normal.
+  ///
+  /// Le galet dit ainsi d'un coup d'œil qui a la parole : la machine ou nous.
+  final ValueNotifier<double> _voice = ValueNotifier<double>(_idleAmp);
+  final ValueNotifier<double> _tts = ValueNotifier<double>(_idleAmp);
+  double _voiceTarget = _idleAmp;
+  double _ttsTarget = _idleAmp;
 
   /// Le plancher : même dans le silence le galet vit un peu, sinon il a l'air
   /// en panne. La parole le fait monter, elle ne le fait pas exister.
@@ -4352,13 +3606,21 @@ class _TranslationOrbState extends State<_TranslationOrb>
   }
 
   void _retarget() {
-    final talking = widget.ttsSpeaking.value || widget.voiceLevel.value > 0.02;
-    _target = talking ? 1.0 : _idleAmp;
+    final speaking = widget.ttsSpeaking.value;
+    final voice = widget.voiceLevel.value > 0.02;
+    // Pendant la traduction, la voix humaine ne doit pas emballer les barres :
+    // c'est le tour de la machine, et deux choses qui s'agitent en même temps
+    // ne désignent plus personne.
+    _voiceTarget = (voice && !speaking) ? 1.0 : _idleAmp;
+    _ttsTarget = speaking ? 1.0 : _idleAmp;
   }
 
   void _tick() {
-    final next = _amp.value + (_target - _amp.value) * 0.12;
-    if ((next - _amp.value).abs() > 0.001) _amp.value = next;
+    for (final pair in [(_voice, _voiceTarget), (_tts, _ttsTarget)]) {
+      final n = pair.$1;
+      final next = n.value + (pair.$2 - n.value) * 0.12;
+      if ((next - n.value).abs() > 0.001) n.value = next;
+    }
   }
 
   @override
@@ -4369,7 +3631,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
     for (final c in _all) {
       c.dispose();
     }
-    _amp.dispose();
+    _voice.dispose();
+    _tts.dispose();
     super.dispose();
   }
 
@@ -4386,8 +3649,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: SizedBox(
-          width: _TranslationOrb.box,
-          height: _TranslationOrb.box,
+          width: widget.box,
+          height: widget.box,
           child: widget.on ? _live() : _dormant(),
         ),
       ),
@@ -4396,7 +3659,7 @@ class _TranslationOrbState extends State<_TranslationOrb>
 
   Widget _live() {
     return AnimatedBuilder(
-      animation: Listenable.merge([..._all, _amp]),
+      animation: Listenable.merge([..._all, _voice, _tts]),
       builder: (context, _) => CustomPaint(
         painter: _OrbPainter(
           spin: _spin.value,
@@ -4409,7 +3672,9 @@ class _TranslationOrbState extends State<_TranslationOrb>
           bars: _bars.value,
           float: Curves.easeInOut.transform(_float.value),
           breathe: Curves.easeInOut.transform(_breathe.value),
-          amp: _amp.value,
+          amp: _voice.value,
+          // Ondes coupées : leur amplitude tombe à zéro, le reste vit.
+          waveAmp: widget.ripples ? _tts.value : 0,
           // Le painter sait déjà se taire : poser une icône au centre à la
           // place des barres — la « pierre réduite » de la maquette — ne
           // demandera que de passer false ici et un Icon en enfant.
@@ -4425,8 +3690,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
   Widget _dormant() {
     return Center(
       child: SizedBox(
-        width: _TranslationOrb.dormantSize,
-        height: _TranslationOrb.dormantSize,
+        width: widget.size * _TranslationOrb.dormantRatio,
+        height: widget.size * _TranslationOrb.dormantRatio,
         child: ClipOval(
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
@@ -4499,6 +3764,7 @@ class _OrbPainter extends CustomPainter {
     required this.float,
     required this.breathe,
     required this.amp,
+    required this.waveAmp,
     required this.showBars,
   });
 
@@ -4510,8 +3776,11 @@ class _OrbPainter extends CustomPainter {
   final double float;
   final double breathe;
 
-  /// L'amplitude courante des barres (0,3 au repos, 1 quand ça parle).
+  /// L'amplitude des barres : elle monte quand quelqu'un parle.
   final double amp;
+
+  /// Celle des ondes : elle monte quand la traduction est dite.
+  final double waveAmp;
 
   /// Faux quand une icône occupe le centre à leur place.
   final bool showBars;
@@ -4535,16 +3804,18 @@ class _OrbPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // La toile fait [boxFactor] fois le galet : la marge est là pour le halo et
     // les ondes. Le galet, lui, se dessine au CENTRE, à sa taille propre.
-    final k = size.width / _TranslationOrb.box;
-    final r = _TranslationOrb.size * k / 2;
+    // k rapporte les cotes, toutes données pour un galet de 130, à la taille
+    // réelle ; r est le rayon du galet dans la toile élargie.
+    final k = size.width / (_TranslationOrb.boxFactor * 130);
+    final r = 130 * k / 2;
 
     // Le flottement : tout le galet monte de 13 px et redescend.
     final c = Offset(size.width / 2, size.height / 2 - 13 * k * float);
 
     // 1. Les deux ondes. La seconde est décalée d'une demi-période — d'où le
     //    modulo : une seule horloge sert aux deux.
-    _wave(canvas, c, r, ripple, _violet, 0.5);
-    _wave(canvas, c, r, (ripple + 0.5) % 1.0, _teal, 0.45);
+    _wave(canvas, c, r, ripple, _violet, 0.5 * waveAmp);
+    _wave(canvas, c, r, (ripple + 0.5) % 1.0, _teal, 0.45 * waveAmp);
 
     // 2. Le halo qui respire, débordant de 18 px.
     final grow = 0.97 + 0.06 * breathe;
@@ -4727,6 +3998,7 @@ class _OrbPainter extends CustomPainter {
       old.float != float ||
       old.breathe != breathe ||
       old.amp != amp ||
+      old.waveAmp != waveAmp ||
       old.showBars != showBars;
 }
 
@@ -4800,16 +4072,24 @@ class _RailToggleButton extends StatelessWidget {
 /// Elle s'efface quand les réglages sont dépliés : le bouton est alors blanc
 /// plein, et deux signaux qui disent la même chose se gênent.
 class _ChevronRimPainter extends CustomPainter {
-  const _ChevronRimPainter({required this.visible});
+  const _ChevronRimPainter({
+    required this.visible,
+    this.buttonSize = _RailToggleButton._size,
+  });
 
   final bool visible;
+
+  /// Le diamètre du bouton que l'anneau doit cerner. Il ne connaissait que le
+  /// chevron ; le bouton des messages porte le même anneau et n'a pas la même
+  /// taille.
+  final double buttonSize;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (!visible) return;
     final c = Offset(size.width / 2, size.height / 2);
     // Le rayon du bouton, plus un cheveu : le trait court juste à l'extérieur.
-    final r = _RailToggleButton._size / 2 + 1.2;
+    final r = buttonSize / 2 + 1.2;
     // La lueur d'abord : le même anneau, plus épais et flou, dessous.
     canvas.drawCircle(
       c,
@@ -4832,7 +4112,8 @@ class _ChevronRimPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ChevronRimPainter old) => old.visible != visible;
+  bool shouldRepaint(_ChevronRimPainter old) =>
+      old.visible != visible || old.buttonSize != buttonSize;
 }
 
 /// Un réglage d'appel, au-dessus du dock.
@@ -4850,11 +4131,16 @@ class _RoundCallButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
+    this.ring = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// L'anneau cyan du chevron, autour de ce bouton-ci : il désigne celui qu'on
+  /// cherche en premier dans la rangée.
+  final bool ring;
 
   /// L'état que porte ce bouton est engagé. Un bouton qui ouvre un panneau ne
   /// l'est jamais : il garde son verre.
@@ -4877,9 +4163,15 @@ class _RoundCallButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Stable Flutter frosted-glass circle (NOT a platform view): the
-            // native glass flickered/reset under the keyboard animation.
-            ClipOval(
+            CustomPaint(
+              // L'anneau est PEINT autour, pas posé en bordure : un dégradé ne
+              // rentre pas dans un Border, et il doit déborder du bouton.
+              painter: ring
+                  ? const _ChevronRimPainter(visible: true, buttonSize: 45)
+                  : null,
+              child: // Stable Flutter frosted-glass circle (NOT a platform
+                  // view): the native glass flickered under the keyboard.
+                  ClipOval(
               child: BackdropFilter(
                 filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: AnimatedContainer(
@@ -4903,6 +4195,7 @@ class _RoundCallButton extends StatelessWidget {
                     size: 21,
                   ),
                 ),
+              ),
               ),
             ),
             const SizedBox(height: 6),
@@ -4940,35 +4233,112 @@ class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
     required this.spokenCode,
     required this.heardCode,
+    required this.translationOn,
+    required this.ttsSpeaking,
+    required this.voiceLevel,
     required this.onChanged,
   });
 
   final String spokenCode;
   final String heardCode;
 
+  /// De quoi rendre le galet réduit posé au-dessus du panneau : il continue de
+  /// vivre pendant qu'on choisit, sinon l'appel a l'air suspendu.
+  final bool translationOn;
+  final ValueListenable<bool> ttsSpeaking;
+  final ValueListenable<double> voiceLevel;
+
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
   /// d'appel qui le fera quand le panneau se refermera.
   final void Function(String spoken, String heard) onChanged;
 
+  /// Le galet du panneau. Plus petit que celui de l'appel, et sans ondes :
+  /// sous un panneau ouvert, elles iraient chercher l'œil pour rien.
+  static const double _orbSize = 56;
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _SheetHandle(),
-            _LanguageWheels(
-              spokenCode: spokenCode,
-              heardCode: heardCode,
-              onChanged: onChanged,
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        // Le haut : la vidéo floutée, et le galet posé dessus. Un tap referme —
+        // c'est la barrière du panneau, qu'on peint nous-mêmes puisqu'elle
+        // porte le flou.
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).maybePop(),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: Container(
+                // Un voile sombre par-dessus le flou : flouter seul éclaircit
+                // l'image, et le galet blanc s'y noierait.
+                color: Colors.black.withValues(alpha: 0.35),
+                alignment: const Alignment(0, 0.15),
+                child: IgnorePointer(
+                  child: _TranslationOrb(
+                    on: translationOn,
+                    ttsSpeaking: ttsSpeaking,
+                    voiceLevel: voiceLevel,
+                    size: _orbSize,
+                    ripples: false,
+                    onTap: () {},
+                    onLongPress: () {},
+                  ),
+                ),
+              ),
             ),
-          ],
+          ),
         ),
-      ),
+        // Le panneau lui-même.
+        DecoratedBox(
+          decoration: const BoxDecoration(
+            color: SC.bg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _SheetHandle(),
+                  _LanguageWheels(
+                    spokenCode: spokenCode,
+                    heardCode: heardCode,
+                    onChanged: onChanged,
+                  ),
+                  const SizedBox(height: 18),
+                  // Le panneau s'appliquait déjà en se refermant, quel qu'ait
+                  // été le geste. Ce bouton ne fait donc que refermer — mais
+                  // il dit qu'on a fini, ce qu'un panneau qu'on fait glisser
+                  // ne dit jamais vraiment.
+                  SizedBox(
+                    height: 52,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: Text(AppStrings.t('save')),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
