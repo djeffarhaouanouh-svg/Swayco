@@ -3698,7 +3698,7 @@ class _TranslationOrb extends StatefulWidget {
   /// La taille par défaut. Toutes les cotes du dessin sont données pour 130
   /// puis mises à l'échelle, donc ce seul nombre redimensionne l'ensemble sans
   /// rien déformer.
-  static const double kSize = 92;
+  static const double kSize = 104;
 
   /// La pierre endormie est plus petite que le galet vivant : couper la
   /// traduction se voit à sa taille avant même qu'on lise l'icône. Même
