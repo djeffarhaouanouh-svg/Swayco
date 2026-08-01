@@ -940,29 +940,30 @@ class _ThreadHeader extends StatelessWidget {
                 },
               ),
             ),
-            // Deux boutons d'appel : le téléphone démarre un appel normal
-            // (caméras coupées), la caméra démarre le mode visio. Grisés
-            // quand le pair m'a bloqué — l'appel ne passerait pas.
+            // Deux boutons d'appel : la caméra démarre le mode visio, le
+            // téléphone un appel normal (caméras coupées) — c'est lui qui est
+            // au bord, le plus près du pouce. Grisés quand le pair m'a
+            // bloqué : l'appel ne passerait pas.
             Opacity(
               opacity: blockedByPeer ? 0.4 : 1.0,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GlassIconButton(
-                    icon: Icons.phone_rounded,
+                    icon: Icons.videocam_rounded,
                     size: 40,
                     iconSize: 20,
                     // Marked pop on tap (matches the back button / nav bar).
                     popScale: 1.25,
-                    onTap: onCall,
+                    onTap: onVideoCall,
                   ),
                   const SizedBox(width: 8),
                   GlassIconButton(
-                    icon: Icons.videocam_rounded,
+                    icon: Icons.phone_rounded,
                     size: 40,
                     iconSize: 20,
                     popScale: 1.25,
-                    onTap: onVideoCall,
+                    onTap: onCall,
                   ),
                 ],
               ),
