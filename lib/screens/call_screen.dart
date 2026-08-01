@@ -2791,7 +2791,7 @@ class _CallScreenState extends State<CallScreen> {
                               // Rien de déplié : ses ondes atteignent les
                               // touches et c'est très bien, elles passent
                               // derrière.
-                              : const Alignment(0, 0.74),
+                              : const Alignment(0, 0.80),
                   child: AnimatedScale(
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutCubic,
