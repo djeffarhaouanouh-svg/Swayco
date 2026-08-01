@@ -578,6 +578,21 @@ class _CallScreenState extends State<CallScreen> {
   /// without ever playing (a missing voice, a browser that suspended
   /// speechSynthesis), and then the completion event never comes — which would
   /// wedge every translation behind it for the rest of the call.
+  /// Combien de temps on laisse à une phrase avant de considérer qu'elle ne
+  /// jouera jamais.
+  ///
+  /// À la LONGUEUR du texte, plus un forfait — pas 20 secondes pour tout le
+  /// monde. Vingt secondes, c'était le temps qu'il faut à la plus longue
+  /// phrase imaginable ; une phrase de quatre mots qui reste muette bloquait
+  /// donc la file vingt secondes, et la suivante repartait pour vingt
+  /// secondes derrière elle. Trois mots morts coûtent maintenant six secondes.
+  ///
+  /// Le plafond reste : une phrase très longue garde ses vingt secondes.
+  Duration _speakCap(String text) {
+    final ms = 2500 + text.length * 110;
+    return Duration(milliseconds: ms > 20000 ? 20000 : ms);
+  }
+
   Future<void> _speakOsVoice(String text, String lang) async {
     final tag = _voiceTagFor(lang);
     DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
@@ -593,7 +608,7 @@ class _CallScreenState extends State<CallScreen> {
       // Mobile Chrome auto-pauses speechSynthesis after a stretch of inactivity;
       // speak() then plays nothing and fires no event.
       resumeSpeechSynthesisIfPaused();
-      await _deviceTts.speak(text).timeout(const Duration(seconds: 20));
+      await _deviceTts.speak(text).timeout(_speakCap(text));
       DebugOverlay.log('speak done');
     } catch (e) {
       DebugOverlay.log('speak FAILED: $e');
@@ -3481,12 +3496,12 @@ class _CallDock extends StatelessWidget {
                       ),
                       // LE BLANC MARQUE CE QU'ON VEUT VOIR D'UN COUP D'ŒIL.
                       //
-                      // Haut-parleur et caméra : blancs quand ils sont ALLUMÉS.
-                      // Le micro : blanc quand il est COUPÉ. Il n'y a pas de
-                      // règle unique, et c'est assumé — d'un appel on veut
-                      // savoir « je diffuse » pour la caméra et le son, et
-                      // « on ne m'entend pas » pour le micro. Ce sont les deux
-                      // choses qu'on cherche, et ce sont elles qui s'allument.
+                      // Le haut-parleur s'allume quand il est ACTIF ; le micro
+                      // et la caméra quand ils sont COUPÉS. Pas de règle
+                      // unique, et c'est assumé : d'un appel on veut savoir
+                      // « le son sort du haut-parleur » d'un côté, et « on ne
+                      // me voit pas, on ne m'entend pas » de l'autre. Ce sont
+                      // les trois choses qu'on cherche du regard.
                       //
                       // L'ICÔNE et le TEXTE disent tous deux l'état courant :
                       // micro barré + « Muet », micro plein + « Micro ». Les
@@ -3508,12 +3523,11 @@ class _CallDock extends StatelessWidget {
                       label: AppStrings.t(
                         camOn ? 'call_camera' : 'call_video_off',
                       ),
-                      // Blanche quand la caméra est ALLUMÉE, grise et barrée
-                      // quand elle est coupée.
+                      // Blanche quand la caméra est COUPÉE, comme le micro.
                       background: camOn
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.14),
-                      iconColor: camOn ? Colors.black : Colors.white,
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white,
+                      iconColor: camOn ? Colors.white : Colors.black,
                       onTap: onToggleCam,
                     ),
                   ),
