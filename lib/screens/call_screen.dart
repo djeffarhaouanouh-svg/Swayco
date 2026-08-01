@@ -128,9 +128,34 @@ class _CallScreenState extends State<CallScreen> {
   /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
   bool _turnsOpen = false;
 
-  /// Le panneau des langues est ouvert : le galet de l'écran s'efface, celui
-  /// du panneau prend le relais.
-  bool _langSheetOpen = false;
+  /// Un panneau est ouvert par-dessus l'appel (langues, son, réglages).
+  ///
+  /// Ce n'est pas une affaire de panneau des langues : le galet doit remonter
+  /// et la vidéo se flouter pour N'IMPORTE lequel, sinon chaque panneau se
+  /// comporte à sa façon — l'un recouvrait le galet, l'autre le remplaçait par
+  /// un second.
+  bool _sheetOpen = false;
+
+  /// Ouvre [body] par-dessus l'appel en faisant remonter le galet et flouter la
+  /// vidéo, et remet tout en place à la fermeture — quelle qu'en soit la
+  /// manière, y compris un balayage.
+  Future<void> _showCallSheet(WidgetBuilder body) {
+    setState(() => _sheetOpen = true);
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SC.bg,
+      // Pas de voile : c'est l'écran d'appel qui floute, sous le galet. Un
+      // voile par-dessus le flouterait lui aussi.
+      barrierColor: Colors.transparent,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: body,
+    ).whenComplete(() {
+      if (mounted) setState(() => _sheetOpen = false);
+    });
+  }
 
   /// La conversation s'est ouverte d'elle-même une fois. Ensuite elle
   /// n'insiste plus : c'est au premier tour de parole qu'on veut découvrir
@@ -1833,15 +1858,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _openAudioSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: SC.bg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) => _AudioSettingsSheet(controller: _audio),
-    );
+    unawaited(_showCallSheet((ctx) => _AudioSettingsSheet(controller: _audio)));
   }
 
   /// Les deux langues de l'appel, dans un seul panneau : à gauche celle que je
@@ -1861,23 +1878,10 @@ class _CallScreenState extends State<CallScreen> {
     // survoler.
     var spoken = _mySourceLang;
     var heard = _myOutputLang;
-    // Le galet de l'appel s'efface pendant le panneau : celui-ci en montre un
-    // à lui, réduit et sans ondes. Deux galets dont un flouté derrière l'autre
-    // n'auraient rien voulu dire.
-    setState(() => _langSheetOpen = true);
-    showModalBottomSheet<void>(
-      context: context,
-      // Le panneau se peint lui-même, sur toute la hauteur : le fond, le flou
-      // et le galet lui appartiennent.
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _LanguagePairSheet(
+    unawaited(_showCallSheet(
+      (ctx) => _LanguagePairSheet(
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
-        translationOn: _translationEnabled,
-        ttsSpeaking: ttsSpeaking,
-        voiceLevel: _voiceLevel,
         onChanged: (s, h) {
           spoken = s;
           heard = h;
@@ -1885,7 +1889,6 @@ class _CallScreenState extends State<CallScreen> {
       ),
     ).whenComplete(() {
       if (!mounted) return;
-      setState(() => _langSheetOpen = false);
       // Deux chemins bien distincts : la langue parlée relance notre
       // recogniser, celle qu'on entend est annoncée au pair.
       if (_baseLang(spoken) != _baseLang(_mySourceLang)) {
@@ -1894,7 +1897,7 @@ class _CallScreenState extends State<CallScreen> {
       if (_baseLang(heard) != _baseLang(_myOutputLang)) {
         unawaited(_changeOutputLanguage(heard));
       }
-    });
+    }));
   }
 
   /// Les deux panneaux de l'appel d'un coup — le son à gauche, les langues à
@@ -1903,14 +1906,8 @@ class _CallScreenState extends State<CallScreen> {
   void _openCallSettingsSheet() {
     var spoken = _mySourceLang;
     var heard = _myOutputLang;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: SC.bg,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) => _CallSettingsSheet(
+    unawaited(_showCallSheet(
+      (ctx) => _CallSettingsSheet(
         controller: _audio,
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
@@ -1927,7 +1924,7 @@ class _CallScreenState extends State<CallScreen> {
       if (_baseLang(heard) != _baseLang(_myOutputLang)) {
         unawaited(_changeOutputLanguage(heard));
       }
-    });
+    }));
   }
 
   /// `fr-FR` et `fr` sont la même langue : comparer les tags bruts ferait
@@ -2698,13 +2695,57 @@ class _CallScreenState extends State<CallScreen> {
                 // Posé au-dessus de la couche qui rallume la barre — sinon un
                 // tap dessus se contenterait de la réveiller au lieu de couper
                 // la traduction.
-                if (!_langSheetOpen)
-                  Align(
-                    alignment: const Alignment(0, 0.36),
+                // Un panneau s'ouvre : la vidéo se floute SOUS le galet, qui
+                // reste net. Le flou appartient à l'écran et pas au panneau —
+                // posé dans le panneau, il aurait flouté le galet avec le
+                // reste, et il aurait fallu en dessiner un second par-dessus.
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: _sheetOpen ? 22 : 0),
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, blur, _) => blur < 0.4
+                      // Rien à flouter : pas de BackdropFilter du tout. À
+                      // sigma nul il coûte encore une passe de composition
+                      // pendant tout l'appel.
+                      ? const SizedBox.shrink()
+                      : Positioned.fill(
+                          child: IgnorePointer(
+                            child: BackdropFilter(
+                              filter: ui.ImageFilter.blur(
+                                sigmaX: blur,
+                                sigmaY: blur,
+                              ),
+                              child: ColoredBox(
+                                color: Colors.black
+                                    .withValues(alpha: 0.35 * blur / 22),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+                // Le galet REMONTE au-dessus du panneau et rétrécit, il ne
+                // disparaît pas pour être remplacé ailleurs. Un seul objet,
+                // un seul jeu de tickers, et le trajet se voit.
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                  alignment: _sheetOpen
+                      ? const Alignment(0, -0.52)
+                      : const Alignment(0, 0.36),
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    // 56 sur 65 : la même réduction que la maquette, obtenue
+                    // par une transformation plutôt qu'en repeignant le galet
+                    // à chaque image d'une taille qui change.
+                    scale: _sheetOpen ? 56 / _TranslationOrb.kSize : 1,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _TranslationOrb(
+                          // Sous un panneau, les ondes iraient chercher l'œil
+                          // pour rien.
+                          ripples: !_sheetOpen,
                           on: _translationEnabled,
                           ttsSpeaking: ttsSpeaking,
                           voiceLevel: _voiceLevel,
@@ -2737,6 +2778,7 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
+                ),
                 // Le dock : une barre de verre posée en bas, qui flotte
                 // au-dessus de la vidéo. Ce qui se déplie — conversation et
                 // réglages — pousse vers le HAUT, au-dessus d'elle ; la barre,
@@ -3492,16 +3534,11 @@ class _TranslationOrb extends StatefulWidget {
     required this.voiceLevel,
     required this.onTap,
     required this.onLongPress,
-    this.size = _kSize,
     this.ripples = true,
   });
 
   /// La traduction tourne. False = coupée : pierre endormie.
   final bool on;
-
-  /// Sa taille à l'écran. Réduite, il devient l'en-tête d'un panneau plutôt que
-  /// la pièce centrale de l'appel.
-  final double size;
 
   /// Les ondes qui s'échappent. Coupées quand le galet n'est plus le sujet de
   /// l'écran : sous un panneau, elles vont chercher l'œil pour rien.
@@ -3517,7 +3554,7 @@ class _TranslationOrb extends StatefulWidget {
   /// La taille par défaut. Toutes les cotes du dessin sont données pour 130
   /// puis mises à l'échelle, donc ce seul nombre redimensionne l'ensemble sans
   /// rien déformer.
-  static const double _kSize = 65;
+  static const double kSize = 65;
 
   /// La pierre endormie est plus petite que le galet vivant : couper la
   /// traduction se voit à sa taille avant même qu'on lise l'icône. Même
@@ -3531,7 +3568,7 @@ class _TranslationOrb extends StatefulWidget {
   static const double boxFactor = 1.9;
 
   /// L'encombrement réel du widget.
-  double get box => size * boxFactor;
+  static const double box = kSize * boxFactor;
 
   @override
   State<_TranslationOrb> createState() => _TranslationOrbState();
@@ -3666,8 +3703,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: SizedBox(
-          width: widget.box,
-          height: widget.box,
+          width: _TranslationOrb.box,
+          height: _TranslationOrb.box,
           child: widget.on ? _live() : _dormant(),
         ),
       ),
@@ -3707,8 +3744,8 @@ class _TranslationOrbState extends State<_TranslationOrb>
   Widget _dormant() {
     return Center(
       child: SizedBox(
-        width: widget.size * _TranslationOrb.dormantRatio,
-        height: widget.size * _TranslationOrb.dormantRatio,
+        width: _TranslationOrb.kSize * _TranslationOrb.dormantRatio,
+        height: _TranslationOrb.kSize * _TranslationOrb.dormantRatio,
         child: ClipOval(
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
@@ -4250,112 +4287,61 @@ class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
     required this.spokenCode,
     required this.heardCode,
-    required this.translationOn,
-    required this.ttsSpeaking,
-    required this.voiceLevel,
     required this.onChanged,
   });
 
   final String spokenCode;
   final String heardCode;
 
-  /// De quoi rendre le galet réduit posé au-dessus du panneau : il continue de
-  /// vivre pendant qu'on choisit, sinon l'appel a l'air suspendu.
-  final bool translationOn;
-  final ValueListenable<bool> ttsSpeaking;
-  final ValueListenable<double> voiceLevel;
-
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
   /// d'appel qui le fera quand le panneau se refermera.
   final void Function(String spoken, String heard) onChanged;
 
-  /// Le galet du panneau. Plus petit que celui de l'appel, et sans ondes :
-  /// sous un panneau ouvert, elles iraient chercher l'œil pour rien.
-  static const double _orbSize = 56;
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.max,
-      children: [
-        // Le haut : la vidéo floutée, et le galet posé dessus. Un tap referme —
-        // c'est la barrière du panneau, qu'on peint nous-mêmes puisqu'elle
-        // porte le flou.
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).maybePop(),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Container(
-                // Un voile sombre par-dessus le flou : flouter seul éclaircit
-                // l'image, et le galet blanc s'y noierait.
-                color: Colors.black.withValues(alpha: 0.35),
-                alignment: const Alignment(0, 0.15),
-                child: IgnorePointer(
-                  child: _TranslationOrb(
-                    on: translationOn,
-                    ttsSpeaking: ttsSpeaking,
-                    voiceLevel: voiceLevel,
-                    size: _orbSize,
-                    ripples: false,
-                    onTap: () {},
-                    onLongPress: () {},
+    // Ni flou ni galet ici : les deux appartiennent à l'écran d'appel, qui
+    // floute sa vidéo SOUS le galet et le fait remonter. Un panneau qui
+    // portait son propre galet en dessinait forcément un second, avec ses
+    // propres tickers et un état à tenir d'accord avec le premier.
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHandle(),
+            _LanguageWheels(
+              spokenCode: spokenCode,
+              heardCode: heardCode,
+              onChanged: onChanged,
+            ),
+            const SizedBox(height: 18),
+            // Le panneau s'appliquait déjà en se refermant, quel qu'ait été le
+            // geste. Ce bouton ne fait donc que refermer — mais il dit qu'on a
+            // fini, ce qu'un panneau qu'on fait glisser ne dit jamais vraiment.
+            SizedBox(
+              height: 52,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: Text(AppStrings.t('save')),
               ),
             ),
-          ),
+          ],
         ),
-        // Le panneau lui-même.
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            color: SC.bg,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _SheetHandle(),
-                  _LanguageWheels(
-                    spokenCode: spokenCode,
-                    heardCode: heardCode,
-                    onChanged: onChanged,
-                  ),
-                  const SizedBox(height: 18),
-                  // Le panneau s'appliquait déjà en se refermant, quel qu'ait
-                  // été le geste. Ce bouton ne fait donc que refermer — mais
-                  // il dit qu'on a fini, ce qu'un panneau qu'on fait glisser
-                  // ne dit jamais vraiment.
-                  SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(26),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      child: Text(AppStrings.t('save')),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
