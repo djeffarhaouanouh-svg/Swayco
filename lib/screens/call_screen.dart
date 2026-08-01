@@ -2813,9 +2813,21 @@ class _CallScreenState extends State<CallScreen> {
                                           ring: true,
                                           onTap: () {
                                             _wakeDock();
-                                            setState(
-                                              () => _turnsOpen = !_turnsOpen,
-                                            );
+                                            setState(() {
+                                              _turnsOpen = !_turnsOpen;
+                                              // Le rail se replie en même
+                                              // temps : les deux se déplient
+                                              // au MÊME endroit, l'un sur
+                                              // l'autre, et la conversation a
+                                              // besoin de toute la hauteur. Le
+                                              // bouton qu'on vient de toucher
+                                              // disparaît avec — c'est
+                                              // justement ce qu'on veut, il a
+                                              // fait son office.
+                                              if (_turnsOpen) {
+                                                _controlsOpen = false;
+                                              }
+                                            });
                                           },
                                         ),
                                         // Les langues reviennent ici : la barre
@@ -2867,9 +2879,14 @@ class _CallScreenState extends State<CallScreen> {
                             onHangUp: _hangUp,
                             onToggleControls: () {
                               _wakeDock();
-                              setState(
-                                () => _controlsOpen = !_controlsOpen,
-                              );
+                              setState(() {
+                                _controlsOpen = !_controlsOpen;
+                                // Et dans l'autre sens aussi : les réglages et
+                                // la conversation se disputent la même bande
+                                // au-dessus de la barre. Un seul des deux à la
+                                // fois, quel que soit celui qu'on ouvre.
+                                if (_controlsOpen) _turnsOpen = false;
+                              });
                             },
                           ),
                         ],
