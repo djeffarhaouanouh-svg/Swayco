@@ -153,7 +153,14 @@ class _CallScreenState extends State<CallScreen> {
       ),
       builder: body,
     ).whenComplete(() {
-      if (mounted) setState(() => _sheetOpen = false);
+      if (!mounted) return;
+      setState(() {
+        _sheetOpen = false;
+        // Et le rail avec : c'est lui qui a ouvert ce panneau, le laisser
+        // déplié obligeait à un second geste pour revenir à l'appel.
+        _controlsOpen = false;
+        _turnsOpen = false;
+      });
     });
   }
 
@@ -2729,12 +2736,20 @@ class _CallScreenState extends State<CallScreen> {
                 AnimatedAlign(
                   duration: const Duration(milliseconds: 320),
                   curve: Curves.easeOutCubic,
+                  // Il remonte d'un cran à chaque chose qui s'ouvre, et
+                  // redescend tout en bas quand il ne reste que l'appel. Les
+                  // cas sont testés du plus haut au plus bas : un panneau
+                  // recouvre le rail, qui recouvre la conversation.
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
-                      // Plus bas, assumé : ses ondes atteignent les touches et
-                      // c'est très bien — elles passent derrière, elles ne les
-                      // gênent pas.
-                      : const Alignment(0, 0.66),
+                      : _turnsOpen
+                          ? const Alignment(0, 0.02)
+                          : _controlsOpen
+                              ? const Alignment(0, 0.34)
+                              // Rien de déplié : ses ondes atteignent les
+                              // touches et c'est très bien, elles passent
+                              // derrière.
+                              : const Alignment(0, 0.74),
                   child: AnimatedScale(
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutCubic,
@@ -2800,7 +2815,7 @@ class _CallScreenState extends State<CallScreen> {
                       // ces 40 ne cadraient plus rien : ils empêchaient
                       // seulement les touches d'atteindre les bords, quel que
                       // soit le rembourrage qu'on mettait à l'intérieur.
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -3090,10 +3105,11 @@ class _SpokenTurnsPanel extends StatefulWidget {
   final String peerName;
   final String peerAvatarUrl;
 
-  /// Trois phrases à l'écran, pas plus. Au-delà on ne relit plus, on subit —
-  /// et la vidéo est ce qu'on est venu regarder. Les plus anciennes restent
-  /// atteignables en faisant défiler.
-  static const int visible = 3;
+  /// La hauteur qu'on laisse à la conversation : trois bulles courtes environ.
+  /// Au-delà on ne relit plus, on subit — et la vidéo est ce qu'on est venu
+  /// regarder. Les plus anciennes ne sont pas jetées pour autant : on remonte
+  /// le fil en faisant défiler.
+  static const double maxHeight = 186;
 
   @override
   State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
@@ -3103,9 +3119,6 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
   @override
   Widget build(BuildContext context) {
     final turns = widget.turns;
-    final shown = turns.length <= _SpokenTurnsPanel.visible
-        ? turns
-        : turns.sublist(turns.length - _SpokenTurnsPanel.visible);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -3161,20 +3174,39 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
               ],
             ),
           ),
-          for (var i = 0; i < shown.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _TurnBubble(
-                turn: shown[i],
-                name: shown[i].mine ? widget.myName : widget.peerName,
-                avatarUrl:
-                    shown[i].mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
-                // La dernière phrase passe au blanc plein : c'est celle qu'on
-                // est en train de lire. Les précédentes s'effacent derrière
-                // elle au lieu de se disputer le regard.
-                latest: i == shown.length - 1,
-              ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxHeight: _SpokenTurnsPanel.maxHeight,
             ),
+            child: ListView.builder(
+              // À l'envers : la plus récente en bas, collée à la barre, et on
+              // remonte le temps en faisant défiler. C'est aussi ce qui garde
+              // la vue calée sur la dernière quand une phrase arrive.
+              reverse: true,
+              // Sous la hauteur maximale, la liste épouse ses bulles : deux
+              // phrases n'occupent pas la place de trois.
+              shrinkWrap: true,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: turns.length,
+              itemBuilder: (ctx, i) {
+                final turn = turns[turns.length - 1 - i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _TurnBubble(
+                    turn: turn,
+                    name: turn.mine ? widget.myName : widget.peerName,
+                    avatarUrl:
+                        turn.mine ? widget.myAvatarUrl : widget.peerAvatarUrl,
+                    // La dernière phrase passe au blanc plein : c'est celle
+                    // qu'on est en train de lire. Les précédentes s'effacent
+                    // derrière elle au lieu de se disputer le regard.
+                    latest: i == 0,
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -3693,6 +3725,18 @@ class _TranslationOrbState extends State<_TranslationOrb>
   /// Le plancher, le même que celui qu'avait la barre.
   static const double _idleOpacity = 0.22;
 
+  /// Le sursis avant que le galet ne commence à s'effacer.
+  ///
+  /// Sans lui, il pâlit à la seconde où on se tait — et comme on se tait entre
+  /// deux phrases, il a l'air de s'être arrêté d'enregistrer. Les gens se
+  /// précipitent alors pour enchaîner, ce qui coupe justement la phrase que la
+  /// reconnaissance était en train de fermer. Une seconde et demie couvre les
+  /// respirations d'une conversation normale.
+  static const Duration _presenceHold = Duration(milliseconds: 1500);
+
+  /// L'instant où le silence a commencé. Null tant que ça parle.
+  DateTime? _quietSince;
+
   /// Le niveau à partir duquel le galet a fini de grossir.
   ///
   /// Bas EXPRÈS. Une voix de conversation normale l'atteint déjà, donc parler
@@ -3762,7 +3806,11 @@ class _TranslationOrbState extends State<_TranslationOrb>
     // Il revient pour TOUT son, la traduction comprise : c'est lui qui montre
     // qu'elle est en train d'être dite. S'effacer pendant qu'elle parle
     // reviendrait à cacher le seul témoin du travail en cours.
-    _presenceTarget = (voice || speaking) ? 1.0 : _idleOpacity;
+    final live = voice || speaking;
+    _presenceTarget = live ? 1.0 : _idleOpacity;
+    // Le compte à rebours repart de zéro à chaque son : c'est le silence
+    // CONTINU qui efface le galet, pas un blanc entre deux mots.
+    _quietSince = live ? null : (_quietSince ?? DateTime.now());
   }
 
   void _tick() {
@@ -3773,9 +3821,19 @@ class _TranslationOrbState extends State<_TranslationOrb>
     // La présence revient VITE et s'en va lentement : on ne doit pas rater le
     // début d'une phrase, et un galet qui clignote entre deux mots serait pire
     // que pas de retour du tout.
-    final rate = _presenceTarget > _presence.value ? 0.35 : 0.06;
-    final pres = _presence.value + (_presenceTarget - _presence.value) * rate;
-    if ((pres - _presence.value).abs() > 0.001) _presence.value = pres;
+    final rising = _presenceTarget > _presence.value;
+    final quiet = _quietSince;
+    // Et elle ne commence à retomber qu'après le sursis. Monter, en revanche,
+    // n'attend jamais.
+    if (!rising &&
+        quiet != null &&
+        DateTime.now().difference(quiet) < _presenceHold) {
+      // On tient. Rien à faire.
+    } else {
+      final rate = rising ? 0.35 : 0.06;
+      final pres = _presence.value + (_presenceTarget - _presence.value) * rate;
+      if ((pres - _presence.value).abs() > 0.001) _presence.value = pres;
+    }
     for (final pair in [(_voice, _voiceTarget), (_tts, _ttsTarget)]) {
       final n = pair.$1;
       final next = n.value + (pair.$2 - n.value) * 0.12;
