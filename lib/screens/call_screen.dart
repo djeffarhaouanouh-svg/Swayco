@@ -3448,8 +3448,9 @@ class _CallDock extends StatelessWidget {
                       label: AppStrings.t(
                         speakerOn ? 'call_earpiece' : 'call_speaker',
                       ),
-                      // Inversé : c'est l'ÉCOUTEUR qui remplit la touche, pas
-                      // le haut-parleur.
+                      // Pleine sur l'ÉCOUTEUR, c'est-à-dire quand le
+                      // haut-parleur est coupé — la même règle que les deux
+                      // autres.
                       background: speakerOn
                           ? Colors.white.withValues(alpha: 0.14)
                           : Colors.white,
@@ -3492,12 +3493,15 @@ class _CallDock extends StatelessWidget {
                     _DockKeyButton(
                       icon: micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
                       label: AppStrings.t(micOn ? 'call_mute' : 'call_unmute'),
-                      // Inversé aussi : la touche est pleine quand le micro
-                      // OUVERT, vide quand il est coupé.
+                      // Pleine quand le micro est COUPÉ. Les trois bascules
+                      // de la rangée disent la même chose de la même façon :
+                      // le blanc signale ce qui est coupé — micro, caméra,
+                      // haut-parleur. C'est ce qu'on cherche du regard en
+                      // appel, pas ce qui marche normalement.
                       background: micOn
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.14),
-                      iconColor: micOn ? Colors.black : Colors.white,
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white,
+                      iconColor: micOn ? Colors.white : Colors.black,
                       onTap: onToggleMic,
                     ),
                   ),
