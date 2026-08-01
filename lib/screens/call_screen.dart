@@ -2794,10 +2794,13 @@ class _CallScreenState extends State<CallScreen> {
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      // Mêmes marges que la barre de navigation de l'app
-                      // (root_shell, left/right 48) : les deux barres font la
-                      // même largeur d'un écran à l'autre.
-                      padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
+                      // Presque rien sur les côtés. C'était 40 — la largeur de
+                      // la barre de nav de l'app — du temps où la rangée était
+                      // un panneau de verre qu'il fallait cadrer. Sans panneau,
+                      // ces 40 ne cadraient plus rien : ils empêchaient
+                      // seulement les touches d'atteindre les bords, quel que
+                      // soit le rembourrage qu'on mettait à l'intérieur.
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2809,9 +2812,12 @@ class _CallScreenState extends State<CallScreen> {
                             alignment: Alignment.bottomCenter,
                             child: (_turnsOpen && _turns.isNotEmpty)
                                 ? Padding(
+                                    // Les bulles vont d'un bord à l'autre : à
+                                    // droite il restait 40 px de vide, et une
+                                    // phrase longue se repliait pour rien.
                                     padding: const EdgeInsets.only(
-                                      left: 4,
-                                      right: 40,
+                                      left: 10,
+                                      right: 10,
                                       bottom: 10,
                                     ),
                                     child: _SpokenTurnsPanel(
