@@ -728,11 +728,27 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// The tag to hand flutter_tts for [lang] — the device's own (`ja-JP`) when we
-  /// know it, the bare code otherwise (the probe may not have answered yet).
+  /// Le tag à donner à flutter_tts pour [lang] — celui de l'appareil (`ja-JP`)
+  /// quand on le connaît, VIDE sinon.
+  ///
+  /// Vide et pas le code nu, qui était pire que rien : sur le web,
+  /// `speechSynthesis` reçoit un `fr` qu'il ne sait pas résoudre, ne joue rien
+  /// et **n'émet aucun événement** — la phrase attendait alors les vingt
+  /// secondes du garde-fou, et la suivante repartait pour vingt secondes. Sur
+  /// iOS c'est le même piège : `AVSpeechSynthesisVoice(language:)` veut la
+  /// région, rend nil sur un code nu, et le système lit dans sa langue par
+  /// défaut sans le dire.
+  ///
+  /// Vide, l'appelant ne change pas de langue et laisse le moteur parler avec
+  /// la voix qu'il a. L'accent sera peut-être faux ; au moins ça sort du
+  /// haut-parleur, et la file avance.
   String _voiceTagFor(String lang) {
     final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
-    return _deviceVoiceTags[base] ?? lang;
+    final tag = _deviceVoiceTags[base];
+    if (tag == null && _deviceVoiceTags.isNotEmpty) {
+      DebugOverlay.log('no device voice for "$base" — keeping current voice');
+    }
+    return tag ?? '';
   }
 
   /// Whether WE want to hear the peer translated. Toggle via
@@ -969,7 +985,10 @@ class _CallScreenState extends State<CallScreen> {
         if (_myOutputLang.isNotEmpty && kIsWeb) {
           unawaited(() async {
             try {
-              await _deviceTts.setLanguage(_voiceTagFor(_myOutputLang));
+              final warmTag = _voiceTagFor(_myOutputLang);
+              if (warmTag.isNotEmpty) {
+                await _deviceTts.setLanguage(warmTag);
+              }
               await _deviceTts.setVolume(0.0);
               await _deviceTts.speak(' ');
               await _deviceTts.stop();
@@ -977,7 +996,10 @@ class _CallScreenState extends State<CallScreen> {
             } catch (_) {}
           }());
         } else if (_myOutputLang.isNotEmpty) {
-          unawaited(_deviceTts.setLanguage(_voiceTagFor(_myOutputLang)).catchError((_) {}));
+          final preTag = _voiceTagFor(_myOutputLang);
+          if (preTag.isNotEmpty) {
+            unawaited(_deviceTts.setLanguage(preTag).catchError((_) {}));
+          }
         }
       } while (_refreshPending && mounted);
     } finally {
@@ -1971,8 +1993,13 @@ class _CallScreenState extends State<CallScreen> {
     final room = _room;
     if (room != null) _announceOutputLang(room);
 
-    _deviceTtsLang = code;
-    unawaited(_deviceTts.setLanguage(code).catchError((_) {}));
+    // Par le résolveur, pas le code brut : c'est ici que le `fr` nu du log
+    // était poussé, et flutter_tts restait ensuite bloqué dessus.
+    final tag = _voiceTagFor(code);
+    if (tag.isNotEmpty) {
+      _deviceTtsLang = tag;
+      unawaited(_deviceTts.setLanguage(tag).catchError((_) {}));
+    }
   }
 
 
