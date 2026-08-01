@@ -3756,9 +3756,11 @@ class _TranslationOrbState extends State<_TranslationOrb>
   /// saturé se transcrit moins bien, pas mieux.
   static const double _swellCeiling = 0.22;
 
-  /// Le plancher : même dans le silence le galet vit un peu, sinon il a l'air
-  /// en panne. La parole le fait monter, elle ne le fait pas exister.
-  static const double _idleAmp = 0.3;
+  /// Au repos, les barres ne bougent PAS. C'est le seuil de l'ancienne
+  /// pastille, et il vaut mieux que le mien : des barres qui remuent tout le
+  /// temps ne disent plus rien quand quelqu'un parle. Elles restent visibles —
+  /// c'est le painter qui leur garde une hauteur de repos — simplement figées.
+  static const double _idleAmp = 0.0;
 
   @override
   void initState() {
@@ -4205,7 +4207,10 @@ class _OrbPainter extends CustomPainter {
       final phase = (bars - delays[i]) % 1.0;
       // Un aller-retour sur le cycle : 0,35 → 1 → 0,35.
       final swing = 0.35 + 0.65 * (1 - (2 * phase - 1).abs());
-      final h = heights[i] * k * swing * amp;
+      // Une hauteur de repos FIXE, plus une part qui suit la voix. Multiplier
+      // la hauteur entière par l'amplitude faisait disparaître les barres dans
+      // le silence ; ici elles restent posées et cessent seulement de bouger.
+      final h = heights[i] * k * (0.4 + 0.6 * swing * amp);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(center: Offset(x, c.dy), width: barW, height: h),
