@@ -30,6 +30,11 @@ import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
+/// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
+/// assez pour qu'on voie où il commence quand il recouvre la photo, assez peu
+/// pour rester du noir.
+const Color _kPanelBg = Color(0xFF141517);
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1012,27 +1017,22 @@ class _ProfileInfoPanel extends StatelessWidget {
       },
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          // Verre clair type iOS : la photo transparaît, le texte passe en noir.
-          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+        child: DecoratedBox(
+          // Fond OPAQUE, plus de verre : le flou laissait passer la photo, et
+          // une photo n'est jamais assez uniforme pour porter du texte — selon
+          // le cliché, un mot sur deux tombait sur une zone claire. Le panneau
+          // est maintenant une page à lui, posée devant l'image.
+          decoration: const BoxDecoration(
+            color: _kPanelBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           child: Container(
             decoration: BoxDecoration(
-              // Un voile blanc TRÈS léger : à 0.6 il agissait comme une
-              // peinture et effaçait la photo. Le flou fait le gros du travail,
-              // le blanc ne sert qu'à porter le texte noir.
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withValues(alpha: 0.30),
-                  Colors.white.withValues(alpha: 0.18),
-                ],
-              ),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(24),
               ),
               border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.75)),
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
               ),
             ),
             child: Column(
@@ -1046,7 +1046,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                       width: 44,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.28),
+                        color: Colors.white.withValues(alpha: 0.22),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -1072,13 +1072,20 @@ class _ProfileInfoPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                      // Le prénom EN TÊTE du panneau : déplié, il recouvre
+                      // celui posé sur la photo, et on ne sait plus de qui on
+                      // lit la fiche. L'âge le suit, et la paire de langues
+                      // ferme la ligne — c'est la promesse de l'app, elle vaut
+                      // d'être dite avant la bio.
+                      _PanelHeader(profile: p),
+                      const SizedBox(height: 20),
                       if (p.bio.trim().isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_bio')),
                         const SizedBox(height: 8),
                         Text(
                           p.bio.trim(),
-                          style: const TextStyle(
-                            color: Colors.black,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
                             fontSize: 15.5,
                             height: 1.45,
                           ),
@@ -1088,26 +1095,30 @@ class _ProfileInfoPanel extends StatelessWidget {
                       if (facts.isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_about')),
                         const SizedBox(height: 10),
-                        for (final f in facts)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
+                        // Deux colonnes : en une seule, six lignes d'une ligne
+                        // chacune faisaient une liste à trous — la moitié de la
+                        // largeur restait vide et le panneau descendait pour
+                        // rien.
+                        LayoutBuilder(
+                          builder: (ctx, c) {
+                            final w = (c.maxWidth - 10) / 2;
+                            return Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
                               children: [
-                                Text(f.emoji, style: const TextStyle(fontSize: 17)),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    f.label,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 15,
+                                for (final f in facts)
+                                  SizedBox(
+                                    width: w,
+                                    child: _FactChip(
+                                      emoji: f.emoji,
+                                      label: f.label,
                                     ),
                                   ),
-                                ),
                               ],
-                            ),
-                          ),
-                        const SizedBox(height: 10),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 22),
                       ],
                       if (p.interests.isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_interests')),
@@ -1119,20 +1130,20 @@ class _ProfileInfoPanel extends StatelessWidget {
                             for (final tag in p.interests)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 7,
+                                  horizontal: 14,
+                                  vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: Colors.black.withValues(alpha: 0.10),
+                                    color: Colors.white.withValues(alpha: 0.12),
                                   ),
                                 ),
                                 child: Text(
                                   interestLabel(tag),
-                                  style: const TextStyle(
-                                    color: Colors.black,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.90),
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1150,7 +1161,7 @@ class _ProfileInfoPanel extends StatelessWidget {
                             AppStrings.t('info_empty'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.black.withValues(alpha: 0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 14,
                             ),
                           ),
@@ -1179,10 +1190,144 @@ class _PanelSectionTitle extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: TextStyle(
-        color: Colors.black.withValues(alpha: 0.55),
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
+        color: Colors.white.withValues(alpha: 0.45),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+}
+
+/// La première ligne du panneau : prénom, âge, et la paire de langues.
+class _PanelHeader extends StatelessWidget {
+  const _PanelHeader({required this.profile});
+
+  final RemoteProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile.displayName.trim().isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : profile.displayName.trim();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+              height: 1.1,
+            ),
+          ),
+        ),
+        if (profile.age != null) ...[
+          const SizedBox(width: 9),
+          Text(
+            '${profile.age}',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(width: 10),
+        _LanguagePairChip(theirLang: profile.language),
+      ],
+    );
+  }
+}
+
+/// « 🇫🇷 FR ⇄ EN 🇬🇧 » : sa langue, la mienne, et la flèche entre les deux.
+///
+/// C'est la seule chose de la fiche qui parle de MOI : tout le reste décrit la
+/// personne, celle-ci dit ce qui se passera si on se parle. La flèche est en
+/// cyan — c'est la traduction, pas une simple mention de langue.
+class _LanguagePairChip extends StatelessWidget {
+  const _LanguagePairChip({required this.theirLang});
+
+  final String theirLang;
+
+  @override
+  Widget build(BuildContext context) {
+    final theirs = findLanguageByCode(theirLang);
+    final mine = findLanguageByCode(AppStrings.currentBcp47.value);
+    // Une seule langue connue, ou la même des deux côtés : il n'y a pas de
+    // paire à montrer.
+    if (theirs == null || mine == null || theirs.code == mine.code) {
+      return const SizedBox.shrink();
+    }
+    const code = TextStyle(
+      color: Colors.white,
+      fontSize: 12.5,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.5,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(theirs.flag, style: const TextStyle(fontSize: 13)),
+          const SizedBox(width: 6),
+          Text(theirs.code.toUpperCase(), style: code),
+          const SizedBox(width: 5),
+          const Icon(Icons.sync_alt_rounded, size: 13, color: SC.accent),
+          const SizedBox(width: 5),
+          Text(mine.code.toUpperCase(), style: code),
+          const SizedBox(width: 6),
+          Text(mine.flag, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Une info du bloc « À propos » : son emoji, puis sa valeur. Une pastille par
+/// fait, deux par ligne.
+class _FactChip extends StatelessWidget {
+  const _FactChip({required this.emoji, required this.label});
+
+  final String emoji;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.055),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 15)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1530,16 +1675,15 @@ class _TinderCardState extends State<_TinderCard> {
               ],
             ),
 
-          // ── Photo dots — petits, centrés en haut ────────────────────────
+          // ── Photo dots — en haut à DROITE ───────────────────────────────
+          // Face au logo, pas au milieu : centrées, elles tombaient sous lui et
+          // le haut de la carte avait deux choses empilées au même endroit.
           if (photos.length > 1)
             Positioned(
               // Descendues : collées au bord elles se perdaient dans l'encoche.
               top: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _PhotoDots(count: photos.length, active: _photoIndex),
-              ),
+              right: 16,
+              child: _PhotoDots(count: photos.length, active: _photoIndex),
             ),
 
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
