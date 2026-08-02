@@ -184,7 +184,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   /// Local time at the peer's place, derived from the free-text city they
   /// filled into their profile (country as a fallback). Null when no city is
-  /// set or the place isn't in our timezone table — the bubble then hides.
+  /// set or the place isn't in our timezone table — the header line then hides.
   PeerLocalTime? get _peerClock {
     final p = _peer;
     if (p == null || p.city.trim().isEmpty) return null;
@@ -574,6 +574,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     _ThreadHeader(
                       title: widget.title,
                       peer: _peer,
+                      clock: peerClock,
+                      place: _peer?.city ?? '',
                       blockedByPeer: _peerBlockedMe,
                       onCall: () => _startCall(withCamera: false),
                       onVideoCall: () => _startCall(withCamera: true),
@@ -600,9 +602,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             GestureDetector(
                               behavior: HitTestBehavior.translucent,
                               onTap: () => FocusScope.of(context).unfocus(),
-                              child: _buildMessageList(
-                                hasClockChip: peerClock != null,
-                              ),
+                              child: _buildMessageList(),
                             ),
                             // Top fade — messages dissolve into black under the
                             // header (floating, not empty).
@@ -655,26 +655,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                                 ),
                               ),
                             ),
-                            // Floating "local time at the peer's place" bubble.
-                            // Alignée SOUS le prénom, pas centrée sous le logo :
-                            // l'heure et la ville se lisent avec le nom de la
-                            // personne dont elles parlent. Le 112 est le décalage
-                            // du prénom dans l'en-tête (18 de marge + 40 du
-                            // retour + 8 + 36 de la photo + 10) ; le 58 tient la
-                            // pastille à l'écart des boutons d'appel.
-                            if (peerClock != null)
-                              Positioned(
-                                top: 8,
-                                left: 112,
-                                right: 58,
-                                child: Align(
-                                  alignment: Alignment.topLeft,
-                                  child: _PeerClockChip(
-                                    clock: peerClock,
-                                    place: _peer?.city ?? '',
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -747,7 +727,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  Widget _buildMessageList({bool hasClockChip = false}) {
+  Widget _buildMessageList() {
     if (_messages.isEmpty) {
       return Center(
         child: Padding(
@@ -766,12 +746,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     const canDub = true;
     return ListView.builder(
       controller: _scrollCtrl,
-      // Extra top room when the floating local-time bubble is shown so the
-      // first message never hides behind it.
       // Bottom room so the last message clears the floating composer.
       padding: EdgeInsets.fromLTRB(
         12,
-        hasClockChip ? 46 : 12,
+        12,
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
@@ -801,6 +779,8 @@ class _ThreadHeader extends StatelessWidget {
     required this.onCall,
     required this.onVideoCall,
     required this.onViewProfile,
+    this.clock,
+    this.place = '',
     this.peerBlocked = false,
     this.blockedByPeer = false,
     this.onToggleBlock,
@@ -808,6 +788,13 @@ class _ThreadHeader extends StatelessWidget {
   });
   final String title;
   final RemoteProfile? peer;
+
+  /// Local time at the peer's place — rendered as an orange line under the
+  /// first name (not a floating pill over the messages).
+  final PeerLocalTime? clock;
+
+  /// City label shown next to the clock (empty = time alone).
+  final String place;
 
   /// True when the peer has blocked ME — greys out the call button.
   final bool blockedByPeer;
@@ -890,10 +877,9 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: the swaycø logo CENTRED between the PDP and the
-            // call button (its own, larger size), with the peer name small and
-            // left-aligned, nudged up. The logo is dropped for a long name so
-            // the two never collide.
+            // Middle zone: peer name left-aligned (with local-time line under
+            // it when known), swaycø logo centred. Logo drops if the name /
+            // clock would collide with it.
             Expanded(
               child: LayoutBuilder(
                 builder: (context, c) {
@@ -916,11 +902,29 @@ class _ThreadHeader extends StatelessWidget {
                   )..layout()).width;
                   final nameW = widthOf(title, nameStyle);
                   final logoW = widthOf('swaycø', logoStyle);
-                  // Logo is centred over [0, c.maxWidth]; the name is left-
-                  // aligned [0, nameW]. Show the logo ONLY if the name's right
-                  // edge clears the logo's left edge with a 14px gap — measured,
-                  // so it never collides regardless of the name.
-                  final showLogo = nameW <= c.maxWidth / 2 - logoW / 2 - 14;
+                  final clock = this.clock;
+                  // Rough clock-line width so the logo never sits on top of
+                  // "11:15 ☀ DAKAR". Icon + gaps ≈ 28px.
+                  final city = place.trim();
+                  final clockLabel = clock == null
+                      ? ''
+                      : '${clock.hhmm}${city.isEmpty ? '' : ' $city'}';
+                  final clockW = clock == null
+                      ? 0.0
+                      : widthOf(
+                            clockLabel,
+                            const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ) +
+                          28;
+                  final leftBlockW = nameW > clockW ? nameW : clockW;
+                  // Logo is centred over [0, c.maxWidth]; the name/clock is
+                  // left-aligned. Show the logo ONLY if the left block clears
+                  // the logo's left edge with a 14px gap.
+                  final showLogo =
+                      leftBlockW <= c.maxWidth / 2 - logoW / 2 - 14;
                   return Stack(
                     alignment: Alignment.center,
                     children: [
@@ -929,16 +933,21 @@ class _ThreadHeader extends StatelessWidget {
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: onViewProfile,
-                          child: Transform.translate(
-                            offset: const Offset(0, -3),
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: c.maxWidth),
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: nameStyle,
-                              ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: c.maxWidth),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: nameStyle,
+                                ),
+                                if (clock != null)
+                                  _PeerClockLine(clock: clock, place: place),
+                              ],
                             ),
                           ),
                         ),
@@ -1029,74 +1038,59 @@ class _DeadCallIcon extends StatelessWidget {
   }
 }
 
-/// Small floating bubble under the header showing the peer's local time, with
-/// a white sun (day) / moon (night) icon and the city it is that time in.
-/// Orange-tinted, darker border.
-///
-/// The city is the whole point of the line — an hour on its own says nothing
-/// about where the other person is. It replaces the tap-to-unfold phrase
-/// ("il est 11:15 chez Djeffar"), which said the same thing in more words and
-/// only after a tap nobody knew to make: the pill is now inert.
-class _PeerClockChip extends StatelessWidget {
-  const _PeerClockChip({required this.clock, required this.place});
+/// Orange subtitle under the peer's first name: local time, sun/moon, city.
+/// Plain text — no pill / glass island over the conversation.
+class _PeerClockLine extends StatelessWidget {
+  const _PeerClockLine({required this.clock, required this.place});
 
   final PeerLocalTime clock;
 
   /// The peer's city (their country when no city is set); empty = time alone.
   final String place;
 
+  static const _orange = Color(0xFFFFB74D);
+
   @override
   Widget build(BuildContext context) {
-    // Frosted-glass orange pill — translucent so the chat behind shows through.
-    const shadows = [
-      Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
-    ];
     const textStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      shadows: shadows,
+      color: _orange,
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+      height: 1.15,
     );
     final city = place.trim();
 
-    final timeRow = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          clock.hhmm,
-          style: textStyle.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Icon(
-          clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
-          size: 14,
-          color: Colors.white,
-          shadows: shadows,
-        ),
-        if (city.isNotEmpty) ...[
-          const SizedBox(width: 7),
-          // Capitales et un poil plus petit : la ville accompagne l'heure, elle
-          // ne lui dispute pas la place.
-          Flexible(
-            child: Text(
-              city.toUpperCase(),
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              style: textStyle.copyWith(fontSize: 11.5, letterSpacing: 0.4),
+    return Padding(
+      padding: const EdgeInsets.only(top: 1),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            clock.hhmm,
+            style: textStyle.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
+          const SizedBox(width: 4),
+          Icon(
+            clock.isDay ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+            size: 12,
+            color: _orange,
+          ),
+          if (city.isNotEmpty) ...[
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                city.toUpperCase(),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: textStyle.copyWith(letterSpacing: 0.3),
+              ),
+            ),
+          ],
         ],
-      ],
-    );
-
-    return GlassPanel(
-      borderRadius: 999,
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      color: const Color(0x55FFA726), // light orange — recording tint
-      child: timeRow,
+      ),
     );
   }
 }
