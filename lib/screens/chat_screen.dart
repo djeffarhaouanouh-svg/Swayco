@@ -74,6 +74,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String _myId = '';
   List<RemoteProfile> _friends = const [];
+  /// Peer ids with an accepted friendship — drives "Supprimer le match".
+  Set<String> _matchedIds = const {};
   /// Matchs des 7 derniers jours, du plus récent au plus ancien — le rail de
   /// bulles sous le logo. Ils ont AUSSI leur ligne dans Messages ; la bulle
   /// disparaît quand la fenêtre expire, pas quand la conversation démarre.
@@ -356,6 +358,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {
         _myId = id;
         _friends = friends;
+        _matchedIds = {for (final p in matches) p.id};
         _newMatches = newMatches;
         _seenMatches = seenMatches;
         _latestByConv = latest;
@@ -463,6 +466,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ? AppStrings.t('incoming_someone')
           : peer.displayName,
     );
+  }
+
+  /// Drop the accepted match (not a block) and hide the conversation locally.
+  Future<void> _unmatchPeer(RemoteProfile peer) async {
+    final name = peer.displayName.isEmpty
+        ? AppStrings.t('incoming_someone')
+        : peer.displayName;
+    final ok = await showSwaycoConfirm(
+      context: context,
+      title: AppStrings.t('unmatch_q', args: {'name': name}),
+      body: AppStrings.t('unmatch_body', args: {'name': name}),
+      confirmLabel: AppStrings.t('unmatch'),
+    );
+    if (ok != true || _myId.isEmpty) return;
+    try {
+      await FriendshipApi.unmatchWith(meId: _myId, peerId: peer.id);
+      await ChatUnread.markConversationCleared(_conversationIdFor(peer.id));
+      if (!mounted) return;
+      _showTopToast('${name} · ${AppStrings.t('unmatch')}');
+      await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'})),
+      ));
+    }
   }
 
   Future<void> _blockPeer(RemoteProfile peer) async {
@@ -703,6 +732,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 unreadCount: _unreadCountFor(p),
                                 onTap: () => _openThread(p),
                                 onViewProfile: () => _viewProfile(p),
+                                isMatched: _matchedIds.contains(p.id),
+                                onUnmatch: () => _unmatchPeer(p),
                                 onBlock: () => _blockPeer(p),
                                 onReport: () => _reportPeer(p),
                                 onDeleteConversation: () =>
@@ -758,6 +789,8 @@ class _FriendChatRow extends StatelessWidget {
     required this.unreadCount,
     required this.onTap,
     required this.onViewProfile,
+    required this.isMatched,
+    required this.onUnmatch,
     required this.onBlock,
     required this.onReport,
     required this.onDeleteConversation,
@@ -777,6 +810,9 @@ class _FriendChatRow extends StatelessWidget {
   final int unreadCount;
   final VoidCallback onTap;
   final VoidCallback onViewProfile;
+  /// Accepted friendship — show "Supprimer le match" above Block.
+  final bool isMatched;
+  final VoidCallback onUnmatch;
   final VoidCallback onBlock;
   final VoidCallback onReport;
   /// Removes this conversation from the chat list (local "delete for me").
@@ -815,8 +851,7 @@ class _FriendChatRow extends StatelessWidget {
     return '$d/$mo';
   }
 
-  /// Long-press menu (the per-row 3-dots was removed): block / report /
-  /// delete the conversation.
+  /// Long-press menu: mute / unmatch / block / report / delete conversation.
   void _showRowActions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -852,6 +887,21 @@ class _FriendChatRow extends StatelessWidget {
                 );
               },
             ),
+            if (isMatched)
+              ListTile(
+                leading: const Icon(
+                  Icons.heart_broken_outlined,
+                  color: SC.textPrimary,
+                ),
+                title: Text(
+                  AppStrings.t('unmatch'),
+                  style: const TextStyle(color: SC.textPrimary),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  onUnmatch();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.block, color: Color(0xFFE53935)),
               title: Text(

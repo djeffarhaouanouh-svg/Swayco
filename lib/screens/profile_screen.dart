@@ -258,6 +258,39 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  Future<void> _unmatchPeer() async {
+    if (_targetId.isEmpty || _deviceId.isEmpty || !_matched) return;
+    final name = _displayName.isEmpty
+        ? AppStrings.t('incoming_someone')
+        : _displayName;
+    final ok = await showSwaycoConfirm(
+      context: context,
+      title: AppStrings.t('unmatch_q', args: {'name': name}),
+      body: AppStrings.t('unmatch_body', args: {'name': name}),
+      confirmLabel: AppStrings.t('unmatch'),
+    );
+    if (ok != true) return;
+    try {
+      await FriendshipApi.unmatchWith(meId: _deviceId, peerId: _targetId);
+      final ids = [_deviceId, _targetId]..sort();
+      await ChatUnread.markConversationCleared('dm-${ids[0]}-${ids[1]}');
+      if (!mounted) return;
+      setState(() {
+        _matched = false;
+        _iLiked = false;
+        _peerLikedMe = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('unmatch'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+    }
+  }
+
   Future<void> _toggleBlock() async {
     if (_targetId.isEmpty || _deviceId.isEmpty) return;
     final wasBlocked = _peerBlocked;
@@ -877,10 +910,31 @@ class _ProfileScreenState extends State<ProfileScreen>
                             side: const BorderSide(color: SC.glassBorder),
                           ),
                           onSelected: (v) {
+                            if (v == 'unmatch') _unmatchPeer();
                             if (v == 'report') _reportPeer();
                             if (v == 'block') _toggleBlock();
                           },
                           itemBuilder: (ctx) => [
+                            if (_matched)
+                              PopupMenuItem<String>(
+                                value: 'unmatch',
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.heart_broken_outlined,
+                                      size: 18,
+                                      color: SC.textPrimary,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      AppStrings.t('unmatch'),
+                                      style: const TextStyle(
+                                        color: SC.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             PopupMenuItem<String>(
                               value: 'report',
                               child: Row(

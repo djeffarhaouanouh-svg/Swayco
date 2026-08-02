@@ -369,6 +369,29 @@ abstract final class FriendshipApi {
     await _c.from('friendships').delete().eq('id', friendshipId);
   }
 
+  /// Drop the accepted match between [meId] and [peerId] (hard delete so
+  /// either side can like again later — this is not a block).
+  /// Returns `true` when at least one accepted row was removed.
+  static Future<bool> unmatchWith({
+    required String meId,
+    required String peerId,
+  }) async {
+    if (!isSupabaseReady || meId.isEmpty || peerId.isEmpty || meId == peerId) {
+      return false;
+    }
+    final mine = await fetchMine(meId);
+    var removed = false;
+    for (final f in mine) {
+      final involves =
+          (f.requester == meId && f.addressee == peerId) ||
+          (f.requester == peerId && f.addressee == meId);
+      if (!involves || f.status != 'accepted') continue;
+      await remove(f.id);
+      removed = true;
+    }
+    return removed;
+  }
+
   /// Viewer-mode helper for the profile screen: where do [meId] and [peerId]
   /// stand?
   ///   * `matched`     → an accepted row either way: both said yes.

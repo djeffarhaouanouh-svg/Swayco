@@ -366,6 +366,10 @@ abstract final class AppStrings {
     'tooltip_more': 'Plus',
     'view_profile': 'Voir profil',
     // Chat thread
+    'unmatch': 'Supprimer le match',
+    'unmatch_q': 'Supprimer le match avec {name} ?',
+    'unmatch_body':
+        "Vous ne serez plus matchés et la conversation quittera ta liste. Ce n'est pas un blocage : {name} pourra te retrouver et te renvoyer un like.",
     'block_peer_q': 'Bloquer {name} ?',
     'unblock_peer_q': 'Débloquer {name} ?',
     'block_peer_body':
@@ -953,6 +957,10 @@ abstract final class AppStrings {
     'guest_connecting': 'Joining the call…',
     'tooltip_more': 'More',
     'view_profile': 'View profile',
+    'unmatch': 'Remove match',
+    'unmatch_q': 'Remove match with {name}?',
+    'unmatch_body':
+        "You'll no longer be matched and the chat leaves your list. This is not a block: {name} can still find you and like you again.",
     'block_peer_q': 'Block {name}?',
     'unblock_peer_q': 'Unblock {name}?',
     'block_peer_body':
@@ -1482,6 +1490,10 @@ abstract final class AppStrings {
     'gif_none': 'Ningún GIF encontrado',
     'tooltip_more': 'Más',
     'view_profile': 'Ver perfil',
+    'unmatch': 'Eliminar el match',
+    'unmatch_q': '¿Eliminar el match con {name}?',
+    'unmatch_body':
+        'Ya no estaréis matchados y el chat saldrá de tu lista. No es un bloqueo: {name} podrá encontrarte y darte like de nuevo.',
     'block_peer_q': '¿Bloquear a {name}?',
     'unblock_peer_q': '¿Desbloquear a {name}?',
     'block_peer_body':
@@ -1966,6 +1978,10 @@ abstract final class AppStrings {
     'gif_none': 'Kein GIF gefunden',
     'tooltip_more': 'Mehr',
     'view_profile': 'Profil ansehen',
+    'unmatch': 'Match entfernen',
+    'unmatch_q': 'Match mit {name} entfernen?',
+    'unmatch_body':
+        'Ihr seid nicht mehr gematcht und der Chat verschwindet aus deiner Liste. Das ist keine Blockierung: {name} kann dich wiederfinden und erneut liken.',
     'block_peer_q': '{name} blockieren?',
     'unblock_peer_q': '{name} entsperren?',
     'block_peer_body':
@@ -2529,6 +2545,10 @@ abstract final class AppStrings {
     'gif_none': 'Nessuna GIF trovata',
     'tooltip_more': 'Altro',
     'view_profile': 'Vedi profilo',
+    'unmatch': 'Rimuovi match',
+    'unmatch_q': 'Rimuovere il match con {name}?',
+    'unmatch_body':
+        'Non sarete più matchati e la chat uscirà dalla tua lista. Non è un blocco: {name} potrà ritrovarti e metterti di nuovo like.',
     'block_peer_q': 'Bloccare {name}?',
     'unblock_peer_q': 'Sbloccare {name}?',
     'block_peer_body':
@@ -3087,6 +3107,10 @@ abstract final class AppStrings {
     'gif_none': 'Nenhum GIF encontrado',
     'tooltip_more': 'Mais',
     'view_profile': 'Ver perfil',
+    'unmatch': 'Remover match',
+    'unmatch_q': 'Remover o match com {name}?',
+    'unmatch_body':
+        'Vocês deixam de ser um match e a conversa sai da tua lista. Não é um bloqueio: {name} pode encontrar-te e dar-te like outra vez.',
     'block_peer_q': 'Bloquear {name}?',
     'unblock_peer_q': 'Desbloquear {name}?',
     'block_peer_body':
@@ -3645,6 +3669,10 @@ abstract final class AppStrings {
     'gif_none': 'Geen GIF gevonden',
     'tooltip_more': 'Meer',
     'view_profile': 'Profiel bekijken',
+    'unmatch': 'Match verwijderen',
+    'unmatch_q': 'Match met {name} verwijderen?',
+    'unmatch_body':
+        'Jullie zijn geen match meer en de chat verdwijnt uit je lijst. Dit is geen blokkade: {name} kan je weer vinden en opnieuw liken.',
     'block_peer_q': '{name} blokkeren?',
     'unblock_peer_q': '{name} deblokkeren?',
     'block_peer_body':
@@ -4196,6 +4224,10 @@ abstract final class AppStrings {
     'gif_none': 'لم يتم العثور على GIF',
     'tooltip_more': 'المزيد',
     'view_profile': 'عرض الملف الشخصي',
+    'unmatch': 'حذف التطابق',
+    'unmatch_q': 'حذف التطابق مع {name}؟',
+    'unmatch_body':
+        'لن تعودا متطابقين وستغادر المحادثة قائمتك. هذا ليس حظرًا: يمكن لـ {name} أن يجدك ويرسل لك إعجابًا من جديد.',
     'block_peer_q': 'حظر {name}؟',
     'unblock_peer_q': 'إلغاء حظر {name}؟',
     'block_peer_body':
@@ -4740,6 +4772,10 @@ abstract final class AppStrings {
     'gif_none': 'GIF не найдены',
     'tooltip_more': 'Ещё',
     'view_profile': 'Посмотреть профиль',
+    'unmatch': 'Удалить мэтч',
+    'unmatch_q': 'Удалить мэтч с {name}?',
+    'unmatch_body':
+        'Вы больше не в мэтче, и чат исчезнет из списка. Это не блокировка: {name} сможет снова найти тебя и поставить лайк.',
     'block_peer_q': 'Заблокировать {name}?',
     'unblock_peer_q': 'Разблокировать {name}?',
     'block_peer_body':
@@ -5288,6 +5324,9 @@ abstract final class AppStrings {
     'gif_none': '未找到 GIF',
     'tooltip_more': '更多',
     'view_profile': '查看个人资料',
+    'unmatch': '删除配对',
+    'unmatch_q': '删除与 {name} 的配对？',
+    'unmatch_body': '你们将不再配对，对话会离开你的列表。这不是屏蔽：{name} 仍可以找到你并再次喜欢你。',
     'block_peer_q': '屏蔽 {name}？',
     'unblock_peer_q': '解除屏蔽 {name}？',
     'block_peer_body': '此人将无法再找到你、联系你或拨打你的电话。你可以从设置 → 已屏蔽中撤销。',
@@ -5789,6 +5828,10 @@ abstract final class AppStrings {
     'gif_none': 'GIFが見つかりません',
     'tooltip_more': 'もっと見る',
     'view_profile': 'プロフィールを見る',
+    'unmatch': 'マッチを削除',
+    'unmatch_q': '{name} とのマッチを削除しますか？',
+    'unmatch_body':
+        'マッチは解除され、チャットはリストから消えます。ブロックではありません。{name} は再びあなたを見つけていいねできます。',
     'block_peer_q': '{name} をブロックしますか？',
     'unblock_peer_q': '{name} のブロックを解除しますか？',
     'block_peer_body':
@@ -6297,6 +6340,10 @@ abstract final class AppStrings {
     'gif_none': 'GIF를 찾을 수 없습니다',
     'tooltip_more': '더 보기',
     'view_profile': '프로필 보기',
+    'unmatch': '매치 삭제',
+    'unmatch_q': '{name}님과의 매치를 삭제할까요?',
+    'unmatch_body':
+        '더 이상 매치되지 않으며 대화가 목록에서 사라집니다. 차단이 아닙니다. {name}님이 다시 찾고 좋아요할 수 있습니다.',
     'block_peer_q': '{name} 차단하시겠습니까?',
     'unblock_peer_q': '{name} 차단을 해제하시겠습니까?',
     'block_peer_body':
