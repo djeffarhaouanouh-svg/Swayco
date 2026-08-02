@@ -1641,13 +1641,13 @@ class _TinderCardState extends State<_TinderCard> {
           // Dégradé noir LISSE sur toute la carte (comme Tinder) — aucun
           // rectangle, aucun blur : transparent en haut, fondu progressif
           // jusqu'au noir en bas où reposent nom + boutons.
-          // ── Bottom info (net, en bas de la carte photo) ──────────────────
+          // ── Bottom info (net, au-dessus des chevrons) ───────────────────
           Positioned(
             left: 14,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Prénom, ville et centres d'intérêt, posés au bas de l'image.
-            bottom: 20,
+            // Posé au-dessus des chevrons, qui sont tout en bas.
+            bottom: 66,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1722,12 +1722,6 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Le repère « tire vers le haut », entre l'identité et les
-                // centres d'intérêt.
-                const SizedBox(height: 6),
-                const IgnorePointer(
-                  child: Center(child: _ScrollHintChevrons()),
-                ),
                 // Interests — un seul chip sur la carte (le reste est dans le
                 // panneau info).
                 if (p.interests.isNotEmpty) ...[
@@ -1766,6 +1760,17 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
+          // ── Repère "tire vers le haut" : les deux chevrons qui sautent,
+          //    centrés tout en bas de la photo.
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 10,
+            child: IgnorePointer(
+              child: Center(child: _ScrollHintChevrons()),
+            ),
+          ),
+
         ],
       );
   }
@@ -1773,7 +1778,7 @@ class _TinderCardState extends State<_TinderCard> {
 
 /// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
 /// marquent une pause avant de recommencer. Le repère "il y a des infos à
-/// découvrir, tire vers le haut", posé au-dessus du bloc identité.
+/// découvrir, tire vers le haut", posé tout en bas de la carte.
 ///
 /// (L'ancienne version faisait défiler les chevrons en boucle, façon
 /// escalator ; le saut se lit mieux et n'attire pas l'œil en permanence.)
