@@ -67,8 +67,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   int _currentIndex = 0;
+  /// True once every card has been swiped today — show the end-of-deck screen
+  /// instead of looping back to the first profile.
+  bool _deckDone = false;
   final _stackKey = GlobalKey<_TinderCardStackState>();
   List<Friendship> _myFriendships = const [];
+
+  bool get _hasActiveCard =>
+      !_feedLoading && _cards.isNotEmpty && !_deckDone;
 
   // Search
   bool _searchExpanded = false;
@@ -86,7 +92,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _infoOpen = false;
 
   void _openInfo() {
-    if (_infoOpen || _cards.isEmpty) return;
+    if (_infoOpen || !_hasActiveCard) return;
     setState(() => _infoOpen = true);
     NavChrome.hide();
   }
@@ -141,6 +147,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         FriendshipApi.fetchMine(id),
         ProfileApi.fetchDiscoverFeed(myId: id),
         UserPrefs.loadDiscoverCursor(),
+        UserPrefs.loadDiscoverDoneToday(),
       ]).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
@@ -148,15 +155,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _profiles = results[1] as List<RemoteProfile>;
         _rebuildCards();
         final cursor = results[2] as String;
-        if (cursor.isNotEmpty && _cards.isNotEmpty) {
-          final idx = _cards.indexWhere((c) => c.profile.id == cursor);
-          if (idx > 0) _currentIndex = idx;
+        final doneToday = results[3] as bool;
+        if (_cards.isNotEmpty) {
+          if (doneToday) {
+            _deckDone = true;
+            _currentIndex = _cards.length;
+          } else if (cursor.isNotEmpty) {
+            final idx = _cards.indexWhere((c) => c.profile.id == cursor);
+            if (idx >= 0) _currentIndex = idx;
+          }
         }
         _feedLoading = false;
       });
       AppBoot.markHomeReady();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _precacheAround(_currentIndex);
+        if (mounted && !_deckDone) _precacheAround(_currentIndex);
       });
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
@@ -165,11 +178,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _precacheAround(int index) {
-    if (!mounted || _cards.isEmpty) return;
+    if (!mounted || _cards.isEmpty || _deckDone) return;
     final n = _cards.length;
     final seen = <String>{};
-    for (var off = -1; off <= 5; off++) {
-      for (final url in _cards[(index + off) % n].photos) {
+    for (var off = 0; off <= 5; off++) {
+      final i = index + off;
+      if (i < 0 || i >= n) continue;
+      for (final url in _cards[i].photos) {
         if (url.isNotEmpty && seen.add(url)) {
           precacheImage(NetworkImage(url), context).ignore();
         }
@@ -238,16 +253,42 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _likePeer(profile);
     }
     if (!mounted || _cards.isEmpty) return;
+    final next = _currentIndex + 1;
+    if (next >= _cards.length) {
+      setState(() {
+        _currentIndex = _cards.length;
+        _deckDone = true;
+      });
+      UserPrefs.markDiscoverDoneToday();
+      UserPrefs.saveDiscoverCursor('');
+      return;
+    }
     setState(() {
-      _currentIndex = (_currentIndex + 1) % _cards.length;
-      UserPrefs.saveDiscoverCursor(_cards[_currentIndex % _cards.length].profile.id);
+      _currentIndex = next;
+      _deckDone = false;
+      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
       _precacheAround(_currentIndex);
     });
   }
 
   void _onActionUndo() {
     if (_cards.isEmpty) return;
-    setState(() => _currentIndex = (_currentIndex - 1 + _cards.length) % _cards.length);
+    if (_deckDone) {
+      setState(() {
+        _deckDone = false;
+        _currentIndex = _cards.length - 1;
+      });
+      UserPrefs.clearDiscoverDone();
+      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
+      _precacheAround(_currentIndex);
+      return;
+    }
+    if (_currentIndex <= 0) return;
+    setState(() {
+      _currentIndex -= 1;
+      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
+      _precacheAround(_currentIndex);
+    });
   }
 
   void _onSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);
@@ -304,11 +345,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Future<void> _reset() async {
     if (_myId.isEmpty) return;
-    setState(() { _feedLoading = true; _currentIndex = 0; });
+    setState(() {
+      _feedLoading = true;
+      _currentIndex = 0;
+      _deckDone = false;
+    });
+    await UserPrefs.clearDiscoverDone();
+    await UserPrefs.saveDiscoverCursor('');
     try {
       final feed = await ProfileApi.fetchDiscoverFeed(myId: _myId);
       if (!mounted) return;
-      setState(() { _profiles = feed; _rebuildCards(); _feedLoading = false; });
+      setState(() {
+        _profiles = feed;
+        _rebuildCards();
+        _feedLoading = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _feedLoading = false);
     }
@@ -354,20 +405,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   )
                 : _cards.isEmpty
                     ? _Empty(onReset: _reset)
-                    : _TinderCardStack(
-                        key: _stackKey,
-                        cards: _cards,
-                        currentIndex: _currentIndex,
-                        onSwiped: _onCardSwiped,
-                        onPullUp: _openInfo,
-                        infoOpen: _infoOpen,
-                        onCloseInfo: _closeInfo,
-                      ),
+                    : _deckDone
+                        ? _DiscoverDone(onBack: _onActionUndo)
+                        : _TinderCardStack(
+                            key: _stackKey,
+                            cards: _cards,
+                            currentIndex: _currentIndex,
+                            onSwiped: _onCardSwiped,
+                            onPullUp: _openInfo,
+                            infoOpen: _infoOpen,
+                            onCloseInfo: _closeInfo,
+                          ),
           ),
 
           // ── Retour arrière — coin haut-GAUCHE de la photo, verre nu (pas de
           //    liseré cyan : seule l'icône est colorée). ─────────────────────
-          if (!_feedLoading && _cards.isNotEmpty && !_infoOpen)
+          if (_hasActiveCard && !_infoOpen)
             Positioned(
               top: tabBarH + 20,
               left: 20,
@@ -403,22 +456,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             right: 0,
             bottom: _infoOpen ? safeBottom + 4 : btnBottom,
             height: actionH,
-            child: _SwipeActionBar(
-              height: actionH,
-              onNope: _onSwipeLeft,
-              onLike: _onSwipeRight,
-              onMessage: () {
-                if (_cards.isEmpty) return;
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ProfileScreen(
-                      userId:
-                          _cards[_currentIndex % _cards.length].profile.id,
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _hasActiveCard
+                ? _SwipeActionBar(
+                    height: actionH,
+                    onNope: _onSwipeLeft,
+                    onLike: _onSwipeRight,
+                    onMessage: () {
+                      if (!_hasActiveCard) return;
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ProfileScreen(
+                            userId: _cards[_currentIndex].profile.id,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : const SizedBox.shrink(),
           ),
 
           // ── Search overlay ────────────────────────────────────────────────
@@ -860,7 +914,9 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       for (var step = 1; step <= 2; step++) {
-        final card = widget.cards[(widget.currentIndex + step) % n];
+        final i = widget.currentIndex + step;
+        if (i >= n) break;
+        final card = widget.cards[i];
         final url = card.photos.isEmpty ? '' : card.photos.first;
         if (url.isEmpty || !_warmed.add(url)) continue;
         precacheImage(NetworkImage(url), context).catchError((_) {
@@ -883,7 +939,9 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   Widget build(BuildContext context) {
     final n = widget.cards.length;
     if (n == 0) return const SizedBox.shrink();
-    final i = widget.currentIndex % n;
+    final i = widget.currentIndex.clamp(0, n - 1);
+    final hasMid = i + 1 < n;
+    final hasBack = i + 2 < n;
 
     return LayoutBuilder(
       builder: (context, c) {
@@ -894,22 +952,22 @@ class _TinderCardStackState extends State<_TinderCardStack> {
         return Stack(
         children: [
           // Back card (3rd)
-          if (n >= 3)
+          if (hasBack)
             _StackCard(
-              key: ValueKey('back_${(i + 2) % n}'),
+              key: ValueKey('back_${i + 2}'),
               scale: 0.90,
               translateY: 18,
-              child: _buildCard(widget.cards[(i + 2) % n]),
+              child: _buildCard(widget.cards[i + 2]),
             ),
           // Middle card (2nd) — scales up as top card moves
-          if (n >= 2)
+          if (hasMid)
             ValueListenableBuilder<double>(
               valueListenable: _progress,
               builder: (_, p, child) => _StackCard(
-                key: ValueKey('mid_${(i + 1) % n}'),
+                key: ValueKey('mid_${i + 1}'),
                 scale: 0.95 + 0.05 * p.clamp(0.0, 1.0),
                 translateY: 9 * (1 - p.clamp(0.0, 1.0)),
-                child: _buildCard(widget.cards[(i + 1) % n]),
+                child: _buildCard(widget.cards[i + 1]),
               ),
             ),
           // Top card (interactive)
@@ -2361,8 +2419,75 @@ class _Pill extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Empty state
+// Empty / end-of-deck
 // ══════════════════════════════════════════════════════════════════════════════
+
+/// Shown after the last Discover card — tap anywhere (or the rewind control)
+/// to step one card back.
+class _DiscoverDone extends StatelessWidget {
+  const _DiscoverDone({required this.onBack});
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onBack,
+        borderRadius: BorderRadius.circular(28),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    color: SC.accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: SC.accent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.replay_rounded,
+                    color: SC.accent,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  AppStrings.t('discover_done'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  AppStrings.t('discover_done_back'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _Empty extends StatelessWidget {
   const _Empty({required this.onReset});
@@ -2385,17 +2510,21 @@ class _Empty extends StatelessWidget {
             child: const Icon(Icons.favorite_border, color: Colors.white54, size: 32),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Vous avez tout vu !',
-            style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+          Text(
+            AppStrings.t('discover_done'),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 20),
           TextButton.icon(
             onPressed: onReset,
-            icon: const Icon(Icons.refresh, color: Color(0xFF3DCA72)),
-            label: const Text(
-              'Recommencer',
-              style: TextStyle(color: Color(0xFF3DCA72)),
+            icon: const Icon(Icons.refresh, color: SC.accent),
+            label: Text(
+              AppStrings.t('restart'),
+              style: const TextStyle(color: SC.accent),
             ),
           ),
         ],

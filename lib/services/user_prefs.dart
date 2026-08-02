@@ -32,6 +32,10 @@ abstract final class UserPrefs {
   /// feed comes back in a different order next launch. Empty = start at the top.
   static const String keyDiscoverCursor = 'discover_cursor_profile_id';
 
+  /// Calendar day (`yyyy-MM-dd`, local) the user finished the Discover deck.
+  /// Cleared on a new day so the feed can start again tomorrow.
+  static const String keyDiscoverDoneDay = 'discover_done_day';
+
   static Future<String> loadDiscoverCursor() async {
     final p = await SharedPreferences.getInstance();
     return p.getString(keyDiscoverCursor) ?? '';
@@ -45,6 +49,29 @@ abstract final class UserPrefs {
     } else {
       await p.setString(keyDiscoverCursor, id);
     }
+  }
+
+  static String _todayKey() {
+    final n = DateTime.now();
+    final m = n.month.toString().padLeft(2, '0');
+    final d = n.day.toString().padLeft(2, '0');
+    return '${n.year}-$m-$d';
+  }
+
+  /// True when the Discover deck was exhausted earlier today.
+  static Future<bool> loadDiscoverDoneToday() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(keyDiscoverDoneDay) == _todayKey();
+  }
+
+  static Future<void> markDiscoverDoneToday() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(keyDiscoverDoneDay, _todayKey());
+  }
+
+  static Future<void> clearDiscoverDone() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(keyDiscoverDoneDay);
   }
 
   static Future<String> readPendingReferralCode() async {
