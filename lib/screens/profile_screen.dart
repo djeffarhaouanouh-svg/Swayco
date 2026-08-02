@@ -359,19 +359,25 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// The "It's a match!" celebration. Needs MY avatar too — in viewer mode
-  /// `_remote` holds the PEER's profile, so pull mine for the left circle.
+  /// The "It's a match!" celebration. Needs MY profile too — in viewer mode
+  /// `_remote` holds the PEER, so pull mine for the card.
   Future<void> _celebrateMatch() async {
     final me = isSupabaseReady ? await ProfileApi.fetchById(_deviceId) : null;
-    if (!mounted) return;
+    final peer = _remote;
+    if (!mounted || peer == null) return;
+    final meProfile = me ??
+        RemoteProfile(
+          id: _deviceId,
+          handle: '',
+          displayName: '',
+          language: AppStrings.currentBcp47.value,
+          avatarColor: '',
+          avatarUrl: '',
+        );
     await showMatchOverlay(
       context,
-      myName: me?.displayName ?? '',
-      myPhotoUrl: me?.avatarUrl ?? '',
-      theirName: _displayName.isEmpty
-          ? AppStrings.t('profile_anonymous')
-          : _displayName,
-      theirPhotoUrl: _remote?.avatarUrl ?? '',
+      me: meProfile,
+      peer: peer,
       onSayHi: _openChatWithPeer,
     );
     if (mounted) await _reload(silent: true);

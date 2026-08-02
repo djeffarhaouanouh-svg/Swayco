@@ -216,20 +216,27 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     }
   }
 
-  /// "It's a match!" over the Demandes list. "Dire bonjour" opens the DM.
+  /// "It's a match!" over the Demandes list. "Dis bonjour" opens the DM.
   Future<void> _celebrateMatch(RemoteProfile? peer) async {
     if (peer == null) return;
     final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
     if (!mounted) return;
+    final meProfile = me ??
+        RemoteProfile(
+          id: _myId,
+          handle: '',
+          displayName: '',
+          language: AppStrings.currentBcp47.value,
+          avatarColor: '',
+          avatarUrl: '',
+        );
     final peerName = peer.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : peer.displayName;
     await showMatchOverlay(
       context,
-      myName: me?.displayName ?? '',
-      myPhotoUrl: me?.avatarUrl ?? '',
-      theirName: peerName,
-      theirPhotoUrl: peer.avatarUrl,
+      me: meProfile,
+      peer: peer,
       onSayHi: () {
         final ids = [_myId, peer.id]..sort();
         Navigator.of(context).push<void>(

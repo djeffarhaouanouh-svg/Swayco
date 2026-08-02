@@ -113,6 +113,15 @@ const List<Country> kCountries = [
     'Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adélaïde',
   ]),
   Country(name: 'Luxembourg', flag: '🇱🇺', cities: ['Luxembourg', 'Esch-sur-Alzette']),
+  Country(name: 'Islande', flag: '🇮🇸', cities: ['Reykjavík', 'Akureyri', 'Kópavogur']),
+  Country(name: 'Norvège', flag: '🇳🇴', cities: ['Oslo', 'Bergen', 'Trondheim', 'Stavanger']),
+  Country(name: 'Suède', flag: '🇸🇪', cities: ['Stockholm', 'Göteborg', 'Malmö', 'Uppsala']),
+  Country(name: 'Danemark', flag: '🇩🇰', cities: ['Copenhague', 'Aarhus', 'Odense']),
+  Country(name: 'Finlande', flag: '🇫🇮', cities: ['Helsinki', 'Espoo', 'Tampere', 'Turku']),
+  Country(name: 'Irlande', flag: '🇮🇪', cities: ['Dublin', 'Cork', 'Galway', 'Limerick']),
+  Country(name: 'Pologne', flag: '🇵🇱', cities: ['Varsovie', 'Cracovie', 'Gdańsk', 'Wrocław']),
+  Country(name: 'Ukraine', flag: '🇺🇦', cities: ['Kyiv', 'Lviv', 'Odessa', 'Kharkiv']),
+  Country(name: 'Grèce', flag: '🇬🇷', cities: ['Athènes', 'Thessalonique', 'Héraklion']),
 ];
 
 /// The flag emoji for a stored [country] name (verbatim match against

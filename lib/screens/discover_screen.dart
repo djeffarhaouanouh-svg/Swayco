@@ -193,19 +193,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (res.matched) await _celebrateMatch(peer);
   }
 
-  /// "It's a match!" over the Discover stack. "Dire bonjour" opens the DM.
+  /// "It's a match!" over the Discover stack. "Dis bonjour" opens the DM.
   Future<void> _celebrateMatch(RemoteProfile peer) async {
     final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
     if (!mounted) return;
+    final meProfile = me ??
+        RemoteProfile(
+          id: _myId,
+          handle: '',
+          displayName: '',
+          language: AppStrings.currentBcp47.value,
+          avatarColor: '',
+          avatarUrl: '',
+        );
     final peerName = peer.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : peer.displayName;
     await showMatchOverlay(
       context,
-      myName: me?.displayName ?? '',
-      myPhotoUrl: me?.avatarUrl ?? '',
-      theirName: peerName,
-      theirPhotoUrl: peer.avatarUrl,
+      me: meProfile,
+      peer: peer,
       onSayHi: () {
         final ids = [_myId, peer.id]..sort();
         Navigator.of(context).push<void>(
