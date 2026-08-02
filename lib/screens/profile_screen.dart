@@ -1574,7 +1574,7 @@ class _PeerInfoCard extends StatelessWidget {
         (
           emoji: kFactEmojiZodiac,
           label: AppStrings.t('info_zodiac'),
-          value: displayZodiacWithMonths(p.zodiac),
+          value: displayZodiac(p.zodiac),
         ),
       if (p.lookingFor.trim().isNotEmpty)
         (
@@ -2210,7 +2210,7 @@ class _PersonalInfoSection extends StatelessWidget {
           _PersonalInfoRow(
             emoji: kFactEmojiZodiac,
             label: AppStrings.t('info_zodiac'),
-            value: displayZodiacWithMonths(p?.zodiac ?? ''),
+            value: displayZodiac(p?.zodiac ?? ''),
             onPick: (ctx) async {
               final current = normalizeZodiac(p?.zodiac ?? '');
               final picked = await showWheelPicker(
@@ -2218,6 +2218,7 @@ class _PersonalInfoSection extends StatelessWidget {
                 title: AppStrings.t('info_zodiac'),
                 emoji: kFactEmojiZodiac,
                 labels: [
+                  // Months only in the wheel — cards show the sign alone.
                   for (final k in kZodiacSigns) displayZodiacWithMonths(k),
                 ],
                 initialIndex: zodiacIndex(current),

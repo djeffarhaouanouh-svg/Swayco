@@ -1004,7 +1004,7 @@ class _ProfileInfoPanel extends StatelessWidget {
       if (p.job.trim().isNotEmpty)
         (emoji: kFactEmojiJob, label: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
-        (emoji: kFactEmojiZodiac, label: displayZodiacWithMonths(p.zodiac)),
+        (emoji: kFactEmojiZodiac, label: displayZodiac(p.zodiac)),
       if (p.lookingFor.trim().isNotEmpty)
         (emoji: kFactEmojiLookingFor, label: displayLookingFor(p.lookingFor)),
       if (place.isNotEmpty)
@@ -1772,7 +1772,7 @@ class _TinderCardState extends State<_TinderCard> {
           const Positioned(
             left: 0,
             right: 0,
-            bottom: 10,
+            bottom: 2,
             child: IgnorePointer(
               child: Center(child: _ScrollHintChevrons()),
             ),
