@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show RealtimeChannel, Supabase;
 
 import '../services/analytics.dart';
 import '../services/app_settings.dart';
@@ -98,6 +100,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// celle du chargement initial — quelqu'un qui se connecte après coup
   /// n'apparaissait jamais en ligne.
   Timer? _presenceTimer;
+  RealtimeChannel? _friendshipChannel;
   /// True when OS notifications are off (never asked or refused). Drives the
   /// recovery banner at the top of the conversation list — the moment where a
   /// missed-message notification matters most. Dismissible per session.
@@ -126,6 +129,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
     NavTab.index.addListener(_onNavTabChanged);
     _reload();
+    _watchFriendships();
     _checkNotifStatus();
     // Web build doesn't always get realtime push reliably — poll the list
     // silently so new messages / new friends appear without pull-to-refresh.
@@ -148,6 +152,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // taps the Chat tab destination.
   }
 
+  /// A new match must land in this list right away, not on the next resume.
+  Future<void> _watchFriendships() async {
+    if (!isSupabaseReady) return;
+    final id = await DeviceId.getOrCreate();
+    if (!mounted || id.isEmpty) return;
+    _friendshipChannel = FriendshipApi.subscribeMine(
+      userId: id,
+      onChange: () => _reload(silent: true),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -156,6 +171,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
+    final ch = _friendshipChannel;
+    if (ch != null) {
+      unawaited(Supabase.instance.client.removeChannel(ch));
+    }
     super.dispose();
   }
 
@@ -167,6 +186,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _onNavTabChanged() {
     if (!mounted) return;
     if (NavTab.index.value == NavTab.chat) {
+      // This screen lives in an IndexedStack, so it is built once at launch.
+      // Without this, a match made while the user was on Discover only shows
+      // up after an app resume (the poll below is web-only).
+      _reload(silent: true);
       _scheduleMatchSeen();
     } else {
       _matchSeenTimer?.cancel();
@@ -297,7 +320,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final visible = byId.values.where((p) {
         final clearedAt = cleared[convIdFor(p.id)];
         if (clearedAt == null) return true;
-        // Re-surface the conversation once a newer message lands.
+        // A match made AFTER the row was cleared is a fresh relationship
+        // (typically unmatch → re-match): the conversation comes back even
+        // though nobody has written yet.
+        final matchedAt = matchedAtById[p.id];
+        if (matchedAt != null && matchedAt.isAfter(clearedAt)) return true;
+        // Otherwise it re-surfaces once a newer message lands.
         final lm = latest[convIdFor(p.id)];
         return lm != null && lm.createdAt.isAfter(clearedAt);
       }).toSet();

@@ -10,6 +10,8 @@
 // colour bands: nordic crosses, the Union Jack and disc flags aren't stripes.
 // Flag colours are only ever used for the round photo ring of `first`.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -69,13 +71,24 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     duration: const Duration(milliseconds: 2200),
   )..repeat(reverse: true);
 
+  /// One-shot confetti burst — fires with the card, never loops.
+  late final AnimationController _confetti = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..forward();
+
   @override
   void dispose() {
     _pop.dispose();
     _breath.dispose();
     _glow.dispose();
+    _confetti.dispose();
     super.dispose();
   }
+
+  late final List<_ConfettiPiece> _confettiPieces = _buildConfetti(
+    widget.kind == MatchCardKind.rare,
+  );
 
   RemoteProfile get _peer => widget.peer;
 
@@ -158,6 +171,19 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
         alignment: Alignment.center,
         children: [
           _halo(),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _confetti,
+                builder: (_, _) => CustomPaint(
+                  painter: _ConfettiPainter(
+                    progress: _confetti.value,
+                    pieces: _confettiPieces,
+                  ),
+                ),
+              ),
+            ),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 26),
@@ -571,4 +597,118 @@ MatchCardKind resolveMatchCardKind({
   if (acceptedMatchCount <= 1) return MatchCardKind.first;
   if (share != null && share.isRare) return MatchCardKind.rare;
   return MatchCardKind.standard;
+}
+
+// ── confetti ────────────────────────────────────────────────────────────────
+
+/// One paper rectangle: where it starts, how it flies, how it tumbles.
+class _ConfettiPiece {
+  const _ConfettiPiece({
+    required this.startX,
+    required this.angle,
+    required this.speed,
+    required this.spin,
+    required this.width,
+    required this.height,
+    required this.color,
+    required this.delay,
+    required this.drift,
+  });
+
+  /// Horizontal launch point, 0..1 of the card width.
+  final double startX;
+  final double angle;
+  final double speed;
+  final double spin;
+  final double width;
+  final double height;
+  final Color color;
+
+  /// 0..1 of the animation spent waiting before this piece launches.
+  final double delay;
+  final double drift;
+}
+
+List<_ConfettiPiece> _buildConfetti(bool rare) {
+  // Fixed seed: the burst is identical on every rebuild of the same card,
+  // so a resize or a rebuild doesn't reshuffle mid-flight.
+  final rng = math.Random(rare ? 77 : 42);
+  final palette = rare
+      ? const [_gold1, _gold2, _gold3, Color(0xFFFFFFFF)]
+      : const [
+          _cyan,
+          Color(0xFFA78BFA),
+          Color(0xFFF472B6),
+          Color(0xFFFBBF24),
+          Color(0xFF34D399),
+        ];
+  return [
+    for (var i = 0; i < 46; i++)
+      _ConfettiPiece(
+        startX: rng.nextDouble(),
+        angle: rng.nextDouble() * math.pi * 2,
+        speed: 0.75 + rng.nextDouble() * 0.75,
+        spin: (rng.nextDouble() * 2 - 1) * 7,
+        width: 5 + rng.nextDouble() * 5,
+        height: 9 + rng.nextDouble() * 7,
+        color: palette[rng.nextInt(palette.length)],
+        delay: rng.nextDouble() * 0.22,
+        drift: (rng.nextDouble() * 2 - 1) * 0.32,
+      ),
+  ];
+}
+
+/// Confetti that erupts from behind the photo, then falls and fades.
+class _ConfettiPainter extends CustomPainter {
+  const _ConfettiPainter({required this.progress, required this.pieces});
+
+  final double progress;
+  final List<_ConfettiPiece> pieces;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+    final origin = Offset(size.width / 2, size.height * 0.30);
+    final paint = Paint();
+
+    for (final p in pieces) {
+      final t = ((progress - p.delay) / (1 - p.delay)).clamp(0.0, 1.0);
+      if (t <= 0) continue;
+
+      // Burst outward, then gravity takes over — the classic pop-and-fall.
+      final burst = (1 - math.pow(1 - t, 3).toDouble()) * p.speed;
+      final spread = size.width * 0.62 * burst;
+      final dx = math.cos(p.angle) * spread + p.drift * size.width * t;
+      final dy = math.sin(p.angle) * spread * 0.55 +
+          size.height * 0.95 * t * t * p.speed;
+
+      final centre = origin + Offset(dx, dy);
+      if (centre.dy > size.height + 40) continue;
+
+      // Hold full opacity through the burst, fade only on the way out.
+      final opacity = t < 0.7 ? 1.0 : (1 - (t - 0.7) / 0.3).clamp(0.0, 1.0);
+      paint.color = p.color.withValues(alpha: opacity);
+
+      canvas.save();
+      canvas.translate(centre.dx, centre.dy);
+      canvas.rotate(p.angle + p.spin * t);
+      // Tumbling: the rectangle squashes as it turns edge-on to the viewer.
+      final squash = math.cos(t * p.spin * 1.6).abs().clamp(0.25, 1.0);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: p.width,
+            height: p.height * squash,
+          ),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => old.progress != progress;
 }
