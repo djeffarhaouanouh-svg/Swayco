@@ -1392,11 +1392,13 @@ abstract final class ProfileApi {
   }
 
   /// People to surface on the Discover stack. Backed by the
-  /// `discover_feed` SECURITY DEFINER RPC (migration 0026) which
+  /// `discover_feed` SECURITY DEFINER RPC (migrations 0026 / 0050) which
   /// applies every privacy filter in SQL:
   ///   • caller excluded
   ///   • profiles without a discover photo excluded
   ///   • blocks (both directions) excluded
+  ///   • accepted matches + my pending likes excluded (unmatch brings
+  ///     them back into the deck)
   ///   • peers with hide_from_country=true AND a matching language
   ///     excluded — opt-out can't be bypassed by a tampered client
   ///     because the rows never leave the database.
@@ -1410,15 +1412,31 @@ abstract final class ProfileApi {
   }) async {
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
-      final result = await _c.rpc(
-        'discover_feed',
-        params: {'p_user_id': myId, 'p_limit': limit},
-      );
+      final results = await Future.wait([
+        _c.rpc(
+          'discover_feed',
+          params: {'p_user_id': myId, 'p_limit': limit},
+        ),
+        // Client-side belt: hide matches / my pending likes even if the
+        // DB hasn't applied migration 0050 yet.
+        FriendshipApi.fetchMine(myId),
+      ]);
+      final result = results[0];
+      final mine = results[1] as List<Friendship>;
       if (result is! List) return const [];
+      final skipIds = <String>{};
+      for (final f in mine) {
+        if (f.status == 'accepted') {
+          skipIds.add(f.peerOf(myId));
+        } else if (f.status == 'pending' && f.requester == myId) {
+          skipIds.add(f.addressee);
+        }
+      }
       final candidates = result
           .map(
             (r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)),
           )
+          .where((p) => p.id.isNotEmpty && !skipIds.contains(p.id))
           .toList(growable: false);
       if (candidates.isEmpty) return const [];
 

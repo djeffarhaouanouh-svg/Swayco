@@ -369,7 +369,7 @@ abstract final class AppStrings {
     'unmatch': 'Supprimer le match',
     'unmatch_q': 'Supprimer le match avec {name} ?',
     'unmatch_body':
-        "Vous ne serez plus matchés et la conversation quittera ta liste. Ce n'est pas un blocage : {name} pourra te retrouver et te renvoyer un like.",
+        "Vous ne serez plus matchés et la conversation quittera ta liste. Ce n'est pas un blocage : {name} pourra réapparaître dans Discover et te renvoyer un like.",
     'block_peer_q': 'Bloquer {name} ?',
     'unblock_peer_q': 'Débloquer {name} ?',
     'block_peer_body':
@@ -960,7 +960,7 @@ abstract final class AppStrings {
     'unmatch': 'Remove match',
     'unmatch_q': 'Remove match with {name}?',
     'unmatch_body':
-        "You'll no longer be matched and the chat leaves your list. This is not a block: {name} can still find you and like you again.",
+        "You'll no longer be matched and the chat leaves your list. This is not a block: {name} can show up again in Discover and like you again.",
     'block_peer_q': 'Block {name}?',
     'unblock_peer_q': 'Unblock {name}?',
     'block_peer_body':
