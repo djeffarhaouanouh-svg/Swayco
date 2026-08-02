@@ -7,14 +7,18 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
+import 'flag_border.dart';
+import 'flag_gradients.dart';
 import 'profile_avatar.dart';
 
-/// Which celebration card to show after the recipient accepts a like.
+/// Which celebration card to show after a mutual match.
 enum MatchCardKind { first, rare, standard }
 
-/// Match celebration — design from the product mock:
-/// round rainbow photo, yellow-underlined "C'est un match." + meta line,
-/// cyan "Dis bonjour", grey "Plus tard". Rare keeps the gold square variant.
+/// Match celebration from the product mocks:
+/// * circular peer PDP with **liseré drapeau**
+/// * first → "TON PREMIER MATCH" + "Ça y est." + tip
+/// * standard → "C'est un match." + yellow underlines
+/// * rare → gold square variant
 class MatchCard extends StatelessWidget {
   const MatchCard({
     super.key,
@@ -38,15 +42,19 @@ class MatchCard extends StatelessWidget {
     return n.isEmpty ? AppStrings.t('profile_anonymous') : n;
   }
 
+  /// Profile picture (PDP) — avatar first, then Discover photo, then gallery.
   String get _peerPhoto {
-    if (peer.discoverPhotoUrl.trim().isNotEmpty) return peer.discoverPhotoUrl;
-    if (peer.photos.isNotEmpty && peer.photos.first.trim().isNotEmpty) {
-      return peer.photos.first;
+    if (peer.avatarUrl.trim().isNotEmpty) return peer.avatarUrl.trim();
+    if (peer.discoverPhotoUrl.trim().isNotEmpty) {
+      return peer.discoverPhotoUrl.trim();
     }
-    return peer.avatarUrl;
+    if (peer.photos.isNotEmpty && peer.photos.first.trim().isNotEmpty) {
+      return peer.photos.first.trim();
+    }
+    return '';
   }
 
-  String get _metaLine {
+  String get _whoLine {
     final age = peer.age;
     final city = peer.city.trim();
     final bits = <String>[
@@ -54,8 +62,10 @@ class MatchCard extends StatelessWidget {
       if (age != null) AppStrings.t('match_age_years', args: {'n': '$age'}),
       if (city.isNotEmpty) city,
     ];
-    return '${bits.join(', ')}.';
+    return bits.join(', ');
   }
+
+  String get _metaLine => '$_whoLine.';
 
   String get _peerLangLabel =>
       findLanguageByCode(peer.language)?.label ?? peer.language.toUpperCase();
@@ -65,21 +75,83 @@ class MatchCard extends StatelessWidget {
       findLanguageByCode(AppStrings.currentBcp47.value)?.label ??
       AppStrings.currentBcp47.value.toUpperCase();
 
+  FlagCountry get _flagCountry =>
+      flagCountryForProfile(country: peer.country, language: peer.language) ??
+      FlagCountry.france;
+
   @override
   Widget build(BuildContext context) {
     if (kind == MatchCardKind.rare) return _buildRare(context);
+    if (kind == MatchCardKind.first) return _buildFirst(context);
     return _buildStandard(context);
   }
 
-  /// Default + first-match layout (product mock).
+  Widget _buildFirst(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Pill(
+          label: AppStrings.t('match_pill_first'),
+          bg: SC.accent,
+          fg: const Color(0xFF0A1024),
+        ),
+        const SizedBox(height: 22),
+        _FlagPhoto(name: _peerName, photoUrl: _peerPhoto, country: _flagCountry),
+        const SizedBox(height: 28),
+        Text(
+          AppStrings.t('match_first_title'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.6,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            AppStrings.t('match_first_sub', args: {'who': _whoLine}),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.88),
+              fontSize: 15.5,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        _TipBox(text: AppStrings.t('match_tip_auto_translate')),
+        const SizedBox(height: 28),
+        _SayHiButton(onPressed: onSayHi),
+        const SizedBox(height: 14),
+        TextButton(
+          onPressed: onDismiss,
+          child: Text(
+            AppStrings.t('match_later'),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStandard(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _RainbowPhoto(name: _peerName, photoUrl: _peerPhoto),
+        _FlagPhoto(name: _peerName, photoUrl: _peerPhoto, country: _flagCountry),
         const SizedBox(height: 28),
-        _UnderlinedText(
-          text: AppStrings.t('match_standard_title'),
+        Text(
+          AppStrings.t('match_standard_title'),
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 34,
@@ -89,13 +161,17 @@ class MatchCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _UnderlinedText(
-          text: _metaLine,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.92),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            height: 1.3,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Text(
+            _metaLine,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.92),
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+            ),
           ),
         ),
         const SizedBox(height: 36),
@@ -235,21 +311,41 @@ MatchCardKind resolveMatchCardKind({
 
 // ── pieces ──────────────────────────────────────────────────────────────────
 
-class _UnderlinedText extends StatelessWidget {
-  const _UnderlinedText({required this.text, required this.style});
+class _TipBox extends StatelessWidget {
+  const _TipBox({required this.text});
   final String text;
-  final TextStyle style;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: IntrinsicWidth(
-        child: Column(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(text, textAlign: TextAlign.center, style: style),
-            const SizedBox(height: 4),
-            Container(height: 2, color: const Color(0xFFFBBF24)),
+            Icon(
+              Icons.auto_awesome,
+              size: 18,
+              color: const Color(0xFFA78BFA).withValues(alpha: 0.95),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 13.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -337,84 +433,50 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _RainbowPhoto extends StatelessWidget {
-  const _RainbowPhoto({required this.name, required this.photoUrl});
+/// Circular peer PDP wrapped in the flag gradient border (liseré drapeau).
+class _FlagPhoto extends StatelessWidget {
+  const _FlagPhoto({
+    required this.name,
+    required this.photoUrl,
+    required this.country,
+  });
+
   final String name;
   final String photoUrl;
+  final FlagCountry country;
+
+  static const double _size = 156;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 168,
-      height: 168,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 8,
-            right: 6,
-            child: Transform.rotate(
-              angle: 0.3,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF60A5FA).withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(3),
+      width: _size,
+      height: _size,
+      child: FlagBorder(
+        country: country,
+        borderWidth: 3,
+        radius: _size / 2,
+        glowBlur: 22,
+        dropShadow: false,
+        child: photoUrl.isEmpty
+            ? ColoredBox(
+                color: const Color(0xFF0A0A0A),
+                child: Center(
+                  child: ProfileAvatar(displayName: name, size: _size - 12),
+                ),
+              )
+            : Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                width: _size,
+                height: _size,
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: const Color(0xFF0A0A0A),
+                  child: Center(
+                    child: ProfileAvatar(displayName: name, size: _size - 12),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 18,
-            left: 4,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Container(
-            width: 156,
-            height: 156,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: SweepGradient(
-                colors: [
-                  Color(0xFF22D3EE),
-                  Color(0xFFA78BFA),
-                  Color(0xFFF472B6),
-                  Color(0xFFFBBF24),
-                  Color(0xFF34D399),
-                  Color(0xFF22D3EE),
-                ],
-              ),
-            ),
-            padding: const EdgeInsets.all(3.5),
-            child: Container(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF0A0A0A),
-              ),
-              padding: const EdgeInsets.all(3),
-              child: ClipOval(
-                child: photoUrl.isEmpty
-                    ? ProfileAvatar(displayName: name, size: 140)
-                    : Image.network(
-                        photoUrl,
-                        fit: BoxFit.cover,
-                        width: 140,
-                        height: 140,
-                        errorBuilder: (_, _, _) =>
-                            ProfileAvatar(displayName: name, size: 140),
-                      ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

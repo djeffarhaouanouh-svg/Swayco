@@ -146,3 +146,43 @@ FlagCountry? flagCountryForLanguage(String langCode) {
   if (primary.isEmpty) return null;
   return kFlagCountryForLanguage[primary];
 }
+
+/// Contour drapeau from a profile's country name, falling back to language.
+FlagCountry? flagCountryForProfile({
+  required String country,
+  required String language,
+}) {
+  const byName = <String, FlagCountry>{
+    'France': FlagCountry.france,
+    'Portugal': FlagCountry.portugal,
+    'Japon': FlagCountry.japan,
+    'Japan': FlagCountry.japan,
+    'Italie': FlagCountry.italy,
+    'Italy': FlagCountry.italy,
+    'Brésil': FlagCountry.brazil,
+    'Brazil': FlagCountry.brazil,
+    'Espagne': FlagCountry.spain,
+    'Spain': FlagCountry.spain,
+    'Corée du Sud': FlagCountry.southKorea,
+    'South Korea': FlagCountry.southKorea,
+    'États-Unis': FlagCountry.unitedStates,
+    'United States': FlagCountry.unitedStates,
+    'USA': FlagCountry.unitedStates,
+    'Royaume-Uni': FlagCountry.unitedKingdom,
+    'United Kingdom': FlagCountry.unitedKingdom,
+    'UK': FlagCountry.unitedKingdom,
+    'Belgique': FlagCountry.belgium,
+    'Belgium': FlagCountry.belgium,
+    'Allemagne': FlagCountry.germany,
+    'Germany': FlagCountry.germany,
+    'Pays-Bas': FlagCountry.netherlands,
+    'Netherlands': FlagCountry.netherlands,
+    'Russie': FlagCountry.russia,
+    'Russia': FlagCountry.russia,
+    'Chine': FlagCountry.china,
+    'China': FlagCountry.china,
+  };
+  final named = byName[country.trim()];
+  if (named != null) return named;
+  return flagCountryForLanguage(language);
+}

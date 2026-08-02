@@ -10,6 +10,7 @@ import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
 import '../services/like_api.dart';
+import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
@@ -219,6 +220,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   /// "It's a match!" over the Demandes list. "Dis bonjour" opens the DM.
   Future<void> _celebrateMatch(RemoteProfile? peer) async {
     if (peer == null) return;
+    MatchCelebration.markShown(peer.id);
     final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
     if (!mounted) return;
     final meProfile = me ??

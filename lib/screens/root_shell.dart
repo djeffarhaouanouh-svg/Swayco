@@ -16,6 +16,8 @@ import '../services/call_audio.dart';
 import '../services/incoming_call_api.dart';
 import '../services/ios_callkit.dart';
 import '../services/local_notifications.dart';
+import '../services/match_celebration.dart';
+import '../services/friendship_api.dart';
 import '../services/muted_calls.dart';
 import '../services/nav_chrome.dart';
 import '../services/nav_tab.dart';
@@ -29,9 +31,11 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
+import 'chat_thread_screen.dart';
 import 'discover_screen.dart';
 import 'friend_requests_screen.dart';
 import 'profile_screen.dart';
@@ -75,6 +79,15 @@ class _RootShellState extends State<RootShell> {
   /// Guards the one-shot coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
 
+  /// Watches my friendship rows so a match created by the OTHER side (they
+  /// accepted / liked back while I was elsewhere) still pops the celebration
+  /// on this device.
+  RealtimeChannel? _matchChannel;
+  Timer? _matchPollTimer;
+  Set<String> _knownMatchIds = {};
+  bool _matchWatchPrimed = false;
+  bool _celebrating = false;
+
   /// Drives the horizontal swipe between tabs (Snapchat-style). Kept in sync
   /// with [NavTab.index]: nav-bar taps / routing animate it, swipes update
   /// [NavTab.index] via [PageView.onPageChanged].
@@ -117,6 +130,11 @@ class _RootShellState extends State<RootShell> {
     final intent = NotificationRouter.pending.value;
     if (intent == null || !mounted) return;
     switch (intent.type) {
+      case 'match':
+        // Both sides get the celebration: the peer who accepted sees it on
+        // the spot, this one when the "c'est un match" push lands.
+        final peerId = intent.data['peerId']?.toString() ?? '';
+        if (peerId.isNotEmpty) MatchCelebration.offer(peerId);
       case 'message':
         NavTab.select(NavTab.chat);
         ChatUnread.markAllSeen();
@@ -133,11 +151,110 @@ class _RootShellState extends State<RootShell> {
     NotificationRouter.consume();
   }
 
+  /// Realtime watch on my friendships: any newly accepted peer that this
+  /// device didn't celebrate itself becomes a pending celebration.
+  Future<void> _startMatchWatch(String myId) async {
+    if (!isSupabaseReady || myId.isEmpty) return;
+    MatchCelebration.pendingPeerId.addListener(_onMatchPending);
+    await _refreshKnownMatches(myId);
+    _matchWatchPrimed = true;
+    _matchChannel = FriendshipApi.subscribeMine(
+      userId: myId,
+      onChange: () => _refreshKnownMatches(myId),
+    );
+    // Web realtime can drop events; a light poll keeps the celebration honest.
+    _matchPollTimer = WebPoll.every(
+      const Duration(seconds: 12),
+      () => _refreshKnownMatches(myId),
+    );
+  }
+
+  Future<void> _refreshKnownMatches(String myId) async {
+    if (!mounted || myId.isEmpty) return;
+    try {
+      final peers = await FriendshipApi.fetchMatches(myId);
+      final ids = {for (final p in peers) p.id};
+      if (!_matchWatchPrimed) {
+        // First read is the baseline — don't replay every past match.
+        for (final id in ids) {
+          MatchCelebration.markShown(id);
+        }
+        _knownMatchIds = ids;
+        return;
+      }
+      final fresh = ids.difference(_knownMatchIds);
+      _knownMatchIds = ids;
+      for (final id in fresh) {
+        MatchCelebration.offer(id);
+      }
+    } catch (e) {
+      debugPrint('match watch failed: $e');
+    }
+  }
+
+  void _onMatchPending() {
+    final peerId = MatchCelebration.pendingPeerId.value;
+    if (peerId == null || peerId.isEmpty || _celebrating || !mounted) return;
+    MatchCelebration.consume();
+    unawaited(_celebrateWithPeer(peerId));
+  }
+
+  /// Push the same celebration the other side just saw.
+  Future<void> _celebrateWithPeer(String peerId) async {
+    if (_celebrating || !mounted) return;
+    _celebrating = true;
+    try {
+      final myId = _myCalleeId.isNotEmpty
+          ? _myCalleeId
+          : await DeviceId.getOrCreate();
+      final results = await Future.wait([
+        ProfileApi.fetchById(myId),
+        ProfileApi.fetchById(peerId),
+      ]);
+      final peer = results[1];
+      if (peer == null || !mounted) return;
+      final me = results[0] ??
+          RemoteProfile(
+            id: myId,
+            handle: '',
+            displayName: '',
+            language: AppStrings.currentBcp47.value,
+            avatarColor: '',
+            avatarUrl: '',
+          );
+      final peerName = peer.displayName.trim().isEmpty
+          ? AppStrings.t('profile_anonymous')
+          : peer.displayName;
+      await showMatchOverlay(
+        context,
+        me: me,
+        peer: peer,
+        onSayHi: () {
+          final ids = [myId, peer.id]..sort();
+          Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatThreadScreen(
+                conversationId: 'dm-${ids[0]}-${ids[1]}',
+                title: peerName,
+                peerDeviceId: peer.id,
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('match celebration failed: $e');
+    } finally {
+      _celebrating = false;
+    }
+  }
+
   Future<void> _subscribeIncomingCalls() async {
     if (!isSupabaseReady) return;
     final myId = await DeviceId.getOrCreate();
     if (!mounted || myId.isEmpty) return;
     _myCalleeId = myId;
+    unawaited(_startMatchWatch(myId));
     // iOS only: wire CallKit so an incoming call rings full-screen via a
     // VoIP push even when the app is killed. Accept → join the room;
     // decline → tell the caller (same path as the in-app dialog).
@@ -464,7 +581,13 @@ class _RootShellState extends State<RootShell> {
     _callPollTimer?.cancel();
     _pageController.dispose();
     NotificationRouter.pending.removeListener(_onNotificationIntent);
+    MatchCelebration.pendingPeerId.removeListener(_onMatchPending);
     NavTab.index.removeListener(_onNavTabChanged);
+    _matchPollTimer?.cancel();
+    final matchCh = _matchChannel;
+    if (matchCh != null) {
+      unawaited(Supabase.instance.client.removeChannel(matchCh));
+    }
     final ch = _callsChannel;
     if (ch != null) {
       unawaited(Supabase.instance.client.removeChannel(ch));

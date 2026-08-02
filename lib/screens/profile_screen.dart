@@ -28,6 +28,7 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/looking_for.dart';
 import '../services/like_api.dart';
+import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
@@ -395,6 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   /// The "It's a match!" celebration. Needs MY profile too — in viewer mode
   /// `_remote` holds the PEER, so pull mine for the card.
   Future<void> _celebrateMatch() async {
+    MatchCelebration.markShown(_targetId);
     final me = isSupabaseReady ? await ProfileApi.fetchById(_deviceId) : null;
     final peer = _remote;
     if (!mounted || peer == null) return;

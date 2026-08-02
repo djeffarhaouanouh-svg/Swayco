@@ -15,6 +15,7 @@ import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/looking_for.dart';
+import '../services/match_celebration.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
@@ -283,6 +284,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   /// "It's a match!" over the Discover stack. "Dis bonjour" opens the DM.
   Future<void> _celebrateMatch(RemoteProfile peer) async {
+    MatchCelebration.markShown(peer.id);
     final me = isSupabaseReady ? await ProfileApi.fetchById(_myId) : null;
     if (!mounted) return;
     final meProfile = me ??
