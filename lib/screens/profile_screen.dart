@@ -20,6 +20,7 @@ import '../services/chat_unread.dart';
 import '../services/friend_request_unread.dart';
 import '../services/device_id.dart';
 import '../services/friendship_api.dart';
+import '../services/age_range.dart';
 import '../services/fact_emojis.dart';
 import '../services/interests.dart';
 import '../services/job_sectors.dart';
@@ -1573,7 +1574,7 @@ class _PeerInfoCard extends StatelessWidget {
         (
           emoji: kFactEmojiZodiac,
           label: AppStrings.t('info_zodiac'),
-          value: displayZodiac(p.zodiac),
+          value: displayZodiacWithMonths(p.zodiac),
         ),
       if (p.lookingFor.trim().isNotEmpty)
         (
@@ -2141,12 +2142,27 @@ class _PersonalInfoSection extends StatelessWidget {
             ),
             _divider,
           ],
+          // Âge : roulette 15–40, plus de saisie libre.
           _PersonalInfoRow(
             emoji: kFactEmojiAge,
             label: AppStrings.t('info_age'),
             value: p?.age?.toString() ?? '',
-            numeric: true,
-            onSave: (v) => save(age: v.isEmpty ? null : int.tryParse(v)),
+            onPick: (ctx) async {
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_age'),
+                emoji: kFactEmojiAge,
+                labels: [for (final a in kAgeOptions) '$a'],
+                initialIndex: ageIndex(p?.age),
+                allowClear: p?.age != null,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(age: null);
+                return;
+              }
+              await save(age: kAgeOptions[picked]);
+            },
           ),
           // Taille : plus de champ libre. Une roulette, graduée en cm ou en
           // pieds/pouces selon le pays — c'est elle qui garantit le format,
@@ -2194,14 +2210,16 @@ class _PersonalInfoSection extends StatelessWidget {
           _PersonalInfoRow(
             emoji: kFactEmojiZodiac,
             label: AppStrings.t('info_zodiac'),
-            value: displayZodiac(p?.zodiac ?? ''),
+            value: displayZodiacWithMonths(p?.zodiac ?? ''),
             onPick: (ctx) async {
               final current = normalizeZodiac(p?.zodiac ?? '');
               final picked = await showWheelPicker(
                 context: ctx,
                 title: AppStrings.t('info_zodiac'),
                 emoji: kFactEmojiZodiac,
-                labels: [for (final k in kZodiacSigns) zodiacLabel(k)],
+                labels: [
+                  for (final k in kZodiacSigns) displayZodiacWithMonths(k),
+                ],
                 initialIndex: zodiacIndex(current),
                 allowClear: current.isNotEmpty,
               );

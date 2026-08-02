@@ -69,3 +69,63 @@ String zodiacLabel(String key) {
   if (lang == 'fr') return key;
   return _kZodiacI18n[key]?[lang] ?? key;
 }
+
+/// Short month labels (1 = January) for the zodiac date hint.
+const Map<String, List<String>> _kMonthAbbrev = {
+  'fr': [
+    'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+    'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+  ],
+  'en': [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ],
+  'es': [
+    'ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.',
+    'jul.', 'ago.', 'sept.', 'oct.', 'nov.', 'dic.',
+  ],
+  'de': [
+    'Jan.', 'Feb.', 'Mär.', 'Apr.', 'Mai', 'Jun.',
+    'Jul.', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.',
+  ],
+  'it': [
+    'gen.', 'feb.', 'mar.', 'apr.', 'mag.', 'giu.',
+    'lug.', 'ago.', 'set.', 'ott.', 'nov.', 'dic.',
+  ],
+  'pt': [
+    'jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.',
+    'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.',
+  ],
+  'nl': [
+    'jan.', 'feb.', 'mrt.', 'apr.', 'mei', 'jun.',
+    'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.',
+  ],
+  'ar': [
+    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+  ],
+  'ru': [
+    'янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июн.',
+    'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.',
+  ],
+  'zh': [
+    '1月', '2月', '3月', '4月', '5月', '6月',
+    '7月', '8月', '9月', '10月', '11月', '12月',
+  ],
+  'ja': [
+    '1月', '2月', '3月', '4月', '5月', '6月',
+    '7月', '8月', '9月', '10月', '11月', '12月',
+  ],
+  'ko': [
+    '1월', '2월', '3월', '4월', '5월', '6월',
+    '7월', '8월', '9월', '10월', '11월', '12월',
+  ],
+};
+
+/// Localised short month name for [month] (1–12).
+String monthAbbrev(int month) {
+  final m = month.clamp(1, 12);
+  final lang = AppStrings.currentBcp47.value;
+  final list = _kMonthAbbrev[lang] ?? _kMonthAbbrev['en']!;
+  return list[m - 1];
+}

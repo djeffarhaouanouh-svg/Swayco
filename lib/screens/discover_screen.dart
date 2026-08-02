@@ -1004,7 +1004,7 @@ class _ProfileInfoPanel extends StatelessWidget {
       if (p.job.trim().isNotEmpty)
         (emoji: kFactEmojiJob, label: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
-        (emoji: kFactEmojiZodiac, label: displayZodiac(p.zodiac)),
+        (emoji: kFactEmojiZodiac, label: displayZodiacWithMonths(p.zodiac)),
       if (p.lookingFor.trim().isNotEmpty)
         (emoji: kFactEmojiLookingFor, label: displayLookingFor(p.lookingFor)),
       if (place.isNotEmpty)
