@@ -222,6 +222,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() {
           _myId = id;
           _friends = const [];
+          _matchedIds = const {};
           _newMatches = const [];
           _loading = false;
         });
@@ -484,7 +485,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       await FriendshipApi.unmatchWith(meId: _myId, peerId: peer.id);
       await ChatUnread.markConversationCleared(_conversationIdFor(peer.id));
       if (!mounted) return;
-      _showTopToast('${name} · ${AppStrings.t('unmatch')}');
+      _showTopToast('$name · ${AppStrings.t('unmatch')}');
       await _reload();
     } catch (e) {
       if (!mounted) return;
