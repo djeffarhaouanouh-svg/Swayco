@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../services/country_stats.dart';
 import '../services/friendship_api.dart';
 import '../services/profile_api.dart';
-import 'match_card.dart';
+import 'match_card.dart' show MatchBackdrop, MatchCard, MatchCardKind, resolveMatchCardKind;
 
 /// The "It's a match!" celebration. Resolves first / rare / standard, then
 /// renders [MatchCard]. Push it with [showMatchOverlay].
@@ -117,6 +117,13 @@ class _MatchOverlayState extends State<MatchOverlay>
                 ),
               ),
             ),
+            if (_ready)
+              Positioned.fill(
+                child: Opacity(
+                  opacity: _body.value.clamp(0.0, 1.0),
+                  child: MatchBackdrop(kind: _kind),
+                ),
+              ),
             if (_ready)
               Positioned.fill(
                 child: SafeArea(

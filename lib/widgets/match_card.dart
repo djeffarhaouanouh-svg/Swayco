@@ -300,6 +300,36 @@ class MatchCard extends StatelessWidget {
   }
 }
 
+/// Ambient wash behind the celebration: teal for a normal match, gold for a
+/// rare one — the tinted backdrop from the mock.
+class MatchBackdrop extends StatelessWidget {
+  const MatchBackdrop({super.key, required this.kind});
+
+  final MatchCardKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = kind == MatchCardKind.rare
+        ? const Color(0xFFE8C98B)
+        : SC.accent;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.45),
+          radius: 1.1,
+          colors: [
+            tint.withValues(alpha: 0.20),
+            tint.withValues(alpha: 0.06),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ),
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
 MatchCardKind resolveMatchCardKind({
   required int acceptedMatchCount,
   required CountryShare? share,
@@ -433,7 +463,8 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// Circular peer PDP wrapped in the flag gradient border (liseré drapeau).
+/// Circular peer PDP wrapped in the flag gradient border (liseré drapeau),
+/// with the two floating accents from the mock.
 class _FlagPhoto extends StatelessWidget {
   const _FlagPhoto({
     required this.name,
@@ -450,33 +481,70 @@ class _FlagPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _size,
-      height: _size,
-      child: FlagBorder(
-        country: country,
-        borderWidth: 3,
-        radius: _size / 2,
-        glowBlur: 22,
-        dropShadow: false,
-        child: photoUrl.isEmpty
-            ? ColoredBox(
-                color: const Color(0xFF0A0A0A),
-                child: Center(
-                  child: ProfileAvatar(displayName: name, size: _size - 12),
-                ),
-              )
-            : Image.network(
-                photoUrl,
-                fit: BoxFit.cover,
-                width: _size,
-                height: _size,
-                errorBuilder: (_, _, _) => ColoredBox(
-                  color: const Color(0xFF0A0A0A),
-                  child: Center(
-                    child: ProfileAvatar(displayName: name, size: _size - 12),
-                  ),
-                ),
+      width: 232,
+      height: _size + 16,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 6,
+            top: 44,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: SC.accent,
+                borderRadius: BorderRadius.circular(3),
               ),
+            ),
+          ),
+          Positioned(
+            right: 12,
+            top: 74,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _size,
+            height: _size,
+            child: FlagBorder(
+              country: country,
+              borderWidth: 3,
+              radius: _size / 2,
+              glowBlur: 22,
+              dropShadow: false,
+              child: photoUrl.isEmpty
+                  ? ColoredBox(
+                      color: const Color(0xFF0A0A0A),
+                      child: Center(
+                        child:
+                            ProfileAvatar(displayName: name, size: _size - 12),
+                      ),
+                    )
+                  : Image.network(
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      width: _size,
+                      height: _size,
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: const Color(0xFF0A0A0A),
+                        child: Center(
+                          child: ProfileAvatar(
+                            displayName: name,
+                            size: _size - 12,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
