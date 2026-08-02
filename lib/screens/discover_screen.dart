@@ -274,13 +274,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _onActionUndo() {
     if (_cards.isEmpty) return;
     if (_deckDone) {
+      // End-of-day screen → restart the deck from the first card.
       setState(() {
         _deckDone = false;
-        _currentIndex = _cards.length - 1;
+        _currentIndex = 0;
       });
       UserPrefs.clearDiscoverDone();
-      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
-      _precacheAround(_currentIndex);
+      UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+      _precacheAround(0);
       return;
     }
     if (_currentIndex <= 0) return;
@@ -2422,8 +2423,8 @@ class _Pill extends StatelessWidget {
 // Empty / end-of-deck
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Shown after the last Discover card — tap anywhere (or the rewind control)
-/// to step one card back.
+/// Shown after the last Discover card — tap anywhere to restart from the
+/// first card of the deck.
 class _DiscoverDone extends StatelessWidget {
   const _DiscoverDone({required this.onBack});
   final VoidCallback onBack;
