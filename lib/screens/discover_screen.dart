@@ -1774,7 +1774,14 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Interests — données réelles Supabase uniquement
+                // Le repère « tire vers le haut », entre l'identité et les
+                // centres d'intérêt.
+                const SizedBox(height: 6),
+                const IgnorePointer(
+                  child: Center(child: _ScrollHintChevrons()),
+                ),
+                // Interests — un seul chip sur la carte (le reste est dans le
+                // panneau info).
                 if (p.interests.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Row(
@@ -1802,7 +1809,7 @@ class _TinderCardState extends State<_TinderCard> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final tag in p.interests.take(6))
+                      for (final tag in p.interests.take(1))
                         _InterestChip(label: interestLabel(tag)),
                     ],
                   ),
@@ -1813,6 +1820,81 @@ class _TinderCardState extends State<_TinderCard> {
 
         ],
       );
+  }
+}
+
+/// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
+/// marquent une pause avant de recommencer. Le repère "il y a des infos à
+/// découvrir, tire vers le haut", posé au-dessus du bloc identité.
+///
+/// (L'ancienne version faisait défiler les chevrons en boucle, façon
+/// escalator ; le saut se lit mieux et n'attire pas l'œil en permanence.)
+class _ScrollHintChevrons extends StatefulWidget {
+  const _ScrollHintChevrons();
+
+  @override
+  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
+}
+
+class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Le chevron du bas part une fraction de seconde après celui du
+          // haut : les deux sautent ensemble sans être collés.
+          _chevron(0.0),
+          Transform.translate(
+            offset: const Offset(0, -14),
+            child: _chevron(0.10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Un chevron, [delay] tours de retard sur le cycle. Le saut occupe la
+  /// première moitié du cycle, le reste est une pause.
+  Widget _chevron(double delay) {
+    final u = (_c.value - delay) % 1.0;
+    double lift;
+    if (u < 0.25) {
+      // Montée franche.
+      lift = Curves.easeOutCubic.transform(u / 0.25);
+    } else if (u < 0.5) {
+      // Retombée.
+      lift = 1 - Curves.easeInCubic.transform((u - 0.25) / 0.25);
+    } else {
+      lift = 0; // pause
+    }
+    return Transform.translate(
+      offset: Offset(0, -12 * lift),
+      child: Opacity(
+        // À peine plus vif en haut du saut.
+        opacity: 0.75 + 0.25 * lift,
+        child: const Icon(
+          Icons.keyboard_arrow_up_rounded,
+          color: Colors.white,
+          size: 34,
+          shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+        ),
+      ),
+    );
   }
 }
 
