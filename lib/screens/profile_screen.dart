@@ -32,13 +32,11 @@ import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
-import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
-import '../widgets/height_picker_sheet.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
@@ -1557,13 +1555,6 @@ class _PeerInfoCard extends StatelessWidget {
     final rows = <({String emoji, String label, String value})>[
       if (p.age != null)
         (emoji: kFactEmojiAge, label: AppStrings.t('info_age'), value: '${p.age}'),
-      if (p.heightCm != null)
-        (
-          emoji: kFactEmojiHeight,
-          label: AppStrings.t('info_height'),
-          // Pieds/pouces pour un profil américain, centimètres ailleurs.
-          value: formatHeight(p.heightCm!, country: p.country),
-        ),
       if (p.job.trim().isNotEmpty)
         (
           emoji: kFactEmojiJob,
@@ -1640,7 +1631,6 @@ class _PeerMediaStack extends StatelessWidget {
   static bool _hasInfo(RemoteProfile? p) =>
       p != null &&
       (p.age != null ||
-          p.heightCm != null ||
           p.job.trim().isNotEmpty ||
           p.zodiac.trim().isNotEmpty ||
           p.lookingFor.trim().isNotEmpty);
@@ -2162,25 +2152,6 @@ class _PersonalInfoSection extends StatelessWidget {
                 return;
               }
               await save(age: kAgeOptions[picked]);
-            },
-          ),
-          // Taille : plus de champ libre. Une roulette, graduée en cm ou en
-          // pieds/pouces selon le pays — c'est elle qui garantit le format,
-          // la base ne stocke que des centimètres.
-          _PersonalInfoRow(
-            emoji: kFactEmojiHeight,
-            label: AppStrings.t('info_height'),
-            value: p?.heightCm == null
-                ? ''
-                : formatHeight(p!.heightCm!, country: p.country),
-            onPick: (ctx) async {
-              final picked = await showHeightPicker(
-                ctx,
-                country: p?.country ?? '',
-                current: p?.heightCm,
-              );
-              if (picked == null) return;
-              await save(heightCm: picked == 0 ? null : picked);
             },
           ),
           // Métier / signe / looking-for : plus de champ libre. Une roulette

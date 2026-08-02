@@ -18,7 +18,6 @@ import '../services/looking_for.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
-import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
@@ -998,9 +997,6 @@ class _ProfileInfoPanel extends StatelessWidget {
     final facts = <({String emoji, String label})>[
       if (p.age != null)
         (emoji: kFactEmojiAge, label: AppStrings.t('info_age_value', args: {'n': '${p.age}'})),
-      if (p.heightCm != null)
-        // Pieds/pouces pour un profil américain, centimètres ailleurs.
-        (emoji: kFactEmojiHeight, label: formatHeight(p.heightCm!, country: p.country)),
       if (p.job.trim().isNotEmpty)
         (emoji: kFactEmojiJob, label: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
