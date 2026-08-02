@@ -1391,6 +1391,37 @@ abstract final class ProfileApi {
     return s;
   }
 
+  /// Peer ids Discover should hide even if the SQL RPC is still on an
+  /// older migration: accepted matches + my pending outgoing likes.
+  static Future<Set<String>> _discoverSkipPeerIds(String myId) async {
+    try {
+      final rows = await _c
+          .from('friendships')
+          .select('requester, addressee, status')
+          .or('requester.eq.$myId,addressee.eq.$myId');
+      if (rows is! List) return const <String>{};
+      final out = <String>{};
+      for (final row in rows) {
+        final m = Map<String, dynamic>.from(row as Map);
+        final status = m['status']?.toString() ?? '';
+        final requester = m['requester']?.toString() ?? '';
+        final addressee = m['addressee']?.toString() ?? '';
+        if (status == 'accepted') {
+          final peer = requester == myId ? addressee : requester;
+          if (peer.isNotEmpty) out.add(peer);
+        } else if (status == 'pending' &&
+            requester == myId &&
+            addressee.isNotEmpty) {
+          out.add(addressee);
+        }
+      }
+      return out;
+    } catch (e) {
+      debugPrint('ProfileApi._discoverSkipPeerIds failed: $e');
+      return const <String>{};
+    }
+  }
+
   /// People to surface on the Discover stack. Backed by the
   /// `discover_feed` SECURITY DEFINER RPC (migrations 0026 / 0050) which
   /// applies every privacy filter in SQL:
@@ -1412,43 +1443,17 @@ abstract final class ProfileApi {
   }) async {
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
-      final results = await Future.wait([
-        _c.rpc(
-          'discover_feed',
-          params: {'p_user_id': myId, 'p_limit': limit},
-        ),
-        // Client-side belt: hide matches / my pending likes even if the
-        // DB hasn't applied migration 0050 yet. Inlined (not FriendshipApi)
-        // to avoid a circular import with friendship_api.dart.
-        _c
-            .from('friendships')
-            .select('requester, addressee, status')
-            .or('requester.eq.$myId,addressee.eq.$myId'),
-      ]);
-      final result = results[0];
+      final result = await _c.rpc(
+        'discover_feed',
+        params: {'p_user_id': myId, 'p_limit': limit},
+      );
       if (result is! List) return const [];
-      final skipIds = <String>{};
-      try {
-        final mine = results[1];
-        if (mine is List) {
-          for (final row in mine) {
-            final m = Map<String, dynamic>.from(row as Map);
-            final status = m['status']?.toString() ?? '';
-            final requester = m['requester']?.toString() ?? '';
-            final addressee = m['addressee']?.toString() ?? '';
-            if (status == 'accepted') {
-              final peer = requester == myId ? addressee : requester;
-              if (peer.isNotEmpty) skipIds.add(peer);
-            } else if (status == 'pending' &&
-                requester == myId &&
-                addressee.isNotEmpty) {
-              skipIds.add(addressee);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('ProfileApi.fetchDiscoverFeed: friendship skip failed: $e');
-      }
+
+      // Client-side belt: hide matches / my pending likes even if the
+      // DB hasn't applied migration 0050 yet. Queried inline (not via
+      // FriendshipApi) to avoid a circular import with friendship_api.dart.
+      final skipIds = await _discoverSkipPeerIds(myId);
+
       final candidates = result
           .map(
             (r) => RemoteProfile.fromMap(Map<String, dynamic>.from(r as Map)),
