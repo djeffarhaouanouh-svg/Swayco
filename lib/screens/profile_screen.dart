@@ -22,8 +22,10 @@ import '../services/device_id.dart';
 import '../services/friendship_api.dart';
 import '../services/fact_emojis.dart';
 import '../services/interests.dart';
+import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
+import '../services/looking_for.dart';
 import '../services/like_api.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
@@ -32,6 +34,7 @@ import '../services/supabase_service.dart';
 import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
+import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/height_picker_sheet.dart';
@@ -41,6 +44,8 @@ import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/translated_profile_text.dart';
+import '../widgets/wheel_picker_sheet.dart';
 import 'chat_thread_screen.dart';
 // L'aperçu "ma carte" vit dans le Discover : il réutilise le widget de carte
 // du feed pour que l'aperçu soit le rendu réel, pas une copie qui dérive.
@@ -1423,10 +1428,15 @@ class _IdentitySection extends StatelessWidget {
         ),
         // (Online presence is now a green dot on the PDP — see _pdpBubble.)
         // Bio (read-only) — between the PDP/name block and the stats, centred.
+        // Translated into the viewer's UI language when it differs from the
+        // peer's spoken language.
         if (!emptyBio) ...[
           const SizedBox(height: 14),
-          Text(
-            bio,
+          TranslatedProfileText(
+            text: bio,
+            profileId: personalInfo?.id ?? handle,
+            field: 'bio',
+            fromLang: personalInfo?.language ?? '',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: SC.textPrimary,
@@ -1554,18 +1564,22 @@ class _PeerInfoCard extends StatelessWidget {
           value: formatHeight(p.heightCm!, country: p.country),
         ),
       if (p.job.trim().isNotEmpty)
-        (emoji: kFactEmojiJob, label: AppStrings.t('info_job'), value: p.job.trim()),
+        (
+          emoji: kFactEmojiJob,
+          label: AppStrings.t('info_job'),
+          value: displayJob(p.job),
+        ),
       if (p.zodiac.trim().isNotEmpty)
         (
           emoji: kFactEmojiZodiac,
           label: AppStrings.t('info_zodiac'),
-          value: p.zodiac.trim(),
+          value: displayZodiac(p.zodiac),
         ),
       if (p.lookingFor.trim().isNotEmpty)
         (
           emoji: kFactEmojiLookingFor,
           label: AppStrings.t('info_looking_for'),
-          value: p.lookingFor.trim(),
+          value: displayLookingFor(p.lookingFor),
         ),
     ];
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -2153,23 +2167,75 @@ class _PersonalInfoSection extends StatelessWidget {
               await save(heightCm: picked == 0 ? null : picked);
             },
           ),
+          // Métier / signe / looking-for : plus de champ libre. Une roulette
+          // écrit une clé FR stable ; l'affichage la localise pour le viewer.
           _PersonalInfoRow(
             emoji: kFactEmojiJob,
             label: AppStrings.t('info_job'),
-            value: p?.job ?? '',
-            onSave: (v) => save(job: v),
+            value: displayJob(p?.job ?? ''),
+            onPick: (ctx) async {
+              final current = normalizeJob(p?.job ?? '');
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_job'),
+                emoji: kFactEmojiJob,
+                labels: [for (final k in kJobSectors) jobSectorLabel(k)],
+                initialIndex: jobSectorIndex(current),
+                allowClear: current.isNotEmpty,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(job: '');
+                return;
+              }
+              await save(job: kJobSectors[picked]);
+            },
           ),
           _PersonalInfoRow(
             emoji: kFactEmojiZodiac,
             label: AppStrings.t('info_zodiac'),
-            value: p?.zodiac ?? '',
-            onSave: (v) => save(zodiac: v),
+            value: displayZodiac(p?.zodiac ?? ''),
+            onPick: (ctx) async {
+              final current = normalizeZodiac(p?.zodiac ?? '');
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_zodiac'),
+                emoji: kFactEmojiZodiac,
+                labels: [for (final k in kZodiacSigns) zodiacLabel(k)],
+                initialIndex: zodiacIndex(current),
+                allowClear: current.isNotEmpty,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(zodiac: '');
+                return;
+              }
+              await save(zodiac: kZodiacSigns[picked]);
+            },
           ),
           _PersonalInfoRow(
             emoji: kFactEmojiLookingFor,
             label: AppStrings.t('info_looking_for'),
-            value: p?.lookingFor ?? '',
-            onSave: (v) => save(lookingFor: v),
+            value: displayLookingFor(p?.lookingFor ?? ''),
+            onPick: (ctx) async {
+              final current = normalizeLookingFor(p?.lookingFor ?? '');
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_looking_for'),
+                emoji: kFactEmojiLookingFor,
+                labels: [
+                  for (final k in kLookingForOptions) lookingForLabel(k),
+                ],
+                initialIndex: lookingForIndex(current),
+                allowClear: current.isNotEmpty,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(lookingFor: '');
+                return;
+              }
+              await save(lookingFor: kLookingForOptions[picked]);
+            },
             last: bottom == null,
           ),
           if (bottom != null) ...[
