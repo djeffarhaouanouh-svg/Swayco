@@ -44,7 +44,6 @@ const Map<String, String> _kLookingForAliases = {
   'love': 'Une relation',
   'something serious': 'Une relation',
   'casual': 'Du fun',
-  'fun': 'Du fun',
   'not sure': 'Je ne sais pas encore',
   "don't know": 'Je ne sais pas encore',
   'idk': 'Je ne sais pas encore',
