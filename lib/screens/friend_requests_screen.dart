@@ -688,7 +688,7 @@ class _AcceptButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text(
-            AppStrings.t('accept'),
+            AppStrings.t('match_cta'),
             style: const TextStyle(
               color: Color(0xFF0A1024),
               fontSize: 13,

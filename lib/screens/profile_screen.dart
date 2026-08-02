@@ -1547,7 +1547,7 @@ class _IdentitySection extends StatelessWidget {
             ] else if (peerLikedMe) ...[
               const SizedBox(height: 10),
               _GradientActionButton(
-                label: AppStrings.t('accept'),
+                label: AppStrings.t('match_cta'),
                 icon: Icons.favorite,
                 onTap: onAcceptPeer ?? () {},
               ),
