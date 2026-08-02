@@ -740,8 +740,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         ),
       );
     }
-    // Top-anchored layout: first (oldest) message at the top, list grows
-    // downward, empty space at the bottom when the conversation is short.
+    // Flat list of day separators + bubbles. A separator opens every calendar
+    // day so a long thread reads as "MERCREDI / JEUDI / …" instead of one
+    // unbroken scroll of timestamps.
+    final items = <_ThreadListItem>[];
+    DateTime? lastDay;
+    for (final m in _messages) {
+      final day = DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day);
+      if (lastDay == null || day != lastDay) {
+        items.add(_ThreadListItem.day(day));
+        lastDay = day;
+      }
+      items.add(_ThreadListItem.message(m));
+    }
+
     // Local TTS is local — no cloud cost, available to all tiers.
     const canDub = true;
     return ListView.builder(
@@ -753,9 +765,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
-      itemCount: _messages.length,
+      itemCount: items.length,
       itemBuilder: (ctx, i) {
-        final m = _messages[i];
+        final item = items[i];
+        if (item.isDay) {
+          return _DaySeparator(day: item.day!);
+        }
+        final m = item.message!;
         final mine = m.senderId == _myId;
         return _MessageBubble(
           message: m,
@@ -769,6 +785,80 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         );
       },
     );
+  }
+}
+
+/// One row of the thread list: either a day label or a message bubble.
+class _ThreadListItem {
+  const _ThreadListItem._({this.day, this.message});
+
+  factory _ThreadListItem.day(DateTime day) => _ThreadListItem._(day: day);
+  factory _ThreadListItem.message(ChatMessage m) =>
+      _ThreadListItem._(message: m);
+
+  final DateTime? day;
+  final ChatMessage? message;
+
+  bool get isDay => day != null;
+}
+
+/// Hairline — JOUR — hairline. Marks the start of a calendar day in the
+/// thread, matching the Messages list's mono section-label feel.
+class _DaySeparator extends StatelessWidget {
+  const _DaySeparator({required this.day});
+
+  final DateTime day;
+
+  static const _hairline = Color(0x22FFFFFF);
+  static const _label = TextStyle(
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 1.2,
+    color: Color(0x66FFFFFF),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(height: 1, thickness: 1, color: _hairline)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(_labelFor(day).toUpperCase(), style: _label),
+          ),
+          const Expanded(child: Divider(height: 1, thickness: 1, color: _hairline)),
+        ],
+      ),
+    );
+  }
+
+  /// Today / yesterday when recent; full weekday within the last week;
+  /// otherwise a short numeric date so old threads stay scannable.
+  static String _labelFor(DateTime day) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (day == today) return AppStrings.t('chat_day_today');
+    if (day == yesterday) return AppStrings.t('chat_day_yesterday');
+    final daysAgo = today.difference(day).inDays;
+    if (daysAgo >= 0 && daysAgo < 7) {
+      const keys = [
+        'weekday_mon',
+        'weekday_tue',
+        'weekday_wed',
+        'weekday_thu',
+        'weekday_fri',
+        'weekday_sat',
+        'weekday_sun',
+      ];
+      return AppStrings.t(keys[(day.weekday - 1).clamp(0, 6)]);
+    }
+    final d = day.day.toString().padLeft(2, '0');
+    final mo = day.month.toString().padLeft(2, '0');
+    return '$d/$mo/${day.year}';
   }
 }
 

@@ -360,6 +360,15 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Cette personne pourra à nouveau te trouver, te contacter et voir tes messages.',
     'no_messages': 'Aucun message — écris le premier !',
+    'chat_day_today': "Aujourd'hui",
+    'chat_day_yesterday': 'Hier',
+    'weekday_mon': 'Lundi',
+    'weekday_tue': 'Mardi',
+    'weekday_wed': 'Mercredi',
+    'weekday_thu': 'Jeudi',
+    'weekday_fri': 'Vendredi',
+    'weekday_sat': 'Samedi',
+    'weekday_sun': 'Dimanche',
     'tooltip_call': 'Appeler',
     'tip_photo_title': 'Apparais dans le Discover ✨',
     'tip_photo_body':
@@ -925,6 +934,15 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'They will be able to find you, contact you and see your messages again.',
     'no_messages': 'No messages — write the first one!',
+    'chat_day_today': 'Today',
+    'chat_day_yesterday': 'Yesterday',
+    'weekday_mon': 'Monday',
+    'weekday_tue': 'Tuesday',
+    'weekday_wed': 'Wednesday',
+    'weekday_thu': 'Thursday',
+    'weekday_fri': 'Friday',
+    'weekday_sat': 'Saturday',
+    'weekday_sun': 'Sunday',
     'tooltip_call': 'Call',
     'tip_photo_title': 'Show up in Discover ✨',
     'tip_photo_body':
