@@ -1418,19 +1418,36 @@ abstract final class ProfileApi {
           params: {'p_user_id': myId, 'p_limit': limit},
         ),
         // Client-side belt: hide matches / my pending likes even if the
-        // DB hasn't applied migration 0050 yet.
-        FriendshipApi.fetchMine(myId),
+        // DB hasn't applied migration 0050 yet. Inlined (not FriendshipApi)
+        // to avoid a circular import with friendship_api.dart.
+        _c
+            .from('friendships')
+            .select('requester, addressee, status')
+            .or('requester.eq.$myId,addressee.eq.$myId'),
       ]);
       final result = results[0];
-      final mine = results[1] as List<Friendship>;
       if (result is! List) return const [];
       final skipIds = <String>{};
-      for (final f in mine) {
-        if (f.status == 'accepted') {
-          skipIds.add(f.peerOf(myId));
-        } else if (f.status == 'pending' && f.requester == myId) {
-          skipIds.add(f.addressee);
+      try {
+        final mine = results[1];
+        if (mine is List) {
+          for (final row in mine) {
+            final m = Map<String, dynamic>.from(row as Map);
+            final status = m['status']?.toString() ?? '';
+            final requester = m['requester']?.toString() ?? '';
+            final addressee = m['addressee']?.toString() ?? '';
+            if (status == 'accepted') {
+              final peer = requester == myId ? addressee : requester;
+              if (peer.isNotEmpty) skipIds.add(peer);
+            } else if (status == 'pending' &&
+                requester == myId &&
+                addressee.isNotEmpty) {
+              skipIds.add(addressee);
+            }
+          }
         }
+      } catch (e) {
+        debugPrint('ProfileApi.fetchDiscoverFeed: friendship skip failed: $e');
       }
       final candidates = result
           .map(
