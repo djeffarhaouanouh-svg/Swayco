@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../services/country_stats.dart';
 import '../services/friendship_api.dart';
 import '../services/profile_api.dart';
-import 'match_card.dart' show MatchBackdrop, MatchCard, MatchCardKind, resolveMatchCardKind;
+import 'match_card.dart';
 
 /// The "It's a match!" celebration. Resolves first / rare / standard, then
 /// renders [MatchCard]. Push it with [showMatchOverlay].
@@ -109,45 +109,22 @@ class _MatchOverlayState extends State<MatchOverlay>
         return Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                onTap: widget.onDismiss,
-                child: Opacity(
-                  opacity: _scrim.value * 0.96,
-                  child: const ColoredBox(color: Color(0xFF000000)),
-                ),
+              child: Opacity(
+                opacity: _scrim.value.clamp(0.0, 1.0),
+                child: const ColoredBox(color: Color(0xFF05070A)),
               ),
             ),
             if (_ready)
               Positioned.fill(
                 child: Opacity(
                   opacity: _body.value.clamp(0.0, 1.0),
-                  child: MatchBackdrop(kind: _kind),
-                ),
-              ),
-            if (_ready)
-              Positioned.fill(
-                child: SafeArea(
-                  child: Opacity(
-                    opacity: _body.value.clamp(0.0, 1.0),
-                    child: Transform.translate(
-                      offset: Offset(0, 24 * (1 - _body.value)),
-                      child: Transform.scale(
-                        scale: 0.92 + 0.08 * _body.value,
-                        child: Center(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: MatchCard(
-                              kind: _kind,
-                              me: widget.me,
-                              peer: widget.peer,
-                              countryShare: _share,
-                              onSayHi: widget.onSayHi,
-                              onDismiss: widget.onDismiss,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: MatchCard(
+                    kind: _kind,
+                    me: widget.me,
+                    peer: widget.peer,
+                    countryShare: _share,
+                    onSayHi: widget.onSayHi,
+                    onDismiss: widget.onDismiss,
                   ),
                 ),
               )

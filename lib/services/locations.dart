@@ -135,3 +135,51 @@ String? countryFlagFor(String country) {
   }
   return null;
 }
+
+/// ISO-3166-1 alpha-2 code for a stored country label, or `''` when unknown.
+/// Real flag artwork is fetched with this code — nordic crosses, the Union
+/// Jack and disc flags can't be faked with colour bands.
+String countryIso2For(String country) => _kIso2[country.trim()] ?? '';
+
+const Map<String, String> _kIso2 = {
+  'France': 'fr',
+  'Belgique': 'be',
+  'Suisse': 'ch',
+  'Canada': 'ca',
+  'États-Unis': 'us',
+  'Royaume-Uni': 'gb',
+  'Espagne': 'es',
+  'Portugal': 'pt',
+  'Italie': 'it',
+  'Allemagne': 'de',
+  'Pays-Bas': 'nl',
+  'Mexique': 'mx',
+  'Argentine': 'ar',
+  'Colombie': 'co',
+  'Brésil': 'br',
+  'Maroc': 'ma',
+  'Algérie': 'dz',
+  'Tunisie': 'tn',
+  'Sénégal': 'sn',
+  "Côte d'Ivoire": 'ci',
+  'Égypte': 'eg',
+  'Arabie Saoudite': 'sa',
+  'Émirats arabes unis': 'ae',
+  'Turquie': 'tr',
+  'Russie': 'ru',
+  'Chine': 'cn',
+  'Japon': 'jp',
+  'Corée du Sud': 'kr',
+  'Inde': 'in',
+  'Australie': 'au',
+  'Luxembourg': 'lu',
+  'Islande': 'is',
+  'Norvège': 'no',
+  'Suède': 'se',
+  'Danemark': 'dk',
+  'Finlande': 'fi',
+  'Irlande': 'ie',
+  'Pologne': 'pl',
+  'Ukraine': 'ua',
+  'Grèce': 'gr',
+};

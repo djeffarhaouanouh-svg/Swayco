@@ -1,4 +1,17 @@
+// swaycø — MatchCard, ported from the design hand-off (variants 4a "first"
+// and 4b "rare", plus the plain "standard" match).
+//
+// Selection rule:
+//   first accepted match       -> MatchCardKind.first
+//   country share  < 1 % 	    -> MatchCardKind.rare
+//   otherwise                  -> MatchCardKind.standard
+//
+// The flag badge is REAL artwork (flagcdn, by ISO-2) — never synthesised from
+// colour bands: nordic crosses, the Union Jack and disc flags aren't stripes.
+// Flag colours are only ever used for the round photo ring of `first`.
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
 import '../services/country_stats.dart';
@@ -6,20 +19,19 @@ import '../services/demonyms.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
-import '../theme/swayco_theme.dart';
-import 'flag_border.dart';
 import 'flag_gradients.dart';
 import 'profile_avatar.dart';
 
-/// Which celebration card to show after a mutual match.
 enum MatchCardKind { first, rare, standard }
 
-/// Match celebration from the product mocks:
-/// * circular peer PDP with **liseré drapeau**
-/// * first → "TON PREMIER MATCH" + "Ça y est." + tip
-/// * standard → "C'est un match." + yellow underlines
-/// * rare → gold square variant
-class MatchCard extends StatelessWidget {
+const _cyan = Color(0xFF22D3EE);
+const _cyanInk = Color(0xFF04262D);
+const _gold1 = Color(0xFFF0C86E);
+const _gold2 = Color(0xFFFFF6DA);
+const _gold3 = Color(0xFFC9A24A);
+const _goldInk = Color(0xFF3A2C07);
+
+class MatchCard extends StatefulWidget {
   const MatchCard({
     super.key,
     required this.kind,
@@ -37,296 +49,518 @@ class MatchCard extends StatelessWidget {
   final VoidCallback onDismiss;
   final CountryShare? countryShare;
 
-  String get _peerName {
-    final n = peer.displayName.trim();
+  @override
+  State<MatchCard> createState() => _MatchCardState();
+}
+
+class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  )..forward();
+
+  late final AnimationController _breath = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3400),
+  )..repeat(reverse: true);
+
+  late final AnimationController _glow = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    _breath.dispose();
+    _glow.dispose();
+    super.dispose();
+  }
+
+  RemoteProfile get _peer => widget.peer;
+
+  bool get _isRare => widget.kind == MatchCardKind.rare;
+  bool get _isFirst => widget.kind == MatchCardKind.first;
+
+  String get _name {
+    final n = _peer.displayName.trim();
     return n.isEmpty ? AppStrings.t('profile_anonymous') : n;
   }
 
-  /// Profile picture (PDP) — avatar first, then Discover photo, then gallery.
-  String get _peerPhoto {
-    if (peer.avatarUrl.trim().isNotEmpty) return peer.avatarUrl.trim();
-    if (peer.discoverPhotoUrl.trim().isNotEmpty) {
-      return peer.discoverPhotoUrl.trim();
+  /// Profile picture first — the PDP is what the mock shows.
+  String get _photoUrl {
+    if (_peer.avatarUrl.trim().isNotEmpty) return _peer.avatarUrl.trim();
+    if (_peer.discoverPhotoUrl.trim().isNotEmpty) {
+      return _peer.discoverPhotoUrl.trim();
     }
-    if (peer.photos.isNotEmpty && peer.photos.first.trim().isNotEmpty) {
-      return peer.photos.first.trim();
+    if (_peer.photos.isNotEmpty && _peer.photos.first.trim().isNotEmpty) {
+      return _peer.photos.first.trim();
     }
     return '';
   }
 
-  String get _whoLine {
-    final age = peer.age;
-    final city = peer.city.trim();
-    final bits = <String>[
-      _peerName,
+  String get _flagSrc {
+    final iso = countryIso2For(_peer.country);
+    return iso.isEmpty ? '' : 'https://flagcdn.com/w80/$iso.png';
+  }
+
+  /// "Alice, 24 ans, Paris"
+  String get _who {
+    final age = _peer.age;
+    final city = _peer.city.trim();
+    return [
+      _name,
       if (age != null) AppStrings.t('match_age_years', args: {'n': '$age'}),
       if (city.isNotEmpty) city,
-    ];
-    return bits.join(', ');
+    ].join(', ');
   }
 
-  String get _metaLine => '$_whoLine.';
-
-  String get _peerLangLabel =>
-      findLanguageByCode(peer.language)?.label ?? peer.language.toUpperCase();
-
-  String get _myLangLabel =>
-      findLanguageByCode(me.language)?.label ??
-      findLanguageByCode(AppStrings.currentBcp47.value)?.label ??
-      AppStrings.currentBcp47.value.toUpperCase();
-
-  FlagCountry get _flagCountry =>
-      flagCountryForProfile(country: peer.country, language: peer.language) ??
-      FlagCountry.france;
-
-  @override
-  Widget build(BuildContext context) {
-    if (kind == MatchCardKind.rare) return _buildRare(context);
-    if (kind == MatchCardKind.first) return _buildFirst(context);
-    return _buildStandard(context);
-  }
-
-  Widget _buildFirst(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Pill(
-          label: AppStrings.t('match_pill_first'),
-          bg: SC.accent,
-          fg: const Color(0xFF0A1024),
-        ),
-        const SizedBox(height: 22),
-        _FlagPhoto(name: _peerName, photoUrl: _peerPhoto, country: _flagCountry),
-        const SizedBox(height: 28),
-        Text(
-          AppStrings.t('match_first_title'),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.6,
-            height: 1.1,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            AppStrings.t('match_first_sub', args: {'who': _whoLine}),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.88),
-              fontSize: 15.5,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        _TipBox(text: AppStrings.t('match_tip_auto_translate')),
-        const SizedBox(height: 28),
-        _SayHiButton(onPressed: onSayHi),
-        const SizedBox(height: 14),
-        TextButton(
-          onPressed: onDismiss,
-          child: Text(
-            AppStrings.t('match_later'),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.45),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStandard(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _FlagPhoto(name: _peerName, photoUrl: _peerPhoto, country: _flagCountry),
-        const SizedBox(height: 28),
-        Text(
-          AppStrings.t('match_standard_title'),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.6,
-            height: 1.1,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Text(
-            _metaLine,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.92),
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              height: 1.3,
-            ),
-          ),
-        ),
-        const SizedBox(height: 36),
-        _SayHiButton(onPressed: onSayHi),
-        const SizedBox(height: 14),
-        TextButton(
-          onPressed: onDismiss,
-          child: Text(
-            AppStrings.t('match_later'),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.45),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRare(BuildContext context) {
-    final headline = demonymHeadline(peer.country, gender: peer.gender);
-    final demonym = countryDemonym(peer.country, gender: peer.gender);
-    final prefix = headline.endsWith(demonym) && demonym.isNotEmpty
-        ? headline.substring(0, headline.length - demonym.length)
-        : '';
-    final goldWord = demonym.isNotEmpty ? demonym : headline;
-    final age = peer.age;
-    final city = peer.city.trim();
-    final meta = [
-      _peerName,
+  /// "Katla, 27 · Reykjavík"
+  String get _rareMeta {
+    final age = _peer.age;
+    final city = _peer.city.trim();
+    return [
+      _name,
       if (age != null) '$age',
       if (city.isNotEmpty) city,
     ].join(' · ');
+  }
 
+  String get _theirLang =>
+      findLanguageByCode(_peer.language)?.label ?? _peer.language.toUpperCase();
+
+  String get _myLang =>
+      findLanguageByCode(widget.me.language)?.label ??
+      findLanguageByCode(AppStrings.currentBcp47.value)?.label ??
+      AppStrings.currentBcp47.value.toUpperCase();
+
+  String get _translationNote => _isFirst
+      ? AppStrings.t('match_tip_auto_translate', args: {'name': _name})
+      : AppStrings.t(
+          'match_lang_bridge',
+          args: {'their': _theirLang, 'mine': _myLang},
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.64),
+          radius: 1.1,
+          colors: _isRare
+              ? const [Color(0xFF2A2410), Color(0xFF07070A)]
+              : const [Color(0xFF123C46), Color(0xFF05070A)],
+          stops: const [0, 0.6],
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _halo(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: Center(
+                child: ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: _pop,
+                    curve: Curves.easeOutBack,
+                  ),
+                  child: FadeTransition(
+                    opacity: _pop,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 300),
+                      child: SingleChildScrollView(
+                        child: _isRare ? _rareBody() : _roundBody(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _halo() => Positioned(
+        top: 80,
+        child: AnimatedBuilder(
+          animation: _breath,
+          builder: (_, _) {
+            final t = _breath.value;
+            return Transform.scale(
+              scale: 1 + 0.12 * t,
+              child: Opacity(
+                opacity: 0.55 + 0.35 * t,
+                child: Container(
+                  width: 440,
+                  height: 440,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        (_isRare ? _gold1 : _cyan).withValues(alpha: 0.4),
+                        Colors.transparent,
+                      ],
+                      stops: const [0, 0.66],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+  // ── 4a "first" + standard ───────────────────────────────────────────────
+  Widget _roundBody() {
+    final ring = flagRingColors(
+      country: _peer.country,
+      language: _peer.language,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Pill(
-          label: AppStrings.t(
-            'match_pill_rare',
-            args: {'pct': _formatPct(countryShare?.percent ?? 0)},
+        if (_isFirst) ...[
+          _pill(
+            AppStrings.t('match_pill_first').toUpperCase(),
+            bg: _cyan,
+            fg: _cyanInk,
           ),
-          bg: const Color(0xFFE8C98B),
-          fg: const Color(0xFF1A1408),
-          leading: const Text('✦ ', style: TextStyle(fontSize: 12)),
-        ),
-        const SizedBox(height: 28),
-        _RarePhoto(name: _peerName, photoUrl: _peerPhoto, country: peer.country),
-        const SizedBox(height: 28),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text.rich(
-                TextSpan(
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                    height: 1.15,
-                  ),
-                  children: [
-                    if (prefix.isNotEmpty)
-                      TextSpan(
-                        text: prefix,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    TextSpan(
-                      text: goldWord,
-                      style: const TextStyle(color: Color(0xFFE8C98B)),
-                    ),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                AppStrings.t('match_rare_liked'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                meta,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  fontSize: 14.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        _SayHiButton(onPressed: onSayHi),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            AppStrings.t(
-              'match_lang_bridge',
-              args: {'their': _peerLangLabel, 'mine': _myLangLabel},
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.75),
-              fontSize: 13.5,
-              height: 1.35,
+          const SizedBox(height: 22),
+        ],
+        Container(
+          width: 150,
+          height: 150,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [ring.first, const Color(0xFFF2F2F4), ring.last],
             ),
           ),
+          child: ClipOval(child: _photo()),
         ),
+        const SizedBox(height: 22),
+        Text(
+          AppStrings.t(
+            _isFirst ? 'match_first_title' : 'match_standard_title',
+          ),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.interTight(
+            fontSize: 40,
+            height: 1.05,
+            letterSpacing: -1.6,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _isFirst
+              ? AppStrings.t('match_first_sub', args: {'who': _who})
+              : AppStrings.t('match_standard_sub', args: {'who': _who}),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.interTight(
+            fontSize: 16,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.75),
+          ),
+        ),
+        // The translation tile only belongs on the very first match — that's
+        // the one time the user has never seen it work.
+        if (_isFirst) ...[
+          const SizedBox(height: 22),
+          _translationTile(),
+        ],
+        const SizedBox(height: 22),
+        _primaryButton(),
+        const SizedBox(height: 11),
+        _dismissLink(),
       ],
     );
   }
+
+  // ── 4b "rare" ───────────────────────────────────────────────────────────
+  Widget _rareBody() {
+    final pct = _formatPct(widget.countryShare?.percent ?? 0);
+    final headline = demonymHeadline(_peer.country, gender: _peer.gender);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _pill(
+          '✦ ${AppStrings.t('match_pill_rare', args: {'pct': pct}).toUpperCase()}',
+          gradient: const LinearGradient(colors: [_gold1, _gold2]),
+          fg: _goldInk,
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: 204,
+          height: 246,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 196,
+                height: 238,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_gold1, _gold2, _gold3],
+                    stops: [0, 0.4, 1],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      blurRadius: 60,
+                      offset: const Offset(0, 24),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(17),
+                  child: _photo(),
+                ),
+              ),
+              if (_flagSrc.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(11),
+                      color: const Color(0xFF111111),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: Image.network(
+                        _flagSrc,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (headline.isNotEmpty) _goldTitle(headline),
+        const SizedBox(height: 3),
+        Text(
+          AppStrings.t('match_rare_liked'),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.interTight(
+            fontSize: 20,
+            height: 1,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          _rareMeta,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.interTight(
+            fontSize: 13.5,
+            height: 1.4,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.6),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(),
+        const SizedBox(height: 11),
+        Text(
+          _translationNote,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.interTight(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.45),
+          ),
+        ),
+        const SizedBox(height: 6),
+        _dismissLink(),
+      ],
+    );
+  }
+
+  // ── shared pieces ───────────────────────────────────────────────────────
+  Widget _photo() {
+    final url = _photoUrl;
+    final fallback = ColoredBox(
+      color: const Color(0xFF111111),
+      child: Center(child: ProfileAvatar(displayName: _name, size: 96)),
+    );
+    if (url.isEmpty) return fallback;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
+  Widget _goldTitle(String text) => ShaderMask(
+        shaderCallback: (r) =>
+            const LinearGradient(colors: [_gold1, _gold2]).createShader(r),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.interTight(
+            fontSize: 34,
+            height: 1.1,
+            letterSpacing: -1.4,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      );
+
+  Widget _pill(
+    String text, {
+    Color? bg,
+    Gradient? gradient,
+    required Color fg,
+  }) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: bg,
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          style: GoogleFonts.interTight(
+            fontSize: 11,
+            height: 1,
+            letterSpacing: 1.32,
+            fontWeight: FontWeight.w700,
+            color: fg,
+          ),
+        ),
+      );
+
+  Widget _translationTile() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _cyan.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text('🗣️', style: TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _translationNote,
+                style: GoogleFonts.interTight(
+                  fontSize: 12.5,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.72),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _primaryButton() => AnimatedBuilder(
+        animation: _glow,
+        builder: (_, _) {
+          final t = _glow.value;
+          return GestureDetector(
+            onTap: widget.onSayHi,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _cyan,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: _cyan.withValues(alpha: 0.5 * (1 - t)),
+                    blurRadius: 0,
+                    spreadRadius: 14 * t,
+                  ),
+                  BoxShadow(
+                    color: _cyan.withValues(alpha: 0.35 + 0.15 * t),
+                    blurRadius: 40,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Text(
+                AppStrings.t('match_say_hi'),
+                style: GoogleFonts.interTight(
+                  fontSize: 16.5,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  color: _cyanInk,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+  Widget _dismissLink() => GestureDetector(
+        onTap: widget.onDismiss,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Text(
+            AppStrings.t('match_later'),
+            style: GoogleFonts.interTight(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.42),
+            ),
+          ),
+        ),
+      );
 
   static String _formatPct(double pct) {
     if (pct <= 0) return '—';
     if (pct < 0.1) return pct.toStringAsFixed(2).replaceAll('.', ',');
     return pct.toStringAsFixed(1).replaceAll('.', ',');
-  }
-}
-
-/// Ambient wash behind the celebration: teal for a normal match, gold for a
-/// rare one — the tinted backdrop from the mock.
-class MatchBackdrop extends StatelessWidget {
-  const MatchBackdrop({super.key, required this.kind});
-
-  final MatchCardKind kind;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = kind == MatchCardKind.rare
-        ? const Color(0xFFE8C98B)
-        : SC.accent;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.45),
-          radius: 1.1,
-          colors: [
-            tint.withValues(alpha: 0.20),
-            tint.withValues(alpha: 0.06),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
-      ),
-      child: const SizedBox.expand(),
-    );
   }
 }
 
@@ -337,292 +571,4 @@ MatchCardKind resolveMatchCardKind({
   if (acceptedMatchCount <= 1) return MatchCardKind.first;
   if (share != null && share.isRare) return MatchCardKind.rare;
   return MatchCardKind.standard;
-}
-
-// ── pieces ──────────────────────────────────────────────────────────────────
-
-class _TipBox extends StatelessWidget {
-  const _TipBox({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.auto_awesome,
-              size: 18,
-              color: const Color(0xFFA78BFA).withValues(alpha: 0.95),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 13.5,
-                  height: 1.35,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SayHiButton extends StatelessWidget {
-  const _SayHiButton({required this.onPressed});
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: SizedBox(
-        width: double.infinity,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: SC.accent.withValues(alpha: 0.45),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: FilledButton(
-            onPressed: onPressed,
-            style: FilledButton.styleFrom(
-              backgroundColor: SC.accent,
-              foregroundColor: const Color(0xFF0A1024),
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: const StadiumBorder(),
-            ),
-            child: Text(
-              AppStrings.t('match_say_hi'),
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.label,
-    required this.bg,
-    required this.fg,
-    this.leading,
-  });
-
-  final String label;
-  final Color bg;
-  final Color fg;
-  final Widget? leading;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (leading != null) leading!,
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: fg,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Circular peer PDP wrapped in the flag gradient border (liseré drapeau),
-/// with the two floating accents from the mock.
-class _FlagPhoto extends StatelessWidget {
-  const _FlagPhoto({
-    required this.name,
-    required this.photoUrl,
-    required this.country,
-  });
-
-  final String name;
-  final String photoUrl;
-  final FlagCountry country;
-
-  static const double _size = 156;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 232,
-      height: _size + 16,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            left: 6,
-            top: 44,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: SC.accent,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 12,
-            top: 74,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.65),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: _size,
-            height: _size,
-            child: FlagBorder(
-              country: country,
-              borderWidth: 3,
-              radius: _size / 2,
-              glowBlur: 22,
-              dropShadow: false,
-              child: photoUrl.isEmpty
-                  ? ColoredBox(
-                      color: const Color(0xFF0A0A0A),
-                      child: Center(
-                        child:
-                            ProfileAvatar(displayName: name, size: _size - 12),
-                      ),
-                    )
-                  : Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      width: _size,
-                      height: _size,
-                      errorBuilder: (_, _, _) => ColoredBox(
-                        color: const Color(0xFF0A0A0A),
-                        child: Center(
-                          child: ProfileAvatar(
-                            displayName: name,
-                            size: _size - 12,
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RarePhoto extends StatelessWidget {
-  const _RarePhoto({
-    required this.name,
-    required this.photoUrl,
-    required this.country,
-  });
-
-  final String name;
-  final String photoUrl;
-  final String country;
-
-  @override
-  Widget build(BuildContext context) {
-    final flag = countryFlagFor(country);
-    return SizedBox(
-      width: 168,
-      height: 168,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 156,
-            height: 156,
-            margin: const EdgeInsets.only(left: 6, top: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFFE8C98B), width: 2.5),
-            ),
-            padding: const EdgeInsets.all(3),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: photoUrl.isEmpty
-                  ? ColoredBox(
-                      color: SC.bubbleIn,
-                      child: Center(
-                        child: ProfileAvatar(displayName: name, size: 100),
-                      ),
-                    )
-                  : Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (_, _, _) => ColoredBox(
-                        color: SC.bubbleIn,
-                        child: Center(
-                          child: ProfileAvatar(displayName: name, size: 100),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-          if (flag != null)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF0A0A0A),
-                  border: Border.all(
-                    color: const Color(0xFFE8C98B).withValues(alpha: 0.7),
-                    width: 2,
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(flag, style: const TextStyle(fontSize: 22)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }

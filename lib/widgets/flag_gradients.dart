@@ -147,42 +147,59 @@ FlagCountry? flagCountryForLanguage(String langCode) {
   return kFlagCountryForLanguage[primary];
 }
 
-/// Contour drapeau from a profile's country name, falling back to language.
-FlagCountry? flagCountryForProfile({
-  required String country,
-  required String language,
-}) {
-  const byName = <String, FlagCountry>{
-    'France': FlagCountry.france,
-    'Portugal': FlagCountry.portugal,
-    'Japon': FlagCountry.japan,
-    'Japan': FlagCountry.japan,
-    'Italie': FlagCountry.italy,
-    'Italy': FlagCountry.italy,
-    'Brésil': FlagCountry.brazil,
-    'Brazil': FlagCountry.brazil,
-    'Espagne': FlagCountry.spain,
-    'Spain': FlagCountry.spain,
-    'Corée du Sud': FlagCountry.southKorea,
-    'South Korea': FlagCountry.southKorea,
-    'États-Unis': FlagCountry.unitedStates,
-    'United States': FlagCountry.unitedStates,
-    'USA': FlagCountry.unitedStates,
-    'Royaume-Uni': FlagCountry.unitedKingdom,
-    'United Kingdom': FlagCountry.unitedKingdom,
-    'UK': FlagCountry.unitedKingdom,
-    'Belgique': FlagCountry.belgium,
-    'Belgium': FlagCountry.belgium,
-    'Allemagne': FlagCountry.germany,
-    'Germany': FlagCountry.germany,
-    'Pays-Bas': FlagCountry.netherlands,
-    'Netherlands': FlagCountry.netherlands,
-    'Russie': FlagCountry.russia,
-    'Russia': FlagCountry.russia,
-    'Chine': FlagCountry.china,
-    'China': FlagCountry.china,
+/// The two dominant flag colours used for the round photo ring on the match
+/// card. Keyed by the stored French country label; falls back to the
+/// language-based gradient, then to the cyan house pair.
+List<Color> flagRingColors({required String country, required String language}) {
+  const byCountry = <String, List<Color>>{
+    'France': [Color(0xFF0B40B5), Color(0xFFF11B34)],
+    'Belgique': [Color(0xFF2D2926), Color(0xFFEF3340)],
+    'Suisse': [Color(0xFFD52B1E), Color(0xFFD52B1E)],
+    'Canada': [Color(0xFFD80621), Color(0xFFD80621)],
+    'États-Unis': [Color(0xFF0A3161), Color(0xFFB31942)],
+    'Royaume-Uni': [Color(0xFF012169), Color(0xFFC8102E)],
+    'Espagne': [Color(0xFFAA151B), Color(0xFFF1BF00)],
+    'Portugal': [Color(0xFF00B84F), Color(0xFFFF2338)],
+    'Italie': [Color(0xFF009246), Color(0xFFCE2B37)],
+    'Allemagne': [Color(0xFF1A1A1A), Color(0xFFFFCE00)],
+    'Pays-Bas': [Color(0xFFAE1C28), Color(0xFF21468B)],
+    'Mexique': [Color(0xFF006847), Color(0xFFCE1126)],
+    'Argentine': [Color(0xFF74ACDF), Color(0xFFF6B40E)],
+    'Colombie': [Color(0xFFFCD116), Color(0xFFCE1126)],
+    'Brésil': [Color(0xFF009C3B), Color(0xFF002776)],
+    'Maroc': [Color(0xFFC1272D), Color(0xFF006233)],
+    'Algérie': [Color(0xFF006233), Color(0xFFD21034)],
+    'Tunisie': [Color(0xFFE70013), Color(0xFFE70013)],
+    'Sénégal': [Color(0xFF00853F), Color(0xFFE31B23)],
+    "Côte d'Ivoire": [Color(0xFFF77F00), Color(0xFF009E60)],
+    'Égypte': [Color(0xFFCE1126), Color(0xFF1A1A1A)],
+    'Arabie Saoudite': [Color(0xFF006C35), Color(0xFF006C35)],
+    'Émirats arabes unis': [Color(0xFF00732F), Color(0xFFFF0000)],
+    'Turquie': [Color(0xFFE30A17), Color(0xFFE30A17)],
+    'Russie': [Color(0xFF0039A6), Color(0xFFD52B1E)],
+    'Chine': [Color(0xFFDE2910), Color(0xFFFFDE00)],
+    'Japon': [Color(0xFFE5001F), Color(0xFFE5001F)],
+    'Corée du Sud': [Color(0xFF0047A0), Color(0xFFCD2E3A)],
+    'Inde': [Color(0xFFFF9933), Color(0xFF138808)],
+    'Australie': [Color(0xFF00247D), Color(0xFFCF142B)],
+    'Luxembourg': [Color(0xFFED2939), Color(0xFF00A1DE)],
+    'Islande': [Color(0xFF02529C), Color(0xFFDC1E35)],
+    'Norvège': [Color(0xFFBA0C2F), Color(0xFF00205B)],
+    'Suède': [Color(0xFF006AA7), Color(0xFFFECC00)],
+    'Danemark': [Color(0xFFC8102E), Color(0xFFC8102E)],
+    'Finlande': [Color(0xFF003580), Color(0xFF003580)],
+    'Irlande': [Color(0xFF169B62), Color(0xFFFF883E)],
+    'Pologne': [Color(0xFFDC143C), Color(0xFFDC143C)],
+    'Ukraine': [Color(0xFF0057B7), Color(0xFFFFDD00)],
+    'Grèce': [Color(0xFF0D5EAF), Color(0xFF0D5EAF)],
   };
-  final named = byName[country.trim()];
+  final named = byCountry[country.trim()];
   if (named != null) return named;
-  return flagCountryForLanguage(language);
+  final byLang = flagCountryForLanguage(language);
+  if (byLang != null) {
+    final g = kFlagGradients[byLang]!;
+    return [g.colors.first, g.colors.last];
+  }
+  return const [Color(0xFF22D3EE), Color(0xFFA78BFA)];
 }
+
