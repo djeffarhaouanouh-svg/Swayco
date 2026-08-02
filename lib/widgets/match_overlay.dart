@@ -118,20 +118,27 @@ class _MatchOverlayState extends State<MatchOverlay>
               ),
             ),
             if (_ready)
-              SafeArea(
-                child: Opacity(
-                  opacity: _body.value.clamp(0.0, 1.0),
-                  child: Transform.translate(
-                    offset: Offset(0, 24 * (1 - _body.value)),
-                    child: Transform.scale(
-                      scale: 0.92 + 0.08 * _body.value,
-                      child: MatchCard(
-                        kind: _kind,
-                        me: widget.me,
-                        peer: widget.peer,
-                        countryShare: _share,
-                        onSayHi: widget.onSayHi,
-                        onDismiss: widget.onDismiss,
+              Positioned.fill(
+                child: SafeArea(
+                  child: Opacity(
+                    opacity: _body.value.clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(0, 24 * (1 - _body.value)),
+                      child: Transform.scale(
+                        scale: 0.92 + 0.08 * _body.value,
+                        child: Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: MatchCard(
+                              kind: _kind,
+                              me: widget.me,
+                              peer: widget.peer,
+                              countryShare: _share,
+                              onSayHi: widget.onSayHi,
+                              onDismiss: widget.onDismiss,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

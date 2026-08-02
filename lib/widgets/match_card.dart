@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
@@ -11,13 +9,12 @@ import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import 'profile_avatar.dart';
 
-/// Which celebration card to show after a mutual like.
+/// Which celebration card to show after the recipient accepts a like.
 enum MatchCardKind { first, rare, standard }
 
-/// Visual match celebration — three flavours from the design handoff:
-/// * [MatchCardKind.first] — "TON PREMIER MATCH", round rainbow photo, tip box
-/// * [MatchCardKind.rare] — gold "RARE · x %" pill, square photo + flag
-/// * [MatchCardKind.standard] — same layout as first, without the premier pill
+/// Match celebration — design from the product mock:
+/// round rainbow photo, yellow-underlined "C'est un match." + meta line,
+/// cyan "Dis bonjour", grey "Plus tard". Rare keeps the gold square variant.
 class MatchCard extends StatelessWidget {
   const MatchCard({
     super.key,
@@ -34,8 +31,6 @@ class MatchCard extends StatelessWidget {
   final RemoteProfile peer;
   final VoidCallback onSayHi;
   final VoidCallback onDismiss;
-
-  /// Pre-fetched share for [peer.country]; null → rare card falls back gently.
   final CountryShare? countryShare;
 
   String get _peerName {
@@ -51,6 +46,17 @@ class MatchCard extends StatelessWidget {
     return peer.avatarUrl;
   }
 
+  String get _metaLine {
+    final age = peer.age;
+    final city = peer.city.trim();
+    final bits = <String>[
+      _peerName,
+      if (age != null) AppStrings.t('match_age_years', args: {'n': '$age'}),
+      if (city.isNotEmpty) city,
+    ];
+    return '${bits.join(', ')}.';
+  }
+
   String get _peerLangLabel =>
       findLanguageByCode(peer.language)?.label ?? peer.language.toUpperCase();
 
@@ -61,162 +67,62 @@ class MatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRare = kind == MatchCardKind.rare;
+    if (kind == MatchCardKind.rare) return _buildRare(context);
+    return _buildStandard(context);
+  }
+
+  /// Default + first-match layout (product mock).
+  Widget _buildStandard(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (kind == MatchCardKind.first)
-          _Pill(
-            label: AppStrings.t('match_pill_first'),
-            bg: SC.accent,
-            fg: const Color(0xFF0A1024),
-          )
-        else if (isRare)
-          _Pill(
-            label: AppStrings.t(
-              'match_pill_rare',
-              args: {
-                'pct': _formatPct(countryShare?.percent ?? 0),
-              },
-            ),
-            bg: const Color(0xFFE8C98B),
-            fg: const Color(0xFF1A1408),
-            leading: const Text('✦ ', style: TextStyle(fontSize: 12)),
+        _RainbowPhoto(name: _peerName, photoUrl: _peerPhoto),
+        const SizedBox(height: 28),
+        _UnderlinedText(
+          text: AppStrings.t('match_standard_title'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.6,
+            height: 1.1,
           ),
-        const SizedBox(height: 28),
-        if (isRare)
-          _RarePhoto(name: _peerName, photoUrl: _peerPhoto, country: peer.country)
-        else
-          _FirstPhoto(name: _peerName, photoUrl: _peerPhoto),
-        const SizedBox(height: 28),
-        if (isRare) _rareHeadline() else _firstHeadline(),
-        const SizedBox(height: 28),
-        if (kind == MatchCardKind.first) ...[
-          _TipBox(text: AppStrings.t('match_tip_auto_translate')),
-          const SizedBox(height: 28),
-        ],
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: SizedBox(
-            width: double.infinity,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: SC.accent.withValues(alpha: 0.45),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: FilledButton(
-                onPressed: onSayHi,
-                style: FilledButton.styleFrom(
-                  backgroundColor: SC.accent,
-                  foregroundColor: const Color(0xFF0A1024),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: Text(
-                  AppStrings.t('match_say_hi'),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
+        ),
+        const SizedBox(height: 12),
+        _UnderlinedText(
+          text: _metaLine,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.92),
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 36),
+        _SayHiButton(onPressed: onSayHi),
+        const SizedBox(height: 14),
+        TextButton(
+          onPressed: onDismiss,
+          child: Text(
+            AppStrings.t('match_later'),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        if (isRare)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              AppStrings.t(
-                'match_lang_bridge',
-                args: {
-                  'their': _peerLangLabel,
-                  'mine': _myLangLabel,
-                },
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
-                fontSize: 13.5,
-                height: 1.35,
-              ),
-            ),
-          )
-        else
-          TextButton(
-            onPressed: onDismiss,
-            child: Text(
-              AppStrings.t('match_later'),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.45),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  Widget _firstHeadline() {
-    final age = peer.age;
-    final city = peer.city.trim();
-    final bits = <String>[
-      _peerName,
-      if (age != null) AppStrings.t('match_age_years', args: {'n': '$age'}),
-      if (city.isNotEmpty) city,
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          Text(
-            AppStrings.t(
-              kind == MatchCardKind.first
-                  ? 'match_first_title'
-                  : 'match_standard_title',
-            ),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.6,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            AppStrings.t(
-              kind == MatchCardKind.first
-                  ? 'match_first_sub'
-                  : 'match_standard_sub',
-              args: {'who': bits.join(', ')},
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.78),
-              fontSize: 15.5,
-              height: 1.35,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _rareHeadline() {
+  Widget _buildRare(BuildContext context) {
     final headline = demonymHeadline(peer.country, gender: peer.gender);
     final demonym = countryDemonym(peer.country, gender: peer.gender);
+    final prefix = headline.endsWith(demonym) && demonym.isNotEmpty
+        ? headline.substring(0, headline.length - demonym.length)
+        : '';
+    final goldWord = demonym.isNotEmpty ? demonym : headline;
     final age = peer.age;
     final city = peer.city.trim();
     final meta = [
@@ -224,56 +130,90 @@ class MatchCard extends StatelessWidget {
       if (age != null) '$age',
       if (city.isNotEmpty) city,
     ].join(' · ');
-    // Split "Une Islandaise" so only the demonym is gold.
-    final prefix = headline.endsWith(demonym) && demonym.isNotEmpty
-        ? headline.substring(0, headline.length - demonym.length)
-        : '';
-    final goldWord = demonym.isNotEmpty ? demonym : headline;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          Text.rich(
-            TextSpan(
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-                height: 1.15,
-              ),
-              children: [
-                if (prefix.isNotEmpty)
-                  TextSpan(text: prefix, style: const TextStyle(color: Colors.white)),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Pill(
+          label: AppStrings.t(
+            'match_pill_rare',
+            args: {'pct': _formatPct(countryShare?.percent ?? 0)},
+          ),
+          bg: const Color(0xFFE8C98B),
+          fg: const Color(0xFF1A1408),
+          leading: const Text('✦ ', style: TextStyle(fontSize: 12)),
+        ),
+        const SizedBox(height: 28),
+        _RarePhoto(name: _peerName, photoUrl: _peerPhoto, country: peer.country),
+        const SizedBox(height: 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text.rich(
                 TextSpan(
-                  text: goldWord,
-                  style: const TextStyle(color: Color(0xFFE8C98B)),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                    height: 1.15,
+                  ),
+                  children: [
+                    if (prefix.isNotEmpty)
+                      TextSpan(
+                        text: prefix,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    TextSpan(
+                      text: goldWord,
+                      style: const TextStyle(color: Color(0xFFE8C98B)),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            textAlign: TextAlign.center,
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                AppStrings.t('match_rare_liked'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                meta,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 14.5,
+                ),
+              ),
+            ],
           ),
-          Text(
-            AppStrings.t('match_rare_liked'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
+        ),
+        const SizedBox(height: 32),
+        _SayHiButton(onPressed: onSayHi),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            AppStrings.t(
+              'match_lang_bridge',
+              args: {'their': _peerLangLabel, 'mine': _myLangLabel},
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            meta,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontSize: 14.5,
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 13.5,
+              height: 1.35,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -281,6 +221,79 @@ class MatchCard extends StatelessWidget {
     if (pct <= 0) return '—';
     if (pct < 0.1) return pct.toStringAsFixed(2).replaceAll('.', ',');
     return pct.toStringAsFixed(1).replaceAll('.', ',');
+  }
+}
+
+MatchCardKind resolveMatchCardKind({
+  required int acceptedMatchCount,
+  required CountryShare? share,
+}) {
+  if (acceptedMatchCount <= 1) return MatchCardKind.first;
+  if (share != null && share.isRare) return MatchCardKind.rare;
+  return MatchCardKind.standard;
+}
+
+// ── pieces ──────────────────────────────────────────────────────────────────
+
+class _UnderlinedText extends StatelessWidget {
+  const _UnderlinedText({required this.text, required this.style});
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: IntrinsicWidth(
+        child: Column(
+          children: [
+            Text(text, textAlign: TextAlign.center, style: style),
+            const SizedBox(height: 4),
+            Container(height: 2, color: const Color(0xFFFBBF24)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SayHiButton extends StatelessWidget {
+  const _SayHiButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: SC.accent.withValues(alpha: 0.45),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: SC.accent,
+              foregroundColor: const Color(0xFF0A1024),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(
+              AppStrings.t('match_say_hi'),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -324,58 +337,8 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _TipBox extends StatelessWidget {
-  const _TipBox({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.translate_rounded,
-                color: Color(0xFFC4B5FD),
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 13.5,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FirstPhoto extends StatelessWidget {
-  const _FirstPhoto({required this.name, required this.photoUrl});
+class _RainbowPhoto extends StatelessWidget {
+  const _RainbowPhoto({required this.name, required this.photoUrl});
   final String name;
   final String photoUrl;
 
@@ -387,7 +350,6 @@ class _FirstPhoto extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Soft floating confetti accents.
           Positioned(
             top: 8,
             right: 6,
@@ -415,7 +377,6 @@ class _FirstPhoto extends StatelessWidget {
               ),
             ),
           ),
-          // Rainbow ring.
           Container(
             width: 156,
             height: 156,
@@ -440,11 +401,16 @@ class _FirstPhoto extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(3),
               child: ClipOval(
-                child: ProfileAvatar(
-                  displayName: name,
-                  avatarUrl: photoUrl.isEmpty ? null : photoUrl,
-                  size: 140,
-                ),
+                child: photoUrl.isEmpty
+                    ? ProfileAvatar(displayName: name, size: 140)
+                    : Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        width: 140,
+                        height: 140,
+                        errorBuilder: (_, _, _) =>
+                            ProfileAvatar(displayName: name, size: 140),
+                      ),
               ),
             ),
           ),
@@ -489,10 +455,7 @@ class _RarePhoto extends StatelessWidget {
                   ? ColoredBox(
                       color: SC.bubbleIn,
                       child: Center(
-                        child: ProfileAvatar(
-                          displayName: name,
-                          size: 100,
-                        ),
+                        child: ProfileAvatar(displayName: name, size: 100),
                       ),
                     )
                   : Image.network(
@@ -533,17 +496,3 @@ class _RarePhoto extends StatelessWidget {
     );
   }
 }
-
-/// Pick the card kind from match count + country rarity.
-MatchCardKind resolveMatchCardKind({
-  required int acceptedMatchCount,
-  required CountryShare? share,
-}) {
-  // The match we just made is already counted — first means "only one".
-  if (acceptedMatchCount <= 1) return MatchCardKind.first;
-  if (share != null && share.isRare) return MatchCardKind.rare;
-  return MatchCardKind.standard;
-}
-
-/// Tiny helper so a future animation can spin the rainbow without rebuild noise.
-double matchCardSpin(double t) => t * 2 * math.pi;

@@ -690,9 +690,9 @@ class _AcceptButton extends StatelessWidget {
           child: Text(
             AppStrings.t('accept'),
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF0A1024),
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
