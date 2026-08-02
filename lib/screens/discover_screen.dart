@@ -64,6 +64,49 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       }
       if (photos.isNotEmpty) _cards.add((profile: p, photos: photos));
     }
+    if (_cards.isNotEmpty) {
+      UserPrefs.saveDiscoverDeck([for (final c in _cards) c.profile.id]);
+    }
+  }
+
+  /// Reload today's cached deck by profile id (bypasses the live feed filter
+  /// so "Recommencer" still works after everyone was liked / matched).
+  Future<bool> _hydrateCachedDeck() async {
+    final ids = await UserPrefs.loadDiscoverDeckToday();
+    if (ids.isEmpty || !isSupabaseReady) return false;
+    try {
+      final profiles = await ProfileApi.fetchByIds(ids);
+      if (profiles.isEmpty) return false;
+      final byId = {for (final p in profiles) p.id: p};
+      final ordered = [
+        for (final id in ids)
+          if (byId[id] != null) byId[id]!,
+      ];
+      if (ordered.isEmpty) return false;
+      if (!mounted) return false;
+      setState(() {
+        _profiles = ordered;
+        _rebuildCards();
+      });
+      return _cards.isNotEmpty;
+    } catch (e) {
+      debugPrint('discover: hydrate cache failed: $e');
+      return false;
+    }
+  }
+
+  /// Replay today's deck from the first card — no network required.
+  void _restartDeck() {
+    if (_cards.isEmpty) return;
+    setState(() {
+      _deckDone = false;
+      _currentIndex = 0;
+      _infoOpen = false;
+    });
+    NavChrome.show();
+    UserPrefs.clearDiscoverDone();
+    UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+    _precacheAround(0);
   }
 
   int _currentIndex = 0;
@@ -150,12 +193,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         UserPrefs.loadDiscoverDoneToday(),
       ]).timeout(const Duration(seconds: 8));
       if (!mounted) return;
+      final friendships = results[0] as List<Friendship>;
+      var feed = results[1] as List<RemoteProfile>;
+      final cursor = results[2] as String;
+      final doneToday = results[3] as bool;
+
       setState(() {
-        _myFriendships = results[0] as List<Friendship>;
-        _profiles = results[1] as List<RemoteProfile>;
+        _myFriendships = friendships;
+        _profiles = feed;
         _rebuildCards();
-        final cursor = results[2] as String;
-        final doneToday = results[3] as bool;
+      });
+
+      // Live feed empty (everyone already liked) but we still have today's
+      // deck cached → restore it so Restart / end-of-day can replay.
+      if (_cards.isEmpty) {
+        final ok = await _hydrateCachedDeck();
+        debugPrint('discover: feed empty, cache hydrate=$ok');
+      }
+
+      if (!mounted) return;
+      setState(() {
         if (_cards.isNotEmpty) {
           if (doneToday) {
             _deckDone = true;
@@ -167,12 +224,28 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         }
         _feedLoading = false;
       });
+      debugPrint(
+        'discover: feed=${feed.length} cards=${_cards.length} '
+        'done=$_deckDone idx=$_currentIndex',
+      );
       AppBoot.markHomeReady();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_deckDone) _precacheAround(_currentIndex);
       });
-    } catch (_) {
-      if (mounted) setState(() => _feedLoading = false);
+    } catch (e) {
+      debugPrint('discover: bootstrap failed: $e');
+      // Last resort: show today's cached deck if the network timed out.
+      final ok = await _hydrateCachedDeck();
+      if (mounted) {
+        setState(() {
+          if (ok && _cards.isNotEmpty) {
+            // Keep them on the end screen only if they already finished today.
+            // loadDiscoverDoneToday is async — best-effort false here; Restart works either way.
+            _currentIndex = 0;
+          }
+          _feedLoading = false;
+        });
+      }
       AppBoot.markHomeReady();
     }
   }
@@ -274,14 +347,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _onActionUndo() {
     if (_cards.isEmpty) return;
     if (_deckDone) {
-      // End-of-day screen → restart the deck from the first card.
-      setState(() {
-        _deckDone = false;
-        _currentIndex = 0;
-      });
-      UserPrefs.clearDiscoverDone();
-      UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
-      _precacheAround(0);
+      _restartDeck();
       return;
     }
     if (_currentIndex <= 0) return;
@@ -344,7 +410,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (mounted) _refreshFriendships();
   }
 
+  /// Empty-state / end-of-deck Restart.
+  /// Prefer replaying the cards we already have (or today's cache). A live
+  /// refetch alone often returns [] once everyone is liked — that's why the
+  /// button looked broken.
   Future<void> _reset() async {
+    if (_cards.isNotEmpty) {
+      _restartDeck();
+      return;
+    }
     if (_myId.isEmpty) return;
     setState(() {
       _feedLoading = true;
@@ -359,10 +433,33 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       setState(() {
         _profiles = feed;
         _rebuildCards();
+      });
+      if (_cards.isEmpty) {
+        final ok = await _hydrateCachedDeck();
+        debugPrint('discover: reset feed=${feed.length} cache=$ok');
+      }
+      if (!mounted) return;
+      setState(() {
+        _currentIndex = 0;
+        _deckDone = false;
         _feedLoading = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _feedLoading = false);
+      if (_cards.isNotEmpty) {
+        UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+        _precacheAround(0);
+      }
+    } catch (e) {
+      debugPrint('discover: reset failed: $e');
+      final ok = await _hydrateCachedDeck();
+      if (!mounted) return;
+      setState(() {
+        _currentIndex = 0;
+        _deckDone = false;
+        _feedLoading = false;
+      });
+      if (ok && _cards.isNotEmpty) {
+        UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+      }
     }
   }
 
@@ -407,7 +504,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 : _cards.isEmpty
                     ? _Empty(onReset: _reset)
                     : _deckDone
-                        ? _DiscoverDone(onBack: _onActionUndo)
+                        ? _DiscoverDone(onRestart: _restartDeck)
                         : _TinderCardStack(
                             key: _stackKey,
                             cards: _cards,
@@ -2423,18 +2520,17 @@ class _Pill extends StatelessWidget {
 // Empty / end-of-deck
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Shown after the last Discover card — tap anywhere to restart from the
-/// first card of the deck.
+/// Shown after the last Discover card — Restart replays from the first card.
 class _DiscoverDone extends StatelessWidget {
-  const _DiscoverDone({required this.onBack});
-  final VoidCallback onBack;
+  const _DiscoverDone({required this.onRestart});
+  final VoidCallback onRestart;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onBack,
+        onTap: onRestart,
         borderRadius: BorderRadius.circular(28),
         child: Center(
           child: Padding(
@@ -2481,6 +2577,15 @@ class _DiscoverDone extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                const SizedBox(height: 22),
+                TextButton.icon(
+                  onPressed: onRestart,
+                  icon: const Icon(Icons.refresh, color: SC.accent),
+                  label: Text(
+                    AppStrings.t('restart'),
+                    style: const TextStyle(color: SC.accent),
+                  ),
+                ),
               ],
             ),
           ),
@@ -2497,38 +2602,56 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+              child: const Icon(
+                Icons.favorite_border,
+                color: Colors.white54,
+                size: 32,
+              ),
             ),
-            child: const Icon(Icons.favorite_border, color: Colors.white54, size: 32),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            AppStrings.t('discover_done'),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 16),
+            Text(
+              AppStrings.t('discover_empty_title'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          TextButton.icon(
-            onPressed: onReset,
-            icon: const Icon(Icons.refresh, color: SC.accent),
-            label: Text(
-              AppStrings.t('restart'),
-              style: const TextStyle(color: SC.accent),
+            const SizedBox(height: 8),
+            Text(
+              AppStrings.t('discover_empty_body'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.45),
+                fontSize: 13.5,
+                height: 1.35,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            TextButton.icon(
+              onPressed: onReset,
+              icon: const Icon(Icons.refresh, color: SC.accent),
+              label: Text(
+                AppStrings.t('restart'),
+                style: const TextStyle(color: SC.accent),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

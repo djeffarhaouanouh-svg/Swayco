@@ -1392,7 +1392,8 @@ abstract final class ProfileApi {
   }
 
   /// Peer ids Discover should hide even if the SQL RPC is still on an
-  /// older migration: accepted matches + my pending outgoing likes.
+  /// older migration: accepted matches only. Pending likes stay visible so
+  /// Restart still has a deck after a full pass.
   static Future<Set<String>> _discoverSkipPeerIds(String myId) async {
     try {
       final rows = await _c
@@ -1403,17 +1404,11 @@ abstract final class ProfileApi {
       final out = <String>{};
       for (final row in rows) {
         final m = Map<String, dynamic>.from(row as Map);
-        final status = m['status']?.toString() ?? '';
+        if (m['status']?.toString() != 'accepted') continue;
         final requester = m['requester']?.toString() ?? '';
         final addressee = m['addressee']?.toString() ?? '';
-        if (status == 'accepted') {
-          final peer = requester == myId ? addressee : requester;
-          if (peer.isNotEmpty) out.add(peer);
-        } else if (status == 'pending' &&
-            requester == myId &&
-            addressee.isNotEmpty) {
-          out.add(addressee);
-        }
+        final peer = requester == myId ? addressee : requester;
+        if (peer.isNotEmpty) out.add(peer);
       }
       return out;
     } catch (e) {
@@ -1428,8 +1423,8 @@ abstract final class ProfileApi {
   ///   • caller excluded
   ///   • profiles without a discover photo excluded
   ///   • blocks (both directions) excluded
-  ///   • accepted matches + my pending likes excluded (unmatch brings
-  ///     them back into the deck)
+  ///   • accepted matches excluded (unmatch brings them back; pending
+  ///     likes stay so Restart can replay the deck)
   ///   • peers with hide_from_country=true AND a matching language
   ///     excluded — opt-out can't be bypassed by a tampered client
   ///     because the rows never leave the database.

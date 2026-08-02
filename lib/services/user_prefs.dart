@@ -36,6 +36,11 @@ abstract final class UserPrefs {
   /// Cleared on a new day so the feed can start again tomorrow.
   static const String keyDiscoverDoneDay = 'discover_done_day';
 
+  /// Profile ids of today's Discover deck — kept so "Recommencer" can replay
+  /// even when the live feed is empty (everyone already liked / matched).
+  static const String keyDiscoverDeckIds = 'discover_deck_ids';
+  static const String keyDiscoverDeckDay = 'discover_deck_day';
+
   static Future<String> loadDiscoverCursor() async {
     final p = await SharedPreferences.getInstance();
     return p.getString(keyDiscoverCursor) ?? '';
@@ -72,6 +77,28 @@ abstract final class UserPrefs {
   static Future<void> clearDiscoverDone() async {
     final p = await SharedPreferences.getInstance();
     await p.remove(keyDiscoverDoneDay);
+  }
+
+  static Future<void> saveDiscoverDeck(List<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    final clean = [
+      for (final id in ids)
+        if (id.trim().isNotEmpty) id.trim(),
+    ];
+    if (clean.isEmpty) {
+      await p.remove(keyDiscoverDeckIds);
+      await p.remove(keyDiscoverDeckDay);
+      return;
+    }
+    await p.setStringList(keyDiscoverDeckIds, clean);
+    await p.setString(keyDiscoverDeckDay, _todayKey());
+  }
+
+  /// Today's cached Discover deck ids, or empty when none / another day.
+  static Future<List<String>> loadDiscoverDeckToday() async {
+    final p = await SharedPreferences.getInstance();
+    if (p.getString(keyDiscoverDeckDay) != _todayKey()) return const [];
+    return p.getStringList(keyDiscoverDeckIds) ?? const [];
   }
 
   static Future<String> readPendingReferralCode() async {
