@@ -1675,15 +1675,16 @@ class _TinderCardState extends State<_TinderCard> {
               ],
             ),
 
-          // ── Photo dots — en haut à DROITE ───────────────────────────────
-          // Face au logo, pas au milieu : centrées, elles tombaient sous lui et
-          // le haut de la carte avait deux choses empilées au même endroit.
+          // ── Photo dots — petits, centrés en haut ────────────────────────
           if (photos.length > 1)
             Positioned(
               // Descendues : collées au bord elles se perdaient dans l'encoche.
               top: 20,
-              right: 16,
-              child: _PhotoDots(count: photos.length, active: _photoIndex),
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _PhotoDots(count: photos.length, active: _photoIndex),
+              ),
             ),
 
           // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
