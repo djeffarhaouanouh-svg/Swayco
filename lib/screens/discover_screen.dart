@@ -1199,7 +1199,7 @@ class _PanelSectionTitle extends StatelessWidget {
   }
 }
 
-/// La première ligne du panneau : prénom, âge, et la paire de langues.
+/// La première ligne du panneau : prénom et âge.
 class _PanelHeader extends StatelessWidget {
   const _PanelHeader({required this.profile});
 
@@ -1238,59 +1238,7 @@ class _PanelHeader extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(width: 10),
-        _LanguagePairChip(theirLang: profile.language),
       ],
-    );
-  }
-}
-
-/// « 🇫🇷 FR ⇄ EN 🇬🇧 » : sa langue, la mienne, et la flèche entre les deux.
-///
-/// C'est la seule chose de la fiche qui parle de MOI : tout le reste décrit la
-/// personne, celle-ci dit ce qui se passera si on se parle. La flèche est en
-/// cyan — c'est la traduction, pas une simple mention de langue.
-class _LanguagePairChip extends StatelessWidget {
-  const _LanguagePairChip({required this.theirLang});
-
-  final String theirLang;
-
-  @override
-  Widget build(BuildContext context) {
-    final theirs = findLanguageByCode(theirLang);
-    final mine = findLanguageByCode(AppStrings.currentBcp47.value);
-    // Une seule langue connue, ou la même des deux côtés : il n'y a pas de
-    // paire à montrer.
-    if (theirs == null || mine == null || theirs.code == mine.code) {
-      return const SizedBox.shrink();
-    }
-    const code = TextStyle(
-      color: Colors.white,
-      fontSize: 12.5,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.5,
-    );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(theirs.flag, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 6),
-          Text(theirs.code.toUpperCase(), style: code),
-          const SizedBox(width: 5),
-          const Icon(Icons.sync_alt_rounded, size: 13, color: SC.accent),
-          const SizedBox(width: 5),
-          Text(mine.code.toUpperCase(), style: code),
-          const SizedBox(width: 6),
-          Text(mine.flag, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
     );
   }
 }
