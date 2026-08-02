@@ -11,14 +11,17 @@ import '../services/device_id.dart';
 import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
 import '../services/interests.dart';
+import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
+import '../services/looking_for.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/units.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
+import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
@@ -27,6 +30,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -998,11 +1002,11 @@ class _ProfileInfoPanel extends StatelessWidget {
         // Pieds/pouces pour un profil américain, centimètres ailleurs.
         (emoji: kFactEmojiHeight, label: formatHeight(p.heightCm!, country: p.country)),
       if (p.job.trim().isNotEmpty)
-        (emoji: kFactEmojiJob, label: p.job.trim()),
+        (emoji: kFactEmojiJob, label: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
-        (emoji: kFactEmojiZodiac, label: p.zodiac.trim()),
+        (emoji: kFactEmojiZodiac, label: displayZodiac(p.zodiac)),
       if (p.lookingFor.trim().isNotEmpty)
-        (emoji: kFactEmojiLookingFor, label: p.lookingFor.trim()),
+        (emoji: kFactEmojiLookingFor, label: displayLookingFor(p.lookingFor)),
       if (place.isNotEmpty)
         (emoji: kFactEmojiPlace, label: place),
       // Pas de ligne "langue" : le drapeau est déjà sur la photo, et l'app
@@ -1082,8 +1086,11 @@ class _ProfileInfoPanel extends StatelessWidget {
                       if (p.bio.trim().isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_bio')),
                         const SizedBox(height: 8),
-                        Text(
-                          p.bio.trim(),
+                        TranslatedProfileText(
+                          text: p.bio.trim(),
+                          profileId: p.id,
+                          field: 'bio',
+                          fromLang: p.language,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.92),
                             fontSize: 15.5,
