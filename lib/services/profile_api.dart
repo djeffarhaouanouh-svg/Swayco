@@ -31,7 +31,6 @@ class RemoteProfile {
     this.proExpiresAt,
     this.lastSeen,
     this.nameChangedAt,
-    this.referralCode = '',
     this.age,
     this.heightCm,
     this.job = '',
@@ -152,11 +151,6 @@ class RemoteProfile {
   /// trigger (migration 0044) as the real, un-bypassable guard.
   final DateTime? nameChangedAt;
 
-  /// Short URL-safe slug appended to share links as `?ref=<code>` so a
-  /// new sign-up can be attributed back to whoever sent the invite.
-  /// Server-assigned at profile insert (see migration 0028); empty
-  /// only on legacy rows that haven't been fetched since the backfill.
-  final String referralCode;
 
   /// Backwards-compat shim — the rest of the UI still reads `firstName` /
   /// `sourceLang`. Same data, different schema names.
@@ -252,7 +246,6 @@ class RemoteProfile {
     proExpiresAt: _parseDate(m['pro_expires_at']),
     lastSeen: _parseDate(m['last_seen']),
     nameChangedAt: _parseDate(m['display_name_changed_at']),
-    referralCode: m['referral_code']?.toString() ?? '',
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -286,7 +279,6 @@ class RemoteProfile {
     DateTime? proExpiresAt,
     DateTime? lastSeen,
     DateTime? nameChangedAt,
-    String? referralCode,
   }) => RemoteProfile(
     id: id,
     handle: handle ?? this.handle,
@@ -315,7 +307,6 @@ class RemoteProfile {
     proExpiresAt: proExpiresAt ?? this.proExpiresAt,
     lastSeen: lastSeen ?? this.lastSeen,
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
-    referralCode: referralCode ?? this.referralCode,
   );
 }
 
@@ -799,45 +790,6 @@ abstract final class ProfileApi {
         .timeout(const Duration(seconds: 10));
     if (row == null) return null;
     return RemoteProfile.fromMap(Map<String, dynamic>.from(row));
-  }
-
-  /// Tell the server "I was invited by the holder of [code]". Idempotent
-  /// — a second call (or a self-referral) is rejected without throwing.
-  /// Returns null when the RPC fails entirely; otherwise a parsed
-  /// result map: `{ok, reason?, referralsTotal?, bonusAddedSeconds?}`.
-  static Future<Map<String, dynamic>?> attributeReferral(String code) async {
-    if (!isSupabaseReady) return null;
-    final trimmed = code.trim();
-    if (trimmed.isEmpty) return null;
-    try {
-      final res = await _c.rpc(
-        'attribute_referral',
-        params: {'p_code': trimmed},
-      );
-      if (res is Map) return Map<String, dynamic>.from(res);
-      return {'ok': false, 'reason': 'malformed_response'};
-    } catch (e) {
-      debugPrint('ProfileApi.attributeReferral failed: $e');
-      return null;
-    }
-  }
-
-  /// Count of users who signed up with [userId] as their referrer.
-  /// Used by the invite-friends popup to render "X / 3" progress. Falls
-  /// back to 0 on failure rather than throwing — the popup shouldn't
-  /// blow up when the network is flaky.
-  static Future<int> countReferrals(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) return 0;
-    try {
-      final rows = await _c
-          .from('profiles')
-          .select('id')
-          .eq('referred_by', userId);
-      return rows.length;
-    } catch (e) {
-      debugPrint('ProfileApi.countReferrals failed: $e');
-      return 0;
-    }
   }
 
   /// Persist the user's display name (the "prénom"). Trims to

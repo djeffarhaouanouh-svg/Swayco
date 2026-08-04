@@ -183,7 +183,6 @@ abstract final class AppStrings {
     // Settings page
     'settings_title': 'Paramètres',
     'settings_section_account': 'Compte',
-    'settings_section_credits': 'Crédits',
     'settings_section_notifications': 'Notifications',
     'settings_section_privacy': 'Confidentialité',
     'settings_section_lang': 'Langue & traduction',
@@ -335,16 +334,6 @@ abstract final class AppStrings {
     'chat_unread_count': '{n} non lus',
     'gif_search_hint': 'Rechercher un GIF',
     'gif_none': 'Aucun GIF trouvé',
-    'invite_friend': 'Inviter un ami sur Swayco',
-    'invite_share_text':
-        'Rejoins-moi sur Swayco 🌍 — appels vidéo avec traduction en temps réel. En t\'inscrivant via mon lien, on gagne tous les deux du temps d\'appel : {link}',
-    // Out-of-credits / invite-friends popup
-    'invite_bonus_title': 'Parraine 3 amis, gagne 15 min',
-    'invite_bonus_body':
-        'Invite 3 amis qui s\'inscrivent avec ton lien et reçois 15 min de traduction live, automatiquement.',
-    'invite_bonus_progress': 'Filleuls inscrits : {count} / {total}',
-    'invite_bonus_share_cta': 'Partager mon lien',
-    'invite_bonus_later': 'Plus tard',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Inviter à un appel',
     'invite_call_share_text':
@@ -536,17 +525,8 @@ abstract final class AppStrings {
         'Tu pourras te reconnecter avec ton e-mail et ton mot de passe.',
     'cancel': 'Annuler',
 
-    'credits_remaining_inline': '{count} crédits restants ce mois',
-    'credits_unlimited': 'Traduction illimitée',
-    'credits_low_hint':
-        'Bientôt à court de crédits. Renouvellement le mois prochain — passe à un palier supérieur pour ne pas attendre.',
     // Native (App Store / Play Store) variant — no upgrade upsell, since
     // external subscription prompts aren't allowed in the store builds.
-    'credits_low_hint_native':
-        'Bientôt à court de crédits. Renouvellement le mois prochain.',
-    'credits_used_total_inline': '{time} traduit au total',
-    'credits_exhausted_banner':
-        'Crédits épuisés — la traduction est désactivée, l\'appel continue.',
 
     'login_title_signin': 'Bon retour',
     'login_title_signup': 'Créer un compte',
@@ -616,35 +596,6 @@ abstract final class AppStrings {
     'onb_interests_title': 'Tes centres d\'intérêt',
     'onb_interests_count': '{n} / {max} sélectionnés',
 
-    // Voice messages — chat composer + bubble.
-    'voice_mic_denied':
-        "Accès au micro refusé. Active-le dans les réglages de l'app.",
-    'voice_recording_hint': 'Touche pour envoyer ou supprime pour annuler',
-    'voice_message': 'Message vocal',
-    'voice_dub_listen': 'Écouter la traduction',
-    'voice_dub_upgrade':
-        'Passe à Plus pour écouter la traduction des messages vocaux.',
-    'voice_dub_quota':
-        'Quota de doublages atteint pour ce mois. Repasse plus tard ou monte en Ultra Plus.',
-    'voice_dub_failed': 'Doublage indisponible, réessaie dans un instant.',
-    // Ultra voice-clone enrolment card.
-    'voice_clone_title': 'Cloner ma voix',
-    'voice_clone_subtitle':
-        'Enregistre 30 secondes de ta voix. Tes messages vocaux seront ensuite doublés dans TA voix pour les utilisateurs Ultra Plus.',
-    'voice_clone_start': 'Enregistrer',
-    'voice_clone_redo': 'Refaire',
-    'voice_clone_send': 'Envoyer',
-    'voice_clone_processing': 'Clonage en cours…',
-    'voice_clone_success': 'Voix clonée ! 🎙',
-    'voice_clone_too_short': 'Il faut au moins 20 secondes pour cloner.',
-    'voice_clone_failed': 'Clonage échoué, réessaie dans un instant.',
-    'voice_clone_ultra_only': 'Le clonage est réservé aux abonnés Ultra Plus.',
-    'voice_clone_enrolled_title': 'Voix clonée',
-    'voice_clone_enrolled_subtitle':
-        'Tes messages vocaux sont désormais doublés dans ta voix pour les Ultra Plus. Recommence à tout moment pour mettre à jour la clone.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Débloquer avec Ultra Plus',
-
     'join_title': 'Rejoindre une room',
     'join_desc':
         'Choisis un nom de room et partage-le avec une autre personne. Vous devez utiliser le même nom pour vous retrouver en 1-on-1.',
@@ -665,10 +616,6 @@ abstract final class AppStrings {
     'join_header_subtitle': 'LiveKit · 1-on-1',
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Ton profil',
-    'out_of_credits_title': 'Oups… plus de crédits',
-    'out_of_credits_body':
-        'Recharge pour continuer à traduire tes appels en temps réel.',
-    'out_of_credits_cta': 'Recharger',
   };
 
   // ─── English ──────────────────────────────────────────────────────────────
@@ -782,7 +729,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Pick up to 5 emojis that represent you',
     'settings_title': 'Settings',
     'settings_section_account': 'Account',
-    'settings_section_credits': 'Credits',
     'settings_section_notifications': 'Notifications',
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Language & translation',
@@ -929,16 +875,6 @@ abstract final class AppStrings {
     'chat_unread_count': '{n} unread',
     'gif_search_hint': 'Search GIFs',
     'gif_none': 'No GIF found',
-    'invite_friend': 'Invite a friend to Swayco',
-    'invite_share_text':
-        'Join me on Swayco 🌍 — video calls with real-time translation. Sign up with my link and we both earn extra call time: {link}',
-    // Out-of-credits / invite-friends popup
-    'invite_bonus_title': 'Refer 3 friends, earn 15 min',
-    'invite_bonus_body':
-        'Invite 3 friends who sign up with your link and get 15 min of live translation, automatically.',
-    'invite_bonus_progress': 'Signed-up referrals: {count} / {total}',
-    'invite_bonus_share_cta': 'Share my link',
-    'invite_bonus_later': 'Later',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Invite to a call',
     'invite_call_share_text':
@@ -1127,16 +1063,8 @@ abstract final class AppStrings {
         'You can sign back in with your email and password.',
     'cancel': 'Cancel',
 
-    'credits_remaining_inline': '{count} credits left this month',
-    'credits_unlimited': 'Unlimited translation',
-    'credits_low_hint':
-        'Running low. Refills next month — upgrade if you don\'t want to wait.',
     // Native (App Store / Play Store) variant — no upgrade upsell, since
     // external subscription prompts aren't allowed in the store builds.
-    'credits_low_hint_native': 'Running low. Refills next month.',
-    'credits_used_total_inline': '{time} translated in total',
-    'credits_exhausted_banner':
-        'Out of credits — translation is off, the call continues.',
 
     'login_title_signin': 'Welcome back',
     'login_title_signup': 'Create an account',
@@ -1205,36 +1133,6 @@ abstract final class AppStrings {
     'onb_interests_title': 'Your interests',
     'onb_interests_count': '{n} / {max} selected',
 
-    // Voice messages — chat composer + bubble.
-    'voice_mic_denied':
-        "Microphone access denied. Enable it in the app settings.",
-    'voice_recording_hint': 'Tap to send, or delete to cancel',
-    'voice_message': 'Voice message',
-    'voice_dub_listen': 'Listen to translation',
-    'voice_dub_upgrade':
-        'Upgrade to Plus to hear voice messages translated aloud.',
-    'voice_dub_quota':
-        'Monthly translation cap reached. Come back later or upgrade to Ultra Plus.',
-    'voice_dub_failed': 'Translation playback unavailable, try again.',
-    // Ultra voice-clone enrolment card.
-    'voice_clone_title': 'Clone my voice',
-    'voice_clone_subtitle':
-        'Record 30 seconds of yourself talking. Your voice messages will then be dubbed in YOUR voice for Ultra Plus listeners.',
-    'voice_clone_start': 'Record',
-    'voice_clone_redo': 'Redo',
-    'voice_clone_send': 'Send',
-    'voice_clone_processing': 'Cloning…',
-    'voice_clone_success': 'Voice cloned! 🎙',
-    'voice_clone_too_short': 'You need at least 20 seconds to clone.',
-    'voice_clone_failed': 'Cloning failed, please try again.',
-    'voice_clone_ultra_only':
-        'Voice cloning is reserved for Ultra Plus subscribers.',
-    'voice_clone_enrolled_title': 'Voice cloned',
-    'voice_clone_enrolled_subtitle':
-        'Your voice messages are now dubbed in your own voice for Ultra Plus listeners. Re-record any time to refresh the clone.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Unlock with Ultra Plus',
-
     'join_title': 'Join a room',
     'join_desc':
         'Pick any room name and share it with one other person. Both of you must use the same name to connect 1-on-1.',
@@ -1256,10 +1154,6 @@ abstract final class AppStrings {
     'join_header_subtitle': 'LiveKit · 1-on-1',
     'join_header_token_server': 'Token server: {api}',
     'join_header_profile_tooltip': 'Your profile',
-    'out_of_credits_title': 'Oops… out of credits',
-    'out_of_credits_body':
-        'Top up to keep translating your calls in real time.',
-    'out_of_credits_cta': 'Top up',
   };
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
@@ -1373,7 +1267,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Elige hasta 5 emojis que te representen',
     'settings_title': 'Ajustes',
     'settings_section_account': 'Cuenta',
-    'settings_section_credits': 'Créditos',
     'settings_section_notifications': 'Notificaciones',
     'settings_section_privacy': 'Privacidad',
     'settings_section_lang': 'Idioma y traducción',
@@ -1580,7 +1473,6 @@ abstract final class AppStrings {
     'call_route_external_hint':
         'Tu dispositivo gestiona la salida mientras haya auriculares o Bluetooth conectados.',
     'call_route_internal_hint': 'Activa el altavoz o vuelve al auricular.',
-    'invite_friend': 'Invitar a un amigo a Swayco',
     'sent_label': 'Enviado',
     'follow_following': 'Siguiendo',
     'call_language': 'Idioma',
@@ -1716,14 +1608,6 @@ abstract final class AppStrings {
     'report_reason_underage': 'Usuario menor de edad',
     'report_reason_scam': 'Estafa',
     'report_reason_other': 'Otro',
-    'invite_share_text':
-        'Únete a mí en Swayco 🌍 — videollamadas con traducción en tiempo real. Regístrate con mi enlace y ambos ganamos tiempo de llamada extra: {link}',
-    'invite_bonus_title': 'Invita a 3 amigos y gana 15 min',
-    'invite_bonus_body':
-        'Invita a 3 amigos que se registren con tu enlace y consigue 15 min de traducción en vivo, automáticamente.',
-    'invite_bonus_progress': 'Invitados registrados: {count} / {total}',
-    'invite_bonus_share_cta': 'Compartir mi enlace',
-    'invite_bonus_later': 'Más tarde',
     'invite_to_call': 'Invitar a una llamada',
     'invite_call_share_text':
         'Únete a mi videollamada con traducción en directo en Swayco 🌍 — solo toca, sin necesidad de cuenta: {link}',
@@ -1749,14 +1633,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Puedes volver a iniciar sesión con tu correo y contraseña.',
     'cancel': 'Cancelar',
-    'credits_remaining_inline': '{count} créditos restantes este mes',
-    'credits_unlimited': 'Traducción ilimitada',
-    'credits_low_hint':
-        'Te quedan pocos. Se recargan el próximo mes — mejora tu plan si no quieres esperar.',
-    'credits_low_hint_native': 'Te quedan pocos. Se recargan el próximo mes.',
-    'credits_used_total_inline': '{time} traducidos en total',
-    'credits_exhausted_banner':
-        'Sin créditos — la traducción está desactivada, la llamada continúa.',
     'login_title_signin': 'Bienvenido de nuevo',
     'login_title_signup': 'Crear una cuenta',
     'login_subtitle_signin': 'Inicia sesión en tu cuenta.',
@@ -1792,38 +1668,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Elige una opción para continuar.',
     'onb_interests_title': 'Tus intereses',
     'onb_interests_count': '{n} / {max} seleccionados',
-    'voice_mic_denied':
-        'Acceso al micrófono denegado. Actívalo en los ajustes de la app.',
-    'voice_recording_hint': 'Toca para enviar, o borra para cancelar',
-    'voice_message': 'Mensaje de voz',
-    'voice_dub_listen': 'Escuchar la traducción',
-    'voice_dub_upgrade':
-        'Mejora a Plus para escuchar los mensajes de voz traducidos en voz alta.',
-    'voice_dub_quota':
-        'Has alcanzado el límite mensual de traducción. Vuelve más tarde o mejora a Ultra Plus.',
-    'voice_dub_failed':
-        'Reproducción de la traducción no disponible, inténtalo de nuevo.',
-    'voice_clone_title': 'Clonar mi voz',
-    'voice_clone_subtitle':
-        'Graba 30 segundos hablando. Tus mensajes de voz se doblarán con TU voz para los oyentes de Ultra Plus.',
-    'voice_clone_start': 'Grabar',
-    'voice_clone_redo': 'Repetir',
-    'voice_clone_send': 'Enviar',
-    'voice_clone_processing': 'Clonando…',
-    'voice_clone_success': '¡Voz clonada! 🎙',
-    'voice_clone_too_short': 'Necesitas al menos 20 segundos para clonar.',
-    'voice_clone_failed': 'La clonación falló, inténtalo de nuevo.',
-    'voice_clone_ultra_only':
-        'La clonación de voz está reservada para suscriptores de Ultra Plus.',
-    'voice_clone_enrolled_title': 'Voz clonada',
-    'voice_clone_enrolled_subtitle':
-        'Tus mensajes de voz ahora se doblan con tu propia voz para los oyentes de Ultra Plus. Vuelve a grabar cuando quieras para actualizar el clon.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Desbloquear con Ultra Plus',
-    'out_of_credits_title': 'Ups… sin créditos',
-    'out_of_credits_body':
-        'Recarga para seguir traduciendo tus llamadas en tiempo real.',
-    'out_of_credits_cta': 'Recargar',
   };
 
   // ─── German ───────────────────────────────────────────────────────────────
@@ -2071,7 +1915,6 @@ abstract final class AppStrings {
         'Die Ausgabe steuert dein Gerät, solange Kopfhörer oder Bluetooth verbunden sind.',
     'call_route_internal_hint':
         'Schalte den Lautsprecher ein oder wechsle zurück zur Hörmuschel.',
-    'invite_friend': 'Einen Freund zu Swayco einladen',
     'follow_following': 'Abonniert',
     'call_language': 'Sprache',
     'call_language_output': 'Ich höre',
@@ -2182,7 +2025,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Wähle bis zu 5 Emojis, die dich repräsentieren',
     'settings_title': 'Einstellungen',
     'settings_section_account': 'Konto',
-    'settings_section_credits': 'Guthaben',
     'settings_section_notifications': 'Benachrichtigungen',
     'settings_section_privacy': 'Privatsphäre',
     'settings_section_lang': 'Sprache & Übersetzung',
@@ -2256,14 +2098,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'Betrug',
     'report_reason_other': 'Sonstiges',
     'discover_message_sent': 'Nachricht gesendet',
-    'invite_share_text':
-        'Komm zu mir auf Swayco 🌍 — Videoanrufe mit Echtzeit-Übersetzung. Melde dich mit meinem Link an und wir beide bekommen extra Anrufzeit: {link}',
-    'invite_bonus_title': 'Wirb 3 Freunde, erhalte 15 Min',
-    'invite_bonus_body':
-        'Lade 3 Freunde ein, die sich über deinen Link registrieren, und erhalte automatisch 15 Min. Live-Übersetzung.',
-    'invite_bonus_progress': 'Angemeldete Empfehlungen: {count} / {total}',
-    'invite_bonus_share_cta': 'Meinen Link teilen',
-    'invite_bonus_later': 'Später',
     'invite_to_call': 'Zu einem Anruf einladen',
     'invite_call_share_text':
         'Komm zu meinem live-übersetzten Videoanruf auf Swayco 🌍 — einfach tippen, kein Konto nötig: {link}',
@@ -2308,15 +2142,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Du kannst dich wieder mit deiner E-Mail und deinem Passwort anmelden.',
     'cancel': 'Abbrechen',
-    'credits_remaining_inline': 'Noch {count} Guthaben diesen Monat',
-    'credits_unlimited': 'Unbegrenzte Übersetzung',
-    'credits_low_hint':
-        'Geht zur Neige. Wird nächsten Monat aufgefüllt — upgrade, wenn du nicht warten möchtest.',
-    'credits_low_hint_native':
-        'Geht zur Neige. Wird nächsten Monat aufgefüllt.',
-    'credits_used_total_inline': 'Insgesamt {time} übersetzt',
-    'credits_exhausted_banner':
-        'Guthaben aufgebraucht — die Übersetzung ist aus, der Anruf läuft weiter.',
     'login_title_signin': 'Willkommen zurück',
     'login_title_signup': 'Konto erstellen',
     'login_subtitle_signin': 'Melde dich in deinem Konto an.',
@@ -2362,38 +2187,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Wähle eine Option, um fortzufahren.',
     'onb_interests_title': 'Deine Interessen',
     'onb_interests_count': '{n} / {max} ausgewählt',
-    'voice_mic_denied':
-        'Mikrofonzugriff verweigert. Aktiviere ihn in den App-Einstellungen.',
-    'voice_recording_hint': 'Tippe zum Senden oder lösche zum Abbrechen',
-    'voice_message': 'Sprachnachricht',
-    'voice_dub_listen': 'Übersetzung anhören',
-    'voice_dub_upgrade':
-        'Upgrade auf Plus, um Sprachnachrichten laut übersetzt zu hören.',
-    'voice_dub_quota':
-        'Monatliches Übersetzungslimit erreicht. Komm später wieder oder upgrade auf Ultra Plus.',
-    'voice_dub_failed':
-        'Übersetzungswiedergabe nicht verfügbar, versuche es erneut.',
-    'voice_clone_title': 'Meine Stimme klonen',
-    'voice_clone_subtitle':
-        'Nimm 30 Sekunden von dir beim Sprechen auf. Deine Sprachnachrichten werden dann für Ultra-Plus-Hörer mit DEINER Stimme vertont.',
-    'voice_clone_start': 'Aufnehmen',
-    'voice_clone_redo': 'Wiederholen',
-    'voice_clone_send': 'Senden',
-    'voice_clone_processing': 'Wird geklont…',
-    'voice_clone_success': 'Stimme geklont! 🎙',
-    'voice_clone_too_short': 'Du brauchst mindestens 20 Sekunden zum Klonen.',
-    'voice_clone_failed': 'Klonen fehlgeschlagen, bitte versuche es erneut.',
-    'voice_clone_ultra_only':
-        'Das Klonen der Stimme ist Ultra-Plus-Abonnenten vorbehalten.',
-    'voice_clone_enrolled_title': 'Stimme geklont',
-    'voice_clone_enrolled_subtitle':
-        'Deine Sprachnachrichten werden jetzt für Ultra-Plus-Hörer mit deiner eigenen Stimme vertont. Nimm jederzeit neu auf, um den Klon zu aktualisieren.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Mit Ultra Plus freischalten',
-    'out_of_credits_title': 'Ups… keine Credits mehr',
-    'out_of_credits_body':
-        'Lade auf, um deine Anrufe weiter in Echtzeit zu übersetzen.',
-    'out_of_credits_cta': 'Aufladen',
   };
 
   // ─── Italian ──────────────────────────────────────────────────────────────
@@ -2639,7 +2432,6 @@ abstract final class AppStrings {
     'call_route_external_hint':
         'L’uscita è gestita dal dispositivo finché cuffie o Bluetooth sono collegati.',
     'call_route_internal_hint': 'Attiva l’altoparlante o torna all’auricolare.',
-    'invite_friend': 'Invita un amico su Swayco',
     'follow_following': 'Già seguito',
     'call_language': 'Lingua',
     'call_language_output': 'Io sento',
@@ -2749,7 +2541,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Scegli fino a 5 emoji che ti rappresentano',
     'settings_title': 'Impostazioni',
     'settings_section_account': 'Account',
-    'settings_section_credits': 'Crediti',
     'settings_section_notifications': 'Notifiche',
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Lingua e traduzione',
@@ -2822,14 +2613,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'Truffa',
     'report_reason_other': 'Altro',
     'discover_message_sent': 'Messaggio inviato',
-    'invite_share_text':
-        'Unisciti a me su Swayco 🌍 — videochiamate con traduzione in tempo reale. Iscriviti con il mio link e otterremo entrambi più minuti di chiamata: {link}',
-    'invite_bonus_title': 'Invita 3 amici, ottieni 15 min',
-    'invite_bonus_body':
-        'Invita 3 amici che si iscrivono con il tuo link e ottieni 15 min di traduzione live, automaticamente.',
-    'invite_bonus_progress': 'Iscritti tramite invito: {count} / {total}',
-    'invite_bonus_share_cta': 'Condividi il mio link',
-    'invite_bonus_later': 'Più tardi',
     'invite_to_call': 'Invita a una chiamata',
     'invite_call_share_text':
         'Unisciti alla mia videochiamata con traduzione in diretta su Swayco 🌍 — basta un tocco, senza bisogno di account: {link}',
@@ -2872,15 +2655,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Puoi accedere di nuovo con la tua email e password.',
     'cancel': 'Annulla',
-    'credits_remaining_inline': '{count} crediti rimasti questo mese',
-    'credits_unlimited': 'Traduzione illimitata',
-    'credits_low_hint':
-        'Stanno per finire. Si ricaricano il mese prossimo — passa a un piano superiore se non vuoi aspettare.',
-    'credits_low_hint_native':
-        'Stanno per finire. Si ricaricano il mese prossimo.',
-    'credits_used_total_inline': '{time} tradotti in totale',
-    'credits_exhausted_banner':
-        'Crediti esauriti — la traduzione è disattivata, la chiamata continua.',
     'login_title_signin': 'Bentornato',
     'login_title_signup': 'Crea un account',
     'login_subtitle_signin': 'Accedi al tuo account.',
@@ -2926,38 +2700,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Scegli un\'opzione per continuare.',
     'onb_interests_title': 'I tuoi interessi',
     'onb_interests_count': '{n} / {max} selezionati',
-    'voice_mic_denied':
-        'Accesso al microfono negato. Attivalo nelle impostazioni dell\'app.',
-    'voice_recording_hint': 'Tocca per inviare, oppure elimina per annullare',
-    'voice_message': 'Messaggio vocale',
-    'voice_dub_listen': 'Ascolta la traduzione',
-    'voice_dub_upgrade':
-        'Passa a Plus per ascoltare i messaggi vocali tradotti ad alta voce.',
-    'voice_dub_quota':
-        'Limite mensile di traduzione raggiunto. Torna più tardi o passa a Ultra Plus.',
-    'voice_dub_failed':
-        'Riproduzione della traduzione non disponibile, riprova.',
-    'voice_clone_title': 'Clona la mia voce',
-    'voice_clone_subtitle':
-        'Registra 30 secondi mentre parli. I tuoi messaggi vocali verranno poi doppiati con la TUA voce per gli ascoltatori Ultra Plus.',
-    'voice_clone_start': 'Registra',
-    'voice_clone_redo': 'Rifai',
-    'voice_clone_send': 'Invia',
-    'voice_clone_processing': 'Clonazione…',
-    'voice_clone_success': 'Voce clonata! 🎙',
-    'voice_clone_too_short': 'Servono almeno 20 secondi per clonare.',
-    'voice_clone_failed': 'Clonazione non riuscita, riprova.',
-    'voice_clone_ultra_only':
-        'La clonazione della voce è riservata agli abbonati Ultra Plus.',
-    'voice_clone_enrolled_title': 'Voce clonata',
-    'voice_clone_enrolled_subtitle':
-        'I tuoi messaggi vocali ora vengono doppiati con la tua voce per gli ascoltatori Ultra Plus. Registra di nuovo in qualsiasi momento per aggiornare il clone.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Sblocca con Ultra Plus',
-    'out_of_credits_title': 'Ops… crediti esauriti',
-    'out_of_credits_body':
-        'Ricarica per continuare a tradurre le tue chiamate in tempo reale.',
-    'out_of_credits_cta': 'Ricarica',
   };
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
@@ -3203,7 +2945,6 @@ abstract final class AppStrings {
     'call_route_external_hint':
         'A saída é gerida pelo teu dispositivo enquanto houver auscultadores ou Bluetooth ligados.',
     'call_route_internal_hint': 'Ativa o altifalante ou volta ao auricular.',
-    'invite_friend': 'Convidar um amigo para o Swayco',
     'follow_following': 'A seguir',
     'call_language': 'Idioma',
     'call_language_output': 'Eu ouço',
@@ -3312,7 +3053,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Escolha até 5 emojis que o representam',
     'settings_title': 'Definições',
     'settings_section_account': 'Conta',
-    'settings_section_credits': 'Créditos',
     'settings_section_notifications': 'Notificações',
     'settings_section_privacy': 'Privacidade',
     'settings_section_lang': 'Idioma e tradução',
@@ -3386,14 +3126,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'Burla',
     'report_reason_other': 'Outro',
     'discover_message_sent': 'Mensagem enviada',
-    'invite_share_text':
-        'Junte-se a mim no Swayco 🌍 — videochamadas com tradução em tempo real. Registe-se com o meu link e ambos ganhamos tempo de chamada extra: {link}',
-    'invite_bonus_title': 'Convida 3 amigos e ganha 15 min',
-    'invite_bonus_body':
-        'Convida 3 amigos que se registem com o teu link e recebe 15 min de tradução ao vivo, automaticamente.',
-    'invite_bonus_progress': 'Indicações registadas: {count} / {total}',
-    'invite_bonus_share_cta': 'Partilhar o meu link',
-    'invite_bonus_later': 'Mais tarde',
     'invite_to_call': 'Convidar para uma chamada',
     'invite_call_share_text':
         'Junte-se à minha videochamada com tradução em direto no Swayco 🌍 — basta tocar, sem necessidade de conta: {link}',
@@ -3437,14 +3169,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Pode voltar a iniciar sessão com o seu e-mail e palavra-passe.',
     'cancel': 'Cancelar',
-    'credits_remaining_inline': '{count} créditos restantes este mês',
-    'credits_unlimited': 'Tradução ilimitada',
-    'credits_low_hint':
-        'A esgotar. Recarrega no próximo mês — faça upgrade se não quiser esperar.',
-    'credits_low_hint_native': 'A esgotar. Recarrega no próximo mês.',
-    'credits_used_total_inline': '{time} traduzidos no total',
-    'credits_exhausted_banner':
-        'Sem créditos — a tradução está desligada, mas a chamada continua.',
     'login_title_signin': 'Bem-vindo de volta',
     'login_title_signup': 'Criar uma conta',
     'login_subtitle_signin': 'Inicie sessão na sua conta.',
@@ -3490,37 +3214,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Escolha uma opção para continuar.',
     'onb_interests_title': 'Os seus interesses',
     'onb_interests_count': '{n} / {max} selecionados',
-    'voice_mic_denied':
-        'Acesso ao microfone negado. Ative-o nas definições da aplicação.',
-    'voice_recording_hint': 'Toque para enviar ou elimine para cancelar',
-    'voice_message': 'Mensagem de voz',
-    'voice_dub_listen': 'Ouvir a tradução',
-    'voice_dub_upgrade':
-        'Faça upgrade para o Plus para ouvir as mensagens de voz traduzidas em voz alta.',
-    'voice_dub_quota':
-        'Limite mensal de tradução atingido. Volte mais tarde ou faça upgrade para o Ultra Plus.',
-    'voice_dub_failed': 'Reprodução da tradução indisponível, tente novamente.',
-    'voice_clone_title': 'Clonar a minha voz',
-    'voice_clone_subtitle':
-        'Grave 30 segundos a falar. As suas mensagens de voz passarão a ser dobradas com a SUA voz para os ouvintes Ultra Plus.',
-    'voice_clone_start': 'Gravar',
-    'voice_clone_redo': 'Repetir',
-    'voice_clone_send': 'Enviar',
-    'voice_clone_processing': 'A clonar…',
-    'voice_clone_success': 'Voz clonada! 🎙',
-    'voice_clone_too_short': 'Precisa de pelo menos 20 segundos para clonar.',
-    'voice_clone_failed': 'A clonagem falhou, tente novamente.',
-    'voice_clone_ultra_only':
-        'A clonagem de voz está reservada aos subscritores Ultra Plus.',
-    'voice_clone_enrolled_title': 'Voz clonada',
-    'voice_clone_enrolled_subtitle':
-        'As suas mensagens de voz são agora dobradas com a sua própria voz para os ouvintes Ultra Plus. Volte a gravar a qualquer momento para atualizar o clone.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Desbloquear com o Ultra Plus',
-    'out_of_credits_title': 'Ups… sem créditos',
-    'out_of_credits_body':
-        'Recarrega para continuares a traduzir as tuas chamadas em tempo real.',
-    'out_of_credits_cta': 'Recarregar',
   };
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
@@ -3768,7 +3461,6 @@ abstract final class AppStrings {
         'De uitvoer wordt door je apparaat geregeld zolang een koptelefoon of Bluetooth verbonden is.',
     'call_route_internal_hint':
         'Zet de luidspreker aan of schakel terug naar de oortelefoon.',
-    'invite_friend': 'Nodig een vriend uit voor Swayco',
     'follow_following': 'Volgend',
     'call_language': 'Taal',
     'call_language_output': 'Ik hoor',
@@ -3877,7 +3569,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Kies maximaal 5 emoji\'s die bij je passen',
     'settings_title': 'Instellingen',
     'settings_section_account': 'Account',
-    'settings_section_credits': 'Tegoed',
     'settings_section_notifications': 'Meldingen',
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Taal en vertaling',
@@ -3949,14 +3640,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'Oplichting',
     'report_reason_other': 'Overig',
     'discover_message_sent': 'Bericht verstuurd',
-    'invite_share_text':
-        'Doe met me mee op Swayco 🌍 — videogesprekken met realtime vertaling. Meld je aan met mijn link en we krijgen allebei extra belminuten: {link}',
-    'invite_bonus_title': 'Nodig 3 vrienden uit, verdien 15 min',
-    'invite_bonus_body':
-        'Nodig 3 vrienden uit die zich met jouw link aanmelden en krijg automatisch 15 min live vertaling.',
-    'invite_bonus_progress': 'Aangemelde verwijzingen: {count} / {total}',
-    'invite_bonus_share_cta': 'Mijn link delen',
-    'invite_bonus_later': 'Later',
     'invite_to_call': 'Uitnodigen voor een gesprek',
     'invite_call_share_text':
         'Doe mee aan mijn livevertaalde videogesprek op Swayco 🌍 — gewoon tikken, geen account nodig: {link}',
@@ -4000,14 +3683,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Je kunt weer inloggen met je e-mailadres en wachtwoord.',
     'cancel': 'Annuleren',
-    'credits_remaining_inline': 'Nog {count} tegoeden deze maand',
-    'credits_unlimited': 'Onbeperkt vertalen',
-    'credits_low_hint':
-        'Bijna op. Wordt volgende maand aangevuld — upgrade als je niet wilt wachten.',
-    'credits_low_hint_native': 'Bijna op. Wordt volgende maand aangevuld.',
-    'credits_used_total_inline': 'In totaal {time} vertaald',
-    'credits_exhausted_banner':
-        'Tegoed op — vertaling staat uit, het gesprek gaat door.',
     'login_title_signin': 'Welkom terug',
     'login_title_signup': 'Een account aanmaken',
     'login_subtitle_signin': 'Log in op je account.',
@@ -4053,37 +3728,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Kies een optie om door te gaan.',
     'onb_interests_title': 'Jouw interesses',
     'onb_interests_count': '{n} / {max} geselecteerd',
-    'voice_mic_denied':
-        'Toegang tot de microfoon geweigerd. Schakel het in bij de app-instellingen.',
-    'voice_recording_hint': 'Tik om te versturen, of verwijder om te annuleren',
-    'voice_message': 'Spraakbericht',
-    'voice_dub_listen': 'Luister naar de vertaling',
-    'voice_dub_upgrade':
-        'Upgrade naar Plus om spraakberichten hardop vertaald te horen.',
-    'voice_dub_quota':
-        'Maandelijkse vertaallimiet bereikt. Kom later terug of upgrade naar Ultra Plus.',
-    'voice_dub_failed': 'Vertaalde weergave niet beschikbaar, probeer opnieuw.',
-    'voice_clone_title': 'Mijn stem klonen',
-    'voice_clone_subtitle':
-        'Neem 30 seconden van jezelf op terwijl je praat. Je spraakberichten worden dan in JOUW stem nagesproken voor Ultra Plus-luisteraars.',
-    'voice_clone_start': 'Opnemen',
-    'voice_clone_redo': 'Opnieuw',
-    'voice_clone_send': 'Versturen',
-    'voice_clone_processing': 'Klonen…',
-    'voice_clone_success': 'Stem gekloond! 🎙',
-    'voice_clone_too_short': 'Je hebt minstens 20 seconden nodig om te klonen.',
-    'voice_clone_failed': 'Klonen mislukt, probeer het opnieuw.',
-    'voice_clone_ultra_only':
-        'Stem klonen is voorbehouden aan Ultra Plus-abonnees.',
-    'voice_clone_enrolled_title': 'Stem gekloond',
-    'voice_clone_enrolled_subtitle':
-        'Je spraakberichten worden nu in je eigen stem nagesproken voor Ultra Plus-luisteraars. Neem op elk moment opnieuw op om de kloon te vernieuwen.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Ontgrendelen met Ultra Plus',
-    'out_of_credits_title': 'Oeps… geen tegoed meer',
-    'out_of_credits_body':
-        'Vul aan om je gesprekken in realtime te blijven vertalen.',
-    'out_of_credits_cta': 'Aanvullen',
   };
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
@@ -4321,7 +3965,6 @@ abstract final class AppStrings {
     'call_route_external_hint':
         'جهازك يتحكم في المخرج طالما أن سماعات الرأس أو البلوتوث متصلة.',
     'call_route_internal_hint': 'فعّل مكبر الصوت أو ارجع إلى سماعة الأذن.',
-    'invite_friend': 'ادعُ صديقًا إلى Swayco',
     'follow_following': 'تتابعه',
     'call_language': 'اللغة',
     'call_language_output': 'أنا أسمع',
@@ -4429,7 +4072,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'اختر حتى 5 رموز تعبيرية تمثّلك',
     'settings_title': 'الإعدادات',
     'settings_section_account': 'الحساب',
-    'settings_section_credits': 'الرصيد',
     'settings_section_notifications': 'الإشعارات',
     'settings_section_privacy': 'الخصوصية',
     'settings_section_lang': 'اللغة والترجمة',
@@ -4500,14 +4142,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'احتيال',
     'report_reason_other': 'أخرى',
     'discover_message_sent': 'تم إرسال الرسالة',
-    'invite_share_text':
-        'انضم إليّ على Swayco 🌍 — مكالمات فيديو بترجمة فورية. سجّل عبر رابطي ونحصل كلانا على وقت مكالمات إضافي: {link}',
-    'invite_bonus_title': 'ادعُ 3 أصدقاء واحصل على 15 دقيقة',
-    'invite_bonus_body':
-        'ادعُ 3 أصدقاء يسجّلون عبر رابطك واحصل تلقائيًا على 15 دقيقة ترجمة مباشرة.',
-    'invite_bonus_progress': 'الدعوات المسجَّلة: {count} / {total}',
-    'invite_bonus_share_cta': 'مشاركة رابطي',
-    'invite_bonus_later': 'لاحقًا',
     'invite_to_call': 'دعوة إلى مكالمة',
     'invite_call_share_text':
         'انضم إلى مكالمة الفيديو المترجمة مباشرةً على Swayco 🌍 — اضغط فقط، دون الحاجة إلى حساب: {link}',
@@ -4549,14 +4183,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'يمكنك تسجيل الدخول مجددًا ببريدك الإلكتروني وكلمة المرور.',
     'cancel': 'إلغاء',
-    'credits_remaining_inline': 'تبقّى {count} من الرصيد هذا الشهر',
-    'credits_unlimited': 'ترجمة غير محدودة',
-    'credits_low_hint':
-        'الرصيد منخفض. يتجدّد الشهر المقبل — قم بالترقية إن لم ترغب في الانتظار.',
-    'credits_low_hint_native': 'الرصيد منخفض. يتجدّد الشهر المقبل.',
-    'credits_used_total_inline': 'تمت ترجمة {time} إجمالًا',
-    'credits_exhausted_banner':
-        'نفد الرصيد — الترجمة متوقفة، لكن المكالمة مستمرة.',
     'login_title_signin': 'مرحبًا بعودتك',
     'login_title_signup': 'إنشاء حساب',
     'login_subtitle_signin': 'سجّل الدخول إلى حسابك.',
@@ -4601,35 +4227,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'اختر خيارًا للمتابعة.',
     'onb_interests_title': 'اهتماماتك',
     'onb_interests_count': 'تم اختيار {n} / {max}',
-    'voice_mic_denied':
-        'تم رفض الوصول إلى الميكروفون. فعّله من إعدادات التطبيق.',
-    'voice_recording_hint': 'اضغط للإرسال، أو احذف للإلغاء',
-    'voice_message': 'رسالة صوتية',
-    'voice_dub_listen': 'الاستماع إلى الترجمة',
-    'voice_dub_upgrade':
-        'قم بالترقية إلى Plus لسماع الرسائل الصوتية مترجمة بصوت مسموع.',
-    'voice_dub_quota':
-        'تم بلوغ الحد الشهري للترجمة. عُد لاحقًا أو قم بالترقية إلى Ultra Plus.',
-    'voice_dub_failed': 'تشغيل الترجمة غير متاح، حاول مجددًا.',
-    'voice_clone_title': 'استنساخ صوتي',
-    'voice_clone_subtitle':
-        'سجّل 30 ثانية وأنت تتحدث. عندها ستُدبلج رسائلك الصوتية بصوتك أنت لمستمعي Ultra Plus.',
-    'voice_clone_start': 'تسجيل',
-    'voice_clone_redo': 'إعادة',
-    'voice_clone_send': 'إرسال',
-    'voice_clone_processing': 'جارٍ الاستنساخ…',
-    'voice_clone_success': 'تم استنساخ الصوت! 🎙',
-    'voice_clone_too_short': 'تحتاج إلى 20 ثانية على الأقل للاستنساخ.',
-    'voice_clone_failed': 'فشل الاستنساخ، يرجى المحاولة مجددًا.',
-    'voice_clone_ultra_only': 'استنساخ الصوت مخصّص لمشتركي Ultra Plus.',
-    'voice_clone_enrolled_title': 'تم استنساخ الصوت',
-    'voice_clone_enrolled_subtitle':
-        'تُدبلج رسائلك الصوتية الآن بصوتك أنت لمستمعي Ultra Plus. أعد التسجيل في أي وقت لتحديث النسخة.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'افتحها مع Ultra Plus',
-    'out_of_credits_title': 'عذرًا… لا يوجد رصيد',
-    'out_of_credits_body': 'أعد الشحن لمواصلة ترجمة مكالماتك في الوقت الفعلي.',
-    'out_of_credits_cta': 'إعادة الشحن',
   };
 
   // ─── Russian ──────────────────────────────────────────────────────────────
@@ -4875,7 +4472,6 @@ abstract final class AppStrings {
         'Вывод управляется устройством, пока подключены наушники или Bluetooth.',
     'call_route_internal_hint':
         'Включите динамик или вернитесь к разговорному динамику.',
-    'invite_friend': 'Пригласить друга в Swayco',
     'follow_following': 'Вы подписаны',
     'call_language': 'Язык',
     'call_language_output': 'Я слышу',
@@ -4983,7 +4579,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'Выберите до 5 эмодзи, которые вас отражают',
     'settings_title': 'Настройки',
     'settings_section_account': 'Аккаунт',
-    'settings_section_credits': 'Кредиты',
     'settings_section_notifications': 'Уведомления',
     'settings_section_privacy': 'Конфиденциальность',
     'settings_section_lang': 'Язык и перевод',
@@ -5056,15 +4651,6 @@ abstract final class AppStrings {
     'report_reason_scam': 'Мошенничество',
     'report_reason_other': 'Другое',
     'discover_message_sent': 'Сообщение отправлено',
-    'invite_share_text':
-        'Присоединяйтесь ко мне в Swayco 🌍 — видеозвонки с переводом в реальном времени. Зарегистрируйтесь по моей ссылке, и мы оба получим дополнительное время для звонков: {link}',
-    'invite_bonus_title': 'Пригласите 3 друзей — получите 15 мин',
-    'invite_bonus_body':
-        'Пригласи 3 друзей по своей ссылке и получи 15 мин живого перевода автоматически.',
-    'invite_bonus_progress':
-        'Зарегистрировались по приглашению: {count} / {total}',
-    'invite_bonus_share_cta': 'Поделиться ссылкой',
-    'invite_bonus_later': 'Позже',
     'invite_to_call': 'Пригласить на звонок',
     'invite_call_share_text':
         'Присоединяйтесь к моему видеозвонку с живым переводом в Swayco 🌍 — просто нажмите, аккаунт не нужен: {link}',
@@ -5107,14 +4693,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_body':
         'Вы сможете снова войти, используя эл. почту и пароль.',
     'cancel': 'Отмена',
-    'credits_remaining_inline': 'Осталось {count} кредитов в этом месяце',
-    'credits_unlimited': 'Безлимитный перевод',
-    'credits_low_hint':
-        'Заканчиваются. Пополнятся в следующем месяце — оформите подписку, если не хотите ждать.',
-    'credits_low_hint_native': 'Заканчиваются. Пополнятся в следующем месяце.',
-    'credits_used_total_inline': 'Всего переведено: {time}',
-    'credits_exhausted_banner':
-        'Кредиты закончились — перевод выключен, звонок продолжается.',
     'login_title_signin': 'С возвращением',
     'login_title_signup': 'Создать аккаунт',
     'login_subtitle_signin': 'Войдите в свой аккаунт.',
@@ -5160,39 +4738,6 @@ abstract final class AppStrings {
     'onb_need_gender': 'Выберите вариант, чтобы продолжить.',
     'onb_interests_title': 'Ваши интересы',
     'onb_interests_count': 'Выбрано {n} / {max}',
-    'voice_mic_denied':
-        'Доступ к микрофону запрещён. Включите его в настройках приложения.',
-    'voice_recording_hint':
-        'Нажмите, чтобы отправить, или удалите, чтобы отменить',
-    'voice_message': 'Голосовое сообщение',
-    'voice_dub_listen': 'Прослушать перевод',
-    'voice_dub_upgrade':
-        'Оформите Plus, чтобы слушать голосовые сообщения с озвученным переводом.',
-    'voice_dub_quota':
-        'Достигнут месячный лимит перевода. Вернитесь позже или оформите Ultra Plus.',
-    'voice_dub_failed':
-        'Воспроизведение перевода недоступно, попробуйте снова.',
-    'voice_clone_title': 'Клонировать мой голос',
-    'voice_clone_subtitle':
-        'Запишите 30 секунд своей речи. После этого ваши голосовые сообщения будут озвучиваться ВАШИМ голосом для слушателей Ultra Plus.',
-    'voice_clone_start': 'Записать',
-    'voice_clone_redo': 'Перезаписать',
-    'voice_clone_send': 'Отправить',
-    'voice_clone_processing': 'Клонирование…',
-    'voice_clone_success': 'Голос клонирован! 🎙',
-    'voice_clone_too_short': 'Для клонирования нужно не менее 20 секунд.',
-    'voice_clone_failed': 'Не удалось клонировать, попробуйте снова.',
-    'voice_clone_ultra_only':
-        'Клонирование голоса доступно только подписчикам Ultra Plus.',
-    'voice_clone_enrolled_title': 'Голос клонирован',
-    'voice_clone_enrolled_subtitle':
-        'Ваши голосовые сообщения теперь озвучиваются вашим собственным голосом для слушателей Ultra Plus. Перезапишите в любой момент, чтобы обновить клон.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Разблокировать с Ultra Plus',
-    'out_of_credits_title': 'Упс… кредиты закончились',
-    'out_of_credits_body':
-        'Пополните, чтобы продолжать переводить звонки в реальном времени.',
-    'out_of_credits_cta': 'Пополнить',
   };
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
@@ -5416,7 +4961,6 @@ abstract final class AppStrings {
     'call_audio_output': '音频输出',
     'call_route_external_hint': '连接耳机或蓝牙时，输出由你的设备控制。',
     'call_route_internal_hint': '开启扬声器或切回听筒。',
-    'invite_friend': '邀请好友加入 Swayco',
     'follow_following': '已关注',
     'call_language': '语言',
     'call_language_output': '我听',
@@ -5516,7 +5060,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': '最多选 5 个能代表你的表情',
     'settings_title': '设置',
     'settings_section_account': '账户',
-    'settings_section_credits': '额度',
     'settings_section_notifications': '通知',
     'settings_section_privacy': '隐私',
     'settings_section_lang': '语言与翻译',
@@ -5582,13 +5125,6 @@ abstract final class AppStrings {
     'report_reason_scam': '诈骗',
     'report_reason_other': '其他',
     'discover_message_sent': '消息已发送',
-    'invite_share_text':
-        '来 Swayco 和我一起吧 🌍 — 实时翻译的视频通话。用我的链接注册，我们俩都能获得额外通话时长：{link}',
-    'invite_bonus_title': '邀请 3 位好友，得 15 分钟',
-    'invite_bonus_body': '邀请 3 位好友通过你的链接注册，自动获得 15 分钟实时翻译。',
-    'invite_bonus_progress': '成功注册的推荐：{count} / {total}',
-    'invite_bonus_share_cta': '分享我的链接',
-    'invite_bonus_later': '以后再说',
     'invite_to_call': '邀请通话',
     'invite_call_share_text': '来 Swayco 加入我的实时翻译视频通话 🌍 — 点一下即可，无需账户：{link}',
     'invite_call_creating': '正在创建链接…',
@@ -5626,12 +5162,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_title': '退出登录？',
     'profile_signout_confirm_body': '你可以用邮箱和密码重新登录。',
     'cancel': '取消',
-    'credits_remaining_inline': '本月剩余 {count} 点额度',
-    'credits_unlimited': '无限翻译',
-    'credits_low_hint': '额度快用完了。下月会重置 — 不想等就升级吧。',
-    'credits_low_hint_native': '额度快用完了，下月会重置。',
-    'credits_used_total_inline': '累计已翻译 {time}',
-    'credits_exhausted_banner': '额度已用完 — 翻译已关闭，通话继续。',
     'login_title_signin': '欢迎回来',
     'login_title_signup': '创建账户',
     'login_subtitle_signin': '登录你的账户。',
@@ -5672,31 +5202,6 @@ abstract final class AppStrings {
     'onb_need_gender': '请选择一个选项以继续。',
     'onb_interests_title': '你的兴趣',
     'onb_interests_count': '已选 {n} / {max}',
-    'voice_mic_denied': '麦克风访问被拒绝。请在应用设置中开启。',
-    'voice_recording_hint': '点击发送，或删除以取消',
-    'voice_message': '语音消息',
-    'voice_dub_listen': '收听翻译',
-    'voice_dub_upgrade': '升级到 Plus 即可听到语音消息的朗读翻译。',
-    'voice_dub_quota': '本月翻译上限已达到。请稍后再来，或升级到 Ultra Plus。',
-    'voice_dub_failed': '翻译播放不可用，请重试。',
-    'voice_clone_title': '克隆我的声音',
-    'voice_clone_subtitle': '录下你说话的 30 秒。之后你的语音消息将用你自己的声音为 Ultra Plus 听众配音。',
-    'voice_clone_start': '录制',
-    'voice_clone_redo': '重录',
-    'voice_clone_send': '发送',
-    'voice_clone_processing': '正在克隆…',
-    'voice_clone_success': '声音已克隆！🎙',
-    'voice_clone_too_short': '克隆至少需要 20 秒。',
-    'voice_clone_failed': '克隆失败，请重试。',
-    'voice_clone_ultra_only': '声音克隆仅限 Ultra Plus 订阅用户。',
-    'voice_clone_enrolled_title': '声音已克隆',
-    'voice_clone_enrolled_subtitle':
-        '你的语音消息现在会用你自己的声音为 Ultra Plus 听众配音。随时可以重录以刷新克隆。',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': '通过 Ultra Plus 解锁',
-    'out_of_credits_title': '哎呀…额度用完了',
-    'out_of_credits_body': '充值以继续实时翻译你的通话。',
-    'out_of_credits_cta': '充值',
   };
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
@@ -5924,7 +5429,6 @@ abstract final class AppStrings {
     'call_audio_output': '音声出力',
     'call_route_external_hint': 'ヘッドホンまたはBluetoothの接続中は端末が出力を管理します。',
     'call_route_internal_hint': 'スピーカーをオンにするか受話口に戻します。',
-    'invite_friend': '友達をSwaycoに招待',
     'follow_following': 'フォロー中',
     'call_language': '言語',
     'call_language_output': '聞く言語',
@@ -6026,7 +5530,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': 'あなたを表す絵文字を5つまで選んでください',
     'settings_title': '設定',
     'settings_section_account': 'アカウント',
-    'settings_section_credits': 'クレジット',
     'settings_section_notifications': '通知',
     'settings_section_privacy': 'プライバシー',
     'settings_section_lang': '言語と翻訳',
@@ -6095,13 +5598,6 @@ abstract final class AppStrings {
     'report_reason_scam': '詐欺',
     'report_reason_other': 'その他',
     'discover_message_sent': 'メッセージを送信しました',
-    'invite_share_text':
-        'Swayco で一緒に話そう 🌍 — リアルタイム翻訳付きのビデオ通話。私のリンクから登録すると、お互いに通話時間がもらえます: {link}',
-    'invite_bonus_title': '友達を3人招待して15分ゲット',
-    'invite_bonus_body': 'あなたのリンクで友達3人が登録すると、自動でライブ翻訳15分を獲得。',
-    'invite_bonus_progress': '登録した紹介者: {count} / {total}',
-    'invite_bonus_share_cta': 'リンクを共有',
-    'invite_bonus_later': 'あとで',
     'invite_to_call': '通話に招待',
     'invite_call_share_text':
         'Swayco のリアルタイム翻訳ビデオ通話に参加しよう 🌍 — タップするだけ、アカウント不要: {link}',
@@ -6140,12 +5636,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_title': 'サインアウトしますか？',
     'profile_signout_confirm_body': 'メールアドレスとパスワードで再びサインインできます。',
     'cancel': 'キャンセル',
-    'credits_remaining_inline': '今月の残りクレジット: {count}',
-    'credits_unlimited': '翻訳無制限',
-    'credits_low_hint': '残りわずか。来月補充されます — 待ちたくない場合はアップグレードを。',
-    'credits_low_hint_native': '残りわずか。来月補充されます。',
-    'credits_used_total_inline': '合計{time}を翻訳しました',
-    'credits_exhausted_banner': 'クレジット切れ — 翻訳はオフですが通話は続きます。',
     'login_title_signin': 'おかえりなさい',
     'login_title_signup': 'アカウントを作成',
     'login_subtitle_signin': 'アカウントにサインイン。',
@@ -6186,32 +5676,6 @@ abstract final class AppStrings {
     'onb_need_gender': '続けるには選択してください。',
     'onb_interests_title': 'あなたの興味',
     'onb_interests_count': '{n} / {max} 選択中',
-    'voice_mic_denied': 'マイクへのアクセスが拒否されました。アプリの設定で有効にしてください。',
-    'voice_recording_hint': 'タップで送信、削除でキャンセル',
-    'voice_message': 'ボイスメッセージ',
-    'voice_dub_listen': '翻訳を聞く',
-    'voice_dub_upgrade': 'ボイスメッセージの音声翻訳を聞くには Plus にアップグレードしてください。',
-    'voice_dub_quota': '今月の翻訳上限に達しました。後で戻るか、Ultra Plus にアップグレードしてください。',
-    'voice_dub_failed': '翻訳の再生ができません。もう一度お試しください。',
-    'voice_clone_title': '自分の声をクローン',
-    'voice_clone_subtitle':
-        '自分が話す声を30秒録音します。すると、Ultra Plus のリスナーにはあなたのボイスメッセージがあなた自身の声で吹き替えられます。',
-    'voice_clone_start': '録音',
-    'voice_clone_redo': 'やり直す',
-    'voice_clone_send': '送信',
-    'voice_clone_processing': 'クローン作成中…',
-    'voice_clone_success': '声をクローンしました！🎙',
-    'voice_clone_too_short': 'クローンには最低20秒必要です。',
-    'voice_clone_failed': 'クローン作成に失敗しました。もう一度お試しください。',
-    'voice_clone_ultra_only': '声のクローンは Ultra Plus 加入者限定です。',
-    'voice_clone_enrolled_title': '声をクローン済み',
-    'voice_clone_enrolled_subtitle':
-        'あなたのボイスメッセージは、Ultra Plus のリスナーにはあなた自身の声で吹き替えられます。いつでも録音し直してクローンを更新できます。',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Ultra Plus で解除',
-    'out_of_credits_title': 'おっと…クレジットがありません',
-    'out_of_credits_body': 'チャージして、通話のリアルタイム翻訳を続けましょう。',
-    'out_of_credits_cta': 'チャージ',
   };
 
   // ─── Korean ───────────────────────────────────────────────────────────────
@@ -6438,7 +5902,6 @@ abstract final class AppStrings {
     'call_audio_output': '오디오 출력',
     'call_route_external_hint': '헤드폰이나 블루투스가 연결된 동안에는 기기가 출력을 관리합니다.',
     'call_route_internal_hint': '스피커를 켜거나 수화부로 돌아갑니다.',
-    'invite_friend': '친구를 Swayco에 초대',
     'follow_following': '팔로잉',
     'call_language': '언어',
     'call_language_output': '내가 들음',
@@ -6539,7 +6002,6 @@ abstract final class AppStrings {
     'emojis_editor_hint': '나를 표현하는 이모지를 최대 5개까지 골라요',
     'settings_title': '설정',
     'settings_section_account': '계정',
-    'settings_section_credits': '크레딧',
     'settings_section_notifications': '알림',
     'settings_section_privacy': '개인정보',
     'settings_section_lang': '언어 및 번역',
@@ -6607,13 +6069,6 @@ abstract final class AppStrings {
     'report_reason_scam': '사기',
     'report_reason_other': '기타',
     'discover_message_sent': '메시지를 보냈어요',
-    'invite_share_text':
-        'Swayco에서 함께해요 🌍 — 실시간 번역 영상 통화예요. 제 링크로 가입하면 둘 다 추가 통화 시간을 받아요: {link}',
-    'invite_bonus_title': '친구 3명 초대하고 15분 받기',
-    'invite_bonus_body': '내 링크로 친구 3명이 가입하면 자동으로 실시간 번역 15분을 받아요.',
-    'invite_bonus_progress': '가입한 추천인: {count} / {total}',
-    'invite_bonus_share_cta': '내 링크 공유',
-    'invite_bonus_later': '나중에',
     'invite_to_call': '통화에 초대',
     'invite_call_share_text':
         'Swayco에서 실시간 번역 영상 통화에 함께해요 🌍 — 계정 없이 탭만 하면 돼요: {link}',
@@ -6652,12 +6107,6 @@ abstract final class AppStrings {
     'profile_signout_confirm_title': '로그아웃할까요?',
     'profile_signout_confirm_body': '이메일과 비밀번호로 다시 로그인할 수 있어요.',
     'cancel': '취소',
-    'credits_remaining_inline': '이번 달 남은 크레딧 {count}개',
-    'credits_unlimited': '무제한 번역',
-    'credits_low_hint': '얼마 안 남았어요. 다음 달에 충전돼요 — 기다리기 싫으면 업그레이드하세요.',
-    'credits_low_hint_native': '얼마 안 남았어요. 다음 달에 충전돼요.',
-    'credits_used_total_inline': '총 {time} 번역됨',
-    'credits_exhausted_banner': '크레딧이 다 떨어졌어요 — 번역은 꺼지지만 통화는 계속돼요.',
     'login_title_signin': '다시 만나서 반가워요',
     'login_title_signup': '계정 만들기',
     'login_subtitle_signin': '계정에 로그인하세요.',
@@ -6698,31 +6147,5 @@ abstract final class AppStrings {
     'onb_need_gender': '계속하려면 옵션을 선택하세요.',
     'onb_interests_title': '내 관심사',
     'onb_interests_count': '{n} / {max} 선택됨',
-    'voice_mic_denied': '마이크 접근이 거부됐어요. 앱 설정에서 허용해 주세요.',
-    'voice_recording_hint': '탭하면 전송, 삭제하면 취소돼요',
-    'voice_message': '음성 메시지',
-    'voice_dub_listen': '번역 듣기',
-    'voice_dub_upgrade': '음성 메시지를 소리로 번역해 들으려면 Plus로 업그레이드하세요.',
-    'voice_dub_quota': '월 번역 한도에 도달했어요. 나중에 다시 오거나 Ultra Plus로 업그레이드하세요.',
-    'voice_dub_failed': '번역 재생을 사용할 수 없어요. 다시 시도해 주세요.',
-    'voice_clone_title': '내 목소리 복제',
-    'voice_clone_subtitle':
-        '말하는 모습을 30초 녹음하세요. 그러면 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요.',
-    'voice_clone_start': '녹음',
-    'voice_clone_redo': '다시 하기',
-    'voice_clone_send': '전송',
-    'voice_clone_processing': '복제 중…',
-    'voice_clone_success': '목소리가 복제됐어요! 🎙',
-    'voice_clone_too_short': '복제하려면 최소 20초가 필요해요.',
-    'voice_clone_failed': '복제에 실패했어요. 다시 시도해 주세요.',
-    'voice_clone_ultra_only': '음성 복제는 Ultra Plus 구독자 전용이에요.',
-    'voice_clone_enrolled_title': '목소리 복제됨',
-    'voice_clone_enrolled_subtitle':
-        '이제 Ultra Plus 청취자에게 음성 메시지가 내 목소리로 더빙돼요. 언제든 다시 녹음해 복제본을 갱신할 수 있어요.',
-    'voice_clone_ultra_badge': 'ULTRA PLUS',
-    'voice_clone_unlock': 'Ultra Plus로 잠금 해제',
-    'out_of_credits_title': '앗… 크레딧이 없어요',
-    'out_of_credits_body': '충전하여 통화를 실시간으로 계속 번역하세요.',
-    'out_of_credits_cta': '충전하기',
   };
 }

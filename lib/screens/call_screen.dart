@@ -1945,32 +1945,6 @@ class _CallScreenState extends State<CallScreen> {
     return '$m min ${s.toString().padLeft(2, '0')} s';
   }
 
-  /// Share the user's referral link — invite friends, both earn free live
-  /// minutes. Mirrors the profile's invite-a-friend section. Best-effort.
-  Future<void> _shareReferral() async {
-    try {
-      final uid = AuthService.currentUserId;
-      final code =
-          uid.isEmpty ? '' : (await ProfileApi.fetchById(uid))?.referralCode ?? '';
-      final link = code.isEmpty
-          ? 'https://www.swayco.fr'
-          : 'https://www.swayco.fr/?ref=$code';
-      if (!mounted) return;
-      final box = context.findRenderObject() as RenderBox?;
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text', args: {'link': link}),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // Sheet dismissed / sharing unavailable — nothing to do.
-    }
-  }
-
   /// Black "call ended" card: the peer's PDP + flag, the minutes spent, a
   /// share button bottom-right and the swayco logo dead-centre at the bottom.
   Widget _buildEndedSummary(BuildContext context) {
@@ -2099,54 +2073,6 @@ class _CallScreenState extends State<CallScreen> {
                 icon: const Icon(Icons.close_rounded,
                     color: Colors.white, size: 26),
                 onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-            // Invite friends → both earn free live minutes (referral link).
-            // Full-width cyan -> blue gradient CTA pinned to the bottom.
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 28,
-              child: Pressable(
-                bounce: true,
-                onTap: _shareReferral,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    gradient: const LinearGradient(
-                      colors: [SC.accent, SC.meshBlue],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SC.accent.withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.group_add_rounded,
-                            color: Colors.white, size: 20),
-                        const SizedBox(width: 10),
-                        Text(
-                          AppStrings.t('invite_bonus_share_cta'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ),
             ),
           ],

@@ -19,11 +19,6 @@ abstract final class UserPrefs {
   static const String keyOnboardingTipsSeen = 'onboarding_tips_seen';
   static const String keyProfileTipSeen = 'profile_tip_seen';
 
-  /// Referral code captured from a `?ref=<code>` query at app boot, held
-  /// until the user finishes sign-up + onboarding so it can be passed to
-  /// `attribute_referral` once they actually have a profile row.
-  /// Cleared after a successful attribution.
-  static const String keyPendingReferralCode = 'pending_referral_code';
 
   /// Discover feed cursor: the profile id of the card the user was last
   /// parked on. Written on every page change so closing + reopening the app
@@ -101,25 +96,6 @@ abstract final class UserPrefs {
     return p.getStringList(keyDiscoverDeckIds) ?? const [];
   }
 
-  static Future<String> readPendingReferralCode() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getString(keyPendingReferralCode) ?? '';
-  }
-
-  static Future<void> writePendingReferralCode(String code) async {
-    final p = await SharedPreferences.getInstance();
-    final trimmed = code.trim();
-    if (trimmed.isEmpty) {
-      await p.remove(keyPendingReferralCode);
-    } else {
-      await p.setString(keyPendingReferralCode, trimmed);
-    }
-  }
-
-  static Future<void> clearPendingReferralCode() async {
-    final p = await SharedPreferences.getInstance();
-    await p.remove(keyPendingReferralCode);
-  }
 
   static Future<bool> isOnboardingDone() async {
     final p = await SharedPreferences.getInstance();

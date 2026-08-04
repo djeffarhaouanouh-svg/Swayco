@@ -95,16 +95,3 @@ xxxx/
 
 # Optional local jniLibs (not currently shipped).
 android/app/src/main/jniLibs/
-
-# llama.cpp / ggml static libs for iOS on-device translation — built by
-# scripts/build_llama_ios.sh from the STQ_0 fork (~8 MB). The podspec force_loads them.
-# (llm_llamacpp path override was removed; artefacts kept ignored if rebuilt.)
-native/llm_llamacpp_patched/ios/libs/
-
-# STQ-fork llama.cpp / ggml shared libs for Android on-device translation —
-# (re)built by scripts/build_llama_android.sh (~52 MB). Packaged as jniLibs.
-native/llm_llamacpp_patched/android/src/main/jniLibs/
-
-# Gradle artefacts of the vendored llm_llamacpp android module
-native/llm_llamacpp_patched/android/.gradle/
-native/llm_llamacpp_patched/android/build/

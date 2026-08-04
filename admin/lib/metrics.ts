@@ -539,40 +539,6 @@ export async function getRetention(days = 30): Promise<Retention> {
   return { cohorts: cohortRows, overall, lostUsers, dau };
 }
 
-// ─── referrals ────────────────────────────────────────────────────────────
-
-export type ReferralStats = {
-  /** Profiles whose `referred_by` is non-null = filleuls captured by
-   *  the `attribute_referral` RPC since the system shipped. */
-  totalAttributed: number;
-  /** Number of distinct referrers that have at least one filleul. */
-  activeReferrers: number;
-};
-
-/**
- * Snapshot of invite attribution. Credits bonuses were removed — this
- * only counts referred_by links (migration 0028 / 0052).
- */
-export async function getReferralStats(): Promise<ReferralStats> {
-  const [attributed, referrerRows] = await Promise.all([
-    safeCount("profiles", (q) => q.not("referred_by", "is", null)),
-    safeRows("profiles", "referred_by", (q) =>
-      q.not("referred_by", "is", null).limit(100000),
-    ),
-  ]);
-
-  const referrers = new Set<string>();
-  for (const r of referrerRows) {
-    const id = r.referred_by?.toString?.() ?? "";
-    if (id) referrers.add(id);
-  }
-
-  return {
-    totalAttributed: attributed,
-    activeReferrers: referrers.size,
-  };
-}
-
 // ─── consolidated single table ──────────────────────────────────────────────
 
 export type MetricGroup =
@@ -597,10 +563,9 @@ export type MetricRow = {
 
 /**
  * Everything the app tracks, on ONE table, one row per metric. Reuses
- * the per-section aggregates (overview / retention / social / costs /
- * referrals) and adds the per-user averages no other page computes:
- * likes, voice messages, calls, photos, interests and profile
- * completion.
+ * the per-section aggregates (overview / retention / social / costs)
+ * and adds the per-user averages no other page computes:
+ * likes, calls, photos, interests and profile completion.
  *
  * Per-user averages divide an ALL-TIME total by the total user count (a
  * lifetime average), while activity metrics (DAU, retention, new users)
@@ -614,7 +579,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     retention,
     social,
     costs,
-    referrals,
     newUsers30d,
     friendshipsTotal,
     messagesTotal,
@@ -629,7 +593,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     getRetention(30),
     getSocial(30),
     getCosts(30),
-    getReferralStats(),
     safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
     safeCount("friendships"),
     safeCount("messages"),
@@ -859,13 +822,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       total: fmtEur(costs.mrrEur),
       perUser: "—",
       detail: "revenu mensuel récurrent",
-    },
-    {
-      group: "Monétisation",
-      label: "Filleuls (parrainage)",
-      total: fmtInt(referrals.totalAttributed),
-      perUser: "—",
-      detail: `${fmtInt(referrals.activeReferrers)} parrains actifs`,
     },
   ];
 }
