@@ -133,7 +133,7 @@ export default async function MonetisationPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Parrainage (Invite 3 amis = +30 min)</CardTitle>
+            <CardTitle>Parrainage</CardTitle>
           </CardHeader>
           <CardContent>
             <StatList
