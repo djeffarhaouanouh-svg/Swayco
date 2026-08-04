@@ -1766,6 +1766,7 @@ class _CallScreenState extends State<CallScreen> {
       (ctx) => _LanguagePairSheet(
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
+        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onChanged: (s, h) {
           spoken = s;
           heard = h;
@@ -1795,6 +1796,7 @@ class _CallScreenState extends State<CallScreen> {
         controller: _audio,
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
+        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onLanguagesChanged: (sp, hd) {
           spoken = sp;
           heard = hd;
@@ -4289,11 +4291,17 @@ class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onChanged,
   });
 
   final String spokenCode;
   final String heardCode;
+
+  /// Base language codes the device can actually speak (from flutter_tts
+  /// `getLanguages`). The "heard" wheel only lists these so the user cannot
+  /// pick a translation language with no OS voice.
+  final Set<String> ttsVoiceLangCodes;
 
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
   /// d'appel qui le fera quand le panneau se refermera.
@@ -4317,6 +4325,7 @@ class _LanguagePairSheet extends StatelessWidget {
             _LanguageWheels(
               spokenCode: spokenCode,
               heardCode: heardCode,
+              ttsVoiceLangCodes: ttsVoiceLangCodes,
               onChanged: onChanged,
             ),
             const SizedBox(height: 18),
@@ -4375,16 +4384,22 @@ class _SheetHandle extends StatelessWidget {
 /// roue jusqu'à celui qu'on veut. Rien n'est appliqué en direct — chaque cran
 /// relancerait sinon le recogniser, ou annoncerait une langue au pair, pour des
 /// drapeaux qu'on ne fait que survoler.
+///
+/// Les deux roues ne listent que les langues pour lesquelles le device a une
+/// voix TTS OS ([ttsVoiceLangCodes]) — sinon l'utilisateur sélectionnerait une
+/// langue que flutter_tts ne peut pas parler.
 class _LanguageWheels extends StatefulWidget {
   const _LanguageWheels({
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onChanged,
     this.compact = false,
   });
 
   final String spokenCode;
   final String heardCode;
+  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onChanged;
 
   /// Serré : les deux roues partagent le panneau avec les réglages de son.
@@ -4395,19 +4410,42 @@ class _LanguageWheels extends StatefulWidget {
 }
 
 class _LanguageWheelsState extends State<_LanguageWheels> {
-  late int _spoken = _indexOf(widget.spokenCode);
-  late int _heard = _indexOf(widget.heardCode);
+  late final List<AppLanguage> _langs =
+      _pickerLanguages(widget.ttsVoiceLangCodes, widget.spokenCode, widget.heardCode);
+  late int _spoken = _indexOf(_langs, widget.spokenCode);
+  late int _heard = _indexOf(_langs, widget.heardCode);
 
   void _report() => widget.onChanged(
-        supportedLanguages[_spoken].code,
-        supportedLanguages[_heard].code,
+        _langs[_spoken].code,
+        _langs[_heard].code,
       );
+
+  /// Catalogue UI ∩ voix device. Si [ttsCodes] est encore vide (getLanguages
+  /// pas revenu), on montre tout pour ne pas ouvrir une roue vide. La sélection
+  /// courante reste visible même si elle n'a pas (encore) de voix.
+  static List<AppLanguage> _pickerLanguages(
+    Set<String> ttsCodes,
+    String spokenCode,
+    String heardCode,
+  ) {
+    if (ttsCodes.isEmpty) return supportedLanguages;
+    final list =
+        supportedLanguages.where((l) => ttsCodes.contains(l.code)).toList();
+    if (list.isEmpty) return supportedLanguages;
+    for (final code in [spokenCode, heardCode]) {
+      final base = code.split('-').first.toLowerCase();
+      if (base.isEmpty || list.any((l) => l.code == base)) continue;
+      final i = supportedLanguages.indexWhere((l) => l.code == base);
+      if (i >= 0) list.insert(0, supportedLanguages[i]);
+    }
+    return list;
+  }
 
   /// Une langue hors catalogue (ou vide) retombe sur la première : la roue doit
   /// toujours montrer quelque chose.
-  static int _indexOf(String code) {
+  static int _indexOf(List<AppLanguage> langs, String code) {
     final base = code.split('-').first.toLowerCase();
-    final i = supportedLanguages.indexWhere((l) => l.code == base);
+    final i = langs.indexWhere((l) => l.code == base);
     return i < 0 ? 0 : i;
   }
 
@@ -4420,6 +4458,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
           child: _FlagWheel(
             title: AppStrings.t('call_lang_me'),
             icon: Icons.mic_rounded,
+            languages: _langs,
             index: _spoken,
             compact: widget.compact,
             onChanged: (i) {
@@ -4442,6 +4481,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
           child: _FlagWheel(
             title: AppStrings.t('call_lang_translation'),
             icon: Icons.hearing_rounded,
+            languages: _langs,
             index: _heard,
             compact: widget.compact,
             onChanged: (i) {
@@ -4462,12 +4502,14 @@ class _CallSettingsSheet extends StatelessWidget {
     required this.controller,
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onLanguagesChanged,
   });
 
   final AudioController controller;
   final String spokenCode;
   final String heardCode;
+  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onLanguagesChanged;
 
   @override
@@ -4499,6 +4541,7 @@ class _CallSettingsSheet extends StatelessWidget {
                     child: _LanguageWheels(
                       spokenCode: spokenCode,
                       heardCode: heardCode,
+                      ttsVoiceLangCodes: ttsVoiceLangCodes,
                       onChanged: onLanguagesChanged,
                       compact: true,
                     ),
@@ -4520,6 +4563,7 @@ class _FlagWheel extends StatefulWidget {
   const _FlagWheel({
     required this.title,
     required this.icon,
+    required this.languages,
     required this.index,
     required this.onChanged,
     this.compact = false,
@@ -4529,6 +4573,9 @@ class _FlagWheel extends StatefulWidget {
 
   /// Ce que fait cette colonne : ma voix qui entre, la traduction qui sort.
   final IconData icon;
+
+  /// Langues proposées dans cette roue (déjà filtrées voix OS si besoin).
+  final List<AppLanguage> languages;
   final int index;
   final ValueChanged<int> onChanged;
 
@@ -4551,6 +4598,8 @@ class _FlagWheelState extends State<_FlagWheel> {
 
   @override
   Widget build(BuildContext context) {
+    final langs = widget.languages;
+    final safeIndex = widget.index.clamp(0, langs.isEmpty ? 0 : langs.length - 1);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -4589,7 +4638,7 @@ class _FlagWheelState extends State<_FlagWheel> {
             physics: const FixedExtentScrollPhysics(),
             onSelectedItemChanged: widget.onChanged,
             childDelegate: ListWheelChildBuilderDelegate(
-              childCount: supportedLanguages.length,
+              childCount: langs.length,
               // Sur le téléphone, l'emoji drapeau du système : c'est celui que
               // l'utilisateur voit partout ailleurs sur son appareil. Le web n'a
               // pas ce luxe — sous Windows le glyphe n'existe pas et Chrome
@@ -4597,7 +4646,7 @@ class _FlagWheelState extends State<_FlagWheel> {
               builder: (ctx, i) => Center(
                 child: kIsWeb
                     ? CountryFlag.fromCountryCode(
-                        supportedLanguages[i].countryCode,
+                        langs[i].countryCode,
                         theme: ImageTheme(
                           width: widget.compact ? 32 : 40,
                           height: widget.compact ? 32 : 40,
@@ -4605,7 +4654,7 @@ class _FlagWheelState extends State<_FlagWheel> {
                         ),
                       )
                     : Text(
-                        supportedLanguages[i].flag,
+                        langs[i].flag,
                         style: TextStyle(fontSize: widget.compact ? 30 : 38),
                       ),
               ),
@@ -4614,7 +4663,7 @@ class _FlagWheelState extends State<_FlagWheel> {
         ),
         const SizedBox(height: 8),
         Text(
-          supportedLanguages[widget.index].label,
+          langs.isEmpty ? '' : langs[safeIndex].label,
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
