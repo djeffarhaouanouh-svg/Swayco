@@ -4299,8 +4299,8 @@ class _LanguagePairSheet extends StatelessWidget {
   final String heardCode;
 
   /// Base language codes the device can actually speak (from flutter_tts
-  /// `getLanguages`). The "heard" wheel only lists these so the user cannot
-  /// pick a translation language with no OS voice.
+  /// `getLanguages`). Both wheels only list these so the user cannot pick a
+  /// language with no OS voice.
   final Set<String> ttsVoiceLangCodes;
 
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
