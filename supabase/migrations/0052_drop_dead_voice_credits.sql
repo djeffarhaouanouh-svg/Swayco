@@ -33,11 +33,11 @@ alter table public.messages
   drop column if exists audio_url,
   drop column if exists audio_duration_ms;
 
--- ─── storage: voice-messages bucket ────────────────────────────────────────
+-- ─── storage: voice-messages policy ────────────────────────────────────────
+-- Supabase blocks direct DELETE on storage.objects / storage.buckets
+-- (storage.protect_delete). Drop the public-read policy here; empty + delete
+-- the `voice-messages` bucket from the Dashboard (Storage) or Storage API.
 drop policy if exists "voice messages public read" on storage.objects;
-
-delete from storage.objects where bucket_id = 'voice-messages';
-delete from storage.buckets where id = 'voice-messages';
 
 -- ─── attribute_referral: keep the link, stop granting credits ──────────────
 create or replace function public.attribute_referral(p_code text)
