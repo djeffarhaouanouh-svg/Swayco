@@ -146,15 +146,6 @@ export default async function MonetisationPage() {
                   label: "Parrains actifs",
                   value: fmtInt(r.activeReferrers),
                 },
-                {
-                  label: "Paliers payés (× 3 filleuls)",
-                  value: fmtInt(r.bonusTranchesPaid),
-                },
-                {
-                  label: "Minutes offertes",
-                  value: fmtMinutes(r.bonusMinutesGranted),
-                  tone: "muted",
-                },
               ]}
             />
           </CardContent>

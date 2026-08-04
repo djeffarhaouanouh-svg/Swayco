@@ -547,41 +547,29 @@ export type ReferralStats = {
   totalAttributed: number;
   /** Number of distinct referrers that have at least one filleul. */
   activeReferrers: number;
-  /** Sum of bonus tranches already paid (1 tranche = 3 filleuls = 30 min
-   *  of credits credited to a referrer). */
-  bonusTranchesPaid: number;
-  /** Bonus tranches × 30 min = total free minutes given out via referrals. */
-  bonusMinutesGranted: number;
 };
 
 /**
- * Snapshot of the "Invite 3 amis = +30 min" growth loop. Reads the
- * referral columns added by migration 0028 — falls back to zeros when
- * the columns aren't there yet (e.g. on a stale DB), so the dashboard
- * still renders during a rolling deploy.
+ * Snapshot of invite attribution. Credits bonuses were removed — this
+ * only counts referred_by links (migration 0028 / 0052).
  */
 export async function getReferralStats(): Promise<ReferralStats> {
-  const [attributed, refRows] = await Promise.all([
+  const [attributed, referrerRows] = await Promise.all([
     safeCount("profiles", (q) => q.not("referred_by", "is", null)),
-    safeRows("profiles", "referral_credits_granted", (q) =>
-      q.gt("referral_credits_granted", 0).limit(100000),
+    safeRows("profiles", "referred_by", (q) =>
+      q.not("referred_by", "is", null).limit(100000),
     ),
   ]);
 
-  const activeReferrers = refRows.length;
-  let tranches = 0;
-  for (const r of refRows) {
-    // referral_credits_granted is stored in "filleuls counted" (multiples
-    // of 3 = paid tranches). One tranche = 30 min.
-    const counted = num(r.referral_credits_granted, 0);
-    tranches += Math.floor(counted / 3);
+  const referrers = new Set<string>();
+  for (const r of referrerRows) {
+    const id = r.referred_by?.toString?.() ?? "";
+    if (id) referrers.add(id);
   }
 
   return {
     totalAttributed: attributed,
-    activeReferrers,
-    bonusTranchesPaid: tranches,
-    bonusMinutesGranted: tranches * 30,
+    activeReferrers: referrers.size,
   };
 }
 
@@ -630,7 +618,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     newUsers30d,
     friendshipsTotal,
     messagesTotal,
-    voiceMessages,
     likeRows,
     callsTotal,
     callRows,
@@ -646,9 +633,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
     safeCount("friendships"),
     safeCount("messages"),
-    safeCount("messages", (q) =>
-      q.not("audio_url", "is", null).neq("audio_url", ""),
-    ),
     safeRows("likes", "liker, liked", (q) => q.limit(200000)),
     safeCount("incoming_calls"),
     safeRows("incoming_calls", "duration_seconds", (q) =>
@@ -784,14 +768,7 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       label: "Messages envoyés",
       total: fmtInt(messagesTotal),
       perUser: fmtNum(per(messagesTotal)),
-      detail: "texte, image et vocal",
-    },
-    {
-      group: "Social",
-      label: "Messages vocaux",
-      total: fmtInt(voiceMessages),
-      perUser: fmtNum(per(voiceMessages)),
-      detail: "",
+      detail: "texte et image",
     },
     {
       group: "Social",

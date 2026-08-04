@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -16,7 +15,6 @@ import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
@@ -755,7 +753,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
 
     // Local TTS is local — no cloud cost, available to all tiers.
-    const canDub = true;
     return ListView.builder(
       controller: _scrollCtrl,
       // Bottom room so the last message clears the floating composer.
@@ -778,7 +775,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           mine: mine,
           displayBody: _displayBodyFor(m),
           translating: _translatingIds.contains(m.id),
-          canDubAudio: canDub,
           myLang: _myLang,
           // Long-press to delete — only my own messages.
           onLongPressDelete: mine ? () => _deleteMessage(m) : null,
@@ -1191,7 +1187,6 @@ class _MessageBubble extends StatelessWidget {
     required this.mine,
     required this.displayBody,
     required this.translating,
-    required this.canDubAudio,
     required this.myLang,
     this.onLongPressDelete,
   });
@@ -1208,13 +1203,7 @@ class _MessageBubble extends StatelessWidget {
   /// Show a subtle indicator while the translation is being fetched.
   final bool translating;
 
-  /// True when the local user's tier unlocks /voice/dub. Plus / Pro /
-  /// Ultra → true; Free → false. Server-side gating is the final word,
-  /// so this only drives whether we render the CTA at all.
-  final bool canDubAudio;
-
-  /// BCP-47 primary subtag of the local user's language — the
-  /// translation target for any incoming foreign voice message.
+  /// BCP-47 primary subtag of the local user's language.
   final String myLang;
 
   @override
@@ -1236,7 +1225,7 @@ class _MessageBubble extends StatelessWidget {
     // Text-only bubbles hug their content so a short "👋" or "Coucou !" no
     // longer stretches the full width; media bubbles keep their own width.
     var hugContent =
-        !message.isImage && !message.hasDiscoverPhoto && !message.isVoice;
+        !message.isImage && !message.hasDiscoverPhoto;
 
     // Une image ou un GIF envoyé seul se montre NU : pas de bulle, pas de
     // cadre, pas de fond. L'image est déjà un objet à elle seule — l'enfermer
@@ -1337,24 +1326,9 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-        // Voice messages render an inline mini-player above the body.
-        // The body itself stays so the transcript / translation is
-        // always visible underneath the audio control.
-        if (message.isVoice)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: _VoicePlayer(
-              audioUrl: message.audioUrl,
-              durationMs: message.audioDurationMs,
-            ),
-          ),
-        // For voice messages the transcription / translation is only
-        // for the recipient — the sender already knows what they said,
-        // so we hide the text under their own voice bubble (the player
-        // alone is enough). Non-voice messages always show their body.
-        // When [displayBody] is empty (raw STT returned nothing), drop
-        // the Text node entirely so the bubble shows no phantom line.
-        if (displayBody.isNotEmpty && !(message.isVoice && mine))
+        // When [displayBody] is empty, drop the Text node entirely so
+        // the bubble shows no phantom line.
+        if (displayBody.isNotEmpty)
           Text(
             displayBody,
             style: TextStyle(
@@ -1365,22 +1339,6 @@ class _MessageBubble extends StatelessWidget {
               height: 1.3,
               fontStyle: translating ? FontStyle.italic : FontStyle.normal,
             ),
-          ),
-        // "🔊 Écouter la traduction" CTA. Only shown for incoming
-        // foreign voice messages when the local user is on a paid
-        // tier and we already have a translated body to dub.
-        if (message.isVoice &&
-            !mine &&
-            canDubAudio &&
-            !translating &&
-            displayBody.isNotEmpty &&
-            displayBody != message.body &&
-            myLang.isNotEmpty)
-          _DubButton(
-            key: ValueKey('dub-${message.id}-$myLang'),
-            messageId: message.id,
-            targetLang: myLang,
-            translatedText: displayBody,
           ),
         const SizedBox(height: 2),
         Align(
@@ -1440,216 +1398,6 @@ class _MessageBubble extends StatelessWidget {
     // tap-to-dismiss). viewerMode hides the "set as Discover" button and a
     // single-photo list means no side arrows.
     showPhotoViewer(context, photos: [url], index: 0, viewerMode: true);
-  }
-}
-
-/// Inline audio player for a single voice message. Each bubble owns its
-/// own [AudioPlayer] so two messages can play concurrently if the user
-/// somehow taps two — but in practice we let any other instance keep
-/// running; there is no global "single player" coordinator yet.
-class _VoicePlayer extends StatefulWidget {
-  const _VoicePlayer({required this.audioUrl, required this.durationMs});
-  final String audioUrl;
-  final int durationMs;
-
-  @override
-  State<_VoicePlayer> createState() => _VoicePlayerState();
-}
-
-/// Companion "🔊 Écouter la traduction" CTA shown under the original
-/// voice bubble when:
-///   1. auto-translate is on,
-///   2. the message body is in a different language than mine, AND
-///   3. the local user is on a paid tier with [voiceDub != 'none']
-///      (the backend re-checks — this is a UX hint, not a security
-///      gate).
-/// On first tap we POST /voice/dub with the already-translated text;
-/// the backend renders + caches the mp3 and the player widget below
-/// fades in to play it.
-class _DubButton extends StatefulWidget {
-  const _DubButton({
-    super.key,
-    required this.messageId,
-    required this.targetLang,
-    required this.translatedText,
-  });
-  final String messageId;
-  final String targetLang;
-  final String translatedText;
-
-  @override
-  State<_DubButton> createState() => _DubButtonState();
-}
-
-class _DubButtonState extends State<_DubButton> {
-  bool _loading = false;
-
-  Future<void> _play() async {
-    if (_loading || widget.translatedText.trim().isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      // The device's own voice. This used to load a Piper bundle through
-      // SpeechService — a ~60 MB download for a button that reads one message
-      // aloud.
-      final tts = FlutterTts();
-      await tts.setLanguage(widget.targetLang);
-      await tts.speak(widget.translatedText);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('voice_dub_failed'))),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: InkWell(
-        onTap: _loading ? null : _play,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_loading)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: SC.accent,
-                  ),
-                )
-              else
-                const Icon(Icons.volume_up_outlined, size: 16, color: SC.accent),
-              const SizedBox(width: 6),
-              Text(
-                AppStrings.t('voice_dub_listen'),
-                style: const TextStyle(
-                  color: SC.accent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VoicePlayerState extends State<_VoicePlayer> {
-  late final AudioPlayer _player = AudioPlayer();
-  StreamSubscription<PlayerState>? _stateSub;
-  StreamSubscription<Duration>? _posSub;
-  Duration _position = Duration.zero;
-  bool _playing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _stateSub = _player.onPlayerStateChanged.listen((s) {
-      if (!mounted) return;
-      setState(() => _playing = s == PlayerState.playing);
-      if (s == PlayerState.completed) {
-        setState(() => _position = Duration.zero);
-      }
-    });
-    _posSub = _player.onPositionChanged.listen((p) {
-      if (!mounted) return;
-      setState(() => _position = p);
-    });
-  }
-
-  @override
-  void dispose() {
-    _stateSub?.cancel();
-    _posSub?.cancel();
-    _player.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggle() async {
-    try {
-      if (_playing) {
-        await _player.pause();
-      } else {
-        await _player.play(UrlSource(widget.audioUrl));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Lecture impossible: $e')));
-    }
-  }
-
-  String _fmt(Duration d) {
-    final secs = d.inSeconds;
-    final m = (secs ~/ 60).toString().padLeft(1, '0');
-    final s = (secs % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final total = Duration(milliseconds: widget.durationMs);
-    final progress = total.inMilliseconds <= 0
-        ? 0.0
-        : (_position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
-    final remaining = total - _position;
-    final label = _playing
-        ? _fmt(_position)
-        : _fmt(total > Duration.zero ? total : remaining);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: SC.accent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: _toggle,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                _playing ? Icons.pause : Icons.play_arrow,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 140,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: SC.textPrimary.withValues(alpha: 0.18),
-              valueColor: const AlwaysStoppedAnimation<Color>(SC.accent),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: SC.msgInText.withValues(alpha: 0.75),
-            fontSize: 12,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
-    );
   }
 }
 

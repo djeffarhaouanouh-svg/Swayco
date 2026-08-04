@@ -28,7 +28,6 @@ class RemoteProfile {
     this.emailNotifications = true,
     this.isPro = false,
     this.subscriptionTier = 'free',
-    this.lifetimeCallSeconds = 0,
     this.proExpiresAt,
     this.lastSeen,
     this.nameChangedAt,
@@ -122,10 +121,9 @@ class RemoteProfile {
   /// entitlement (validated against the store IAP receipt server-side, later).
   final bool isPro;
 
-  /// Raw tier string: `'free' | 'plus' | 'pro' | 'ultra'`. Used by the
-  /// chat UI to decide whether to expose the `/voice/dub` CTA (Plus+)
-  /// or the live-call upgrade nudge. The backend re-validates the tier
-  /// on every paid endpoint — this field only drives client-side hints.
+  /// Raw tier string: `'free' | 'plus' | 'pro' | 'ultra'`. Drives client-side
+  /// paywall / upgrade hints. The backend re-validates the tier on paid
+  /// endpoints.
   final String subscriptionTier;
 
   bool get isPlus =>
@@ -139,13 +137,6 @@ class RemoteProfile {
   /// still read `isUltra` keep compiling during the rename. Same
   /// semantics as [isUltraPlus] now that Ultra/Pro merged.
   bool get isUltra => isUltraPlus;
-
-  /// True when this user's tier unlocks /voice/dub — i.e. anything
-  /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
-  bool get canDubAudio => isPlus;
-
-  /// Lifetime stat (never reset). Used for "X minutes used" on the profile.
-  final int lifetimeCallSeconds;
 
   /// When the current Premium period ends. Null on free tier.
   final DateTime? proExpiresAt;
@@ -258,7 +249,6 @@ class RemoteProfile {
       if (t == 'pro' || t == 'ultra') return 'ultra_plus';
       return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
     }(),
-    lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
     proExpiresAt: _parseDate(m['pro_expires_at']),
     lastSeen: _parseDate(m['last_seen']),
     nameChangedAt: _parseDate(m['display_name_changed_at']),
@@ -293,7 +283,6 @@ class RemoteProfile {
     bool? emailNotifications,
     bool? isPro,
     String? subscriptionTier,
-    int? lifetimeCallSeconds,
     DateTime? proExpiresAt,
     DateTime? lastSeen,
     DateTime? nameChangedAt,
@@ -323,7 +312,6 @@ class RemoteProfile {
     emailNotifications: emailNotifications ?? this.emailNotifications,
     isPro: isPro ?? this.isPro,
     subscriptionTier: subscriptionTier ?? this.subscriptionTier,
-    lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
     proExpiresAt: proExpiresAt ?? this.proExpiresAt,
     lastSeen: lastSeen ?? this.lastSeen,
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
