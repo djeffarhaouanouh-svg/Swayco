@@ -281,8 +281,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         });
         return;
       }
-        }
-      }
       // Restore the UI language from local prefs so the login screen
       // renders in whatever the user picked last time on this device
       // (no-op for a fresh install — falls back to the default).
