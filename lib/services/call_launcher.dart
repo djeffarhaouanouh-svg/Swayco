@@ -7,7 +7,6 @@ import '../screens/call_screen.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/spoken_language_gate.dart';
 import 'call_alert.dart';
-import 'call_credit_gate.dart';
 import 'app_strings.dart';
 import 'device_id.dart';
 import 'last_interaction.dart';
@@ -108,25 +107,6 @@ abstract final class CallLauncher {
       final me = await resolveMyIdentity();
       final myName = me.name;
       final mySourceLang = me.sourceLang;
-
-      // Péage: a credit-less caller can't place a call — but they can invite
-      // the peer to call them back (free on their side, since the caller pays
-      // the minutes). Fail-open on a failed read; the backend re-validates
-      // credits on /livekit/token anyway.
-      final myProfile = await ProfileApi.fetchById(myId);
-      if (!CallCreditGate.canPlaceCall(myProfile)) {
-        if (!context.mounted) return false;
-        final peer = await ProfileApi.fetchById(peerDeviceId);
-        if (!context.mounted) return false;
-        await CallCreditGate.showAskToBeCalled(
-          context,
-          peerId: peerDeviceId,
-          peerName: peer?.displayName ?? '',
-          myId: myId,
-          myName: myName,
-        );
-        return false;
-      }
 
       // Which language will actually be spoken. Resolved BEFORE the token is
       // minted on purpose: the token carries it into the LiveKit metadata,
