@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -80,10 +79,6 @@ class AsrModelDownloader {
     onProgress?.call(0);
 
     switch (spec) {
-      case NeuralAsrSpec():
-        await _downloadNeural(spec, dir, onProgress);
-      case LatticeAsrSpec():
-        await _downloadLattice(spec, dir, onProgress);
       case UniversalAsrSpec():
         await _downloadUniversal(spec, dir, onProgress);
     }
@@ -93,40 +88,8 @@ class AsrModelDownloader {
     return dir;
   }
 
-  /// Fetches each graph/tokenizer file, weighting progress by bytes received
-  /// against the spec's advertised size (Hugging Face LFS omits Content-Length
-  /// on some redirects, so a per-file fraction would stutter).
-  Future<void> _downloadNeural(
-    NeuralAsrSpec spec,
-    Directory dir,
-    void Function(double)? onProgress,
-  ) async {
-    final totalBytes = spec.approxMb * 1024 * 1024;
-    var receivedTotal = 0;
-
-    for (final file in spec.files) {
-      // `onnx/encoder_model_quantized.onnx` → flat `encoder_model_quantized.onnx`
-      final flat = file.split('/').last;
-      final dest = File('${dir.path}/$flat');
-      if (await dest.exists()) {
-        receivedTotal += await dest.length();
-        continue;
-      }
-      final tmp = File('${dest.path}.tmp');
-      receivedTotal += await _downloadTo(
-        spec.urlFor(file),
-        tmp,
-        onBytes: (n) => onProgress?.call(
-          ((receivedTotal + n) / totalBytes).clamp(0.0, 0.99),
-        ),
-      );
-      await tmp.rename(dest.path);
-    }
-  }
-
-  /// Same file-by-file fetch as [_downloadNeural]. Our mirror publishes the
-  /// files under the names the engine already wants, so there is nothing to
-  /// remap on the way in.
+  /// File-by-file fetch. Our mirror publishes the files under the names the
+  /// engine already wants, so there is nothing to remap on the way in.
   Future<void> _downloadUniversal(
     UniversalAsrSpec spec,
     Directory dir,
@@ -151,36 +114,6 @@ class AsrModelDownloader {
       );
       await tmp.rename(dest.path);
     }
-  }
-
-  /// The lattice engine ships a zip whose single top-level folder is the model id. We flatten
-  /// that folder into [dir] so the engine can point libvosk straight at it.
-  Future<void> _downloadLattice(
-    LatticeAsrSpec spec,
-    Directory dir,
-    void Function(double)? onProgress,
-  ) async {
-    final tmp = File('${dir.path}/${spec.id}.zip.tmp');
-    final totalBytes = spec.approxMb * 1024 * 1024;
-    await _downloadTo(
-      spec.zipUrl,
-      tmp,
-      // Reserve the last 10% for extraction, which is not instant on a phone.
-      onBytes: (n) => onProgress?.call(((n / totalBytes) * 0.9).clamp(0.0, 0.9)),
-    );
-
-    final archive = ZipDecoder().decodeBytes(await tmp.readAsBytes());
-    for (final entry in archive) {
-      if (!entry.isFile) continue;
-      // Strip the leading `<model-id>/` component.
-      final parts = entry.name.split('/')..removeAt(0);
-      if (parts.isEmpty) continue;
-      final out = File('${dir.path}/${parts.join('/')}');
-      await out.parent.create(recursive: true);
-      await out.writeAsBytes(entry.content as List<int>);
-    }
-    await tmp.delete();
-    onProgress?.call(0.99);
   }
 
   /// Streams [url] into [dest]. Returns the number of bytes written.

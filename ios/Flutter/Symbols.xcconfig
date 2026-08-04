@@ -2,58 +2,14 @@
 // Included from Debug.xcconfig and Release.xcconfig, the base configs of the
 // Runner target only (RunnerTests has none).
 //
-// This file used to link libvosk.a (the Kaldi lattice STT engine) with
-// -force_load, and was named Vosk.xcconfig. It no longer does:
-// asr_catalogue.dart lists the universal sherpa-onnx model (Whisper, 99
-// languages) FIRST, and specForLang returns the first match, so the lattice
-// engine is unreachable and no vosk_* symbol is ever looked up. Linking a 33 MB
-// Kaldi archive for dead code was costing us the whole iOS build — the archive
-// referenced 13 kaldi::chain/nnet2 training symbols nothing defined, so the app
-// could not link at all. See the restore note at the bottom.
-//
-// What survives is STRIP_STYLE, which is NOT vosk-specific and must stay:
-//
 // `flutter build ios` leaves DEPLOYMENT_POSTPROCESSING=NO, so nothing strips
 // and the symbols are there. The *archive* action turns it on and runs strip
 // with the Xcode default STRIP_STYLE=all, which removes every global symbol and
-// rebuilds the export trie without them (measured on the old vosk binary: 14755
-// exports -> 671, __text byte-identical — the code survives, the names do not).
-// Anything resolved by name at runtime then fails in the App Store build while
-// the dev build worked. ja_openjtalk.xcframework resolves its ja_frontend_*
-// entry points through DynamicLibrary.process() (see
-// native/sherpa_onnx_ios_patched/SETUP.md), which is exactly that pattern.
+// rebuilds the export trie without them. Anything resolved by name at runtime
+// then fails in the App Store build while the dev build worked.
+// ja_openjtalk.xcframework resolves its ja_frontend_* entry points through
+// DynamicLibrary.process() (see native/sherpa_onnx_ios_patched/SETUP.md),
+// which is exactly that pattern.
 //
 // `non-global` is `strip -x`: drops local symbols, keeps the globals dlsym reads.
 STRIP_STYLE = non-global
-
-// ── restoring the lattice (vosk) engine, if ever needed ──────────────────────
-// asr_catalogue.dart says the per-language models come back "in one line" by
-// moving the universal spec to the END of _specs. On iOS that is now TWO steps,
-// because the engine is no longer linked:
-//   1. bash scripts/build_libvosk_ios.sh   (rebuilds ios/Frameworks/libvosk.a)
-//   2. re-add to Debug.xcconfig + Release.xcconfig:
-//        OTHER_LDFLAGS = $(inherited) $(VOSK_LDFLAGS)
-//      with, back in this file:
-//        VOSK_KEEP    = -u _vosk_model_new -u _vosk_model_free
-//                       -u _vosk_recognizer_new
-//                       -u _vosk_recognizer_accept_waveform_f
-//                       -u _vosk_recognizer_result
-//                       -u _vosk_recognizer_partial_result
-//                       -u _vosk_recognizer_final_result
-//                       -u _vosk_recognizer_reset -u _vosk_recognizer_free
-//                       -u _vosk_set_log_level
-//        VOSK_LDFLAGS = -force_load $(SRCROOT)/Frameworks/libvosk.a
-//                       $(VOSK_KEEP) -lc++ -framework Accelerate
-//      (one line each — wrapped here only for readability)
-// Both flags were needed, not one, and getting only the first is a green build
-// that crashes with "Failed to lookup symbol" on the first call: -force_load
-// pulls every archive member in (OpenFST registers its FST types from global
-// constructors nothing references, so without it model loading fails at
-// runtime), and -u marks each entry point as a dead-strip ROOT, because
-// DEAD_CODE_STRIPPING=YES runs *after* -force_load and would otherwise drop all
-// ten vosk_* symbols as unreachable from _main. -lc++ because Kaldi/OpenFST are
-// C++ and Runner is otherwise ObjC/Swift; Accelerate for Kaldi's BLAS/LAPACK.
-// Keep the -u list in sync with the lookupFunction calls in
-// lib/swayco/asr/lattice_asr_engine.dart, and verify against the APP binary,
-// not the archive:
-//     nm -gU build/ios/iphoneos/Runner.app/Runner | grep vosk_model_new

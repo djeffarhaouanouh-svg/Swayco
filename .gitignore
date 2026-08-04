@@ -93,15 +93,12 @@ capture-*.png
 # Swayco design handoff reference (Next.js project, not part of the Flutter app)
 xxxx/
 
-# libvosk binaries — fetched by scripts/fetch_libvosk_android.sh (16 MB)
+# Optional local jniLibs (not currently shipped).
 android/app/src/main/jniLibs/
-
-# libvosk for iOS — built by scripts/build_libvosk_ios.sh (large static lib)
-build/libvosk-ios/
-ios/Frameworks/libvosk.a
 
 # llama.cpp / ggml static libs for iOS on-device translation — built by
 # scripts/build_llama_ios.sh from the STQ_0 fork (~8 MB). The podspec force_loads them.
+# (llm_llamacpp path override was removed; artefacts kept ignored if rebuilt.)
 native/llm_llamacpp_patched/ios/libs/
 
 # STQ-fork llama.cpp / ggml shared libs for Android on-device translation —

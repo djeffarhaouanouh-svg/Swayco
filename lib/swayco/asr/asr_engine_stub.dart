@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import 'asr_catalogue.dart';
 
-/// Web stub — ONNX Runtime and libvosk both need dart:ffi. [AsrService] guards
-/// every call with `if (kIsWeb)`, so these are never invoked at runtime.
+/// Web stub — sherpa-onnx needs dart:ffi. [AsrService] guards every call with
+/// `if (kIsWeb)`, so these are never invoked at runtime.
 class SttChunk {
   const SttChunk({this.partial = '', this.finalText = ''});
   static const empty = SttChunk();

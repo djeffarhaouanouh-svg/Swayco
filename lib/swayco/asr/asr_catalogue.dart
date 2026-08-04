@@ -4,11 +4,7 @@
 /// [AsrService.ensureLanguageInstalled].
 ///
 /// - **Universal int8** (sherpa-onnx `OfflineRecognizer`) — 99 languages,
-///   ~357 MB. Listed FIRST, so it now serves every language.
-/// - **Neural v2** (sherpa-onnx) and **lattice** (native lib via dart:ffi) are the
-///   smaller, faster per-language models that used to serve the 16 languages
-///   they cover. They are kept, but unreachable while the universal entry leads the list —
-///   move the universal entry back to the END to restore them.
+///   ~244 MB. Serves every language (OS STT is preferred first when available).
 ///
 /// Speaking is no longer paired with hearing: translations are spoken by the
 /// device's own OS voice (`flutter_tts`), so there is no TTS catalogue to keep
@@ -18,7 +14,7 @@
 /// the model for its user's language.
 library;
 
-enum AsrEngineKind { neural, lattice, universal }
+enum AsrEngineKind { universal }
 
 /// On-disk id of the universal model — a directory name under
 /// `<appSupport>/stt/`, and therefore part of the installed state.
@@ -53,42 +49,6 @@ sealed class AsrModelSpec {
   final int approxMb;
 
   AsrEngineKind get kind;
-}
-
-/// Neural: encoder + decoder ONNX graphs and a BPE tokenizer, fetched file
-/// by file from a Hugging Face repo (same pattern as the local TTS engine downloader).
-class NeuralAsrSpec extends AsrModelSpec {
-  const NeuralAsrSpec({
-    required super.id,
-    required super.langs,
-    required super.approxMb,
-    required this.repo,
-    this.subdir = '',
-  });
-
-  final String repo;
-
-  /// Folder inside [repo] holding this language's neural v2 files
-  /// (one per language), all re-hosted on our own `swayco-stt-models`
-  /// repo: sherpa's v2 loader wants `encoder` + `mergedDecoder` +
-  /// `tokens.txt`, and the `tokens.txt` is produced offline from each model's
-  /// tokenizer by the upstream generate_tokens script.
-  final String subdir;
-
-  @override
-  AsrEngineKind get kind => AsrEngineKind.neural;
-
-  static const encoderFile = 'encoder.onnx';
-  static const mergedDecoderFile = 'decoder_merged.onnx';
-  static const tokensFile = 'tokens.txt';
-
-  List<String> get files =>
-      const [encoderFile, mergedDecoderFile, tokensFile];
-
-  String urlFor(String file) {
-    final path = subdir.isEmpty ? file : '$subdir/$file';
-    return 'https://huggingface.co/$repo/resolve/main/$path';
-  }
 }
 
 /// Universal: encoder + decoder + tokens, fetched file by file from our own
@@ -131,26 +91,7 @@ class UniversalAsrSpec extends AsrModelSpec {
   }
 }
 
-/// Lattice: one zip per language, expanded into `<appSupport>/stt/<id>/`.
-class LatticeAsrSpec extends AsrModelSpec {
-  const LatticeAsrSpec({
-    required super.id,
-    required super.langs,
-    required super.approxMb,
-  });
-
-  @override
-  AsrEngineKind get kind => AsrEngineKind.lattice;
-
-  String get zipUrl => 'https://alphacephei.com/vosk/models/$id.zip';
-}
-
 const _specs = <AsrModelSpec>[
-  // FIRST on purpose: [specForLang] scans in order, so the universal engine now
-  // serves every language and the per-language models below are never reached.
-  // They are left in place so that moving this entry back to the END restores
-  // the old behaviour — per-language models for the 16 languages they cover,
-  // universal for the rest — in one line.
   UniversalAsrSpec(
     id: kUniversalModelId,
     langs: _universalLangs,
@@ -158,55 +99,6 @@ const _specs = <AsrModelSpec>[
     repo: kUniversalRepo,
     subdir: 'u1',
   ),
-  NeuralAsrSpec(
-    id: 'moonshine-v2-en',
-    langs: ['en'],
-    approxMb: 50,
-    repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-v2-en',
-  ),
-  NeuralAsrSpec(
-    id: 'moonshine-v2-ja',
-    langs: ['ja'],
-    approxMb: 50,
-    repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-v2-ja',
-  ),
-  NeuralAsrSpec(
-    id: 'moonshine-v2-zh',
-    langs: ['zh'],
-    approxMb: 50,
-    repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-v2-zh',
-  ),
-  NeuralAsrSpec(
-    id: 'moonshine-v2-ko',
-    langs: ['ko'],
-    approxMb: 50,
-    repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-v2-ko',
-  ),
-  NeuralAsrSpec(
-    id: 'moonshine-v2-ar',
-    langs: ['ar'],
-    approxMb: 50,
-    repo: 'djeffar/swayco-stt-models',
-    subdir: 'moonshine-v2-ar',
-  ),
-  LatticeAsrSpec(id: 'vosk-model-small-fr-0.22', langs: ['fr'], approxMb: 41),
-  LatticeAsrSpec(id: 'vosk-model-small-ru-0.22', langs: ['ru'], approxMb: 45),
-  LatticeAsrSpec(id: 'vosk-model-small-es-0.42', langs: ['es'], approxMb: 39),
-  LatticeAsrSpec(id: 'vosk-model-small-it-0.22', langs: ['it'], approxMb: 48),
-  LatticeAsrSpec(id: 'vosk-model-small-pt-0.3', langs: ['pt'], approxMb: 31),
-  LatticeAsrSpec(id: 'vosk-model-small-de-0.15', langs: ['de'], approxMb: 45),
-  LatticeAsrSpec(id: 'vosk-model-small-nl-0.22', langs: ['nl'], approxMb: 39),
-  // Languages that already had a Piper voice but no way to be heard. Swedish is
-  // deliberately absent: Vosk's only "small" Swedish model is 289 MB, 6x the
-  // others — too heavy to hand a user at onboarding.
-  LatticeAsrSpec(id: 'vosk-model-small-pl-0.22', langs: ['pl'], approxMb: 50),
-  LatticeAsrSpec(id: 'vosk-model-small-tr-0.3', langs: ['tr'], approxMb: 35),
-  LatticeAsrSpec(id: 'vosk-model-small-uk-v3-small', langs: ['uk'], approxMb: 137),
-  LatticeAsrSpec(id: 'vosk-model-small-hi-0.22', langs: ['hi'], approxMb: 42),
 ];
 
 /// The 99 languages the universal engine decodes, in the app’s own codes.

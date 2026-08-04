@@ -9,7 +9,7 @@ import 'asr_engine_native.dart';
 /// for every language with no dedicated per-language model (see
 /// [asr_catalogue]).
 ///
-/// A clip engine like [NeuralAsrEngine]: it attends over a whole VAD segment,
+/// A clip engine: it attends over a whole VAD segment,
 /// inherits [AsrEngine]'s no-op streaming members, and drops overlapping
 /// requests rather than queueing them.
 ///
