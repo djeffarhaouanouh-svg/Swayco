@@ -963,9 +963,9 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: peer name + local-time left-aligned, swaycø centred.
-            // Long clocks (e.g. "03:48 🌙 LAS VEGAS") used to paint over the
-            // brand — either hide swaycø, or cap the left block before it.
+            // Middle zone: peer name + local-time left, swaycø always centred.
+            // The yellow clock used to paint over the brand — the left column
+            // is hard-capped before the logo so the city ellipsizes instead.
             Expanded(
               child: LayoutBuilder(
                 builder: (context, c) {
@@ -979,47 +979,20 @@ class _ThreadHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
                   );
-                  // Must match [_PeerClockLine] (uppercase city + letterSpacing).
-                  const clockStyle = TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    height: 1.15,
-                  );
-                  const cityStyle = TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    height: 1.15,
-                    letterSpacing: 0.3,
-                  );
                   final scaler = MediaQuery.textScalerOf(context);
-                  double widthOf(String t, TextStyle s) => (TextPainter(
-                    text: TextSpan(text: t, style: s),
+                  final logoW = (TextPainter(
+                    text: const TextSpan(text: 'swaycø', style: logoStyle),
                     maxLines: 1,
                     textScaler: scaler,
                     textDirection: TextDirection.ltr,
                   )..layout()).width;
-                  final nameW = widthOf(title, nameStyle);
-                  final logoW = widthOf('swaycø', logoStyle);
-                  final clock = this.clock;
-                  final city = place.trim().toUpperCase();
-                  // hhmm + gap + icon(12) + gap + city  (see _PeerClockLine)
-                  final clockW = clock == null
-                      ? 0.0
-                      : widthOf(clock.hhmm, clockStyle) +
-                          4 +
-                          12 +
-                          (city.isEmpty ? 0.0 : 5 + widthOf(city, cityStyle));
-                  final leftBlockW = nameW > clockW ? nameW : clockW;
-                  // Logo centred in [0, maxW]; its left edge is mid − logoW/2.
-                  // Need ≥16px air between left block and that edge.
-                  const gap = 16.0;
+                  // Leave ≥12px air before the centred brand.
+                  const gap = 12.0;
                   final logoLeft = c.maxWidth / 2 - logoW / 2;
-                  final showLogo = leftBlockW <= logoLeft - gap;
-                  // When the brand stays, clamp the clock so it cannot reach it.
-                  // When the brand drops, the clock may use the full middle width.
-                  final leftMax = showLogo
-                      ? (logoLeft - gap).clamp(0.0, c.maxWidth)
-                      : c.maxWidth;
+                  final leftMax = (logoLeft - gap).clamp(48.0, c.maxWidth);
+                  // Only drop swaycø if the middle strip is too narrow to fit
+                  // both a usable left column and the wordmark.
+                  final showLogo = leftMax + gap + logoW <= c.maxWidth;
                   return Stack(
                     clipBehavior: Clip.hardEdge,
                     alignment: Alignment.center,
@@ -1046,7 +1019,9 @@ class _ThreadHeader extends StatelessWidget {
                           behavior: HitTestBehavior.opaque,
                           onTap: onViewProfile,
                           child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: leftMax),
+                            constraints: BoxConstraints(
+                              maxWidth: showLogo ? leftMax : c.maxWidth,
+                            ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
