@@ -993,6 +993,8 @@ class _ThreadHeader extends StatelessWidget {
                   // Only drop swaycø if the middle strip is too narrow to fit
                   // both a usable left column and the wordmark.
                   final showLogo = leftMax + gap + logoW <= c.maxWidth;
+                  // Local copy so the null check promotes (field `clock` cannot).
+                  final peerClock = clock;
                   return Stack(
                     clipBehavior: Clip.hardEdge,
                     alignment: Alignment.center,
@@ -1032,8 +1034,11 @@ class _ThreadHeader extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: nameStyle,
                                 ),
-                                if (clock != null)
-                                  _PeerClockLine(clock: clock, place: place),
+                                if (peerClock != null)
+                                  _PeerClockLine(
+                                    clock: peerClock,
+                                    place: place,
+                                  ),
                               ],
                             ),
                           ),
