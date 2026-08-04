@@ -7,31 +7,27 @@
 --
 -- Keeps referral_code / referred_by (invite attribution still runs).
 -- Neutralises attribute_referral so it no longer writes credits.
+--
+-- One DROP per statement so the Supabase SQL editor can't split a
+-- multi-action ALTER TABLE and leave a bare "drop column …" fragment.
 
 -- ─── voice_dubs cache table ────────────────────────────────────────────────
 drop table if exists public.voice_dubs;
 
 -- ─── profiles: ElevenLabs + dub counters + credits ─────────────────────────
-alter table public.profiles
-  drop column if exists elevenlabs_voice_id,
-  drop column if exists voice_dubs_used_this_month,
-  drop column if exists voice_dubs_reset_at,
-  drop column if exists credits_seconds,
-  drop column if exists credits_reset_at,
-  drop column if exists lifetime_call_seconds,
-  drop column if exists referral_credits_granted;
-
--- Drop the dub counter check if it survived a partial apply.
-alter table public.profiles
-  drop constraint if exists profiles_voice_dubs_used_chk;
+alter table public.profiles drop column if exists elevenlabs_voice_id;
+alter table public.profiles drop column if exists voice_dubs_used_this_month;
+alter table public.profiles drop column if exists voice_dubs_reset_at;
+alter table public.profiles drop column if exists credits_seconds;
+alter table public.profiles drop column if exists credits_reset_at;
+alter table public.profiles drop column if exists lifetime_call_seconds;
+alter table public.profiles drop column if exists referral_credits_granted;
+alter table public.profiles drop constraint if exists profiles_voice_dubs_used_chk;
 
 -- ─── messages: voice columns ───────────────────────────────────────────────
-alter table public.messages
-  drop constraint if exists messages_audio_duration_ms_chk;
-
-alter table public.messages
-  drop column if exists audio_url,
-  drop column if exists audio_duration_ms;
+alter table public.messages drop constraint if exists messages_audio_duration_ms_chk;
+alter table public.messages drop column if exists audio_url;
+alter table public.messages drop column if exists audio_duration_ms;
 
 -- ─── storage: voice-messages policy ────────────────────────────────────────
 -- Supabase blocks direct DELETE on storage.objects / storage.buckets
