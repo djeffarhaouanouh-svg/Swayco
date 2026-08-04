@@ -963,9 +963,9 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: peer name left-aligned (with local-time line under
-            // it when known), swaycø logo centred. Logo drops if the name /
-            // clock would collide with it.
+            // Middle zone: peer name + local-time left-aligned, swaycø centred.
+            // Long clocks (e.g. "03:48 🌙 LAS VEGAS") used to paint over the
+            // brand — either hide swaycø, or cap the left block before it.
             Expanded(
               child: LayoutBuilder(
                 builder: (context, c) {
@@ -979,6 +979,18 @@ class _ThreadHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
                   );
+                  // Must match [_PeerClockLine] (uppercase city + letterSpacing).
+                  const clockStyle = TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.15,
+                  );
+                  const cityStyle = TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.15,
+                    letterSpacing: 0.3,
+                  );
                   final scaler = MediaQuery.textScalerOf(context);
                   double widthOf(String t, TextStyle s) => (TextPainter(
                     text: TextSpan(text: t, style: s),
@@ -989,38 +1001,52 @@ class _ThreadHeader extends StatelessWidget {
                   final nameW = widthOf(title, nameStyle);
                   final logoW = widthOf('swaycø', logoStyle);
                   final clock = this.clock;
-                  // Rough clock-line width so the logo never sits on top of
-                  // "11:15 ☀ DAKAR". Icon + gaps ≈ 28px.
-                  final city = place.trim();
-                  final clockLabel = clock == null
-                      ? ''
-                      : '${clock.hhmm}${city.isEmpty ? '' : ' $city'}';
+                  final city = place.trim().toUpperCase();
+                  // hhmm + gap + icon(12) + gap + city  (see _PeerClockLine)
                   final clockW = clock == null
                       ? 0.0
-                      : widthOf(
-                            clockLabel,
-                            const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ) +
-                          28;
+                      : widthOf(clock.hhmm, clockStyle) +
+                          4 +
+                          12 +
+                          (city.isEmpty ? 0.0 : 5 + widthOf(city, cityStyle));
                   final leftBlockW = nameW > clockW ? nameW : clockW;
-                  // Logo is centred over [0, c.maxWidth]; the name/clock is
-                  // left-aligned. Show the logo ONLY if the left block clears
-                  // the logo's left edge with a 14px gap.
-                  final showLogo =
-                      leftBlockW <= c.maxWidth / 2 - logoW / 2 - 14;
+                  // Logo centred in [0, maxW]; its left edge is mid − logoW/2.
+                  // Need ≥16px air between left block and that edge.
+                  const gap = 16.0;
+                  final logoLeft = c.maxWidth / 2 - logoW / 2;
+                  final showLogo = leftBlockW <= logoLeft - gap;
+                  // When the brand stays, clamp the clock so it cannot reach it.
+                  // When the brand drops, the clock may use the full middle width.
+                  final leftMax = showLogo
+                      ? (logoLeft - gap).clamp(0.0, c.maxWidth)
+                      : c.maxWidth;
                   return Stack(
+                    clipBehavior: Clip.hardEdge,
                     alignment: Alignment.center,
                     children: [
+                      if (showLogo)
+                        const Center(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: 'swayc'),
+                                TextSpan(
+                                  text: 'ø',
+                                  style: TextStyle(color: SC.accent),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            style: logoStyle,
+                          ),
+                        ),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: onViewProfile,
                           child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: c.maxWidth),
+                            constraints: BoxConstraints(maxWidth: leftMax),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1038,22 +1064,6 @@ class _ThreadHeader extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (showLogo)
-                        const Center(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: 'swayc'),
-                                TextSpan(
-                                  text: 'ø',
-                                  style: TextStyle(color: SC.accent),
-                                ),
-                              ],
-                            ),
-                            maxLines: 1,
-                            style: logoStyle,
-                          ),
-                        ),
                     ],
                   );
                 },
@@ -1149,7 +1159,8 @@ class _PeerClockLine extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 1),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        // Fill the constrained parent so [Expanded] can ellipsize the city
+        // instead of painting past swaycø in the header Stack.
         children: [
           Text(
             clock.hhmm,
@@ -1165,7 +1176,7 @@ class _PeerClockLine extends StatelessWidget {
           ),
           if (city.isNotEmpty) ...[
             const SizedBox(width: 5),
-            Flexible(
+            Expanded(
               child: Text(
                 city.toUpperCase(),
                 maxLines: 1,
