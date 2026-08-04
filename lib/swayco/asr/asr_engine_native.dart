@@ -1,8 +1,6 @@
 import 'dart:typed_data';
 
-import 'neural_asr_engine.dart';
 import 'asr_catalogue.dart';
-import 'lattice_asr_engine.dart';
 import 'universal_asr_engine.dart';
 
 /// One step of a streaming engine's output.
@@ -65,14 +63,10 @@ class AsrResult {
 
 /// One on-device recogniser, already pointed at a downloaded model.
 ///
-/// Two shapes, distinguished by [isStreaming]:
+/// Clip engines only: feed [transcribe] one complete VAD-clipped utterance.
+/// The encoder attends over the whole segment, so it cannot consume a stream.
 ///
-///  * **Streaming** (lattice): feed [acceptFrame] every frame. The engine
-///    endpoints utterances itself and emits partial hypotheses meanwhile.
-///  * **Clip** (neural): feed [transcribe] one complete utterance. Its
-///    encoder attends over the whole segment, so it cannot consume a stream.
-///
-/// Both do real work synchronously on the calling isolate.
+/// Real work runs synchronously on the calling isolate.
 abstract class AsrEngine {
   /// [modelDir] is the extracted model directory; [lang] the BCP-47 primary tag.
   Future<void> load(String modelDir, String lang);
@@ -81,22 +75,17 @@ abstract class AsrEngine {
 
   bool get isStreaming => false;
 
-  /// Feed one frame of a continuous stream. 16 kHz mono, samples in [-1, 1].
-  /// Only meaningful when [isStreaming].
+  /// Feed one frame of a continuous stream. Unused by clip engines.
   Future<SttChunk> acceptFrame(Float32List samples16k) async => SttChunk.empty;
 
-  /// Close the utterance in progress, return whatever was decoded, and reset.
-  /// Call when the mic goes away (doze, hang-up) so a half-decoded phrase is
-  /// not spliced onto the next one. Only meaningful when [isStreaming].
+  /// Close the utterance in progress. Unused by clip engines.
   Future<String> flush() async => '';
 
-  /// Drop decoder state without returning a result — for audio we deliberately
-  /// discarded (mute, our own TTS echo) which must not contaminate the next
-  /// utterance. Only meaningful when [isStreaming].
+  /// Drop decoder state without returning a result. Unused by clip engines.
   Future<void> reset() async {}
 
   /// Transcribe one complete, VAD-clipped utterance. 16 kHz mono, [-1, 1].
-  /// Returns '' when nothing was recognised. Only meaningful when ![isStreaming].
+  /// Returns '' when nothing was recognised.
   Future<String> transcribe(Float32List samples16k);
 
   /// [transcribe], plus the rival hypotheses and shaky words when the engine has
@@ -112,7 +101,5 @@ abstract class AsrEngine {
 }
 
 AsrEngine createAsrEngine(AsrEngineKind kind) => switch (kind) {
-      AsrEngineKind.neural => NeuralAsrEngine(),
-      AsrEngineKind.lattice => LatticeAsrEngine(),
       AsrEngineKind.universal => UniversalAsrEngine(),
     };

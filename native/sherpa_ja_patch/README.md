@@ -24,8 +24,7 @@ no second runtime, no iOS duplicate-symbol link failure.
 ## Verified (macOS, this repo's fp16 model)
 Built `libsherpa-onnx-c-api.dylib` from patched source; `test_from_tokens.c`
 loads `model.fp16.onnx` + `tokens.txt`, feeds the Dart-phonemizer token/tone
-arrays, and synthesises correct audio on sherpa's ORT. Samples:
-`docs/ja_tts_phase0_samples/sherpa_external_tokens/`.
+arrays, and synthesises correct audio on sherpa's ORT.
 
 ## Apply + build
 ```sh

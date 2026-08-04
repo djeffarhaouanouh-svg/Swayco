@@ -368,9 +368,9 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         AsrService.instance.ensureLanguageInstalled(sourceLang).then((_) async {
           _modelReady = AsrService.instance.isReady;
           DebugOverlay.log('stt model ready=$_modelReady lang=$sourceLang');
-          // Download failed, or the engine could not load — most often libvosk
-          // missing on this platform. Hand the call to the cloud engine rather than let the
-          // user speak into a pipeline that will never answer.
+          // Download failed, or the engine could not load. Hand the call to the
+          // cloud engine rather than let the user speak into a pipeline that
+          // will never answer.
           if (!_modelReady) await _startFallback('model_unavailable');
         }),
       );

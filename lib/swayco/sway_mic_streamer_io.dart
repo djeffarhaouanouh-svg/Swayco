@@ -18,9 +18,9 @@ SwayMicStreamer createSwayMicStreamer() =>
     // ignore: dead_code
     kUseCloudSttOnNative ? _IoSwayMicStreamer() : LocalSttMicStreamer();
 
-/// The remote the cloud engine streamer, used as a fallback when the on-device engine
-/// cannot load — no libvosk on this platform, no model for the language, or a
-/// corrupt download. Better a remote transcript than a silently dead call.
+/// The remote cloud engine streamer, used as a fallback when the on-device engine
+/// cannot load — no model for the language, or a corrupt download. Better a
+/// remote transcript than a silently dead call.
 SwayMicStreamer createCloudMicStreamer() => _IoSwayMicStreamer();
 
 /// Native (iOS/Android) realtime mic streamer, SENDER-side. Captures MY local

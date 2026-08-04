@@ -7,31 +7,6 @@ import 'auth_service.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
 
-/// Translation credits. UI-side we expose these as "crédits" where
-/// 1 crédit = 60 s of translated call, so the per-tier numbers read
-/// abstract and generous instead of stopwatch-y. Source of truth for
-/// the matching per-tier values lives in `backend/tiers.js` (FEATURES);
-/// these constants exist so the local UI can pre-render a refill
-/// without waiting on the network.
-///
-/// Free is refilled every 7 days ([freeRefillPeriod]); paid tiers
-/// every 30 days ([paidRefillPeriod]) to match Stripe's monthly
-/// invoice.
-const int freeWeeklyCreditsSeconds = 15 * 60; // 15 crédits / semaine
-const int plusMonthlyCreditsSeconds = 180 * 60; // 180 crédits / mois (3 h)
-const int ultraPlusMonthlyCreditsSeconds = 360 * 60; // 360 crédits / mois (6 h)
-
-/// Legacy alias kept so older call sites that still read this name
-/// keep compiling during the rename. New code should use
-/// `ultraPlusMonthlyCreditsSeconds` directly.
-const int proWeeklyCreditsSeconds = ultraPlusMonthlyCreditsSeconds;
-
-/// Refill cadence per tier. Free rolls over weekly; paid tiers roll
-/// over every 30 days to land on the same date as Stripe's monthly
-/// invoice ("refill" and "new bill" feel like the same event).
-const Duration freeRefillPeriod = Duration(days: 7);
-const Duration paidRefillPeriod = Duration(days: 30);
-
 class RemoteProfile {
   const RemoteProfile({
     required this.id,
@@ -53,14 +28,9 @@ class RemoteProfile {
     this.emailNotifications = true,
     this.isPro = false,
     this.subscriptionTier = 'free',
-    this.elevenlabsVoiceId = '',
-    this.creditsSeconds = freeWeeklyCreditsSeconds,
-    this.creditsResetAt,
-    this.lifetimeCallSeconds = 0,
     this.proExpiresAt,
     this.lastSeen,
     this.nameChangedAt,
-    this.referralCode = '',
     this.age,
     this.heightCm,
     this.job = '',
@@ -150,10 +120,9 @@ class RemoteProfile {
   /// entitlement (validated against the store IAP receipt server-side, later).
   final bool isPro;
 
-  /// Raw tier string: `'free' | 'plus' | 'pro' | 'ultra'`. Used by the
-  /// chat UI to decide whether to expose the `/voice/dub` CTA (Plus+)
-  /// or the live-call upgrade nudge. The backend re-validates the tier
-  /// on every paid endpoint — this field only drives client-side hints.
+  /// Raw tier string: `'free' | 'plus' | 'pro' | 'ultra'`. Drives client-side
+  /// paywall / upgrade hints. The backend re-validates the tier on paid
+  /// endpoints.
   final String subscriptionTier;
 
   bool get isPlus =>
@@ -167,32 +136,6 @@ class RemoteProfile {
   /// still read `isUltra` keep compiling during the rename. Same
   /// semantics as [isUltraPlus] now that Ultra/Pro merged.
   bool get isUltra => isUltraPlus;
-
-  /// True when this user's tier unlocks /voice/dub — i.e. anything
-  /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
-  bool get canDubAudio => isPlus;
-
-  /// the voice provider voice id from the user's own Instant Voice Clone.
-  /// Populated by /voice/enroll. Empty until enrolled. Only ever
-  /// non-empty for Ultra subscribers — the backend gates enrolment on
-  /// tier so this field stays empty for everyone else.
-  final String elevenlabsVoiceId;
-
-  /// True when this user has already enrolled their voice clone.
-  /// Drives the profile card's "Voix clonée" badge vs. the CTA.
-  bool get hasClonedVoice => elevenlabsVoiceId.isNotEmpty;
-
-  /// Translation credit remaining in seconds. Decremented during calls; the
-  /// translation pipeline disables itself when this hits 0 but the underlying
-  /// call keeps going.
-  final int creditsSeconds;
-
-  /// Next refill — when `now()` passes this, credits are reset to the tier's
-  /// allotment ([proWeeklyCreditsSeconds] / [freeWeeklyCreditsSeconds]).
-  final DateTime? creditsResetAt;
-
-  /// Lifetime stat (never reset). Used for "X minutes used" on the profile.
-  final int lifetimeCallSeconds;
 
   /// When the current Premium period ends. Null on free tier.
   final DateTime? proExpiresAt;
@@ -208,11 +151,6 @@ class RemoteProfile {
   /// trigger (migration 0044) as the real, un-bypassable guard.
   final DateTime? nameChangedAt;
 
-  /// Short URL-safe slug appended to share links as `?ref=<code>` so a
-  /// new sign-up can be attributed back to whoever sent the invite.
-  /// Server-assigned at profile insert (see migration 0028); empty
-  /// only on legacy rows that haven't been fetched since the backfill.
-  final String referralCode;
 
   /// Backwards-compat shim — the rest of the UI still reads `firstName` /
   /// `sourceLang`. Same data, different schema names.
@@ -305,20 +243,15 @@ class RemoteProfile {
       if (t == 'pro' || t == 'ultra') return 'ultra_plus';
       return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
     }(),
-    elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
-    creditsSeconds: _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
-    creditsResetAt: _parseDate(m['credits_reset_at']),
-    lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
     proExpiresAt: _parseDate(m['pro_expires_at']),
     lastSeen: _parseDate(m['last_seen']),
     nameChangedAt: _parseDate(m['display_name_changed_at']),
-    referralCode: m['referral_code']?.toString() ?? '',
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
-  /// sites that mutate a single attribute (bio / emojis save, credit refill)
-  /// and need a fresh immutable instance without re-listing every field —
-  /// which previously dropped attributes like `subscriptionTier` on rebuild.
+  /// sites that mutate a single attribute (bio / emojis save) and need a
+  /// fresh immutable instance without re-listing every field — which
+  /// previously dropped attributes like `subscriptionTier` on rebuild.
   RemoteProfile copyWith({
     String? handle,
     String? displayName,
@@ -343,14 +276,9 @@ class RemoteProfile {
     bool? emailNotifications,
     bool? isPro,
     String? subscriptionTier,
-    String? elevenlabsVoiceId,
-    int? creditsSeconds,
-    DateTime? creditsResetAt,
-    int? lifetimeCallSeconds,
     DateTime? proExpiresAt,
     DateTime? lastSeen,
     DateTime? nameChangedAt,
-    String? referralCode,
   }) => RemoteProfile(
     id: id,
     handle: handle ?? this.handle,
@@ -376,14 +304,9 @@ class RemoteProfile {
     emailNotifications: emailNotifications ?? this.emailNotifications,
     isPro: isPro ?? this.isPro,
     subscriptionTier: subscriptionTier ?? this.subscriptionTier,
-    elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
-    creditsSeconds: creditsSeconds ?? this.creditsSeconds,
-    creditsResetAt: creditsResetAt ?? this.creditsResetAt,
-    lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
     proExpiresAt: proExpiresAt ?? this.proExpiresAt,
     lastSeen: lastSeen ?? this.lastSeen,
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
-    referralCode: referralCode ?? this.referralCode,
   );
 }
 
@@ -853,8 +776,7 @@ abstract final class ProfileApi {
         .toList(growable: false);
   }
 
-  /// Fetch a single profile by id, or null if no row exists. Also applies the
-  /// weekly credit-refill check so the rest of the app doesn't have to.
+  /// Fetch a single profile by id, or null if no row exists.
   static Future<RemoteProfile?> fetchById(String id) async {
     if (!isSupabaseReady || id.isEmpty) return null;
     // Bounded: an unbounded await here left the iOS CallKit "Accept" path
@@ -867,118 +789,7 @@ abstract final class ProfileApi {
         .maybeSingle()
         .timeout(const Duration(seconds: 10));
     if (row == null) return null;
-    final p = RemoteProfile.fromMap(Map<String, dynamic>.from(row));
-    final refilled = await _maybeRefillCredits(p);
-    return refilled ?? p;
-  }
-
-  /// If [p.creditsResetAt] is in the past, top credits back up to the tier's
-  /// weekly allotment and push a new reset date 7 days out. Returns the
-  /// updated profile, or null if no refill was needed.
-  static Future<RemoteProfile?> _maybeRefillCredits(RemoteProfile p) async {
-    final resetAt = p.creditsResetAt;
-    if (resetAt == null) return null;
-    if (DateTime.now().isBefore(resetAt)) return null;
-    final allotment = switch (p.subscriptionTier) {
-      'ultra_plus' => ultraPlusMonthlyCreditsSeconds,
-      'plus' => plusMonthlyCreditsSeconds,
-      _ => freeWeeklyCreditsSeconds,
-    };
-    final period = p.isPro ? paidRefillPeriod : freeRefillPeriod;
-    final nextReset = DateTime.now().toUtc().add(period);
-    try {
-      await _c
-          .from('profiles')
-          .update({
-            'credits_seconds': allotment,
-            'credits_reset_at': nextReset.toIso8601String(),
-          })
-          .eq('id', p.id);
-    } catch (e) {
-      debugPrint('ProfileApi._maybeRefillCredits failed: $e');
-      return null;
-    }
-    return p.copyWith(
-      creditsSeconds: allotment,
-      creditsResetAt: nextReset.toLocal(),
-    );
-  }
-
-  /// Tell the server "I was invited by the holder of [code]". Idempotent
-  /// — a second call (or a self-referral) is rejected without throwing.
-  /// Returns null when the RPC fails entirely; otherwise a parsed
-  /// result map: `{ok, reason?, referralsTotal?, bonusAddedSeconds?}`.
-  static Future<Map<String, dynamic>?> attributeReferral(String code) async {
-    if (!isSupabaseReady) return null;
-    final trimmed = code.trim();
-    if (trimmed.isEmpty) return null;
-    try {
-      final res = await _c.rpc(
-        'attribute_referral',
-        params: {'p_code': trimmed},
-      );
-      if (res is Map) return Map<String, dynamic>.from(res);
-      return {'ok': false, 'reason': 'malformed_response'};
-    } catch (e) {
-      debugPrint('ProfileApi.attributeReferral failed: $e');
-      return null;
-    }
-  }
-
-  /// Count of users who signed up with [userId] as their referrer.
-  /// Used by the invite-friends popup to render "X / 3" progress. Falls
-  /// back to 0 on failure rather than throwing — the popup shouldn't
-  /// blow up when the network is flaky.
-  static Future<int> countReferrals(String userId) async {
-    if (!isSupabaseReady || userId.isEmpty) return 0;
-    try {
-      final rows = await _c
-          .from('profiles')
-          .select('id')
-          .eq('referred_by', userId);
-      return rows.length;
-    } catch (e) {
-      debugPrint('ProfileApi.countReferrals failed: $e');
-      return 0;
-    }
-  }
-
-  /// Decrement `credits_seconds` by [seconds] and bump `lifetime_call_seconds`
-  /// by the same amount. Both clamp at sensible bounds. Returns the new
-  /// credits balance, or null on failure.
-  ///
-  /// Note: this is a client-side decrement. A determined user could spoof it
-  /// by editing the request. That's fine for the v1 honor-system; if it
-  /// becomes an issue we'll move it behind a Postgres function with
-  /// `SECURITY DEFINER` so the decrement is atomic + tamper-proof.
-  static Future<int?> consumeCredits({
-    required String userId,
-    required int seconds,
-  }) async {
-    if (!isSupabaseReady || userId.isEmpty || seconds <= 0) return null;
-    try {
-      // Read-modify-write. Two round-trips but keeps the logic readable.
-      final row = await _c
-          .from('profiles')
-          .select('credits_seconds, lifetime_call_seconds')
-          .eq('id', userId)
-          .maybeSingle();
-      if (row == null) return null;
-      final current = RemoteProfile._parseInt(row['credits_seconds'], 0);
-      final lifetime = RemoteProfile._parseInt(row['lifetime_call_seconds'], 0);
-      final next = (current - seconds).clamp(0, 1 << 31);
-      await _c
-          .from('profiles')
-          .update({
-            'credits_seconds': next,
-            'lifetime_call_seconds': lifetime + seconds,
-          })
-          .eq('id', userId);
-      return next;
-    } catch (e) {
-      debugPrint('ProfileApi.consumeCredits failed: $e');
-      return null;
-    }
+    return RemoteProfile.fromMap(Map<String, dynamic>.from(row));
   }
 
   /// Persist the user's display name (the "prénom"). Trims to

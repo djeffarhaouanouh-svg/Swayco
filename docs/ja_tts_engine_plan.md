@@ -79,7 +79,7 @@ with no ORT) = one ONNX Runtime total.** iOS links cleanly.
 Executed on desktop: reproduced MeloTTS's Japanese g2p faithfully, ran
 `onnx_exports/ja/model.onnx` on plain `onnxruntime`, synthesised 10 stress
 phrases, listened → **voice quality validated, proceed.** Samples committed under
-`docs/ja_tts_phase0_samples/`. Repro harness: `scratchpad/ja_tts_phase0/`.
+Samples lived under `docs/ja_tts_phase0_samples/` (removed). Repro harness was `scratchpad/ja_tts_phase0/`.
 
 Four findings that **refine** the phases below (they make the frontend simpler
 than first assumed):

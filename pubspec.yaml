@@ -58,9 +58,7 @@ dependencies:
   share_plus: ^12.0.2
   # Reads the real app version/build number for the Settings screen.
   package_info_plus: ^8.0.0
-  # Voice messages: record on iOS/Android/web (AAC/m4a + WebM on web),
-  # play back the original recording on the receiving end. Both packages
-  # request mic / playback permissions through permission_handler above.
+  # Call mic capture (record) + in-call / TTS playback (audioplayers).
   # 6.x — required because record_linux 0.7.2 (the latest in the 5.x
   # tree) doesn't implement the streaming API introduced in
   # record_platform_interface 1.4+, breaking the Android release build
@@ -103,26 +101,16 @@ dependencies:
 
   # sherpa_onnx — the single ONNX Runtime the app consolidates on. Drives both
   # on-device TTS (OfflineTts: Kokoro + Piper/VITS, espeak-ng inside each model
-  # bundle) and on-device neural STT (OfflineRecognizer: Moonshine v2). It
-  # statically links its own runtime, so it must be the ONLY ONNX Runtime in the
-  # app — a second one (e.g. the gtbluesky `onnxruntime` we removed) makes iOS
-  # fail to link on duplicate symbols. Models stay download-on-demand.
+  # bundle) and on-device STT (OfflineRecognizer: universal Whisper) plus the
+  # VAD segmenter (seg.onnx). It statically links its own runtime, so it must
+  # be the ONLY ONNX Runtime in the app — a second one makes iOS fail to link
+  # on duplicate symbols. Models stay download-on-demand.
   sherpa_onnx: ^1.13.4
 
-  # On-device TRANSLATION (Hy-MT2 on llama.cpp / llm_llamacpp) was REMOVED here:
-  # every language now repairs+translates in the cloud (see the note on
-  # translate_routing.routeFor). It cost a 440 MB download, ~2.5-4 s of latency,
-  # and shipped confident wrong sentences on the 1.25-bit quant. Bringing it back
-  # means restoring `llm_llamacpp: ^0.1.9` here, its dependency_override below,
-  # lib/swayco/translate/ondevice_translator.dart, and the on-device branch in
-  # sway_local_mic_streamer_io._translateAndSend — all recoverable from git.
-
-  # On-device STT (lib/swayco/asr): the neural engine (Moonshine) runs on
-  # sherpa_onnx above; the lattice engine (Vosk) is bound directly with dart:ffi
-  # against its native library (no plugin — the only published one is
-  # Android-only, unmaintained).
+  # On-device STT (lib/swayco/asr): universal Whisper via sherpa_onnx above
+  # (OS STT preferred first on iOS/Android). FFI for OpenJTalk / other natives.
   ffi: ^2.1.3
-  # The lattice engine ships its language models as zip archives.
+  # TTS voice bundles ship as tar archives.
   archive: ^4.0.7
 
 # iOS + macOS: use the sherpa_onnx plugin patched with the ja external-tokens API
@@ -156,7 +144,7 @@ dev_dependencies:
   # launch_background drawable still display during cold start
   # (they're handled by the OS, not the plugin), so the user keeps
   # the brief logo flash without the broken overlay.
-  # Generates the launcher icons (Android / iOS / web) from icon-swayco.png.
+  # Generates the launcher icons (Android / iOS / web) from icon-app.png.
   flutter_launcher_icons: ^0.14.1
 
 # App launcher icon. Regenerate after changing assets/icon-app.png with:

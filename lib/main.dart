@@ -281,19 +281,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         });
         return;
       }
-      // Referral pickup: when the app is opened from
-      // `https://www.swayco.fr/?ref=<code>`, stash the code in prefs so we
-      // can credit the referrer once this visitor has finished sign-up
-      // + onboarding. Cleared by `_maybeAttributePendingReferral`. (Host-
-      // agnostic — reads the `ref` query param whatever the host.)
-      if (kIsWeb) {
-        final ref = Uri.base.queryParameters['ref']?.trim() ?? '';
-        if (ref.isNotEmpty) {
-          try {
-            await UserPrefs.writePendingReferralCode(ref);
-          } catch (e) {
-            debugPrint('writePendingReferralCode failed: $e');
-          }
         }
       }
       // Restore the UI language from local prefs so the login screen
@@ -394,22 +381,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     unawaited(RevenueCat.logOut());
   }
 
-  /// Consume the pending `?ref=<code>` captured at boot (if any) and
-  /// call the `attribute_referral` RPC so the referrer gets credit for
-  /// this new sign-up. Cleared regardless of outcome — bad codes /
-  /// self-refs shouldn't get retried forever on subsequent launches.
-  Future<void> _maybeAttributePendingReferral() async {
-    final code = await UserPrefs.readPendingReferralCode();
-    if (code.isEmpty) return;
-    try {
-      await ProfileApi.attributeReferral(code);
-    } catch (e) {
-      debugPrint('attributeReferral failed: $e');
-    } finally {
-      await UserPrefs.clearPendingReferralCode();
-    }
-  }
-
   /// True when this auth user has never completed onboarding — detected
   /// by the absence of a `profiles` row (or one with no display name)
   /// on Supabase. This is the source of truth so a returning user
@@ -508,10 +479,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // (23503 "key not present in table profiles"). Guarantee the row exists
     // now, insert-only so a shared account's language is never clobbered.
     unawaited(ProfileApi.ensureMyProfileRow());
-    // Once the profile row exists, fire the deferred referral
-    // attribution captured at boot. Best-effort — failure is silent so
-    // a flaky network never blocks the user from entering the app.
-    unawaited(_maybeAttributePendingReferral());
     unawaited(ChatUnread.start(uid));
     // Presence heartbeat — keeps profiles.last_seen fresh for the
     // online indicator (gated by each user's hide-online-status

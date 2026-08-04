@@ -539,52 +539,6 @@ export async function getRetention(days = 30): Promise<Retention> {
   return { cohorts: cohortRows, overall, lostUsers, dau };
 }
 
-// ─── referrals ────────────────────────────────────────────────────────────
-
-export type ReferralStats = {
-  /** Profiles whose `referred_by` is non-null = filleuls captured by
-   *  the `attribute_referral` RPC since the system shipped. */
-  totalAttributed: number;
-  /** Number of distinct referrers that have at least one filleul. */
-  activeReferrers: number;
-  /** Sum of bonus tranches already paid (1 tranche = 3 filleuls = 30 min
-   *  of credits credited to a referrer). */
-  bonusTranchesPaid: number;
-  /** Bonus tranches × 30 min = total free minutes given out via referrals. */
-  bonusMinutesGranted: number;
-};
-
-/**
- * Snapshot of the "Invite 3 amis = +30 min" growth loop. Reads the
- * referral columns added by migration 0028 — falls back to zeros when
- * the columns aren't there yet (e.g. on a stale DB), so the dashboard
- * still renders during a rolling deploy.
- */
-export async function getReferralStats(): Promise<ReferralStats> {
-  const [attributed, refRows] = await Promise.all([
-    safeCount("profiles", (q) => q.not("referred_by", "is", null)),
-    safeRows("profiles", "referral_credits_granted", (q) =>
-      q.gt("referral_credits_granted", 0).limit(100000),
-    ),
-  ]);
-
-  const activeReferrers = refRows.length;
-  let tranches = 0;
-  for (const r of refRows) {
-    // referral_credits_granted is stored in "filleuls counted" (multiples
-    // of 3 = paid tranches). One tranche = 30 min.
-    const counted = num(r.referral_credits_granted, 0);
-    tranches += Math.floor(counted / 3);
-  }
-
-  return {
-    totalAttributed: attributed,
-    activeReferrers,
-    bonusTranchesPaid: tranches,
-    bonusMinutesGranted: tranches * 30,
-  };
-}
-
 // ─── consolidated single table ──────────────────────────────────────────────
 
 export type MetricGroup =
@@ -609,10 +563,9 @@ export type MetricRow = {
 
 /**
  * Everything the app tracks, on ONE table, one row per metric. Reuses
- * the per-section aggregates (overview / retention / social / costs /
- * referrals) and adds the per-user averages no other page computes:
- * likes, voice messages, calls, photos, interests and profile
- * completion.
+ * the per-section aggregates (overview / retention / social / costs)
+ * and adds the per-user averages no other page computes:
+ * likes, calls, photos, interests and profile completion.
  *
  * Per-user averages divide an ALL-TIME total by the total user count (a
  * lifetime average), while activity metrics (DAU, retention, new users)
@@ -626,11 +579,9 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     retention,
     social,
     costs,
-    referrals,
     newUsers30d,
     friendshipsTotal,
     messagesTotal,
-    voiceMessages,
     likeRows,
     callsTotal,
     callRows,
@@ -642,13 +593,9 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
     getRetention(30),
     getSocial(30),
     getCosts(30),
-    getReferralStats(),
     safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
     safeCount("friendships"),
     safeCount("messages"),
-    safeCount("messages", (q) =>
-      q.not("audio_url", "is", null).neq("audio_url", ""),
-    ),
     safeRows("likes", "liker, liked", (q) => q.limit(200000)),
     safeCount("incoming_calls"),
     safeRows("incoming_calls", "duration_seconds", (q) =>
@@ -784,14 +731,7 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       label: "Messages envoyés",
       total: fmtInt(messagesTotal),
       perUser: fmtNum(per(messagesTotal)),
-      detail: "texte, image et vocal",
-    },
-    {
-      group: "Social",
-      label: "Messages vocaux",
-      total: fmtInt(voiceMessages),
-      perUser: fmtNum(per(voiceMessages)),
-      detail: "",
+      detail: "texte et image",
     },
     {
       group: "Social",
@@ -882,13 +822,6 @@ export async function getGlobalTable(): Promise<MetricRow[]> {
       total: fmtEur(costs.mrrEur),
       perUser: "—",
       detail: "revenu mensuel récurrent",
-    },
-    {
-      group: "Monétisation",
-      label: "Filleuls (parrainage)",
-      total: fmtInt(referrals.totalAttributed),
-      perUser: "—",
-      detail: `${fmtInt(referrals.activeReferrers)} parrains actifs`,
     },
   ];
 }

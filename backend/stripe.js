@@ -68,20 +68,10 @@ function supabase() {
   return _supabase;
 }
 
-// Per-tier monthly credit allotment (seconds) the webhook refills after
-// every successful payment. The numbers live in `./tiers.js` so backend
-// gating endpoints (e.g. /voice/dub) and the credit refill share one
-// source of truth — never duplicate them here.
-const { monthlySecondsFor } = require('./tiers');
-
-function creditsForTier(tier) {
-  return monthlySecondsFor(tier);
-}
-
-// 30-day rolling refill window, same cadence as the auto-refill in
-// ProfileApi.dart. Pinned here so the webhook and the in-app refill
-// land on the same date. Aligned with Stripe's monthly billing cycle
-// so users perceive "refill" + "new invoice" as the same event.
+// 30-day rolling window used for `pro_expires_at` on checkout, aligned
+// with Stripe's monthly billing cycle. Credit allotment writes
+// (`credits_seconds` / `credits_reset_at`) were removed — the
+// translation session no longer gates on credits.
 function nextRefillDate() {
   const d = new Date();
   d.setDate(d.getDate() + 30);
@@ -212,8 +202,6 @@ async function handleEvent(event) {
           subscription_tier: tier,
           stripe_subscription_id: subscriptionId,
           pro_expires_at: nextRefillDate(),
-          credits_seconds: creditsForTier(tier),
-          credits_reset_at: nextRefillDate(),
         })
         .eq('id', userId);
       // eslint-disable-next-line no-console
@@ -241,7 +229,6 @@ async function handleEvent(event) {
         .update({
           is_pro: isActive,
           subscription_tier: isActive ? tier : 'free',
-          credits_seconds: isActive ? creditsForTier(tier) : 0,
           pro_expires_at: sub.current_period_end
             ? new Date(sub.current_period_end * 1000).toISOString()
             : null,
@@ -280,26 +267,12 @@ async function handleEvent(event) {
     }
 
     case 'invoice.payment_succeeded': {
-      // Renewal — refill weekly credit allotment.
-      const invoice = event.data.object;
-      const subscriptionId = invoice.subscription;
-      if (!subscriptionId) return;
-      const { data: row } = await sb
-        .from('profiles')
-        .select('id, subscription_tier')
-        .eq('stripe_subscription_id', subscriptionId)
-        .maybeSingle();
-      if (!row?.id) return;
-      const tier = row.subscription_tier || 'pro';
-      await sb
-        .from('profiles')
-        .update({
-          credits_seconds: creditsForTier(tier),
-          credits_reset_at: nextRefillDate(),
-        })
-        .eq('id', row.id);
+      // Renewal — tier stays active via subscription.updated; no credit
+      // refill (translation sessions are no longer credit-gated).
       // eslint-disable-next-line no-console
-      console.log(`[stripe] invoice.payment_succeeded refill user=${row.id}`);
+      console.log(
+        `[stripe] invoice.payment_succeeded sub=${event.data.object.subscription}`,
+      );
       break;
     }
 

@@ -28,7 +28,7 @@ case "$("$CMAKE" --version | head -1)" in
   *" 4."*) echo "error: CMake 4 cannot configure sherpa's vendored deps; use 3.x" >&2; exit 1;;
 esac
 
-# 1) sherpa source: v1.13.4 + three patches. Delete $WORK to force a clean
+# 1) sherpa source: v1.13.4 + patches. Delete $WORK to force a clean
 #    re-clone + re-apply.
 WORK="${SHERPA_SRC:-/tmp/sherpa-onnx-patched}"
 if [ ! -d "$WORK" ]; then
@@ -37,9 +37,6 @@ if [ ! -d "$WORK" ]; then
   git -C "$WORK" apply "$REPO/native/sherpa_ja_patch/external-tokens-v1.13.4.patch"
   # STT byte-fallback UTF-8 fix (ja/zh/ko/hi character dropping).
   git -C "$WORK" apply "$REPO/native/sherpa_whisper_patch/byte-fallback-utf8-v1.13.4.patch"
-  # Exports OrtGetApiBase so the voice converter can reach the runtime sherpa
-  # already links, instead of the app vendoring a second ONNX Runtime.
-  git -C "$WORK" apply "$REPO/native/sherpa_ort_export_patch/ort-getapibase-v1.13.4.patch"
 fi
 
 # 2) ORT for iOS. build-ios-shared.sh fetches this with wget, which macOS does
@@ -75,12 +72,4 @@ if [ ! -d "$HERE/ios/ja_openjtalk.xcframework" ]; then
   cp -R "$REPO/native/ja_openjtalk/build/ios/ja_openjtalk.xcframework" "$HERE/ios/"
 fi
 
-# 6) The point of the export patch — fail loudly if it silently stopped working
-#    (e.g. sherpa's generate.sh regenerated the .exp from its ^_Sherpa grep).
-BIN="$HERE/ios/sherpa_onnx.xcframework/ios-arm64/sherpa_onnx.framework/sherpa_onnx"
-if ! nm -gU "$BIN" | grep -q "_OrtGetApiBase"; then
-  echo "error: _OrtGetApiBase is not exported — the voice converter will not open" >&2
-  echo "       (see ../sherpa_ort_export_patch/README.md)" >&2
-  exit 1
-fi
-echo "done: sherpa_onnx.xcframework rebuilt, _OrtGetApiBase exported"
+echo "done: sherpa_onnx.xcframework rebuilt"

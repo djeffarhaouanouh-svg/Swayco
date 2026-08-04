@@ -30,14 +30,12 @@ import '../services/profile_api.dart';
 import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
-import '../services/usage_tracker.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
-import 'paywall_screen.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -855,13 +853,6 @@ class _CallScreenState extends State<CallScreen> {
   /// always runs, whatever the exit path: hang-up, peer-left, back nav).
   DateTime? _connectedAt;
 
-  /// Guard against showing the invite-friends popup twice in the same
-  /// call session — fires once on the credits-exhaustion edge AND once
-  /// at init time when credits were already 0 at call start (the
-  /// notifier was already `true` from a previous call, so addListener
-  /// won't re-fire on the second set-to-true).
-  bool _inviteDialogShown = false;
-
   /// `guest` / `live` / `friend`, inferred from the room-name prefix the
   /// backend mints. Tags every call analytics event.
   String get _callKind {
@@ -897,25 +888,16 @@ class _CallScreenState extends State<CallScreen> {
     // panneau. Lui ne revient qu'au doigt.
   }
 
-  /// Translation credits should only burn while the live pipeline is
-  /// actually live â€” not for the whole call. Pause the meter while
-  /// waiting for the peer / connecting / idle, resume it once the live engine is
-  /// connected and translating.
+  /// Track real translation-live time for cost analytics. Starts while the
+  /// live pipeline is connected and translating; stops while waiting /
+  /// connecting / idle.
   void _syncUsageMeter() {
     final live = widget.translation.translationFeedbackPhase ==
         TranslationFeedbackPhase.live;
-    // The stopwatch tracks real translation time for the cost analytics â€”
-    // kept running even when UsageTracker is disabled (test mode).
     if (live) {
       _translationLive.start();
     } else {
       _translationLive.stop();
-    }
-    if (UsageTracker.isDisabled) return;
-    if (live) {
-      UsageTracker.resume();
-    } else {
-      UsageTracker.pause();
     }
   }
 
@@ -1119,9 +1101,7 @@ class _CallScreenState extends State<CallScreen> {
     _wireDeviceTtsSignal();
     ttsSpeaking.addListener(_syncTranslationSpeaking);
     unawaited(_loadDeviceVoiceLangs());
-    unawaited(_initUsageTracking());
     _wakeDock();
-    UsageTracker.creditsExhausted.addListener(_onCreditsExhausted);
     // Caller waiting for pickup: listen for the callee declining so we
     // can close this screen instead of ringing into an empty room.
     final callId = widget.outgoingCallId;
@@ -1199,140 +1179,6 @@ class _CallScreenState extends State<CallScreen> {
       SnackBar(content: Text(AppStrings.t('call_declined'))),
     );
     unawaited(_hangUp());
-  }
-
-  /// Pull the user's current credit balance and start the call timer. The
-  /// call itself runs regardless â€” we just decide whether translation is
-  /// allowed on top.
-  Future<void> _initUsageTracking() async {
-    final uid = AuthService.currentUserId;
-    if (uid.isEmpty) return;
-    final p = await ProfileApi.fetchById(uid);
-    if (!mounted || p == null) return;
-    // "Caller pays" rule: a paying subscriber who is not the caller of
-    // this session is never debited. Their abonnement covers it. Free
-    // users fall through and are always debited (free vs free → both
-    // sides pay; free vs paying → only the free side pays).
-    if (p.isPro && !widget.isCaller) {
-      debugPrint(
-        '[usage] paying callee — skipping tracker '
-        '(tier=${p.subscriptionTier})',
-      );
-      return;
-    }
-    UsageTracker.start(userId: uid, initialCredits: p.creditsSeconds);
-    if (UsageTracker.isDisabled) return;
-    // Don't bill the whole call â€” only while translation is live. Set the
-    // meter to whatever the pipeline's state is right now.
-    _syncUsageMeter();
-    if (p.creditsSeconds <= 0) {
-      // Already empty before the call started â€” kill translation now,
-      // and surface the invite-friends popup directly (the
-      // `creditsExhausted` listener won't fire because the notifier
-      // was already `true` from a prior session, so no value change).
-      await widget.translation.detach();
-      if (mounted && !_inviteDialogShown) {
-        unawaited(_showOutOfCreditsDialog());
-      }
-    }
-  }
-
-  /// Triggered when credits hit 0 mid-call. We detach the translation
-  /// pipeline so the live session stops billing, but leave the LiveKit
-  /// connection alone so people can keep talking (untranslated). Then
-  /// surface the "Invite 3 amis = +30 min" dialog so the user has a
-  /// concrete way to earn more time without forcing them to upgrade.
-  void _onCreditsExhausted() {
-    if (!UsageTracker.creditsExhausted.value) return;
-    unawaited(widget.translation.detach());
-    if (!mounted) return;
-    if (_inviteDialogShown) return;
-    unawaited(_showOutOfCreditsDialog());
-  }
-
-  /// Modal shown when the user is out of translation credits: a quick
-  /// "Oups… plus de crédits" with a Recharger button that opens the paywall.
-  Future<void> _showOutOfCreditsDialog() async {
-    _inviteDialogShown = true;
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        // Même surface que _TipDialog (root_shell.dart) : le fond de l'app,
-        // détaché de la page par sa bordure blanche.
-        backgroundColor: SC.bg,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 36),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 88,
-                height: 88,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: SC.accent.withValues(alpha: 0.15),
-                ),
-                child: const Icon(
-                  Icons.bolt_rounded,
-                  color: SC.accent,
-                  size: 44,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                AppStrings.t('out_of_credits_title'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                AppStrings.t('out_of_credits_body'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14.5,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    unawaited(showPaywallSheet(context));
-                  },
-                  child: Text(AppStrings.t('out_of_credits_cta')),
-                ),
-              ),
-              const SizedBox(height: 4),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(
-                  AppStrings.t('invite_bonus_later'),
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _start() async {
@@ -1909,12 +1755,6 @@ class _CallScreenState extends State<CallScreen> {
   /// parle, à droite celle que j'entends. Une roue par question, un drapeau à
   /// la fois — rien à lire, on fait défiler jusqu'au bon.
   void _openLanguagePairSheet() {
-    // Out of credits → translation is off; tapping the languages opens the
-    // recharge paywall instead of the picker.
-    if (!UsageTracker.isDisabled && UsageTracker.creditsExhausted.value) {
-      unawaited(_showOutOfCreditsDialog());
-      return;
-    }
     // Le panneau n'a pas de bouton de validation : on note ce que les roues
     // désignent, et on applique quand il se referme — peu importe comment il a
     // été refermé. Appliquer à chaque cran relancerait le recogniser, ou
@@ -1926,6 +1766,7 @@ class _CallScreenState extends State<CallScreen> {
       (ctx) => _LanguagePairSheet(
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
+        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onChanged: (s, h) {
           spoken = s;
           heard = h;
@@ -1955,6 +1796,7 @@ class _CallScreenState extends State<CallScreen> {
         controller: _audio,
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
+        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onLanguagesChanged: (sp, hd) {
           spoken = sp;
           heard = hd;
@@ -2092,7 +1934,6 @@ class _CallScreenState extends State<CallScreen> {
     final startedAt = _connectedAt;
     if (startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
-      unawaited(UsageTracker.stop());
       setState(() => _ended = true);
       return;
     }
@@ -2104,32 +1945,6 @@ class _CallScreenState extends State<CallScreen> {
     final s = d.inSeconds % 60;
     if (m <= 0) return '$s s';
     return '$m min ${s.toString().padLeft(2, '0')} s';
-  }
-
-  /// Share the user's referral link — invite friends, both earn free live
-  /// minutes. Mirrors the profile's invite-a-friend section. Best-effort.
-  Future<void> _shareReferral() async {
-    try {
-      final uid = AuthService.currentUserId;
-      final code =
-          uid.isEmpty ? '' : (await ProfileApi.fetchById(uid))?.referralCode ?? '';
-      final link = code.isEmpty
-          ? 'https://www.swayco.fr'
-          : 'https://www.swayco.fr/?ref=$code';
-      if (!mounted) return;
-      final box = context.findRenderObject() as RenderBox?;
-      await SharePlus.instance.share(
-        ShareParams(
-          text: AppStrings.t('invite_share_text', args: {'link': link}),
-          subject: AppStrings.t('invite_friend'),
-          sharePositionOrigin: box != null
-              ? box.localToGlobal(Offset.zero) & box.size
-              : null,
-        ),
-      );
-    } catch (_) {
-      // Sheet dismissed / sharing unavailable — nothing to do.
-    }
   }
 
   /// Black "call ended" card: the peer's PDP + flag, the minutes spent, a
@@ -2262,54 +2077,6 @@ class _CallScreenState extends State<CallScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            // Invite friends → both earn free live minutes (referral link).
-            // Full-width cyan -> blue gradient CTA pinned to the bottom.
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 28,
-              child: Pressable(
-                bounce: true,
-                onTap: _shareReferral,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    gradient: const LinearGradient(
-                      colors: [SC.accent, SC.meshBlue],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SC.accent.withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.group_add_rounded,
-                            color: Colors.white, size: 20),
-                        const SizedBox(width: 10),
-                        Text(
-                          AppStrings.t('invite_bonus_share_cta'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -2381,15 +2148,11 @@ class _CallScreenState extends State<CallScreen> {
     _voiceLevel.dispose();
     _dockIdleTimer?.cancel();
     _micProbe?.cancel();
-    UsageTracker.creditsExhausted.removeListener(_onCreditsExhausted);
     final declineCh = _declineChannel;
     _declineChannel = null;
     if (declineCh != null) {
       unawaited(Supabase.instance.client.removeChannel(declineCh));
     }
-    // Flush whatever seconds were used since the last tick before tearing
-    // everything down. Fire-and-forget â€” disposing a State must be sync.
-    unawaited(UsageTracker.stop());
     final ev = _roomEvents;
     _roomEvents = null;
     if (ev != null) unawaited(ev.dispose());
@@ -3058,9 +2821,6 @@ class _CallScreenState extends State<CallScreen> {
                               ),
                             ),
                           ),
-                          // Mini white countdown just under the watermark —
-                          // appears only when credit drops below 5 min.
-                          const _LowCreditCounter(),
                         ],
                       ),
                     ),
@@ -3077,42 +2837,6 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
-}
-
-/// Tiny white "credit time left" readout. Renders a compact mm:ss only when
-/// this side is genuinely being debited (the usage tracker is running — i.e.
-/// not a paying callee, not test mode) AND the remaining credit has dropped
-/// below five minutes. Zero-size otherwise, so it never shifts the layout
-/// while there's plenty of credit left.
-class _LowCreditCounter extends StatelessWidget {
-  const _LowCreditCounter();
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: UsageTracker.creditsRemaining,
-      builder: (context, secs, _) {
-        if (!UsageTracker.isRunning || secs <= 0 || secs >= 300) {
-          return const SizedBox.shrink();
-        }
-        final m = secs ~/ 60;
-        final s = (secs % 60).toString().padLeft(2, '0');
-        return Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            '$m:$s',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-              shadows: [Shadow(color: Colors.black, blurRadius: 6)],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// Un tour de parole : ce qu'une des deux personnes vient de dire, déjà dans
@@ -4567,11 +4291,17 @@ class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onChanged,
   });
 
   final String spokenCode;
   final String heardCode;
+
+  /// Base language codes the device can actually speak (from flutter_tts
+  /// `getLanguages`). Both wheels only list these so the user cannot pick a
+  /// language with no OS voice.
+  final Set<String> ttsVoiceLangCodes;
 
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
   /// d'appel qui le fera quand le panneau se refermera.
@@ -4595,6 +4325,7 @@ class _LanguagePairSheet extends StatelessWidget {
             _LanguageWheels(
               spokenCode: spokenCode,
               heardCode: heardCode,
+              ttsVoiceLangCodes: ttsVoiceLangCodes,
               onChanged: onChanged,
             ),
             const SizedBox(height: 18),
@@ -4653,16 +4384,22 @@ class _SheetHandle extends StatelessWidget {
 /// roue jusqu'à celui qu'on veut. Rien n'est appliqué en direct — chaque cran
 /// relancerait sinon le recogniser, ou annoncerait une langue au pair, pour des
 /// drapeaux qu'on ne fait que survoler.
+///
+/// Les deux roues ne listent que les langues pour lesquelles le device a une
+/// voix TTS OS ([ttsVoiceLangCodes]) — sinon l'utilisateur sélectionnerait une
+/// langue que flutter_tts ne peut pas parler.
 class _LanguageWheels extends StatefulWidget {
   const _LanguageWheels({
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onChanged,
     this.compact = false,
   });
 
   final String spokenCode;
   final String heardCode;
+  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onChanged;
 
   /// Serré : les deux roues partagent le panneau avec les réglages de son.
@@ -4673,19 +4410,42 @@ class _LanguageWheels extends StatefulWidget {
 }
 
 class _LanguageWheelsState extends State<_LanguageWheels> {
-  late int _spoken = _indexOf(widget.spokenCode);
-  late int _heard = _indexOf(widget.heardCode);
+  late final List<AppLanguage> _langs =
+      _pickerLanguages(widget.ttsVoiceLangCodes, widget.spokenCode, widget.heardCode);
+  late int _spoken = _indexOf(_langs, widget.spokenCode);
+  late int _heard = _indexOf(_langs, widget.heardCode);
 
   void _report() => widget.onChanged(
-        supportedLanguages[_spoken].code,
-        supportedLanguages[_heard].code,
+        _langs[_spoken].code,
+        _langs[_heard].code,
       );
+
+  /// Catalogue UI ∩ voix device. Si [ttsCodes] est encore vide (getLanguages
+  /// pas revenu), on montre tout pour ne pas ouvrir une roue vide. La sélection
+  /// courante reste visible même si elle n'a pas (encore) de voix.
+  static List<AppLanguage> _pickerLanguages(
+    Set<String> ttsCodes,
+    String spokenCode,
+    String heardCode,
+  ) {
+    if (ttsCodes.isEmpty) return supportedLanguages;
+    final list =
+        supportedLanguages.where((l) => ttsCodes.contains(l.code)).toList();
+    if (list.isEmpty) return supportedLanguages;
+    for (final code in [spokenCode, heardCode]) {
+      final base = code.split('-').first.toLowerCase();
+      if (base.isEmpty || list.any((l) => l.code == base)) continue;
+      final i = supportedLanguages.indexWhere((l) => l.code == base);
+      if (i >= 0) list.insert(0, supportedLanguages[i]);
+    }
+    return list;
+  }
 
   /// Une langue hors catalogue (ou vide) retombe sur la première : la roue doit
   /// toujours montrer quelque chose.
-  static int _indexOf(String code) {
+  static int _indexOf(List<AppLanguage> langs, String code) {
     final base = code.split('-').first.toLowerCase();
-    final i = supportedLanguages.indexWhere((l) => l.code == base);
+    final i = langs.indexWhere((l) => l.code == base);
     return i < 0 ? 0 : i;
   }
 
@@ -4698,6 +4458,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
           child: _FlagWheel(
             title: AppStrings.t('call_lang_me'),
             icon: Icons.mic_rounded,
+            languages: _langs,
             index: _spoken,
             compact: widget.compact,
             onChanged: (i) {
@@ -4720,6 +4481,7 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
           child: _FlagWheel(
             title: AppStrings.t('call_lang_translation'),
             icon: Icons.hearing_rounded,
+            languages: _langs,
             index: _heard,
             compact: widget.compact,
             onChanged: (i) {
@@ -4740,12 +4502,14 @@ class _CallSettingsSheet extends StatelessWidget {
     required this.controller,
     required this.spokenCode,
     required this.heardCode,
+    required this.ttsVoiceLangCodes,
     required this.onLanguagesChanged,
   });
 
   final AudioController controller;
   final String spokenCode;
   final String heardCode;
+  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onLanguagesChanged;
 
   @override
@@ -4777,6 +4541,7 @@ class _CallSettingsSheet extends StatelessWidget {
                     child: _LanguageWheels(
                       spokenCode: spokenCode,
                       heardCode: heardCode,
+                      ttsVoiceLangCodes: ttsVoiceLangCodes,
                       onChanged: onLanguagesChanged,
                       compact: true,
                     ),
@@ -4798,6 +4563,7 @@ class _FlagWheel extends StatefulWidget {
   const _FlagWheel({
     required this.title,
     required this.icon,
+    required this.languages,
     required this.index,
     required this.onChanged,
     this.compact = false,
@@ -4807,6 +4573,9 @@ class _FlagWheel extends StatefulWidget {
 
   /// Ce que fait cette colonne : ma voix qui entre, la traduction qui sort.
   final IconData icon;
+
+  /// Langues proposées dans cette roue (déjà filtrées voix OS si besoin).
+  final List<AppLanguage> languages;
   final int index;
   final ValueChanged<int> onChanged;
 
@@ -4829,6 +4598,8 @@ class _FlagWheelState extends State<_FlagWheel> {
 
   @override
   Widget build(BuildContext context) {
+    final langs = widget.languages;
+    final safeIndex = widget.index.clamp(0, langs.isEmpty ? 0 : langs.length - 1);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -4867,7 +4638,7 @@ class _FlagWheelState extends State<_FlagWheel> {
             physics: const FixedExtentScrollPhysics(),
             onSelectedItemChanged: widget.onChanged,
             childDelegate: ListWheelChildBuilderDelegate(
-              childCount: supportedLanguages.length,
+              childCount: langs.length,
               // Sur le téléphone, l'emoji drapeau du système : c'est celui que
               // l'utilisateur voit partout ailleurs sur son appareil. Le web n'a
               // pas ce luxe — sous Windows le glyphe n'existe pas et Chrome
@@ -4875,7 +4646,7 @@ class _FlagWheelState extends State<_FlagWheel> {
               builder: (ctx, i) => Center(
                 child: kIsWeb
                     ? CountryFlag.fromCountryCode(
-                        supportedLanguages[i].countryCode,
+                        langs[i].countryCode,
                         theme: ImageTheme(
                           width: widget.compact ? 32 : 40,
                           height: widget.compact ? 32 : 40,
@@ -4883,7 +4654,7 @@ class _FlagWheelState extends State<_FlagWheel> {
                         ),
                       )
                     : Text(
-                        supportedLanguages[i].flag,
+                        langs[i].flag,
                         style: TextStyle(fontSize: widget.compact ? 30 : 38),
                       ),
               ),
@@ -4892,7 +4663,7 @@ class _FlagWheelState extends State<_FlagWheel> {
         ),
         const SizedBox(height: 8),
         Text(
-          supportedLanguages[widget.index].label,
+          langs.isEmpty ? '' : langs[safeIndex].label,
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

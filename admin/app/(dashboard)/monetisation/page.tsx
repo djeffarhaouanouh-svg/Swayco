@@ -1,4 +1,4 @@
-import { getCosts, getReferralStats } from "@/lib/metrics";
+import { getCosts } from "@/lib/metrics";
 import { SectionHeader } from "@/components/section";
 import { KpiCard } from "@/components/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { StatList } from "@/components/stat-list";
 import { fmtEur, fmtEur2, fmtInt, fmtMinutes, fmtUsd } from "@/lib/format";
 
 export default async function MonetisationPage() {
-  const [c, r] = await Promise.all([getCosts(30), getReferralStats()]);
+  const c = await getCosts(30);
 
   return (
     <>
@@ -126,34 +126,6 @@ export default async function MonetisationPage() {
                 {
                   label: "Tokens de traduction texte",
                   value: fmtInt(c.textTokens),
-                },
-              ]}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Parrainage (Invite 3 amis = +30 min)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatList
-              items={[
-                {
-                  label: "Filleuls attribués",
-                  value: fmtInt(r.totalAttributed),
-                },
-                {
-                  label: "Parrains actifs",
-                  value: fmtInt(r.activeReferrers),
-                },
-                {
-                  label: "Paliers payés (× 3 filleuls)",
-                  value: fmtInt(r.bonusTranchesPaid),
-                },
-                {
-                  label: "Minutes offertes",
-                  value: fmtMinutes(r.bonusMinutesGranted),
-                  tone: "muted",
                 },
               ]}
             />
