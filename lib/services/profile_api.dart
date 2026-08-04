@@ -53,7 +53,6 @@ class RemoteProfile {
     this.emailNotifications = true,
     this.isPro = false,
     this.subscriptionTier = 'free',
-    this.elevenlabsVoiceId = '',
     this.creditsSeconds = freeWeeklyCreditsSeconds,
     this.creditsResetAt,
     this.lifetimeCallSeconds = 0,
@@ -171,16 +170,6 @@ class RemoteProfile {
   /// True when this user's tier unlocks /voice/dub — i.e. anything
   /// above Free. Mirrors `tiers.js#FEATURES.voiceDub !== 'none'`.
   bool get canDubAudio => isPlus;
-
-  /// the voice provider voice id from the user's own Instant Voice Clone.
-  /// Populated by /voice/enroll. Empty until enrolled. Only ever
-  /// non-empty for Ultra subscribers — the backend gates enrolment on
-  /// tier so this field stays empty for everyone else.
-  final String elevenlabsVoiceId;
-
-  /// True when this user has already enrolled their voice clone.
-  /// Drives the profile card's "Voix clonée" badge vs. the CTA.
-  bool get hasClonedVoice => elevenlabsVoiceId.isNotEmpty;
 
   /// Translation credit remaining in seconds. Decremented during calls; the
   /// translation pipeline disables itself when this hits 0 but the underlying
@@ -305,7 +294,6 @@ class RemoteProfile {
       if (t == 'pro' || t == 'ultra') return 'ultra_plus';
       return (t == 'plus' || t == 'ultra_plus') ? t : 'free';
     }(),
-    elevenlabsVoiceId: m['elevenlabs_voice_id']?.toString().trim() ?? '',
     creditsSeconds: _parseInt(m['credits_seconds'], freeWeeklyCreditsSeconds),
     creditsResetAt: _parseDate(m['credits_reset_at']),
     lifetimeCallSeconds: _parseInt(m['lifetime_call_seconds'], 0),
@@ -343,7 +331,6 @@ class RemoteProfile {
     bool? emailNotifications,
     bool? isPro,
     String? subscriptionTier,
-    String? elevenlabsVoiceId,
     int? creditsSeconds,
     DateTime? creditsResetAt,
     int? lifetimeCallSeconds,
@@ -376,7 +363,6 @@ class RemoteProfile {
     emailNotifications: emailNotifications ?? this.emailNotifications,
     isPro: isPro ?? this.isPro,
     subscriptionTier: subscriptionTier ?? this.subscriptionTier,
-    elevenlabsVoiceId: elevenlabsVoiceId ?? this.elevenlabsVoiceId,
     creditsSeconds: creditsSeconds ?? this.creditsSeconds,
     creditsResetAt: creditsResetAt ?? this.creditsResetAt,
     lifetimeCallSeconds: lifetimeCallSeconds ?? this.lifetimeCallSeconds,
