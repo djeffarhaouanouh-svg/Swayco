@@ -30,6 +30,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_wordmark.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -598,23 +599,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: 'swayc'),
-                  TextSpan(
-                    text: 'ø',
-                    style: TextStyle(color: SC.accent),
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.3,
-              ),
-            ),
+            const SwaycoWordmark(fontSize: 22),
             // Personne en ligne = pas de pastille : un « 0 en ligne » est une
             // mauvaise nouvelle affichée en permanence.
             if (_onlineFriends > 0)

@@ -36,6 +36,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_wordmark.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -1978,32 +1979,18 @@ class _CallScreenState extends State<CallScreen> {
                   color: SC.bg,
                   child: Stack(
                     children: [
-                      // Brand wordmark — top-centre, like the in-call screen.
+                      // Brand lockup — top-centre, like the in-call screen.
                       const Positioned(
                         top: 12,
                         left: 0,
                         right: 0,
                         child: Center(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: 'swayc'),
-                                // ".ai" in cyan accent.
-                                TextSpan(
-                                  text: 'ø',
-                                  style: TextStyle(color: SC.accent),
-                                ),
-                              ],
-                            ),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                              shadows: [
-                                Shadow(color: Colors.black54, blurRadius: 8),
-                              ],
-                            ),
+                          child: SwaycoWordmark(
+                            fontSize: 25,
+                            letterSpacing: 0.5,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 8),
+                            ],
                           ),
                         ),
                       ),
@@ -2785,41 +2772,21 @@ class _CallScreenState extends State<CallScreen> {
                     ),
                   ),
                 ),
-                // Brand watermark — top-centre, always on top of whatever
+                // Brand lockup — top-centre, always on top of whatever
                 // call layout is showing (full-screen, PiP, split…).
                 Align(
                   alignment: Alignment.topCenter,
                   child: IgnorePointer(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Opacity(
-                            opacity: 0.7,
-                            child: Text.rich(
-                              const TextSpan(
-                                children: [
-                                  TextSpan(text: 'swayc'),
-                                  TextSpan(
-                                    text: 'ø',
-                                    style: TextStyle(color: SC.accent),
-                                  ),
-                                ],
-                              ),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 25,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    blurRadius: 8,
-                                  ),
-                                ],
-                              ),
-                            ),
+                      child: SwaycoWordmark(
+                        fontSize: 25,
+                        letterSpacing: 0.5,
+                        opacity: 0.7,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 8,
                           ),
                         ],
                       ),
