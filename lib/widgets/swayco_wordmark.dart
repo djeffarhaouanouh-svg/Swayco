@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
 
-/// Brand lockup: coconut mark + `swaycø` (ø in accent).
+/// Brand lockup: `swaycø` then the coconut mark (ø in accent).
 ///
 /// Icon size tracks [fontSize] so every placement stays coherent with the
 /// surrounding text — ~1.05× the type size, optically matched to the
-/// heavy weight of the wordmark.
+/// heavy weight of the wordmark. Mark sits **after** the letters.
 class SwaycoWordmark extends StatelessWidget {
   const SwaycoWordmark({
     super.key,
@@ -29,10 +29,10 @@ class SwaycoWordmark extends StatelessWidget {
   /// Icon edge length paired with a given wordmark [fontSize].
   static double iconSizeFor(double fontSize) => fontSize * 1.05;
 
-  /// Gap between mark and text.
+  /// Gap between text and mark.
   static double gapFor(double fontSize) => (fontSize * 0.22).clamp(3.0, 8.0);
 
-  /// Approximate laid-out width (mark + gap + "swaycø") for collision math.
+  /// Approximate laid-out width ("swaycø" + gap + mark) for collision math.
   static double widthFor(double fontSize, {double letterSpacing = 0.3}) {
     final icon = iconSizeFor(fontSize);
     final gap = gapFor(fontSize);
@@ -49,7 +49,7 @@ class SwaycoWordmark extends StatelessWidget {
       textDirection: TextDirection.ltr,
     )..layout())
         .width;
-    return icon + gap + textW;
+    return textW + gap + icon;
   }
 
   @override
@@ -60,15 +60,6 @@ class SwaycoWordmark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image.asset(
-          asset,
-          width: icon,
-          height: icon,
-          filterQuality: FilterQuality.high,
-          // Black squares must never leak if the asset fails to load.
-          errorBuilder: (_, _, _) => SizedBox(width: icon, height: icon),
-        ),
-        SizedBox(width: gap),
         Text.rich(
           TextSpan(
             children: [
@@ -87,6 +78,14 @@ class SwaycoWordmark extends StatelessWidget {
             height: 1.0,
             shadows: shadows,
           ),
+        ),
+        SizedBox(width: gap),
+        Image.asset(
+          asset,
+          width: icon,
+          height: icon,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, _, _) => SizedBox(width: icon, height: icon),
         ),
       ],
     );
