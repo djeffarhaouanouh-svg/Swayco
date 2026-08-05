@@ -824,7 +824,7 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swaycø + coconut mark. Hidden while search expands.
+              // Wordmark swaycø. Hidden while the search field expands.
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,

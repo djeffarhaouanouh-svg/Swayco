@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
 
-/// Brand lockup: `swaycø` then the coconut mark (ø in [SC.brandO]).
+/// The `swaycø` wordmark — plain type, the "ø" in [SC.brandO].
 ///
-/// Icon size tracks [fontSize] so every placement stays coherent with the
-/// surrounding text — ~1.05× the type size, optically matched to the
-/// heavy weight of the wordmark. Mark sits **after** the letters.
+/// Single source of truth for the brand type so a weight / colour tweak lands
+/// everywhere at once (Discover, Messages, chat header, in-call watermark).
 class SwaycoWordmark extends StatelessWidget {
   const SwaycoWordmark({
     super.key,
@@ -23,71 +22,49 @@ class SwaycoWordmark extends StatelessWidget {
   final List<Shadow>? shadows;
   final double opacity;
 
-  /// Coconut mark asset (transparent PNG).
-  static const asset = 'assets/icons/swayco_coconut_mark.png';
+  static TextStyle styleFor(
+    double fontSize, {
+    double letterSpacing = 0.3,
+    List<Shadow>? shadows,
+  }) =>
+      TextStyle(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        letterSpacing: letterSpacing,
+        height: 1.0,
+        shadows: shadows,
+      );
 
-  /// Icon edge length paired with a given wordmark [fontSize].
-  static double iconSizeFor(double fontSize) => fontSize * 1.05;
-
-  /// Gap between text and mark.
-  static double gapFor(double fontSize) => (fontSize * 0.22).clamp(3.0, 8.0);
-
-  /// Approximate laid-out width ("swaycø" + gap + mark) for collision math.
-  static double widthFor(double fontSize, {double letterSpacing = 0.3}) {
-    final icon = iconSizeFor(fontSize);
-    final gap = gapFor(fontSize);
-    final textW = (TextPainter(
-      text: TextSpan(
-        text: 'swaycø',
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w800,
-          letterSpacing: letterSpacing,
+  /// Laid-out width of "swaycø" — used by the chat header collision math.
+  static double widthFor(double fontSize, {double letterSpacing = 0.3}) =>
+      (TextPainter(
+        text: TextSpan(
+          text: 'swaycø',
+          style: styleFor(fontSize, letterSpacing: letterSpacing),
         ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout())
-        .width;
-    return textW + gap + icon;
-  }
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+      )..layout())
+          .width;
 
   @override
   Widget build(BuildContext context) {
-    final icon = iconSizeFor(fontSize);
-    final gap = gapFor(fontSize);
-    final child = Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(text: 'swayc', style: TextStyle(color: color)),
-              TextSpan(
-                text: 'ø',
-                style: TextStyle(color: SC.brandO),
-              ),
-            ],
+    final child = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: 'swayc', style: TextStyle(color: color)),
+          const TextSpan(
+            text: 'ø',
+            style: TextStyle(color: SC.brandO),
           ),
-          maxLines: 1,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            letterSpacing: letterSpacing,
-            height: 1.0,
-            shadows: shadows,
-          ),
-        ),
-        SizedBox(width: gap),
-        Image.asset(
-          asset,
-          width: icon,
-          height: icon,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (_, _, _) => SizedBox(width: icon, height: icon),
-        ),
-      ],
+        ],
+      ),
+      maxLines: 1,
+      style: styleFor(
+        fontSize,
+        letterSpacing: letterSpacing,
+        shadows: shadows,
+      ),
     );
     if (opacity >= 1) return child;
     return Opacity(opacity: opacity, child: child);
