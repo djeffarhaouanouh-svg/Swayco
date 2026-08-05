@@ -28,7 +28,7 @@ abstract final class SC {
 
   // The "ø" of the swaycø wordmark — turquoise pulled from the splash art,
   // slightly greener than [accent]. Brand-only: never used as a UI accent.
-  static const brandO        = Color(0xFF2EECD7);
+  static const brandO        = Color(0xFF59FFED);
 
   // "Online" indicator — light green, used for presence dots / labels and
   // the auto-translate toggle in the chat composer.
