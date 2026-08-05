@@ -21,13 +21,14 @@ import '../services/demonyms.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/profile_api.dart';
+import '../theme/swayco_theme.dart';
 import 'flag_gradients.dart';
 import 'profile_avatar.dart';
 
 enum MatchCardKind { first, rare, standard }
 
-const _cyan = Color(0xFF22D3EE);
-const _cyanInk = Color(0xFF04262D);
+const _cyan = SC.accent;
+const _cyanInk = Color(0xFF042622);
 const _gold1 = Color(0xFFF0C86E);
 const _gold2 = Color(0xFFFFF6DA);
 const _gold3 = Color(0xFFC9A24A);

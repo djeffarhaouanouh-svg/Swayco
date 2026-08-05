@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Swayco "Midnight" palette — deep navy mesh background, glass
-/// surfaces, cyan accent. Source of truth for every theme-aware
-/// surface in the app since the legacy WhatsApp-green palette was
-/// retired.
+/// surfaces, turquoise accent taken from the coconut logo. Source of truth
+/// for every theme-aware surface in the app since the legacy WhatsApp-green
+/// palette was retired.
 abstract final class SC {
   // Backgrounds
   // Un seul fond pour toute l'app : le gris quasi-noir que portaient déjà
@@ -12,8 +12,8 @@ abstract final class SC {
   // secondaires en bleu nuit — passer d'un onglet à l'autre se voyait.
   // Toute surface de fond passe par [bg] : ne pas recoder la valeur en dur.
   static const bg            = Color(0xFF0E0E0E);
-  // Encre sombre posée SUR l'accent cyan (texte des badges / boutons pleins),
-  // pas un fond : elle reste bleu nuit.
+  // Encre sombre posée SUR l'accent turquoise (texte des badges / boutons
+  // pleins), pas un fond : elle reste bleu nuit.
   static const bgDeep        = Color(0xFF050817);
 
   // Mesh halo colors (used by MeshBackground).
@@ -22,12 +22,14 @@ abstract final class SC {
   static const meshCyan      = Color(0xFF06B6D4);
   static const meshNavy      = Color(0xFF1E40AF);
 
-  // Accent
-  static const accent        = Color(0xFF22D3EE);
-  static const accentDeep    = Color(0xFF0891B2);
+  // Accent — the turquoise of the coconut logo. Replaced the cyan-400 the app
+  // shipped with; [accentDeep] and the outgoing-bubble stops below are the
+  // same hue at lower lightness, so the whole family moves together.
+  static const accent        = Color(0xFF2EECD7);
+  static const accentDeep    = Color(0xFF0BAF9C);
 
-  // The "ø" of the swaycø wordmark — turquoise pulled from the splash art,
-  // slightly greener than [accent]. Brand-only: never used as a UI accent.
+  // The "ø" of the swaycø wordmark — a brighter step of the same turquoise so
+  // the letter still lifts off the accent. Brand-only, never a UI colour.
   static const brandO        = Color(0xFF59FFED);
 
   // "Online" indicator — light green, used for presence dots / labels and
@@ -55,18 +57,19 @@ abstract final class SC {
   static const glassBorderStrong = Color(0x33FFFFFF);
 
   // Outgoing bubble gradient stops.
-  static const outBubbleStart = Color(0xFF0891B2);
-  static const outBubbleEnd   = Color(0xFF0E7490);
+  static const outBubbleStart = Color(0xFF0BAF9C);
+  static const outBubbleEnd   = Color(0xFF0E9081);
 
   // Chat message bubbles — "card" style on the black message area.
-  // Incoming (received): dark slate grey. Outgoing (sent): dark cyan with a
-  // bright cyan border. Both keep light text so they read on the black area.
+  // Incoming (received): dark slate grey. Outgoing (sent): deep turquoise with
+  // a bright turquoise border. Both keep light text so they read on the black
+  // area.
   static const msgInBg       = Color(0xFF2F333B);
   static const msgInText     = Color(0xFFF5F7FF);
   static const msgInBorder   = Color(0x1FFFFFFF);
-  static const msgOutBg      = Color(0xFF0F505F);
+  static const msgOutBg      = Color(0xFF0F5F56);
   static const msgOutBorder  = accent;
-  static const msgOutText    = Color(0xFFEAFBFF);
+  static const msgOutText    = Color(0xFFEAFFFB);
 
   /// Global Material 3 theme used by [MaterialApp.theme]. Mirrors the
   /// Midnight palette so any widget that opts into the inherited

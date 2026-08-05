@@ -882,7 +882,7 @@ class _TopTabBar extends StatelessWidget {
                             focusNode: searchFocus,
                             onChanged: onSearchChanged,
                             textInputAction: TextInputAction.search,
-                            cursorColor: const Color(0xFF22D3EE),
+                            cursorColor: SC.accent,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -2305,7 +2305,7 @@ class _CardUndoButton extends StatelessWidget {
             ),
             child: const Icon(
               Icons.replay_rounded,
-              color: Color(0xFF22D3EE),
+              color: SC.accent,
               size: 22,
             ),
           ),
