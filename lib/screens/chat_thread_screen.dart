@@ -964,7 +964,7 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: peer name + local-time left, swaycø lockup centred.
+            // Middle zone: peer name + local-time left, swaycø centred.
             // The yellow clock used to paint over the brand — the left column
             // is hard-capped before the logo so the city ellipsizes instead.
             Expanded(
@@ -981,7 +981,7 @@ class _ThreadHeader extends StatelessWidget {
                   final logoLeft = c.maxWidth / 2 - logoW / 2;
                   final leftMax = (logoLeft - gap).clamp(48.0, c.maxWidth);
                   // Only drop swaycø if the middle strip is too narrow to fit
-                  // both a usable left column and the lockup.
+                  // both a usable left column and the wordmark.
                   final showLogo = leftMax + gap + logoW <= c.maxWidth;
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;

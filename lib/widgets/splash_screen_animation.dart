@@ -59,8 +59,16 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     final size = MediaQuery.sizeOf(context);
     final side = math.max(size.width, size.height);
 
-    return ColoredBox(
-      color: const Color(0xFF5AD0D8), // fallback under the gradient art
+    return DecoratedBox(
+      // Same gradient as the art, so the frame before the PNG decodes (and any
+      // area the square can't cover) matches instead of flashing a flat block.
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFDEFCF9), Color(0xFF48EEDD)],
+        ),
+      ),
       child: FadeTransition(
         opacity: _fade,
         child: Center(
