@@ -110,38 +110,22 @@
           }
     }
 
-    /* Boot splash: coconut mark + swaycø, centred on the app background.
-       Shown immediately while the Flutter engine downloads + boots, then
-       removed by removeSplashFromWeb() once the first Flutter frame renders
-       (the in-app SplashScreenAnimation shows the same mark). */
+    /* Boot splash: full splash_screen.png art (gradient + coconut). */
     #splash {
       position: fixed;
       inset: 0;
       margin: 0;
-      background-color: #0E0E0E;
+      background-color: #5AD0D8;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
+      overflow: hidden;
       z-index: 2147483647;
     }
-    #splash-mark {
-      width: min(32vmin, 180px);
-      height: min(32vmin, 180px);
-      object-fit: contain;
-    }
-    #splash-wordmark {
-      color: #ffffff;
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-      font-size: min(7vmin, 34px);
-      font-weight: 800;
-      letter-spacing: 0.4px;
-      line-height: 1;
-      margin: 0;
-    }
-    #splash-wordmark .o {
-      color: #22D3EE;
+    #splash-art {
+      width: max(100vw, 100vh);
+      height: max(100vw, 100vh);
+      object-fit: cover;
     }
   </style>
 
@@ -160,25 +144,15 @@
     function removeSplashFromWeb() {
       document.getElementById("splash")?.remove();
       document.getElementById("splash-branding")?.remove();
-      // Stay on the app background behind Flutter (no white flash on first frame).
       document.body.style.background = "#0E0E0E";
     }
-    // Flutter fires "flutter-first-frame" once its first frame is painted —
-    // that's our cue to pull the HTML boot splash so the (identical) in-app
-    // splash shows through. WITHOUT this, the #splash overlay (z-index max)
-    // covers the running app forever. The timeout is a backstop in case the
-    // event never fires.
     window.addEventListener("flutter-first-frame", removeSplashFromWeb);
     window.setTimeout(removeSplashFromWeb, 15000);
   </script>
 </head>
 <body>
-  <!-- Boot splash: coconut mark + swaycø on deep black. This is the very
-       first image on web; removeSplashFromWeb() removes it once the Flutter
-       first frame is up. -->
   <div id="splash">
-    <img id="splash-mark" src="icons/swayco_coconut_mark.png" alt="" />
-    <p id="splash-wordmark">swayc<span class="o">ø</span></p>
+    <img id="splash-art" src="icons/splash_screen.png" alt="" />
   </div>
 
   <!--

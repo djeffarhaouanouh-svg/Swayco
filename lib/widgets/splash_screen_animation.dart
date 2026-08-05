@@ -2,28 +2,20 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../theme/swayco_theme.dart';
-import 'swayco_wordmark.dart';
-
-/// Boot splash for Swayco — coconut mark + `swaycø` centred on pure black.
+/// Boot splash — full-bleed `assets/icons/splash_screen.png` (gradient + coconut).
 ///
-/// Fades/scales in once, holds briefly, then fires [onComplete] so `main.dart`
-/// can hand off to the first real screen. The web boot page (`web/index.html`)
-/// shows the same mark during engine download so the hand-off stays seamless.
+/// Fades in once, holds briefly, then fires [onComplete] so `main.dart` can
+/// hand off. The web boot page shows the same art during engine download.
 class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,
-    this.background = const Color(0xFF000000),
     this.onComplete,
   });
-
-  /// Pure black by design — matches the web boot page and the app theme.
-  final Color background;
 
   /// Fired once after the entrance animation settles.
   final VoidCallback? onComplete;
 
-  static const markAsset = SwaycoWordmark.asset;
+  static const splashAsset = 'assets/icons/splash_screen.png';
 
   @override
   State<SplashScreenAnimation> createState() => _SplashScreenAnimationState();
@@ -33,7 +25,6 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
-  late final Animation<double> _scale;
   bool _completed = false;
 
   @override
@@ -41,22 +32,13 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 700),
     );
-    _fade = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.55, curve: Curves.easeOut),
-    );
-    _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
-      ),
-    );
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed && !_completed) {
         _completed = true;
-        Future<void>.delayed(const Duration(milliseconds: 450), () {
+        Future<void>.delayed(const Duration(milliseconds: 550), () {
           if (mounted) widget.onComplete?.call();
         });
       }
@@ -72,50 +54,23 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
 
   @override
   Widget build(BuildContext context) {
-    final shortest = MediaQuery.sizeOf(context).shortestSide;
-    final markSize = math.min(shortest * 0.32, 180.0);
+    // Match the art's square composition without letterboxing on tall phones:
+    // cover the viewport; the coconut stays centred in the PNG.
+    final size = MediaQuery.sizeOf(context);
+    final side = math.max(size.width, size.height);
 
-    return Scaffold(
-      backgroundColor: widget.background,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fade,
-          child: ScaleTransition(
-            scale: _scale,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  SplashScreenAnimation.markAsset,
-                  width: markSize,
-                  height: markSize,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (_, _, _) =>
-                      SizedBox(width: markSize, height: markSize),
-                ),
-                SizedBox(height: markSize * 0.16),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      const TextSpan(
-                        text: 'swayc',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      TextSpan(
-                        text: 'ø',
-                        style: TextStyle(color: SC.accent),
-                      ),
-                    ],
-                  ),
-                  style: TextStyle(
-                    fontSize: math.min(shortest * 0.07, 34.0),
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
+    return ColoredBox(
+      color: const Color(0xFF5AD0D8), // fallback under the gradient art
+      child: FadeTransition(
+        opacity: _fade,
+        child: Center(
+          child: Image.asset(
+            SplashScreenAnimation.splashAsset,
+            width: side,
+            height: side,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (_, _, _) => const SizedBox.expand(),
           ),
         ),
       ),
