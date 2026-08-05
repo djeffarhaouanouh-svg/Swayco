@@ -110,28 +110,40 @@
           }
     }
 
-    /* Boot splash: the Traduction.json Lottie, centred on the app background.
+    /* Boot splash: coconut mark + swaycø, centred on the app background.
        Shown immediately while the Flutter engine downloads + boots, then
        removed by removeSplashFromWeb() once the first Flutter frame renders
-       (the in-app SplashScreenAnimation plays the SAME Lottie, so the hand-off
-       is invisible). */
+       (the in-app SplashScreenAnimation shows the same mark). */
     #splash {
       position: fixed;
       inset: 0;
       margin: 0;
       background-color: #0E0E0E;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 18px;
       z-index: 2147483647;
     }
-    #splash-lottie {
-      width: min(80vmin, 500px);
-      height: min(80vmin, 500px);
+    #splash-mark {
+      width: min(32vmin, 180px);
+      height: min(32vmin, 180px);
+      object-fit: contain;
+    }
+    #splash-wordmark {
+      color: #ffffff;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: min(7vmin, 34px);
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      line-height: 1;
+      margin: 0;
+    }
+    #splash-wordmark .o {
+      color: #22D3EE;
     }
   </style>
-  <!-- Lottie player (vendored, offline-safe) for the boot splash above. -->
-  <script src="lottie.min.js"></script>
 
   <!--
     TEST — non-streaming STT (Silero VAD + Whisper). WEB ONLY, TO BE REVERTED.
@@ -146,7 +158,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/bundle.min.js"></script>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
-      try { window.__splashAnim?.destroy(); } catch (e) {}
       document.getElementById("splash")?.remove();
       document.getElementById("splash-branding")?.remove();
       // Stay on the app background behind Flutter (no white flash on first frame).
@@ -154,39 +165,21 @@
     }
     // Flutter fires "flutter-first-frame" once its first frame is painted —
     // that's our cue to pull the HTML boot splash so the (identical) in-app
-    // Lottie shows through. WITHOUT this, the #splash overlay (z-index max)
-    // covers the running app forever (flutter_native_splash, which used to
-    // call removeSplashFromWeb, was retired). The timeout is a backstop in
-    // case the event never fires.
+    // splash shows through. WITHOUT this, the #splash overlay (z-index max)
+    // covers the running app forever. The timeout is a backstop in case the
+    // event never fires.
     window.addEventListener("flutter-first-frame", removeSplashFromWeb);
     window.setTimeout(removeSplashFromWeb, 15000);
   </script>
 </head>
 <body>
-  <!-- Boot splash: the Traduction.json Lottie animation on deep black. This is
-       the very first image on web; removeSplashFromWeb() removes it once the
-       Flutter first frame is up. -->
+  <!-- Boot splash: coconut mark + swaycø on deep black. This is the very
+       first image on web; removeSplashFromWeb() removes it once the Flutter
+       first frame is up. -->
   <div id="splash">
-    <div id="splash-lottie"></div>
+    <img id="splash-mark" src="icons/swayco_coconut_mark.png" alt="" />
+    <p id="splash-wordmark">swayc<span class="o">ø</span></p>
   </div>
-  <script>
-    (function () {
-      try {
-        if (window.lottie) {
-          window.__splashAnim = lottie.loadAnimation({
-            container: document.getElementById("splash-lottie"),
-            renderer: "svg",
-            loop: true,
-            autoplay: true,
-            path: "Traduction.json",
-          });
-        }
-      } catch (e) {
-        // If Lottie fails to load, the deep-black #splash background remains,
-        // which is exactly the previous boot look — no white flash.
-      }
-    })();
-  </script>
 
   <!--
     You can customize the "flutter_bootstrap.js" script.

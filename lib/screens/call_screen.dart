@@ -2217,7 +2217,7 @@ class _CallScreenState extends State<CallScreen> {
                 // (centred together as a tight group, not spread apart).
                 const Spacer(flex: 5),
                 Image.asset(
-                  'assets/notif-android.png',
+                  'assets/icons/swayco_coconut_mark.png',
                   width: 210,
                   height: 210,
                   fit: BoxFit.contain,
