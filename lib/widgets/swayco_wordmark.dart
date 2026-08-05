@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/swayco_theme.dart';
 
-/// Brand lockup: `swaycø` then the coconut mark (ø in accent).
+/// Brand lockup: `swaycø` then the coconut mark (ø in [SC.brandO]).
 ///
 /// Icon size tracks [fontSize] so every placement stays coherent with the
 /// surrounding text — ~1.05× the type size, optically matched to the
@@ -66,7 +66,7 @@ class SwaycoWordmark extends StatelessWidget {
               TextSpan(text: 'swayc', style: TextStyle(color: color)),
               TextSpan(
                 text: 'ø',
-                style: TextStyle(color: SC.accent),
+                style: TextStyle(color: SC.brandO),
               ),
             ],
           ),
