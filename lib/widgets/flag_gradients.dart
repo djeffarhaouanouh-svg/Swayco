@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/swayco_theme.dart';
-
 /// Pays disponibles pour le contour drapeau (design « 2a »).
 enum FlagCountry {
   portugal,
@@ -202,6 +200,6 @@ List<Color> flagRingColors({required String country, required String language}) 
     final g = kFlagGradients[byLang]!;
     return [g.colors.first, g.colors.last];
   }
-  return const [SC.accent, Color(0xFFA78BFA)];
+  return const [Color(0xFF22D3EE), Color(0xFFA78BFA)];
 }
 

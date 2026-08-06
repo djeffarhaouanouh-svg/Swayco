@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Accent tint applied to push-notification small icons + app name. -->
-    <color name="notification_color">#2EECD7</color>
-	<color name="ic_launcher_background">#48EEDD</color>
+    <color name="notification_color">#00A884</color>
+	<color name="ic_launcher_background">#000000</color>
 </resources>

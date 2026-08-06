@@ -31,7 +31,6 @@ import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/translated_profile_text.dart';
-import '../widgets/swayco_wordmark.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -824,14 +823,31 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swaycø. Hidden while the search field expands.
+              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
+              // recherche pour laisser le champ s'étirer sur toute la barre.
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: SwaycoWordmark(fontSize: 22),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'swayc'),
+                        TextSpan(
+                          text: 'ø',
+                          style: TextStyle(color: Color(0xFF22D3EE)),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
               ),
               // Onglets retirés — logo à gauche, actions à droite.
@@ -882,7 +898,7 @@ class _TopTabBar extends StatelessWidget {
                             focusNode: searchFocus,
                             onChanged: onSearchChanged,
                             textInputAction: TextInputAction.search,
-                            cursorColor: SC.accent,
+                            cursorColor: const Color(0xFF22D3EE),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -2305,7 +2321,7 @@ class _CardUndoButton extends StatelessWidget {
             ),
             child: const Icon(
               Icons.replay_rounded,
-              color: SC.accent,
+              color: Color(0xFF22D3EE),
               size: 22,
             ),
           ),

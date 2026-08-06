@@ -448,7 +448,7 @@ class _HeroLogo extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Image.asset(
-        'assets/icons/swayco_coconut_mark.png',
+        'assets/icon-fg-transparent.png',
         width: 100,
         height: 100,
         fit: BoxFit.contain,

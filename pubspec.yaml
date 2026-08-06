@@ -161,14 +161,14 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/icon-fg-transparent.png"
   ios: true
   # iOS icons may not carry transparency — flatten the rounded-corner
-  # alpha onto the icon's own turquoise background.
+  # alpha onto the icon's own near-black background.
   remove_alpha_ios: true
-  background_color_ios: "#48EEDD"
+  background_color_ios: "#000000"
   web:
     generate: true
     image_path: "assets/icon-app.png"
-    background_color: "#48EEDD"
-    theme_color: "#2EECD7"
+    background_color: "#000000"
+    theme_color: "#00A884"
 
 # flutter_native_splash config retired in 6.1.2+10. See the
 # `dev_dependencies` comment above for the diagnosis.
@@ -189,13 +189,17 @@ flutter:
     - assets/add-picture.png
     # Group-selfie photo heading the onboarding welcome step.
     - assets/bienvenue.jpg
+    # Transparent logo mark — shown on the "call ended" summary card.
+    - assets/icon-fg-transparent.png
+    # White "S" mark — centre of the premium boot splash (SplashScreenAnimation).
+    - assets/notif-android.png
     # Lottie boot/splash animation (cyan + white line-art on black).
     - assets/Traduction.json
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
     # Short chime played when the "It's a match" badge pops.
     - assets/sounds/match_pop.wav
-    # Coconut mark + the boot splash art.
+    # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
 
   # To add assets to your application, add an assets section, like this:

@@ -1,21 +1,31 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
-/// Boot splash — full-bleed `assets/icons/splash_screen.png` (gradient + coconut).
+/// Boot splash for Swayco — renders the `assets/Traduction.json` Lottie
+/// animation (cyan + white line-art) centred on pure black.
 ///
-/// Fades in once, holds briefly, then fires [onComplete] so `main.dart` can
-/// hand off. The web boot page shows the same art during engine download.
+/// Plays through exactly ONCE (no infinite loop) and fires [onComplete] when
+/// done, so `main.dart` can hand off to the first real screen. The web boot
+/// page (`web/index.html`) plays the SAME Lottie during engine download, so
+/// the hand-off from the HTML splash to this one is invisible.
 class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,
+    this.asset = 'assets/Traduction.json',
+    this.background = const Color(0xFF000000),
     this.onComplete,
   });
 
-  /// Fired once after the entrance animation settles.
-  final VoidCallback? onComplete;
+  /// Lottie animation rendered at the centre of the screen.
+  final String asset;
 
-  static const splashAsset = 'assets/icons/splash_screen.png';
+  /// Pure black by design — matches the web boot page and the app theme.
+  final Color background;
+
+  /// Fired once, after the animation has played through a single time.
+  final VoidCallback? onComplete;
 
   @override
   State<SplashScreenAnimation> createState() => _SplashScreenAnimationState();
@@ -24,26 +34,17 @@ class SplashScreenAnimation extends StatefulWidget {
 class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _fade;
-  bool _completed = false;
+  bool _started = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed && !_completed) {
-        _completed = true;
-        Future<void>.delayed(const Duration(milliseconds: 550), () {
-          if (mounted) widget.onComplete?.call();
-        });
-      }
-    });
-    _controller.forward();
+    _controller = AnimationController(vsync: this)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          widget.onComplete?.call();
+        }
+      });
   }
 
   @override
@@ -54,31 +55,29 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
 
   @override
   Widget build(BuildContext context) {
-    // Match the art's square composition without letterboxing on tall phones:
-    // cover the viewport; the coconut stays centred in the PNG.
-    final size = MediaQuery.sizeOf(context);
-    final side = math.max(size.width, size.height);
+    final shortest = MediaQuery.sizeOf(context).shortestSide;
+    final size = math.min(shortest * 0.80, 500.0);
 
-    return DecoratedBox(
-      // Same gradient as the art, so the frame before the PNG decodes (and any
-      // area the square can't cover) matches instead of flashing a flat block.
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFDEFCF9), Color(0xFF48EEDD)],
-        ),
-      ),
-      child: FadeTransition(
-        opacity: _fade,
-        child: Center(
-          child: Image.asset(
-            SplashScreenAnimation.splashAsset,
-            width: side,
-            height: side,
-            fit: BoxFit.cover,
+    return Scaffold(
+      backgroundColor: widget.background,
+      body: Center(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Lottie.asset(
+            widget.asset,
+            // Driven by [_controller] → plays once, then holds the last frame
+            // until main.dart swaps in the next screen (never loops).
+            controller: _controller,
+            fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
-            errorBuilder: (_, _, _) => const SizedBox.expand(),
+            onLoaded: (composition) {
+              if (_started) return;
+              _started = true;
+              _controller
+                ..duration = composition.duration
+                ..forward();
+            },
           ),
         ),
       ),

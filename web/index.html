@@ -110,24 +110,28 @@
           }
     }
 
-    /* Boot splash: full splash_screen.png art (gradient + coconut). */
+    /* Boot splash: the Traduction.json Lottie, centred on the app background.
+       Shown immediately while the Flutter engine downloads + boots, then
+       removed by removeSplashFromWeb() once the first Flutter frame renders
+       (the in-app SplashScreenAnimation plays the SAME Lottie, so the hand-off
+       is invisible). */
     #splash {
       position: fixed;
       inset: 0;
       margin: 0;
-      background: linear-gradient(180deg, #DEFCF9 0%, #48EEDD 100%);
+      background-color: #0E0E0E;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
       z-index: 2147483647;
     }
-    #splash-art {
-      width: max(100vw, 100vh);
-      height: max(100vw, 100vh);
-      object-fit: cover;
+    #splash-lottie {
+      width: min(80vmin, 500px);
+      height: min(80vmin, 500px);
     }
   </style>
+  <!-- Lottie player (vendored, offline-safe) for the boot splash above. -->
+  <script src="lottie.min.js"></script>
 
   <!--
     TEST — non-streaming STT (Silero VAD + Whisper). WEB ONLY, TO BE REVERTED.
@@ -142,18 +146,47 @@
   <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/bundle.min.js"></script>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
+      try { window.__splashAnim?.destroy(); } catch (e) {}
       document.getElementById("splash")?.remove();
       document.getElementById("splash-branding")?.remove();
+      // Stay on the app background behind Flutter (no white flash on first frame).
       document.body.style.background = "#0E0E0E";
     }
+    // Flutter fires "flutter-first-frame" once its first frame is painted —
+    // that's our cue to pull the HTML boot splash so the (identical) in-app
+    // Lottie shows through. WITHOUT this, the #splash overlay (z-index max)
+    // covers the running app forever (flutter_native_splash, which used to
+    // call removeSplashFromWeb, was retired). The timeout is a backstop in
+    // case the event never fires.
     window.addEventListener("flutter-first-frame", removeSplashFromWeb);
     window.setTimeout(removeSplashFromWeb, 15000);
   </script>
 </head>
 <body>
+  <!-- Boot splash: the Traduction.json Lottie animation on deep black. This is
+       the very first image on web; removeSplashFromWeb() removes it once the
+       Flutter first frame is up. -->
   <div id="splash">
-    <img id="splash-art" src="icons/splash_screen.png" alt="" />
+    <div id="splash-lottie"></div>
   </div>
+  <script>
+    (function () {
+      try {
+        if (window.lottie) {
+          window.__splashAnim = lottie.loadAnimation({
+            container: document.getElementById("splash-lottie"),
+            renderer: "svg",
+            loop: true,
+            autoplay: true,
+            path: "Traduction.json",
+          });
+        }
+      } catch (e) {
+        // If Lottie fails to load, the deep-black #splash background remains,
+        // which is exactly the previous boot look — no white flash.
+      }
+    })();
+  </script>
 
   <!--
     You can customize the "flutter_bootstrap.js" script.
