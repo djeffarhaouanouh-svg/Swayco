@@ -976,7 +976,7 @@ class _ThreadHeader extends StatelessWidget {
                   const logoStyle = TextStyle(
                     color: Colors.white,
                     fontFamily: SC.brandFont,
-                    fontSize: 17,
+                    fontSize: 19,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.3,
                   );
