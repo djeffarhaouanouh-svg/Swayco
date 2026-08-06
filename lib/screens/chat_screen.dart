@@ -611,7 +611,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               style: TextStyle(
                 color: Colors.white,
                 fontFamily: SC.brandFont,
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.3,
               ),
