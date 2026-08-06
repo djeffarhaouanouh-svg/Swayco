@@ -1997,8 +1997,9 @@ class _CallScreenState extends State<CallScreen> {
                             ),
                             style: TextStyle(
                               color: Colors.white,
+                              fontFamily: SC.brandFont,
                               fontSize: 25,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
                               shadows: [
                                 Shadow(color: Colors.black54, blurRadius: 8),
@@ -2809,8 +2810,9 @@ class _CallScreenState extends State<CallScreen> {
                               ),
                               style: TextStyle(
                                 color: Colors.white,
+                                fontFamily: SC.brandFont,
                                 fontSize: 25,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: 0.5,
                                 shadows: [
                                   Shadow(

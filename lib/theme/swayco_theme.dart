@@ -26,6 +26,11 @@ abstract final class SC {
   static const accent        = Color(0xFF22D3EE);
   static const accentDeep    = Color(0xFF0891B2);
 
+  /// Type of the swaycø wordmark (declared in pubspec). Brand only — the rest
+  /// of the UI stays on the google_fonts families in [SCText]. It tops out at
+  /// Bold, so pair it with [FontWeight.w700], never w800.
+  static const brandFont     = 'GlacialIndifference';
+
   // "Online" indicator — light green, used for presence dots / labels and
   // the auto-translate toggle in the chat composer.
   static const online        = Color(0xFF4ADE80);

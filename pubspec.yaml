@@ -202,6 +202,16 @@ flutter:
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
 
+  # The swaycø wordmark is set in Glacial Indifference (SIL Open Font
+  # License — see assets/fonts/OFL.txt). Brand type only: the rest of the UI
+  # stays on Bricolage Grotesque / DM Sans via google_fonts.
+  fonts:
+    - family: GlacialIndifference
+      fonts:
+        - asset: assets/fonts/GlacialIndifference-Regular.ttf
+        - asset: assets/fonts/GlacialIndifference-Bold.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

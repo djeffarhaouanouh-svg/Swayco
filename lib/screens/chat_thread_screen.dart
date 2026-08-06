@@ -975,8 +975,9 @@ class _ThreadHeader extends StatelessWidget {
                   );
                   const logoStyle = TextStyle(
                     color: Colors.white,
+                    fontFamily: SC.brandFont,
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.3,
                   );
                   final scaler = MediaQuery.textScalerOf(context);

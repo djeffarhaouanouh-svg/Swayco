@@ -843,8 +843,9 @@ class _TopTabBar extends StatelessWidget {
                     ),
                     style: TextStyle(
                       color: Colors.white,
+                      fontFamily: SC.brandFont,
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.3,
                     ),
                   ),
