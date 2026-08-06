@@ -36,6 +36,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_logo.dart';
 
 class CallScreen extends StatefulWidget {
   const CallScreen({
@@ -1978,34 +1979,13 @@ class _CallScreenState extends State<CallScreen> {
                   color: SC.bg,
                   child: Stack(
                     children: [
-                      // Brand wordmark — top-centre, like the in-call screen.
+                      // Brand mark — top-centre, like the in-call screen.
                       const Positioned(
                         top: 12,
                         left: 0,
                         right: 0,
                         child: Center(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: 'swayc'),
-                                // ".ai" in cyan accent.
-                                TextSpan(
-                                  text: 'ø',
-                                  style: TextStyle(color: SC.accent),
-                                ),
-                              ],
-                            ),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: SC.brandFont,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              shadows: [
-                                Shadow(color: Colors.black54, blurRadius: 8),
-                              ],
-                            ),
-                          ),
+                          child: SwaycoLogo(height: 30),
                         ),
                       ),
                       // Peer PDP + first name + call duration, grouped in the
@@ -2231,7 +2211,7 @@ class _CallScreenState extends State<CallScreen> {
                 // (centred together as a tight group, not spread apart).
                 const Spacer(flex: 5),
                 Image.asset(
-                  'assets/notif-android.png',
+                  SwaycoLogo.asset,
                   width: 210,
                   height: 210,
                   fit: BoxFit.contain,
@@ -2793,37 +2773,9 @@ class _CallScreenState extends State<CallScreen> {
                   child: IgnorePointer(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Opacity(
-                            opacity: 0.7,
-                            child: Text.rich(
-                              const TextSpan(
-                                children: [
-                                  TextSpan(text: 'swayc'),
-                                  TextSpan(
-                                    text: 'ø',
-                                    style: TextStyle(color: SC.accent),
-                                  ),
-                                ],
-                              ),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: SC.brandFont,
-                                fontSize: 25,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    blurRadius: 8,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: const Opacity(
+                        opacity: 0.7,
+                        child: SwaycoLogo(height: 30),
                       ),
                     ),
                   ),

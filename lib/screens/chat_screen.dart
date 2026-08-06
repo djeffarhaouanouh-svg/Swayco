@@ -30,6 +30,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_logo.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -589,7 +590,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Amis joignables tout de suite — le compteur de la pastille verte.
   int get _onlineFriends => _friends.where(isPeerOnline).length;
 
-  /// The band pinned at the top of the page — the swaycø wordmark on the left,
+  /// The band pinned at the top of the page — brand mark on the left,
   /// and on the right the count of friends who are online right now. Le seul
   /// chiffre de la page qui ne parle pas du passé : tout le reste dit ce qui
   /// s'est dit, celui-là dit qui est là.
@@ -598,24 +599,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: 'swayc'),
-                  TextSpan(
-                    text: 'ø',
-                    style: TextStyle(color: SC.accent),
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: SC.brandFont,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-              ),
-            ),
+            const SwaycoLogo(height: 26),
             // Personne en ligne = pas de pastille : un « 0 en ligne » est une
             // mauvaise nouvelle affichée en permanence.
             if (_onlineFriends > 0)

@@ -120,7 +120,7 @@ class _RootShellState extends State<RootShell> {
       // it shows instantly when a call begins (it was decoding on first
       // display, leaving a visible blank beat on the connecting screen).
       if (mounted) {
-        precacheImage(const AssetImage('assets/notif-android.png'), context);
+        precacheImage(const AssetImage('assets/test-logo.png'), context);
       }
     });
   }

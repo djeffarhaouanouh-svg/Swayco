@@ -189,9 +189,11 @@ flutter:
     - assets/add-picture.png
     # Group-selfie photo heading the onboarding welcome step.
     - assets/bienvenue.jpg
-    # Transparent logo mark — shown on the "call ended" summary card.
+    # Cyan Ø brand mark (cropped from test-logo.png).
+    - assets/test-logo.png
+    # Transparent logo mark — shown on the paywall hero.
     - assets/icon-fg-transparent.png
-    # White "S" mark — centre of the premium boot splash (SplashScreenAnimation).
+    # Brand mark on black — call connecting splash.
     - assets/notif-android.png
     # Lottie boot/splash animation (cyan + white line-art on black).
     - assets/Traduction.json

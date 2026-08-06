@@ -30,6 +30,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_logo.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -823,32 +824,14 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
-              // recherche pour laisser le champ s'étirer sur toute la barre.
+              // Brand mark — fades out while search expands across the bar.
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'swayc'),
-                        TextSpan(
-                          text: 'ø',
-                          style: TextStyle(color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: SC.brandFont,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                  child: SwaycoLogo(height: 26),
                 ),
               ),
               // Onglets retirés — logo à gauche, actions à droite.

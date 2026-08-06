@@ -27,6 +27,7 @@ import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_logo.dart';
 import 'profile_screen.dart';
 
 /// One-to-one chat thread for [conversationId]. Title is the human-friendly
@@ -963,7 +964,7 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: peer name + local-time left, swaycø always centred.
+            // Middle zone: peer name + local-time left, brand mark centred.
             // The yellow clock used to paint over the brand — the left column
             // is hard-capped before the logo so the city ellipsizes instead.
             Expanded(
@@ -973,26 +974,13 @@ class _ThreadHeader extends StatelessWidget {
                     fontSize: 15,
                     color: Colors.white.withValues(alpha: 0.9),
                   );
-                  const logoStyle = TextStyle(
-                    color: Colors.white,
-                    fontFamily: SC.brandFont,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  );
-                  final scaler = MediaQuery.textScalerOf(context);
-                  final logoW = (TextPainter(
-                    text: const TextSpan(text: 'swaycø', style: logoStyle),
-                    maxLines: 1,
-                    textScaler: scaler,
-                    textDirection: TextDirection.ltr,
-                  )..layout()).width;
+                  const logoW = 22.0;
                   // Leave ≥12px air before the centred brand.
                   const gap = 12.0;
                   final logoLeft = c.maxWidth / 2 - logoW / 2;
                   final leftMax = (logoLeft - gap).clamp(48.0, c.maxWidth);
-                  // Only drop swaycø if the middle strip is too narrow to fit
-                  // both a usable left column and the wordmark.
+                  // Only drop the mark if the middle strip is too narrow to fit
+                  // both a usable left column and the logo.
                   final showLogo = leftMax + gap + logoW <= c.maxWidth;
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;
@@ -1002,19 +990,7 @@ class _ThreadHeader extends StatelessWidget {
                     children: [
                       if (showLogo)
                         const Center(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: 'swayc'),
-                                TextSpan(
-                                  text: 'ø',
-                                  style: TextStyle(color: SC.accent),
-                                ),
-                              ],
-                            ),
-                            maxLines: 1,
-                            style: logoStyle,
-                          ),
+                          child: SwaycoLogo(height: 22),
                         ),
                       Align(
                         alignment: Alignment.centerLeft,
