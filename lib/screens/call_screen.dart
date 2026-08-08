@@ -3798,20 +3798,21 @@ class _OrbPainter extends CustomPainter {
   /// Faux quand une icône occupe le centre à leur place.
   final bool showBars;
 
-  /// Les six teintes de l'anneau. La dernière reprend la première : c'est ce
+  /// Les sept teintes de l'anneau. La dernière reprend la première : c'est ce
   /// qui permet à la roue de boucler sans couture.
   static const List<Color> _ring = [
-    Color(0xFF5FE3D0),
-    Color(0xFF7AA2FF),
-    Color(0xFFC9B7FF),
-    Color(0xFFFF9EC4),
-    Color(0xFFFFD479),
-    Color(0xFF5FE3D0),
+    Color(0xFFFF0080),
+    Color(0xFFFF8C00),
+    Color(0xFFFFEF00),
+    Color(0xFF00FF87),
+    Color(0xFF00BFFF),
+    Color(0xFF7C3AED),
+    Color(0xFFFF0080),
   ];
 
-  static const Color _violet = Color(0xFFC9B7FF);
-  static const Color _teal = Color(0xFF5FE3D0);
-  static const Color _blue = Color(0xFF7AA2FF);
+  static const Color _violet = Color(0xFF7C3AED);
+  static const Color _teal = Color(0xFF00FF87);
+  static const Color _blue = Color(0xFF00BFFF);
 
   @override
   void paint(Canvas canvas, Size size) {
