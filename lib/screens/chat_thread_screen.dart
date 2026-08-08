@@ -963,89 +963,40 @@ class _ThreadHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            // Middle zone: peer name + local-time left, swaycø always centred.
-            // The yellow clock used to paint over the brand — the left column
-            // is hard-capped before the logo so the city ellipsizes instead.
+            // Middle zone: peer name + local-time, left-aligned. Le swaycø
+            // centré a été retiré — la bande d'en-tête ne porte plus que le
+            // pair. Plus de logo à contourner, donc plus de largeur bornée :
+            // le nom et la ville disposent de toute la bande jusqu'aux boutons
+            // d'appel et n'ellipsent que s'ils la remplissent vraiment.
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, c) {
+              child: Builder(
+                builder: (context) {
                   final nameStyle = SCText.h3.copyWith(
                     fontSize: 15,
                     color: Colors.white.withValues(alpha: 0.9),
                   );
-                  const logoStyle = TextStyle(
-                    color: Colors.white,
-                    fontFamily: SC.brandFont,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  );
-                  final scaler = MediaQuery.textScalerOf(context);
-                  final logoW = (TextPainter(
-                    text: const TextSpan(text: 'swaycø', style: logoStyle),
-                    maxLines: 1,
-                    textScaler: scaler,
-                    textDirection: TextDirection.ltr,
-                  )..layout()).width;
-                  // Leave ≥12px air before the centred brand.
-                  const gap = 12.0;
-                  final logoLeft = c.maxWidth / 2 - logoW / 2;
-                  final leftMax = (logoLeft - gap).clamp(48.0, c.maxWidth);
-                  // Only drop swaycø if the middle strip is too narrow to fit
-                  // both a usable left column and the wordmark.
-                  final showLogo = leftMax + gap + logoW <= c.maxWidth;
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;
-                  return Stack(
-                    clipBehavior: Clip.hardEdge,
-                    alignment: Alignment.center,
-                    children: [
-                      if (showLogo)
-                        const Center(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: 'swayc'),
-                                TextSpan(
-                                  text: 'ø',
-                                  style: TextStyle(color: SC.accent),
-                                ),
-                              ],
-                            ),
-                            maxLines: 1,
-                            style: logoStyle,
-                          ),
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onViewProfile,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: nameStyle,
                         ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onViewProfile,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: showLogo ? leftMax : c.maxWidth,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: nameStyle,
-                                ),
-                                if (peerClock != null)
-                                  _PeerClockLine(
-                                    clock: peerClock,
-                                    place: place,
-                                  ),
-                              ],
-                            ),
+                        if (peerClock != null)
+                          _PeerClockLine(
+                            clock: peerClock,
+                            place: place,
                           ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
