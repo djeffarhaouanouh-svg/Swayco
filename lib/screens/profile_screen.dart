@@ -1596,15 +1596,23 @@ class _IdentitySection extends StatelessWidget {
 
 /// Read-only "infos perso" as a portrait TILE — same footprint as a photo
 /// cell in [_PeerMediaStack]. Only emoji + value (no "Âge" / "Métier" labels).
+/// Tap opens a full-screen enlarge overlay, like a photo.
 class _PeerInfoCard extends StatelessWidget {
-  const _PeerInfoCard({required this.profile});
-  final RemoteProfile? profile;
+  const _PeerInfoCard({
+    required this.profile,
+    this.onTap,
+    this.expanded = false,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    final p = profile;
-    if (p == null) return const SizedBox.shrink();
-    final rows = <({String emoji, String value})>[
+  final RemoteProfile? profile;
+  final VoidCallback? onTap;
+
+  /// Larger typography / padding when shown in the fullscreen overlay.
+  final bool expanded;
+
+  static List<({String emoji, String value})> rowsFor(RemoteProfile? p) {
+    if (p == null) return const [];
+    return [
       if (p.age != null) (emoji: kFactEmojiAge, value: '${p.age}'),
       if (p.job.trim().isNotEmpty)
         (emoji: kFactEmojiJob, value: displayJob(p.job)),
@@ -1613,53 +1621,164 @@ class _PeerInfoCard extends StatelessWidget {
       if (p.lookingFor.trim().isNotEmpty)
         (emoji: kFactEmojiLookingFor, value: displayLookingFor(p.lookingFor)),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = rowsFor(profile);
     if (rows.isEmpty) return const SizedBox.shrink();
-    return Material(
+    final emojiSize = expanded ? 28.0 : 18.0;
+    final valueSize = expanded ? 22.0 : 14.5;
+    final gap = expanded ? 18.0 : 12.0;
+    final padH = expanded ? 28.0 : 14.0;
+    final padV = expanded ? 32.0 : 16.0;
+
+    final body = Material(
       color: SC.bubbleIn,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(expanded ? 20 : 10),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: SC.glassBorder),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(expanded ? 20 : 10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(expanded ? 20 : 10),
+            border: Border.all(color: SC.glassBorder),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (i, r) in rows.indexed) ...[
+                if (i > 0) SizedBox(height: gap),
+                Row(
+                  children: [
+                    Text(r.emoji, style: TextStyle(fontSize: emojiSize)),
+                    SizedBox(width: expanded ? 14 : 10),
+                    Expanded(
+                      child: Text(
+                        r.value,
+                        maxLines: expanded ? 3 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: valueSize,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (i, r) in rows.indexed) ...[
-              if (i > 0) const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text(r.emoji, style: const TextStyle(fontSize: 18)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      r.value,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
+      ),
+    );
+    return body;
+  }
+}
+
+/// Full-screen enlarge for the peer info tile — same open/close feel as
+/// [showPhotoViewer] (fade + scale, ✕, tap backdrop to dismiss).
+Future<void> showPeerInfoViewer(
+  BuildContext context, {
+  required RemoteProfile profile,
+}) {
+  if (_PeerInfoCard.rowsFor(profile).isEmpty) return Future<void>.value();
+  return Navigator.of(context).push<void>(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (ctx, anim, _) => _PeerInfoViewer(profile: profile),
+      transitionsBuilder: (ctx, anim, _, child) {
+        final curved =
+            CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _PeerInfoViewer extends StatelessWidget {
+  const _PeerInfoViewer({required this.profile});
+  final RemoteProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: 0.78),
+      body: GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: size.width - 28,
+                  maxHeight: size.height * 0.7,
+                ),
+                child: AspectRatio(
+                  aspectRatio: 162 / 216,
+                  child: _PeerInfoCard(
+                    profile: profile,
+                    expanded: true,
+                    // Absorb taps so only backdrop / ✕ closes.
+                    onTap: () {},
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: ClipOval(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Grille Instagram sur le profil d'un pair : tuile infos perso (même format
-/// que les photos) en première position, puis chaque photo — 3 colonnes qui
-/// occupent toute la largeur de l'écran.
+/// Grille sur le profil d'un pair : tuile infos + photos en **2 colonnes**
+/// pleine largeur. La tuile infos s'agrandit au tap comme une photo.
 class _PeerMediaStack extends StatelessWidget {
   const _PeerMediaStack({
     required this.personalInfo,
@@ -1674,17 +1793,12 @@ class _PeerMediaStack extends StatelessWidget {
   final void Function(String photoUrl)? onTogglePhotoLike;
 
   static bool _hasInfo(RemoteProfile? p) =>
-      p != null &&
-      (p.age != null ||
-          p.job.trim().isNotEmpty ||
-          p.zodiac.trim().isNotEmpty ||
-          p.lookingFor.trim().isNotEmpty);
+      p != null && _PeerInfoCard.rowsFor(p).isNotEmpty;
 
-  // 3 par ligne, tuiles portrait (3:4). Le gutter du ListView parent est
-  // compensé ci-dessous pour coller les cartes au bord de l'écran.
+  // 2 par ligne, tuiles portrait (3:4). Compense le gutter du ListView.
   static const double _aspect = 216 / 162; // height / width
-  static const double _spacing = 6;
-  static const int _columns = 3;
+  static const double _spacing = 8;
+  static const int _columns = 2;
   static const double _parentGutter = 28;
 
   @override
@@ -1692,8 +1806,6 @@ class _PeerMediaStack extends StatelessWidget {
     final hasInfo = _hasInfo(personalInfo);
     if (!hasInfo && photos.isEmpty) return const _EmptyPhotosPlaceholder();
 
-    // Sortir du padding horizontal du ListView (28) pour prendre toute la
-    // largeur — les 3 tuiles grossissent d'autant.
     return LayoutBuilder(
       builder: (context, constraints) {
         final fullWidth = constraints.maxWidth + _parentGutter * 2;
@@ -1712,7 +1824,15 @@ class _PeerMediaStack extends StatelessWidget {
                   SizedBox(
                     width: tileWidth,
                     height: tileHeight,
-                    child: _PeerInfoCard(profile: personalInfo),
+                    child: _PeerInfoCard(
+                      profile: personalInfo,
+                      onTap: personalInfo == null
+                          ? null
+                          : () => showPeerInfoViewer(
+                                context,
+                                profile: personalInfo!,
+                              ),
+                    ),
                   ),
                 for (var i = 0; i < photos.length; i++)
                   SizedBox(
