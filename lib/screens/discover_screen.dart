@@ -39,6 +39,10 @@ import 'profile_screen.dart';
 /// pour rester du noir.
 const Color _kPanelBg = Color(0xFF141517);
 
+/// Marge latérale du bloc Discover (carte + bande blanche). Les deux DOIVENT
+/// la partager, sinon leurs bords ne s'alignent plus.
+const double _kCardInset = 16.0;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -469,8 +473,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // 64 (bouton) + 2 × 22 (respiration) = la barre du design swipe_card.dart.
-    const actionH = 108.0;
+    // 64 (bouton) + 2 × 12 (respiration) : la bande blanche serre les boutons
+    // au lieu de leur faire un socle.
+    const actionH = 88.0;
     // Boutons SOUS la carte, posés sur le fond noir (juste au-dessus de la nav).
     final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 10;
     // La carte s'arrête PILE sur la barre : aucun écart, elles se lisent comme
@@ -495,8 +500,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             top: currentCardTop,
-            left: 8,
-            right: 8,
+            left: _kCardInset,
+            right: _kCardInset,
             bottom: currentCardBottom,
             child: _feedLoading
                 ? const Center(
@@ -525,7 +530,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           if (_hasActiveCard && !_infoOpen)
             Positioned(
               top: tabBarH + 20,
-              left: 20,
+              // Même retrait DANS la carte qu'avant : il suit sa marge.
+              left: _kCardInset + 12,
               child: _CardUndoButton(onTap: _onActionUndo),
             ),
 
@@ -2083,7 +2089,7 @@ class _SwipeActionBar extends StatelessWidget {
         // Le bas blanc : haut à vif (il prolonge la carte, on ne doit pas voir
         // la jointure), bas arrondi comme le reste du bloc. Même marge
         // horizontale que la carte : les deux bords s'alignent au pixel.
-        margin: const EdgeInsets.symmetric(horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: _kCardInset),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
