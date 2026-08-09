@@ -2112,7 +2112,7 @@ class _SwipeActionBar extends StatelessWidget {
               onTap: onNope,
               child: const Icon(Icons.close, color: Colors.white, size: 24),
             ),
-            const SizedBox(width: 32),
+            const SizedBox(width: 45),
             _ActionButton(
               background: const Color(0xFF22D3EE),
               onTap: onLike,
