@@ -1573,10 +1573,10 @@ class _IdentitySection extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              for (final (i, tag) in interests.indexed)
+              for (final tag in interests)
                 InterestTagChip(
                   label: tag,
-                  color: interestPaletteColor(i),
+                  color: interestColor(tag),
                 ),
             ],
           ),
@@ -2667,10 +2667,10 @@ class _InterestsSectionState extends State<_InterestsSection> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final (i, tag) in _sel.toList().indexed)
+            for (final tag in _sel)
               InterestTagChip(
                 label: tag,
-                color: interestPaletteColor(i),
+                color: interestColor(tag),
                 onTap: _openPicker,
               ),
             if (_sel.length < profileInterestsMax)
@@ -2727,10 +2727,12 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
   Widget build(BuildContext context) {
     final full = widget.sel.length >= profileInterestsMax;
     final cats = interestCategoriesFor(widget.country);
+    final canPrev = _page > 0;
+    final canNext = _page < cats.length - 1;
     return Container(
       // Plus de marge haute : elle datait du temps où ce panneau se dépliait
       // sous les chips. Dans une pop-up centrée, elle décentrait le contenu.
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       decoration: BoxDecoration(
         color: SC.bg,
         borderRadius: BorderRadius.circular(18),
@@ -2741,21 +2743,65 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
         // dialogue, elle s'étirait jusqu'en bas de l'écran et le panneau
         // devenait un grand rectangle noir. Elle fait sa taille, désormais.
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // One page per category — swipe sideways to switch category.
+          // Croix de fermeture — même teinte que l'icône paramètres.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.10),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: widget.onDone,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 20,
+                    color: SC.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Flèches gauche / droite autour du carrousel de catégories.
           SizedBox(
             height: 248,
-            child: PageView.builder(
-              controller: _pager,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemCount: cats.length,
-              itemBuilder: (ctx, i) => _CategoryPage(
-                cat: cats[i],
-                sel: widget.sel,
-                full: full,
-                onToggle: widget.onToggle,
-              ),
+            child: Row(
+              children: [
+                _PickerNavArrow(
+                  icon: Icons.chevron_left_rounded,
+                  enabled: canPrev,
+                  onTap: canPrev ? () => _goTo(_page - 1) : null,
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pager,
+                    onPageChanged: (i) => setState(() => _page = i),
+                    itemCount: cats.length,
+                    itemBuilder: (ctx, i) => _CategoryPage(
+                      cat: cats[i],
+                      sel: widget.sel,
+                      full: full,
+                      onToggle: widget.onToggle,
+                    ),
+                  ),
+                ),
+                _PickerNavArrow(
+                  icon: Icons.chevron_right_rounded,
+                  enabled: canNext,
+                  onTap: canNext ? () => _goTo(_page + 1) : null,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),
@@ -2799,6 +2845,42 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Chevron de navigation du carrousel d'intérêts — même teinte que
+/// l'icône paramètres du profil ([SC.textPrimary]).
+class _PickerNavArrow extends StatelessWidget {
+  const _PickerNavArrow({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 48,
+          child: Icon(
+            icon,
+            size: 28,
+            color: enabled
+                ? SC.textPrimary
+                : SC.textPrimary.withValues(alpha: 0.28),
+          ),
+        ),
       ),
     );
   }
@@ -2871,10 +2953,11 @@ class _CategoryPage extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  for (final (i, opt) in cat.options.indexed)
+                  for (final opt in cat.options)
                     InterestTagChip(
                       label: opt,
-                      color: interestPaletteColor(i),
+                      // Une seule couleur par catégorie (celle du header).
+                      color: cat.color,
                       selected: sel.contains(opt),
                       showCheck: sel.contains(opt),
                       // When the cap is hit, leave only the already-picked

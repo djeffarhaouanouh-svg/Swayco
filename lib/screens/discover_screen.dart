@@ -1297,10 +1297,10 @@ class _ProfileInfoPanel extends StatelessWidget {
                           spacing: 12,
                           runSpacing: 12,
                           children: [
-                            for (final (i, tag) in p.interests.indexed)
+                            for (final tag in p.interests)
                               InterestTagChip(
                                 label: tag,
-                                color: interestPaletteColor(i),
+                                color: interestColor(tag),
                               ),
                           ],
                         ),
@@ -1904,10 +1904,10 @@ class _TinderCardState extends State<_TinderCard> {
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      for (final (i, tag) in p.interests.take(1).toList().indexed)
+                      for (final tag in p.interests.take(1))
                         InterestTagChip(
                           label: tag,
-                          color: interestPaletteColor(i),
+                          color: interestColor(tag),
                         ),
                     ],
                   ),
