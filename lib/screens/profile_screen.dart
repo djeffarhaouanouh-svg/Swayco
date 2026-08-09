@@ -1594,9 +1594,9 @@ class _IdentitySection extends StatelessWidget {
   }
 }
 
-/// Read-only "infos perso" as a portrait TILE — same footprint as a photo
-/// cell in [_PeerMediaStack]. Closed: emoji + value only. Expanded (viewer):
-/// emoji + label + value, like the original info rows.
+/// Read-only "infos perso" tile — same FactChip look as Discover's "À propos"
+/// panel (emoji + value chips in two columns). Age uses `info_age_value`
+/// ("34 ans"), not a separate "Âge" label row.
 class _PeerInfoCard extends StatelessWidget {
   const _PeerInfoCard({
     required this.profile,
@@ -1607,149 +1607,128 @@ class _PeerInfoCard extends StatelessWidget {
   final RemoteProfile? profile;
   final VoidCallback? onTap;
 
-  /// Fullscreen viewer: show "Âge" / "Métier" / … labels. Grid tile: hide them.
+  /// Fullscreen viewer: roomier chips. Grid tile: compact.
   final bool expanded;
 
-  static List<({String emoji, String label, String value})> rowsFor(
-    RemoteProfile? p,
-  ) {
+  static List<({String emoji, String label})> factsFor(RemoteProfile? p) {
     if (p == null) return const [];
+    final place = [p.city.trim(), p.country.trim()]
+        .where((e) => e.isNotEmpty)
+        .join(', ');
     return [
       if (p.age != null)
         (
           emoji: kFactEmojiAge,
-          label: AppStrings.t('info_age'),
-          value: '${p.age}',
+          label: AppStrings.t('info_age_value', args: {'n': '${p.age}'}),
         ),
       if (p.job.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiJob,
-          label: AppStrings.t('info_job'),
-          value: displayJob(p.job),
-        ),
+        (emoji: kFactEmojiJob, label: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiZodiac,
-          label: AppStrings.t('info_zodiac'),
-          value: displayZodiac(p.zodiac),
-        ),
+        (emoji: kFactEmojiZodiac, label: displayZodiac(p.zodiac)),
       if (p.lookingFor.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiLookingFor,
-          label: AppStrings.t('info_looking_for'),
-          value: displayLookingFor(p.lookingFor),
-        ),
+        (emoji: kFactEmojiLookingFor, label: displayLookingFor(p.lookingFor)),
+      if (place.isNotEmpty) (emoji: kFactEmojiPlace, label: place),
     ];
   }
 
+  /// Kept for [_PeerMediaStack] emptiness checks.
+  static List<({String emoji, String label})> rowsFor(RemoteProfile? p) =>
+      factsFor(p);
+
   @override
   Widget build(BuildContext context) {
-    final rows = rowsFor(profile);
-    if (rows.isEmpty) return const SizedBox.shrink();
+    final facts = factsFor(profile);
+    if (facts.isEmpty) return const SizedBox.shrink();
 
-    if (expanded) {
-      return Material(
-        color: SC.bubbleIn,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: SC.glassBorder),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (final (i, r) in rows.indexed) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Row(
-                      children: [
-                        Text(r.emoji, style: const TextStyle(fontSize: 22)),
-                        const SizedBox(width: 12),
-                        Text(
-                          r.label,
-                          style: const TextStyle(
-                            color: SC.textMuted,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            r.value,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: SC.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    final radius = expanded ? 20.0 : 10.0;
+    final pad = expanded ? 18.0 : 10.0;
+    final gap = expanded ? 10.0 : 8.0;
+    final chipPadV = expanded ? 14.0 : 11.0;
+    final chipPadH = expanded ? 14.0 : 10.0;
+    final emojiSize = expanded ? 16.0 : 14.0;
+    final textSize = expanded ? 15.0 : 13.0;
 
-    // Compact grid tile — emoji + value only (no labels).
     return Material(
-      color: SC.bubbleIn,
-      borderRadius: BorderRadius.circular(10),
+      color: expanded ? const Color(0xFF141517) : SC.bubbleIn,
+      borderRadius: BorderRadius.circular(radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(color: SC.glassBorder),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          padding: EdgeInsets.all(pad),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final (i, r) in rows.indexed) ...[
-                if (i > 0) const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(r.emoji, style: const TextStyle(fontSize: 18)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        r.value,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: SC.textPrimary,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
+              if (expanded) ...[
+                Text(
+                  AppStrings.t('info_about'),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
                 ),
+                const SizedBox(height: 14),
               ],
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (ctx, c) {
+                    final chipW = (c.maxWidth - gap) / 2;
+                    return Align(
+                      alignment: Alignment.center,
+                      child: Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final f in facts)
+                            SizedBox(
+                              width: chipW,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: chipPadH,
+                                  vertical: chipPadV,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.055),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      f.emoji,
+                                      style: TextStyle(fontSize: emojiSize),
+                                    ),
+                                    SizedBox(width: expanded ? 10 : 8),
+                                    Expanded(
+                                      child: Text(
+                                        f.label,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.92),
+                                          fontSize: textSize,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
