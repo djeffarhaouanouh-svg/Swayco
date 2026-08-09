@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'auth_service.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -41,21 +42,48 @@ abstract final class LikeApi {
     required String likedId,
     required String photoUrl,
   }) async {
-    if (!isSupabaseReady) return;
-    if (likerId.isEmpty || likedId.isEmpty || likerId == likedId) return;
-    if (photoUrl.isEmpty) return;
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    // Always write as the signed-in user — callers sometimes pass a stale
+    // device id; RLS requires auth.uid() = liker.
+    final uid = AuthService.currentUserId;
+    if (uid.isEmpty) {
+      throw StateError('Non authentifié');
+    }
+    final liker = uid;
+    final liked = likedId.trim();
+    final photo = stablePhotoUrl(photoUrl);
+    if (liked.isEmpty || photo.isEmpty || liker == liked) return;
+
+    // Same heal friendships do before FK inserts — if `likes.liker` points at
+    // `profiles`, a missing row would 23503 and surface as "impossible".
+    await ProfileApi.ensureMyProfileRow();
+
     try {
-      await _c.from('likes').upsert({
-        'liker': likerId,
-        'liked': likedId,
-        'photo_url': photoUrl,
+      await _c.from('likes').insert({
+        'liker': liker,
+        'liked': liked,
+        'photo_url': photo,
         'created_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'liker,liked,photo_url');
-      unawaited(_notifyLike(likerId, likedId));
+      });
+      unawaited(_notifyLike(liker, liked));
+    } on PostgrestException catch (e) {
+      // 23505 = unique_violation — already liked this photo, treat as success.
+      if (e.code == '23505') return;
+      debugPrint('LikeApi.like failed: ${e.code} ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('LikeApi.like failed: $e');
       rethrow;
     }
+  }
+
+  /// Strip cache-busters (`?v=…`) so the same photo always maps to one row.
+  static String stablePhotoUrl(String url) {
+    final t = url.trim();
+    final q = t.indexOf('?');
+    return q < 0 ? t : t.substring(0, q);
   }
 
   static Future<void> _notifyLike(String likerId, String likedId) async {
@@ -84,15 +112,18 @@ abstract final class LikeApi {
     required String likedId,
     required String photoUrl,
   }) async {
-    if (!isSupabaseReady || likerId.isEmpty || likedId.isEmpty) return;
-    if (photoUrl.isEmpty) return;
+    if (!isSupabaseReady) return;
+    final uid = AuthService.currentUserId;
+    if (uid.isEmpty || likedId.isEmpty) return;
+    final photo = stablePhotoUrl(photoUrl);
+    if (photo.isEmpty) return;
     try {
       await _c
           .from('likes')
           .delete()
-          .eq('liker', likerId)
-          .eq('liked', likedId)
-          .eq('photo_url', photoUrl);
+          .eq('liker', uid)
+          .eq('liked', likedId.trim())
+          .eq('photo_url', photo);
     } catch (e) {
       debugPrint('LikeApi.unlike failed: $e');
       rethrow;
@@ -110,9 +141,10 @@ abstract final class LikeApi {
           .eq('liker', likerId);
       return (rows as List)
           .map(
-            (r) =>
-                Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ??
-                '',
+            (r) => stablePhotoUrl(
+              Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ??
+                  '',
+            ),
           )
           .where((u) => u.isNotEmpty)
           .toSet();
@@ -283,8 +315,9 @@ abstract final class LikeApi {
           .eq('liked', userId);
       final out = <String, int>{};
       for (final r in rows as List) {
-        final url =
-            Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ?? '';
+        final url = stablePhotoUrl(
+          Map<String, dynamic>.from(r as Map)['photo_url']?.toString() ?? '',
+        );
         if (url.isEmpty) continue;
         out[url] = (out[url] ?? 0) + 1;
       }
