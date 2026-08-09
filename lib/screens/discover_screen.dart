@@ -29,7 +29,6 @@ import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/match_overlay.dart';
-import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
@@ -470,11 +469,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    const actionH = 92.0;
+    // 64 (bouton) + 2 × 22 (respiration) = la barre du design swipe_card.dart.
+    const actionH = 108.0;
     // Boutons SOUS la carte, posés sur le fond noir (juste au-dessus de la nav).
     final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 10;
-    // La carte (photo arrondie) s'arrête AU-DESSUS des boutons.
-    final cardBottom = btnBottom + actionH + 14;
+    // La carte s'arrête PILE sur la barre : aucun écart, elles se lisent comme
+    // une seule pièce (photo en haut, boutons en bas).
+    final cardBottom = btnBottom + actionH;
     final tabBarH = safeTop + _TopTabBar.height;
 
     // Panneau ouvert : la carte prend toute la hauteur — elle monte sous la
@@ -1130,15 +1131,21 @@ class _TinderCardStackState extends State<_TinderCardStack> {
       photos: card.photos,
     );
     final country = flagCountryForLanguage(card.profile.language);
+    // Bas à vif : la carte se termine à plat sur la barre d'action blanche,
+    // les deux ne font qu'un bloc (design swipe_card.dart).
     return SizedBox.expand(
       child: country != null
           ? FlagBorder(
               country: country,
-              radius: 24,
+              radius: 28,
+              borderWidth: 3,
+              flushBottom: true,
               child: tinderCard,
             )
           : ClipRRect(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
               child: tinderCard,
             ),
     );
@@ -2073,18 +2080,18 @@ class _SwipeActionBar extends StatelessWidget {
     return SizedBox(
       height: height,
       child: Container(
-        // Le bas blanc : un bloc plein qui englobe les deux boutons, même
-        // largeur et même rayon que la carte au-dessus. Pas de clip — l'onde
-        // du bouton doit pouvoir déborder du bloc.
+        // Le bas blanc : haut à vif (il prolonge la carte, on ne doit pas voir
+        // la jointure), bas arrondi comme le reste du bloc. Même marge
+        // horizontale que la carte : les deux bords s'alignent au pixel.
         margin: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 6),
+              color: Color(0x59000000),
+              blurRadius: 30,
+              offset: Offset(0, 12),
             ),
           ],
         ),
@@ -2092,27 +2099,20 @@ class _SwipeActionBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _GlassButton(
-              size: 58,
-              iconSize: 27,
-              icon: Icons.close_rounded,
-              // Croix encre sombre : le vert est réservé à la coche, et sur le
-              // bloc blanc une croix blanche serait invisible.
-              color: const Color(0xFF263043),
-              onLight: true,
+            _ActionButton(
+              background: Colors.black,
               onTap: onNope,
+              child: const Icon(Icons.close, color: Colors.white, size: 26),
             ),
-            const SizedBox(width: 28),
-            _GlassButton(
-              size: 58,
-              iconSize: 27,
-              // Une coche, pas un cœur : on valide quelqu'un, et le geste se
-              // lit sans ambiguïté à côté de la croix.
-              icon: Icons.check_rounded,
-              // Le vert que ce bouton portait à l'origine.
-              color: const Color(0xFF3DCA72),
-              onLight: true,
+            const SizedBox(width: 26),
+            _ActionButton(
+              background: const Color(0xFF22D3EE),
               onTap: onLike,
+              child: const Icon(
+                Icons.favorite,
+                color: Color(0xFF111111),
+                size: 26,
+              ),
             ),
           ],
         ),
@@ -2121,150 +2121,29 @@ class _SwipeActionBar extends StatelessWidget {
   }
 }
 
-/// Les deux boutons de match : des ronds en verre nu, une icône colorée au
-/// centre (✕ blanche pour passer, ❤️ rouge pour liker) et un halo discret
-/// derrière. Au clic, une onde de la couleur de l'icône part du cercle et se
-/// dissipe — le geste reste visible même quand le pouce couvre le bouton.
-class _GlassButton extends StatefulWidget {
-  const _GlassButton({
-    required this.size,
-    required this.iconSize,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    this.onLight = false,
+/// Les deux boutons de match : un rond plein de 64, noir pour passer, cyan de
+/// marque pour valider. Rien de translucide — ils sont posés sur du blanc.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.background,
+    required this.child,
+    this.onTap,
   });
 
-  final double size;
-  final double iconSize;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  /// Posé sur une surface claire (le bas blanc) : le verre translucide y
-  /// disparaîtrait, on passe à un cercle gris pâle et des ombres allégées.
-  final bool onLight;
-
-  @override
-  State<_GlassButton> createState() => _GlassButtonState();
-}
-
-class _GlassButtonState extends State<_GlassButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ripple = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 380),
-  );
-
-  @override
-  void dispose() {
-    _ripple.dispose();
-    super.dispose();
-  }
-
-  void _fire() {
-    _ripple.forward(from: 0);
-    widget.onTap();
-  }
+  final Color background;
+  final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.size;
-    final color = widget.color;
-    return Stack(
-      // L'onde déborde du bouton : surtout ne pas la rogner.
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        // L'onde vit dans une boîte de la TAILLE DU BOUTON et déborde en
-        // peinture seulement (OverflowBox) : sans ça l'anneau élargissait le
-        // Stack, la Row s'étirait, et les deux boutons s'écartaient à chaque
-        // clic — l'animation restant à sa valeur finale, ils ne revenaient
-        // même pas.
-        SizedBox(
-          width: size,
-          height: size,
-          child: IgnorePointer(
-            child: OverflowBox(
-              maxWidth: double.infinity,
-              maxHeight: double.infinity,
-              child: AnimatedBuilder(
-                animation: _ripple,
-                builder: (_, _) {
-                  final t = _ripple.value;
-                  // Au repos (jamais joué, ou terminé) : rien à dessiner.
-                  if (t == 0 || t == 1) return const SizedBox.shrink();
-                  // L'anneau grandit de moitié, s'affine et s'efface.
-                  final d = size * (1 + 0.9 * t);
-                  return Opacity(
-                    opacity: (1 - t) * 0.55,
-                    child: Container(
-                      width: d,
-                      height: d,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: color,
-                          width: 0.5 + 2.5 * (1 - t),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-        Pressable(
-      bounce: true,
-      onTap: _fire,
-      child: DecoratedBox(
-        // Depth + coloured glow sit OUTSIDE the clip so they aren't cut off.
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            // Ombres plus discrètes — effet léger/premium.
-            BoxShadow(
-              color: color.withValues(alpha: widget.onLight ? 0.10 : 0.16),
-              blurRadius: 12,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: widget.onLight ? 0.08 : 0.18),
-              blurRadius: widget.onLight ? 6 : 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                // Verre nu : ni teinte cyan, ni reflet. Seule l'icône est
-                // colorée, le cercle laisse passer la photo. Sur le bas blanc,
-                // ce verre-là ne se verrait pas : gris pâle + liseré noir.
-                color: widget.onLight
-                    ? const Color(0xFFF2F4F8)
-                    : Colors.white.withValues(alpha: 0.12),
-                border: Border.all(
-                  color: widget.onLight
-                      ? Colors.black.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.25),
-                  width: 0.8,
-                ),
-              ),
-              child: Center(
-                child: Icon(widget.icon, color: color, size: widget.iconSize),
-              ),
-            ),
-          ),
-        ),
+    return Material(
+      color: background,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(width: 64, height: 64, child: Center(child: child)),
       ),
-        ),
-      ],
     );
   }
 }

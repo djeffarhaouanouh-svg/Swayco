@@ -33,6 +33,11 @@ class FlagBorder extends StatelessWidget {
   /// Affiche (ou non) l'ombre portée sous la carte. (design 2a : activée)
   final bool dropShadow;
 
+  /// Bord bas à vif : coins inférieurs carrés et pas de liseré en bas, pour que
+  /// la carte se pose SUR une autre surface (la barre d'action blanche du
+  /// Discover) sans couture entre les deux.
+  final bool flushBottom;
+
   const FlagBorder({
     super.key,
     required this.child,
@@ -41,16 +46,31 @@ class FlagBorder extends StatelessWidget {
     this.radius = 28.0,
     this.glowBlur = 30.0,
     this.dropShadow = true,
+    this.flushBottom = false,
   });
+
+  BorderRadius _outer() => flushBottom
+      ? BorderRadius.vertical(top: Radius.circular(radius))
+      : BorderRadius.circular(radius);
+
+  BorderRadius _inner() {
+    final r = Radius.circular(radius - borderWidth);
+    return flushBottom ? BorderRadius.vertical(top: r) : BorderRadius.all(r);
+  }
 
   @override
   Widget build(BuildContext context) {
     final g = kFlagGradients[country]!;
 
     return Container(
-      padding: EdgeInsets.all(borderWidth),
+      padding: EdgeInsets.fromLTRB(
+        borderWidth,
+        borderWidth,
+        borderWidth,
+        flushBottom ? 0 : borderWidth,
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: _outer(),
         gradient: LinearGradient(
           // ≈ 145° en CSS → diagonale haut-gauche vers bas-droit.
           begin: Alignment.topLeft,
@@ -69,7 +89,7 @@ class FlagBorder extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius - borderWidth),
+        borderRadius: _inner(),
         child: child,
       ),
     );
