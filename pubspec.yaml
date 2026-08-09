@@ -156,9 +156,11 @@ flutter_launcher_icons:
   # BACKGROUND layer, which fills the icon edge to edge with no inset —
   # so the tile fills whatever mask shape the launcher applies, instead
   # of floating as a small square. The foreground layer is left
-  # transparent (the plugin still requires one).
+  # transparent (the plugin still requires one) — it MUST be genuinely
+  # empty: icon-fg-transparent.png only looked empty and was in fact the
+  # old filled-Ø, which stacked over the tile and hid the real icon.
   adaptive_icon_background: "assets/icon-app.png"
-  adaptive_icon_foreground: "assets/icon-fg-transparent.png"
+  adaptive_icon_foreground: "assets/icon-fg-empty.png"
   ios: true
   # iOS icons may not carry transparency — flatten the rounded-corner
   # alpha onto the icon's own near-black background.
@@ -191,10 +193,8 @@ flutter:
     - assets/bienvenue.jpg
     # Cyan Ø brand mark (cropped from test-logo.png).
     - assets/test-logo.png
-    # Transparent logo mark — shown on the paywall hero.
-    - assets/icon-fg-transparent.png
     # Transparent Ø-arrows mark — call connecting splash ("sas").
-    - assets/call-saas.png
+    - assets/icon-saas.png
     # Lottie boot/splash animation (cyan + white line-art on black).
     - assets/Traduction.json
     # Official multicolour Google "G" — login "Continue with Google" button.

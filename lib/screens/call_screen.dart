@@ -2229,10 +2229,13 @@ class _CallScreenState extends State<CallScreen> {
                 // Logo, then the spinner + hint kept close just beneath it
                 // (centred together as a tight group, not spread apart).
                 const Spacer(flex: 5),
+                // 278 rather than 210: the mark only fills 59% of its own
+                // canvas, so at 210 it would render a third smaller than
+                // the logo it replaces. The file itself is untouched.
                 Image.asset(
-                  'assets/call-saas.png',
-                  width: 210,
-                  height: 210,
+                  'assets/icon-saas.png',
+                  width: 278,
+                  height: 278,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 22),
