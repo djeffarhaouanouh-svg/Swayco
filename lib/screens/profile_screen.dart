@@ -1581,8 +1581,7 @@ class _IdentitySection extends StatelessWidget {
             ],
           ),
         ],
-        // Grandes cartes empilées, pas d'entête "Photos" : la carte infos
-        // perso vient EN PREMIER, puis chaque photo en grand.
+        // Grille photos (+ tuile infos perso, même format).
         const SizedBox(height: 24),
         _PeerMediaStack(
           personalInfo: personalInfo,
@@ -1595,9 +1594,8 @@ class _IdentitySection extends StatelessWidget {
   }
 }
 
-/// Read-only "infos perso" rendue comme une CARTE (glass) — la première carte
-/// de la pile sur le profil de quelqu'un. Ne montre que les champs remplis ;
-/// vide si la personne n'a rien renseigné.
+/// Read-only "infos perso" as a portrait TILE — same footprint as a photo
+/// cell in [_PeerMediaStack]. Only emoji + value (no "Âge" / "Métier" labels).
 class _PeerInfoCard extends StatelessWidget {
   const _PeerInfoCard({required this.profile});
   final RemoteProfile? profile;
@@ -1606,69 +1604,61 @@ class _PeerInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     if (p == null) return const SizedBox.shrink();
-    final rows = <({String emoji, String label, String value})>[
-      if (p.age != null)
-        (emoji: kFactEmojiAge, label: AppStrings.t('info_age'), value: '${p.age}'),
+    final rows = <({String emoji, String value})>[
+      if (p.age != null) (emoji: kFactEmojiAge, value: '${p.age}'),
       if (p.job.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiJob,
-          label: AppStrings.t('info_job'),
-          value: displayJob(p.job),
-        ),
+        (emoji: kFactEmojiJob, value: displayJob(p.job)),
       if (p.zodiac.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiZodiac,
-          label: AppStrings.t('info_zodiac'),
-          value: displayZodiac(p.zodiac),
-        ),
+        (emoji: kFactEmojiZodiac, value: displayZodiac(p.zodiac)),
       if (p.lookingFor.trim().isNotEmpty)
-        (
-          emoji: kFactEmojiLookingFor,
-          label: AppStrings.t('info_looking_for'),
-          value: displayLookingFor(p.lookingFor),
-        ),
+        (emoji: kFactEmojiLookingFor, value: displayLookingFor(p.lookingFor)),
     ];
     if (rows.isEmpty) return const SizedBox.shrink();
-    return Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: SC.glassBorder),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      child: Column(
-        children: [
-          for (final (i, r) in rows.indexed) ...[
-            if (i > 0)
-              Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              child: Row(
+    return Material(
+      color: SC.bubbleIn,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: SC.glassBorder),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (i, r) in rows.indexed) ...[
+              if (i > 0) const SizedBox(height: 10),
+              Row(
                 children: [
-                  Text(r.emoji, style: const TextStyle(fontSize: 19)),
-                  const SizedBox(width: 14),
-                  Text(r.label, style: const TextStyle(color: SC.textMuted, fontSize: 15)),
-                  const Spacer(),
-                  Text(
-                    r.value,
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                  Text(r.emoji, style: const TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      r.value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-/// La pile de grandes cartes sur le profil d'un pair : la carte infos perso en
-/// tête, puis chaque photo en grand (portrait plein-largeur, avec le cœur).
+/// Grille Instagram sur le profil d'un pair : tuile infos perso (même format
+/// que les photos) en première position, puis chaque photo en portrait.
 class _PeerMediaStack extends StatelessWidget {
   const _PeerMediaStack({
     required this.personalInfo,
@@ -1699,7 +1689,7 @@ class _PeerMediaStack extends StatelessWidget {
     final hasInfo = _hasInfo(personalInfo);
     if (!hasInfo && photos.isEmpty) return const _EmptyPhotosPlaceholder();
 
-    final grid = LayoutBuilder(
+    return LayoutBuilder(
       builder: (context, constraints) {
         final tileWidth =
             (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
@@ -1708,6 +1698,12 @@ class _PeerMediaStack extends StatelessWidget {
           spacing: _spacing,
           runSpacing: _spacing,
           children: [
+            if (hasInfo)
+              SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _PeerInfoCard(profile: personalInfo),
+              ),
             for (var i = 0; i < photos.length; i++)
               SizedBox(
                 width: tileWidth,
@@ -1715,8 +1711,12 @@ class _PeerMediaStack extends StatelessWidget {
                 child: _PhotoCell(
                   photoUrl: photos[i],
                   viewerMode: true,
-                  onTap: () =>
-                      showPhotoViewer(context, photos: photos, index: i, viewerMode: true),
+                  onTap: () => showPhotoViewer(
+                    context,
+                    photos: photos,
+                    index: i,
+                    viewerMode: true,
+                  ),
                   iLikePeer: likedPhotoUrls.contains(photos[i]),
                   onTogglePeerLike: onTogglePhotoLike != null
                       ? () => onTogglePhotoLike!(photos[i])
@@ -1726,18 +1726,6 @@ class _PeerMediaStack extends StatelessWidget {
           ],
         );
       },
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // La carte infos perso vient en premier, puis la grille de photos.
-        if (hasInfo) ...[
-          _PeerInfoCard(profile: personalInfo),
-          const SizedBox(height: 16),
-        ],
-        if (photos.isNotEmpty) grid,
-      ],
     );
   }
 }

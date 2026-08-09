@@ -21,7 +21,8 @@ class InterestTagChip extends StatefulWidget {
   final String label;
   final Color color;
 
-  /// Filled/active vs dimmed (picker: unpicked options).
+  /// Whether this tag is currently picked (picker). Display chips stay true.
+  /// Selection is shown with the check — colours stay fully opaque either way.
   final bool selected;
 
   /// Leading check — picker only, for already-picked options.
@@ -97,9 +98,10 @@ class _InterestTagChipState extends State<InterestTagChip> {
       child: chip,
     );
 
-    // Unpicked picker options: same relief, reduced opacity (handoff).
-    return Opacity(
-      opacity: widget.selected ? 1.0 : 0.42,
+    // Always full colour — selection is the leading check, not a grey veil.
+    return Semantics(
+      selected: widget.selected,
+      button: _enabled,
       child: _enabled ? tappable : chip,
     );
   }
