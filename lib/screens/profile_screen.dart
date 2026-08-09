@@ -1595,8 +1595,8 @@ class _IdentitySection extends StatelessWidget {
 }
 
 /// Read-only "infos perso" as a portrait TILE — same footprint as a photo
-/// cell in [_PeerMediaStack]. Only emoji + value (no "Âge" / "Métier" labels).
-/// Tap opens a full-screen enlarge overlay, like a photo.
+/// cell in [_PeerMediaStack]. Closed: emoji + value only. Expanded (viewer):
+/// emoji + label + value, like the original info rows.
 class _PeerInfoCard extends StatelessWidget {
   const _PeerInfoCard({
     required this.profile,
@@ -1607,7 +1607,7 @@ class _PeerInfoCard extends StatelessWidget {
   final RemoteProfile? profile;
   final VoidCallback? onTap;
 
-  /// Larger typography / padding when shown in the fullscreen overlay.
+  /// Fullscreen viewer: show "Âge" / "Métier" / … labels. Grid tile: hide them.
   final bool expanded;
 
   static List<({String emoji, String label, String value})> rowsFor(
@@ -1646,66 +1646,108 @@ class _PeerInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = rowsFor(profile);
     if (rows.isEmpty) return const SizedBox.shrink();
-    final emojiSize = expanded ? 22.0 : 17.0;
-    final labelSize = expanded ? 16.0 : 13.0;
-    final valueSize = expanded ? 16.0 : 13.0;
-    final rowPad = expanded ? 14.0 : 10.0;
-    final padH = expanded ? 22.0 : 12.0;
-    final padV = expanded ? 10.0 : 4.0;
 
+    if (expanded) {
+      return Material(
+        color: SC.bubbleIn,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: SC.glassBorder),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final (i, r) in rows.indexed) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        Text(r.emoji, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 12),
+                        Text(
+                          r.label,
+                          style: const TextStyle(
+                            color: SC.textMuted,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            r.value,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              color: SC.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Compact grid tile — emoji + value only (no labels).
     return Material(
       color: SC.bubbleIn,
-      borderRadius: BorderRadius.circular(expanded ? 20 : 10),
+      borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(expanded ? 20 : 10),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(expanded ? 20 : 10),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: SC.glassBorder),
           ),
-          padding: EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, r) in rows.indexed) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: rowPad),
-                  child: Row(
-                    children: [
-                      Text(r.emoji, style: TextStyle(fontSize: emojiSize)),
-                      SizedBox(width: expanded ? 12 : 10),
-                      Text(
-                        r.label,
-                        style: TextStyle(
-                          color: SC.textMuted,
-                          fontSize: labelSize,
+                if (i > 0) const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(r.emoji, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        r.value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          r.value,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            color: SC.textPrimary,
-                            fontSize: valueSize,
-                            fontWeight: FontWeight.w600,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -1716,19 +1758,27 @@ class _PeerInfoCard extends StatelessWidget {
   }
 }
 
-/// Full-screen enlarge for the peer info tile — same open/close feel as
-/// [showPhotoViewer] (fade + scale, ✕, tap backdrop to dismiss).
-Future<void> showPeerInfoViewer(
+/// Opens the peer media viewer (info tile + photos) with side arrows.
+Future<void> showPeerMediaViewer(
   BuildContext context, {
-  required RemoteProfile profile,
+  RemoteProfile? infoProfile,
+  required List<String> photos,
+  int initialIndex = 0,
 }) {
-  if (_PeerInfoCard.rowsFor(profile).isEmpty) return Future<void>.value();
+  final hasInfo =
+      infoProfile != null && _PeerInfoCard.rowsFor(infoProfile).isNotEmpty;
+  if (!hasInfo && photos.isEmpty) return Future<void>.value();
+  final pageCount = (hasInfo ? 1 : 0) + photos.length;
   return Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
       opaque: false,
       barrierColor: Colors.black,
       transitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (ctx, anim, _) => _PeerInfoViewer(profile: profile),
+      pageBuilder: (ctx, anim, _) => _PeerMediaViewer(
+        infoProfile: hasInfo ? infoProfile : null,
+        photos: photos,
+        initialIndex: initialIndex.clamp(0, pageCount - 1),
+      ),
       transitionsBuilder: (ctx, anim, _, child) {
         final curved =
             CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -1744,76 +1794,180 @@ Future<void> showPeerInfoViewer(
   );
 }
 
-class _PeerInfoViewer extends StatelessWidget {
-  const _PeerInfoViewer({required this.profile});
-  final RemoteProfile profile;
+/// Full-screen carousel: optional info card first, then each photo — same
+/// chrome as [_PhotoViewer] (✕ + left/right arrows when more than one page).
+class _PeerMediaViewer extends StatefulWidget {
+  const _PeerMediaViewer({
+    required this.photos,
+    required this.initialIndex,
+    this.infoProfile,
+  });
+
+  final RemoteProfile? infoProfile;
+  final List<String> photos;
+  final int initialIndex;
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.78),
-      body: GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        behavior: HitTestBehavior.opaque,
-        child: Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: size.width - 28,
-                  maxHeight: size.height * 0.7,
-                ),
-                child: AspectRatio(
-                  aspectRatio: 162 / 216,
-                  child: _PeerInfoCard(
-                    profile: profile,
-                    expanded: true,
-                    // Absorb taps so only backdrop / ✕ closes.
-                    onTap: () {},
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: ClipOval(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.14),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.22),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
+  State<_PeerMediaViewer> createState() => _PeerMediaViewerState();
+}
+
+class _PeerMediaViewerState extends State<_PeerMediaViewer> {
+  late final PageController _pc = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _index = widget.initialIndex;
+
+  bool get _hasInfo => widget.infoProfile != null;
+  int get _pageCount => (_hasInfo ? 1 : 0) + widget.photos.length;
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  void _go(int delta) {
+    final next = (_index + delta).clamp(0, _pageCount - 1);
+    if (next != _index) {
+      _pc.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Widget _circleBtn(IconData icon, VoidCallback? onTap, {double size = 36}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: onTap == null ? 0.25 : 1,
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
                 ),
               ),
-            ],
+              child: Icon(icon, color: Colors.white, size: size * 0.55),
+            ),
           ),
         ),
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final multi = _pageCount > 1;
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: 0.78),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pc,
+            itemCount: _pageCount,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (ctx, i) {
+              final isInfo = _hasInfo && i == 0;
+              final photoIndex = _hasInfo ? i - 1 : i;
+              return GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                behavior: HitTestBehavior.opaque,
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: size.width - 28,
+                          maxHeight: size.height * 0.78,
+                        ),
+                        child: isInfo
+                            ? AspectRatio(
+                                aspectRatio: 162 / 216,
+                                child: _PeerInfoCard(
+                                  profile: widget.infoProfile,
+                                  expanded: true,
+                                  onTap: () {},
+                                ),
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: InteractiveViewer(
+                                  minScale: 1,
+                                  maxScale: 4,
+                                  child: Image.network(
+                                    widget.photos[photoIndex],
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, _, _) => const Padding(
+                                      padding: EdgeInsets.all(40),
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        color: SC.textMuted,
+                                        size: 48,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _circleBtn(
+                          Icons.close_rounded,
+                          () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (multi) ...[
+            Positioned(
+              left: 6,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _circleBtn(
+                  Icons.chevron_left_rounded,
+                  _index > 0 ? () => _go(-1) : null,
+                  size: 44,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 6,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _circleBtn(
+                  Icons.chevron_right_rounded,
+                  _index < _pageCount - 1 ? () => _go(1) : null,
+                  size: 44,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
-/// Grille sur le profil d'un pair : tuile infos + photos en **2 colonnes**
-/// pleine largeur. La tuile infos s'agrandit au tap comme une photo.
+/// Grille 2 colonnes (infos + photos) sur la largeur utile du profil.
+/// Tap → [_PeerMediaViewer] avec flèches gauche/droite.
 class _PeerMediaStack extends StatelessWidget {
   const _PeerMediaStack({
     required this.personalInfo,
@@ -1830,67 +1984,62 @@ class _PeerMediaStack extends StatelessWidget {
   static bool _hasInfo(RemoteProfile? p) =>
       p != null && _PeerInfoCard.rowsFor(p).isNotEmpty;
 
-  // 2 par ligne, tuiles portrait (3:4). Compense le gutter du ListView.
   static const double _aspect = 216 / 162; // height / width
   static const double _spacing = 8;
   static const int _columns = 2;
-  static const double _parentGutter = 28;
+
+  void _openViewer(BuildContext context, {required int index}) {
+    showPeerMediaViewer(
+      context,
+      infoProfile: _hasInfo(personalInfo) ? personalInfo : null,
+      photos: photos,
+      initialIndex: index,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final hasInfo = _hasInfo(personalInfo);
     if (!hasInfo && photos.isEmpty) return const _EmptyPhotosPlaceholder();
 
+    // Use the ACTUAL available width (no Transform bleed hack) so Wrap
+    // can fit exactly 2 tiles per row.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final fullWidth = constraints.maxWidth + _parentGutter * 2;
         final tileWidth =
-            (fullWidth - _spacing * (_columns - 1)) / _columns;
+            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
         final tileHeight = tileWidth * _aspect;
-        return Transform.translate(
-          offset: const Offset(-_parentGutter, 0),
-          child: SizedBox(
-            width: fullWidth,
-            child: Wrap(
-              spacing: _spacing,
-              runSpacing: _spacing,
-              children: [
-                if (hasInfo)
-                  SizedBox(
-                    width: tileWidth,
-                    height: tileHeight,
-                    child: _PeerInfoCard(
-                      profile: personalInfo,
-                      onTap: personalInfo == null
-                          ? null
-                          : () => showPeerInfoViewer(
-                                context,
-                                profile: personalInfo!,
-                              ),
-                    ),
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: [
+            if (hasInfo)
+              SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _PeerInfoCard(
+                  profile: personalInfo,
+                  onTap: () => _openViewer(context, index: 0),
+                ),
+              ),
+            for (var i = 0; i < photos.length; i++)
+              SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _PhotoCell(
+                  photoUrl: photos[i],
+                  viewerMode: true,
+                  onTap: () => _openViewer(
+                    context,
+                    index: hasInfo ? i + 1 : i,
                   ),
-                for (var i = 0; i < photos.length; i++)
-                  SizedBox(
-                    width: tileWidth,
-                    height: tileHeight,
-                    child: _PhotoCell(
-                      photoUrl: photos[i],
-                      viewerMode: true,
-                      onTap: () => showPhotoViewer(
-                        context,
-                        photos: photos,
-                        index: i,
-                        viewerMode: true,
-                      ),
-                      iLikePeer: likedPhotoUrls.contains(photos[i]),
-                      onTogglePeerLike: onTogglePhotoLike != null
-                          ? () => onTogglePhotoLike!(photos[i])
-                          : null,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+                  iLikePeer: likedPhotoUrls.contains(photos[i]),
+                  onTogglePeerLike: onTogglePhotoLike != null
+                      ? () => onTogglePhotoLike!(photos[i])
+                      : null,
+                ),
+              ),
+          ],
         );
       },
     );
