@@ -473,14 +473,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // 64 (bouton) + 2 × 12 (respiration) : la bande blanche serre les boutons
+    // 58 (bouton) + 2 × 9 (respiration) : la bande blanche serre les boutons
     // au lieu de leur faire un socle.
-    const actionH = 88.0;
-    // Boutons SOUS la carte, posés sur le fond noir (juste au-dessus de la nav).
-    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 10;
+    const actionH = 76.0;
+    // La bande se raccourcit PAR LE BAS : le bas de la photo reste où il est
+    // (98 = les 88 de la bande d'avant + les 10 qui la séparaient de la nav) et
+    // c'est le bord inférieur du bloc blanc qui remonte.
+    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom + 98;
     // La carte s'arrête PILE sur la barre : aucun écart, elles se lisent comme
     // une seule pièce (photo en haut, boutons en bas).
-    final cardBottom = btnBottom + actionH;
+    final btnBottom = cardBottom - actionH;
     final tabBarH = safeTop + _TopTabBar.height;
 
     // Panneau ouvert : la carte prend toute la hauteur — elle monte sous la
@@ -2108,16 +2110,16 @@ class _SwipeActionBar extends StatelessWidget {
             _ActionButton(
               background: Colors.black,
               onTap: onNope,
-              child: const Icon(Icons.close, color: Colors.white, size: 26),
+              child: const Icon(Icons.close, color: Colors.white, size: 24),
             ),
-            const SizedBox(width: 26),
+            const SizedBox(width: 32),
             _ActionButton(
               background: const Color(0xFF22D3EE),
               onTap: onLike,
               child: const Icon(
                 Icons.favorite,
                 color: Color(0xFF111111),
-                size: 26,
+                size: 24,
               ),
             ),
           ],
@@ -2127,7 +2129,7 @@ class _SwipeActionBar extends StatelessWidget {
   }
 }
 
-/// Les deux boutons de match : un rond plein de 64, noir pour passer, cyan de
+/// Les deux boutons de match : un rond plein de 58, noir pour passer, cyan de
 /// marque pour valider. Rien de translucide — ils sont posés sur du blanc.
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
@@ -2148,7 +2150,7 @@ class _ActionButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: SizedBox(width: 64, height: 64, child: Center(child: child)),
+        child: SizedBox(width: 58, height: 58, child: Center(child: child)),
       ),
     );
   }
