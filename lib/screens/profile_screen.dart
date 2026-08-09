@@ -30,6 +30,7 @@ import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/interest_chip.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -1569,13 +1570,13 @@ class _IdentitySection extends StatelessWidget {
           _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
           const SizedBox(height: 12),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              for (final tag in interests)
-                _InterestChip(
+              for (final (i, tag) in interests.indexed)
+                InterestTagChip(
                   label: tag,
-                  color: interestColor(tag),
+                  color: interestPaletteColor(i),
                 ),
             ],
           ),
@@ -2511,81 +2512,6 @@ class _InlineEditableState extends State<_InlineEditable> {
 /// A "centre d'intérêt" chip — a category-coloured pill. Used both on the
 /// profile (display) and, with [selected], inside the picker. Tapping it on
 /// my own profile opens the picker.
-class _InterestChip extends StatelessWidget {
-  const _InterestChip({
-    required this.label,
-    required this.color,
-    this.shape,
-    this.selected = true,
-    this.showCheck = false,
-    this.onTap,
-  });
-
-  final String label;
-  final Color color;
-
-  /// Per-category silhouette. Null → derived from the label's category
-  /// (used by the read-only display chips, which only know the stored label).
-  final InterestShape? shape;
-
-  /// Filled (true) vs faint outline (false). Display chips are always filled;
-  /// the picker uses false for the unpicked options.
-  final bool selected;
-
-  /// Show a leading check — only used by the picker for picked options.
-  final bool showCheck;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    // "Bord blanc" style: EVERY chip is its category's solid vivid colour with
-    // white text, so all colours are always visible. Selected chips get a bold
-    // white border + check + shadow; unpicked ones a thin faint white border.
-    final fg = Colors.white;
-    final s = shape ?? interestShape(label);
-    final outer = interestShapeBorder(s);
-    final bordered = interestShapeBorder(
-      s,
-      side: BorderSide(
-        color: selected ? Colors.white : Colors.white.withValues(alpha: 0.35),
-        width: selected ? 2 : 1,
-      ),
-    );
-    final inner = InkWell(
-      customBorder: outer,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: ShapeDecoration(shape: bordered),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (showCheck) ...[
-              Icon(Icons.check_rounded, size: 18, color: fg),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              interestLabel(label),
-              style: TextStyle(
-                color: fg,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    return Material(
-      color: color,
-      elevation: selected ? 3 : 1,
-      shadowColor: color.withValues(alpha: 0.6),
-      shape: outer,
-      child: inner,
-    );
-  }
-}
-
 /// The "+ Ajouter" chip that opens the interest picker on my own profile.
 class _InterestAddChip extends StatelessWidget {
   const _InterestAddChip({required this.onTap});
@@ -2676,8 +2602,11 @@ class _InterestsSectionState extends State<_InterestsSection> {
   // state once more when folding, which also wins any rapid-tap race.
   void _toggle(String tag) {
     setState(() {
-      // Choix unique : re-taper enlève, taper un autre remplace.
-      _sel = _sel.contains(tag) ? <String>{} : {tag};
+      if (_sel.contains(tag)) {
+        _sel = {..._sel}..remove(tag);
+      } else if (_sel.length < profileInterestsMax) {
+        _sel = {..._sel, tag};
+      }
     });
     widget.onSave?.call(_sel.toList());
   }
@@ -2747,13 +2676,13 @@ class _InterestsSectionState extends State<_InterestsSection> {
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
         // feuille de sélection, qui se pose PAR-DESSUS la page.
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            for (final tag in _sel)
-              _InterestChip(
+            for (final (i, tag) in _sel.toList().indexed)
+              InterestTagChip(
                 label: tag,
-                color: interestColor(tag),
+                color: interestPaletteColor(i),
                 onTap: _openPicker,
               ),
             if (_sel.length < profileInterestsMax)
@@ -2951,18 +2880,13 @@ class _CategoryPage extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  for (final opt in cat.options)
-                    _InterestChip(
+                  for (final (i, opt) in cat.options.indexed)
+                    InterestTagChip(
                       label: opt,
-                      // Use THIS category's colour — interestColor() takes the
-                      // first matching category, so a label shared by two
-                      // categories (e.g. K-pop / J-pop) would otherwise show
-                      // the other category's colour inside this page.
-                      color: cat.color,
-                      shape: cat.shape,
+                      color: interestPaletteColor(i),
                       selected: sel.contains(opt),
                       showCheck: sel.contains(opt),
                       // When the cap is hit, leave only the already-picked

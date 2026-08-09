@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Tags — Relief 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@900&family=Space+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  html,body{margin:0;background:#000;font-family:sans-serif}
+  .panel{max-width:520px;margin:24px auto;background:radial-gradient(120% 80% at 50% -10%,#16161a 0%,#0a0a0c 55%,#060608 100%);border-radius:12px;padding:30px 28px 34px;box-sizing:border-box}
+  .panel-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
+  .panel-kicker{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.4);margin:0}
+  .panel-count{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.1em;color:rgba(255,255,255,.28)}
+  .cloud{display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start}
+  .tag{border:0;cursor:pointer;user-select:none;color:#fff;line-height:1;font-family:"Archivo",sans-serif;font-weight:900;font-size:16px;letter-spacing:.005em;padding:10px 18px;border-radius:13px;transition:transform .16s cubic-bezier(.2,.8,.3,1),box-shadow .16s}
+  .tag:hover{transform:translateY(2px)}
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="panel-head"><p class="panel-kicker">Centres d'intérêt</p><span class="panel-count" id="count"></span></div>
+  <div class="cloud" id="cloud"></div>
+</div>
+<script>
+const SOLID=['#22C55E','#F97316','#D946EF','#3B82F6','#EAB308','#EC4899','#8B5CF6','#0EA5E9','#EF4444','#14B8A6'];
+const TAGS=['One Piece','Jul','Basketball','Ninho','Tatouage','Voyages','Randonnée','Techno','Cuisine italienne','Manga','Concerts','Photographie','Jeux vidéo','Footing','Vinyles'];
+function darken(hex,amt){const n=parseInt(hex.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;r=Math.round(r*(1-amt));g=Math.round(g*(1-amt));b=Math.round(b*(1-amt));return`rgb(${r},${g},${b})`}
+const cloud=document.getElementById('cloud');
+document.getElementById('count').textContent=TAGS.length+" centres d'intérêt";
+TAGS.forEach((t,i)=>{const c=SOLID[i%SOLID.length];const btn=document.createElement('button');btn.className='tag';btn.textContent=t;btn.style.background=c;btn.style.boxShadow=`0 5px 0 0 ${darken(c,0.38)}, 0 10px 20px rgba(0,0,0,0.45)`;cloud.appendChild(btn)});
+</script>
+</body>
+</html>

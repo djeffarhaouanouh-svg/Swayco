@@ -27,6 +27,7 @@ import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/interest_chip.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -1293,30 +1294,13 @@ class _ProfileInfoPanel extends StatelessWidget {
                         _PanelSectionTitle(AppStrings.t('info_interests')),
                         const SizedBox(height: 10),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
-                            for (final tag in p.interests)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.07),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                  ),
-                                ),
-                                child: Text(
-                                  interestLabel(tag),
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.90),
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                            for (final (i, tag) in p.interests.indexed)
+                              InterestTagChip(
+                                label: tag,
+                                color: interestPaletteColor(i),
                               ),
                           ],
                         ),
@@ -1917,11 +1901,14 @@ class _TinderCardState extends State<_TinderCard> {
                   ),
                   const SizedBox(height: 7),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      for (final tag in p.interests.take(1))
-                        _InterestChip(label: interestLabel(tag)),
+                      for (final (i, tag) in p.interests.take(1).toList().indexed)
+                        InterestTagChip(
+                          label: tag,
+                          color: interestPaletteColor(i),
+                        ),
                     ],
                   ),
                 ],
@@ -2061,49 +2048,6 @@ class _PhotoDots extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 // Interest chip — dark pill (Tinder style)
 // ══════════════════════════════════════════════════════════════════════════════
-
-class _InterestChip extends StatelessWidget {
-  const _InterestChip({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      // Légère ombre derrière chaque chip d'intérêt.
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.30),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Action bar — pass / like. The rewind arrow lives on the card now, and the

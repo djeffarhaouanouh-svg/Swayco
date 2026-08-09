@@ -171,10 +171,43 @@ List<InterestCategory> interestCategoriesFor(String country) {
       : kJapanInterestCategories;
 }
 
+/// Cyclic Relief-3D palette for interest tags (display order on the profile).
+/// Colour is assigned by index in the list: `PALETTE[i % length]`.
+const List<Color> kInterestTagPalette = [
+  Color(0xFF22C55E), // vert
+  Color(0xFFF97316), // orange
+  Color(0xFFD946EF), // magenta
+  Color(0xFF3B82F6), // bleu
+  Color(0xFFEAB308), // jaune
+  Color(0xFFEC4899), // rose
+  Color(0xFF8B5CF6), // violet
+  Color(0xFF0EA5E9), // cyan
+  Color(0xFFEF4444), // rouge
+  Color(0xFF14B8A6), // teal
+];
+
+/// Palette colour for the tag at [index] in a displayed interests list.
+Color interestPaletteColor(int index) =>
+    kInterestTagPalette[index % kInterestTagPalette.length];
+
+/// Darken [color] by multiplying each RGB channel by `(1 - amount)`.
+/// Used for the hard bottom lip of the Relief-3D tag shadow (amount 0.38).
+Color interestDarken(Color color, [double amount = 0.38]) {
+  return Color.from(
+    alpha: color.a,
+    red: color.r * (1 - amount),
+    green: color.g * (1 - amount),
+    blue: color.b * (1 - amount),
+  );
+}
+
 /// Colour for a chip [label] = its CATEGORY colour, resolved across BOTH the
 /// Japan and France taxonomies (so a stored label always finds its colour,
 /// whichever set the user picked from). Falls back to a neutral slate for a
 /// tag no longer in either taxonomy.
+///
+/// Prefer [interestPaletteColor] for profile / discover display chips (Relief
+/// 3D handoff). This helper remains for category-tinted picker headers.
 Color interestColor(String label) {
   for (final c in kAllInterestCategories) {
     if (c.options.contains(label)) return c.color;
