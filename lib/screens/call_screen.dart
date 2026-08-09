@@ -37,6 +37,37 @@ import '../swayco/translation_route.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 
+/// The connecting-splash ("sas") mark, decoded at boot and pinned for the
+/// process lifetime.
+///
+/// [Image] only paints once its decode has finished, so the splash used to
+/// open on an empty column and the logo popped in a frame or two later.
+/// Resolving the stream at startup moves that decode into the boot, where
+/// there is nothing to be late for; holding the listener keeps [ImageCache]
+/// from evicting it once the user has scrolled a few hundred Discover
+/// photos — a precache alone does not survive that.
+class CallSplashImage {
+  const CallSplashImage._();
+
+  static const provider = AssetImage('assets/icon-saas.png');
+
+  static ImageStream? _stream;
+
+  /// Idempotent — safe to call from more than one boot path. Needs no
+  /// [BuildContext] and nothing awaits it: the decode lands long before a
+  /// call can start.
+  static void warm() {
+    if (_stream != null) return;
+    _stream = provider.resolve(ImageConfiguration.empty)
+      ..addListener(
+        ImageStreamListener(
+          (_, _) {},
+          onError: (e, _) => debugPrint('call splash precache failed: $e'),
+        ),
+      );
+  }
+}
+
 class CallScreen extends StatefulWidget {
   const CallScreen({
     super.key,
@@ -2229,11 +2260,13 @@ class _CallScreenState extends State<CallScreen> {
                 // Logo, then the spinner + hint kept close just beneath it
                 // (centred together as a tight group, not spread apart).
                 const Spacer(flex: 5),
-                // 278 rather than 210: the mark only fills 59% of its own
-                // canvas, so at 210 it would render a third smaller than
-                // the logo it replaces. The file itself is untouched.
-                Image.asset(
-                  'assets/icon-saas.png',
+                // Same provider CallSplashImage warmed at boot, so this
+                // paints on the splash's very first frame instead of a
+                // beat later. 278 rather than 210: the mark only fills
+                // 59% of its own canvas, so at 210 it would render a
+                // third smaller than the logo it replaces.
+                const Image(
+                  image: CallSplashImage.provider,
                   width: 278,
                   height: 278,
                   fit: BoxFit.contain,

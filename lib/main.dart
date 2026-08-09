@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
+import 'screens/call_screen.dart';
 import 'screens/guest_join_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -97,6 +98,14 @@ Future<void> main() async {
       debugPrint('PlatformDispatcher error: $e');
       return true;
     };
+    // Decode the call-splash mark into the image cache now, so it paints
+    // on the splash's very first frame instead of a beat later. It used
+    // to be warmed from RootShell's post-frame callback, which a cold
+    // launch straight into a call (CallKit / full-screen intent) skips
+    // entirely — exactly the path where the blank beat showed. Holding
+    // the stream (see CallSplashImage) also keeps the cache from evicting
+    // it behind a few hundred scrolled Discover photos.
+    CallSplashImage.warm();
     // Supabase keys come from --dart-define at build time. 15s cap so a
     // reviewer device on a bad network still boots — the earlier 5s cap
     // was actively harmful (it cut Hive session recovery mid-flight and
