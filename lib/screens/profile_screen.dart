@@ -1623,17 +1623,17 @@ class _PeerInfoCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: SC.glassBorder),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final (i, r) in rows.indexed) ...[
-              if (i > 0) const SizedBox(height: 10),
+              if (i > 0) const SizedBox(height: 12),
               Row(
                 children: [
-                  Text(r.emoji, style: const TextStyle(fontSize: 16)),
-                  const SizedBox(width: 8),
+                  Text(r.emoji, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       r.value,
@@ -1641,7 +1641,7 @@ class _PeerInfoCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: SC.textPrimary,
-                        fontSize: 13.5,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),
@@ -1658,7 +1658,8 @@ class _PeerInfoCard extends StatelessWidget {
 }
 
 /// Grille Instagram sur le profil d'un pair : tuile infos perso (même format
-/// que les photos) en première position, puis chaque photo en portrait.
+/// que les photos) en première position, puis chaque photo — 3 colonnes qui
+/// occupent toute la largeur de l'écran.
 class _PeerMediaStack extends StatelessWidget {
   const _PeerMediaStack({
     required this.personalInfo,
@@ -1679,51 +1680,62 @@ class _PeerMediaStack extends StatelessWidget {
           p.zodiac.trim().isNotEmpty ||
           p.lookingFor.trim().isNotEmpty);
 
-  // Grille façon Instagram : 3 par ligne, tuiles portrait (3:4).
+  // 3 par ligne, tuiles portrait (3:4). Le gutter du ListView parent est
+  // compensé ci-dessous pour coller les cartes au bord de l'écran.
   static const double _aspect = 216 / 162; // height / width
-  static const double _spacing = 8;
+  static const double _spacing = 6;
   static const int _columns = 3;
+  static const double _parentGutter = 28;
 
   @override
   Widget build(BuildContext context) {
     final hasInfo = _hasInfo(personalInfo);
     if (!hasInfo && photos.isEmpty) return const _EmptyPhotosPlaceholder();
 
+    // Sortir du padding horizontal du ListView (28) pour prendre toute la
+    // largeur — les 3 tuiles grossissent d'autant.
     return LayoutBuilder(
       builder: (context, constraints) {
+        final fullWidth = constraints.maxWidth + _parentGutter * 2;
         final tileWidth =
-            (constraints.maxWidth - _spacing * (_columns - 1)) / _columns;
+            (fullWidth - _spacing * (_columns - 1)) / _columns;
         final tileHeight = tileWidth * _aspect;
-        return Wrap(
-          spacing: _spacing,
-          runSpacing: _spacing,
-          children: [
-            if (hasInfo)
-              SizedBox(
-                width: tileWidth,
-                height: tileHeight,
-                child: _PeerInfoCard(profile: personalInfo),
-              ),
-            for (var i = 0; i < photos.length; i++)
-              SizedBox(
-                width: tileWidth,
-                height: tileHeight,
-                child: _PhotoCell(
-                  photoUrl: photos[i],
-                  viewerMode: true,
-                  onTap: () => showPhotoViewer(
-                    context,
-                    photos: photos,
-                    index: i,
-                    viewerMode: true,
+        return Transform.translate(
+          offset: const Offset(-_parentGutter, 0),
+          child: SizedBox(
+            width: fullWidth,
+            child: Wrap(
+              spacing: _spacing,
+              runSpacing: _spacing,
+              children: [
+                if (hasInfo)
+                  SizedBox(
+                    width: tileWidth,
+                    height: tileHeight,
+                    child: _PeerInfoCard(profile: personalInfo),
                   ),
-                  iLikePeer: likedPhotoUrls.contains(photos[i]),
-                  onTogglePeerLike: onTogglePhotoLike != null
-                      ? () => onTogglePhotoLike!(photos[i])
-                      : null,
-                ),
-              ),
-          ],
+                for (var i = 0; i < photos.length; i++)
+                  SizedBox(
+                    width: tileWidth,
+                    height: tileHeight,
+                    child: _PhotoCell(
+                      photoUrl: photos[i],
+                      viewerMode: true,
+                      onTap: () => showPhotoViewer(
+                        context,
+                        photos: photos,
+                        index: i,
+                        viewerMode: true,
+                      ),
+                      iLikePeer: likedPhotoUrls.contains(photos[i]),
+                      onTogglePeerLike: onTogglePhotoLike != null
+                          ? () => onTogglePhotoLike!(photos[i])
+                          : null,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
       },
     );
