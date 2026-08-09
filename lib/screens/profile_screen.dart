@@ -2877,9 +2877,9 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Croix de fermeture — même teinte que l'icône paramètres.
+          // Croix de fermeture en haut à droite — même teinte que paramètres.
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: Alignment.centerRight,
             child: Material(
               color: Colors.white.withValues(alpha: 0.10),
               shape: const CircleBorder(),
@@ -3048,8 +3048,8 @@ class _CategoryPage extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 interestLabel(cat.label),
-                style: TextStyle(
-                  color: cat.color,
+                style: const TextStyle(
+                  color: SC.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.2,
