@@ -1610,16 +1610,35 @@ class _PeerInfoCard extends StatelessWidget {
   /// Larger typography / padding when shown in the fullscreen overlay.
   final bool expanded;
 
-  static List<({String emoji, String value})> rowsFor(RemoteProfile? p) {
+  static List<({String emoji, String label, String value})> rowsFor(
+    RemoteProfile? p,
+  ) {
     if (p == null) return const [];
     return [
-      if (p.age != null) (emoji: kFactEmojiAge, value: '${p.age}'),
+      if (p.age != null)
+        (
+          emoji: kFactEmojiAge,
+          label: AppStrings.t('info_age'),
+          value: '${p.age}',
+        ),
       if (p.job.trim().isNotEmpty)
-        (emoji: kFactEmojiJob, value: displayJob(p.job)),
+        (
+          emoji: kFactEmojiJob,
+          label: AppStrings.t('info_job'),
+          value: displayJob(p.job),
+        ),
       if (p.zodiac.trim().isNotEmpty)
-        (emoji: kFactEmojiZodiac, value: displayZodiac(p.zodiac)),
+        (
+          emoji: kFactEmojiZodiac,
+          label: AppStrings.t('info_zodiac'),
+          value: displayZodiac(p.zodiac),
+        ),
       if (p.lookingFor.trim().isNotEmpty)
-        (emoji: kFactEmojiLookingFor, value: displayLookingFor(p.lookingFor)),
+        (
+          emoji: kFactEmojiLookingFor,
+          label: AppStrings.t('info_looking_for'),
+          value: displayLookingFor(p.lookingFor),
+        ),
     ];
   }
 
@@ -1627,13 +1646,14 @@ class _PeerInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = rowsFor(profile);
     if (rows.isEmpty) return const SizedBox.shrink();
-    final emojiSize = expanded ? 28.0 : 18.0;
-    final valueSize = expanded ? 22.0 : 14.5;
-    final gap = expanded ? 18.0 : 12.0;
-    final padH = expanded ? 28.0 : 14.0;
-    final padV = expanded ? 32.0 : 16.0;
+    final emojiSize = expanded ? 22.0 : 17.0;
+    final labelSize = expanded ? 16.0 : 13.0;
+    final valueSize = expanded ? 16.0 : 13.0;
+    final rowPad = expanded ? 14.0 : 10.0;
+    final padH = expanded ? 22.0 : 12.0;
+    final padV = expanded ? 10.0 : 4.0;
 
-    final body = Material(
+    return Material(
       color: SC.bubbleIn,
       borderRadius: BorderRadius.circular(expanded ? 20 : 10),
       clipBehavior: Clip.antiAlias,
@@ -1648,28 +1668,44 @@ class _PeerInfoCard extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: padH, vertical: padV),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, r) in rows.indexed) ...[
-                if (i > 0) SizedBox(height: gap),
-                Row(
-                  children: [
-                    Text(r.emoji, style: TextStyle(fontSize: emojiSize)),
-                    SizedBox(width: expanded ? 14 : 10),
-                    Expanded(
-                      child: Text(
-                        r.value,
-                        maxLines: expanded ? 3 : 2,
-                        overflow: TextOverflow.ellipsis,
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: rowPad),
+                  child: Row(
+                    children: [
+                      Text(r.emoji, style: TextStyle(fontSize: emojiSize)),
+                      SizedBox(width: expanded ? 12 : 10),
+                      Text(
+                        r.label,
                         style: TextStyle(
-                          color: SC.textPrimary,
-                          fontSize: valueSize,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
+                          color: SC.textMuted,
+                          fontSize: labelSize,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          r.value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: SC.textPrimary,
+                            fontSize: valueSize,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -1677,7 +1713,6 @@ class _PeerInfoCard extends StatelessWidget {
         ),
       ),
     );
-    return body;
   }
 }
 
