@@ -1352,7 +1352,7 @@ class _PanelSectionTitle extends StatelessWidget {
   }
 }
 
-/// La première ligne du panneau : prénom et âge.
+/// La première ligne du panneau : prénom + drapeau (l'âge est dans « À propos »).
 class _PanelHeader extends StatelessWidget {
   const _PanelHeader({required this.profile});
 
@@ -1363,6 +1363,11 @@ class _PanelHeader extends StatelessWidget {
     final name = profile.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : profile.displayName.trim();
+    final flag = (profile.city.trim().isNotEmpty
+            ? countryFlagFor(profile.country)
+            : null) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -1380,16 +1385,9 @@ class _PanelHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (profile.age != null) ...[
+        if (flag.isNotEmpty) ...[
           const SizedBox(width: 9),
-          Text(
-            '${profile.age}',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(flag, style: const TextStyle(fontSize: 26)),
         ],
       ],
     );
