@@ -2072,31 +2072,50 @@ class _SwipeActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: height,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _GlassButton(
-            size: 58,
-            iconSize: 27,
-            icon: Icons.close_rounded,
-            // Croix blanche : le rouge est réservé au cœur, sinon les deux
-            // boutons se ressemblaient trop.
-            color: Colors.white,
-            onTap: onNope,
-          ),
-          const SizedBox(width: 28),
-          _GlassButton(
-            size: 58,
-            iconSize: 27,
-            // Une coche, pas un cœur : on valide quelqu'un, et le geste se
-            // lit sans ambiguïté à côté de la croix.
-            icon: Icons.check_rounded,
-            // Le vert que ce bouton portait à l'origine.
-            color: const Color(0xFF3DCA72),
-            onTap: onLike,
-          ),
-        ],
+      child: Container(
+        // Le bas blanc : un bloc plein qui englobe les deux boutons, même
+        // largeur et même rayon que la carte au-dessus. Pas de clip — l'onde
+        // du bouton doit pouvoir déborder du bloc.
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _GlassButton(
+              size: 58,
+              iconSize: 27,
+              icon: Icons.close_rounded,
+              // Croix encre sombre : le vert est réservé à la coche, et sur le
+              // bloc blanc une croix blanche serait invisible.
+              color: const Color(0xFF263043),
+              onLight: true,
+              onTap: onNope,
+            ),
+            const SizedBox(width: 28),
+            _GlassButton(
+              size: 58,
+              iconSize: 27,
+              // Une coche, pas un cœur : on valide quelqu'un, et le geste se
+              // lit sans ambiguïté à côté de la croix.
+              icon: Icons.check_rounded,
+              // Le vert que ce bouton portait à l'origine.
+              color: const Color(0xFF3DCA72),
+              onLight: true,
+              onTap: onLike,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2113,6 +2132,7 @@ class _GlassButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.onLight = false,
   });
 
   final double size;
@@ -2120,6 +2140,10 @@ class _GlassButton extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+
+  /// Posé sur une surface claire (le bas blanc) : le verre translucide y
+  /// disparaîtrait, on passe à un cercle gris pâle et des ombres allégées.
+  final bool onLight;
 
   @override
   State<_GlassButton> createState() => _GlassButtonState();
@@ -2201,12 +2225,12 @@ class _GlassButtonState extends State<_GlassButton>
           boxShadow: [
             // Ombres plus discrètes — effet léger/premium.
             BoxShadow(
-              color: color.withValues(alpha: 0.16),
+              color: color.withValues(alpha: widget.onLight ? 0.10 : 0.16),
               blurRadius: 12,
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: widget.onLight ? 0.08 : 0.18),
+              blurRadius: widget.onLight ? 6 : 8,
               offset: const Offset(0, 3),
             ),
           ],
@@ -2220,10 +2244,15 @@ class _GlassButtonState extends State<_GlassButton>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 // Verre nu : ni teinte cyan, ni reflet. Seule l'icône est
-                // colorée, le cercle laisse passer la photo.
-                color: Colors.white.withValues(alpha: 0.12),
+                // colorée, le cercle laisse passer la photo. Sur le bas blanc,
+                // ce verre-là ne se verrait pas : gris pâle + liseré noir.
+                color: widget.onLight
+                    ? const Color(0xFFF2F4F8)
+                    : Colors.white.withValues(alpha: 0.12),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: widget.onLight
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.25),
                   width: 0.8,
                 ),
               ),
