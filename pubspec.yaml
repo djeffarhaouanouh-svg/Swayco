@@ -193,8 +193,8 @@ flutter:
     - assets/test-logo.png
     # Transparent logo mark — shown on the paywall hero.
     - assets/icon-fg-transparent.png
-    # Brand mark on black — call connecting splash.
-    - assets/notif-android.png
+    # Transparent Ø-arrows mark — call connecting splash ("sas").
+    - assets/call-saas.png
     # Lottie boot/splash animation (cyan + white line-art on black).
     - assets/Traduction.json
     # Official multicolour Google "G" — login "Continue with Google" button.
