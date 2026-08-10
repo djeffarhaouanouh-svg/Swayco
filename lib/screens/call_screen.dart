@@ -3034,7 +3034,33 @@ class _CallScreenState extends State<CallScreen> {
                           if (_turnsOpen)
                             const SizedBox(width: double.infinity)
                           else
-                          _CallDock(
+                          // En veille, la rangée ne se contente plus de
+                          // s'effacer : elle REND SA PLACE. Elle passait à
+                          // l'opacité zéro en gardant toute sa hauteur, et les
+                          // phrases restaient suspendues au-dessus d'une bande
+                          // vide — on voyait le trou, pas la vidéo. Sa hauteur
+                          // se replie donc avec elle, sur la même durée et la
+                          // même courbe que son fondu, et les bulles
+                          // descendent d'autant.
+                          //
+                          // La cible qui la rallume ne se perd pas au passage :
+                          // c'est la couche plein écran [dock_wake] qui
+                          // l'attrape, pas la rangée elle-même.
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                              begin: 1,
+                              end: _dockDimmed ? 0 : 1,
+                            ),
+                            duration: const Duration(milliseconds: 450),
+                            curve: Curves.easeInOut,
+                            builder: (context, f, child) => ClipRect(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                heightFactor: f,
+                                child: child,
+                              ),
+                            ),
+                            child: _CallDock(
                             camOn: _camOn,
                             micOn: _micOn,
                             speakerOn: _audio.speakerOn,
@@ -3067,6 +3093,7 @@ class _CallScreenState extends State<CallScreen> {
                                 if (_controlsOpen) _turnsOpen = false;
                               });
                             },
+                            ),
                           ),
                         ],
                       ),
@@ -3177,6 +3204,30 @@ class _RestingTurns extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Le même mot qu'en haut du panneau ouvert, au même endroit : à
+          // droite, au-dessus des phrases. Un tap les retire ici comme là, et
+          // rien ne le disait — un geste qui ne s'annonce pas n'existe pas.
+          // Sans la pastille ni le titre : au repos ce n'est pas un panneau,
+          // c'est un sous-titre.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                AppStrings.t('call_turns_close'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 10.5,
+                  letterSpacing: 0.2,
+                  shadows: const [
+                    // Posé à même la vidéo, sans le verre d'une bulle
+                    // derrière : sur une image claire, ce gris disparaîtrait.
+                    Shadow(color: Colors.black, blurRadius: 6),
+                  ],
+                ),
+              ),
+            ),
+          ),
           for (final turn in shown)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
