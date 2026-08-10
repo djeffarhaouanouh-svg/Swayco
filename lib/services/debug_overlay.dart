@@ -26,7 +26,7 @@ class DebugOverlay extends StatefulWidget {
     // is fine while that is only us. BEFORE OPENING TO REAL USERS: put this
     // back behind `kIsWeb || kDebugMode`, or keep the tap target and drop the
     // icon.
-    _enabled = false;
+    _enabled = true;
   }
 
   static void log(String msg) {
