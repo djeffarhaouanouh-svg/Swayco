@@ -414,11 +414,12 @@ class _CallScreenState extends State<CallScreen> {
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
-    // La conversation ne s'ouvre plus d'elle-même. Elle le faisait à la
-    // première phrase de l'appel, pour se faire découvrir — mais elle efface
-    // désormais la barre entière : la première phrase venue emportait les
-    // touches sans que personne ne l'ait demandé. C'est le bouton Messages qui
-    // l'ouvre, et lui seul.
+    // Rien à ouvrir ici : la phrase se montrera d'elle-même au-dessus des
+    // touches ([_RestingTurns]), sans rien effacer. C'était l'affaire d'une
+    // ouverture automatique de la zone entière, mais celle-ci efface désormais
+    // la barre — la première phrase venue emportait les touches sans que
+    // personne l'ait demandé. Se DÉPLIER reste au bouton Messages (ou au tap
+    // sur la phrase) ; PARAÎTRE se fait tout seul.
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -2780,16 +2781,25 @@ class _CallScreenState extends State<CallScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // 1. La conversation, dépliée par la touche Messages.
-                          // Elle se range À GAUCHE et ne prend qu'une part de la
-                          // largeur : c'est une marge de page, pas un panneau
-                          // centré — le visage reste visible à côté.
+                          // 1. La conversation. Deux états, tous deux rangés À
+                          // GAUCHE sur 82 % de la largeur — c'est une marge de
+                          // page, pas un panneau centré : le visage reste
+                          // visible à côté.
+                          //
+                          //  • AU REPOS : les derniers tours se posent
+                          //    AU-DESSUS DES TOUCHES, sans en-tête ni saisie.
+                          //    Une phrase paraît d'elle-même dès qu'elle est
+                          //    dite — c'est ce qui fait découvrir qu'il y a une
+                          //    conversation — et les touches ne bougent pas.
+                          //  • OUVERTE par la touche Messages : elle prend
+                          //    l'écran, la barre s'efface et la saisie apparaît.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.bottomLeft,
-                            child: _turnsOpen
-                                ? Align(
+                            child: (!_turnsOpen && _turns.isEmpty)
+                                ? const SizedBox(width: double.infinity)
+                                : Align(
                                     alignment: Alignment.centerLeft,
                                     child: FractionallySizedBox(
                                       widthFactor: 0.82,
@@ -2802,24 +2812,48 @@ class _CallScreenState extends State<CallScreen> {
                                         padding: const EdgeInsets.only(
                                           bottom: 10,
                                         ),
-                                        child: _SpokenTurnsPanel(
-                                          turns: _turns,
-                                          myName: widget.displayName,
-                                          myAvatarUrl: '',
-                                          peerName:
-                                              _peerProfile?.displayName ?? '',
-                                          peerAvatarUrl:
-                                              _peerProfile?.avatarUrl ?? '',
-                                          onToggle: _closeTurns,
-                                          chatController: _chatCtrl,
-                                          chatFocus: _chatFocus,
-                                          sending: _chatSending,
-                                          onSend: _sendCaption,
-                                        ),
+                                        child: _turnsOpen
+                                            ? _SpokenTurnsPanel(
+                                                turns: _turns,
+                                                myName: widget.displayName,
+                                                myAvatarUrl: '',
+                                                peerName: _peerProfile
+                                                        ?.displayName ??
+                                                    '',
+                                                peerAvatarUrl:
+                                                    _peerProfile?.avatarUrl ??
+                                                        '',
+                                                onToggle: _closeTurns,
+                                                chatController: _chatCtrl,
+                                                chatFocus: _chatFocus,
+                                                sending: _chatSending,
+                                                onSend: _sendCaption,
+                                              )
+                                            : _RestingTurns(
+                                                turns: _turns,
+                                                myName: widget.displayName,
+                                                myAvatarUrl: '',
+                                                peerName: _peerProfile
+                                                        ?.displayName ??
+                                                    '',
+                                                peerAvatarUrl:
+                                                    _peerProfile?.avatarUrl ??
+                                                        '',
+                                                // Le tap sur une phrase ouvre
+                                                // le reste : on lit, on veut
+                                                // remonter ou répondre, la
+                                                // zone entière est là.
+                                                onTap: () {
+                                                  _wakeDock();
+                                                  setState(() {
+                                                    _turnsOpen = true;
+                                                    _controlsOpen = false;
+                                                  });
+                                                },
+                                              ),
                                       ),
                                     ),
-                                  )
-                                : const SizedBox(width: double.infinity),
+                                  ),
                           ),
                           // 2. Les réglages, dépliés par le chevron.
                           AnimatedSize(
@@ -3020,6 +3054,63 @@ class _SpokenTurn {
 
   /// Mine only: heard, but the peer never got it. Drawn dimmed.
   final bool delivered;
+}
+
+/// Les derniers tours AU REPOS : posés au-dessus des touches, sans en-tête ni
+/// saisie, et sans rien effacer. C'est ce qui fait découvrir la conversation —
+/// une phrase paraît d'elle-même dès qu'elle est dite, et le tap dessus ouvre
+/// le reste.
+///
+/// Ça remplace l'ouverture automatique d'avant : la zone entière s'ouvrait
+/// toute seule à la première phrase, ce qui, maintenant qu'elle efface la
+/// barre, emportait les touches sans que personne l'ait demandé. Ici la phrase
+/// se montre, et rien d'autre ne bouge.
+class _RestingTurns extends StatelessWidget {
+  const _RestingTurns({
+    required this.turns,
+    required this.onTap,
+    required this.myName,
+    required this.myAvatarUrl,
+    required this.peerName,
+    required this.peerAvatarUrl,
+  });
+
+  final List<_SpokenTurn> turns;
+  final VoidCallback onTap;
+  final String myName;
+  final String myAvatarUrl;
+  final String peerName;
+  final String peerAvatarUrl;
+
+  /// Deux, comme dans la zone ouverte. Au repos on ne fait pas défiler : ce
+  /// qui dépasse n'est pas montré, il attend qu'on ouvre.
+  static const int _kRestCount = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = turns.length > _kRestCount
+        ? turns.sublist(turns.length - _kRestCount)
+        : turns;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final turn in shown)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _TurnBubble(
+                turn: turn,
+                name: turn.mine ? myName : peerName,
+                avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// La conversation de l'appel, rangée en bas à GAUCHE : les deux derniers tours
