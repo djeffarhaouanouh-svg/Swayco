@@ -7,6 +7,7 @@ import '../screens/call_screen.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/spoken_language_gate.dart';
 import 'call_alert.dart';
+import 'call_audio.dart';
 import 'app_strings.dart';
 import 'device_id.dart';
 import 'last_interaction.dart';
@@ -81,6 +82,22 @@ abstract final class CallLauncher {
     required RealtimeTranslationPort translation,
     bool startWithCamera = false,
   }) async {
+    // AVANT le moindre `await`, sans quoi ça ne sert à rien : le navigateur
+    // n'ouvre ses sorties audio que depuis un geste de l'utilisateur, et le
+    // geste est fini dès la première suspension.
+    //
+    // Seul CELUI QUI DÉCROCHE armait — l'écran d'appel entrant, et l'écran
+    // Join. Celui qui APPELAIT depuis une conversation, jamais : sur le web,
+    // son `speechSynthesis` restait verrouillé pour tout l'appel. `speak()` ne
+    // jouait alors rien ET n'émettait aucun événement, donc chaque traduction
+    // mourait sur le garde-fou. D'où deux téléphones, le même code, et un seul
+    // qui parle.
+    //
+    // Posé ici et pas dans chaque bouton : c'est le passage obligé de tout
+    // appel sortant, et un point d'entrée de plus ne pourra pas l'oublier. Sans
+    // effet sur le natif, où les deux fonctions sont vides.
+    armCallAudio();
+    armSpeechSynthesis();
     if (_starting) return false;
     _starting = true;
     try {
