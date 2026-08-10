@@ -498,29 +498,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          // ── Socle blanc — la MÊME bande que celle des boutons, mais glissée
-          //    derrière la photo sur la hauteur d'un rayon. C'est elle qu'on
-          //    aperçoit dans les deux coins arrondis du bas de l'image ; sans
-          //    elle, ces arrondis laisseraient voir le fond de page. Panneau
-          //    ouvert, la carte la recouvre entièrement. ──────────────────────
-          if (_hasActiveCard)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: _kCardInset,
-              right: _kCardInset,
-              bottom: _infoOpen ? safeBottom + 4 : btnBottom,
-              height: actionH + _kCardRadius,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(_kCardRadius),
-                  ),
-                ),
-              ),
-            ),
-
           // ── Card — flotte sous le header (coins arrondis bien visibles) ──
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
@@ -581,18 +558,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           ),
 
-          // ── Boutons action — sous la carte au repos, flottant PAR-DESSUS
-          //    elle (sur le panneau) dès qu'il est déplié. ─────────────────
+          // ── Bas blanc + boutons — sous la carte au repos, flottant
+          //    PAR-DESSUS elle (sur le panneau) dès qu'il est déplié.
+          //    Au repos, le blanc remonte d'un rayon DERRIÈRE la photo pour en
+          //    combler les deux coins arrondis : les deux surfaces n'en font
+          //    qu'une. Déplié, ce raccord n'a plus rien à épouser — il tombe à
+          //    zéro, sinon deux cornes blanches dépasseraient sur le panneau.
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
             bottom: _infoOpen ? safeBottom + 4 : btnBottom,
-            height: actionH,
+            height: actionH + (_infoOpen ? 0 : _kCardRadius),
             child: _hasActiveCard
                 ? _SwipeActionBar(
                     height: actionH,
+                    topJoin: _infoOpen ? 0 : _kCardRadius,
                     onNope: _onSwipeLeft,
                     onLike: _onSwipeRight,
                     onMessage: () {
@@ -2092,12 +2074,20 @@ class _PhotoDots extends StatelessWidget {
 class _SwipeActionBar extends StatelessWidget {
   const _SwipeActionBar({
     required this.height,
+    required this.topJoin,
     required this.onNope,
     required this.onLike,
     required this.onMessage,
   });
 
+  /// Hauteur de la bande VISIBLE (celle qui porte les boutons).
   final double height;
+
+  /// Hauteur du raccord qui remonte derrière la photo. Il ne déborde pas sur
+  /// l'image : il n'en remplit que les deux coins arrondis, pour que le blanc
+  /// et la carte se lisent d'un seul tenant. 0 = pas de raccord.
+  final double topJoin;
+
   final VoidCallback onNope;
   final VoidCallback onLike;
 
@@ -2108,47 +2098,101 @@ class _SwipeActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: height,
-      child: Container(
-        // Le bas blanc : haut à vif (il prolonge la carte, on ne doit pas voir
-        // la jointure), bas arrondi comme le reste du bloc. Même marge
-        // horizontale que la carte : les deux bords s'alignent au pixel.
-        margin: const EdgeInsets.symmetric(horizontal: _kCardInset),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x59000000),
-              blurRadius: 30,
-              offset: Offset(0, 12),
+      height: height + topJoin,
+      child: Padding(
+        // Même marge que la carte : les deux bords s'alignent au pixel.
+        padding: const EdgeInsets.symmetric(horizontal: _kCardInset),
+        child: CustomPaint(
+          painter: _ActionBarShape(topJoin: topJoin, radius: _kCardRadius),
+          child: Padding(
+            // Les boutons se centrent dans la bande visible, jamais dans le
+            // raccord — sinon ils descendraient d'un demi-rayon.
+            padding: EdgeInsets.only(top: topJoin),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _ActionButton(
+                  background: Colors.black,
+                  onTap: onNope,
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 45),
+                _ActionButton(
+                  background: const Color(0xFF22D3EE),
+                  onTap: onLike,
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Color(0xFF111111),
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _ActionButton(
-              background: Colors.black,
-              onTap: onNope,
-              child: const Icon(Icons.close, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 45),
-            _ActionButton(
-              background: const Color(0xFF22D3EE),
-              onTap: onLike,
-              child: const Icon(
-                Icons.favorite,
-                color: Color(0xFF111111),
-                size: 24,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Le bas blanc : une bande à bas arrondi, surmontée — quand [topJoin] > 0 —
+/// des deux « cornes » qui viennent combler les coins arrondis du bas de la
+/// photo. Ces cornes sont EXACTEMENT le complément de ces coins : le blanc
+/// monte jusqu'au bord de l'image sans jamais mordre dessus, et la carte et la
+/// bande n'ont plus de couture entre elles.
+class _ActionBarShape extends CustomPainter {
+  const _ActionBarShape({required this.topJoin, required this.radius});
+
+  final double topJoin;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Radius.circular(radius);
+    final bar = RRect.fromRectAndCorners(
+      Rect.fromLTRB(0, topJoin, size.width, size.height),
+      bottomLeft: r,
+      bottomRight: r,
+    );
+
+    // Ombre du bloc (design swipe_card.dart : 0x59000000, blur 30, +12). Elle
+    // ne part QUE de la bande : les cornes sont sous la photo, leur ombre
+    // salirait le bas de l'image.
+    canvas.drawPath(
+      Path()..addRRect(bar.shift(const Offset(0, 12))),
+      Paint()
+        ..color = const Color(0x59000000)
+        // sigma ≈ blurRadius × 0.57735, la conversion de BoxShadow.
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 17.3),
+    );
+
+    var shape = Path()..addRRect(bar);
+    if (topJoin > 0) {
+      // La bande du raccord MOINS l'empreinte du bas de la carte : il ne reste
+      // que les deux angles que l'arrondi laissait ouverts sur le fond.
+      final band = Path()
+        ..addRect(Rect.fromLTWH(0, 0, size.width, topJoin));
+      final cardFoot = Path()
+        ..addRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTRB(0, -radius, size.width, topJoin),
+            bottomLeft: r,
+            bottomRight: r,
+          ),
+        );
+      shape = Path.combine(
+        PathOperation.union,
+        shape,
+        Path.combine(PathOperation.difference, band, cardFoot),
+      );
+    }
+    canvas.drawPath(shape, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(_ActionBarShape old) =>
+      old.topJoin != topJoin || old.radius != radius;
 }
 
 /// Les deux boutons de match : un rond plein de 58, noir pour passer, cyan de
