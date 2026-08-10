@@ -43,6 +43,9 @@ const Color _kPanelBg = Color(0xFF141517);
 /// la partager, sinon leurs bords ne s'alignent plus.
 const double _kCardInset = 16.0;
 
+/// Rayon des coins de la carte photo — et de ce qui doit s'y raccorder.
+const double _kCardRadius = 28.0;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -473,16 +476,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // 58 (bouton) + 2 × 9 (respiration) : la bande blanche serre les boutons
-    // au lieu de leur faire un socle.
-    const actionH = 76.0;
-    // La bande se raccourcit PAR LE BAS : le bas de la photo reste où il est
-    // (98 = les 88 de la bande d'avant + les 10 qui la séparaient de la nav) et
-    // c'est le bord inférieur du bloc blanc qui remonte.
-    final cardBottom = GlassNavBar.totalReservedHeight + safeBottom + 98;
-    // La carte s'arrête PILE sur la barre : aucun écart, elles se lisent comme
-    // une seule pièce (photo en haut, boutons en bas).
-    final btnBottom = cardBottom - actionH;
+    // La bande blanche garde son bord bas (22 au-dessus de la nav) et remonte
+    // par le haut : la photo s'arrête plus tôt, le blanc respire.
+    const actionH = 90.0;
+    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 22;
+    // La photo s'arrête PILE sur la bande — mais avec des coins bas arrondis,
+    // donc le blanc doit aussi passer DERRIÈRE elle (voir le socle plus bas),
+    // sinon les arrondis s'ouvriraient sur le fond noir de la page.
+    final cardBottom = btnBottom + actionH;
     final tabBarH = safeTop + _TopTabBar.height;
 
     // Panneau ouvert : la carte prend toute la hauteur — elle monte sous la
@@ -497,6 +498,29 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       extendBody: true,
       body: Stack(
         children: [
+          // ── Socle blanc — la MÊME bande que celle des boutons, mais glissée
+          //    derrière la photo sur la hauteur d'un rayon. C'est elle qu'on
+          //    aperçoit dans les deux coins arrondis du bas de l'image ; sans
+          //    elle, ces arrondis laisseraient voir le fond de page. Panneau
+          //    ouvert, la carte la recouvre entièrement. ──────────────────────
+          if (_hasActiveCard)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              left: _kCardInset,
+              right: _kCardInset,
+              bottom: _infoOpen ? safeBottom + 4 : btnBottom,
+              height: actionH + _kCardRadius,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(_kCardRadius),
+                  ),
+                ),
+              ),
+            ),
+
           // ── Card — flotte sous le header (coins arrondis bien visibles) ──
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
@@ -1139,21 +1163,19 @@ class _TinderCardStackState extends State<_TinderCardStack> {
       photos: card.photos,
     );
     final country = flagCountryForLanguage(card.profile.language);
-    // Bas à vif : la carte se termine à plat sur la barre d'action blanche,
-    // les deux ne font qu'un bloc (design swipe_card.dart).
+    // Arrondie sur ses QUATRE coins : elle est posée sur la bande blanche, pas
+    // soudée à elle — le blanc qu'on voit dans les deux arrondis du bas vient
+    // du socle glissé derrière.
     return SizedBox.expand(
       child: country != null
           ? FlagBorder(
               country: country,
-              radius: 28,
+              radius: _kCardRadius,
               borderWidth: 3,
-              flushBottom: true,
               child: tinderCard,
             )
           : ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
+              borderRadius: BorderRadius.circular(_kCardRadius),
               child: tinderCard,
             ),
     );
