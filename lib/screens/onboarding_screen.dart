@@ -94,7 +94,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (snap != null) {
       setState(() {
         final stored = snap.sourceLang.trim();
-        if (stored.isNotEmpty && findLanguageByCode(stored) != null) {
+        // `isOfferedLanguage`, pas `findLanguageByCode` : une langue qu'on sait
+        // afficher mais qu'on ne propose plus laisserait le menu vide avec une
+        // valeur invisible dessous. Elle est ignorée, la devinette OS reprend.
+        if (stored.isNotEmpty && isOfferedLanguage(stored)) {
           _selectedLang = findLanguageByCode(stored)!.code;
         }
         if (snap.gender == 'm' || snap.gender == 'f' || snap.gender == 'x') {
@@ -139,7 +142,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _cityCtrl.text = remote.city;
         }
         if (remote.language.trim().isNotEmpty &&
-            findLanguageByCode(remote.language) != null) {
+            isOfferedLanguage(remote.language)) {
           _selectedLang = remote.language;
         }
       });

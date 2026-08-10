@@ -47,7 +47,12 @@ class AppLanguage {
 ///
 /// Swedish is the one Piper voice with no companion here: Vosk's only "small"
 /// Swedish model weighs 289 MB, 6x every other one, so it is not offered.
-const List<AppLanguage> supportedLanguages = <AppLanguage>[
+///
+/// This is the LOOKUP table, not the picker: see [supportedLanguages] for what
+/// the app actually offers. It stays complete so a peer (or an account created
+/// before the shortlist) whose language is `es` still gets its flag and its
+/// native label everywhere it is merely DISPLAYED.
+const List<AppLanguage> allLanguages = <AppLanguage>[
   AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
   AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
   AppLanguage(code: 'es', flag: '🇪🇸', label: 'Español'),
@@ -73,30 +78,60 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'hi', flag: '🇮🇳', label: 'हिन्दी'),
 ];
 
-/// The phone's own language, when we support it — used to pre-select the
+/// Les langues réellement PROPOSÉES : onboarding, réglages, roues de l'appel.
+///
+/// Volontairement court. Un menu de seize langues fait choisir alors que le seul
+/// choix qui compte est « la mienne », et il promet seize couloirs de traduction
+/// alors que le produit se lance sur trois marchés. Trois entrées tiennent sans
+/// défilement, se lisent d'un coup d'œil, et chaque paire possible est testée.
+///
+/// [allLanguages] reste la table de correspondance pour tout ce qui n'est
+/// qu'affiché — élargir l'offre, c'est rallonger cette liste-ci.
+const List<AppLanguage> supportedLanguages = <AppLanguage>[
+  AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
+  AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
+  AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
+];
+
+/// The phone's own language, when we OFFER it — used to pre-select the
 /// onboarding picker so a first-run user confirms instead of choosing.
 ///
 /// [PlatformDispatcher.locales] is ordered by the user's OS preference, so the
-/// first entry we support is the best guess. Returns null rather than a default
-/// when none matches: the caller decides, and a wrong guess here becomes the
-/// language their first call is transcribed in.
+/// first entry we offer is the best guess. Matches against
+/// [supportedLanguages], not [allLanguages]: pre-selecting a row the picker
+/// doesn't contain would leave the step looking blank. Returns null rather than
+/// a default when none matches: the caller decides, and a wrong guess here
+/// becomes the language their first call is transcribed in.
 String? deviceLanguageCode() {
   for (final locale in PlatformDispatcher.instance.locales) {
-    final match = findLanguageByCode(locale.languageCode);
-    if (match != null) return match.code;
+    final primary = locale.languageCode.trim().toLowerCase();
+    for (final l in supportedLanguages) {
+      if (l.code == primary) return l.code;
+    }
   }
   return null;
 }
 
 /// Returns the language whose primary subtag matches [code] (case-insensitive),
 /// or null if the code is empty or unknown.
+///
+/// Looks through [allLanguages]: this answers "how do I show this code", and the
+/// code may come from a peer's profile written before the shortlist.
 AppLanguage? findLanguageByCode(String code) {
   final trimmed = code.trim().toLowerCase();
   if (trimmed.isEmpty) return null;
   // Drop region subtag if present (`fr-FR` -> `fr`).
   final primary = trimmed.split('-').first;
-  for (final l in supportedLanguages) {
+  for (final l in allLanguages) {
     if (l.code == primary) return l;
   }
   return null;
+}
+
+/// True when [code] is one of the languages the app currently offers — i.e. a
+/// legal value for the account language / the call wheels, as opposed to one we
+/// merely know how to display.
+bool isOfferedLanguage(String code) {
+  final primary = code.trim().toLowerCase().split('-').first;
+  return supportedLanguages.any((l) => l.code == primary);
 }
