@@ -167,12 +167,40 @@ class _CallScreenState extends State<CallScreen> {
   final FocusNode _chatFocus = FocusNode();
   bool _chatSending = false;
 
-  /// Referme la conversation ET le clavier. Les deux vont toujours ensemble :
-  /// un panneau qui disparaît en laissant le clavier levé ne rend pas l'appel.
+  /// Les phrases au repos sont retirées : soit le temps a passé, soit on a
+  /// touché l'écran. La prochaine phrase les ramène — [_addTurn] remet ça à
+  /// faux.
+  bool _turnsHidden = false;
+
+  /// Ce que les phrases au repos restent à l'écran quand plus rien n'arrive.
+  ///
+  /// Un sous-titre s'efface : posé pour toujours sur un appel vidéo, il ne se
+  /// referme jamais et finit par recouvrir le visage qu'on est venu voir. Dix
+  /// secondes, c'est le temps de relire la dernière phrase et pas plus — le
+  /// fil complet est à un tap, il n'est jamais perdu.
+  static const Duration _kRestTtl = Duration(seconds: 10);
+  Timer? _restTimer;
+
+  /// Retire les phrases au repos et remet le compteur à zéro.
+  void _hideTurns() {
+    _restTimer?.cancel();
+    if (_turnsHidden || !mounted) return;
+    setState(() => _turnsHidden = true);
+  }
+
+  /// Referme la conversation ET le clavier, et emporte les phrases au repos
+  /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
+  /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
+  /// exactement ce qu'on reprochait à la version d'avant.
   void _closeTurns() {
     _chatFocus.unfocus();
-    if (!_turnsOpen || !mounted) return;
-    setState(() => _turnsOpen = false);
+    _restTimer?.cancel();
+    if (!mounted) return;
+    if (!_turnsOpen && _turnsHidden) return;
+    setState(() {
+      _turnsOpen = false;
+      _turnsHidden = true;
+    });
   }
 
   /// Un panneau est ouvert par-dessus l'appel (langues, son, réglages).
@@ -418,8 +446,14 @@ class _CallScreenState extends State<CallScreen> {
     // touches ([_RestingTurns]), sans rien effacer. C'était l'affaire d'une
     // ouverture automatique de la zone entière, mais celle-ci efface désormais
     // la barre — la première phrase venue emportait les touches sans que
-    // personne l'ait demandé. Se DÉPLIER reste au bouton Messages (ou au tap
-    // sur la phrase) ; PARAÎTRE se fait tout seul.
+    // personne l'ait demandé. Se DÉPLIER reste au bouton Messages ; PARAÎTRE
+    // se fait tout seul.
+    //
+    // Et repart pour dix secondes : chaque phrase relance le sursis, une
+    // conversation suivie garde donc ses sous-titres, un silence les rend.
+    _turnsHidden = false;
+    _restTimer?.cancel();
+    _restTimer = Timer(_kRestTtl, _hideTurns);
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -2236,6 +2270,7 @@ class _CallScreenState extends State<CallScreen> {
     AsrService.osRefusedKey.removeListener(_onSttRefused);
     _chatCtrl.dispose();
     _chatFocus.dispose();
+    _restTimer?.cancel();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
@@ -2791,13 +2826,16 @@ class _CallScreenState extends State<CallScreen> {
                           //    Une phrase paraît d'elle-même dès qu'elle est
                           //    dite — c'est ce qui fait découvrir qu'il y a une
                           //    conversation — et les touches ne bougent pas.
+                          //    Elle s'efface seule au bout de dix secondes, ou
+                          //    au premier doigt posé dessus.
                           //  • OUVERTE par la touche Messages : elle prend
                           //    l'écran, la barre s'efface et la saisie apparaît.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
                             alignment: Alignment.bottomLeft,
-                            child: (!_turnsOpen && _turns.isEmpty)
+                            child: (!_turnsOpen &&
+                                    (_turns.isEmpty || _turnsHidden))
                                 ? const SizedBox(width: double.infinity)
                                 : Align(
                                     alignment: Alignment.centerLeft,
@@ -2839,17 +2877,19 @@ class _CallScreenState extends State<CallScreen> {
                                                 peerAvatarUrl:
                                                     _peerProfile?.avatarUrl ??
                                                         '',
-                                                // Le tap sur une phrase ouvre
-                                                // le reste : on lit, on veut
-                                                // remonter ou répondre, la
-                                                // zone entière est là.
-                                                onTap: () {
-                                                  _wakeDock();
-                                                  setState(() {
-                                                    _turnsOpen = true;
-                                                    _controlsOpen = false;
-                                                  });
-                                                },
+                                                // Le tap sur une phrase la
+                                                // RETIRE, il n'ouvre pas la
+                                                // zone. L'inverse faisait un
+                                                // cercle dont on ne sortait
+                                                // pas : on touchait la bulle,
+                                                // la zone s'ouvrait, on
+                                                // touchait ailleurs pour la
+                                                // fermer, la bulle revenait —
+                                                // et l'écran ne se rendait
+                                                // jamais. Ouvrir reste
+                                                // l'affaire de la touche
+                                                // Messages, et d'elle seule.
+                                                onTap: _hideTurns,
                                               ),
                                       ),
                                     ),
@@ -2891,8 +2931,22 @@ class _CallScreenState extends State<CallScreen> {
                                           ring: true,
                                           onTap: () {
                                             _wakeDock();
+                                            if (_turnsOpen) {
+                                              // Referme comme un tap sur
+                                              // l'écran : la zone ET les
+                                              // bulles au repos, sinon la
+                                              // touche rendrait la barre en
+                                              // laissant les phrases derrière.
+                                              _closeTurns();
+                                              return;
+                                            }
                                             setState(() {
-                                              _turnsOpen = !_turnsOpen;
+                                              _turnsOpen = true;
+                                              // Les phrases masquées
+                                              // reparaissent avec la zone :
+                                              // c'est le fil qu'on demande.
+                                              _turnsHidden = false;
+                                              _restTimer?.cancel();
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
                                               // au MÊME endroit, l'un sur
@@ -2902,9 +2956,7 @@ class _CallScreenState extends State<CallScreen> {
                                               // disparaît avec — c'est
                                               // justement ce qu'on veut, il a
                                               // fait son office.
-                                              if (_turnsOpen) {
-                                                _controlsOpen = false;
-                                              }
+                                              _controlsOpen = false;
                                             });
                                           },
                                         ),
