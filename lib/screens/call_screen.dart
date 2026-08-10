@@ -30,10 +30,12 @@ import '../services/profile_api.dart';
 import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
+import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 
@@ -154,8 +156,24 @@ class _CallScreenState extends State<CallScreen> {
   /// vivent que le temps de l'appel (rien n'est persisté).
   final List<_SpokenTurn> _turns = [];
 
-  /// La zone est dépliée : on voit les 4 derniers tours, on peut remonter.
+  /// La zone est dépliée : les deux derniers tours et la saisie, tout le reste
+  /// de l'appel s'efface le temps qu'elle est là.
   bool _turnsOpen = false;
+
+  /// La saisie de la conversation. Ce qui est tapé part comme une phrase dite :
+  /// traduit chez le pair, écrit et lu à voix haute. Rien n'est persisté, ça ne
+  /// vit que le temps de l'appel.
+  final TextEditingController _chatCtrl = TextEditingController();
+  final FocusNode _chatFocus = FocusNode();
+  bool _chatSending = false;
+
+  /// Referme la conversation ET le clavier. Les deux vont toujours ensemble :
+  /// un panneau qui disparaît en laissant le clavier levé ne rend pas l'appel.
+  void _closeTurns() {
+    _chatFocus.unfocus();
+    if (!_turnsOpen || !mounted) return;
+    setState(() => _turnsOpen = false);
+  }
 
   /// Un panneau est ouvert par-dessus l'appel (langues, son, réglages).
   ///
@@ -192,11 +210,6 @@ class _CallScreenState extends State<CallScreen> {
       });
     });
   }
-
-  /// La conversation s'est ouverte d'elle-même une fois. Ensuite elle
-  /// n'insiste plus : c'est au premier tour de parole qu'on veut découvrir
-  /// qu'elle existe, pas à chaque phrase de l'appel.
-  bool _turnsAutoOpened = false;
 
   /// Plus personne ne parle : le dock s'efface presque entièrement et il ne
   /// reste que la pastille, comme la pilule de Gemini qui se replie en pastille.
@@ -401,18 +414,67 @@ class _CallScreenState extends State<CallScreen> {
 
   void _addTurn(_SpokenTurn turn) {
     if (!mounted || turn.text.trim().isEmpty) return;
-    // La toute première phrase de l'appel ouvre la conversation : sans ça,
-    // personne ne découvre qu'elle est là. Les suivantes ne forcent plus rien —
-    // si on l'a refermée, c'est qu'on voulait voir le visage.
-    if (!_turnsAutoOpened) {
-      _turnsAutoOpened = true;
-      _turnsOpen = true;
-    }
+    // La conversation ne s'ouvre plus d'elle-même. Elle le faisait à la
+    // première phrase de l'appel, pour se faire découvrir — mais elle efface
+    // désormais la barre entière : la première phrase venue emportait les
+    // touches sans que personne ne l'ait demandé. C'est le bouton Messages qui
+    // l'ouvre, et lui seul.
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
       if (_turns.length > 60) _turns.removeRange(0, _turns.length - 60);
     });
+  }
+
+  /// Ce que je TAPE part exactement comme une phrase dite : traduit dans la
+  /// langue du pair, publié sur le même canal de données que la voix. Chez lui
+  /// ça s'écrit dans la conversation et ça se dit avec la voix du device.
+  ///
+  /// Ma bulle à moi garde MES mots, pas la traduction — c'est ce que j'ai écrit
+  /// que je veux relire, comme pour ma voix.
+  Future<void> _sendCaption() async {
+    final room = _room;
+    final text = _chatCtrl.text.trim();
+    if (room == null || text.isEmpty || _chatSending) return;
+    setState(() => _chatSending = true);
+    // La même cible que la voix : ce que le pair a DEMANDÉ d'entendre, et à
+    // défaut la langue de son compte. Sans cible connue, on envoie tel quel
+    // plutôt que rien.
+    final to = _peerListenLang.isNotEmpty
+        ? _peerListenLang
+        : _discoverRemoteLang(room);
+    var trans = text;
+    if (to.isNotEmpty) {
+      trans = await fetchTextTranslation(
+        text: text,
+        to: to,
+        from: _mySourceLang,
+      );
+    }
+    if (!mounted) return;
+    _chatCtrl.clear();
+    setState(() => _chatSending = false);
+    // Le clavier reste levé : on tape rarement une seule phrase.
+    var delivered = true;
+    try {
+      final payload = jsonEncode({
+        _kTypedFlag: true,
+        'orig': text,
+        'trans': trans,
+        'lang': to,
+      });
+      await room.localParticipant?.publishData(
+        Uint8List.fromList(utf8.encode(payload)),
+        reliable: true,
+        topic: _captionTopic,
+      );
+    } catch (_) {
+      // Partie nulle part : la bulle s'affiche quand même, en grisé — c'est la
+      // même convention que pour une phrase dite qui n'est pas passée.
+      delivered = false;
+    }
+    _addTurn(_SpokenTurn(mine: true, text: text, delivered: delivered));
+    Analytics.track('message_sent', props: {'source': 'live', 'type': 'text'});
   }
 
   /// Mon micro vient de produire une phrase : elle s'affiche chez moi dans ma
@@ -435,6 +497,12 @@ class _CallScreenState extends State<CallScreen> {
   EventsListener<RoomEvent>? _roomEvents;
 
   static const String _captionTopic = 'swayco-chat';
+
+  /// Marque un paquet comme une phrase TAPÉE et non dite. Elle emprunte le même
+  /// canal que la voix, mais elle ne doit pas nourrir le contexte du moteur de
+  /// traduction : on ne répond pas à un message écrit comme à une phrase qu'on
+  /// vient d'entendre.
+  static const String _kTypedFlag = 'typed';
 
   /// Data-channel key carrying "the language I want to hear you in". Sent by the
   /// LISTENER, acted on by the SPEAKER — translation runs on the speaker's side.
@@ -1568,6 +1636,26 @@ class _CallScreenState extends State<CallScreen> {
         unawaited(_applyPeerWantsTranslation(xlateOn));
         return;
       }
+      // Une phrase TAPÉE par le pair : elle s'écrit dans la conversation et se
+      // dit avec la voix du device, comme une phrase parlée. Traitée avant le
+      // cas de la voix, sinon le drapeau de TTS locale l'avalerait.
+      if (m[_kTypedFlag] == true) {
+        final trans = m['trans']?.toString() ?? '';
+        final lang = m['lang']?.toString() ?? '';
+        DebugOverlay.log('caption typed trans="$trans" lang=$lang');
+        if (trans.isEmpty) return;
+        _addTurn(_SpokenTurn(mine: false, text: trans));
+        // Le même interrupteur que pour la voix : couper la traduction, c'est
+        // en couper LE SON — la phrase s'écrit toujours.
+        if (_translationEnabled) {
+          if (kIsWeb) {
+            unawaited(_speakDeviceTts(trans, lang));
+          } else {
+            unawaited(_playWithLocalTts(trans, lang));
+          }
+        }
+        return;
+      }
       if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -2145,6 +2233,8 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);
+    _chatCtrl.dispose();
+    _chatFocus.dispose();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
     // call_ended is emitted here, not in _hangUp(), because dispose()
@@ -2510,7 +2600,7 @@ class _CallScreenState extends State<CallScreen> {
                     key: const ValueKey('turns_dismiss'),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _turnsOpen = false),
+                      onTap: _closeTurns,
                     ),
                   ),
                 // Le panneau effacé : l'écran ENTIER le rappelle. C'est ce qui
@@ -2574,7 +2664,20 @@ class _CallScreenState extends State<CallScreen> {
                 // Le galet REMONTE au-dessus du panneau et rétrécit, il ne
                 // disparaît pas pour être remplacé ailleurs. Un seul objet,
                 // un seul jeu de tickers, et le trajet se voit.
-                AnimatedAlign(
+                LayoutBuilder(
+                  builder: (context, box) {
+                    // La conversation est un bloc au ras du bas dont on connaît
+                    // la hauteur ; le galet se pose JUSTE au-dessus. Calculé
+                    // plutôt que réglé à la main : le clavier fait monter la
+                    // zone, et une valeur fixe le laisserait dessous.
+                    final lift = _SpokenTurnsPanel.zoneHeight +
+                        MediaQuery.of(context).viewInsets.bottom +
+                        16 + // le rembourrage bas de la colonne
+                        46; // la moitié du galet réduit, plus un peu d'air
+                    final turnsY = box.maxHeight <= 0
+                        ? 0.0
+                        : (1 - 2 * lift / box.maxHeight).clamp(-0.9, 0.9);
+                    return AnimatedAlign(
                   duration: const Duration(milliseconds: 320),
                   curve: Curves.easeOutCubic,
                   // Il remonte d'un cran à chaque chose qui s'ouvre, et
@@ -2584,7 +2687,7 @@ class _CallScreenState extends State<CallScreen> {
                   alignment: _sheetOpen
                       ? const Alignment(0, -0.52)
                       : _turnsOpen
-                          ? const Alignment(0, 0.02)
+                          ? Alignment(0, turnsY.toDouble())
                           : _controlsOpen
                               ? const Alignment(0, 0.34)
                               // Rien de déplié : ses ondes atteignent les
@@ -2596,8 +2699,11 @@ class _CallScreenState extends State<CallScreen> {
                     curve: Curves.easeOutCubic,
                     // 56 sur 65 : la même réduction que la maquette, obtenue
                     // par une transformation plutôt qu'en repeignant le galet
-                    // à chaque image d'une taille qui change.
-                    scale: _sheetOpen ? 56 / _TranslationOrb.kSize : 1,
+                    // à chaque image d'une taille qui change. La conversation
+                    // le réduit pareil : sous elle il n'est plus le sujet.
+                    scale: (_sheetOpen || _turnsOpen)
+                        ? 56 / _TranslationOrb.kSize
+                        : 1,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -2638,6 +2744,8 @@ class _CallScreenState extends State<CallScreen> {
                       ],
                     ),
                   ),
+                    );
+                  },
                 ),
                 // Le dock : une barre de verre posée en bas, qui flotte
                 // au-dessus de la vidéo. Ce qui se déplie — conversation et
@@ -2657,36 +2765,57 @@ class _CallScreenState extends State<CallScreen> {
                       // ces 40 ne cadraient plus rien : ils empêchaient
                       // seulement les touches d'atteindre les bords, quel que
                       // soit le rembourrage qu'on mettait à l'intérieur.
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      //
+                      // Le clavier pousse la colonne entière vers le haut :
+                      // c'est le seul endroit où la saisie peut monter, le
+                      // Scaffold ayant [resizeToAvoidBottomInset] à false pour
+                      // que la vidéo, elle, ne bouge pas.
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        0,
+                        12,
+                        16 + MediaQuery.of(context).viewInsets.bottom,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // 1. La légende, dépliée depuis la zone de gauche.
+                          // 1. La conversation, dépliée par la touche Messages.
+                          // Elle se range À GAUCHE et ne prend qu'une part de la
+                          // largeur : c'est une marge de page, pas un panneau
+                          // centré — le visage reste visible à côté.
                           AnimatedSize(
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
-                            alignment: Alignment.bottomCenter,
-                            child: (_turnsOpen && _turns.isNotEmpty)
-                                ? Padding(
-                                    // Les bulles vont d'un bord à l'autre : à
-                                    // droite il restait 40 px de vide, et une
-                                    // phrase longue se repliait pour rien.
-                                    padding: const EdgeInsets.only(
-                                      left: 10,
-                                      right: 10,
-                                      bottom: 10,
-                                    ),
-                                    child: _SpokenTurnsPanel(
-                                      turns: _turns,
-                                      myName: widget.displayName,
-                                      myAvatarUrl: '',
-                                      peerName:
-                                          _peerProfile?.displayName ?? '',
-                                      peerAvatarUrl:
-                                          _peerProfile?.avatarUrl ?? '',
-                                      onToggle: () => setState(
-                                        () => _turnsOpen = false,
+                            alignment: Alignment.bottomLeft,
+                            child: _turnsOpen
+                                ? Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor: 0.82,
+                                      // Sans ça la boîte se centre dans la
+                                      // largeur qu'on lui laisse : elle
+                                      // occuperait 82 % au MILIEU de l'écran
+                                      // au lieu de se ranger sur le bord.
+                                      alignment: Alignment.centerLeft,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _SpokenTurnsPanel(
+                                          turns: _turns,
+                                          myName: widget.displayName,
+                                          myAvatarUrl: '',
+                                          peerName:
+                                              _peerProfile?.displayName ?? '',
+                                          peerAvatarUrl:
+                                              _peerProfile?.avatarUrl ?? '',
+                                          onToggle: _closeTurns,
+                                          chatController: _chatCtrl,
+                                          chatFocus: _chatFocus,
+                                          sending: _chatSending,
+                                          onSend: _sendCaption,
+                                        ),
                                       ),
                                     ),
                                   )
@@ -2781,7 +2910,17 @@ class _CallScreenState extends State<CallScreen> {
                                     ),
                                   ),
                           ),
-                          // 3. La barre elle-même.
+                          // 3. La barre elle-même — effacée tant que la
+                          // conversation est ouverte. Elle et la saisie se
+                          // disputent le bas de l'écran, et c'est la saisie
+                          // qu'on est venu chercher ; le tap qui referme la
+                          // ramène. La place dans la colonne est gardée (une
+                          // boîte vide) : retirer un enfant re-mappe ses
+                          // voisins, et le champ de saisie y perdrait son
+                          // focus — c'est le bug de b2f3293.
+                          if (_turnsOpen)
+                            const SizedBox(width: double.infinity)
+                          else
                           _CallDock(
                             camOn: _camOn,
                             micOn: _micOn,
@@ -2883,10 +3022,10 @@ class _SpokenTurn {
   final bool delivered;
 }
 
-/// La légende de l'appel, dépliée depuis la zone de gauche du dock : les quatre
-/// derniers tours en bulles de verre, le haut fondu en dégradé — on remonte
-/// plus loin en faisant défiler. Un tap la referme. Aucune saisie : ça ne fait
-/// que retranscrire la voix.
+/// La conversation de l'appel, rangée en bas à GAUCHE : les deux derniers tours
+/// en bulles de verre, la saisie dessous. On remonte le fil en faisant défiler.
+/// Tout le reste de l'appel s'efface le temps qu'elle est là, et un tap
+/// n'importe où la referme.
 class _SpokenTurnsPanel extends StatefulWidget {
   const _SpokenTurnsPanel({
     required this.turns,
@@ -2895,6 +3034,10 @@ class _SpokenTurnsPanel extends StatefulWidget {
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
+    required this.chatController,
+    required this.chatFocus,
+    required this.sending,
+    required this.onSend,
   });
 
   final List<_SpokenTurn> turns;
@@ -2904,11 +3047,27 @@ class _SpokenTurnsPanel extends StatefulWidget {
   final String peerName;
   final String peerAvatarUrl;
 
-  /// La hauteur qu'on laisse à la conversation : trois bulles courtes environ.
-  /// Au-delà on ne relit plus, on subit — et la vidéo est ce qu'on est venu
-  /// regarder. Les plus anciennes ne sont pas jetées pour autant : on remonte
-  /// le fil en faisant défiler.
-  static const double maxHeight = 186;
+  /// La saisie. Elle appartient à l'écran d'appel et pas au panneau : le
+  /// panneau se démonte à chaque fermeture, ce qui perdrait le texte en cours.
+  final TextEditingController chatController;
+  final FocusNode chatFocus;
+  final bool sending;
+  final Future<void> Function() onSend;
+
+  /// La hauteur qu'on laisse aux bulles : DEUX, et la troisième se devine
+  /// au-dessus — c'est ce qui invite à faire défiler. Au-delà on ne relit plus,
+  /// on subit, et la vidéo est ce qu'on est venu regarder. Les plus anciennes
+  /// ne sont pas jetées pour autant : on remonte le fil en faisant défiler.
+  ///
+  /// 132 et pas 90 : une bulle courte fait 45 avec son air, mais une phrase de
+  /// deux lignes en fait 64 — à 90 la seconde aurait été rognée dès qu'elle
+  /// dépasse une ligne, ce qui est le cas courant.
+  static const double maxHeight = 132;
+
+  /// Ce que la zone occupe en bas de l'écran, bulles pleines : les deux bulles,
+  /// l'en-tête, la saisie et l'air entre les trois. C'est ce dont le galet a
+  /// besoin pour savoir où se poser sans recouvrir quoi que ce soit.
+  static const double zoneHeight = maxHeight + 27 + 8 + 46 + 10;
 
   @override
   State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
@@ -2919,17 +3078,22 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
   Widget build(BuildContext context) {
     final turns = widget.turns;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onToggle,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // L'en-tête : ce que c'est à gauche, comment s'en débarrasser à
-          // droite. Le geste de fermeture ne se devine pas — un panneau qui
-          // recouvre un visage doit dire lui-même comment on le retire.
-          Padding(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // L'en-tête : ce que c'est à gauche, comment s'en débarrasser à
+        // droite. Le geste de fermeture ne se devine pas — un panneau qui
+        // recouvre un visage doit dire lui-même comment on le retire.
+        //
+        // Le tap de fermeture est posé ICI et pas sur tout le panneau : plus
+        // bas il y a un champ de saisie, et un panneau qui se referme quand on
+        // touche son propre champ ne se remplirait jamais. Ailleurs sur
+        // l'écran, c'est la couche plein écran qui referme.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onToggle,
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2973,17 +3137,19 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
               ],
             ),
           ),
+        ),
+        if (turns.isNotEmpty)
           ConstrainedBox(
             constraints: const BoxConstraints(
               maxHeight: _SpokenTurnsPanel.maxHeight,
             ),
             child: ListView.builder(
-              // À l'envers : la plus récente en bas, collée à la barre, et on
+              // À l'envers : la plus récente en bas, collée à la saisie, et on
               // remonte le temps en faisant défiler. C'est aussi ce qui garde
               // la vue calée sur la dernière quand une phrase arrive.
               reverse: true,
-              // Sous la hauteur maximale, la liste épouse ses bulles : deux
-              // phrases n'occupent pas la place de trois.
+              // Sous la hauteur maximale, la liste épouse ses bulles : une
+              // phrase n'occupe pas la place de deux.
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.zero,
@@ -3002,6 +3168,89 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
               },
             ),
           ),
+        // La saisie, sous les bulles : ce qu'on tape part traduit chez le pair
+        // et se dit chez lui à voix haute, exactement comme une phrase parlée.
+        _ChatComposer(
+          controller: widget.chatController,
+          focusNode: widget.chatFocus,
+          sending: widget.sending,
+          onSend: widget.onSend,
+        ),
+      ],
+    );
+  }
+}
+
+/// La saisie de l'appel : un champ de verre et un rond d'envoi.
+///
+/// Verre en nuance (GlassPanel), pas la vue native — celle-là avale vraiment
+/// les touches. Sans danger ici : le bug du clavier qui retombait n'était pas
+/// le verre mais des voisins non clés (b2f3293).
+class _ChatComposer extends StatelessWidget {
+  const _ChatComposer({
+    required this.controller,
+    required this.focusNode,
+    required this.sending,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool sending;
+  final Future<void> Function() onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      borderRadius: 22,
+      color: Colors.black.withValues(alpha: 0.35),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              minLines: 1,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.send,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                hintText: AppStrings.t('call_chat_hint'),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
+              ),
+              onSubmitted: (_) => onSend(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: sending ? null : onSend,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                // Grisé pendant la traduction : la phrase est partie chercher
+                // ses mots, un second tap l'enverrait deux fois.
+                color: sending ? Colors.white24 : SC.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_upward_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -3010,9 +3259,9 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
 
 /// Une bulle : la PDP de qui parle, du côté de qui parle.
 ///
-/// Les miennes vont à DROITE, les siennes à gauche — la même convention que
-/// n'importe quelle messagerie, et elle vaut ici aussi : on sait qui a dit quoi
-/// sans lire le nom.
+/// TOUTES à gauche, les miennes comme les siennes : la conversation n'occupe
+/// qu'une colonne sur le bord de l'écran, et une bulle renvoyée à droite y
+/// serait à l'étroit pour rien. C'est la PDP qui dit qui a parlé, pas le côté.
 class _TurnBubble extends StatelessWidget {
   const _TurnBubble({
     required this.turn,
@@ -3032,12 +3281,14 @@ class _TurnBubble extends StatelessWidget {
       size: 26,
     );
 
-    // Deux états, et deux seulement : les miennes dans le cyan des bulles
-    // envoyées de l'app, celles du pair en verre sombre. La plus récente ne se
-    // distingue plus — elle passait en blanc plein, ce qui faisait changer de
-    // couleur une bulle déjà lue dès que la suivante arrivait.
+    // Deux teintes, et toutes deux TRANSPARENTES : les miennes dans l'accent,
+    // les siennes en verre sombre. Posées sur un visage, elles doivent le
+    // laisser passer — une bulle opaque en plein appel vidéo cache justement ce
+    // qu'on est venu regarder. La plus récente ne se distingue pas : elle
+    // passait en blanc plein, ce qui faisait changer de couleur une bulle déjà
+    // lue dès que la suivante arrivait.
     final Color fill = turn.mine
-        ? SC.outBubbleEnd.withValues(alpha: 0.75)
+        ? SC.accent.withValues(alpha: 0.32)
         : Colors.black.withValues(alpha: 0.42);
     final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
 
@@ -3075,12 +3326,9 @@ class _TurnBubble extends StatelessWidget {
     );
 
     return Row(
-      mainAxisAlignment:
-          turn.mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: turn.mine
-          ? [bubble, const SizedBox(width: 8), avatar]
-          : [avatar, const SizedBox(width: 8), bubble],
+      children: [avatar, const SizedBox(width: 8), bubble],
     );
   }
 }
