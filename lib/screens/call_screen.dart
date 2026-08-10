@@ -766,10 +766,53 @@ class _CallScreenState extends State<CallScreen> {
     'en': ['en-US', 'en-GB'],
   };
 
-  Future<void> _loadDeviceVoiceLangs() async {
+  /// Un chargement de la liste est déjà en vol : on n'en lance pas un second.
+  bool _loadingVoiceLangs = false;
+
+  /// Combien de fois on redemande la liste quand elle revient VIDE, et à quel
+  /// rythme. Environ trois secondes en tout — largement de quoi couvrir la
+  /// latence de `voiceschanged`, et borné pour qu'un appareil réellement sans
+  /// voix n'interroge pas le moteur pour l'éternité.
+  static const int _kVoiceLoadTries = 6;
+  static const Duration _kVoiceLoadGap = Duration(milliseconds: 500);
+
+  /// Demande la liste des voix, et REDEMANDE tant qu'elle revient vide.
+  ///
+  /// Elle n'était demandée qu'une fois. Sur le WEB c'est une course perdue
+  /// d'avance une fois sur deux : `speechSynthesis.getVoices()` rend un tableau
+  /// VIDE au premier appel et ne se remplit qu'à l'événement `voiceschanged`,
+  /// quelques centaines de millisecondes plus tard. Le device qui perdait la
+  /// course gardait donc une liste vide pour tout l'appel — et [_voiceTagFor]
+  /// renvoyant '' pour chaque langue, `setLanguage` n'était jamais appelé,
+  /// `speak()` ne jouait rien, n'émettait aucun événement, et chaque phrase
+  /// mourait sur le garde-fou. Deux téléphones, le même code, l'un parlait et
+  /// l'autre était muet.
+  ///
+  /// Ça ne change rien au natif, où la liste arrive pleine du premier coup :
+  /// une seconde tentative n'a lieu QUE si la première n'a rien rendu.
+  Future<void> _loadDeviceVoiceLangs({int attempt = 1}) async {
+    if (_loadingVoiceLangs && attempt == 1) return;
+    _loadingVoiceLangs = true;
+    try {
+      final ok = await _readDeviceVoiceLangs();
+      if (ok || !mounted) return;
+      if (attempt >= _kVoiceLoadTries) {
+        DebugOverlay.log('device voices: still none after $attempt tries');
+        return;
+      }
+      await Future<void>.delayed(_kVoiceLoadGap);
+      if (!mounted) return;
+      return _loadDeviceVoiceLangs(attempt: attempt + 1);
+    } finally {
+      if (attempt == 1) _loadingVoiceLangs = false;
+    }
+  }
+
+  /// Une tentative. Rend `true` quand la liste a été retenue.
+  Future<bool> _readDeviceVoiceLangs() async {
     try {
       final raw = await _deviceTts.getLanguages;
-      if (raw is! List) return;
+      if (raw is! List) return false;
       final tags = <String, String>{};
       final all = <String, List<String>>{};
       for (final t in raw) {
@@ -796,15 +839,25 @@ class _CallScreenState extends State<CallScreen> {
           }
         }
       });
-      if (!mounted || tags.isEmpty) return;
+      if (!mounted) return false;
+      if (tags.isEmpty) {
+        // Journalisé, et pas seulement en debugPrint : c'est l'absence de
+        // cette information qui rendait la panne indéchiffrable — un log
+        // d'appel entier sans une seule ligne sur les voix.
+        DebugOverlay.log('device voices: none yet');
+        return false;
+      }
       // La région retenue pour l'anglais est écrite : c'est celle qu'on a vue
       // partir en `en-ZA` sans qu'aucune ligne ne dise pourquoi.
       DebugOverlay.log(
         'device voices: ${tags.length} langs (en=${tags['en'] ?? '—'})',
       );
       setState(() => _deviceVoiceTags = tags);
+      return true;
     } catch (e) {
+      DebugOverlay.log('device voices: getLanguages failed: $e');
       debugPrint('[speech] getLanguages failed: $e');
+      return false;
     }
   }
 
@@ -824,8 +877,17 @@ class _CallScreenState extends State<CallScreen> {
   /// haut-parleur, et la file avance.
   String _voiceTagFor(String lang) {
     final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
+    if (_deviceVoiceTags.isEmpty) {
+      // Toujours rien : les tentatives du démarrage ont pu toutes tomber avant
+      // que le navigateur ne remplisse sa liste. On redemande — trop tard pour
+      // CETTE phrase, à temps pour la suivante. Sans ce rattrapage, un appel
+      // mal démarré restait muet jusqu'au bout.
+      DebugOverlay.log('no voice list yet — asking again');
+      unawaited(_loadDeviceVoiceLangs());
+      return '';
+    }
     final tag = _deviceVoiceTags[base];
-    if (tag == null && _deviceVoiceTags.isNotEmpty) {
+    if (tag == null) {
       DebugOverlay.log('no device voice for "$base" — keeping current voice');
     }
     return tag ?? '';
