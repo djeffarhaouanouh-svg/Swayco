@@ -476,9 +476,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // La bande blanche garde son bord bas (22 au-dessus de la nav) et remonte
-    // par le haut : la photo s'arrête plus tôt, le blanc respire.
-    const actionH = 90.0;
+    // 58 (bouton) + 2 × 9 (respiration) : la bande blanche serre les boutons
+    // au lieu de leur faire un socle. Elle garde son bord bas à 22 au-dessus
+    // de la nav ; c'est son haut — donc le bas de la photo — qui redescend.
+    const actionH = 76.0;
     final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 22;
     // La photo s'arrête PILE sur la bande — mais avec des coins bas arrondis,
     // donc le blanc doit aussi passer DERRIÈRE elle (voir le socle plus bas),
