@@ -473,43 +473,70 @@ class _CallScreenState extends State<CallScreen> {
     if (room == null || text.isEmpty || _chatSending) return;
     setState(() => _chatSending = true);
     // La même cible que la voix : ce que le pair a DEMANDÉ d'entendre, et à
-    // défaut la langue de son compte. Sans cible connue, on envoie tel quel
-    // plutôt que rien.
+    // défaut la langue de son compte.
     final to = _peerListenLang.isNotEmpty
         ? _peerListenLang
         : _discoverRemoteLang(room);
-    var trans = text;
-    if (to.isNotEmpty) {
-      trans = await fetchTextTranslation(
+    // La MÊME route que la voix : /translation/fix, DeepSeek. L'écrit passait
+    // par /translation/text, qui est un second fournisseur — et quand celui-là
+    // tombe (401 sur son hôte), la phrase arrivait telle quelle chez le pair,
+    // dans MA langue, sans que rien ne le signale. Une seule route pour les
+    // deux : ce qui traduit la voix traduit l'écrit.
+    //
+    // Le sexe du pair suit, comme pour la voix : c'est ce qui fait accorder la
+    // phrase dans les langues qui marquent le genre.
+    var trans = '';
+    if (to.isNotEmpty && _mySourceLang.isNotEmpty) {
+      final fix = await fetchTranscriptFix(
         text: text,
-        to: to,
         from: _mySourceLang,
+        to: to,
+        peerGender: _peerProfile?.gender,
+      );
+      if (!fix.unclear) trans = fix.text.trim();
+      DebugOverlay.log(
+        'typed→$to via ${fix.engine.isEmpty ? "?" : fix.engine} '
+        'unclear=${fix.unclear}',
       );
     }
     if (!mounted) return;
     _chatCtrl.clear();
     setState(() => _chatSending = false);
     // Le clavier reste levé : on tape rarement une seule phrase.
-    var delivered = true;
-    try {
-      final payload = jsonEncode({
-        _kTypedFlag: true,
-        'orig': text,
-        'trans': trans,
-        'lang': to,
-      });
-      await room.localParticipant?.publishData(
-        Uint8List.fromList(utf8.encode(payload)),
-        reliable: true,
-        topic: _captionTopic,
-      );
-    } catch (_) {
-      // Partie nulle part : la bulle s'affiche quand même, en grisé — c'est la
-      // même convention que pour une phrase dite qui n'est pas passée.
-      delivered = false;
+
+    // RIEN ne part sans traduction. Le repli d'avant — publier le texte brut
+    // quand la traduction échoue ou que la langue du pair est inconnue —
+    // livrait ma langue à quelqu'un qui ne la lit pas, et son téléphone la
+    // prononçait par-dessus le marché. Un message illisible n'est pas mieux
+    // qu'un message non remis : c'est le même échec, en moins visible.
+    //
+    // La bulle s'affiche quand même, grisée en italique : la convention existe
+    // déjà pour une phrase dite qui n'est pas passée, et elle sert à ça — on
+    // relit ce qu'on voulait dire pour le redire.
+    var delivered = false;
+    if (trans.isNotEmpty) {
+      try {
+        final payload = jsonEncode({
+          _kTypedFlag: true,
+          'orig': text,
+          'trans': trans,
+          'lang': to,
+        });
+        await room.localParticipant?.publishData(
+          Uint8List.fromList(utf8.encode(payload)),
+          reliable: true,
+          topic: _captionTopic,
+        );
+        delivered = true;
+      } catch (_) {
+        // Publication refusée : même sort qu'une traduction manquante.
+      }
     }
     _addTurn(_SpokenTurn(mine: true, text: text, delivered: delivered));
-    Analytics.track('message_sent', props: {'source': 'live', 'type': 'text'});
+    Analytics.track(
+      'message_sent',
+      props: {'source': 'live', 'type': 'text', 'delivered': delivered},
+    );
   }
 
   /// Mon micro vient de produire une phrase : elle s'affiche chez moi dans ma
