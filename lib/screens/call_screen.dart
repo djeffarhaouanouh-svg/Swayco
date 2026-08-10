@@ -188,6 +188,21 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _turnsHidden = true);
   }
 
+  /// Les dix secondes sont écoulées.
+  ///
+  /// On ne s'efface pas sous les doigts de quelqu'un qui écrit : la saisie vit
+  /// désormais AVEC les phrases au repos, et la faire disparaître en pleine
+  /// phrase emporterait le clavier et le texte commencé. Le sursis est
+  /// simplement reconduit — la même règle que la veille du dock.
+  void _restTimeout() {
+    if (!mounted) return;
+    if (_chatFocus.hasFocus || _chatCtrl.text.trim().isNotEmpty) {
+      _restTimer = Timer(_kRestTtl, _restTimeout);
+      return;
+    }
+    _hideTurns();
+  }
+
   /// Referme la conversation ET le clavier, et emporte les phrases au repos
   /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
   /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
@@ -453,7 +468,7 @@ class _CallScreenState extends State<CallScreen> {
     // conversation suivie garde donc ses sous-titres, un silence les rend.
     _turnsHidden = false;
     _restTimer?.cancel();
-    _restTimer = Timer(_kRestTtl, _hideTurns);
+    _restTimer = Timer(_kRestTtl, _restTimeout);
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -2917,6 +2932,10 @@ class _CallScreenState extends State<CallScreen> {
                                                 // l'affaire de la touche
                                                 // Messages, et d'elle seule.
                                                 onTap: _hideTurns,
+                                                chatController: _chatCtrl,
+                                                chatFocus: _chatFocus,
+                                                sending: _chatSending,
+                                                onSend: _sendCaption,
                                               ),
                                       ),
                                     ),
@@ -3162,10 +3181,14 @@ class _SpokenTurn {
   final bool delivered;
 }
 
-/// Les derniers tours AU REPOS : posés au-dessus des touches, sans en-tête ni
-/// saisie, et sans rien effacer. C'est ce qui fait découvrir la conversation —
-/// une phrase paraît d'elle-même dès qu'elle est dite, et le tap dessus ouvre
-/// le reste.
+/// Les derniers tours AU REPOS : posés au-dessus des touches, sans rien
+/// effacer. C'est ce qui fait découvrir la conversation — une phrase paraît
+/// d'elle-même dès qu'elle est dite, et le tap dessus la retire.
+///
+/// La saisie est là aussi : répondre par écrit ne doit pas coûter un détour par
+/// le rail et la touche Messages. Ce qui distingue le repos de la zone ouverte
+/// n'est donc pas ce qu'on peut y faire, mais ce qu'il en coûte à l'écran — ici
+/// la barre reste, on ne remonte pas le fil, et ça s'efface tout seul.
 ///
 /// Ça remplace l'ouverture automatique d'avant : la zone entière s'ouvrait
 /// toute seule à la première phrase, ce qui, maintenant qu'elle efface la
@@ -3179,6 +3202,10 @@ class _RestingTurns extends StatelessWidget {
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
+    required this.chatController,
+    required this.chatFocus,
+    required this.sending,
+    required this.onSend,
   });
 
   final List<_SpokenTurn> turns;
@@ -3187,6 +3214,10 @@ class _RestingTurns extends StatelessWidget {
   final String myAvatarUrl;
   final String peerName;
   final String peerAvatarUrl;
+  final TextEditingController chatController;
+  final FocusNode chatFocus;
+  final bool sending;
+  final Future<void> Function() onSend;
 
   /// Deux, comme dans la zone ouverte. Au repos on ne fait pas défiler : ce
   /// qui dépasse n'est pas montré, il attend qu'on ouvre.
@@ -3197,13 +3228,20 @@ class _RestingTurns extends StatelessWidget {
     final shown = turns.length > _kRestCount
         ? turns.sublist(turns.length - _kRestCount)
         : turns;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Le tap qui retire ne couvre que la mention et les phrases : posé sur
+        // toute la colonne, il aurait emporté la saisie au moment où on la
+        // touche. Même partage que dans la zone ouverte.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           // Le même mot qu'en haut du panneau ouvert, au même endroit : à
           // droite, au-dessus des phrases. Un tap les retire ici comme là, et
           // rien ne le disait — un geste qui ne s'annonce pas n'existe pas.
@@ -3228,17 +3266,28 @@ class _RestingTurns extends StatelessWidget {
               ),
             ),
           ),
-          for (final turn in shown)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _TurnBubble(
-                turn: turn,
-                name: turn.mine ? myName : peerName,
-                avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
-              ),
-            ),
-        ],
-      ),
+              for (final turn in shown)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _TurnBubble(
+                    turn: turn,
+                    name: turn.mine ? myName : peerName,
+                    avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // La même saisie que dans la zone ouverte, au même endroit : sous les
+        // phrases. Répondre par écrit ne doit pas passer par le rail et la
+        // touche Messages — la phrase est là, on répond dessous.
+        _ChatComposer(
+          controller: chatController,
+          focusNode: chatFocus,
+          sending: sending,
+          onSend: onSend,
+        ),
+      ],
     );
   }
 }
@@ -3502,15 +3551,17 @@ class _TurnBubble extends StatelessWidget {
       size: 26,
     );
 
-    // Deux teintes, et toutes deux TRANSPARENTES : les miennes dans l'accent,
-    // les siennes en verre sombre. Posées sur un visage, elles doivent le
-    // laisser passer — une bulle opaque en plein appel vidéo cache justement ce
-    // qu'on est venu regarder. La plus récente ne se distingue pas : elle
-    // passait en blanc plein, ce qui faisait changer de couleur une bulle déjà
-    // lue dès que la suivante arrivait.
-    final Color fill = turn.mine
-        ? SC.accent.withValues(alpha: 0.32)
-        : Colors.black.withValues(alpha: 0.42);
+    // UNE seule teinte, transparente, pour tout le monde : le verre sombre qui
+    // était déjà celui du pair. Les miennes étaient teintées d'accent, ce qui
+    // faisait deux couleurs sur une colonne qui n'en demande pas — la PDP dit
+    // déjà qui parle, et un fond coloré rend surtout la vidéo moins lisible
+    // dessous. Posées sur un visage, les bulles doivent le laisser passer :
+    // c'est tout ce qu'on leur demande.
+    //
+    // La plus récente ne se distingue pas non plus : elle passait en blanc
+    // plein, ce qui faisait changer de couleur une bulle déjà lue dès que la
+    // suivante arrivait.
+    final Color fill = Colors.black.withValues(alpha: 0.42);
     final Color ink = Colors.white.withValues(alpha: turn.mine ? 0.92 : 0.78);
 
     final bubble = Flexible(
