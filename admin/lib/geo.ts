@@ -102,8 +102,14 @@ export function buildWorldMap(stats: CountryStat[]): WorldMapData {
   );
   const path = geoPath(projection);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const land = merge(worldTopology as any, countriesObj as any);
+  // merge() wants the array of individual geometries, not the
+  // GeometryCollection wrapper — unlike mesh()/feature() below, which
+  // both take the collection object itself.
+  const land = merge(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    worldTopology as any,
+    (countriesObj as { geometries: unknown[] }).geometries as never,
+  );
   const borders = mesh(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     worldTopology as any,
