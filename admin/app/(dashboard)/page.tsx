@@ -9,10 +9,13 @@ import {
   getOverview,
 } from "@/lib/metrics";
 import { countryName, flag, fmtInt, languageName } from "@/lib/format";
+import { buildWorldMap } from "@/lib/geo";
 import { KpiCard, KpiGrid } from "@/components/kpi-card";
 import { PageHeader, Section } from "@/components/section";
 import { SeriesChart } from "@/components/charts/series";
 import { RankBars } from "@/components/rank-bars";
+import { Card } from "@/components/ui/card";
+import { WorldMap } from "@/components/world-map";
 
 export default async function OverviewPage() {
   const [overview, calls, newUsers, messages, countries, languages] =
@@ -26,6 +29,7 @@ export default async function OverviewPage() {
     ]);
 
   const { live } = overview;
+  const worldMap = buildWorldMap(countries);
 
   return (
     <>
@@ -119,9 +123,13 @@ export default async function OverviewPage() {
 
       <Section
         title="Où sont-ils"
-        hint="Pays sur 30 jours ; langues déclarées sur les profils."
+        hint="Pays sur 30 jours — un point par pays actif, taille proportionnelle au nombre de personnes."
       >
-        <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
+          <WorldMap {...worldMap} />
+        </Card>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
             <h3 className="mb-2 text-sm font-bold text-sc-text">
               Pays les plus actifs
