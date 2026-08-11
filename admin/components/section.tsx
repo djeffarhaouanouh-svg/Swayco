@@ -1,26 +1,54 @@
-/** Page title + one-line description, used at the top of every section. */
-export function SectionHeader({
+import { cn } from "@/lib/utils";
+
+/** A titled block. `hint` is the one line explaining what the block means. */
+export function Section({
   title,
-  description,
+  hint,
+  right,
+  className,
+  children,
 }: {
   title: string;
-  description?: string;
+  hint?: string;
+  right?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="mb-6">
-      <h1 className="text-xl font-semibold text-zinc-50">{title}</h1>
-      {description ? (
-        <p className="mt-1 text-sm text-zinc-400">{description}</p>
-      ) : null}
-    </div>
+    <section className={cn("mb-10", className)}>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-sc-text">{title}</h2>
+          {hint ? (
+            <p className="mt-0.5 text-sm text-sc-text-muted">{hint}</p>
+          ) : null}
+        </div>
+        {right}
+      </div>
+      {children}
+    </section>
   );
 }
 
-/** Placeholder shown inside a card when a query returned nothing yet. */
-export function EmptyState({ children }: { children: React.ReactNode }) {
+/** Page header — the h1 + subtitle every page opens with. */
+export function PageHeader({
+  title,
+  subtitle,
+  right,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-center rounded-lg border border-dashed border-zinc-800 py-10 text-sm text-zinc-500">
-      {children}
-    </div>
+    <header className="mb-8 flex items-end justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-extrabold text-sc-text">{title}</h1>
+        {subtitle ? (
+          <p className="mt-1 text-sm text-sc-text-muted">{subtitle}</p>
+        ) : null}
+      </div>
+      {right}
+    </header>
   );
 }

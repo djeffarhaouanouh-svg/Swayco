@@ -1,108 +1,90 @@
-import { getNewUsersSeries, getSocial } from "@/lib/metrics";
-import { SectionHeader } from "@/components/section";
-import { KpiCard } from "@/components/kpi-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarSeries } from "@/components/charts/series";
-import { StatList } from "@/components/stat-list";
+import { getActiveSendersSeries, getSocial } from "@/lib/metrics";
 import { fmtInt, fmtPct } from "@/lib/format";
+import { KpiCard, KpiGrid } from "@/components/kpi-card";
+import { PageHeader, Section } from "@/components/section";
+import { SeriesChart } from "@/components/charts/series";
 
 export default async function SocialPage() {
-  const [social, newUsers] = await Promise.all([
+  const [social, senders] = await Promise.all([
     getSocial(30),
-    getNewUsersSeries(14),
+    getActiveSendersSeries(14),
   ]);
 
   return (
     <>
-      <SectionHeader
+      <PageHeader
         title="Social"
-        description="Amitiés, conversations et fidélisation — fenêtre 30 j."
+        subtitle="Amitiés, conversations et messages — fenêtre de 30 jours sauf mention contraire."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="Amis (total)" value={fmtInt(social.friendsTotal)} />
-        <KpiCard
-          label="Nouveaux amis"
-          value={fmtInt(social.friendsNew)}
-          sub="30 j"
-        />
-        <KpiCard
-          label="Demandes en attente"
-          value={fmtInt(social.pendingRequests)}
-        />
-        <KpiCard
-          label="Conversations actives"
-          value={fmtInt(social.conversationsActive)}
-          sub="30 j"
-        />
-        <KpiCard
-          label="Utilisateurs récurrents"
-          value={fmtInt(social.recurringUsers)}
-          sub="≥ 2 jours d'activité"
-        />
-        <KpiCard
-          label="Taux de récurrence"
-          value={fmtPct(social.recurringRate, 0)}
-          tone={social.recurringRate >= 0.3 ? "good" : "default"}
-        />
-        <KpiCard
-          label="Reparle à la même personne"
-          value={fmtInt(social.repeatConversations)}
-          sub="conversations actives ≥ 2 jours"
-        />
-        <KpiCard
-          label="Taux de re-contact"
-          value={fmtPct(social.repeatConversationRate, 0)}
-          tone={social.repeatConversationRate >= 0.3 ? "good" : "default"}
-        />
-      </div>
+      <Section title="Amitiés">
+        <KpiGrid>
+          <KpiCard
+            label="Amis (acceptés)"
+            value={fmtInt(social.friendsTotal)}
+            sub={`+${fmtInt(social.friendsNew)} sur 30 j`}
+          />
+          <KpiCard
+            label="Demandes envoyées"
+            value={fmtInt(social.requestsSent)}
+            sub={`${fmtPct(social.acceptRate)} acceptées`}
+          />
+          <KpiCard
+            label="Demandes en attente"
+            value={fmtInt(social.pendingRequests)}
+          />
+          <KpiCard label="Likes" value={fmtInt(social.likes)} />
+        </KpiGrid>
+      </Section>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Nouveaux utilisateurs par jour — 14 j</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BarSeries data={newUsers} color="#a78bfa" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Détail — 30 j</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatList
-              items={[
-                { label: "Messages envoyés", value: fmtInt(social.messages) },
-                {
-                  label: "Conversations actives",
-                  value: fmtInt(social.conversationsActive),
-                },
-                {
-                  label: "Demandes d'ami en attente",
-                  value: fmtInt(social.pendingRequests),
-                },
-                {
-                  label: "Utilisateurs récurrents",
-                  value: fmtInt(social.recurringUsers),
-                  tone: "good",
-                },
-                {
-                  label: "Reparle à la même personne",
-                  value: fmtInt(social.repeatConversations),
-                  tone: "good",
-                },
-              ]}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Section
+        title="Conversations"
+        hint="Le signal fort : une conversation avec des messages sur au moins 2 jours différents veut dire que quelqu'un est revenu parler à cette personne."
+      >
+        <KpiGrid cols={3}>
+          <KpiCard
+            label="Conversations actives"
+            value={fmtInt(social.conversationsActive)}
+            tone="accent"
+          />
+          <KpiCard
+            label="Conversations qui durent"
+            value={fmtInt(social.repeatConversations)}
+            sub={fmtPct(social.repeatConversationRate)}
+          />
+          <KpiCard
+            label="Messages envoyés"
+            value={fmtInt(social.messages)}
+          />
+        </KpiGrid>
+      </Section>
 
-      <p className="mt-4 text-xs text-zinc-600">
-        Amis et conversations sont lus directement depuis les tables{" "}
-        <code className="text-zinc-500">friendships</code> et{" "}
-        <code className="text-zinc-500">messages</code>.
-      </p>
+      <Section
+        title="Expéditeurs actifs"
+        hint="Utilisateurs distincts ayant envoyé au moins un message, par jour."
+      >
+        <SeriesChart title="Expéditeurs actifs par jour" data={senders} />
+      </Section>
+
+      <Section
+        title="Fidélité"
+        hint="Un utilisateur récurrent a ouvert l'app sur au moins 2 jours différents dans la fenêtre."
+      >
+        <KpiGrid cols={3}>
+          <KpiCard
+            label="Utilisateurs récurrents"
+            value={fmtInt(social.recurringUsers)}
+            sub={fmtPct(social.recurringRate)}
+            tone="accent"
+          />
+          <KpiCard label="Blocages" value={fmtInt(social.blocks)} sub="Total" />
+          <KpiCard
+            label="Signalements"
+            value={fmtInt(social.reports)}
+            sub="Sur 30 j"
+          />
+        </KpiGrid>
+      </Section>
     </>
   );
 }

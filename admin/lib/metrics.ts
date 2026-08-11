@@ -7,19 +7,31 @@
 // everything else fetches a bounded row window and aggregates in JS.
 // That is correct and simple for a young app — once `analytics_events`
 // grows large, promote the heavy aggregates to SQL views / RPCs.
+//
+// Event vocabulary actually emitted by the app (lib/services/analytics.dart
+// + its call sites) — nothing else is read here:
+//   app_open · screen_view · call_started · call_ended · call_failed
+//   message_sent · like_sent · friend_request_sent
+// `call_ended` carries props.duration_ms and props.kind.
 
 import { createSupabaseServiceClient } from "./supabase/service";
-import {
-  dayKey,
-  fmtEur,
-  fmtEur2,
-  fmtInt,
-  fmtMinutes,
-  fmtNum,
-  fmtPct,
-} from "./format";
+import { dayKey, fmtInt, fmtMinutes, fmtNum, fmtPct } from "./format";
 
 const DAY_MS = 86_400_000;
+
+/**
+ * A user is "en ligne" when their presence heartbeat is fresh.
+ * PresenceService bumps `profiles.last_seen` every 90 s while the app is
+ * foregrounded, so 5 min tolerates two missed beats without going stale.
+ */
+const ONLINE_WINDOW_MIN = 5;
+
+/**
+ * A `call_started` with no matching `call_ended` for the same room is
+ * treated as still live, but only inside this window — a client that
+ * crashed without sending `call_ended` would otherwise linger forever.
+ */
+const LIVE_CALL_WINDOW_H = 6;
 
 /** ISO timestamp `days` days ago (fractional days allowed: 0.25 = 6 h). */
 export function sinceISO(days: number): string {
@@ -60,9 +72,16 @@ async function safeRows(
   }
 }
 
-function num(v: unknown, def: number): number {
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/** Read a numeric field out of an event's jsonb `props`. */
+function propNum(props: unknown, key: string): number | null {
+  if (!props || typeof props !== "object") return null;
+  const v = (props as Record<string, unknown>)[key];
   const n = Number(v);
-  return Number.isFinite(n) ? n : def;
+  return Number.isFinite(n) ? n : null;
 }
 
 // ─── series helpers ───────────────────────────────────────────────────────
@@ -83,6 +102,29 @@ function bucketByDay(timestamps: unknown[], days: number): DayPoint[] {
   return [...buckets.entries()].map(([day, value]) => ({ day, value }));
 }
 
+/** Bucket timestamps into daily counts of DISTINCT keys (DAU-style). */
+function bucketDistinctByDay(
+  rows: Row[],
+  tsField: string,
+  keyField: string,
+  days: number,
+): DayPoint[] {
+  const buckets = new Map<string, Set<string>>();
+  for (let i = days - 1; i >= 0; i--) {
+    buckets.set(dayKey(new Date(Date.now() - i * DAY_MS)), new Set());
+  }
+  for (const r of rows) {
+    const ts = str(r[tsField]);
+    const key = str(r[keyField]);
+    if (!ts || !key) continue;
+    buckets.get(dayKey(new Date(ts)))?.add(key);
+  }
+  return [...buckets.entries()].map(([day, set]) => ({
+    day,
+    value: set.size,
+  }));
+}
+
 export type Pair = { label: string; value: number };
 
 function topPairs(m: Map<string, number>, limit: number): Pair[] {
@@ -92,65 +134,145 @@ function topPairs(m: Map<string, number>, limit: number): Pair[] {
     .slice(0, limit);
 }
 
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor(p * sorted.length));
-  return sorted[idx];
-}
-
 // ─── live ─────────────────────────────────────────────────────────────────
 
+export type LiveCall = {
+  room: string;
+  /** Seconds since the first `call_started` seen for this room. */
+  ageSec: number;
+  participants: number;
+  country: string | null;
+  langFrom: string | null;
+  langTo: string | null;
+};
+
 export type LiveSnapshot = {
+  /** Rooms with an open call right now. */
   liveCalls: number;
-  liveUsers: number;
-  waitingLobby: number;
-  countries: string[];
-  languages: string[];
+  /** Distinct users inside those rooms. */
+  usersInCall: number;
+  /** Fresh `profiles.last_seen` heartbeats — the app is open for them. */
+  onlineUsers: number;
+  /** Rings placed in the last 2 min and not yet cleared. */
+  ringing: number;
+  calls: LiveCall[];
+  countries: Pair[];
+  languages: Pair[];
 };
 
 /**
- * Best-effort "right now" picture. A call_started with no matching
- * call_ended (by room) inside the last 6 h is treated as still live —
- * so a crashed client that never sent call_ended lingers up to 6 h.
+ * Best-effort "right now" picture, built from three independent signals
+ * so one gap never blanks the page:
+ *   * open calls  — analytics `call_started` unmatched by `call_ended`
+ *   * online      — `profiles.last_seen` heartbeat (PresenceService)
+ *   * ringing     — rows still sitting in `incoming_calls`
+ *
+ * Note: the old `live_lobby` waiting queue is gone (migration 0025 —
+ * the Random Call lobby was removed from the app), so it is not read.
  */
 export async function getLiveSnapshot(): Promise<LiveSnapshot> {
-  const [starts, ends, waitingLobby] = await Promise.all([
+  const windowDays = LIVE_CALL_WINDOW_H / 24;
+  const [starts, ends, onlineUsers, ringing] = await Promise.all([
     safeRows(
       "analytics_events",
-      "room_name, user_id, lang_from, lang_to, country",
+      "room_name, user_id, session_id, lang_from, lang_to, country, created_at",
       (q) =>
         q
           .eq("event", "call_started")
-          .gte("created_at", sinceISO(0.25))
-          .limit(3000),
+          .gte("created_at", sinceISO(windowDays))
+          .limit(5000),
     ),
     safeRows("analytics_events", "room_name", (q) =>
-      q.eq("event", "call_ended").gte("created_at", sinceISO(0.25)).limit(3000),
+      q
+        .eq("event", "call_ended")
+        .gte("created_at", sinceISO(windowDays))
+        .limit(5000),
     ),
-    safeCount("live_lobby", (q) => q.eq("status", "waiting")),
+    safeCount("profiles", (q) =>
+      q.gte("last_seen", sinceISO(ONLINE_WINDOW_MIN / 1440)),
+    ),
+    safeCount("incoming_calls", (q) =>
+      q.gte("created_at", sinceISO(2 / 1440)),
+    ),
   ]);
 
   const endedRooms = new Set(
-    ends.map((e) => e.room_name).filter(Boolean) as string[],
-  );
-  const open = starts.filter(
-    (s) => s.room_name && !endedRooms.has(s.room_name as string),
+    ends.map((e) => str(e.room_name)).filter(Boolean) as string[],
   );
 
-  const countries = new Set<string>();
-  const languages = new Set<string>();
-  for (const s of open) {
-    if (s.country) countries.add(s.country as string);
-    if (s.lang_from) languages.add(s.lang_from as string);
-    if (s.lang_to) languages.add(s.lang_to as string);
+  // Group the still-open starts by room. Two participants each emit their
+  // own `call_started` for the same room, so the room is the call and the
+  // distinct users inside it are the participants.
+  const byRoom = new Map<
+    string,
+    {
+      oldest: number;
+      people: Set<string>;
+      country: string | null;
+      langFrom: string | null;
+      langTo: string | null;
+    }
+  >();
+  const countryCounts = new Map<string, number>();
+  const langCounts = new Map<string, number>();
+
+  for (const s of starts) {
+    const room = str(s.room_name);
+    if (!room || endedRooms.has(room)) continue;
+    const startedAt = str(s.created_at);
+    const t = startedAt ? new Date(startedAt).getTime() : Date.now();
+    let entry = byRoom.get(room);
+    if (!entry) {
+      entry = {
+        oldest: t,
+        people: new Set(),
+        country: null,
+        langFrom: null,
+        langTo: null,
+      };
+      byRoom.set(room, entry);
+    }
+    entry.oldest = Math.min(entry.oldest, t);
+    // Guests have no user_id — fall back to the session so they still count.
+    const who = str(s.user_id) ?? str(s.session_id);
+    if (who) entry.people.add(who);
+    entry.country ??= str(s.country);
+    entry.langFrom ??= str(s.lang_from);
+    entry.langTo ??= str(s.lang_to);
   }
 
+  const now = Date.now();
+  const calls: LiveCall[] = [...byRoom.entries()]
+    .map(([room, e]) => ({
+      room,
+      ageSec: Math.max(0, Math.round((now - e.oldest) / 1000)),
+      participants: e.people.size,
+      country: e.country,
+      langFrom: e.langFrom,
+      langTo: e.langTo,
+    }))
+    .sort((a, b) => b.ageSec - a.ageSec);
+
+  for (const c of calls) {
+    if (c.country) {
+      countryCounts.set(c.country, (countryCounts.get(c.country) ?? 0) + 1);
+    }
+    for (const l of [c.langFrom, c.langTo]) {
+      if (l) langCounts.set(l, (langCounts.get(l) ?? 0) + 1);
+    }
+  }
+
+  const usersInCall = new Set<string>();
+  for (const [, e] of byRoom) for (const p of e.people) usersInCall.add(p);
+
   return {
-    liveCalls: new Set(open.map((s) => s.room_name)).size,
-    liveUsers: open.length,
-    waitingLobby,
-    countries: [...countries],
-    languages: [...languages],
+    liveCalls: calls.length,
+    usersInCall: usersInCall.size,
+    onlineUsers,
+    ringing,
+    calls,
+    countries: topPairs(countryCounts, 8),
+    languages: topPairs(langCounts, 8),
   };
 }
 
@@ -160,34 +282,57 @@ export type Overview = {
   totalUsers: number;
   newUsers24h: number;
   newUsers7d: number;
+  dauToday: number;
   calls24h: number;
-  sessions24h: number;
+  messages24h: number;
   live: LiveSnapshot;
 };
 
 export async function getOverview(): Promise<Overview> {
-  const [totalUsers, newUsers24h, newUsers7d, calls24h, sessions24h, live] =
-    await Promise.all([
-      safeCount("profiles"),
-      safeCount("profiles", (q) => q.gte("created_at", sinceISO(1))),
-      safeCount("profiles", (q) => q.gte("created_at", sinceISO(7))),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "call_started").gte("created_at", sinceISO(1)),
-      ),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "app_open").gte("created_at", sinceISO(1)),
-      ),
-      getLiveSnapshot(),
-    ]);
-  return { totalUsers, newUsers24h, newUsers7d, calls24h, sessions24h, live };
+  const [
+    totalUsers,
+    newUsers24h,
+    newUsers7d,
+    openRows,
+    calls24h,
+    messages24h,
+    live,
+  ] = await Promise.all([
+    safeCount("profiles"),
+    safeCount("profiles", (q) => q.gte("created_at", sinceISO(1))),
+    safeCount("profiles", (q) => q.gte("created_at", sinceISO(7))),
+    safeRows("analytics_events", "user_id", (q) =>
+      q
+        .eq("event", "app_open")
+        .not("user_id", "is", null)
+        .gte("created_at", `${dayKey(new Date())}T00:00:00Z`)
+        .limit(100000),
+    ),
+    safeCount("analytics_events", (q) =>
+      q.eq("event", "call_started").gte("created_at", sinceISO(1)),
+    ),
+    safeCount("messages", (q) => q.gte("created_at", sinceISO(1))),
+    getLiveSnapshot(),
+  ]);
+
+  const dauToday = new Set(
+    openRows.map((r) => str(r.user_id)).filter(Boolean) as string[],
+  ).size;
+
+  return {
+    totalUsers,
+    newUsers24h,
+    newUsers7d,
+    dauToday,
+    calls24h,
+    messages24h,
+    live,
+  };
 }
 
 export async function getCallsSeries(days = 14): Promise<DayPoint[]> {
   const rows = await safeRows("analytics_events", "created_at", (q) =>
-    q
-      .eq("event", "call_started")
-      .gte("created_at", sinceISO(days))
-      .limit(100000),
+    q.eq("event", "call_started").gte("created_at", sinceISO(days)).limit(100000),
   );
   return bucketByDay(
     rows.map((r) => r.created_at),
@@ -205,26 +350,21 @@ export async function getNewUsersSeries(days = 14): Promise<DayPoint[]> {
   );
 }
 
-// ─── languages & countries ────────────────────────────────────────────────
-
-export async function getLanguagePairs(days = 30): Promise<Pair[]> {
-  const rows = await safeRows("analytics_events", "lang_from, lang_to", (q) =>
-    q
-      .eq("event", "call_ended")
-      .gte("created_at", sinceISO(days))
-      .limit(50000),
+export async function getMessagesSeries(days = 14): Promise<DayPoint[]> {
+  const rows = await safeRows("messages", "created_at", (q) =>
+    q.gte("created_at", sinceISO(days)).limit(100000),
   );
-  const m = new Map<string, number>();
-  for (const r of rows) {
-    if (!r.lang_from && !r.lang_to) continue;
-    const label = `${r.lang_from ?? "?"} → ${r.lang_to ?? "?"}`;
-    m.set(label, (m.get(label) ?? 0) + 1);
-  }
-  return topPairs(m, 12);
+  return bucketByDay(
+    rows.map((r) => r.created_at),
+    days,
+  );
 }
+
+// ─── countries & languages ────────────────────────────────────────────────
 
 export type CountryStat = { code: string; users: number };
 
+/** Distinct users (sessions, for guests) seen per country in the window. */
 export async function getCountries(days = 30): Promise<CountryStat[]> {
   const rows = await safeRows(
     "analytics_events",
@@ -235,12 +375,11 @@ export async function getCountries(days = 30): Promise<CountryStat[]> {
         .gte("created_at", sinceISO(days))
         .limit(100000),
   );
-  // Distinct user (or session, for guests) per country.
   const m = new Map<string, Set<string>>();
   for (const r of rows) {
-    const code = r.country as string | null;
+    const code = str(r.country);
     if (!code) continue;
-    const key = (r.user_id as string) ?? (r.session_id as string) ?? "anon";
+    const key = str(r.user_id) ?? str(r.session_id) ?? "anon";
     if (!m.has(code)) m.set(code, new Set());
     m.get(code)!.add(key);
   }
@@ -249,102 +388,65 @@ export async function getCountries(days = 30): Promise<CountryStat[]> {
     .sort((a, b) => b.users - a.users);
 }
 
-// ─── translation ──────────────────────────────────────────────────────────
-
-export type TranslationStats = {
-  avgLatency: number;
-  p95Latency: number;
-  latencySamples: number;
-  sessions: number;
-  errors: number;
-  sessionFails: number;
-  callFails: number;
-  textTranslations: number;
-  errorRate: number;
-};
-
-export async function getTranslationStats(days = 7): Promise<TranslationStats> {
-  const [latRows, sessions, errors, sessionFails, callFails, textTranslations] =
-    await Promise.all([
-      safeRows("analytics_events", "latency_ms", (q) =>
-        q
-          .eq("event", "translation_connected")
-          .not("latency_ms", "is", null)
-          .gte("created_at", sinceISO(days))
-          .limit(50000),
-      ),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "translation_session").gte("created_at", sinceISO(days)),
-      ),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "translation_error").gte("created_at", sinceISO(days)),
-      ),
-      safeCount("analytics_events", (q) =>
-        q
-          .eq("event", "translation_session_failed")
-          .gte("created_at", sinceISO(days)),
-      ),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "call_failed").gte("created_at", sinceISO(days)),
-      ),
-      safeCount("analytics_events", (q) =>
-        q.eq("event", "text_translation").gte("created_at", sinceISO(days)),
-      ),
-    ]);
-
-  const lat = latRows
-    .map((r) => Number(r.latency_ms))
-    .filter((n) => Number.isFinite(n) && n > 0)
-    .sort((a, b) => a - b);
-  const avgLatency = lat.length
-    ? Math.round(lat.reduce((a, b) => a + b, 0) / lat.length)
-    : 0;
-  const totalErr = errors + sessionFails;
-  const totalAttempts = sessions + sessionFails;
-
-  return {
-    avgLatency,
-    p95Latency: Math.round(percentile(lat, 0.95)),
-    latencySamples: lat.length,
-    sessions,
-    errors,
-    sessionFails,
-    callFails,
-    textTranslations,
-    errorRate: totalAttempts > 0 ? totalErr / totalAttempts : 0,
-  };
+/** Languages users actually speak, straight off their profile. */
+export async function getLanguages(): Promise<Pair[]> {
+  const rows = await safeRows("profiles", "language", (q) =>
+    q.not("language", "is", null).limit(100000),
+  );
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    const l = str(r.language);
+    if (!l) continue;
+    m.set(l, (m.get(l) ?? 0) + 1);
+  }
+  return topPairs(m, 12);
 }
 
-export async function getLatencySeries(days = 14): Promise<DayPoint[]> {
-  const rows = await safeRows(
-    "analytics_events",
-    "created_at, latency_ms",
-    (q) =>
-      q
-        .eq("event", "translation_connected")
-        .not("latency_ms", "is", null)
-        .gte("created_at", sinceISO(days))
-        .limit(100000),
-  );
-  // Daily average latency.
-  const sum = new Map<string, number>();
-  const cnt = new Map<string, number>();
-  for (let i = days - 1; i >= 0; i--) {
-    const k = dayKey(new Date(Date.now() - i * DAY_MS));
-    sum.set(k, 0);
-    cnt.set(k, 0);
+// ─── calls ────────────────────────────────────────────────────────────────
+
+export type CallStats = {
+  calls: number;
+  failed: number;
+  failRate: number;
+  totalMinutes: number;
+  avgMinutes: number;
+  /** Calls that lasted over a minute — a real conversation, not a misfire. */
+  realCalls: number;
+};
+
+export async function getCallStats(days = 30): Promise<CallStats> {
+  const [ended, started, failed] = await Promise.all([
+    safeRows("analytics_events", "props", (q) =>
+      q.eq("event", "call_ended").gte("created_at", sinceISO(days)).limit(50000),
+    ),
+    safeCount("analytics_events", (q) =>
+      q.eq("event", "call_started").gte("created_at", sinceISO(days)),
+    ),
+    safeCount("analytics_events", (q) =>
+      q.eq("event", "call_failed").gte("created_at", sinceISO(days)),
+    ),
+  ]);
+
+  let totalMs = 0;
+  let samples = 0;
+  let realCalls = 0;
+  for (const r of ended) {
+    const ms = propNum(r.props, "duration_ms");
+    if (ms === null || ms < 0) continue;
+    totalMs += ms;
+    samples++;
+    if (ms >= 60_000) realCalls++;
   }
-  for (const r of rows) {
-    if (typeof r.created_at !== "string") continue;
-    const k = dayKey(new Date(r.created_at));
-    if (!sum.has(k)) continue;
-    sum.set(k, (sum.get(k) ?? 0) + Number(r.latency_ms || 0));
-    cnt.set(k, (cnt.get(k) ?? 0) + 1);
-  }
-  return [...sum.entries()].map(([day, total]) => ({
-    day,
-    value: cnt.get(day) ? Math.round(total / (cnt.get(day) as number)) : 0,
-  }));
+
+  const attempts = started + failed;
+  return {
+    calls: started,
+    failed,
+    failRate: attempts > 0 ? failed / attempts : 0,
+    totalMinutes: totalMs / 60_000,
+    avgMinutes: samples > 0 ? totalMs / samples / 60_000 : 0,
+    realCalls,
+  };
 }
 
 // ─── social ───────────────────────────────────────────────────────────────
@@ -353,8 +455,14 @@ export type SocialStats = {
   friendsTotal: number;
   friendsNew: number;
   pendingRequests: number;
+  requestsSent: number;
+  /** friendsNew / requestsSent — how often an "Ajouter" is accepted. */
+  acceptRate: number;
   conversationsActive: number;
   messages: number;
+  likes: number;
+  blocks: number;
+  reports: number;
   recurringUsers: number;
   recurringRate: number;
   /** Conversations with messages on ≥ 2 distinct days. */
@@ -364,44 +472,48 @@ export type SocialStats = {
 };
 
 export async function getSocial(days = 30): Promise<SocialStats> {
-  const [friendsTotal, friendsNew, pendingRequests, msgs, appOpens] =
-    await Promise.all([
-      safeCount("friendships", (q) => q.eq("status", "accepted")),
-      safeCount("friendships", (q) =>
-        q.eq("status", "accepted").gte("responded_at", sinceISO(days)),
-      ),
-      safeCount("friendships", (q) => q.eq("status", "pending")),
-      safeRows("messages", "conversation_id, created_at", (q) =>
-        q.gte("created_at", sinceISO(days)).limit(50000),
-      ),
-      safeRows("analytics_events", "user_id, created_at", (q) =>
-        q
-          .eq("event", "app_open")
-          .not("user_id", "is", null)
-          .gte("created_at", sinceISO(days))
-          .limit(100000),
-      ),
-    ]);
-
-  const conversations = new Set(
-    msgs.map((m) => m.conversation_id).filter(Boolean),
-  );
+  const [
+    friendsTotal,
+    friendsNew,
+    pendingRequests,
+    requestsSent,
+    likes,
+    blocks,
+    reports,
+    msgs,
+    appOpens,
+  ] = await Promise.all([
+    safeCount("friendships", (q) => q.eq("status", "accepted")),
+    safeCount("friendships", (q) =>
+      q.eq("status", "accepted").gte("responded_at", sinceISO(days)),
+    ),
+    safeCount("friendships", (q) => q.eq("status", "pending")),
+    safeCount("friendships", (q) => q.gte("created_at", sinceISO(days))),
+    safeCount("likes", (q) => q.gte("created_at", sinceISO(days))),
+    safeCount("blocked_users"),
+    safeCount("reports", (q) => q.gte("created_at", sinceISO(days))),
+    safeRows("messages", "conversation_id, sender, created_at", (q) =>
+      q.gte("created_at", sinceISO(days)).limit(100000),
+    ),
+    safeRows("analytics_events", "user_id, created_at", (q) =>
+      q
+        .eq("event", "app_open")
+        .not("user_id", "is", null)
+        .gte("created_at", sinceISO(days))
+        .limit(100000),
+    ),
+  ]);
 
   // "Revient parler à la même personne": a conversation carrying messages
   // on ≥ 2 distinct days means at least one side came back to that person
   // — a relationship that stuck, not a one-off. The GOLD engagement signal.
   const convDays = new Map<string, Set<string>>();
   for (const m of msgs) {
-    if (
-      typeof m.conversation_id !== "string" ||
-      typeof m.created_at !== "string"
-    ) {
-      continue;
-    }
-    if (!convDays.has(m.conversation_id)) {
-      convDays.set(m.conversation_id, new Set());
-    }
-    convDays.get(m.conversation_id)!.add(dayKey(new Date(m.created_at)));
+    const conv = str(m.conversation_id);
+    const ts = str(m.created_at);
+    if (!conv || !ts) continue;
+    if (!convDays.has(conv)) convDays.set(conv, new Set());
+    convDays.get(conv)!.add(dayKey(new Date(ts)));
   }
   let repeatConversations = 0;
   for (const [, dset] of convDays) if (dset.size >= 2) repeatConversations++;
@@ -409,27 +521,41 @@ export async function getSocial(days = 30): Promise<SocialStats> {
   // Recurring = a real user who opened the app on ≥ 2 distinct days.
   const userDays = new Map<string, Set<string>>();
   for (const r of appOpens) {
-    if (typeof r.user_id !== "string" || typeof r.created_at !== "string") {
-      continue;
-    }
-    if (!userDays.has(r.user_id)) userDays.set(r.user_id, new Set());
-    userDays.get(r.user_id)!.add(dayKey(new Date(r.created_at)));
+    const uid = str(r.user_id);
+    const ts = str(r.created_at);
+    if (!uid || !ts) continue;
+    if (!userDays.has(uid)) userDays.set(uid, new Set());
+    userDays.get(uid)!.add(dayKey(new Date(ts)));
   }
   let recurring = 0;
   for (const [, dset] of userDays) if (dset.size >= 2) recurring++;
 
+  const conversations = convDays.size;
   return {
     friendsTotal,
     friendsNew,
     pendingRequests,
-    conversationsActive: conversations.size,
+    requestsSent,
+    acceptRate: requestsSent > 0 ? friendsNew / requestsSent : 0,
+    conversationsActive: conversations,
     messages: msgs.length,
+    likes,
+    blocks,
+    reports,
     recurringUsers: recurring,
     recurringRate: userDays.size > 0 ? recurring / userDays.size : 0,
     repeatConversations,
     repeatConversationRate:
-      conversations.size > 0 ? repeatConversations / conversations.size : 0,
+      conversations > 0 ? repeatConversations / conversations : 0,
   };
+}
+
+/** Daily distinct senders — "combien de gens ont écrit ce jour-là". */
+export async function getActiveSendersSeries(days = 14): Promise<DayPoint[]> {
+  const rows = await safeRows("messages", "sender, created_at", (q) =>
+    q.gte("created_at", sinceISO(days)).limit(100000),
+  );
+  return bucketDistinctByDay(rows, "created_at", "sender", days);
 }
 
 // ─── retention ────────────────────────────────────────────────────────────
@@ -445,8 +571,16 @@ export type CohortRow = {
 export type Retention = {
   cohorts: CohortRow[];
   overall: { d1: number; d7: number; d30: number };
+  /** Users whose last app_open is over 30 days old. */
   lostUsers: number;
+  /** Users seen on exactly one day, ever. */
+  oneAndDone: number;
+  trackedUsers: number;
   dau: DayPoint[];
+  wau: number;
+  mau: number;
+  /** dau(today) / mau — the classic stickiness ratio. */
+  stickiness: number;
 };
 
 /**
@@ -468,22 +602,24 @@ export async function getRetention(days = 30): Promise<Retention> {
   // user → set of day indices.
   const userDays = new Map<string, Set<number>>();
   for (const r of rows) {
-    if (typeof r.user_id !== "string" || typeof r.created_at !== "string") {
-      continue;
-    }
-    const di = Math.floor(new Date(r.created_at).getTime() / DAY_MS);
-    if (!userDays.has(r.user_id)) userDays.set(r.user_id, new Set());
-    userDays.get(r.user_id)!.add(di);
+    const uid = str(r.user_id);
+    const ts = str(r.created_at);
+    if (!uid || !ts) continue;
+    const di = Math.floor(new Date(ts).getTime() / DAY_MS);
+    if (!userDays.has(uid)) userDays.set(uid, new Set());
+    userDays.get(uid)!.add(di);
   }
 
   type Acc = { size: number; d1: number; d7: number; d30: number };
   const cohorts = new Map<number, Acc>();
   let lostUsers = 0;
+  let oneAndDone = 0;
   for (const [, dset] of userDays) {
     const sorted = [...dset].sort((a, b) => a - b);
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
     if (last < today - 30) lostUsers++;
+    if (dset.size === 1) oneAndDone++;
     if (!cohorts.has(first)) {
       cohorts.set(first, { size: 0, d1: 0, d7: 0, d30: 0 });
     }
@@ -519,508 +655,277 @@ export async function getRetention(days = 30): Promise<Retention> {
     overall[key] = size > 0 ? ret / size : 0;
   }
 
-  // DAU series for the requested window.
-  const dauSets = new Map<string, Set<string>>();
-  for (let i = days - 1; i >= 0; i--) {
-    dauSets.set(dayKey(new Date(Date.now() - i * DAY_MS)), new Set());
-  }
-  for (const r of rows) {
-    if (typeof r.user_id !== "string" || typeof r.created_at !== "string") {
-      continue;
-    }
-    const k = dayKey(new Date(r.created_at));
-    dauSets.get(k)?.add(r.user_id);
-  }
-  const dau: DayPoint[] = [...dauSets.entries()].map(([day, set]) => ({
-    day,
-    value: set.size,
-  }));
+  const dau = bucketDistinctByDay(rows, "created_at", "user_id", days);
 
-  return { cohorts: cohortRows, overall, lostUsers, dau };
+  const wauSet = new Set<string>();
+  const mauSet = new Set<string>();
+  const weekAgo = today - 7;
+  const monthAgo = today - 30;
+  for (const [uid, dset] of userDays) {
+    for (const di of dset) {
+      if (di > weekAgo) wauSet.add(uid);
+      if (di > monthAgo) mauSet.add(uid);
+    }
+  }
+  const dauToday = dau.length > 0 ? dau[dau.length - 1].value : 0;
+
+  return {
+    cohorts: cohortRows,
+    overall,
+    lostUsers,
+    oneAndDone,
+    trackedUsers: userDays.size,
+    dau,
+    wau: wauSet.size,
+    mau: mauSet.size,
+    stickiness: mauSet.size > 0 ? dauToday / mauSet.size : 0,
+  };
 }
 
-// ─── consolidated single table ──────────────────────────────────────────────
+// ─── consolidated single table ────────────────────────────────────────────
 
 export type MetricGroup =
   | "Croissance"
   | "Rétention"
   | "Social"
   | "Appels"
-  | "Profil"
-  | "Monétisation";
+  | "Profil";
 
-/** One line of the "Tableau global" page — already formatted for display. */
 export type MetricRow = {
   group: MetricGroup;
   label: string;
-  /** Total / valeur globale. */
-  total: string;
-  /** Moyenne par utilisateur — "—" quand la notion n'a pas de sens. */
-  perUser: string;
-  /** Contexte (fenêtre temporelle, définition) — "" si rien à dire. */
-  detail: string;
+  value: string;
+  /** Same metric over the last 30 days, when that framing means something. */
+  window?: string;
+  hint?: string;
 };
 
 /**
- * Everything the app tracks, on ONE table, one row per metric. Reuses
- * the per-section aggregates (overview / retention / social / costs)
- * and adds the per-user averages no other page computes:
- * likes, calls, photos, interests and profile completion.
- *
- * Per-user averages divide an ALL-TIME total by the total user count (a
- * lifetime average), while activity metrics (DAU, retention, new users)
- * keep their natural time window — each row's `detail` says which. Every
- * underlying query is defensive (safeCount / safeRows resolve to 0 / []),
- * so a table that doesn't exist yet just shows 0 instead of crashing.
+ * Every headline number in one flat table — the page you open when you
+ * want the state of the app without clicking through five tabs.
  */
 export async function getGlobalTable(): Promise<MetricRow[]> {
   const [
-    overview,
-    retention,
+    totalUsers,
+    new24h,
+    new7d,
+    new30d,
+    withPhoto,
+    withInterests,
+    withCity,
+    live,
     social,
-    costs,
-    newUsers30d,
-    friendshipsTotal,
-    messagesTotal,
-    likeRows,
-    callsTotal,
-    callRows,
-    blocks,
-    reports,
-    profileRows,
+    retention,
+    calls,
   ] = await Promise.all([
-    getOverview(),
-    getRetention(30),
-    getSocial(30),
-    getCosts(30),
+    safeCount("profiles"),
+    safeCount("profiles", (q) => q.gte("created_at", sinceISO(1))),
+    safeCount("profiles", (q) => q.gte("created_at", sinceISO(7))),
     safeCount("profiles", (q) => q.gte("created_at", sinceISO(30))),
-    safeCount("friendships"),
-    safeCount("messages"),
-    safeRows("likes", "liker, liked", (q) => q.limit(200000)),
-    safeCount("incoming_calls"),
-    safeRows("incoming_calls", "duration_seconds", (q) =>
-      q.not("duration_seconds", "is", null).limit(200000),
-    ),
-    safeCount("blocked_users"),
-    safeCount("reports"),
-    safeRows("profiles", "photos, interests", (q) => q.limit(200000)),
+    safeCount("profiles", (q) => q.not("photos", "is", null)),
+    safeCount("profiles", (q) => q.not("interests", "is", null)),
+    safeCount("profiles", (q) => q.neq("city", "")),
+    getLiveSnapshot(),
+    getSocial(30),
+    getRetention(30),
+    getCallStats(30),
   ]);
 
-  const users = overview.totalUsers || 0;
-  const per = (n: number) => (users > 0 ? n / users : 0);
-
-  // Likes: distinct (liker → liked) pairs, so liking three photos of the
-  // same person counts once toward "people liked".
-  const likePairs = new Set<string>();
-  for (const r of likeRows) {
-    if (r.liker && r.liked) likePairs.add(`${r.liker}→${r.liked}`);
-  }
-
-  // Calls: average + cumulative duration over ended calls only.
-  let callSecs = 0;
-  let endedCalls = 0;
-  for (const c of callRows) {
-    const s = Number(c.duration_seconds);
-    if (Number.isFinite(s) && s > 0) {
-      callSecs += s;
-      endedCalls++;
-    }
-  }
-  const avgCallMin = endedCalls > 0 ? callSecs / endedCalls / 60 : 0;
-
-  // Profiles: photos + interests.
-  let photoTotal = 0;
-  let withPhoto = 0;
-  let interestTotal = 0;
-  for (const p of profileRows) {
-    const photos = Array.isArray(p.photos) ? p.photos : [];
-    const interests = Array.isArray(p.interests) ? p.interests : [];
-    photoTotal += photos.length;
-    if (photos.length > 0) withPhoto++;
-    interestTotal += interests.length;
-  }
-  const seen = profileRows.length || 0;
-  const avgPhotos = seen > 0 ? photoTotal / seen : 0;
-  const avgInterests = seen > 0 ? interestTotal / seen : 0;
-  const withPhotoRate = seen > 0 ? withPhoto / seen : 0;
-
-  const todayDau = retention.dau.length
-    ? retention.dau[retention.dau.length - 1].value
-    : 0;
+  const dauToday =
+    retention.dau.length > 0 ? retention.dau[retention.dau.length - 1].value : 0;
+  const pctOfUsers = (n: number) =>
+    totalUsers > 0 ? fmtPct(n / totalUsers) : "—";
 
   return [
-    // ─── Croissance & activité ───
+    // ── Croissance ──
     {
       group: "Croissance",
       label: "Nombre d'utilisateurs",
-      total: fmtInt(users),
-      perUser: "—",
-      detail: "total cumulé",
+      value: fmtInt(totalUsers),
+      window: `+${fmtInt(new30d)}`,
+      hint: "Lignes dans profiles",
     },
     {
       group: "Croissance",
-      label: "Nouveaux utilisateurs",
-      total: fmtInt(newUsers30d),
-      perUser: "—",
-      detail: `${fmtInt(overview.newUsers24h)} (24 h) · ${fmtInt(
-        overview.newUsers7d,
-      )} (7 j) · ${fmtInt(newUsers30d)} (30 j)`,
+      label: "Nouveaux aujourd'hui",
+      value: fmtInt(new24h),
+      window: `${fmtInt(new7d)} sur 7 j`,
     },
     {
       group: "Croissance",
       label: "Actifs aujourd'hui (DAU)",
-      total: fmtInt(todayDau),
-      perUser: "—",
-      detail: "ouvertures d'app, jour J",
+      value: fmtInt(dauToday),
+      window: `${fmtInt(retention.wau)} WAU · ${fmtInt(retention.mau)} MAU`,
+      hint: "Utilisateurs distincts ayant ouvert l'app",
     },
     {
       group: "Croissance",
-      label: "Utilisateurs récurrents",
-      total: fmtInt(social.recurringUsers),
-      perUser: fmtPct(social.recurringRate),
-      detail: "≥ 2 jours actifs (30 j)",
+      label: "Stickiness (DAU / MAU)",
+      value: fmtPct(retention.stickiness),
+      hint: "Au-dessus de 20 % = habitude installée",
     },
     {
       group: "Croissance",
-      label: "Utilisateurs perdus",
-      total: fmtInt(retention.lostUsers),
-      perUser: "—",
-      detail: "aucune ouverture depuis 30 j",
+      label: "En ligne maintenant",
+      value: fmtInt(live.onlineUsers),
+      hint: `Heartbeat last_seen < ${ONLINE_WINDOW_MIN} min`,
     },
 
-    // ─── Rétention ───
+    // ── Rétention ──
     {
       group: "Rétention",
       label: "Rétention J1",
-      total: fmtPct(retention.overall.d1),
-      perUser: "—",
-      detail: "reviennent le lendemain",
+      value: fmtPct(retention.overall.d1),
+      hint: "Revenus le lendemain de leur 1ʳᵉ ouverture",
     },
     {
       group: "Rétention",
       label: "Rétention J7",
-      total: fmtPct(retention.overall.d7),
-      perUser: "—",
-      detail: "reviennent à 7 jours",
+      value: fmtPct(retention.overall.d7),
     },
     {
       group: "Rétention",
       label: "Rétention J30",
-      total: fmtPct(retention.overall.d30),
-      perUser: "—",
-      detail: "reviennent à 30 jours",
+      value: fmtPct(retention.overall.d30),
+    },
+    {
+      group: "Rétention",
+      label: "Utilisateurs récurrents",
+      value: fmtInt(social.recurringUsers),
+      window: fmtPct(social.recurringRate),
+      hint: "Ouvert l'app au moins 2 jours différents",
+    },
+    {
+      group: "Rétention",
+      label: "Venus une seule fois",
+      value: fmtInt(retention.oneAndDone),
+      window:
+        retention.trackedUsers > 0
+          ? fmtPct(retention.oneAndDone / retention.trackedUsers)
+          : "—",
+    },
+    {
+      group: "Rétention",
+      label: "Utilisateurs perdus",
+      value: fmtInt(retention.lostUsers),
+      hint: "Dernière ouverture il y a plus de 30 jours",
     },
 
-    // ─── Social & engagement ───
+    // ── Social ──
     {
       group: "Social",
       label: "Amis (acceptés)",
-      total: fmtInt(social.friendsTotal),
-      perUser: fmtNum(per(social.friendsTotal * 2)),
-      detail: "moyenne d'amis par utilisateur",
+      value: fmtInt(social.friendsTotal),
+      window: `+${fmtInt(social.friendsNew)}`,
     },
     {
       group: "Social",
-      label: "Demandes d'ami envoyées",
-      total: fmtInt(friendshipsTotal),
-      perUser: fmtNum(per(friendshipsTotal)),
-      detail: "acceptées + en attente + refusées",
+      label: "Demandes envoyées",
+      value: fmtInt(social.requestsSent),
+      window: `${fmtPct(social.acceptRate)} acceptées`,
+    },
+    {
+      group: "Social",
+      label: "Demandes en attente",
+      value: fmtInt(social.pendingRequests),
     },
     {
       group: "Social",
       label: "Messages envoyés",
-      total: fmtInt(messagesTotal),
-      perUser: fmtNum(per(messagesTotal)),
-      detail: "texte et image",
-    },
-    {
-      group: "Social",
-      label: "Likes",
-      total: fmtInt(likePairs.size),
-      perUser: fmtNum(per(likePairs.size)),
-      detail: "personnes likées distinctes",
+      value: fmtInt(social.messages),
+      window: "sur 30 j",
     },
     {
       group: "Social",
       label: "Conversations actives",
-      total: fmtInt(social.conversationsActive),
-      perUser: "—",
-      detail: "30 j",
+      value: fmtInt(social.conversationsActive),
     },
     {
       group: "Social",
+      label: "Conversations qui durent",
+      value: fmtInt(social.repeatConversations),
+      window: fmtPct(social.repeatConversationRate),
+      hint: "Messages sur au moins 2 jours différents — le signal fort",
+    },
+    { group: "Social", label: "Likes", value: fmtInt(social.likes) },
+    {
+      group: "Social",
       label: "Blocages",
-      total: fmtInt(blocks),
-      perUser: fmtNum(per(blocks)),
-      detail: "",
+      value: fmtInt(social.blocks),
+      hint: "Total, toutes périodes",
     },
     {
       group: "Social",
       label: "Signalements",
-      total: fmtInt(reports),
-      perUser: "—",
-      detail: "total cumulé",
+      value: fmtInt(social.reports),
+      window: "sur 30 j",
     },
 
-    // ─── Appels ───
+    // ── Appels ──
     {
       group: "Appels",
       label: "Appels passés",
-      total: fmtInt(callsTotal),
-      perUser: fmtNum(per(callsTotal)),
-      detail: "appels entre amis (hors invités)",
+      value: fmtInt(calls.calls),
+      window: "sur 30 j",
     },
     {
       group: "Appels",
-      label: "Durée moyenne d'un appel",
-      total: fmtMinutes(avgCallMin),
-      perUser: "—",
-      detail: `${fmtInt(endedCalls)} appels terminés`,
+      label: "Appels de plus d'une minute",
+      value: fmtInt(calls.realCalls),
+      window:
+        calls.calls > 0 ? fmtPct(calls.realCalls / calls.calls) : "—",
+      hint: "Une vraie conversation, pas un raccroché immédiat",
     },
     {
       group: "Appels",
-      label: "Minutes d'appel cumulées",
-      total: fmtMinutes(callSecs / 60),
-      perUser: `${fmtNum(per(callSecs / 60))} min`,
-      detail: "",
+      label: "Durée moyenne",
+      value: fmtMinutes(calls.avgMinutes),
+    },
+    {
+      group: "Appels",
+      label: "Minutes cumulées",
+      value: fmtMinutes(calls.totalMinutes),
+    },
+    {
+      group: "Appels",
+      label: "Échecs de connexion",
+      value: fmtInt(calls.failed),
+      window: fmtPct(calls.failRate),
+      hint: "call_failed / (call_started + call_failed)",
+    },
+    {
+      group: "Appels",
+      label: "Appels en cours",
+      value: fmtInt(live.liveCalls),
+      window: `${fmtInt(live.usersInCall)} personnes`,
     },
 
-    // ─── Profil ───
+    // ── Profil ──
     {
       group: "Profil",
-      label: "Photos",
-      total: fmtInt(photoTotal),
-      perUser: fmtNum(avgPhotos),
-      detail: `${fmtPct(withPhotoRate)} ont ≥ 1 photo`,
+      label: "Profils avec photo",
+      value: fmtInt(withPhoto),
+      window: pctOfUsers(withPhoto),
     },
     {
       group: "Profil",
-      label: "Centres d'intérêt",
-      total: "—",
-      perUser: fmtNum(avgInterests),
-      detail: "tags choisis par utilisateur",
-    },
-
-    // ─── Monétisation ───
-    {
-      group: "Monétisation",
-      label: "Abonnés Plus",
-      total: fmtInt(costs.plusCount),
-      perUser: "—",
-      detail: `${fmtEur2(costs.pricePlus)}/mois`,
+      label: "Profils avec centres d'intérêt",
+      value: fmtInt(withInterests),
+      window: pctOfUsers(withInterests),
     },
     {
-      group: "Monétisation",
-      label: "Abonnés Ultra+",
-      total: fmtInt(costs.ultraPlusCount),
-      perUser: "—",
-      detail: `${fmtEur2(costs.priceUltraPlus)}/mois`,
+      group: "Profil",
+      label: "Profils localisés",
+      value: fmtInt(withCity),
+      window: pctOfUsers(withCity),
+      hint: "Ville renseignée",
     },
     {
-      group: "Monétisation",
-      label: "MRR",
-      total: fmtEur(costs.mrrEur),
-      perUser: "—",
-      detail: "revenu mensuel récurrent",
+      group: "Profil",
+      label: "Messages par utilisateur",
+      value:
+        totalUsers > 0 ? fmtNum(social.messages / totalUsers) : "—",
+      window: "sur 30 j",
     },
   ];
-}
-
-// ─── engagement par surface ─────────────────────────────────────────────────
-
-export type SurfaceBreakdown = {
-  /** Total events of this kind in the window. */
-  total: number;
-  /** Per-source counts, sorted desc. */
-  bySource: Pair[];
-};
-
-export type SurfaceEngagement = {
-  windowDays: number;
-  messages: SurfaceBreakdown;
-  messagesByType: SurfaceBreakdown;
-  friendRequests: SurfaceBreakdown;
-  likes: SurfaceBreakdown;
-  screenViews: SurfaceBreakdown;
-};
-
-/** Count rows by a string field inside `props`, sorted desc. */
-function countByProp(rows: Row[], field: string): Pair[] {
-  const m = new Map<string, number>();
-  for (const r of rows) {
-    const p = (r.props as Record<string, unknown> | null) ?? {};
-    const v = p[field];
-    const key = typeof v === "string" && v ? v : "inconnu";
-    m.set(key, (m.get(key) ?? 0) + 1);
-  }
-  return [...m.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
-}
-
-/**
- * WHERE engagement happens. Reads the surface-tagged events the app now
- * emits — `message_sent`, `friend_request_sent`, `like_sent`,
- * `screen_view` — and breaks each down by its `source` (or `screen` /
- * `type`) prop. These events ship from the app's action sites (see
- * lib/screens/*), so the numbers only start the day a build carrying the
- * instrumentation is live and used — older history has no surface tag.
- */
-export async function getSurfaceEngagement(
-  days = 30,
-): Promise<SurfaceEngagement> {
-  const [msgRows, frRows, likeRows, svRows] = await Promise.all([
-    safeRows("analytics_events", "props", (q) =>
-      q
-        .eq("event", "message_sent")
-        .gte("created_at", sinceISO(days))
-        .limit(200000),
-    ),
-    safeRows("analytics_events", "props", (q) =>
-      q
-        .eq("event", "friend_request_sent")
-        .gte("created_at", sinceISO(days))
-        .limit(200000),
-    ),
-    safeRows("analytics_events", "props", (q) =>
-      q.eq("event", "like_sent").gte("created_at", sinceISO(days)).limit(200000),
-    ),
-    safeRows("analytics_events", "props", (q) =>
-      q
-        .eq("event", "screen_view")
-        .gte("created_at", sinceISO(days))
-        .limit(200000),
-    ),
-  ]);
-
-  return {
-    windowDays: days,
-    messages: {
-      total: msgRows.length,
-      bySource: countByProp(msgRows, "source"),
-    },
-    messagesByType: {
-      total: msgRows.length,
-      bySource: countByProp(msgRows, "type"),
-    },
-    friendRequests: {
-      total: frRows.length,
-      bySource: countByProp(frRows, "source"),
-    },
-    likes: {
-      total: likeRows.length,
-      bySource: countByProp(likeRows, "source"),
-    },
-    screenViews: {
-      total: svRows.length,
-      bySource: countByProp(svRows, "screen"),
-    },
-  };
-}
-
-// ─── monetisation ─────────────────────────────────────────────────────────
-
-export type CostBreakdown = {
-  callMinutes: number;
-  /** Minutes the OpenAI translation pipeline was actually live. */
-  translationMinutes: number;
-  textTokens: number;
-  costRealtimeUsd: number;
-  costLivekitUsd: number;
-  costTextUsd: number;
-  costTotalEur: number;
-  /** Paying subscribers on the entry tier (Plus). */
-  plusCount: number;
-  /** Paying subscribers on the top tier (Ultra Plus). */
-  ultraPlusCount: number;
-  freeCount: number;
-  mrrEur: number;
-  marginEur: number;
-  ratesConfigured: boolean;
-  windowDays: number;
-  /** Monthly price of each paid tier (EUR), as used to compute the MRR. */
-  pricePlus: number;
-  priceUltraPlus: number;
-};
-
-/**
- * Costs are derived from usage × per-unit rates pulled from env vars —
- * deliberately NOT hardcoded. Set them in admin/.env.local from the
- * current OpenAI / LiveKit pricing pages. Until then the rates are 0
- * and the cost panels show a "configure the rates" hint.
- */
-export async function getCosts(days = 30): Promise<CostBreakdown> {
-  // Defaults reflect public pricing as of 2026-05 — see admin/env.example
-  // for the source links. Override via .env.local when rates change.
-  const rateRealtime = num(process.env.COST_REALTIME_USD_PER_MIN, 0.10);
-  const rateLivekit = num(process.env.COST_LIVEKIT_USD_PER_MIN, 0.0005);
-  const rateText = num(process.env.COST_TEXT_USD_PER_1K_TOKENS, 0.001);
-  const usdToEur = num(process.env.USD_TO_EUR, 0.92);
-  const pricePlus = num(process.env.PRICE_PLUS_EUR, 9.99);
-  const priceUltraPlus = num(process.env.PRICE_ULTRA_PLUS_EUR, 15.99);
-
-  const [calls, texts, plusCount, ultraPlusCount, freeCount] = await Promise.all([
-    safeRows("analytics_events", "props", (q) =>
-      q.eq("event", "call_ended").gte("created_at", sinceISO(days)).limit(100000),
-    ),
-    safeRows("analytics_events", "props", (q) =>
-      q
-        .eq("event", "text_translation")
-        .gte("created_at", sinceISO(days))
-        .limit(100000),
-    ),
-    safeCount("profiles", (q) => q.eq("subscription_tier", "plus")),
-    safeCount("profiles", (q) => q.eq("subscription_tier", "ultra_plus")),
-    safeCount("profiles", (q) => q.eq("subscription_tier", "free")),
-  ]);
-
-  let totalMs = 0;
-  let translationMs = 0;
-  for (const c of calls) {
-    const props = c.props as Record<string, unknown> | null;
-    const d = props?.duration_ms;
-    if (typeof d === "number" && d > 0) totalMs += d;
-    const t = props?.translation_ms;
-    if (typeof t === "number" && t > 0) translationMs += t;
-  }
-  const callMinutes = totalMs / 60000;
-  // OpenAI Realtime only runs while translation is actually live — not for
-  // the whole call. call_ended carries translation_ms for exactly this;
-  // calls from before that instrumentation contribute 0 (slight
-  // under-count until they roll out of the window).
-  const translationMinutes = translationMs / 60000;
-
-  let textTokens = 0;
-  for (const t of texts) {
-    const p = (t.props as Record<string, unknown> | null) ?? {};
-    textTokens += num(p.prompt_tokens, 0) + num(p.completion_tokens, 0);
-  }
-
-  // Realtime = translation time only; LiveKit = whole call (it carries
-  // every call's audio/video transport regardless of translation).
-  const costRealtimeUsd = translationMinutes * rateRealtime;
-  const costLivekitUsd = callMinutes * rateLivekit;
-  const costTextUsd = (textTokens / 1000) * rateText;
-  const costTotalEur =
-    (costRealtimeUsd + costLivekitUsd + costTextUsd) * usdToEur;
-  const mrrEur = plusCount * pricePlus + ultraPlusCount * priceUltraPlus;
-
-  return {
-    callMinutes,
-    translationMinutes,
-    textTokens,
-    costRealtimeUsd,
-    costLivekitUsd,
-    costTextUsd,
-    costTotalEur,
-    plusCount,
-    ultraPlusCount,
-    freeCount,
-    mrrEur,
-    marginEur: mrrEur - costTotalEur,
-    ratesConfigured: rateRealtime > 0 || rateLivekit > 0 || rateText > 0,
-    windowDays: days,
-    pricePlus,
-    priceUltraPlus,
-  };
 }

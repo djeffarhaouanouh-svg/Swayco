@@ -1,99 +1,127 @@
 import { getRetention } from "@/lib/metrics";
-import { SectionHeader, EmptyState } from "@/components/section";
-import { KpiCard } from "@/components/kpi-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AreaSeries } from "@/components/charts/series";
 import { fmtInt, fmtPct, shortDay } from "@/lib/format";
+import { KpiCard, KpiGrid } from "@/components/kpi-card";
+import { PageHeader, Section } from "@/components/section";
+import { SeriesChart } from "@/components/charts/series";
+import { Card } from "@/components/ui/card";
 
 export default async function RetentionPage() {
-  const ret = await getRetention(30);
-  const cell = (v: number | null) => (v === null ? "—" : fmtPct(v, 0));
+  const retention = await getRetention(30);
+  const dauToday =
+    retention.dau.length > 0
+      ? retention.dau[retention.dau.length - 1].value
+      : 0;
 
   return (
     <>
-      <SectionHeader
+      <PageHeader
         title="Rétention"
-        description="Cohortes journalières, rétention D1 / D7 / D30 et utilisateurs actifs."
+        subtitle="Qui revient, et combien de temps ça dure."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          label="Rétention D1"
-          value={fmtPct(ret.overall.d1, 0)}
-          sub="actif le lendemain"
-        />
-        <KpiCard label="Rétention D7" value={fmtPct(ret.overall.d7, 0)} />
-        <KpiCard label="Rétention D30" value={fmtPct(ret.overall.d30, 0)} />
-        <KpiCard
-          label="Utilisateurs perdus"
-          value={fmtInt(ret.lostUsers)}
-          sub="inactifs > 30 j"
-          tone={ret.lostUsers > 0 ? "warn" : "default"}
-        />
-      </div>
+      <Section title="Rétention par cohorte" hint="J1 / J7 / J30, pondérées sur toutes les cohortes assez mûres pour être mesurées.">
+        <KpiGrid cols={3}>
+          <KpiCard
+            label="Rétention J1"
+            value={fmtPct(retention.overall.d1)}
+            tone="accent"
+          />
+          <KpiCard label="Rétention J7" value={fmtPct(retention.overall.d7)} />
+          <KpiCard
+            label="Rétention J30"
+            value={fmtPct(retention.overall.d30)}
+          />
+        </KpiGrid>
+      </Section>
 
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Utilisateurs actifs par jour (DAU) — 30 j</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AreaSeries data={ret.dau} color="#34d399" />
-          </CardContent>
+      <Section
+        title="Activité"
+        hint="DAU = ouvert l'app aujourd'hui. WAU/MAU = sur 7 / 30 jours. Stickiness = DAU du jour ÷ MAU."
+      >
+        <KpiGrid>
+          <KpiCard label="DAU" value={fmtInt(dauToday)} tone="online" />
+          <KpiCard label="WAU" value={fmtInt(retention.wau)} />
+          <KpiCard label="MAU" value={fmtInt(retention.mau)} />
+          <KpiCard
+            label="Stickiness"
+            value={fmtPct(retention.stickiness)}
+            sub="DAU / MAU"
+          />
+        </KpiGrid>
+      </Section>
+
+      <Section title="Utilisateurs actifs par jour">
+        <SeriesChart title="DAU" data={retention.dau} />
+      </Section>
+
+      <Section
+        title="Ce qu'on perd"
+        hint="Sur les utilisateurs déjà vus au moins une fois."
+      >
+        <KpiGrid cols={3}>
+          <KpiCard
+            label="Venus une seule fois"
+            value={fmtInt(retention.oneAndDone)}
+            sub={
+              retention.trackedUsers > 0
+                ? fmtPct(retention.oneAndDone / retention.trackedUsers)
+                : undefined
+            }
+          />
+          <KpiCard
+            label="Utilisateurs perdus"
+            value={fmtInt(retention.lostUsers)}
+            sub="Pas revenus depuis 30 j"
+          />
+          <KpiCard
+            label="Suivis au total"
+            value={fmtInt(retention.trackedUsers)}
+          />
+        </KpiGrid>
+      </Section>
+
+      <Section
+        title="Cohortes"
+        hint="Une ligne par jour de première ouverture. Une cellule vide = ce jalon n'est pas encore atteignable pour cette cohorte."
+      >
+        <Card className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold text-sc-text-muted uppercase">
+                <th className="px-5 py-2.5">Cohorte</th>
+                <th className="px-5 py-2.5 text-right">Taille</th>
+                <th className="px-5 py-2.5 text-right">J1</th>
+                <th className="px-5 py-2.5 text-right">J7</th>
+                <th className="px-5 py-2.5 text-right">J30</th>
+              </tr>
+            </thead>
+            <tbody>
+              {retention.cohorts.map((c) => (
+                <tr
+                  key={c.cohort}
+                  className="border-t border-white/5 transition-colors hover:bg-white/[0.02]"
+                >
+                  <td className="px-5 py-2.5 text-sc-text">
+                    {shortDay(c.cohort)}
+                  </td>
+                  <td className="sc-nums px-5 py-2.5 text-right text-sc-text-secondary">
+                    {fmtInt(c.size)}
+                  </td>
+                  <td className="sc-nums px-5 py-2.5 text-right text-sc-text-secondary">
+                    {c.d1 === null ? "—" : fmtPct(c.d1)}
+                  </td>
+                  <td className="sc-nums px-5 py-2.5 text-right text-sc-text-secondary">
+                    {c.d7 === null ? "—" : fmtPct(c.d7)}
+                  </td>
+                  <td className="sc-nums px-5 py-2.5 text-right text-sc-text-secondary">
+                    {c.d30 === null ? "—" : fmtPct(c.d30)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Card>
-      </div>
-
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cohortes — par jour de première ouverture</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {ret.cohorts.length === 0 ? (
-              <EmptyState>Pas encore de données de cohorte</EmptyState>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-zinc-500">
-                    <th className="pb-2 font-medium">Cohorte</th>
-                    <th className="pb-2 text-right font-medium">Taille</th>
-                    <th className="pb-2 text-right font-medium">D1</th>
-                    <th className="pb-2 text-right font-medium">D7</th>
-                    <th className="pb-2 text-right font-medium">D30</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {ret.cohorts.map((c) => (
-                    <tr key={c.cohort}>
-                      <td className="py-2 text-zinc-300">
-                        {shortDay(c.cohort)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums text-zinc-400">
-                        {fmtInt(c.size)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums text-zinc-300">
-                        {cell(c.d1)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums text-zinc-300">
-                        {cell(c.d7)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums text-zinc-300">
-                        {cell(c.d30)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <p className="mt-4 text-xs text-zinc-600">
-        Rétention DN classique : l&apos;utilisateur compte s&apos;il a rouvert
-        l&apos;app exactement J+N après sa première session. « — » = le jour
-        n&apos;est pas encore atteint pour cette cohorte.
-      </p>
+      </Section>
     </>
   );
 }

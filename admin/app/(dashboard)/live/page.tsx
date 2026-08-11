@@ -1,94 +1,117 @@
 import { getLiveSnapshot } from "@/lib/metrics";
-import { SectionHeader, EmptyState } from "@/components/section";
-import { KpiCard } from "@/components/kpi-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { countryName, flag, fmtDuration, fmtInt, languageName } from "@/lib/format";
+import { KpiCard, KpiGrid } from "@/components/kpi-card";
+import { PageHeader, Section } from "@/components/section";
+import { RankBars } from "@/components/rank-bars";
+import { Card } from "@/components/ui/card";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { countryName, flag, fmtInt } from "@/lib/format";
 
 export default async function LivePage() {
   const live = await getLiveSnapshot();
 
   return (
     <>
-      <AutoRefresh seconds={20} />
-      <SectionHeader
+      <PageHeader
         title="Live"
-        description="Photo de l'activité en direct — rafraîchie toutes les 20 s."
+        subtitle="Ce qui se passe sur Swayco à l'instant."
+        right={<AutoRefresh seconds={20} />}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiGrid>
+        <KpiCard
+          label="En ligne"
+          value={fmtInt(live.onlineUsers)}
+          sub="Heartbeat de moins de 5 min"
+          tone="online"
+        />
         <KpiCard
           label="Appels en cours"
           value={fmtInt(live.liveCalls)}
-          tone={live.liveCalls > 0 ? "good" : "default"}
+          tone="accent"
         />
         <KpiCard
-          label="Utilisateurs en appel"
-          value={fmtInt(live.liveUsers)}
-          tone={live.liveUsers > 0 ? "good" : "default"}
+          label="Personnes en appel"
+          value={fmtInt(live.usersInCall)}
         />
         <KpiCard
-          label="En file d'attente"
-          value={fmtInt(live.waitingLobby)}
-          sub="lobby live"
+          label="Sonneries"
+          value={fmtInt(live.ringing)}
+          sub="incoming_calls, 2 dernières minutes"
         />
-        <KpiCard
-          label="Pays connectés"
-          value={fmtInt(live.countries.length)}
-        />
-      </div>
+      </KpiGrid>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Pays en appel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {live.countries.length === 0 ? (
-              <EmptyState>Aucun pays actif</EmptyState>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {live.countries.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-md border border-zinc-800 bg-zinc-800/50 px-2.5 py-1 text-sm text-zinc-300"
-                  >
-                    {flag(c)} {countryName(c)}
+      <Section
+        title="Appels en cours"
+        hint="Un call_started sans call_ended correspondant, sur les 6 dernières heures."
+        className="mt-10"
+      >
+        {live.calls.length === 0 ? (
+          <Card className="p-6 text-sm text-sc-text-muted">
+            Aucun appel en cours.
+          </Card>
+        ) : (
+          <Card className="divide-y divide-white/5 overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2.5 text-xs font-semibold text-sc-text-muted uppercase">
+              <span>Salon</span>
+              <span>Langues</span>
+              <span>Pays</span>
+              <span className="text-right">Durée</span>
+            </div>
+            {live.calls.map((c) => (
+              <div
+                key={c.room}
+                className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-4 py-3"
+              >
+                <span className="flex items-center gap-2 truncate text-sm text-sc-text">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sc-online opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-sc-online" />
                   </span>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Langues utilisées</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {live.languages.length === 0 ? (
-              <EmptyState>Aucune langue active</EmptyState>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {live.languages.map((l) => (
-                  <span
-                    key={l}
-                    className="rounded-md border border-zinc-800 bg-zinc-800/50 px-2.5 py-1 text-sm uppercase text-zinc-300"
-                  >
-                    {l}
+                  <span className="truncate font-mono text-xs text-sc-text-secondary">
+                    {c.room}
                   </span>
-                ))}
+                </span>
+                <span className="text-sm text-sc-text-secondary">
+                  {c.langFrom || c.langTo
+                    ? `${c.langFrom ? languageName(c.langFrom) : "?"} → ${
+                        c.langTo ? languageName(c.langTo) : "?"
+                      }`
+                    : "—"}
+                </span>
+                <span className="text-sm text-sc-text-secondary">
+                  {c.country ? `${flag(c.country)} ${countryName(c.country)}` : "—"}
+                </span>
+                <span className="sc-nums text-right text-sm font-semibold text-sc-text">
+                  {fmtDuration(c.ageSec)}
+                </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            ))}
+          </Card>
+        )}
+      </Section>
 
-      <p className="mt-4 text-xs text-zinc-600">
-        Un appel est « en cours » s&apos;il a un évènement{" "}
-        <code className="text-zinc-500">call_started</code> sans{" "}
-        <code className="text-zinc-500">call_ended</code> dans les 6 dernières
-        heures.
-      </p>
+      <Section
+        title="Pays et langues actifs"
+        hint="Comptés sur les appels en cours ci-dessus."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <RankBars
+            items={live.countries.map((c) => ({
+              label: countryName(c.label),
+              value: c.value,
+              lead: flag(c.label),
+            }))}
+            empty="Aucun appel en cours."
+          />
+          <RankBars
+            items={live.languages.map((l) => ({
+              label: languageName(l.label),
+              value: l.value,
+            }))}
+            empty="Aucun appel en cours."
+          />
+        </div>
+      </Section>
     </>
   );
 }

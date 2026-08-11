@@ -1,22 +1,24 @@
 # Swayco Admin
 
 Off-site administration dashboard for the Swayco app — built with
-Next.js 16 (App Router), Tailwind v4, Recharts and Supabase.
+Next.js 16 (App Router), Tailwind v4, Recharts and Supabase. Styled to
+match the app's current "Midnight" palette (`lib/theme/swayco_theme.dart`
+in the main repo) — dark mesh background, glass surfaces, cyan accent.
 
 It reads the `analytics_events` table (populated by the app + backend,
 see migration `0017` and `backend/analytics.js`) plus the existing
-`profiles` / `friendships` / `messages` / `live_lobby` tables, and never
-writes anything.
+`profiles` / `friendships` / `messages` / `likes` / `blocked_users` /
+`reports` / `incoming_calls` tables, and never writes anything.
 
 ## Sections
 
-- **Vue d'ensemble** — headline KPIs, call & signup trends.
-- **Live** — calls in progress, users on a call, lobby queue, countries
-  & languages active right now (auto-refresh 20 s).
-- **Traduction** — pipeline latency, error rate, language pairs.
-- **Social** — friends, conversations, recurring users.
-- **Rétention** — D1 / D7 / D30, DAU, daily cohorts.
-- **Monétisation** — MRR, infra cost, margin, subscription mix.
+- **Vue d'ensemble** — headline KPIs, live snapshot, growth trends, top
+  countries & languages.
+- **Tableau global** — every metric in one flat table, grouped.
+- **Live** — calls in progress, users on a call, online users, active
+  countries & languages, auto-refresh every 20 s.
+- **Social** — friends, requests, conversations that stick, messages.
+- **Rétention** — D1 / D7 / D30, DAU / WAU / MAU, stickiness, cohorts.
 
 ## Setup
 
@@ -30,9 +32,7 @@ npm run dev                    # http://localhost:3000
 ### Environment
 
 See `env.example`. You need the Supabase URL + anon key + **service-role
-key** (the dashboard reads the RLS-locked analytics table with it). The
-cost rates default to `0` — fill them from the current OpenAI / LiveKit
-pricing pages to light up the Monétisation figures.
+key** (the dashboard reads the RLS-locked analytics table with it).
 
 ## Access control
 
@@ -47,15 +47,19 @@ The check runs both at login and in `app/(dashboard)/layout.tsx`.
 
 ## Deploy
 
-Designed for Vercel (separate project from the app, e.g.
-`admin.swayco.fr`). Set the same environment variables in the Vercel
-project. `proxy.ts` (Next 16's renamed middleware) keeps the Supabase
-session fresh.
+`railway.json` targets Railway. Set the same environment variables in
+the Railway project. `proxy.ts` (Next 16's renamed middleware) keeps the
+Supabase session fresh.
 
 ## Notes / next steps
 
 - Aggregations run in JS over bounded query windows — fine while the
   app is young. Once `analytics_events` gets large, move the heavy
   aggregates (`getRetention`, `getCountries`, …) to SQL views / RPCs.
-- Revenue is derived from subscription tiers on `profiles`. For real
-  collected revenue, wire in the Stripe API.
+- The old `live_lobby` waiting-queue table was dropped in migration
+  `0025` (the Random Call lobby was removed from the app) — the Live
+  page no longer reads it. "Live" now means: open calls (`call_started`
+  without a matching `call_ended`), online users (`profiles.last_seen`
+  heartbeat), and ringing calls (`incoming_calls`).
+- Monétisation was removed with this rebuild — prices/tiers were about
+  to change; re-add once the new pricing is final.

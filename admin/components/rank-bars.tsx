@@ -1,42 +1,52 @@
-import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
 import { fmtInt } from "@/lib/format";
-import { EmptyState } from "./section";
 
-type Item = { label: string; value: number; hint?: string };
+export type RankItem = { label: string; value: number; lead?: string };
 
 /**
- * Pure-CSS ranked bar list (no Recharts) — used for language pairs,
- * countries and any "top N" breakdown.
+ * Ranked list with a proportional bar behind each row — a horizontal bar
+ * chart that stays readable at any label length (top countries, top
+ * languages). Bars are scaled against the largest value, not the total.
  */
 export function RankBars({
   items,
-  color = "bg-indigo-500",
-  empty = "Aucune donnée",
+  empty = "Aucune donnée sur la période",
+  unit,
 }: {
-  items: Item[];
-  color?: string;
+  items: RankItem[];
   empty?: string;
+  unit?: string;
 }) {
-  if (items.length === 0) return <EmptyState>{empty}</EmptyState>;
-  const max = Math.max(1, ...items.map((i) => i.value));
+  if (items.length === 0) {
+    return (
+      <Card className="p-6 text-sm text-sc-text-muted">{empty}</Card>
+    );
+  }
+  const max = Math.max(...items.map((i) => i.value), 1);
+
   return (
-    <div className="space-y-3">
+    <Card className="divide-y divide-white/5 overflow-hidden">
       {items.map((it) => (
-        <div key={it.label}>
-          <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="truncate text-zinc-300">{it.label}</span>
-            <span className="shrink-0 tabular-nums text-zinc-500">
-              {it.hint ?? fmtInt(it.value)}
+        <div key={it.label} className="relative px-4 py-3">
+          <div
+            className="absolute inset-y-0 left-0 bg-sc-accent/12"
+            style={{ width: `${(it.value / max) * 100}%` }}
+            aria-hidden
+          />
+          <div className="relative flex items-center justify-between gap-4">
+            <span className="flex min-w-0 items-center gap-2 text-sm text-sc-text">
+              {it.lead ? (
+                <span className="shrink-0 text-base">{it.lead}</span>
+              ) : null}
+              <span className="truncate">{it.label}</span>
             </span>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className={cn("h-full rounded-full", color)}
-              style={{ width: `${(it.value / max) * 100}%` }}
-            />
+            <span className="sc-nums shrink-0 text-sm font-semibold text-sc-text-secondary">
+              {fmtInt(it.value)}
+              {unit ? <span className="text-sc-text-muted"> {unit}</span> : null}
+            </span>
           </div>
         </div>
       ))}
-    </div>
+    </Card>
   );
 }

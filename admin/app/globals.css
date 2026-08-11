@@ -1,22 +1,122 @@
 @import "tailwindcss";
 
-/* Swayco admin — dark, single theme. The dashboard is an internal tool,
-   so there is deliberately no light mode / theme toggle. */
-html,
-body {
-  height: 100%;
+/* ─────────────────────────────────────────────────────────────────────────
+   Swayco "Midnight" — the exact palette the app ships (single source of
+   truth: lib/theme/swayco_theme.dart, class SC). Keep these values in
+   sync with it; never invent a neighbouring shade.
+   ───────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Backgrounds */
+  --color-sc-bg: #0e0e0e;
+  --color-sc-bg-deep: #050817;
+
+  /* Mesh halo colors (MeshBackground in the app) */
+  --color-sc-mesh-blue: #3b82f6;
+  --color-sc-mesh-violet: #7c3aed;
+  --color-sc-mesh-cyan: #06b6d4;
+  --color-sc-mesh-navy: #1e40af;
+
+  /* Accent */
+  --color-sc-accent: #22d3ee;
+  --color-sc-accent-deep: #0891b2;
+
+  /* Presence */
+  --color-sc-online: #4ade80;
+  --color-sc-online-deep: #22c55e;
+
+  /* Text. The app writes these ARGB (0xB3F5F7FF); CSS is RRGGBBAA, so the
+     alpha byte moves to the end — same colour, different byte order. */
+  --color-sc-text: #f5f7ff;
+  --color-sc-text-secondary: #f5f7ffb3;
+  --color-sc-text-muted: #f5f7ff80;
+
+  /* Surfaces */
+  --color-sc-menu: #2b2b2b;
+  --color-sc-bubble: #1a2138;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Semantic aliases used by the components. Defined on bare :root so a
+   value never lives only inside a conditional block. */
+:root {
+  --sc-glass: rgba(255, 255, 255, 0.06);
+  --sc-glass-strong: rgba(255, 255, 255, 0.10);
+  --sc-border: rgba(255, 255, 255, 0.10);
+  --sc-border-strong: rgba(255, 255, 255, 0.20);
+  --sc-text-2: rgba(245, 247, 255, 0.70);
+  --sc-text-3: rgba(245, 247, 255, 0.50);
+}
+
+/* The admin is dark-only, exactly like the app — there is no light
+   Swayco. Paint the ground explicitly rather than inheriting it. */
+html,
 body {
-  background: #09090b;
-  color: #fafafa;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  background-color: var(--color-sc-bg);
+  color: var(--color-sc-text);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Thin dark scrollbars so long tables / sidebars stay on-theme. */
+/* The app's mesh halo, flattened into a fixed backdrop: four soft radial
+   bleeds over the near-black ground. `fixed` so it never scrolls away. */
+.sc-mesh::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60rem 40rem at 10% -10%,
+      color-mix(in oklab, var(--color-sc-mesh-navy) 26%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50rem 34rem at 85% 0%,
+      color-mix(in oklab, var(--color-sc-mesh-violet) 18%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44rem 30rem at 95% 85%,
+      color-mix(in oklab, var(--color-sc-mesh-cyan) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      40rem 28rem at 0% 95%,
+      color-mix(in oklab, var(--color-sc-mesh-blue) 12%, transparent),
+      transparent 70%
+    );
+}
+
+/* Glass surface — the app's card/panel treatment. */
+.sc-glass {
+  background-color: var(--sc-glass);
+  border: 1px solid var(--sc-border);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* Headings ride the display face, like SCText.h1/h2/h3 in the app. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Tabular figures everywhere numbers are compared column-to-column. */
+.sc-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-sc-accent) 35%, transparent);
+}
+
+/* Scrollbars, so the dark page doesn't get a bright native gutter. */
 * {
+  scrollbar-color: var(--sc-border-strong) transparent;
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
 }

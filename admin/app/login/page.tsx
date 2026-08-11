@@ -4,43 +4,47 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+/**
+ * Sign-in for the dashboard. Supabase Auth against the same project as
+ * the app; the `is_admin` gate itself lives server-side in
+ * app/(dashboard)/layout.tsx — this page only refuses early so a
+ * non-admin gets a message instead of a redirect loop.
+ */
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setBusy(true);
+    setError(null);
+    const sb = createSupabaseBrowserClient();
 
-    const supabase = createSupabaseBrowserClient();
-    const { data, error: signInError } =
-      await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-
+    const { data, error: signInError } = await sb.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
     if (signInError || !data.user) {
-      setError("Identifiants invalides.");
-      setLoading(false);
+      setError("Identifiants incorrects.");
+      setBusy(false);
       return;
     }
 
-    // Gate: only profiles flagged is_admin may enter. A non-admin who
-    // authenticates is signed straight back out.
-    const { data: profile } = await supabase
+    // The anon key can read profiles (public select policy), so the
+    // non-admin case is caught here rather than after a redirect.
+    const { data: profile } = await sb
       .from("profiles")
       .select("is_admin")
       .eq("id", data.user.id)
       .maybeSingle();
 
     if (!profile?.is_admin) {
-      await supabase.auth.signOut();
-      setError("Ce compte n'a pas accès au tableau de bord.");
-      setLoading(false);
+      await sb.auth.signOut();
+      setError("Ce compte n'a pas accès à l'administration.");
+      setBusy(false);
       return;
     }
 
@@ -49,54 +53,54 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center px-6">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8"
+        className="sc-glass w-full max-w-sm rounded-2xl p-7"
       >
-        <div className="mb-6">
-          <div className="text-xl font-semibold text-zinc-50">Swayco Admin</div>
-          <div className="mt-1 text-sm text-zinc-400">
-            Connexion réservée aux administrateurs.
-          </div>
+        <div className="font-display text-2xl font-bold tracking-tight text-sc-text">
+          swaycø
         </div>
+        <p className="mt-1 mb-6 text-sm text-sc-text-muted">
+          Tableau de bord admin
+        </p>
 
-        <label className="mb-1 block text-xs font-medium text-zinc-400">
-          Email
+        <label className="block text-xs font-semibold text-sc-text-secondary">
+          E-mail
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-white/10 bg-sc-menu px-3 py-2.5 text-sm font-normal text-sc-text outline-none transition-colors focus:border-sc-accent"
+          />
         </label>
-        <input
-          type="email"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
-        />
 
-        <label className="mb-1 block text-xs font-medium text-zinc-400">
+        <label className="mt-4 block text-xs font-semibold text-sc-text-secondary">
           Mot de passe
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-white/10 bg-sc-menu px-3 py-2.5 text-sm font-normal text-sc-text outline-none transition-colors focus:border-sc-accent"
+          />
         </label>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
-        />
 
         {error ? (
-          <div className="mb-4 rounded-lg border border-rose-900/60 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">
+          <p className="mt-4 text-sm text-red-400" role="alert">
             {error}
-          </div>
+          </p>
         ) : null}
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+          disabled={busy}
+          className="mt-6 w-full rounded-xl bg-sc-accent py-3 text-sm font-bold text-sc-bg-deep transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? "Connexion…" : "Se connecter"}
+          {busy ? "Connexion…" : "Se connecter"}
         </button>
       </form>
     </div>

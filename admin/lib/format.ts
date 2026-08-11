@@ -17,43 +17,22 @@ export function fmtPct(frac: number | null | undefined, digits = 0): string {
   return `${((Number(frac) || 0) * 100).toFixed(digits)} %`;
 }
 
-export function fmtEur(n: number | null | undefined): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(Number(n) || 0);
-}
-
-/** Euro with 2 decimals — for subscription prices like 9,99 €. */
-export function fmtEur2(n: number | null | undefined): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(n) || 0);
-}
-
-export function fmtUsd(n: number | null | undefined): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(Number(n) || 0);
-}
-
-export function fmtLatency(ms: number | null | undefined): string {
-  const v = Number(ms) || 0;
-  if (v <= 0) return "—";
-  if (v < 1000) return `${Math.round(v)} ms`;
-  return `${(v / 1000).toFixed(1)} s`;
-}
-
 export function fmtMinutes(min: number | null | undefined): string {
   const v = Number(min) || 0;
-  if (v < 60) return `${Math.round(v)} min`;
+  if (v <= 0) return "—";
+  if (v < 60) return `${NF1.format(v)} min`;
   return `${NF1.format(v / 60)} h`;
+}
+
+/** Seconds → "4 min 12 s" / "48 s". Used for live call durations. */
+export function fmtDuration(sec: number | null | undefined): string {
+  const v = Math.max(0, Math.round(Number(sec) || 0));
+  if (v < 60) return `${v} s`;
+  const m = Math.floor(v / 60);
+  const s = v % 60;
+  if (m < 60) return s === 0 ? `${m} min` : `${m} min ${s} s`;
+  const h = Math.floor(m / 60);
+  return `${h} h ${m % 60} min`;
 }
 
 /** UTC day key, e.g. "2026-05-21". Used as the bucket key for series. */
@@ -76,6 +55,16 @@ export function countryName(code: string): string {
   try {
     const dn = new Intl.DisplayNames(["fr"], { type: "region" });
     return dn.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** BCP-47 primary subtag → French language name ("ja" → "japonais"). */
+export function languageName(code: string): string {
+  try {
+    const dn = new Intl.DisplayNames(["fr"], { type: "language" });
+    return dn.of(code) ?? code;
   } catch {
     return code;
   }
