@@ -23,10 +23,15 @@ A new Flutter FFI plugin project.
   s.source           = { :path => '.' }
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
-  # Patched sherpa (external-tokens API) + the OpenJTalk reading framework for
-  # the on-device Japanese voice. See native/sherpa_ja_patch and native/ja_openjtalk.
-  s.preserve_paths = ['sherpa_onnx.xcframework/**/*', 'ja_openjtalk.xcframework/**/*']
-  s.vendored_frameworks = ['sherpa_onnx.xcframework', 'ja_openjtalk.xcframework']
+  # Patched sherpa (external-tokens API). OpenJTalk is optional: rebuild it with
+  # setup.sh / ja_openjtalk/build_ios.sh when the Japanese voice is needed.
+  # Without it, VAD + Whisper + non-ja TTS still link; only ja reading FFI fails.
+  frameworks = ['sherpa_onnx.xcframework']
+  if File.directory?(File.join(__dir__, 'ja_openjtalk.xcframework'))
+    frameworks << 'ja_openjtalk.xcframework'
+  end
+  s.preserve_paths = frameworks.map { |f| "#{f}/**/*" }
+  s.vendored_frameworks = frameworks
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = {
