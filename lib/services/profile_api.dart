@@ -173,13 +173,6 @@ class RemoteProfile {
     return int.tryParse(v.toString().trim());
   }
 
-  static int _parseInt(dynamic v, int fallback) {
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    if (v is String) return int.tryParse(v) ?? fallback;
-    return fallback;
-  }
-
   factory RemoteProfile.fromMap(Map<String, dynamic> m) => RemoteProfile(
     id: m['id']?.toString() ?? '',
     handle: m['handle']?.toString() ?? '',
@@ -1211,7 +1204,6 @@ abstract final class ProfileApi {
           .from('friendships')
           .select('requester, addressee, status')
           .or('requester.eq.$myId,addressee.eq.$myId');
-      if (rows is! List) return const <String>{};
       final out = <String>{};
       for (final row in rows) {
         final m = Map<String, dynamic>.from(row as Map);

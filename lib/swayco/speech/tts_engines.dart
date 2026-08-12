@@ -5,4 +5,5 @@
 /// though every call site is already `kIsWeb`-guarded (an import is resolved at
 /// compile time, a runtime guard comes too late). Same pattern as
 /// `asr/asr_engine.dart`.
+library;
 export 'tts_engines_stub.dart' if (dart.library.ffi) 'tts_engines_native.dart';

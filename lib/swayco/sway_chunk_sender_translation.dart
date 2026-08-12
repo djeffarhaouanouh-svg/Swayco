@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
