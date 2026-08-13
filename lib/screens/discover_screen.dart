@@ -18,6 +18,7 @@ import '../services/looking_for.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
+import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
@@ -1758,9 +1759,9 @@ class _TinderCardState extends State<_TinderCard> {
     final location = [p.city.trim(), p.country.trim()]
         .where((s) => s.isNotEmpty)
         .join(', ');
-    final online = !p.hideOnlineStatus &&
-        p.lastSeen != null &&
-        DateTime.now().difference(p.lastSeen!) < const Duration(minutes: 2);
+    // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
+    // son propre statut n'éteignait pas les pastilles des autres sur Discover.
+    final online = isPeerOnline(p);
     return Stack(
       fit: StackFit.expand,
       children: [

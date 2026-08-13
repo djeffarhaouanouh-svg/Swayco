@@ -21,6 +21,7 @@ import '../services/nav_tab.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
+import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -46,17 +47,6 @@ const String _kMono = 'monospace';
 /// Le fil de cheveu qui sépare les sections — presque rien, juste de quoi dire
 /// que ce qui suit est autre chose.
 const Color _kHairline = Color(0x12FFFFFF);
-
-/// Cette personne est-elle joignable maintenant ? Vu il y a moins de deux
-/// minutes, et ni elle ni moi n'avons demandé à masquer le statut : celui qui
-/// se cache ne voit plus les autres non plus.
-bool isPeerOnline(RemoteProfile profile) {
-  if (AppSettings.hideOnlineLocal.value) return false;
-  final ls = profile.lastSeen;
-  return !profile.hideOnlineStatus &&
-      ls != null &&
-      DateTime.now().difference(ls) < const Duration(minutes: 2);
-}
 
 /// WhatsApp-style chat home: lists every accepted friend (union of followers
 /// + following). Tapping a row opens the direct-message thread; the trailing

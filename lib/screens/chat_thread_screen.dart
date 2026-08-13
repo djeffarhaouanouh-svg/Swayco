@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/analytics.dart';
-import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
@@ -14,6 +13,7 @@ import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
+import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
@@ -915,13 +915,8 @@ class _ThreadHeader extends StatelessWidget {
   /// hidden their online state, AND the local user hasn't opted out
   /// of presence (reciprocal rule).
   bool get _peerOnline {
-    if (AppSettings.hideOnlineLocal.value) return false;
     final p = peer;
-    if (p == null) return false;
-    final ls = p.lastSeen;
-    return !p.hideOnlineStatus &&
-        ls != null &&
-        DateTime.now().difference(ls) < const Duration(minutes: 2);
+    return p != null && isPeerOnline(p);
   }
 
   @override

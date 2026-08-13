@@ -23,6 +23,7 @@ import '../services/like_api.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
+import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
@@ -476,10 +477,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool get _peerOnline {
     if (!_isViewingOther) return false;
     final r = _remote;
-    if (r == null || r.hideOnlineStatus) return false;
-    final ls = r.lastSeen;
-    if (ls == null) return false;
-    return DateTime.now().difference(ls) < const Duration(minutes: 2);
+    // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
+    // son propre statut n'éteignait pas la pastille sur un profil visité.
+    return r != null && isPeerOnline(r);
   }
 
   /// "Tes photos" — pick an image and append it to the gallery. The first
