@@ -166,10 +166,22 @@ class _CallScreenState extends State<CallScreen> {
   final FocusNode _chatFocus = FocusNode();
   bool _chatSending = false;
 
-  /// Les phrases au repos sont retirées : soit le temps a passé, soit on a
-  /// touché l'écran. La prochaine phrase les ramène — [_addTurn] remet ça à
-  /// faux.
+  /// Les phrases au repos sont retirées parce que le temps a passé. La
+  /// prochaine phrase les ramène — [_addTurn] remet ça à faux.
   bool _turnsHidden = false;
+
+  /// Les phrases au repos ont été retirées À LA MAIN, et elles restent parties.
+  ///
+  /// Le silence et le doigt ne disent pas la même chose. Personne n'a parlé
+  /// depuis dix secondes : le sous-titre n'a plus rien à montrer, la phrase
+  /// suivante le rappelle et c'est bien. Mais quelqu'un qui TOUCHE pour s'en
+  /// débarrasser en pleine conversation dit « je ne veux plus de ça » — et lui
+  /// remettre une bulle à chaque phrase, alors que l'autre est justement en
+  /// train de parler, c'est refuser de l'entendre.
+  ///
+  /// Ça ne se lève qu'à la touche Messages : redemander la conversation, c'est
+  /// le seul geste qui dise le contraire du premier.
+  bool _turnsMuted = false;
 
   /// Ce que les phrases au repos restent à l'écran quand plus rien n'arrive.
   ///
@@ -180,25 +192,40 @@ class _CallScreenState extends State<CallScreen> {
   static const Duration _kRestTtl = Duration(seconds: 10);
   Timer? _restTimer;
 
-  /// Retire les phrases au repos et remet le compteur à zéro.
+  /// Le temps a passé : on retire, et la phrase suivante ramènera tout.
   void _hideTurns() {
     _restTimer?.cancel();
     if (_turnsHidden || !mounted) return;
     setState(() => _turnsHidden = true);
   }
 
+  /// Un doigt les a retirées : elles ne reviennent plus d'elles-mêmes.
+  void _muteTurns() {
+    _restTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _turnsHidden = true;
+      _turnsMuted = true;
+    });
+  }
+
   /// Referme la conversation ET le clavier, et emporte les phrases au repos
   /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
   /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
   /// exactement ce qu'on reprochait à la version d'avant.
+  ///
+  /// Et c'est un geste, donc ça fait taire pour de bon : refermer le panneau
+  /// puis se voir rendre une bulle à la phrase suivante, c'est ne pas avoir été
+  /// écouté.
   void _closeTurns() {
     _chatFocus.unfocus();
     _restTimer?.cancel();
     if (!mounted) return;
-    if (!_turnsOpen && _turnsHidden) return;
+    if (!_turnsOpen && _turnsMuted) return;
     setState(() {
       _turnsOpen = false;
       _turnsHidden = true;
+      _turnsMuted = true;
     });
   }
 
@@ -450,9 +477,14 @@ class _CallScreenState extends State<CallScreen> {
     //
     // Et repart pour dix secondes : chaque phrase relance le sursis, une
     // conversation suivie garde donc ses sous-titres, un silence les rend.
-    _turnsHidden = false;
-    _restTimer?.cancel();
-    _restTimer = Timer(_kRestTtl, _hideTurns);
+    //
+    // Sauf si on les a fait taire à la main : ce refus-là vaut pour l'appel, et
+    // la phrase suivante n'a pas à revenir dessus.
+    if (!_turnsMuted) {
+      _turnsHidden = false;
+      _restTimer?.cancel();
+      _restTimer = Timer(_kRestTtl, _hideTurns);
+    }
     setState(() {
       _turns.add(turn);
       // Un appel long ne doit pas garder la conversation entière en mémoire.
@@ -2008,7 +2040,6 @@ class _CallScreenState extends State<CallScreen> {
       (ctx) => _LanguagePairSheet(
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
-        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onChanged: (s, h) {
           spoken = s;
           heard = h;
@@ -2038,7 +2069,6 @@ class _CallScreenState extends State<CallScreen> {
         controller: _audio,
         spokenCode: _mySourceLang,
         heardCode: _myOutputLang,
-        ttsVoiceLangCodes: _deviceVoiceTags.keys.toSet(),
         onLanguagesChanged: (sp, hd) {
           spoken = sp;
           heard = hd;
@@ -2976,8 +3006,10 @@ class _CallScreenState extends State<CallScreen> {
                                                 // et l'écran ne se rendait
                                                 // jamais. Ouvrir reste
                                                 // l'affaire de la touche
-                                                // Messages, et d'elle seule.
-                                                onTap: _hideTurns,
+                                                // Messages, et d'elle seule —
+                                                // qui est aussi le seul geste
+                                                // qui les fait revenir.
+                                                onTap: _muteTurns,
                                               ),
                                       ),
                                     ),
@@ -3033,7 +3065,12 @@ class _CallScreenState extends State<CallScreen> {
                                               // Les phrases masquées
                                               // reparaissent avec la zone :
                                               // c'est le fil qu'on demande.
+                                              // Et ça lève le silence qu'un
+                                              // tap avait posé — redemander la
+                                              // conversation est le seul geste
+                                              // qui dise le contraire.
                                               _turnsHidden = false;
+                                              _turnsMuted = false;
                                               _restTimer?.cancel();
                                               // Le rail se replie en même
                                               // temps : les deux se déplient
@@ -3258,6 +3295,12 @@ class _RestingTurns extends StatelessWidget {
   /// qui dépasse n'est pas montré, il attend qu'on ouvre.
   static const int _kRestCount = 2;
 
+  /// Et deux lignes chacune. Le compte de bulles ne suffit pas à borner ce que
+  /// ça prend : deux phrases longues font huit lignes et le bloc monte jusqu'au
+  /// milieu de l'écran. Deux fois deux lignes, c'est une hauteur qu'on connaît
+  /// d'avance, quelle que soit la phrase.
+  static const int _kRestLines = 2;
+
   @override
   Widget build(BuildContext context) {
     final shown = turns.length > _kRestCount
@@ -3301,6 +3344,7 @@ class _RestingTurns extends StatelessWidget {
                 turn: turn,
                 name: turn.mine ? myName : peerName,
                 avatarUrl: turn.mine ? myAvatarUrl : peerAvatarUrl,
+                maxLines: _kRestLines,
               ),
             ),
         ],
@@ -3554,11 +3598,22 @@ class _TurnBubble extends StatelessWidget {
     required this.turn,
     required this.name,
     required this.avatarUrl,
+    this.maxLines,
   });
 
   final _SpokenTurn turn;
   final String name;
   final String avatarUrl;
+
+  /// Combien de lignes au plus, au-delà desquelles la phrase se coupe.
+  ///
+  /// Nul dans le panneau ouvert : on y est venu pour lire, rien n'y est tronqué.
+  /// Fixé au repos, où la bulle s'invite sur la vidéo sans qu'on l'ait demandé
+  /// et ne doit donc pas pouvoir prendre l'écran. Le compte de bulles y était
+  /// bien plafonné, mais pas leur HAUTEUR : deux phrases longues montaient sans
+  /// limite, et « deux au maximum » ne veut plus rien dire quand chacune fait
+  /// huit lignes.
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -3597,6 +3652,12 @@ class _TurnBubble extends StatelessWidget {
             ),
             child: Text(
               turn.text,
+              maxLines: maxLines,
+              // Coupée, la phrase le dit — et la suite n'est pas perdue : elle
+              // est entière dans le panneau, à un tap.
+              overflow: maxLines == null
+                  ? TextOverflow.clip
+                  : TextOverflow.ellipsis,
               style: TextStyle(
                 // Une phrase que personne n'a reçue s'efface franchement : on
                 // doit pouvoir la relire pour la redire, mais on voit d'un
@@ -4861,7 +4922,6 @@ class _LanguagePairSheet extends StatelessWidget {
   const _LanguagePairSheet({
     required this.spokenCode,
     required this.heardCode,
-    required this.ttsVoiceLangCodes,
     required this.onChanged,
   });
 
@@ -4871,7 +4931,6 @@ class _LanguagePairSheet extends StatelessWidget {
   /// Base language codes the device can actually speak (from flutter_tts
   /// `getLanguages`). Both wheels only list these so the user cannot pick a
   /// language with no OS voice.
-  final Set<String> ttsVoiceLangCodes;
 
   /// Appelé à chaque cran des roues. Rien n'est appliqué ici : c'est l'écran
   /// d'appel qui le fera quand le panneau se refermera.
@@ -4895,7 +4954,6 @@ class _LanguagePairSheet extends StatelessWidget {
             _LanguageWheels(
               spokenCode: spokenCode,
               heardCode: heardCode,
-              ttsVoiceLangCodes: ttsVoiceLangCodes,
               onChanged: onChanged,
             ),
             const SizedBox(height: 18),
@@ -4955,21 +5013,17 @@ class _SheetHandle extends StatelessWidget {
 /// relancerait sinon le recogniser, ou annoncerait une langue au pair, pour des
 /// drapeaux qu'on ne fait que survoler.
 ///
-/// Les deux roues ne listent que les langues pour lesquelles le device a une
-/// voix TTS OS ([ttsVoiceLangCodes]) — sinon l'utilisateur sélectionnerait une
-/// langue que flutter_tts ne peut pas parler.
+/// Les deux roues listent LES TROIS langues de l'app, toujours les mêmes.
 class _LanguageWheels extends StatefulWidget {
   const _LanguageWheels({
     required this.spokenCode,
     required this.heardCode,
-    required this.ttsVoiceLangCodes,
     required this.onChanged,
     this.compact = false,
   });
 
   final String spokenCode;
   final String heardCode;
-  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onChanged;
 
   /// Serré : les deux roues partagent le panneau avec les réglages de son.
@@ -4980,8 +5034,20 @@ class _LanguageWheels extends StatefulWidget {
 }
 
 class _LanguageWheelsState extends State<_LanguageWheels> {
-  late final List<AppLanguage> _langs =
-      _pickerLanguages(widget.ttsVoiceLangCodes, widget.spokenCode, widget.heardCode);
+  /// Le catalogue de l'app, tel quel : français, anglais, japonais.
+  ///
+  /// Les roues croisaient ça avec les voix TTS de l'appareil, pour ne pas
+  /// laisser choisir une langue que flutter_tts ne saurait pas prononcer. En
+  /// pratique ce croisement ne pouvait que RETIRER : un navigateur sans voix
+  /// japonaise faisait disparaître le japonais des deux roues, et l'app n'avait
+  /// plus que deux langues à offrir — sur un produit qui en annonce trois, ça
+  /// se lit comme une panne, pas comme une précaution.
+  ///
+  /// Ce qui manque quand la voix manque, c'est la VOIX : la traduction, elle,
+  /// se fait dans le nuage et arrive écrite quoi qu'il arrive. Une phrase lue
+  /// avec un accent qui n'est pas le bon vaut mieux qu'une langue absente du
+  /// menu sans une ligne d'explication.
+  late final List<AppLanguage> _langs = supportedLanguages;
   late int _spoken = _indexOf(_langs, widget.spokenCode);
   late int _heard = _indexOf(_langs, widget.heardCode);
 
@@ -4989,27 +5055,6 @@ class _LanguageWheelsState extends State<_LanguageWheels> {
         _langs[_spoken].code,
         _langs[_heard].code,
       );
-
-  /// Catalogue UI ∩ voix device. Si [ttsCodes] est encore vide (getLanguages
-  /// pas revenu), on montre tout pour ne pas ouvrir une roue vide. La sélection
-  /// courante reste visible même si elle n'a pas (encore) de voix.
-  static List<AppLanguage> _pickerLanguages(
-    Set<String> ttsCodes,
-    String spokenCode,
-    String heardCode,
-  ) {
-    if (ttsCodes.isEmpty) return supportedLanguages;
-    final list =
-        supportedLanguages.where((l) => ttsCodes.contains(l.code)).toList();
-    if (list.isEmpty) return supportedLanguages;
-    for (final code in [spokenCode, heardCode]) {
-      final base = code.split('-').first.toLowerCase();
-      if (base.isEmpty || list.any((l) => l.code == base)) continue;
-      final i = supportedLanguages.indexWhere((l) => l.code == base);
-      if (i >= 0) list.insert(0, supportedLanguages[i]);
-    }
-    return list;
-  }
 
   /// Une langue hors catalogue (ou vide) retombe sur la première : la roue doit
   /// toujours montrer quelque chose.
@@ -5072,14 +5117,12 @@ class _CallSettingsSheet extends StatelessWidget {
     required this.controller,
     required this.spokenCode,
     required this.heardCode,
-    required this.ttsVoiceLangCodes,
     required this.onLanguagesChanged,
   });
 
   final AudioController controller;
   final String spokenCode;
   final String heardCode;
-  final Set<String> ttsVoiceLangCodes;
   final void Function(String spoken, String heard) onLanguagesChanged;
 
   @override
@@ -5111,8 +5154,7 @@ class _CallSettingsSheet extends StatelessWidget {
                     child: _LanguageWheels(
                       spokenCode: spokenCode,
                       heardCode: heardCode,
-                      ttsVoiceLangCodes: ttsVoiceLangCodes,
-                      onChanged: onLanguagesChanged,
+                              onChanged: onLanguagesChanged,
                       compact: true,
                     ),
                   ),
