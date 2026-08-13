@@ -29,10 +29,12 @@ import '../services/profile_api.dart';
 import '../swayco/speech/speech_service.dart';
 import '../swayco/wire_compat.dart';
 import '../services/debug_overlay.dart';
+import '../services/translation_api.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
+import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 
@@ -153,9 +155,16 @@ class _CallScreenState extends State<CallScreen> {
   /// vivent que le temps de l'appel (rien n'est persisté).
   final List<_SpokenTurn> _turns = [];
 
-  /// La zone est dépliée : les deux derniers tours et de quoi remonter le fil,
-  /// tout le reste de l'appel s'efface le temps qu'elle est là.
+  /// La zone est dépliée : les deux derniers tours et la saisie, tout le reste
+  /// de l'appel s'efface le temps qu'elle est là.
   bool _turnsOpen = false;
+
+  /// La saisie de la conversation. Ce qui est tapé part comme une phrase dite :
+  /// traduit chez le pair, écrit et lu à voix haute. Rien n'est persisté, ça ne
+  /// vit que le temps de l'appel.
+  final TextEditingController _chatCtrl = TextEditingController();
+  final FocusNode _chatFocus = FocusNode();
+  bool _chatSending = false;
 
   /// Les phrases au repos sont retirées : soit le temps a passé, soit on a
   /// touché l'écran. La prochaine phrase les ramène — [_addTurn] remet ça à
@@ -178,11 +187,12 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _turnsHidden = true);
   }
 
-  /// Referme la conversation ET emporte les phrases au repos avec. Les deux
-  /// vont ensemble : un tap qui ne ferme que le panneau laisse les bulles
-  /// derrière, et l'écran a l'air de ne jamais se rendre — c'est exactement ce
-  /// qu'on reprochait à la version d'avant.
+  /// Referme la conversation ET le clavier, et emporte les phrases au repos
+  /// avec. Les trois vont ensemble : un tap qui ne ferme que le panneau laisse
+  /// les bulles derrière, et l'écran a l'air de ne jamais se rendre — c'est
+  /// exactement ce qu'on reprochait à la version d'avant.
   void _closeTurns() {
+    _chatFocus.unfocus();
     _restTimer?.cancel();
     if (!mounted) return;
     if (!_turnsOpen && _turnsHidden) return;
@@ -450,6 +460,84 @@ class _CallScreenState extends State<CallScreen> {
     });
   }
 
+  /// Ce que je TAPE part exactement comme une phrase dite : traduit dans la
+  /// langue du pair, publié sur le même canal de données que la voix. Chez lui
+  /// ça s'écrit dans la conversation et ça se dit avec la voix du device.
+  ///
+  /// Ma bulle à moi garde MES mots, pas la traduction — c'est ce que j'ai écrit
+  /// que je veux relire, comme pour ma voix.
+  Future<void> _sendCaption() async {
+    final room = _room;
+    final text = _chatCtrl.text.trim();
+    if (room == null || text.isEmpty || _chatSending) return;
+    setState(() => _chatSending = true);
+    // La même cible que la voix : ce que le pair a DEMANDÉ d'entendre, et à
+    // défaut la langue de son compte.
+    final to = _peerListenLang.isNotEmpty
+        ? _peerListenLang
+        : _discoverRemoteLang(room);
+    // La MÊME route que la voix : /translation/fix, DeepSeek. L'écrit passait
+    // par /translation/text, qui est un second fournisseur — et quand celui-là
+    // tombe (401 sur son hôte), la phrase arrivait telle quelle chez le pair,
+    // dans MA langue, sans que rien ne le signale. Une seule route pour les
+    // deux : ce qui traduit la voix traduit l'écrit.
+    //
+    // Le sexe du pair suit, comme pour la voix : c'est ce qui fait accorder la
+    // phrase dans les langues qui marquent le genre.
+    var trans = '';
+    if (to.isNotEmpty && _mySourceLang.isNotEmpty) {
+      final fix = await fetchTranscriptFix(
+        text: text,
+        from: _mySourceLang,
+        to: to,
+        peerGender: _peerProfile?.gender,
+      );
+      if (!fix.unclear) trans = fix.text.trim();
+      DebugOverlay.log(
+        'typed→$to via ${fix.engine.isEmpty ? "?" : fix.engine} '
+        'unclear=${fix.unclear}',
+      );
+    }
+    if (!mounted) return;
+    _chatCtrl.clear();
+    setState(() => _chatSending = false);
+    // Le clavier reste levé : on tape rarement une seule phrase.
+
+    // RIEN ne part sans traduction. Le repli d'avant — publier le texte brut
+    // quand la traduction échoue ou que la langue du pair est inconnue —
+    // livrait ma langue à quelqu'un qui ne la lit pas, et son téléphone la
+    // prononçait par-dessus le marché. Un message illisible n'est pas mieux
+    // qu'un message non remis : c'est le même échec, en moins visible.
+    //
+    // La bulle s'affiche quand même, grisée en italique : la convention existe
+    // déjà pour une phrase dite qui n'est pas passée, et elle sert à ça — on
+    // relit ce qu'on voulait dire pour le redire.
+    var delivered = false;
+    if (trans.isNotEmpty) {
+      try {
+        final payload = jsonEncode({
+          _kTypedFlag: true,
+          'orig': text,
+          'trans': trans,
+          'lang': to,
+        });
+        await room.localParticipant?.publishData(
+          Uint8List.fromList(utf8.encode(payload)),
+          reliable: true,
+          topic: _captionTopic,
+        );
+        delivered = true;
+      } catch (_) {
+        // Publication refusée : même sort qu'une traduction manquante.
+      }
+    }
+    _addTurn(_SpokenTurn(mine: true, text: text, delivered: delivered));
+    Analytics.track(
+      'message_sent',
+      props: {'source': 'live', 'type': 'text', 'delivered': delivered},
+    );
+  }
+
   /// Mon micro vient de produire une phrase : elle s'affiche chez moi dans ma
   /// langue (le pair, lui, reçoit sa traduction par le canal de données).
   void _onMyTranscript() {
@@ -470,6 +558,12 @@ class _CallScreenState extends State<CallScreen> {
   EventsListener<RoomEvent>? _roomEvents;
 
   static const String _captionTopic = 'swayco-chat';
+
+  /// Marque un paquet comme une phrase TAPÉE et non dite. Elle emprunte le même
+  /// canal que la voix, mais elle ne doit pas nourrir le contexte du moteur de
+  /// traduction : on ne répond pas à un message écrit comme à une phrase qu'on
+  /// vient d'entendre.
+  static const String _kTypedFlag = 'typed';
 
   /// Data-channel key carrying "the language I want to hear you in". Sent by the
   /// LISTENER, acted on by the SPEAKER — translation runs on the speaker's side.
@@ -1665,6 +1759,26 @@ class _CallScreenState extends State<CallScreen> {
         unawaited(_applyPeerWantsTranslation(xlateOn));
         return;
       }
+      // Une phrase TAPÉE par le pair : elle s'écrit dans la conversation et se
+      // dit avec la voix du device, comme une phrase parlée. Traitée avant le
+      // cas de la voix, sinon le drapeau de TTS locale l'avalerait.
+      if (m[_kTypedFlag] == true) {
+        final trans = m['trans']?.toString() ?? '';
+        final lang = m['lang']?.toString() ?? '';
+        DebugOverlay.log('caption typed trans="$trans" lang=$lang');
+        if (trans.isEmpty) return;
+        _addTurn(_SpokenTurn(mine: false, text: trans));
+        // Le même interrupteur que pour la voix : couper la traduction, c'est
+        // en couper LE SON — la phrase s'écrit toujours.
+        if (_translationEnabled) {
+          if (kIsWeb) {
+            unawaited(_speakDeviceTts(trans, lang));
+          } else {
+            unawaited(_playWithLocalTts(trans, lang));
+          }
+        }
+        return;
+      }
       if (m[kLocalTtsFlag] == true || m[kLegacyLocalTtsFlag] == true) {
         final trans = m['trans']?.toString() ?? '';
         final lang = m['lang']?.toString() ?? '';
@@ -2242,6 +2356,8 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     widget.translation.localTranscript?.removeListener(_onMyTranscript);
     AsrService.osRefusedKey.removeListener(_onSttRefused);
+    _chatCtrl.dispose();
+    _chatFocus.dispose();
     _restTimer?.cancel();
     _splashTimer?.cancel();
     _ringTimeout?.cancel();
@@ -2834,6 +2950,10 @@ class _CallScreenState extends State<CallScreen> {
                                                     _peerProfile?.avatarUrl ??
                                                         '',
                                                 onToggle: _closeTurns,
+                                                chatController: _chatCtrl,
+                                                chatFocus: _chatFocus,
+                                                sending: _chatSending,
+                                                onSend: _sendCaption,
                                               )
                                             : _RestingTurns(
                                                 turns: _turns,
@@ -3107,8 +3227,11 @@ class _SpokenTurn {
 /// effacer. C'est ce qui fait découvrir la conversation — une phrase paraît
 /// d'elle-même dès qu'elle est dite, et le tap dessus la retire.
 ///
-/// Ce qui distingue le repos de la zone ouverte : ici la barre reste, on ne
-/// remonte pas le fil, et ça s'efface tout seul.
+/// PAS de saisie ici : au repos c'est une notification, pas une conversation.
+/// Elle vient s'y poser d'elle-même, par-dessus l'appel et sans qu'on ait rien
+/// demandé — y mettre un champ de texte, c'est réclamer une réponse à quelqu'un
+/// qui regardait un visage. Écrire est un geste qu'on choisit : il appartient
+/// au panneau qu'on ouvre.
 ///
 /// Ça remplace l'ouverture automatique d'avant : la zone entière s'ouvrait
 /// toute seule à la première phrase, ce qui, maintenant qu'elle efface la
@@ -3187,9 +3310,9 @@ class _RestingTurns extends StatelessWidget {
 }
 
 /// La conversation de l'appel, rangée en bas à GAUCHE : les deux derniers tours
-/// en bulles de verre, et on remonte le fil en faisant défiler. Tout le reste
-/// de l'appel s'efface le temps qu'elle est là, et un tap n'importe où la
-/// referme. Aucune saisie : ça ne fait que retranscrire la voix.
+/// en bulles de verre, la saisie dessous. On remonte le fil en faisant défiler.
+/// Tout le reste de l'appel s'efface le temps qu'elle est là, et un tap
+/// n'importe où la referme.
 class _SpokenTurnsPanel extends StatefulWidget {
   const _SpokenTurnsPanel({
     required this.turns,
@@ -3198,6 +3321,10 @@ class _SpokenTurnsPanel extends StatefulWidget {
     required this.myAvatarUrl,
     required this.peerName,
     required this.peerAvatarUrl,
+    required this.chatController,
+    required this.chatFocus,
+    required this.sending,
+    required this.onSend,
   });
 
   final List<_SpokenTurn> turns;
@@ -3206,6 +3333,13 @@ class _SpokenTurnsPanel extends StatefulWidget {
   final String myAvatarUrl;
   final String peerName;
   final String peerAvatarUrl;
+
+  /// La saisie. Elle appartient à l'écran d'appel et pas au panneau : le
+  /// panneau se démonte à chaque fermeture, ce qui perdrait le texte en cours.
+  final TextEditingController chatController;
+  final FocusNode chatFocus;
+  final bool sending;
+  final Future<void> Function() onSend;
 
   /// La hauteur qu'on laisse aux bulles : DEUX, et la troisième se devine
   /// au-dessus — c'est ce qui invite à faire défiler. Au-delà on ne relit plus,
@@ -3218,9 +3352,9 @@ class _SpokenTurnsPanel extends StatefulWidget {
   static const double maxHeight = 132;
 
   /// Ce que la zone occupe en bas de l'écran, bulles pleines : les deux bulles,
-  /// l'en-tête et l'air entre les deux. C'est ce dont le galet a besoin pour
-  /// savoir où se poser sans recouvrir quoi que ce soit.
-  static const double zoneHeight = maxHeight + 27 + 10;
+  /// l'en-tête, la saisie et l'air entre les trois. C'est ce dont le galet a
+  /// besoin pour savoir où se poser sans recouvrir quoi que ce soit.
+  static const double zoneHeight = maxHeight + 27 + 8 + 46 + 10;
 
   @override
   State<_SpokenTurnsPanel> createState() => _SpokenTurnsPanelState();
@@ -3321,7 +3455,91 @@ class _SpokenTurnsPanelState extends State<_SpokenTurnsPanel> {
               },
             ),
           ),
+        // La saisie, sous les bulles : ce qu'on tape part traduit chez le pair
+        // et se dit chez lui à voix haute, exactement comme une phrase parlée.
+        _ChatComposer(
+          controller: widget.chatController,
+          focusNode: widget.chatFocus,
+          sending: widget.sending,
+          onSend: widget.onSend,
+        ),
       ],
+    );
+  }
+}
+
+/// La saisie de l'appel : un champ de verre et un rond d'envoi.
+///
+/// Verre en nuance (GlassPanel), pas la vue native — celle-là avale vraiment
+/// les touches. Sans danger ici : le bug du clavier qui retombait n'était pas
+/// le verre mais des voisins non clés (b2f3293).
+class _ChatComposer extends StatelessWidget {
+  const _ChatComposer({
+    required this.controller,
+    required this.focusNode,
+    required this.sending,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool sending;
+  final Future<void> Function() onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      borderRadius: 22,
+      color: Colors.black.withValues(alpha: 0.35),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              minLines: 1,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.send,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                hintText: AppStrings.t('call_chat_hint'),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
+              ),
+              onSubmitted: (_) => onSend(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: sending ? null : onSend,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                // Grisé pendant la traduction : la phrase est partie chercher
+                // ses mots, un second tap l'enverrait deux fois.
+                color: sending ? Colors.white24 : SC.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_upward_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
