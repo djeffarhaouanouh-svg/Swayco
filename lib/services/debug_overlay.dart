@@ -14,19 +14,10 @@ class DebugOverlay extends StatefulWidget {
   static bool _enabled = false;
 
   static void init() {
-    // On EVERYWHERE, signed release included — tap 🐛 (top right) to reveal.
-    //
-    // A release IPA is exactly where the interesting failures live: the model
-    // that only fails to load on a real phone, the decode that is only slow on
-    // ARM. Gating this behind `--dart-define=DEBUG_OVERLAY=true` meant
-    // remembering the flag at the one moment you had already forgotten it —
-    // and shipping a build that silently discarded every line you needed.
-    //
-    // The cost is that the 🐛 is visible to whoever is holding the phone. That
-    // is fine while that is only us. BEFORE OPENING TO REAL USERS: put this
-    // back behind `kIsWeb || kDebugMode`, or keep the tap target and drop the
-    // icon.
-    _enabled = true;
+    // Off everywhere. DebugOverlay.log calls are now no-ops; flip _enabled
+    // back to true (see git history) if the 🐛 needs to come back for
+    // on-device debugging.
+    _enabled = false;
   }
 
   static void log(String msg) {
