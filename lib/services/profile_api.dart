@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
+import 'debug_overlay.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
 
@@ -1078,6 +1079,12 @@ abstract final class ProfileApi {
           .update({'last_seen': DateTime.now().toUtc().toIso8601String()})
           .eq('id', userId);
     } catch (e) {
+      // À l'écran, pas seulement dans la console : sur un téléphone en release
+      // il n'y a pas de console, et c'est précisément là que ça échouait. Un
+      // appareil qui n'écrit pas son `last_seen` reste invisible aux autres
+      // sans qu'aucun écran ne le dise — il n'y a rien à voir, et c'est ça le
+      // problème.
+      DebugOverlay.log('presence: touch FAILED $e');
       debugPrint('ProfileApi.touchLastSeen failed: $e');
     }
   }

@@ -414,6 +414,22 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   Future<void> _hydrateAuthedSession() async {
     final uid = AuthService.currentUserId;
     if (uid.isEmpty) return;
+    // EN PREMIER, avant le moindre await.
+    //
+    // Le battement de présence était la DERNIÈRE ligne de cette fonction, après
+    // deux allers-retours réseau attendus (lecture du profil, puis upsert de la
+    // langue). Il suffit qu'un seul jette — réseau capricieux au démarrage à
+    // froid, ce qui arrive sur un téléphone bien plus que sur un navigateur de
+    // bureau dont la session est déjà chaude — pour que l'exception remonte au
+    // try/catch de l'appelant et que ces lignes-là ne s'exécutent JAMAIS. Il
+    // n'y a qu'un seul point d'appel et aucune reprise : la présence est alors
+    // morte pour toute la session, et l'appareil reste invisible aux autres
+    // sans que rien ne le signale.
+    //
+    // Or elle n'a besoin de rien de tout ça : juste de l'identifiant, qu'on
+    // vient de lire. Rien qui puisse échouer avant elle ne doit pouvoir
+    // l'empêcher de battre.
+    PresenceService.start(uid);
     // Tie store purchases to this account (no-op on web / unconfigured).
     unawaited(RevenueCat.identify(uid));
     final profile = await UserPrefs.loadProfile();
@@ -487,10 +503,6 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // now, insert-only so a shared account's language is never clobbered.
     unawaited(ProfileApi.ensureMyProfileRow());
     unawaited(ChatUnread.start(uid));
-    // Presence heartbeat — keeps profiles.last_seen fresh for the
-    // online indicator (gated by each user's hide-online-status
-    // setting).
-    PresenceService.start(uid);
     // Apply the user's saved Settings preferences.
     final prefs = await SharedPreferences.getInstance();
     // In-app sounds: gate the CallAlert ring / dial tone.
