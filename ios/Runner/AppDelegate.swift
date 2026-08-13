@@ -163,9 +163,25 @@ import FirebaseMessaging
     let dict = payload.dictionaryPayload
     let pushType = (dict["type"] as? String) ?? "incoming_call"
     let callId = (dict["callId"] as? String) ?? UUID().uuidString
-    let callerName = (dict["callerName"] as? String) ?? "Appel entrant"
-    let handle = (dict["callerId"] as? String) ?? ""
+    let rawName = (dict["callerName"] as? String) ?? ""
+    let callerName = rawName.isEmpty ? "Appel entrant" : rawName
+    let callerId = (dict["callerId"] as? String) ?? ""
     let roomName = (dict["roomName"] as? String) ?? ""
+
+    // Le `handle`, c'est ce que le journal des appels d'iOS AFFICHE sous
+    // « Profil social », et ce qu'il rappellerait si on touchait l'entrée.
+    // C'était l'identifiant brut du compte : un pavé base64 illisible, et un
+    // rappel qui ne pouvait mener nulle part. C'est le prénom du pair
+    // maintenant — le premier mot du nom affiché, comme partout ailleurs dans
+    // l'app.
+    //
+    // Vide plutôt que l'identifiant quand le nom manque : mieux vaut une ligne
+    // absente qu'un jeton offert à la lecture. Et `extra` garde le vrai
+    // identifiant — c'est lui qui sert à retrouver le pair au décrochage, il ne
+    // doit surtout pas suivre ce qu'on affiche.
+    // Fermeture explicite plutôt que `map(String.init)` : `String.init` porte
+    // des dizaines de surcharges et le compilateur ne tranche pas toujours.
+    let handle = rawName.split(separator: " ").first.map { String($0) } ?? ""
 
     let data = flutter_callkit_incoming.Data(
       id: callId,
@@ -176,7 +192,7 @@ import FirebaseMessaging
     data.extra = [
       "callId": callId,
       "roomName": roomName,
-      "callerId": handle,
+      "callerId": callerId,
     ] as NSDictionary
 
     // The caller gave up before pickup: backend/notify.js sent a 'call_cancel'
