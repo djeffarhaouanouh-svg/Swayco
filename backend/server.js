@@ -181,28 +181,59 @@ const OPENAI_TRANSLATION_CALLS = 'https://api.openai.com/v1/realtime/translation
 // point of picking it. WHICH model runs there is not: that one stays out of the
 // source and comes from TRANSLATE_MODEL. So the switch needs BOTH its key and its
 // name; a key alone can never arm a half-configured route.
-const _translateKey = process.env.TRANSLATE_KEY?.trim();
-const _translateModel = process.env.TRANSLATE_MODEL?.trim();
-const _translateSwitched = !!(_translateKey && _translateModel);
-const TRANSLATE_KEY = _translateSwitched ? _translateKey : OPENAI_API_KEY;
+// ─── The one engine, for BOTH routes ──────────────────────────────────────
+// DeepSeek. /translation/fix (the call) already ran on it; /translation/text
+// (chat, and the profile texts) ran on whatever the TRANSLATE_* switch pointed
+// at, and that turned out to be exactly the failure this file warned about
+// three paragraphs up: the switch was armed at a host whose token is not
+// authorised, so every chat message came back 401 and the client — which
+// answers a non-2xx by returning the input untouched — showed it untranslated,
+// silently, for as long as it lasted.
+//
+// Two vendors for one job bought nothing but that: a second thing to keep
+// alive, and a second way to fail quietly. Same engine now on both routes, so
+// a route that answers proves the other one will too. The prompts stay apart —
+// they do different work, and that is where the difference belongs.
+const DEEPSEEK_KEY = process.env.FIX_KEY?.trim();
+const DEEPSEEK_BASE = (process.env.FIX_BASE?.trim() || 'https://api.deepseek.com')
+  .replace(/\/$/, '');
+const DEEPSEEK_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
+
+// The DeepSeek key WINS over the TRANSLATE_* variables, and that inversion is
+// deliberate. Those variables are still set in production, pointing at the host
+// that answers 401 — leaving them the last word would ship this fix and change
+// nothing at all, which is the worst of both. They are read only when there is
+// no DeepSeek key to prefer, so a deployment carrying just OPENAI_API_KEY still
+// translates.
+//
+// Rolling back therefore means clearing FIX_KEY, not adding a variable. Say so
+// out loud rather than leave someone editing TRANSLATE_MODEL and watching
+// nothing happen.
+const _translateOverride = !DEEPSEEK_KEY;
+const TRANSLATE_KEY = DEEPSEEK_KEY ||
+  (_translateOverride ? process.env.TRANSLATE_KEY?.trim() : '') || OPENAI_API_KEY;
 const TRANSLATE_BASE = (
-  process.env.TRANSLATE_BASE?.trim() ||
-  (_translateSwitched
-    ? 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1' // OVHcloud AI Endpoints, Gravelines
-    : 'https://api.openai.com/v1')
+  DEEPSEEK_KEY
+    ? DEEPSEEK_BASE
+    : (process.env.TRANSLATE_BASE?.trim() || 'https://api.openai.com/v1')
 ).replace(/\/$/, '');
-const TRANSLATE_MODEL = _translateSwitched ? _translateModel : 'gpt-4.1';
-// Sent only when set — an engine that does not reason answers 400 to the field,
-// so the incumbent must not carry it. On one that does, it is the biggest lever
-// left: measured, it cuts the BILLED output from ~270 tokens to ~51 for the same
-// sentence, because the thinking we pay for is never shown to anyone. The trade
-// was measured too, on 40 real sentences: translating INTO a gender-marking
-// language (fr) it costs ~2 slips per 40 — a masculine agreement, a clumsy turn,
-// both still understood; INTO one that barely marks gender (ja) it costs nothing.
-const TRANSLATE_EFFORT =
-  process.env.TRANSLATE_REASONING_EFFORT?.trim() || (_translateSwitched ? 'low' : '');
+const TRANSLATE_MODEL = DEEPSEEK_KEY
+  ? DEEPSEEK_MODEL
+  : (process.env.TRANSLATE_MODEL?.trim() || 'gpt-4.1');
 // `cache_control` is an OpenAI extension; other gateways reject the array form.
 const TRANSLATE_IS_OPENAI = TRANSLATE_BASE.includes('api.openai.com');
+const TRANSLATE_IS_DEEPSEEK = TRANSLATE_BASE.includes('deepseek');
+// DeepSeek v4 reasons by default and BILLS the hidden thinking — see fixCall(),
+// which learned it the expensive way: 131 output tokens instead of 16, twice
+// as slow, and once an empty answer because the reasoning ate the ceiling.
+// A translation has nothing to think about, so it is disabled here too.
+//
+// `reasoning_effort` is the OpenAI-side spelling of the same idea and is a 400
+// on an engine that does not know the field, so the two are mutually exclusive.
+// It is spent only when explicitly asked for, and only off DeepSeek.
+const TRANSLATE_EFFORT = TRANSLATE_IS_DEEPSEEK
+  ? ''
+  : process.env.TRANSLATE_REASONING_EFFORT?.trim() || '';
 
 /**
  * Resolve a gender hedge the model produced anyway: "venu(e)", "tout(e) seul(e)",
@@ -791,10 +822,12 @@ app.post('/translation/realtime/session', _limTight, async (req, res) => {
  * across requests in the same 5-min window (~-50% on input tokens).
  */
 app.post('/translation/text', _limText, async (req, res) => {
-  try {
-    assertOpenAI();
-  } catch (e) {
-    return res.status(500).json({ error: 'openai_misconfigured' });
+  // La clé de CETTE route, pas celle d'OpenAI. Le garde-fou exigeait
+  // OPENAI_API_KEY alors que la route tourne sur DeepSeek : il aurait refusé
+  // un déploiement parfaitement configuré, et laissé passer celui qui n'a pas
+  // la clé dont il se sert vraiment.
+  if (!TRANSLATE_KEY) {
+    return res.status(500).json({ error: 'translate_misconfigured' });
   }
   const rawText = typeof req.body?.text === 'string' ? req.body.text : '';
   const text = rawText.trim().slice(0, 4000);
@@ -942,6 +975,9 @@ app.post('/translation/text', _limText, async (req, res) => {
         // between the two is a business call, remade without touching this file.
         model: TRANSLATE_MODEL,
         ...(TRANSLATE_EFFORT ? { reasoning_effort: TRANSLATE_EFFORT } : {}),
+        // Voir le bloc du haut : la réflexion cachée de DeepSeek est facturée
+        // et n'a rien à apporter à une traduction. OpenAI refuse le champ.
+        ...(TRANSLATE_IS_DEEPSEEK ? { thinking: { type: 'disabled' } } : {}),
         messages: [
           {
             role: 'system',
@@ -982,7 +1018,11 @@ app.post('/translation/text', _limText, async (req, res) => {
       lang_from: from || undefined,
       lang_to: to,
       props: {
-        model: 'gpt-4.1',
+        // Le modèle qui a RÉELLEMENT répondu. C'était 'gpt-4.1' en dur, donc
+        // l'analytique a annoncé gpt-4.1 pendant toute la durée où la route
+        // pointait ailleurs — et pendant tout le temps où elle ne répondait
+        // plus du tout.
+        model: TRANSLATE_MODEL,
         chars: text.length,
         history_msgs: history.length,
         has_context: Boolean(authorGender || peerGender || relationship),
@@ -1112,10 +1152,11 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
 // and the call stays quiet — that is the point of the UNCLEAR sentinel, and
 // coaxing an answer out of unreadable audio only buys an invented sentence
 // spoken in someone's voice.
-const FIX_KEY = process.env.FIX_KEY?.trim();
-const FIX_BASE = (process.env.FIX_BASE?.trim() || 'https://api.deepseek.com')
-  .replace(/\/$/, '');
-const FIX_MODEL = process.env.FIX_MODEL?.trim() || 'deepseek-v4-flash';
+// Déclarés en haut du fichier (bloc « The one engine »), parce que la route de
+// texte s'en sert aussi maintenant et qu'un `const` ne remonte pas.
+const FIX_KEY = DEEPSEEK_KEY;
+const FIX_BASE = DEEPSEEK_BASE;
+const FIX_MODEL = DEEPSEEK_MODEL;
 
 /** The sentinel a model returns rather than inventing. Never spoken aloud. */
 const FIX_UNCLEAR = 'UNCLEAR';
