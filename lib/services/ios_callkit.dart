@@ -166,6 +166,25 @@ abstract final class IosCallKit {
     if (!_isIos || callId.isEmpty) return;
     try {
       await FlutterCallkitIncoming.endCall(callId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('IosCallKit.endCall failed: $e');
+    }
+  }
+
+  /// Dire à iOS que L'APPEL est fini, à la seconde où il l'est.
+  ///
+  /// Sans identifiant, et c'est voulu : au moment de raccrocher il n'y a qu'un
+  /// appel, le nôtre. L'écran d'appel ne connaît pas l'identifiant CallKit du
+  /// côté qui a DÉCROCHÉ (il vient de la notification VoIP, restée dans
+  /// root_shell), et le faire descendre jusqu'ici pour finalement terminer le
+  /// seul appel en cours n'ajouterait qu'une occasion de le perdre en route.
+  /// Ça ramasse aussi une entrée oubliée d'un appel précédent.
+  static Future<void> endAll() async {
+    if (!_isIos) return;
+    try {
+      await FlutterCallkitIncoming.endAllCalls();
+    } catch (e) {
+      debugPrint('IosCallKit.endAll failed: $e');
+    }
   }
 }

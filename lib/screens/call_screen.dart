@@ -22,6 +22,7 @@ import '../services/audio_controller.dart';
 import '../services/call_audio.dart';
 import '../services/call_alert.dart';
 import '../services/incoming_call_api.dart';
+import '../services/ios_callkit.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/permission_priming.dart';
@@ -2153,6 +2154,21 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _hangUp() async {
+    // EN PREMIER : iOS doit savoir tout de suite que l'appel est fini.
+    //
+    // CallKit n'était démonté qu'au retour de `nav.push`, dans root_shell —
+    // c'est-à-dire quand l'ÉCRAN se referme. Or un appel qui a été connecté ne
+    // referme pas son écran : il laisse la carte noire de fin d'appel, et elle
+    // reste tant qu'on ne l'a pas quittée. Entre les deux, iOS croit toujours
+    // être en communication : le journal des appels a compté neuf minutes pour
+    // un appel de deux, et la session audio du système restait retenue tout ce
+    // temps.
+    //
+    // Raccrocher et fermer l'écran sont deux choses différentes ; c'est la
+    // première que le téléphone doit connaître, et à l'instant où elle arrive.
+    // Avant les démontages qui suivent, aussi : ils sont bornés à cinq secondes
+    // chacun et peuvent traîner, iOS n'a pas à les attendre.
+    unawaited(IosCallKit.endAll());
     // Caller giving up before the callee ever joined: tell their device to
     // stop ringing NOW (symmetric to the callee's decline broadcast), else
     // their phone rings on until a local ~30 s timeout. Covers manual
