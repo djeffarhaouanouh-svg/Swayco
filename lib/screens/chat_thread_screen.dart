@@ -330,15 +330,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     setState(() {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
-      // Prefer the locally-stored spoken language, but fall back to the
-      // Supabase profile when local prefs are empty — otherwise a
-      // returning user on a freshly-installed app has an empty _myLang,
-      // which makes _maybeFetchTranslation bail out and the translate
-      // toggle silently does nothing (works on web only because the
-      // browser session still holds the onboarding prefs).
-      _myLang = (profile?.sourceLang.trim().isNotEmpty ?? false)
-          ? profile!.sourceLang.trim()
-          : (mine?.language.trim() ?? '');
+      // La langue du COMPTE — celle de l'interface — et pas la langue parlée
+      // des préférences locales.
+      //
+      // Les deux se confondent le plus souvent, mais pas toujours : la langue
+      // parlée est celle qu'on a choisie pour être TRANSCRIT en appel, et rien
+      // n'oblige quelqu'un dont l'app est en français à parler français. Cette
+      // personne-là recevait ses messages traduits vers sa langue parlée, dans
+      // une app entièrement en français. Ce qu'on lit doit arriver dans la
+      // langue où on lit tout le reste.
+      //
+      // Le profil DISTANT d'abord : c'est lui qui fait foi pour la langue de
+      // compte, un compte étant partagé entre appareils. [AppStrings] ensuite,
+      // qui porte la même valeur une fois synchronisée et couvre la lecture
+      // distante ratée. La préférence locale en tout dernier, pour ne jamais
+      // rendre une chaîne vide — vide, la traduction se tait sans rien dire.
+      _myLang = (mine?.language.trim().isNotEmpty ?? false)
+          ? mine!.language.trim()
+          : (AppStrings.currentBcp47.value.trim().isNotEmpty
+              ? AppStrings.currentBcp47.value.trim()
+              : (profile?.sourceLang.trim() ?? ''));
       _myGender = (profile?.gender.trim().isNotEmpty ?? false)
           ? profile!.gender.trim()
           : (mine?.gender.trim() ?? '');
