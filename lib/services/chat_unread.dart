@@ -12,9 +12,14 @@ import 'supabase_service.dart';
 abstract final class ChatUnread {
   static final ValueNotifier<int> count = ValueNotifier<int>(0);
 
-  /// Le plancher : tout ce qui est plus vieux est considéré lu, quelle que
-  /// soit la conversation. Il sert au premier lancement (sans lui, tout
-  /// l'historique compterait) et se relève quand on touche l'onglet Messages.
+  /// Le plancher d'INSTALLATION : tout ce qui est antérieur est tenu pour lu.
+  ///
+  /// Posé une fois, au premier lancement, et plus jamais touché. Il se relevait
+  /// à chaque passage sur l'onglet Messages, ce qui voulait dire « regarder la
+  /// liste = avoir tout lu » : la ligne bleue du message non lu s'éteignait
+  /// avant même qu'on ait ouvert la conversation, et on ne savait plus où était
+  /// le nouveau message. VOIR n'est pas LIRE — seul l'ouverture d'un fil pose
+  /// un point de lecture désormais.
   static const _seenKey = 'chat_last_seen_iso';
 
   /// Le point de lecture PAR conversation, relevé à l'ouverture d'un fil.
@@ -57,8 +62,17 @@ abstract final class ChatUnread {
     _meId = meId;
 
     final prefs = await SharedPreferences.getInstance();
-    _lastSeenIso = prefs.getString(_seenKey) ??
-        DateTime.now().toUtc().toIso8601String();
+    final stored = prefs.getString(_seenKey);
+    if (stored != null) {
+      _lastSeenIso = stored;
+    } else {
+      // Premier lancement : on grave l'instant présent, une bonne fois. Sans
+      // cette écriture le plancher se redéfinissait à chaque démarrage, et
+      // tout ce qui était arrivé pendant que l'app était fermée passait pour
+      // lu — le badge ne signalait jamais rien après un redémarrage.
+      _lastSeenIso = DateTime.now().toUtc().toIso8601String();
+      await prefs.setString(_seenKey, _lastSeenIso);
+    }
     _convSeen = await readPerConversationSeen();
 
     await _sub?.cancel();

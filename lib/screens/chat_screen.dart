@@ -366,15 +366,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       // Per-conversation unread COUNT: inbound messages newer than the last
       // time I opened that thread (never opened → all of them count).
-      final floor = ChatUnread.seenFloor;
       final unreadCounts = <String, int>{};
       for (final m in inbound) {
-        // Même repli sur le plancher que [_seenFor] et que le badge : « jamais
-        // ouvert » ne veut pas dire « non lu depuis toujours ».
-        final own = seen[m.conversationId];
-        final s = own == null
-            ? floor
-            : (floor != null && floor.isAfter(own) ? floor : own);
+        // Le point du fil, et lui seul : ce compte est celui de la PASTILLE de
+        // la ligne, qui doit survivre à un passage sur la liste (voir
+        // [_isUnread]).
+        final s = seen[m.conversationId];
         if (s == null || m.createdAt.isAfter(s)) {
           unreadCounts[m.conversationId] =
               (unreadCounts[m.conversationId] ?? 0) + 1;
@@ -809,22 +806,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// True when the peer's last message is newer than the last time I
   /// opened the thread (or I've never opened it). Drives the cyan dot.
-  /// La MÊME règle que le badge ([ChatUnread]) : le point de lecture du fil,
-  /// et à défaut le plancher global. Sans ce repli, une conversation jamais
-  /// ouverte comptait comme non lue depuis toujours ici, alors que le badge la
-  /// tenait pour lue — les deux se contredisaient à l'écran.
-  DateTime? _seenFor(String convId) {
-    final own = _seenByConv[convId];
-    final floor = ChatUnread.seenFloor;
-    if (own == null) return floor;
-    if (floor == null) return own;
-    return own.isAfter(floor) ? own : floor;
-  }
-
+  /// La ligne bleue ne suit QUE le point de lecture du fil — jamais le
+  /// plancher global.
+  ///
+  /// Les deux marques ne répondent pas à la même question. Le « 1 » de la
+  /// barre de nav dit « il y a du nouveau quelque part » : venir sur Messages
+  /// y répond, il s'éteint. La ligne bleue dit « c'est CETTE conversation » :
+  /// venir sur Messages n'y répond pas, il faut ouvrir le fil. Les avoir
+  /// alignées sur le plancher éteignait la ligne dès l'arrivée sur la liste,
+  /// et on ne savait plus où était le message.
   bool _isUnread(RemoteProfile p) {
     final convId = _conversationIdFor(p.id);
     final last = _latestByConv[convId];
-    final seen = _seenFor(convId);
+    final seen = _seenByConv[convId];
     return last != null &&
         last.senderId != _myId &&
         (seen == null || last.createdAt.isAfter(seen));

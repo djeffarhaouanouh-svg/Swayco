@@ -121,6 +121,55 @@ class _RootShellState extends State<RootShell> {
     });
   }
 
+  /// Ouvre le fil que la notification de message désigne.
+  ///
+  /// Ouvrir le fil est ce qui efface sa ligne bleue : c'est
+  /// `ChatThreadScreen` qui pose le point de lecture, pas nous — une seule
+  /// route pour « ce fil est lu », quelle que soit la façon dont on y arrive.
+  ///
+  /// L'identifiant de conversation voyage dans la notification, mais on le
+  /// recalcule à partir des deux identifiants quand il manque : les poussées
+  /// d'une version antérieure ne le portaient pas, et une notification muette
+  /// vaut mieux qu'un écran vide.
+  Future<void> _openThreadFromPush(Map<String, dynamic> data) async {
+    final senderId = data['senderId']?.toString() ?? '';
+    if (senderId.isEmpty) return;
+    try {
+      final myId = await DeviceId.getOrCreate();
+      if (myId.isEmpty) return;
+      var convId = data['conversationId']?.toString() ?? '';
+      if (convId.isEmpty) {
+        final ids = [myId, senderId]..sort();
+        convId = 'dm-${ids[0]}-${ids[1]}';
+      }
+      final peer = await ProfileApi.fetchById(senderId);
+      // Le navigateur peut ne pas être monté sur un lancement à froid depuis
+      // la notification — même attente que le chemin d'appel entrant.
+      NavigatorState? nav;
+      for (var i = 0; i < 40; i++) {
+        nav = rootNavigatorKey.currentState;
+        if (nav != null) break;
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      }
+      if (nav == null || !mounted) return;
+      await nav.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatThreadScreen(
+            conversationId: convId,
+            title: (peer?.displayName.trim().isNotEmpty ?? false)
+                ? peer!.displayName.trim()
+                : AppStrings.t('profile_anonymous'),
+            peerDeviceId: senderId,
+            translation: widget.translation,
+          ),
+        ),
+      );
+    } catch (e) {
+      // Au pire on reste sur la liste, qui montre la ligne bleue.
+      debugPrint('open thread from push failed: $e');
+    }
+  }
+
   /// Sends the shell to the screen a tapped notification points at.
   void _onNotificationIntent() {
     final intent = NotificationRouter.pending.value;
@@ -132,8 +181,14 @@ class _RootShellState extends State<RootShell> {
         final peerId = intent.data['peerId']?.toString() ?? '';
         if (peerId.isNotEmpty) MatchCelebration.offer(peerId);
       case 'message':
+        // L'onglet Messages ET le fil concerné : on a touché la notification
+        // de QUELQU'UN, pas « des messages en général ». S'arrêter à la liste
+        // laissait faire à la main le geste qu'on venait déjà de faire.
         NavTab.select(NavTab.chat);
-        ChatUnread.markAllSeen();
+        // Le « 1 » de la barre s'éteint : arriver sur Messages est la réponse
+        // à la question qu'il posait.
+        unawaited(ChatUnread.markAllSeen());
+        unawaited(_openThreadFromPush(intent.data));
       case 'online_broadcast':
         // "5 Japonaises en ligne" pull notification → open Discover so they
         // can browse / call whoever is online right now.
