@@ -12,13 +12,40 @@ import 'supabase_service.dart';
 abstract final class ChatUnread {
   static final ValueNotifier<int> count = ValueNotifier<int>(0);
 
+  /// Le plancher : tout ce qui est plus vieux est considéré lu, quelle que
+  /// soit la conversation. Il sert au premier lancement (sans lui, tout
+  /// l'historique compterait) et se relève quand on touche l'onglet Messages.
   static const _seenKey = 'chat_last_seen_iso';
-  /// Prefix for per-conversation last-seen ISO timestamps. Each key looks
-  /// like `chat_conv_seen_<conversationId>` and is bumped when the user
-  /// actually opens that thread — independent from the global `_seenKey`
-  /// which only drives the chat-tab unread badge.
+
+  /// Le point de lecture PAR conversation, relevé à l'ouverture d'un fil.
   static const _convSeenPrefix = 'chat_conv_seen_';
   static StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
+  /// Les points de lecture par conversation, en mémoire.
+  ///
+  /// Le compte se calculait sur le seul plancher global, et rien d'autre ne le
+  /// bougeait que « toucher l'onglet Messages ». Lire une conversation
+  /// n'éteignait donc pas le « 1 » de la barre de nav ni celui du profil : ils
+  /// avaient leur propre notion de « vu », séparée de celle des fils, et les
+  /// deux ne se parlaient jamais. Une seule source maintenant — ce que le
+  /// badge affiche est ce que les conversations disent.
+  static Map<String, DateTime> _convSeen = {};
+
+  /// La dernière photo du flux, gardée pour pouvoir RECALCULER le compte quand
+  /// un fil est lu, sans attendre que la base réémette quoi que ce soit. C'est
+  /// ce qui rend l'extinction immédiate.
+  static List<Map<String, dynamic>> _lastRows = const [];
+
+  /// Jusqu'où cette conversation est lue : son propre point s'il existe, le
+  /// plancher sinon — et le plus récent des deux, pour que relever le plancher
+  /// (toucher l'onglet) suffise à tout éteindre.
+  static DateTime? _seenFor(String convId) {
+    final floor = DateTime.tryParse(_lastSeenIso);
+    final own = _convSeen[convId];
+    if (own == null) return floor;
+    if (floor == null) return own;
+    return own.isAfter(floor) ? own : floor;
+  }
   static String _meId = '';
   static String _lastSeenIso = '';
 
@@ -32,6 +59,7 @@ abstract final class ChatUnread {
     final prefs = await SharedPreferences.getInstance();
     _lastSeenIso = prefs.getString(_seenKey) ??
         DateTime.now().toUtc().toIso8601String();
+    _convSeen = await readPerConversationSeen();
 
     await _sub?.cancel();
     _sub = Supabase.instance.client
@@ -46,12 +74,23 @@ abstract final class ChatUnread {
   }
 
   static void _onRows(List<Map<String, dynamic>> rows) {
+    _lastRows = rows;
+    _recount();
+  }
+
+  /// Recompte à partir de la dernière photo connue.
+  ///
+  /// Les dates sont comparées comme des DateTime, plus comme des chaînes : le
+  /// point de lecture était écrit en `…Z` et Postgres rend `…+00:00`, deux
+  /// écritures du même instant qui ne se rangent pas pareil caractère par
+  /// caractère.
+  static void _recount() {
     var n = 0;
-    for (final r in rows) {
-      final ts = r['created_at']?.toString() ?? '';
-      if (ts.isNotEmpty && ts.compareTo(_lastSeenIso) > 0) {
-        n++;
-      }
+    for (final r in _lastRows) {
+      final at = DateTime.tryParse(r['created_at']?.toString() ?? '');
+      if (at == null) continue;
+      final seen = _seenFor(r['conversation_id']?.toString() ?? '');
+      if (seen == null || at.isAfter(seen)) n++;
     }
     if (count.value != n) count.value = n;
   }
@@ -61,9 +100,12 @@ abstract final class ChatUnread {
   static Future<void> markAllSeen() async {
     final nowIso = DateTime.now().toUtc().toIso8601String();
     _lastSeenIso = nowIso;
+    // Éteint AVANT l'écriture disque, et sans l'attendre : le badge doit
+    // tomber au moment du geste. Le compte se relit du plancher déjà posé en
+    // mémoire, donc une réémission du flux entre-temps ne le rallume pas.
+    _recount();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_seenKey, nowIso);
-    count.value = 0;
   }
 
   static Future<void> stop() async {
@@ -78,12 +120,20 @@ abstract final class ChatUnread {
   /// that specific row.
   static Future<void> markConversationSeen(String convId) async {
     if (convId.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    // En mémoire d'abord, et on recompte tout de suite : lire un fil doit
+    // faire tomber le badge de la barre de nav et celui du profil à la
+    // seconde, pas au prochain passage par la liste.
+    _convSeen[convId] = now;
+    _recount();
     final p = await SharedPreferences.getInstance();
-    await p.setString(
-      '$_convSeenPrefix$convId',
-      DateTime.now().toUtc().toIso8601String(),
-    );
+    await p.setString('$_convSeenPrefix$convId', now.toIso8601String());
   }
+
+  /// Le plancher courant, pour que la LISTE juge « non lu » exactement comme
+  /// le badge : une conversation jamais ouverte n'est pas non lue depuis
+  /// toujours, elle l'est depuis le plancher.
+  static DateTime? get seenFloor => DateTime.tryParse(_lastSeenIso);
 
   /// Snapshot of every per-conversation last-seen timestamp. Returned as
   /// a `{conversationId: DateTime}` map; conversations the user has never

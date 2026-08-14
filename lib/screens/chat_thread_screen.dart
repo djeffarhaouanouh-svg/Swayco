@@ -399,6 +399,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       (rows) {
         if (!mounted) return;
         setState(() => _messages = rows);
+        // Lu, puisque le fil est SOUS LES YEUX. Le point de lecture n'était
+        // posé qu'à l'ouverture : un message reçu pendant qu'on lisait
+        // rallumait le badge de la barre de nav derrière l'écran ouvert, et il
+        // fallait ressortir puis revenir pour l'éteindre.
+        unawaited(ChatUnread.markConversationSeen(widget.conversationId));
         // If auto-translate is on, kick translations for the new arrivals.
         if (_autoTranslate) {
           for (final m in rows) {
