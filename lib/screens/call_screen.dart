@@ -2512,13 +2512,18 @@ class _CallScreenState extends State<CallScreen> {
 
     if (_connecting || _room == null || !_minSplashDone) {
       // Splash-style connecting state. Showing the room name + a bare
-      // spinner during LiveKit's handshake felt clinical and gave the
-      // caller no signal about the credit deduction â€” switch to the
-      // app's splash image with a single one-liner hint clarifying
-      // that only the caller's monthly credits are debited (the peer
-      // listens free). Keeps the spinner so the user still has motion
-      // feedback that something is happening. Held for >= 5s (see
-      // _minSplashDone) et sur le fond de l'app, comme partout ailleurs.
+      // spinner during LiveKit's handshake felt clinical — hence the app's
+      // splash image, and a one-liner under it. Keeps the spinner so the
+      // user still has motion feedback that something is happening. Held
+      // for >= 5s (see _minSplashDone) et sur le fond de l'app, comme
+      // partout ailleurs.
+      //
+      // Ces cinq secondes sont le seul moment où on a l'attention de
+      // quelqu'un qui n'a encore rien à faire. La ligne y parlait de
+      // décompte de crédits, à une époque où l'appel se payait — l'appel est
+      // gratuit depuis, et elle occupait la meilleure place de l'écran pour
+      // ne plus rien dire. Elle sert maintenant à ce qui améliore vraiment
+      // l'appel qui commence : la façon de parler.
       return Scaffold(
         backgroundColor: SC.bg,
         body: SafeArea(
@@ -2551,7 +2556,7 @@ class _CallScreenState extends State<CallScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  AppStrings.t('call_connecting_caller_pays'),
+                  AppStrings.t('call_connecting_tip'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: SC.textMuted,
