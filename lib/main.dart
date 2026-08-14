@@ -56,6 +56,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
   } catch (_) {}
   final data = message.data;
+  // L'appelant a renoncé. Il FAUT l'écouter ici : la sonnerie Android est une
+  // notification `ongoing` + `autoCancel: false`, donc l'utilisateur ne peut
+  // pas la balayer, et seul du code peut la retirer. Sans ce cas, un appel
+  // manqué laissait « Appel entrant » planté sur le téléphone — et rouvrir
+  // l'app n'y changeait rien, la sonnerie périmée étant écartée d'avance par
+  // le garde-fou des 45 secondes.
+  //
+  // iOS a son équivalent depuis toujours, dans AppDelegate ; Android ne l'a
+  // jamais eu.
+  if (data['type'] == 'call_cancel') {
+    await LocalNotifications.cancelIncomingCall();
+    return;
+  }
   if (data['type'] != 'incoming_call') return;
   final title = (data['title'] ?? data['callerName'] ?? '').toString().trim();
   final body = (data['body'] ?? '').toString().trim();
@@ -71,6 +84,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void _handleForegroundMessage(RemoteMessage message) {
   final data = message.data;
   if (data['type'] == 'incoming_call') return;
+  // Un renoncement n'est pas une nouvelle : il ÉTEINT la sonnerie de fond si
+  // elle avait démarré avant que l'app revienne. Et il doit sortir avant la
+  // bannière plus bas, sinon l'utilisateur verrait passer un message intitulé
+  // « call_cancel » — c'est le titre que le client envoie, puisque /api/notify
+  // en exige un alors que ce type-là n'affiche jamais rien.
+  if (data['type'] == 'call_cancel') {
+    unawaited(LocalNotifications.cancelIncomingCall());
+    return;
+  }
   final n = message.notification;
   final title = (n?.title ?? data['title'] ?? '').toString().trim();
   final body = (n?.body ?? data['body'] ?? '').toString().trim();

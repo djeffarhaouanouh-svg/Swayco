@@ -22,6 +22,7 @@ import '../services/audio_controller.dart';
 import '../services/call_audio.dart';
 import '../services/call_alert.dart';
 import '../services/incoming_call_api.dart';
+import '../services/local_notifications.dart';
 import '../services/ios_callkit.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
@@ -2169,6 +2170,12 @@ class _CallScreenState extends State<CallScreen> {
     // Avant les démontages qui suivent, aussi : ils sont bornés à cinq secondes
     // chacun et peuvent traîner, iOS n'a pas à les attendre.
     unawaited(IosCallKit.endAll());
+    // Le pendant Android : là-bas la sonnerie n'est pas CallKit mais une
+    // notification `ongoing` — que l'utilisateur ne peut donc PAS balayer.
+    // Elle n'est effacée que sur le chemin où l'app est vivante et ouvre sa
+    // propre modale ; sur tous les autres elle survit à l'appel. Sans
+    // conséquence si rien n'est affiché, et déjà neutralisée sur le web.
+    unawaited(LocalNotifications.cancelIncomingCall());
     // Caller giving up before the callee ever joined: tell their device to
     // stop ringing NOW (symmetric to the callee's decline broadcast), else
     // their phone rings on until a local ~30 s timeout. Covers manual

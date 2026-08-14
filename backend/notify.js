@@ -186,10 +186,11 @@ async function notifyUser(recipientUid, payload) {
   await Promise.all(
     targets.map(async (t) => {
       try {
-        if (payload.type === 'call_cancel' && t.platform !== 'ios_voip') {
-          // A cancel exists only to stop CallKit's VoIP ring — no banner on
-          // web / FCM (the app-alive path already dismisses those via realtime).
-          out.results.push({ id: t.id, skipped: 'cancel-voip-only' });
+        if (payload.type === 'call_cancel' && t.platform === 'web') {
+          // Nothing to stop on web: the ring there is a DOM dialog owned by a
+          // tab that is, by definition, already running — the realtime cancel
+          // reaches it directly.
+          out.results.push({ id: t.id, skipped: 'cancel-not-web' });
           return;
         }
         if (t.platform === 'web') {
@@ -221,8 +222,22 @@ async function notifyUser(recipientUid, payload) {
           // handler wakes and builds the call UI itself — title/body are
           // passed inside `data` instead. iOS keeps the notification block
           // (CallKit/VoIP is a separate follow-up) so it still rings.
+          // Le renoncement voyage comme la sonnerie : DONNÉES SEULES, pas de
+          // bloc `notification`. Deux raisons, et les deux comptent. Un bloc
+          // `notification` ne réveille pas l'isolat Dart quand l'app est morte,
+          // et c'est précisément là qu'il faut agir : la sonnerie Android est
+          // `ongoing`, l'utilisateur ne peut pas la balayer, seul du code la
+          // retire. Et il afficherait une bannière — pour un message dont le
+          // seul rôle est d'en EFFACER une.
+          //
+          // Ce cas ne partait pas du tout vers Android : « le chemin où l'app
+          // est vivante s'en charge par le temps réel », disait le commentaire.
+          // Vrai, sauf que l'app morte est le seul cas où la notification
+          // existe.
           const isCallAndroid =
-            payload.type === 'incoming_call' && t.platform === 'android';
+            (payload.type === 'incoming_call' ||
+              payload.type === 'call_cancel') &&
+            t.platform === 'android';
           const data = {
             ...Object.fromEntries(
               Object.entries(payload.data || {}).map(([k, v]) => [k, String(v)]),

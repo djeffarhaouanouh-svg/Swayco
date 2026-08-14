@@ -322,6 +322,12 @@ class _RootShellState extends State<RootShell> {
     // opens / foregrounds the app long after.
     if (DateTime.now().difference(call.createdAt) >
         const Duration(seconds: 45)) {
+      // Mais on éteint quand même le ringer de fond. Il sortait AVANT, et
+      // c'était le seul cas où plus rien ne pouvait l'effacer : une sonnerie
+      // périmée est précisément celle qui a eu le temps de s'afficher pendant
+      // que l'app était morte, et sur Android elle n'est pas balayable. Ouvrir
+      // l'app était le dernier recours de l'utilisateur, et il tombait ici.
+      unawaited(LocalNotifications.cancelIncomingCall());
       return;
     }
     // The app is now in the foreground handling the call via the in-app
