@@ -16,6 +16,7 @@ import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
+import '../services/translation_cache.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -272,6 +273,21 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           _translations[id] = out;
           _translatingIds.remove(id);
         });
+        // Gardée sur l'appareil : un message ne se réécrit pas, donc le
+        // retraduire à chaque ouverture du fil ne fait que repayer la même
+        // phrase et la faire clignoter le temps qu'elle revienne.
+        //
+        // Seulement si le moteur a VRAIMENT traduit : en cas d'échec,
+        // fetchTextTranslation rend le texte d'entrée tel quel, et graver ça
+        // figerait un message non traduit pour toujours.
+        if (out.isNotEmpty && out != m.body) {
+          unawaited(TranslationCache.put(
+            convId: widget.conversationId,
+            lang: _myLang,
+            messageId: id,
+            translated: out,
+          ));
+        }
       } catch (_) {
         if (mounted) {
           setState(() => _translatingIds.remove(id));
@@ -358,6 +374,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
     });
+
+    // Les traductions déjà obtenues, relues du disque AVANT que les messages
+    // arrivent : sans ça, le fil s'affiche dans la langue de l'autre puis
+    // bascule bulle après bulle, et chaque bascule est une requête payée pour
+    // une phrase qu'on avait déjà traduite.
+    if (_myLang.isNotEmpty) {
+      final cached =
+          await TranslationCache.load(widget.conversationId, _myLang);
+      if (!mounted) return;
+      if (cached.isNotEmpty) {
+        setState(() => _translations.addAll(cached));
+      }
+    }
 
     if (!isSupabaseReady) {
       setState(
