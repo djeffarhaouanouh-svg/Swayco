@@ -73,7 +73,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final title = (data['title'] ?? data['callerName'] ?? '').toString().trim();
   final body = (data['body'] ?? '').toString().trim();
   await LocalNotifications.showIncomingCall(
-    title: title.isEmpty ? 'Appel entrant' : title,
+    // Anglais, et pas français : ce repli ne sert que si la poussée n'a porté
+    // aucun titre — l'expéditeur les localise normalement dans la langue du
+    // DESTINATAIRE (`AppStrings.tIn`). Quand il n'y arrive pas, le français
+    // n'est la bonne langue que pour un tiers de nos marchés, l'anglais est
+    // celle que tout le monde décode à peu près. Même mot que
+    // `push_incoming_call_title` côté anglais, pour ne pas inventer une
+    // seconde formulation.
+    title: title.isEmpty ? 'Incoming call' : title,
     body: body.isEmpty ? null : body,
   );
 }

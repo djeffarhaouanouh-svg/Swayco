@@ -105,7 +105,10 @@ abstract final class LocalNotifications {
     await _plugin.show(
       callNotificationId,
       title,
-      body == null || body.isEmpty ? '📞 Appel entrant' : body,
+      // Anglais en repli, comme le titre : le corps arrive déjà traduit dans la
+      // langue du destinataire, et ceci ne sert que s'il manque. Repris mot
+      // pour mot de `push_incoming_call_body` côté anglais.
+      body == null || body.isEmpty ? '📞 Incoming call' : body,
       NotificationDetails(android: android, iOS: darwin),
       payload: 'incoming_call',
     );

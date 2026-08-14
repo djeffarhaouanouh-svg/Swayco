@@ -4,6 +4,8 @@ import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
+import 'app_strings.dart';
+
 /// Web-only in-app alert for an incoming call.
 ///
 /// Triggers:
@@ -49,9 +51,13 @@ abstract final class CallAlert {
     );
 
     _origTitle = web.document.title;
+    // Pas un repli d'isolat celui-ci : on est dans l'app, [AppStrings] est
+    // chargé avec la langue du compte. Il n'y avait donc aucune raison
+    // d'écrire du français en dur dans l'onglet de quelqu'un qui lit en
+    // japonais.
     final flashLabel = (callerName != null && callerName.isNotEmpty)
         ? '📞 $callerName…'
-        : '📞 Appel entrant…';
+        : '📞 ${AppStrings.t('incoming_call_label')}';
     var on = true;
     _titleTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
       web.document.title = on ? flashLabel : (_origTitle ?? '');
@@ -73,9 +79,10 @@ abstract final class CallAlert {
     );
 
     _origTitle = web.document.title;
+    // Même règle que la sonnerie entrante juste au-dessus : traduit, pas en dur.
     final label = (calleeName != null && calleeName.isNotEmpty)
-        ? '📞 Appel vers $calleeName…'
-        : '📞 Appel sortant…';
+        ? '📞 ${AppStrings.t('call_dialing_to', args: {'name': calleeName})}'
+        : '📞 ${AppStrings.t('call_dialing')}';
     web.document.title = label;
   }
 

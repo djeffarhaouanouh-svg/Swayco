@@ -164,7 +164,11 @@ import FirebaseMessaging
     let pushType = (dict["type"] as? String) ?? "incoming_call"
     let callId = (dict["callId"] as? String) ?? UUID().uuidString
     let rawName = (dict["callerName"] as? String) ?? ""
-    let callerName = rawName.isEmpty ? "Appel entrant" : rawName
+    // Anglais en repli. C'est ce que CallKit écrit en grand sur l'écran
+    // verrouillé, et ça n'arrive que si la poussée VoIP n'a porté aucun nom
+    // d'appelant — l'expéditeur le localise d'ordinaire dans la langue du
+    // destinataire. Le français n'y allait que pour un de nos trois marchés.
+    let callerName = rawName.isEmpty ? "Incoming call" : rawName
     let callerId = (dict["callerId"] as? String) ?? ""
     let roomName = (dict["roomName"] as? String) ?? ""
 
