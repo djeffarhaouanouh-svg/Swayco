@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             : ({..._likedPhotoUrls}..remove(key));
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'enregistrer le like.')),
+        SnackBar(content: Text(AppStrings.t('like_save_failed'))),
       );
     }
   }
@@ -284,7 +284,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
@@ -317,7 +318,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
@@ -348,7 +350,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() => _iLiked = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
@@ -385,7 +388,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
@@ -490,7 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (!isSupabaseReady) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Supabase non configuré.')));
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('backend_unavailable'))));
       return;
     }
     final current = _remote?.photos ?? const <String>[];
@@ -527,7 +531,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Upload échoué : $e'),
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
           duration: const Duration(seconds: 8),
         ),
       );
@@ -542,7 +546,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (!isSupabaseReady) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Supabase non configuré.')));
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('backend_unavailable'))));
       return;
     }
     final picker = ImagePicker();
@@ -570,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Upload échoué : $e'),
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
           duration: const Duration(seconds: 8),
         ),
       );
@@ -602,7 +606,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Suppression échouée : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('delete_failed', args: {'msg': '$e'}))));
     }
   }
 
@@ -620,7 +625,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() => _remote = prev); // revert on failure
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Échec : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
@@ -666,7 +672,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
     if (!mounted || _remote == null) return;
@@ -686,7 +692,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
     if (!mounted || _remote == null) return;
@@ -728,7 +734,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Sauvegarde échouée.')));
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
     if (!mounted || _remote == null) return;

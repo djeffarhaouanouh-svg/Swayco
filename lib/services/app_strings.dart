@@ -67,6 +67,12 @@ abstract final class AppStrings {
 
   // ─── French ───────────────────────────────────────────────────────────────
   static const Map<String, String> _fr = {
+    'save_failed': 'Sauvegarde échouée.',
+    'upload_failed': 'Envoi échoué : {msg}',
+    'delete_failed': 'Suppression échouée : {msg}',
+    'backend_unavailable': 'Service indisponible. Réessaie dans un instant.',
+    // Manquait en français : le libellé retombait sur l'anglais « Edit ».
+    'profile_edit': 'Modifier',
     // ── Call credit gate (péage) ──
     'call_locked_title': 'Plus de crédits d\'appel',
     'call_locked_body':
@@ -621,6 +627,10 @@ abstract final class AppStrings {
 
   // ─── English ──────────────────────────────────────────────────────────────
   static const Map<String, String> _en = {
+    'save_failed': 'Save failed.',
+    'upload_failed': 'Upload failed: {msg}',
+    'delete_failed': 'Delete failed: {msg}',
+    'backend_unavailable': 'Service unavailable. Try again in a moment.',
     'call_locked_title': 'Out of call credit',
     'call_locked_body':
         'You\'re out of credit to place a call. Ask {name} to call you — it\'s free on your side.',
@@ -1160,6 +1170,10 @@ abstract final class AppStrings {
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
   static const Map<String, String> _es = {
+    'save_failed': 'No se pudo guardar.',
+    'upload_failed': 'Error al subir: {msg}',
+    'delete_failed': 'Error al eliminar: {msg}',
+    'backend_unavailable': 'Servicio no disponible. Inténtalo en un momento.',
     'call_locked_title': 'Sin créditos de llamada',
     'call_locked_body':
         'Te has quedado sin crédito para llamar. Pídele a {name} que te llame — para ti es gratis.',
@@ -1675,6 +1689,10 @@ abstract final class AppStrings {
 
   // ─── German ───────────────────────────────────────────────────────────────
   static const Map<String, String> _de = {
+    'save_failed': 'Speichern fehlgeschlagen.',
+    'upload_failed': 'Upload fehlgeschlagen: {msg}',
+    'delete_failed': 'Löschen fehlgeschlagen: {msg}',
+    'backend_unavailable': 'Dienst nicht verfügbar. Versuch es gleich noch mal.',
     'call_locked_title': 'Kein Anrufguthaben',
     'call_locked_body':
         'Dein Guthaben für Anrufe ist aufgebraucht. Bitte {name}, dich anzurufen — für dich ist es kostenlos.',
@@ -2195,6 +2213,10 @@ abstract final class AppStrings {
 
   // ─── Italian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _it = {
+    'save_failed': 'Salvataggio non riuscito.',
+    'upload_failed': 'Caricamento non riuscito: {msg}',
+    'delete_failed': 'Eliminazione non riuscita: {msg}',
+    'backend_unavailable': 'Servizio non disponibile. Riprova tra poco.',
     'call_locked_title': 'Crediti di chiamata esauriti',
     'call_locked_body':
         'Hai esaurito i crediti per chiamare. Chiedi a {name} di chiamarti — per te è gratis.',
@@ -2709,6 +2731,10 @@ abstract final class AppStrings {
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
   static const Map<String, String> _pt = {
+    'save_failed': 'Falha ao guardar.',
+    'upload_failed': 'Falha no envio: {msg}',
+    'delete_failed': 'Falha ao eliminar: {msg}',
+    'backend_unavailable': 'Serviço indisponível. Tenta daqui a pouco.',
     'call_locked_title': 'Sem créditos de chamada',
     'call_locked_body':
         'Ficaste sem crédito para ligar. Pede a {name} para te ligar — do teu lado é grátis.',
@@ -3224,6 +3250,10 @@ abstract final class AppStrings {
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
   static const Map<String, String> _nl = {
+    'save_failed': 'Opslaan mislukt.',
+    'upload_failed': 'Uploaden mislukt: {msg}',
+    'delete_failed': 'Verwijderen mislukt: {msg}',
+    'backend_unavailable': 'Dienst niet beschikbaar. Probeer het zo opnieuw.',
     'call_locked_title': 'Geen beltegoed meer',
     'call_locked_body':
         'Je hebt geen tegoed meer om te bellen. Vraag {name} om jou te bellen — voor jou is het gratis.',
@@ -3739,6 +3769,10 @@ abstract final class AppStrings {
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ar = {
+    'save_failed': 'تعذّر الحفظ.',
+    'upload_failed': 'تعذّر الرفع: {msg}',
+    'delete_failed': 'تعذّر الحذف: {msg}',
+    'backend_unavailable': 'الخدمة غير متاحة. حاول بعد قليل.',
     'call_locked_title': 'لا يوجد رصيد للمكالمات',
     'call_locked_body':
         'لم يتبقَّ لديك رصيد لإجراء مكالمة. اطلب من {name} الاتصال بك — فهو مجاني من جانبك.',
@@ -4239,6 +4273,10 @@ abstract final class AppStrings {
 
   // ─── Russian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _ru = {
+    'save_failed': 'Не удалось сохранить.',
+    'upload_failed': 'Не удалось загрузить: {msg}',
+    'delete_failed': 'Не удалось удалить: {msg}',
+    'backend_unavailable': 'Сервис недоступен. Попробуйте чуть позже.',
     'call_locked_title': 'Закончились минуты для звонка',
     'call_locked_body':
         'У тебя нет кредитов на звонок. Попроси {name} позвонить тебе — для тебя это бесплатно.',
@@ -4751,6 +4789,10 @@ abstract final class AppStrings {
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
   static const Map<String, String> _zh = {
+    'save_failed': '保存失败。',
+    'upload_failed': '上传失败：{msg}',
+    'delete_failed': '删除失败：{msg}',
+    'backend_unavailable': '服务不可用，请稍后再试。',
     'call_locked_title': '通话额度已用完',
     'call_locked_body': '你的通话额度已用完。让 {name} 打给你吧——你这边是免费的。',
     'call_locked_invite': '请 {name} 打给我',
@@ -5216,6 +5258,33 @@ abstract final class AppStrings {
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
   static const Map<String, String> _ja = {
+    'save_failed': '保存できませんでした。',
+    'upload_failed': 'アップロードできませんでした：{msg}',
+    'delete_failed': '削除できませんでした：{msg}',
+    'backend_unavailable': 'サービスに接続できません。しばらくしてからお試しください。',
+    // Ajoutées ici : elles manquaient à la carte japonaise et retombaient donc
+    // en anglais, en plein écran de match et sur les dates de la liste des
+    // conversations — deux endroits que tout le monde voit.
+    'weekday_mon': '月曜日',
+    'weekday_tue': '火曜日',
+    'weekday_wed': '水曜日',
+    'weekday_thu': '木曜日',
+    'weekday_fri': '金曜日',
+    'weekday_sat': '土曜日',
+    'weekday_sun': '日曜日',
+    'chat_day_today': '今日',
+    'chat_day_yesterday': '昨日',
+    'match_age_years': '{n}歳',
+    'match_first_title': 'ついに。',
+    'match_first_sub': '{who}。swaycøでの初めての本当のマッチです。',
+    'match_standard_title': 'マッチしました。',
+    'match_standard_sub': '{who}。',
+    'match_lang_bridge': '相手は{their}で書き、あなたは{mine}で読みます。',
+    'match_later': 'あとで',
+    'match_pill_first': '初めてのマッチ',
+    'match_pill_rare': 'レア · メンバーの{pct}%',
+    'match_rare_liked': 'マッチを希望しています',
+    'match_tip_auto_translate': '自分の言語で書けば、{name}は自分の言語で読みます。いつでも自動です。',
     'call_locked_title': '通話クレジットがありません',
     'call_locked_body':
         '通話するクレジットがなくなりました。{name} に電話してもらいましょう — あなたは無料です。',
@@ -5691,6 +5760,10 @@ abstract final class AppStrings {
 
   // ─── Korean ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ko = {
+    'save_failed': '저장하지 못했습니다.',
+    'upload_failed': '업로드하지 못했습니다: {msg}',
+    'delete_failed': '삭제하지 못했습니다: {msg}',
+    'backend_unavailable': '서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
     'call_locked_title': '통화 크레딧이 없습니다',
     'call_locked_body':
         '통화할 크레딧이 없어요. {name} 님에게 전화해 달라고 하세요 — 당신은 무료예요.',

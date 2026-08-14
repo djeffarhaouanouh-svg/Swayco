@@ -167,7 +167,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      ).showSnackBar(SnackBar(
+          content: Text(AppStrings.t('error_prefix', args: {'msg': '$e'}))));
     }
   }
 
