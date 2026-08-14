@@ -8,6 +8,7 @@ import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
+import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
@@ -88,6 +89,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   RemoteProfile? _peer;
   bool _sending = false;
   String? _error;
+
+  /// Jusqu'où le pair a lu. Null tant qu'il n'a jamais ouvert le fil — ou tant
+  /// que la migration 0054 n'est pas passée, auquel cas aucun « Lu » ne
+  /// s'affiche et rien d'autre ne change.
+  DateTime? _peerLastRead;
+  StreamSubscription<DateTime?>? _peerReadSub;
+
+  /// Publie MA lecture pour que le pair voie son « Lu ». Séparé de
+  /// [ChatUnread.markConversationSeen], qui ne sort jamais du téléphone.
+  void _publishRead() {
+    if (_myId.isEmpty) return;
+    unawaited(ChatReads.markRead(
+      conversationId: widget.conversationId,
+      meId: _myId,
+    ));
+  }
 
   /// When true, replace each foreign-language message body with its
   /// translation into [_myLang]. Translations are cached by message id so we
@@ -343,6 +360,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // Opening this thread = peer's messages here are now "seen". Clears
     // the per-row dot on the chat list for this conversation.
     unawaited(ChatUnread.markConversationSeen(widget.conversationId));
+    // Et la moitié PARTAGÉE : le pair doit voir son « Lu ». `id` plutôt que
+    // [_myId], qui n'est posé que par le setState juste en dessous.
+    unawaited(ChatReads.markRead(
+      conversationId: widget.conversationId,
+      meId: id,
+    ));
     if (!mounted) return;
     setState(() {
       _myId = id;
@@ -404,6 +427,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         // rallumait le badge de la barre de nav derrière l'écran ouvert, et il
         // fallait ressortir puis revenir pour l'éteindre.
         unawaited(ChatUnread.markConversationSeen(widget.conversationId));
+        _publishRead();
         // If auto-translate is on, kick translations for the new arrivals.
         if (_autoTranslate) {
           for (final m in rows) {
@@ -417,6 +441,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         setState(() => _error = 'Connexion temps réel perdue: $e');
       },
     );
+
+    // Jusqu'où le pair a lu, en direct : le « Lu » doit apparaître au moment
+    // où il ouvre le fil, pas au prochain rechargement.
+    _peerReadSub = ChatReads.watchPeerLastRead(
+      conversationId: widget.conversationId,
+      peerId: widget.peerDeviceId,
+    ).listen((at) {
+      if (!mounted || at == null) return;
+      // Jamais en arrière : un flux peut rejouer une ligne plus ancienne, et
+      // un accusé qui recule ferait sauter le « Lu » d'un message à l'autre.
+      final cur = _peerLastRead;
+      if (cur != null && !at.isAfter(cur)) return;
+      setState(() => _peerLastRead = at);
+    });
 
     // La présence du pair, rafraîchie sur toutes les plateformes (sur le web
     // aussi : le poll ci-dessous ne relit que les messages).
@@ -469,6 +507,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   void dispose() {
     _sub?.cancel();
+    _peerReadSub?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
     _clockTimer?.cancel();
@@ -798,6 +837,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       items.add(_ThreadListItem.message(m));
     }
 
+    // Le DERNIER de mes messages que le pair a ouvert : c'est sous celui-là,
+    // et lui seul, que « Lu » se pose. Un accusé par bulle ferait une colonne
+    // de « Lu » qui ne dit rien de plus — ce qu'on veut savoir, c'est jusqu'où
+    // il est allé.
+    final readAt = _peerLastRead;
+    String? lastReadMineId;
+    if (readAt != null) {
+      for (final m in _messages) {
+        if (m.senderId != _myId) continue;
+        if (m.createdAt.isAfter(readAt)) continue;
+        lastReadMineId = m.id;
+      }
+    }
+
     // Local TTS is local — no cloud cost, available to all tiers.
     return ListView.builder(
       controller: _scrollCtrl,
@@ -816,7 +869,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         }
         final m = item.message!;
         final mine = m.senderId == _myId;
-        return _MessageBubble(
+        final bubble = _MessageBubble(
           message: m,
           mine: mine,
           displayBody: _displayBodyFor(m),
@@ -824,6 +877,24 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           myLang: _myLang,
           // Long-press to delete — only my own messages.
           onLongPressDelete: mine ? () => _deleteMessage(m) : null,
+        );
+        if (m.id != lastReadMineId) return bubble;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            bubble,
+            Padding(
+              padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2),
+              child: Text(
+                AppStrings.t('chat_read'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 11,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

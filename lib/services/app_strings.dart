@@ -67,6 +67,7 @@ abstract final class AppStrings {
 
   // ─── French ───────────────────────────────────────────────────────────────
   static const Map<String, String> _fr = {
+    'chat_read': 'Lu',
     'call_dialing_to': 'Appel vers {name}…',
     'call_dialing': 'Appel sortant…',
     'save_failed': 'Sauvegarde échouée.',
@@ -629,6 +630,7 @@ abstract final class AppStrings {
 
   // ─── English ──────────────────────────────────────────────────────────────
   static const Map<String, String> _en = {
+    'chat_read': 'Read',
     'call_dialing_to': 'Calling {name}…',
     'call_dialing': 'Outgoing call…',
     'save_failed': 'Save failed.',
@@ -1174,6 +1176,7 @@ abstract final class AppStrings {
 
   // ─── Spanish ──────────────────────────────────────────────────────────────
   static const Map<String, String> _es = {
+    'chat_read': 'Leído',
     'call_dialing_to': 'Llamando a {name}…',
     'call_dialing': 'Llamada saliente…',
     'save_failed': 'No se pudo guardar.',
@@ -1695,6 +1698,7 @@ abstract final class AppStrings {
 
   // ─── German ───────────────────────────────────────────────────────────────
   static const Map<String, String> _de = {
+    'chat_read': 'Gelesen',
     'call_dialing_to': '{name} wird angerufen…',
     'call_dialing': 'Ausgehender Anruf…',
     'save_failed': 'Speichern fehlgeschlagen.',
@@ -2221,6 +2225,7 @@ abstract final class AppStrings {
 
   // ─── Italian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _it = {
+    'chat_read': 'Letto',
     'call_dialing_to': 'Chiamata a {name}…',
     'call_dialing': 'Chiamata in uscita…',
     'save_failed': 'Salvataggio non riuscito.',
@@ -2741,6 +2746,7 @@ abstract final class AppStrings {
 
   // ─── Portuguese ───────────────────────────────────────────────────────────
   static const Map<String, String> _pt = {
+    'chat_read': 'Lido',
     'call_dialing_to': 'A ligar para {name}…',
     'call_dialing': 'Chamada a sair…',
     'save_failed': 'Falha ao guardar.',
@@ -3262,6 +3268,7 @@ abstract final class AppStrings {
 
   // ─── Dutch ────────────────────────────────────────────────────────────────
   static const Map<String, String> _nl = {
+    'chat_read': 'Gelezen',
     'call_dialing_to': '{name} bellen…',
     'call_dialing': 'Uitgaande oproep…',
     'save_failed': 'Opslaan mislukt.',
@@ -3783,6 +3790,7 @@ abstract final class AppStrings {
 
   // ─── Arabic ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ar = {
+    'chat_read': 'تمت القراءة',
     'call_dialing_to': 'جارٍ الاتصال بـ {name}…',
     'call_dialing': 'مكالمة صادرة…',
     'save_failed': 'تعذّر الحفظ.',
@@ -4289,6 +4297,7 @@ abstract final class AppStrings {
 
   // ─── Russian ──────────────────────────────────────────────────────────────
   static const Map<String, String> _ru = {
+    'chat_read': 'Прочитано',
     'call_dialing_to': 'Звоним {name}…',
     'call_dialing': 'Исходящий вызов…',
     'save_failed': 'Не удалось сохранить.',
@@ -4807,6 +4816,7 @@ abstract final class AppStrings {
 
   // ─── Chinese (Simplified) ─────────────────────────────────────────────────
   static const Map<String, String> _zh = {
+    'chat_read': '已读',
     'call_dialing_to': '正在呼叫 {name}…',
     'call_dialing': '去电…',
     'save_failed': '保存失败。',
@@ -5278,6 +5288,7 @@ abstract final class AppStrings {
 
   // ─── Japanese ─────────────────────────────────────────────────────────────
   static const Map<String, String> _ja = {
+    'chat_read': '既読',
     'call_dialing_to': '{name}に発信中…',
     'call_dialing': '発信中…',
     'save_failed': '保存できませんでした。',
@@ -5782,6 +5793,7 @@ abstract final class AppStrings {
 
   // ─── Korean ───────────────────────────────────────────────────────────────
   static const Map<String, String> _ko = {
+    'chat_read': '읽음',
     'call_dialing_to': '{name}에게 거는 중…',
     'call_dialing': '발신 중…',
     'save_failed': '저장하지 못했습니다.',
