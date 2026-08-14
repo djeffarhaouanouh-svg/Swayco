@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// Append a line to the on-screen debug overlay. Active on every build, signed
-// releases included — tap the 🐛 (top right) to reveal the panel. See [init]
-// for what that costs and when to close it back up.
+// Append a line to the on-screen debug overlay — tap the 🐛 (top right) to
+// reveal the panel. On in every build EXCEPT a plain release; see [init].
 // Usage: DebugOverlay.log('[sway-rt] something happened');
 class DebugOverlay extends StatefulWidget {
   const DebugOverlay({super.key, required this.child});
@@ -13,11 +13,30 @@ class DebugOverlay extends StatefulWidget {
   static final ValueNotifier<List<String>> _lines = ValueNotifier([]);
   static bool _enabled = false;
 
+  /// Allume l'overlay dans une build RELEASE. À passer au moment de la
+  /// compilation :
+  ///
+  ///   flutter build ipa --dart-define=DEBUG_OVERLAY=true
+  ///
+  /// C'est le seul cas qui demande un drapeau, et c'est voulu — voir [init].
+  static const bool _releaseOverride =
+      bool.fromEnvironment('DEBUG_OVERLAY');
+
   static void init() {
-    // Off everywhere. DebugOverlay.log calls are now no-ops; flip _enabled
-    // back to true (see git history) if the 🐛 needs to come back for
-    // on-device debugging.
-    _enabled = false;
+    // Partout SAUF dans une release nue.
+    //
+    // Il a été allumé pour tout le monde, release signée comprise, parce que
+    // les pannes intéressantes vivent justement là — le modèle qui ne charge
+    // que sur un vrai téléphone, le décodage qui ne rame que sur ARM. Puis
+    // éteint partout (e4e4228), parce que l'icône 🐛 s'affichait alors chez
+    // quiconque tenait le téléphone.
+    //
+    // Les deux avaient raison, et c'est le tout-ou-rien qui était faux. En
+    // debug et en profil, il est là sans qu'on ait à y penser : aucun drapeau
+    // à se rappeler au moment précis où on l'a déjà oublié, ce qui était le
+    // reproche fait au `--dart-define`. En release il faut le demander — et
+    // une build de magasin, qui ne le demande pas, n'a plus rien à montrer.
+    _enabled = !kReleaseMode || _releaseOverride;
   }
 
   static void log(String msg) {

@@ -12,6 +12,7 @@ import '../services/block_api.dart';
 import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
+import '../services/debug_overlay.dart';
 import '../services/device_id.dart';
 import '../services/last_interaction.dart';
 import '../services/match_seen.dart';
@@ -415,12 +416,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final fresh = await ProfileApi.fetchByIds(ids);
       if (!mounted || fresh.isEmpty) return;
       final byId = {for (final p in fresh) p.id: p};
+      // Ce que la LECTURE voit réellement, prénom par prénom : l'âge du
+      // dernier signe de vie, et le verdict de la règle. C'est la seule chose
+      // qui manquait pour trancher — on savait que l'écriture partait (la
+      // fonction serveur compte bien les profils frais), sans jamais voir ce
+      // qui arrivait de l'autre côté.
+      DebugOverlay.log(
+        'presence: ${[
+          for (final p in fresh)
+            '${p.displayName.isEmpty ? p.id.substring(0, 4) : p.displayName}'
+                '=${p.lastSeen == null ? "jamais" : "${DateTime.now().difference(p.lastSeen!).inSeconds}s"}'
+                '${p.hideOnlineStatus ? "/masqué" : ""}'
+                '${isPeerOnline(p) ? "/EN LIGNE" : ""}',
+        ].join(' ')}'
+        '${AppSettings.hideOnlineLocal.value ? "  [je me masque → tout éteint]" : ""}',
+      );
       setState(() {
         _friends = [for (final p in _friends) byId[p.id] ?? p];
         _newMatches = [for (final p in _newMatches) byId[p.id] ?? p];
       });
-    } catch (_) {
+    } catch (e) {
       // La présence est un confort : un échec réseau ne doit rien casser.
+      DebugOverlay.log('presence: lecture échouée $e');
     }
   }
 
