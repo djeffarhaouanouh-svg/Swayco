@@ -5,11 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
-import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/friend_request_unread.dart';
 import '../services/friendship_api.dart';
+import '../services/languages.dart';
 import '../services/like_api.dart';
+import '../services/locations.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
@@ -18,20 +19,10 @@ import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
-import '../widgets/list_panel.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
-
-/// A reaction entry rendered on the Demandes feed — the chat message
-/// that was an emoji from [ChatApi.photoReactionEmojis], hydrated with
-/// the reacting user's profile.
-class _PhotoReaction {
-  const _PhotoReaction({required this.message, this.author});
-  final ChatMessage message;
-  final RemoteProfile? author;
-}
 
 /// Demandes — the people who liked me. Accepting is the match (the two likes
 /// meet and the conversation opens); refusing drops the like. Accepted rows
@@ -47,7 +38,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     with WidgetsBindingObserver {
   String _myId = '';
   List<IncomingFriendRequest> _requests = const [];
-  List<_PhotoReaction> _reactions = const [];
   // Profiles who liked one of my photos, newest first.
   List<RemoteProfile> _likers = const [];
   bool _loading = true;
@@ -139,7 +129,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       setState(() {
         _loading = false;
         _requests = const [];
-        _reactions = const [];
         _likers = const [];
       });
       return;
@@ -154,34 +143,15 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       final friendships = await FriendshipApi.fetchIncomingPendingWithProfiles(
         _myId,
       );
-      // Only show likes / reactions received since the feature went live, so
-      // stale historical activity (e.g. an old like on a now-deleted photo)
-      // never surfaces here.
+      // Only show likes received since the feature went live, so stale
+      // historical activity (e.g. an old like on a now-deleted photo) never
+      // surfaces here.
       final since = ReceivedActivityUnread.featureStartAt;
       final likers = await LikeApi.fetchLikersSince(_myId, since);
-      final reactionMessages = (await ChatApi.fetchPhotoReactions(_myId))
-          .where((m) => m.createdAt.toUtc().isAfter(since))
-          .toList(growable: false);
-      // Hydrate each reaction with the author's profile so we can
-      // render avatar + name. fetchByIds dedupes ids internally.
-      final authorIds = reactionMessages
-          .map((m) => m.senderId)
-          .where((id) => id.isNotEmpty)
-          .toSet()
-          .toList(growable: false);
-      final authors = authorIds.isEmpty
-          ? const <RemoteProfile>[]
-          : await ProfileApi.fetchByIds(authorIds);
-      final byId = {for (final p in authors) p.id: p};
-      final reactions = [
-        for (final m in reactionMessages)
-          _PhotoReaction(message: m, author: byId[m.senderId]),
-      ];
       if (!mounted) return;
       setState(() {
         _requests = friendships;
         _likers = likers;
-        _reactions = reactions;
         _loading = false;
       });
       FriendRequestUnread.setCount(friendships.length);
@@ -279,8 +249,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Same dark grey as the ListPanel, now filling the whole page —
-      // no more pure black behind the header / footer.
       backgroundColor: SC.bg,
       body: SafeArea(
         bottom: false,
@@ -300,16 +268,6 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     );
   }
 
-  /// Hairline divider between sections on the white block — inset past the
-  /// avatar on the left, stopping before the action cluster on the right.
-  static Widget get _rowDivider => Divider(
-        height: 1,
-        thickness: 1,
-        indent: 70,
-        endIndent: 24,
-        color: Colors.white.withValues(alpha: 0.08),
-      );
-
   Widget _buildBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: SC.accent));
@@ -327,15 +285,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         ),
       );
     }
-    // Every category flattened into one list of rows, laid on the single white
-    // block (same panel as the Messages page), in priority order: incoming
-    // likes (need a decision) → photo likes → reactions. A hairline divider
-    // falls between consecutive rows.
+    // Every category flattened into one list of rows — each its own floating
+    // card, in priority order: incoming likes (need a decision) → photo likes.
     final rows = <Widget>[
       for (final req in _requests)
         _RequestRow(
           request: req,
-          onTap: () {
+          onOpenProfile: () {
             final p = req.requester;
             if (p != null) _openProfile(p);
           },
@@ -343,63 +299,87 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
           onReject: () => _reject(req),
         ),
       for (final p in _likers)
-        _LikeRow(liker: p, onTap: () => _openProfile(p)),
-      for (final r in _reactions)
-        _ReactionRow(
-          reaction: r,
-          onTap: () {
-            final a = r.author;
-            if (a != null) _openProfile(a);
-          },
-        ),
+        _LikeRow(liker: p, onOpenProfile: () => _openProfile(p)),
     ];
-    // Same as the Messages page: the panel lives inside the page scroll view
-    // so the WHOLE panel moves when you scroll, with a min-height = the zone so
-    // it fills and rests flush on the nav at rest (the concave notches hug its
-    // rounded bottom corners, Discover-style).
     final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fill = constraints.maxHeight - 26 - navBody;
-        return RefreshIndicator(
-          color: SC.accent,
-          backgroundColor: SC.menu,
-          onRefresh: _reload,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(top: 26, bottom: navBody),
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(minHeight: fill > 0 ? fill : 0),
-                child: ListPanel(
-                  child: rows.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 44),
-                          child: _NoRequestsEmpty(),
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final (i, row) in rows.indexed)
-                              // Rows ease in (fade + slide) in a quick cascade.
-                              FadeSlideIn(
-                                delay: Duration(milliseconds: i * 55),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (i > 0) _rowDivider,
-                                    row,
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+    return RefreshIndicator(
+      color: SC.accent,
+      backgroundColor: SC.menu,
+      onRefresh: _reload,
+      child: rows.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(bottom: navBody),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 80),
+                  child: _NoRequestsEmpty(),
+                ),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(16, 4, 16, navBody + 8),
+              itemCount: rows.length,
+              // Rows ease in (fade + slide) in a quick cascade.
+              itemBuilder: (context, i) => FadeSlideIn(
+                delay: Duration(milliseconds: i * 55),
+                child: rows[i],
+              ),
+            ),
+    );
+  }
+}
+
+/// Circular avatar with a small flag badge at the bottom-right — same
+/// country-else-language fallback as the Discover card header. Tapping the
+/// avatar itself opens the peer's profile.
+class _AvatarWithFlag extends StatelessWidget {
+  const _AvatarWithFlag({required this.profile, required this.onTap});
+
+  final RemoteProfile? profile;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final flag = p == null
+        ? ''
+        : (p.city.trim().isNotEmpty ? countryFlagFor(p.country) : null) ??
+            findLanguageByCode(p.language)?.flag ??
+            '';
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ProfileAvatar(
+            displayName: p?.displayName ?? '',
+            avatarUrl: p?.avatarUrl,
+            size: 52,
+            onTap: onTap,
+          ),
+          if (flag.isNotEmpty)
+            Positioned(
+              bottom: -2,
+              right: -2,
+              child: IgnorePointer(
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: SC.menu,
+                    border: Border.all(color: SC.bg, width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(flag, style: const TextStyle(fontSize: 12)),
                 ),
               ),
-            ],
-          ),
-        );
-      },
+            ),
+        ],
+      ),
     );
   }
 }
@@ -407,13 +387,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 class _RequestRow extends StatelessWidget {
   const _RequestRow({
     required this.request,
-    required this.onTap,
+    required this.onOpenProfile,
     required this.onAccept,
     required this.onReject,
   });
 
   final IncomingFriendRequest request;
-  final VoidCallback onTap;
+  final VoidCallback onOpenProfile;
   final VoidCallback onAccept;
   final VoidCallback onReject;
 
@@ -430,111 +410,45 @@ class _RequestRow extends StatelessWidget {
       args: {'name': name},
     );
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: SC.menu,
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              ProfileAvatar(
-                displayName: p?.displayName ?? '',
-                avatarUrl: p?.avatarUrl,
-                size: 46,
+      ),
+      child: Row(
+        children: [
+          _AvatarWithFlag(profile: p, onTap: onOpenProfile),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: SC.accent,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: SCText.body.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _AcceptButton(onTap: onAccept),
-              const SizedBox(width: 6),
-              _RejectButton(onTap: onReject),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
+          _AcceptButton(onTap: onAccept),
+          const SizedBox(width: 6),
+          _RejectButton(onTap: onReject),
+        ],
       ),
     );
   }
 }
 
-/// Read-only row used to surface a Discover-rail emoji reaction sent to
-/// the local user. No accept / reject — tapping the row just opens the
-/// reacting peer's profile, same as on the Messages list.
-class _ReactionRow extends StatelessWidget {
-  const _ReactionRow({required this.reaction, required this.onTap});
-
-  final _PhotoReaction reaction;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = reaction.author;
-    final name = p?.displayName.isNotEmpty == true
-        ? p!.displayName
-        : (p?.handle.isNotEmpty == true
-              ? '@${p!.handle}'
-              : AppStrings.t('chat_no_name'));
-    final subtitle = AppStrings.t(
-      'demandes_reacted_to_photo',
-      args: {'name': name},
-    );
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              ProfileAvatar(
-                displayName: p?.displayName ?? '',
-                avatarUrl: p?.avatarUrl,
-                size: 46,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: SCText.body.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _PopInEmoji(id: reaction.message.id, emoji: reaction.message.body),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A "X liked your photo ❤" row on the Demandes feed — mirrors
-/// [_ReactionRow] but for the heart-like sent on a Discover photo card.
+/// A "X liked your photo ❤" row on the Demandes feed.
 class _LikeRow extends StatelessWidget {
-  const _LikeRow({required this.liker, required this.onTap});
+  const _LikeRow({required this.liker, required this.onOpenProfile});
 
   final RemoteProfile liker;
-  final VoidCallback onTap;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -548,38 +462,32 @@ class _LikeRow extends StatelessWidget {
       args: {'name': name},
     );
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: SC.menu,
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              ProfileAvatar(
-                displayName: liker.displayName,
-                avatarUrl: liker.avatarUrl,
-                size: 46,
+      ),
+      child: Row(
+        children: [
+          _AvatarWithFlag(profile: liker, onTap: onOpenProfile),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+                color: SC.textMuted,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: SCText.body.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _PopInEmoji(id: 'like_${liker.id}', emoji: '❤', fontSize: 24),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
+          _PopInEmoji(id: 'like_${liker.id}', emoji: '❤', fontSize: 24),
+        ],
       ),
     );
   }
@@ -690,7 +598,7 @@ class _AcceptButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Text(
-            AppStrings.t('match_cta'),
+            AppStrings.t('add_friend_short'),
             style: const TextStyle(
               color: Color(0xFF0A1024),
               fontSize: 13,

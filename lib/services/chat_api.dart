@@ -82,60 +82,12 @@ class ChatMessage {
 abstract final class ChatApi {
   static SupabaseClient get _client => Supabase.instance.client;
 
-  /// Emojis recognised as "photo reactions": a chat message whose body
-  /// matches one of these surfaces on the Demandes feed in addition to the
-  /// regular chat thread. Superset of the live Discover rail
-  /// (`_ReactionRail._emojis` = 🔥 😍 ❤️) — the older ✨ / 💯 are kept so
-  /// reactions sent before the rail changed still resolve.
+  /// Emojis recognised as legacy "photo reaction" messages — no current UI
+  /// sends these, but historical rows with these bodies are excluded from
+  /// intro-message detection ([fetchMyMessagedPhotos],
+  /// [fetchMyDiscoverMessagedPeers]) and the ❤️ ones still surface on the
+  /// "Liked photos" page ([fetchMyHeartedItems]).
   static const photoReactionEmojis = <String>['🔥', '✨', '💯', '😍', '❤️'];
-
-  /// Delete every photo-reaction message the local user (`meId`) sent
-  /// to [peerId] with body [emoji]. Used by the Discover rail when the
-  /// user re-taps a filled reaction button to unsend it. Idempotent —
-  /// no row to delete is fine, the call still resolves cleanly.
-  static Future<void> deleteMyReaction({
-    required String meId,
-    required String peerId,
-    required String emoji,
-    required String photoUrl,
-  }) async {
-    if (meId.isEmpty || peerId.isEmpty || emoji.isEmpty) return;
-    var q = _client
-        .from('messages')
-        .delete()
-        .eq('sender', meId)
-        .eq('recipient', peerId)
-        .eq('body', emoji);
-    // A reaction belongs to a specific photo, stamped in `discover_photo`.
-    if (photoUrl.isNotEmpty) q = q.eq('discover_photo', photoUrl);
-    await q;
-  }
-
-  /// Every photo reaction the local user (`meId`) has ever sent, keyed by the
-  /// PHOTO URL it was about (`discover_photo`) and pointing to the set of
-  /// emojis sent on that photo. Lets the Discover rail render the buttons
-  /// pre-filled only for the exact photo the user reacted to. Legacy
-  /// reactions with no photo stamp are ignored (they reset to unreacted).
-  static Future<Map<String, Set<String>>> fetchMyOutgoingPhotoReactions(
-    String meId,
-  ) async {
-    if (meId.isEmpty) return const {};
-    final rows = await _client
-        .from('messages')
-        .select('discover_photo, body')
-        .eq('sender', meId)
-        .inFilter('body', photoReactionEmojis)
-        .neq('discover_photo', '');
-    final out = <String, Set<String>>{};
-    for (final r in rows as List) {
-      final map = Map<String, dynamic>.from(r as Map);
-      final photo = map['discover_photo']?.toString() ?? '';
-      final emoji = map['body']?.toString() ?? '';
-      if (photo.isEmpty || emoji.isEmpty) continue;
-      out.putIfAbsent(photo, () => <String>{}).add(emoji);
-    }
-    return out;
-  }
 
   /// Photos [meId] sent a heart (❤️) reaction on, as (photoUrl, ownerId)
   /// pairs — `recipient` is the photo owner. Feeds the "Liked photos" page so
@@ -207,34 +159,6 @@ abstract final class ChatApi {
       // mere reaction doesn't collapse the card's intro-message field.
       if (rcpt.isEmpty || photoReactionEmojis.contains(body)) continue;
       out.add(rcpt);
-    }
-    return out;
-  }
-
-  /// Photo reactions (Discover-rail emoji taps) addressed to [meId] — one
-  /// entry per DISTINCT reaction (sender + photo + emoji), so a person who
-  /// reacts to several photos (or with several emojis) accumulates instead of
-  /// collapsing to one. Ordered by most recent first.
-  static Future<List<ChatMessage>> fetchPhotoReactions(String meId) async {
-    if (meId.isEmpty) return const [];
-    final rows = await _client
-        .from('messages')
-        .select()
-        .eq('recipient', meId)
-        .inFilter('body', photoReactionEmojis)
-        .order('created_at', ascending: false)
-        .limit(200);
-    final seen = <String>{};
-    final out = <ChatMessage>[];
-    for (final r in rows as List) {
-      final msg = ChatMessage.fromMap(Map<String, dynamic>.from(r as Map));
-      if (msg.senderId.isEmpty || msg.senderId == meId) continue;
-      // Dedup by the actual reaction (sender + photo + emoji), NOT by sender
-      // alone — otherwise a second reaction from the same person replaced the
-      // first instead of accumulating. Distinct photos / emojis each show.
-      final key = '${msg.senderId}|${msg.discoverPhoto}|${msg.body}';
-      if (!seen.add(key)) continue;
-      out.add(msg);
     }
     return out;
   }
