@@ -2360,8 +2360,10 @@ class _CallScreenState extends State<CallScreen> {
               top: 4,
               left: 4,
               child: IconButton(
+                // 32 : c'est la seule sortie de cette page, et elle est posée
+                // dans un coin sur du noir, sans rien autour pour la désigner.
                 icon: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 26),
+                    color: Colors.white, size: 32),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
