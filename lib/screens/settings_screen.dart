@@ -94,7 +94,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
         if (remote.hideOnlineStatus != _hideOnline) {
           setState(() => _hideOnline = remote.hideOnlineStatus);
-          await _saveBool(_kHideOnline, remote.hideOnlineStatus);
+          // Le notifier AUSSI, pas seulement le disque : c'est lui que les
+          // écrans consultent pour peindre les pastilles. Sans ça, la
+          // réconciliation ne prenait effet qu'au lancement suivant.
+          await AppSettings.adoptAccountHideOnline(remote.hideOnlineStatus);
         }
       } catch (_) {}
     }

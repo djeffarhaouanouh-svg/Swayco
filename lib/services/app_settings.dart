@@ -34,12 +34,41 @@ abstract final class AppSettings {
   /// Read once from SharedPreferences and seed the in-memory notifier.
   /// Safe to call multiple times — later writes from the Settings
   /// screen update the same notifier.
+  ///
+  /// Ce n'est qu'un PREMIER jet, le temps que le compte réponde : voir
+  /// [adoptAccountHideOnline], qui a le dernier mot.
   static Future<void> hydrate() async {
     try {
       final p = await SharedPreferences.getInstance();
       hideOnlineLocal.value = p.getBool(kHideOnline) ?? false;
     } catch (_) {
       // Persistence is best-effort here; defaults to false on failure.
+    }
+  }
+
+  /// Le compte a parlé : c'est LUI qui décide si je masque mon statut.
+  ///
+  /// Ce drapeau éteint toutes les pastilles vertes de l'app, chez soi comme
+  /// chez les autres — la règle est réciproque. Or il ne vivait que dans les
+  /// préférences locales, et rien ne le confrontait jamais au compte en dehors
+  /// de l'écran Réglages, qu'on n'ouvre pas tous les jours. Un `true` resté
+  /// dans le cache d'un appareil suffisait donc à ce que PERSONNE n'apparaisse
+  /// jamais en ligne dessus, pendant que le serveur, lui, continuait de
+  /// compter tout le monde en ligne : `hide_online_status` y était à false. Un
+  /// écran vide, aucune erreur, et rien à quoi se raccrocher.
+  ///
+  /// Le compte est partagé entre appareils : c'est la même raison qui fait de
+  /// lui la source de vérité pour la langue.
+  static Future<void> adoptAccountHideOnline(bool remote) async {
+    if (hideOnlineLocal.value != remote) hideOnlineLocal.value = remote;
+    try {
+      final p = await SharedPreferences.getInstance();
+      if ((p.getBool(kHideOnline) ?? false) != remote) {
+        await p.setBool(kHideOnline, remote);
+      }
+    } catch (_) {
+      // Le cache disque n'est qu'un confort de démarrage ; la valeur en
+      // mémoire est déjà la bonne.
     }
   }
 }

@@ -475,6 +475,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       debugPrint('hydrate fetch remote profile failed: $e');
     }
     final remoteLang = remote?.language.trim() ?? '';
+    // Le masquage du statut vient du COMPTE, à chaque lancement, et pas du
+    // cache local qui n'était confronté à rien en dehors de l'écran Réglages.
+    // Seulement sur une lecture réussie : sur un échec réseau on garde ce
+    // qu'on avait, plutôt que de démasquer quelqu'un qui s'était caché.
+    if (remoteOk && remote != null) {
+      unawaited(AppSettings.adoptAccountHideOnline(remote.hideOnlineStatus));
+    }
 
     if (profile != null && profile.firstName.isNotEmpty) {
       // Prefer the account's language; fall back to the local pick only when
