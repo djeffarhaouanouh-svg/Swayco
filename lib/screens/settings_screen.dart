@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +13,6 @@ import '../services/ios_callkit.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
-import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
@@ -52,6 +50,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // from the profile screen).
   RemoteProfile? _profile;
 
+  // '' means "not chosen yet" — calls fall back to the interface language
+  // (see UserPrefs.loadCallSpokenLang / resolveSpokenLanguage).
+  String _callLang = '';
+  String get _callLangLabel {
+    if (_callLang.isEmpty) return AppStrings.t('settings_call_lang_default');
+    return findLanguageByCode(_callLang)?.label ?? _callLang.toUpperCase();
+  }
+
   String get _email => AuthService.currentEmail;
   // Real version + build, loaded from package_info_plus in initState.
   String _appVersion = '—';
@@ -61,6 +67,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _loadPrefs();
     _loadVersion();
+    UserPrefs.loadCallSpokenLang().then((saved) {
+      if (mounted) setState(() => _callLang = saved.lang);
+    });
   }
 
   Future<void> _loadVersion() async {
@@ -374,6 +383,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _profile = _profile?.copyWith(language: code));
   }
 
+  /// Distinct from the interface language: what you speak/get transcribed
+  /// as ON A CALL (UserPrefs.keyCallSpokenLang). Local-only — someone can
+  /// run calls in a language without rewriting their account. Previously
+  /// only settable mid-call; this is the same UserPrefs field, just
+  /// reachable before the first call too.
+  Future<void> _openCallLanguagePicker() async {
+    final saved = await UserPrefs.loadCallSpokenLang();
+    if (!mounted) return;
+    final current =
+        saved.lang.isNotEmpty ? saved.lang : AppStrings.currentBcp47.value;
+    final langs = supportedLanguages;
+    final start = langs.indexWhere((l) => l.code == current);
+    final picked = await showWheelPicker(
+      context: context,
+      title: AppStrings.t('settings_section_call_lang'),
+      emoji: '🗣️',
+      labels: [for (final l in langs) '${l.flag}  ${l.label}'],
+      initialIndex: start < 0 ? 0 : start,
+    );
+    if (picked == null || !mounted) return;
+    final code = langs[picked].code;
+    await UserPrefs.saveCallSpokenLang(code, dontAsk: saved.dontAsk);
+    if (mounted) setState(() => _callLang = code);
+  }
+
   void _openBlockedUsers() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => const _BlockedUsersScreen()),
@@ -384,20 +418,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => const LikedPhotosScreen()),
     );
-  }
-
-  /// Opens the Stripe customer portal (cancel / change card / swap tier).
-  /// Web-only — the subscription section is hidden on native builds.
-  Future<void> _manageSubscription() async {
-    setState(() => _busy = true);
-    final url = await StripeApi.openPortal();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (url != null && url.isNotEmpty) {
-      await _openExternal(url);
-    } else {
-      _toast(AppStrings.t('settings_subscription_appstore'));
-    }
   }
 
   void _openHelp() => _openExternal('https://www.swayco.fr/help');
@@ -465,6 +485,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
+                _SectionHeader(label: AppStrings.t('settings_section_lang')),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.language,
+                      label: AppStrings.t('settings_lang_interface'),
+                      trailing: _SubtleText(
+                        findLanguageByCode(AppStrings.currentBcp47.value)
+                                ?.label ??
+                            AppStrings.currentBcp47.value.toUpperCase(),
+                      ),
+                      onTap: _openLanguagePicker,
+                    ),
+                  ],
+                ),
+
+                _SectionHeader(
+                  label: AppStrings.t('settings_section_call_lang'),
+                ),
+                _SettingsCard(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.call_outlined,
+                      label: AppStrings.t('call_language'),
+                      trailing: _SubtleText(_callLangLabel),
+                      onTap: _openCallLanguagePicker,
+                    ),
+                  ],
+                ),
+
                 _SectionHeader(label: AppStrings.t('settings_section_account')),
                 _SettingsCard(
                   children: [
@@ -552,40 +602,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
-
-                _SectionHeader(label: AppStrings.t('settings_section_lang')),
-                _SettingsCard(
-                  children: [
-                    _SettingsRow(
-                      icon: Icons.language,
-                      label: AppStrings.t('settings_lang_interface'),
-                      trailing: _SubtleText(
-                        findLanguageByCode(AppStrings.currentBcp47.value)
-                                ?.label ??
-                            AppStrings.currentBcp47.value.toUpperCase(),
-                      ),
-                      onTap: _openLanguagePicker,
-                    ),
-                  ],
-                ),
-
-                // Subscriptions are handled by Stripe, which the app only
-                // drives on the web build — hide the section on native
-                // (store IAP isn't wired up).
-                if (kIsWeb) ...[
-                  _SectionHeader(
-                    label: AppStrings.t('settings_section_subscription'),
-                  ),
-                  _SettingsCard(
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.workspace_premium_outlined,
-                        label: AppStrings.t('settings_manage_sub'),
-                        onTap: _manageSubscription,
-                      ),
-                    ],
-                  ),
-                ],
 
                 _SectionHeader(label: AppStrings.t('settings_section_help')),
                 _SettingsCard(
