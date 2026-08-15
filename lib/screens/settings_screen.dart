@@ -300,6 +300,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationClient.unregister(uid);
       await IosCallKit.unregisterToken(uid);
       await AuthService.signOut();
+      // AuthService.signOut() flips the ROOT widget's _authed flag, which
+      // makes it build the login screen — but that only changes what the
+      // BOTTOM route of the stack shows. This screen was pushed on top of
+      // it, so without popping back explicitly the user stayed stranded on
+      // Settings (or wherever they came from) instead of landing on login.
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       _toast('$e');
@@ -333,8 +340,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (isSupabaseReady) {
         await Supabase.instance.client.rpc('delete_my_account');
       }
-      // 4. Sign out locally so the app reroutes to the login screen.
+      // 4. Sign out locally, then actually pop back to the login screen
+      //    (see _signOut — the auth listener alone only changes what the
+      //    bottom route shows, it doesn't pop this pushed one).
       await AuthService.signOut();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       _toast(AppStrings.t('error_prefix', args: {'msg': '$e'}));
