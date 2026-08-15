@@ -1182,17 +1182,40 @@ class _ProfileInfoPanel extends StatelessWidget {
     final place = [p.city.trim(), p.country.trim()]
         .where((e) => e.isNotEmpty)
         .join(', ');
-    final facts = <({String emoji, String label})>[
-      if (p.age != null)
-        (emoji: kFactEmojiAge, label: AppStrings.t('info_age_value', args: {'n': '${p.age}'})),
-      if (p.job.trim().isNotEmpty)
-        (emoji: kFactEmojiJob, label: displayJob(p.job)),
-      if (p.zodiac.trim().isNotEmpty)
-        (emoji: kFactEmojiZodiac, label: displayZodiac(p.zodiac)),
-      if (p.lookingFor.trim().isNotEmpty)
-        (emoji: kFactEmojiLookingFor, label: displayLookingFor(p.lookingFor)),
-      if (place.isNotEmpty)
-        (emoji: kFactEmojiPlace, label: place),
+    // Toujours les cinq pastilles, remplies ou non : un champ vide qui fait
+    // disparaître sa ligne (emoji compris) rendait le panneau à trous —
+    // vide de tout sauf le prénom, on aurait dit une carte cassée plutôt
+    // qu'un profil juste peu rempli. La pastille reste, seul son contenu
+    // change.
+    final facts = <({String emoji, String label, bool filled})>[
+      (
+        emoji: kFactEmojiAge,
+        label: p.age != null
+            ? AppStrings.t('info_age_value', args: {'n': '${p.age}'})
+            : '—',
+        filled: p.age != null,
+      ),
+      (
+        emoji: kFactEmojiJob,
+        label: p.job.trim().isNotEmpty ? displayJob(p.job) : '—',
+        filled: p.job.trim().isNotEmpty,
+      ),
+      (
+        emoji: kFactEmojiZodiac,
+        label: p.zodiac.trim().isNotEmpty ? displayZodiac(p.zodiac) : '—',
+        filled: p.zodiac.trim().isNotEmpty,
+      ),
+      (
+        emoji: kFactEmojiLookingFor,
+        label:
+            p.lookingFor.trim().isNotEmpty ? displayLookingFor(p.lookingFor) : '—',
+        filled: p.lookingFor.trim().isNotEmpty,
+      ),
+      (
+        emoji: kFactEmojiPlace,
+        label: place.isNotEmpty ? place : '—',
+        filled: place.isNotEmpty,
+      ),
       // Pas de ligne "langue" : le drapeau est déjà sur la photo, et l'app
       // traduit — savoir ce que l'autre parle ne change rien.
     ];
@@ -1283,34 +1306,36 @@ class _ProfileInfoPanel extends StatelessWidget {
                         ),
                         const SizedBox(height: 22),
                       ],
-                      if (facts.isNotEmpty) ...[
-                        _PanelSectionTitle(AppStrings.t('info_about')),
-                        const SizedBox(height: 10),
-                        // Deux colonnes : en une seule, six lignes d'une ligne
-                        // chacune faisaient une liste à trous — la moitié de la
-                        // largeur restait vide et le panneau descendait pour
-                        // rien.
-                        LayoutBuilder(
-                          builder: (ctx, c) {
-                            final w = (c.maxWidth - 10) / 2;
-                            return Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                for (final f in facts)
-                                  SizedBox(
-                                    width: w,
-                                    child: _FactChip(
-                                      emoji: f.emoji,
-                                      label: f.label,
-                                    ),
+                      // Inconditionnel désormais : `facts` porte toujours ses
+                      // cinq pastilles (remplies ou en tiret), donc cette
+                      // section n'est plus jamais vide.
+                      _PanelSectionTitle(AppStrings.t('info_about')),
+                      const SizedBox(height: 10),
+                      // Deux colonnes : en une seule, six lignes d'une ligne
+                      // chacune faisaient une liste à trous — la moitié de la
+                      // largeur restait vide et le panneau descendait pour
+                      // rien.
+                      LayoutBuilder(
+                        builder: (ctx, c) {
+                          final w = (c.maxWidth - 10) / 2;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              for (final f in facts)
+                                SizedBox(
+                                  width: w,
+                                  child: _FactChip(
+                                    emoji: f.emoji,
+                                    label: f.label,
+                                    filled: f.filled,
                                   ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 22),
-                      ],
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 22),
                       if (p.interests.isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_interests')),
                         const SizedBox(height: 10),
@@ -1326,20 +1351,6 @@ class _ProfileInfoPanel extends StatelessWidget {
                           ],
                         ),
                       ],
-                      if (p.bio.trim().isEmpty &&
-                          facts.isEmpty &&
-                          p.interests.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Text(
-                            AppStrings.t('info_empty'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
                       ],
                       ),
                     ),
@@ -1416,12 +1427,19 @@ class _PanelHeader extends StatelessWidget {
 }
 
 /// Une info du bloc « À propos » : son emoji, puis sa valeur. Une pastille par
-/// fait, deux par ligne.
+/// fait, deux par ligne. [filled] false = le champ n'est pas renseigné —
+/// l'emoji reste, seule la valeur passe en tiret muet plutôt que de faire
+/// disparaître toute la pastille.
 class _FactChip extends StatelessWidget {
-  const _FactChip({required this.emoji, required this.label});
+  const _FactChip({
+    required this.emoji,
+    required this.label,
+    this.filled = true,
+  });
 
   final String emoji;
   final String label;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -1433,7 +1451,10 @@ class _FactChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 15)),
+          Opacity(
+            opacity: filled ? 1 : 0.4,
+            child: Text(emoji, style: const TextStyle(fontSize: 15)),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1441,9 +1462,10 @@ class _FactChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.92),
+                color: Colors.white.withValues(alpha: filled ? 0.92 : 0.4),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
+                fontStyle: filled ? FontStyle.normal : FontStyle.italic,
               ),
             ),
           ),
