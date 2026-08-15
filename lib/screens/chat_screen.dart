@@ -80,8 +80,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// seen the new matches, so the badge clears.
   Timer? _matchSeenTimer;
   Map<String, ChatMessage> _latestByConv = const {};
-  Map<String, DateTime> _seenByConv = const {};
-  Map<String, int> _unreadCountByConv = const {};
+  // Raw inbound messages (not yet known-seen at _reload() time) — the read
+  // pointer itself is NOT cached here. [_isUnread]/[_unreadCountFor] read
+  // it live from [ChatUnread.seenAt] so a thread opened from ANY path
+  // (this list, a push notification, …) clears its row immediately,
+  // without needing that path to remember to trigger a reload.
+  List<({String conversationId, DateTime createdAt})> _inbound = const [];
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
@@ -119,6 +123,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // immediately, without waiting for the 7 s poll.
     AppSettings.hideOnlineLocal.addListener(_onHideOnlineChanged);
     NavTab.index.addListener(_onNavTabChanged);
+    // A thread can be marked read from OUTSIDE this list's own _openThread
+    // (a push-notification tap pushes ChatThreadScreen straight from
+    // RootShell) — repaint the rows whenever ChatUnread's read pointer
+    // moves, instead of relying on every possible entry point remembering
+    // to trigger a reload on its way back.
+    ChatUnread.revision.addListener(_onUnreadRevisionChanged);
     _reload();
     _watchFriendships();
     _checkNotifStatus();
@@ -159,6 +169,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     NavTab.index.removeListener(_onNavTabChanged);
+    ChatUnread.revision.removeListener(_onUnreadRevisionChanged);
     _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
@@ -170,6 +181,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _onHideOnlineChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _onUnreadRevisionChanged() {
     if (!mounted) return;
     setState(() {});
   }
@@ -251,7 +267,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Latest message per conversation involving me — used for the
         // "WhatsApp-style" last-message preview and the sort order.
         ChatApi.fetchLatestPerConversation(id),
-        ChatUnread.readPerConversationSeen(),
         // Conversations the user deleted from their list (local
         // "delete for me"). A row stays hidden until a message newer
         // than the clear timestamp arrives.
@@ -273,13 +288,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (m.matchedAt != null) m.profile.id: m.matchedAt!,
       };
       final latest = results[1] as Map<String, ChatMessage>;
-      final seen = results[2] as Map<String, DateTime>;
-      final cleared = results[3] as Map<String, DateTime>;
-      final iBlocked = results[4] as List<RemoteProfile>;
-      final blockedMe = results[5] as Set<String>;
+      final cleared = results[2] as Map<String, DateTime>;
+      final iBlocked = results[3] as List<RemoteProfile>;
+      final blockedMe = results[4] as Set<String>;
       final inbound =
-          results[6] as List<({String conversationId, DateTime createdAt})>;
-      final touched = results[7] as Map<String, DateTime>;
+          results[5] as List<({String conversationId, DateTime createdAt})>;
+      final touched = results[6] as Map<String, DateTime>;
 
       final byId = <String, RemoteProfile>{};
       for (final p in matches) {
@@ -364,19 +378,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (lb == null) return -1;
           return lb.compareTo(la); // most recent first
         });
-      // Per-conversation unread COUNT: inbound messages newer than the last
-      // time I opened that thread (never opened → all of them count).
-      final unreadCounts = <String, int>{};
-      for (final m in inbound) {
-        // Le point du fil, et lui seul : ce compte est celui de la PASTILLE de
-        // la ligne, qui doit survivre à un passage sur la liste (voir
-        // [_isUnread]).
-        final s = seen[m.conversationId];
-        if (s == null || m.createdAt.isAfter(s)) {
-          unreadCounts[m.conversationId] =
-              (unreadCounts[m.conversationId] ?? 0) + 1;
-        }
-      }
       if (!mounted) return;
       setState(() {
         _myId = id;
@@ -385,8 +386,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _newMatches = newMatches;
         _seenMatches = seenMatches;
         _latestByConv = latest;
-        _seenByConv = seen;
-        _unreadCountByConv = unreadCounts;
+        _inbound = inbound;
         _loading = false;
       });
       // Landed on Messages with fresh matches → start the "seen" countdown.
@@ -818,15 +818,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isUnread(RemoteProfile p) {
     final convId = _conversationIdFor(p.id);
     final last = _latestByConv[convId];
-    final seen = _seenByConv[convId];
+    final seen = ChatUnread.seenAt(convId);
     return last != null &&
         last.senderId != _myId &&
         (seen == null || last.createdAt.isAfter(seen));
   }
 
   /// Number of unread inbound messages in [p]'s conversation (0 = none).
-  int _unreadCountFor(RemoteProfile p) =>
-      _unreadCountByConv[_conversationIdFor(p.id)] ?? 0;
+  /// Computed live against [ChatUnread.seenAt] rather than a snapshot taken
+  /// at the last [_reload] — the read pointer can move from outside this
+  /// list (a push notification opens the thread directly), and this must
+  /// reflect that the moment it happens, not at the next reload.
+  int _unreadCountFor(RemoteProfile p) {
+    final convId = _conversationIdFor(p.id);
+    final seen = ChatUnread.seenAt(convId);
+    var n = 0;
+    for (final m in _inbound) {
+      if (m.conversationId != convId) continue;
+      if (seen == null || m.createdAt.isAfter(seen)) n++;
+    }
+    return n;
+  }
 }
 
 class _FriendChatRow extends StatelessWidget {

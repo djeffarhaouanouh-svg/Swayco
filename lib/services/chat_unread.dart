@@ -12,6 +12,15 @@ import 'supabase_service.dart';
 abstract final class ChatUnread {
   static final ValueNotifier<int> count = ValueNotifier<int>(0);
 
+  /// Bumped on every write to the seen state (global floor or per-
+  /// conversation). [count] only notifies when the numeric badge total
+  /// actually changes, which isn't a reliable "the chat list should
+  /// repaint its rows" signal — a thread can be marked seen while the
+  /// total unread count coincidentally stays the same. Listen to this
+  /// instead when a widget needs to know "something was marked read,
+  /// re-render," regardless of arrival path (list tap, push notification, …).
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   /// Le plancher d'INSTALLATION : tout ce qui est antérieur est tenu pour lu.
   ///
   /// Posé une fois, au premier lancement, et plus jamais touché. Il se relevait
@@ -51,6 +60,14 @@ abstract final class ChatUnread {
     if (floor == null) return own;
     return own.isAfter(floor) ? own : floor;
   }
+
+  /// Public, live view of [_seenFor] — the single source of truth for
+  /// "is this conversation read," kept current in memory regardless of
+  /// which screen last marked it seen (chat list, thread, push
+  /// notification, …). Callers should prefer this over caching their own
+  /// snapshot: a cached copy only refreshes when someone remembers to
+  /// re-fetch it, which is exactly the class of bug this replaces.
+  static DateTime? seenAt(String convId) => _seenFor(convId);
   static String _meId = '';
   static String _lastSeenIso = '';
 
@@ -118,6 +135,7 @@ abstract final class ChatUnread {
     // tomber au moment du geste. Le compte se relit du plancher déjà posé en
     // mémoire, donc une réémission du flux entre-temps ne le rallume pas.
     _recount();
+    revision.value++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_seenKey, nowIso);
   }
@@ -140,6 +158,7 @@ abstract final class ChatUnread {
     // seconde, pas au prochain passage par la liste.
     _convSeen[convId] = now;
     _recount();
+    revision.value++;
     final p = await SharedPreferences.getInstance();
     await p.setString('$_convSeenPrefix$convId', now.toIso8601String());
   }
