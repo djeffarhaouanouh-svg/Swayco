@@ -999,7 +999,7 @@ class _FriendChatRow extends StatelessWidget {
             : AppStrings.t('chat_no_name'));
 
     final subtitleParts = <InlineSpan>[];
-    if (lastMessage != null && lastMessage!.body.isNotEmpty) {
+    if (lastMessage != null && (lastMessage!.body.isNotEmpty || lastMessage!.isImage)) {
       if (isMine) {
         subtitleParts.add(const TextSpan(
           text: 'Vous : ',
@@ -1009,7 +1009,11 @@ class _FriendChatRow extends StatelessWidget {
           ),
         ));
       }
-      subtitleParts.add(TextSpan(text: lastMessage!.body));
+      subtitleParts.add(TextSpan(
+        text: lastMessage!.isImage
+            ? AppStrings.t('push_photo')
+            : lastMessage!.body,
+      ));
     } else {
       // Jamais un mot échangé : on le dit, au lieu d'inviter à toucher — la
       // ligne entière est déjà la touche.
