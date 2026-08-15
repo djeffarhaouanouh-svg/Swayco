@@ -62,6 +62,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     with SingleTickerProviderStateMixin {
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  bool _didInitialScroll = false;
 
   /// Plays a one-shot white shimmer sweep across the whole chat whenever the
   /// translate toggle is flipped from off → on. Idle the rest of the time so
@@ -422,6 +423,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
         if (!mounted) return;
+        // La toute première salve peuple un ListView.builder jusque-là vide
+        // (0 → N items) : à la frame qui suit, la liste n'a encore rien
+        // laid-out et son maxScrollExtent est une estimation qui peut être
+        // trop courte — on y arrivait donc pas tout en bas, silencieusement.
+        // Un jumpTo (pas d'anim, pas de faux départ visible en haut) suivi
+        // d'une seconde frame de rattrapage règle l'extent une fois que le
+        // sliver a vraiment posé ses enfants.
+        final isFirstLoad = !_didInitialScroll && rows.isNotEmpty;
+        if (isFirstLoad) _didInitialScroll = true;
         setState(() => _messages = rows);
         // Lu, puisque le fil est SOUS LES YEUX. Le point de lecture n'était
         // posé qu'à l'ouverture : un message reçu pendant qu'on lisait
@@ -435,7 +445,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             _maybeFetchTranslation(m);
           }
         }
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom(animate: !isFirstLoad);
+          if (isFirstLoad) {
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _scrollToBottom(animate: false));
+          }
+        });
       },
       onError: (e) {
         if (!mounted) return;
@@ -496,13 +512,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     if (!_scrollCtrl.hasClients) return;
-    _scrollCtrl.animateTo(
-      _scrollCtrl.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-    );
+    final target = _scrollCtrl.position.maxScrollExtent;
+    if (animate) {
+      _scrollCtrl.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _scrollCtrl.jumpTo(target);
+    }
   }
 
   @override
