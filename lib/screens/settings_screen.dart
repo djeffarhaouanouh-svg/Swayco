@@ -18,6 +18,7 @@ import '../services/stripe_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/location_picker_sheet.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
@@ -171,6 +172,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ───── Actions ─────────────────────────────────────────────────────────
+
+  /// Same rename rule as the inline editor on the Profile tab: once every
+  /// [profileNameChangeCooldown] (the DB trigger from migration 0044 is the
+  /// real guard — this is just the friendly front door that says how long
+  /// is left instead of a generic failed save).
+  Future<void> _editName() async {
+    final uid = await DeviceId.getOrCreate();
+    if (uid.isEmpty || !mounted) return;
+    final current = _profile?.displayName ?? '';
+    final changedAt = _profile?.nameChangedAt;
+    if (changedAt != null) {
+      final elapsed = DateTime.now().difference(changedAt);
+      if (elapsed < profileNameChangeCooldown) {
+        final remaining = profileNameChangeCooldown - elapsed;
+        final daysLeft = (remaining.inDays + 1)
+            .clamp(1, profileNameChangeCooldown.inDays);
+        _toast(AppStrings.t('name_change_cooldown', args: {'days': '$daysLeft'}));
+        return;
+      }
+    }
+    final ctrl = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _TextPromptDialog(
+        title: AppStrings.t('settings_first_name'),
+        controller: ctrl,
+        maxLength: profileNameMaxLength,
+      ),
+    );
+    ctrl.dispose();
+    if (result == null || !mounted) return;
+    final trimmed = result.trim();
+    if (trimmed.isEmpty || trimmed == current) return;
+    setState(() => _busy = true);
+    final saved = await ProfileApi.updateMyName(userId: uid, name: trimmed);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (saved == null) {
+      _toast(AppStrings.t('save_failed'));
+      return;
+    }
+    setState(() => _profile = _profile?.copyWith(
+          displayName: saved,
+          nameChangedAt: DateTime.now(),
+        ));
+  }
+
+  Future<void> _editCity() async {
+    final uid = await DeviceId.getOrCreate();
+    if (uid.isEmpty || !mounted) return;
+    final result = await showModalBottomSheet<(String, String)>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => LocationPickerSheet(
+        initialCountry: _profile?.country ?? '',
+        initialCity: _profile?.city ?? '',
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await ProfileApi.updateMyLocation(
+      userId: uid,
+      country: result.$1,
+      city: result.$2,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      _toast(AppStrings.t('save_failed'));
+      return;
+    }
+    setState(
+      () => _profile = _profile?.copyWith(country: result.$1, city: result.$2),
+    );
+  }
 
   Future<void> _changePassword() async {
     if (_email.isEmpty) {
@@ -395,6 +472,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.alternate_email,
                       label: AppStrings.t('settings_email'),
                       trailing: _SubtleText(_email.isEmpty ? '—' : _email),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.badge_outlined,
+                      label: AppStrings.t('settings_first_name'),
+                      trailing: _SubtleText(
+                        _profile?.displayName.trim().isNotEmpty ?? false
+                            ? _profile!.displayName.trim()
+                            : '—',
+                      ),
+                      onTap: _editName,
+                    ),
+                    _SettingsRow(
+                      icon: Icons.location_city_outlined,
+                      label: AppStrings.t('settings_city'),
+                      trailing: _SubtleText(
+                        _profile?.city.trim().isNotEmpty ?? false
+                            ? _profile!.city.trim()
+                            : '—',
+                      ),
+                      onTap: _editCity,
                     ),
                     _SettingsRow(
                       icon: Icons.lock_reset,
@@ -902,6 +999,95 @@ class _BlockedEmptyState extends StatelessWidget {
                 fontSize: 13,
                 height: 1.4,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Minimal single-line text prompt — used for the first-name edit in
+/// Settings. There's no existing "ask for a short string" dialog to reuse
+/// (swayco_dialog.dart only has confirm/cancel); this stays local rather
+/// than growing that file for one field.
+class _TextPromptDialog extends StatelessWidget {
+  const _TextPromptDialog({
+    required this.title,
+    required this.controller,
+    required this.maxLength,
+  });
+
+  final String title;
+  final TextEditingController controller;
+  final int maxLength;
+
+  static const _fieldBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(14)),
+    borderSide: BorderSide(color: SC.glassBorder),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: SC.bubbleIn,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: maxLength,
+              textCapitalization: TextCapitalization.words,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: SC.bg,
+                counterStyle: const TextStyle(color: SC.textMuted),
+                border: _fieldBorder,
+                enabledBorder: _fieldBorder,
+                focusedBorder: _fieldBorder.copyWith(
+                  borderSide: const BorderSide(color: SC.accent, width: 1.5),
+                ),
+              ),
+              onSubmitted: (v) => Navigator.of(context).pop(v),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      AppStrings.t('cancel'),
+                      style: const TextStyle(color: SC.textMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: SC.accent),
+                    onPressed: () =>
+                        Navigator.of(context).pop(controller.text),
+                    child: Text(AppStrings.t('save')),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
