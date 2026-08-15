@@ -1493,7 +1493,15 @@ class _CallScreenState extends State<CallScreen> {
     // this block is iOS-only on purpose.
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       var speechAuth = await AppleSttChannel.instance.authStatus();
-      if (speechAuth != AppleSttAuth.authorized) {
+      // notDetermined is the ONLY state where requestAuth() actually shows
+      // Apple's own dialog — iOS spends that prompt once per install. Once
+      // the answer is denied/restricted, calling requestAuth() again is a
+      // silent no-op (returns denied instantly, nothing on screen): tapping
+      // "Allow" in OUR sheet would look broken because there's no real OS
+      // dialog left to trigger. The only way back at that point is the
+      // Settings app, so already-denied gets a different sheet that deep
+      // links there instead of re-asking — same split as NotifEnableFlow.
+      if (speechAuth == AppleSttAuth.notDetermined) {
         if (!mounted) return;
         final ok = await PermissionPriming.show(
           context,
@@ -1512,6 +1520,23 @@ class _CallScreenState extends State<CallScreen> {
           return;
         }
         speechAuth = await AppleSttChannel.instance.requestAuth();
+      } else if (speechAuth != AppleSttAuth.authorized) {
+        if (!mounted) return;
+        final ok = await PermissionPriming.show(
+          context,
+          icon: Icons.record_voice_over_rounded,
+          title: AppStrings.t('speech_prime_title'),
+          body: AppStrings.t('speech_prime_settings_body'),
+          confirmLabel: AppStrings.t('notif_prime_open_settings'),
+        );
+        if (ok) await openAppSettings();
+        if (mounted) {
+          setState(() {
+            _connecting = false;
+            _connectError = AppStrings.t('call_perm_required_speech');
+          });
+        }
+        return;
       }
       if (speechAuth != AppleSttAuth.authorized) {
         setState(() {

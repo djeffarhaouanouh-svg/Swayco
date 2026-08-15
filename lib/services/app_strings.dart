@@ -115,6 +115,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'On a besoin de la reconnaissance vocale pour traduire ce que tu dis pendant l\'appel.',
     'speech_prime_enable': 'Autoriser',
+    'speech_prime_settings_body':
+        'Active la reconnaissance vocale dans les Réglages pour pouvoir appeler.',
     'notif_banner_text':
         'Notifications désactivées — tu rates les messages et les appels.',
     'notif_banner_cta': 'Activer',
@@ -682,6 +684,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'We need speech recognition to translate what you say during the call.',
     'speech_prime_enable': 'Allow',
+    'speech_prime_settings_body':
+        'Enable speech recognition in Settings to be able to call.',
     'notif_banner_text':
         'Notifications are off — you\'re missing messages and calls.',
     'notif_banner_cta': 'Turn on',
@@ -1238,6 +1242,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'Necesitamos el reconocimiento de voz para traducir lo que dices durante la llamada.',
     'speech_prime_enable': 'Permitir',
+    'speech_prime_settings_body':
+        'Activa el reconocimiento de voz en Ajustes para poder llamar.',
     'notif_banner_text':
         'Notificaciones desactivadas: te pierdes mensajes y llamadas.',
     'notif_banner_cta': 'Activar',
@@ -1770,6 +1776,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'Wir brauchen die Spracherkennung, um zu übersetzen, was du im Anruf sagst.',
     'speech_prime_enable': 'Erlauben',
+    'speech_prime_settings_body':
+        'Aktiviere die Spracherkennung in den Einstellungen, um anrufen zu können.',
     'notif_banner_text':
         'Benachrichtigungen aus — du verpasst Nachrichten und Anrufe.',
     'notif_banner_cta': 'Aktivieren',
@@ -2307,6 +2315,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'Ci serve il riconoscimento vocale per tradurre quello che dici durante la chiamata.',
     'speech_prime_enable': 'Consenti',
+    'speech_prime_settings_body':
+        'Attiva il riconoscimento vocale nelle Impostazioni per poter chiamare.',
     'notif_banner_text':
         'Notifiche disattivate: ti perdi messaggi e chiamate.',
     'notif_banner_cta': 'Attiva',
@@ -2838,6 +2848,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'Precisamos do reconhecimento de voz para traduzir o que dizes durante a chamada.',
     'speech_prime_enable': 'Permitir',
+    'speech_prime_settings_body':
+        'Ativa o reconhecimento de voz nas Definições para poderes ligar.',
     'notif_banner_text':
         'Notificações desativadas — estás a perder mensagens e chamadas.',
     'notif_banner_cta': 'Ativar',
@@ -3370,6 +3382,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'We hebben spraakherkenning nodig om te vertalen wat je tijdens het gesprek zegt.',
     'speech_prime_enable': 'Toestaan',
+    'speech_prime_settings_body':
+        'Zet spraakherkenning aan in Instellingen om te kunnen bellen.',
     'notif_banner_text':
         'Meldingen staan uit — je mist berichten en oproepen.',
     'notif_banner_cta': 'Inschakelen',
@@ -3899,6 +3913,7 @@ abstract final class AppStrings {
     'speech_prime_title': 'التعرف على الصوت',
     'speech_prime_body': 'نحتاج إلى التعرف على الصوت لترجمة ما تقوله أثناء المكالمة.',
     'speech_prime_enable': 'السماح',
+    'speech_prime_settings_body': 'فعّل التعرف على الصوت من الإعدادات حتى تتمكن من الاتصال.',
     'notif_banner_text': 'الإشعارات معطّلة — أنت تفوّت رسائل ومكالمات.',
     'notif_banner_cta': 'تفعيل',
     'schedule_past_error': 'اختر وقتًا في المستقبل.',
@@ -4417,6 +4432,8 @@ abstract final class AppStrings {
     'speech_prime_body':
         'Распознавание речи нужно, чтобы переводить то, что ты говоришь во время звонка.',
     'speech_prime_enable': 'Разрешить',
+    'speech_prime_settings_body':
+        'Включи распознавание речи в Настройках, чтобы можно было звонить.',
     'notif_banner_text':
         'Уведомления выключены — ты пропускаешь сообщения и звонки.',
     'notif_banner_cta': 'Включить',
@@ -4942,6 +4959,7 @@ abstract final class AppStrings {
     'speech_prime_title': '语音识别',
     'speech_prime_body': '需要语音识别来翻译你在通话中说的话。',
     'speech_prime_enable': '允许',
+    'speech_prime_settings_body': '请在设置中开启语音识别才能拨打电话。',
     'notif_banner_text': '通知已关闭——你正在错过消息和来电。',
     'notif_banner_cta': '开启',
     'schedule_past_error': '请选择一个将来的时间。',
@@ -5447,6 +5465,7 @@ abstract final class AppStrings {
     'speech_prime_title': '音声認識',
     'speech_prime_body': '通話中に話した内容を翻訳するために音声認識が必要です。',
     'speech_prime_enable': '許可',
+    'speech_prime_settings_body': '発信するには設定で音声認識をオンにしてください。',
     'notif_banner_text': '通知がオフです — メッセージや電話を逃しています。',
     'notif_banner_cta': 'オンにする',
     'schedule_past_error': '未来の時間を選んでください。',
@@ -5938,6 +5957,7 @@ abstract final class AppStrings {
     'speech_prime_title': '음성 인식',
     'speech_prime_body': '통화 중 말하는 내용을 번역하려면 음성 인식이 필요해요.',
     'speech_prime_enable': '허용',
+    'speech_prime_settings_body': '전화하려면 설정에서 음성 인식을 켜주세요.',
     'notif_banner_text': '알림이 꺼져 있어요 — 메시지와 전화를 놓치고 있어요.',
     'notif_banner_cta': '켜기',
     'schedule_past_error': '미래 시간을 선택하세요.',
