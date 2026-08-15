@@ -634,8 +634,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
 
-                // Destructive actions — kept at the very bottom.
-                const SizedBox(height: 8),
+                // Destructive actions — kept at the very bottom, each its
+                // own section so the two aren't mistaken for one group.
+                _SectionHeader(label: AppStrings.t('settings_section_signout')),
                 _SettingsCard(
                   children: [
                     _SettingsRow(
@@ -644,6 +645,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: const Color(0xFFE53935),
                       onTap: _signOut,
                     ),
+                  ],
+                ),
+
+                _SectionHeader(
+                  label: AppStrings.t('settings_section_delete_account'),
+                ),
+                _SettingsCard(
+                  children: [
                     _SettingsRow(
                       icon: Icons.delete_forever,
                       label: AppStrings.t('settings_delete_account'),
