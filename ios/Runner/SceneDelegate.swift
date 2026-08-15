@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 
 /// Scene-based window setup for Flutter on iOS 13+. Instantiating the
 /// FlutterViewController programmatically from `willConnectTo` and
@@ -18,6 +19,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     options connectionOptions: UIScene.ConnectionOptions
   ) {
     guard let windowScene = scene as? UIWindowScene else { return }
+
+    // A tapped push that COLD-launched the app can arrive HERE instead of
+    // AppDelegate's launchOptions[.remoteNotification] — Scene-based apps
+    // aren't guaranteed which path iOS uses to hand back the notification
+    // that started the launch. Same UserDefaults key as the AppDelegate
+    // capture, read back by NotificationClient.consumeColdLaunchIntent() on
+    // the Dart side regardless of which of the two actually fired.
+    if let response = connectionOptions.notificationResponse {
+      persistPendingNotificationLaunchData(
+        response.notification.request.content.userInfo)
+    }
+
     let flutterVC = FlutterViewController()
     // Plugins must be registered on THIS FlutterViewController's
     // engine — registering on AppDelegate instead targets the implicit

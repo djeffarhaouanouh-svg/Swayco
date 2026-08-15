@@ -62,7 +62,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     with SingleTickerProviderStateMixin {
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  bool _didInitialScroll = false;
 
   /// Plays a one-shot white shimmer sweep across the whole chat whenever the
   /// translate toggle is flipped from off → on. Idle the rest of the time so
@@ -423,15 +422,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
         if (!mounted) return;
-        // La toute première salve peuple un ListView.builder jusque-là vide
-        // (0 → N items) : à la frame qui suit, la liste n'a encore rien
-        // laid-out et son maxScrollExtent est une estimation qui peut être
-        // trop courte — on y arrivait donc pas tout en bas, silencieusement.
-        // Un jumpTo (pas d'anim, pas de faux départ visible en haut) suivi
-        // d'une seconde frame de rattrapage règle l'extent une fois que le
-        // sliver a vraiment posé ses enfants.
-        final isFirstLoad = !_didInitialScroll && rows.isNotEmpty;
-        if (isFirstLoad) _didInitialScroll = true;
         setState(() => _messages = rows);
         // Lu, puisque le fil est SOUS LES YEUX. Le point de lecture n'était
         // posé qu'à l'ouverture : un message reçu pendant qu'on lisait
@@ -445,13 +435,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             _maybeFetchTranslation(m);
           }
         }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom(animate: !isFirstLoad);
-          if (isFirstLoad) {
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _scrollToBottom(animate: false));
-          }
-        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       },
       onError: (e) {
         if (!mounted) return;
@@ -512,18 +496,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
   }
 
-  void _scrollToBottom({bool animate = true}) {
+  // reverse: true means offset 0 IS the newest message — exact, never an
+  // estimate, so there's nothing to guess at on first layout.
+  void _scrollToBottom() {
     if (!_scrollCtrl.hasClients) return;
-    final target = _scrollCtrl.position.maxScrollExtent;
-    if (animate) {
-      _scrollCtrl.animateTo(
-        target,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
-    } else {
-      _scrollCtrl.jumpTo(target);
-    }
+    _scrollCtrl.animateTo(
+      0,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -881,8 +862,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
 
     // Local TTS is local — no cloud cost, available to all tiers.
+    //
+    // reverse: true — the list's resting position (scroll offset 0) IS the
+    // newest message, by construction, with no estimation or post-layout
+    // scroll needed. A non-reversed list had to guess maxScrollExtent to
+    // jump there instead, and that guess is an *extrapolation* from
+    // whichever few items a lazy sliver has actually built (bubbles vary a
+    // lot in height — text vs. image) — wrong on a long history, and no
+    // more accurate on a later frame since nothing between has actually
+    // been measured. `items` stays built oldest→newest exactly as before;
+    // only the read direction is inverted here, at the last possible step.
     return ListView.builder(
       controller: _scrollCtrl,
+      reverse: true,
       // Bottom room so the last message clears the floating composer.
       padding: EdgeInsets.fromLTRB(
         12,
@@ -892,7 +884,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       ),
       itemCount: items.length,
       itemBuilder: (ctx, i) {
-        final item = items[i];
+        final item = items[items.length - 1 - i];
         if (item.isDay) {
           return _DaySeparator(day: item.day!);
         }

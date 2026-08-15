@@ -7,6 +7,25 @@ import WebRTC
 import FirebaseCore
 import FirebaseMessaging
 
+/// Stashes a tapped notification's payload so Dart can pick it up as a
+/// cold-launch routing intent (see AppDelegate.didFinishLaunchingWithOptions
+/// and SceneDelegate.scene(_:willConnectTo:) for the two places iOS may
+/// hand us this). Shared so both call sites write the exact same key/shape
+/// that `NotificationClient.consumeColdLaunchIntent()` reads on the Dart
+/// side.
+func persistPendingNotificationLaunchData(_ userInfo: [AnyHashable: Any]) {
+  var data: [String: String] = [:]
+  for (key, value) in userInfo {
+    guard let key = key as? String, key != "aps" else { continue }
+    data[key] = "\(value)"
+  }
+  guard !data.isEmpty,
+        let json = try? JSONSerialization.data(withJSONObject: data),
+        let jsonString = String(data: json, encoding: .utf8) else { return }
+  UserDefaults.standard.set(jsonString,
+                            forKey: "flutter.pending_notification_launch_data")
+}
+
 @main
 @objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CallkitIncomingAppDelegate {
   override func application(
@@ -68,17 +87,13 @@ import FirebaseMessaging
     // in time to see the launch. Stash the payload natively now so Dart
     // can pick it up as soon as SharedPreferences is available, instead
     // of silently landing on whatever screen the app last showed.
-    if let remoteNotif = launchOptions?[.remoteNotification] as? [String: Any] {
-      var data: [String: String] = [:]
-      for (key, value) in remoteNotif where key != "aps" {
-        data[key] = "\(value)"
-      }
-      if !data.isEmpty,
-         let json = try? JSONSerialization.data(withJSONObject: data),
-         let jsonString = String(data: json, encoding: .utf8) {
-        UserDefaults.standard.set(jsonString,
-                                  forKey: "flutter.pending_notification_launch_data")
-      }
+    //
+    // Belt and suspenders: for a Scene-based app, iOS may deliver this
+    // via UIScene.ConnectionOptions.notificationResponse to the
+    // SceneDelegate INSTEAD of here — see the matching capture there.
+    // Whichever path actually fires, both write the same UserDefaults key.
+    if let remoteNotif = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
+      persistPendingNotificationLaunchData(remoteNotif)
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
