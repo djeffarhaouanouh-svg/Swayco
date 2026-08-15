@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -555,15 +556,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       setState(() => _error = 'Supabase non configuré.');
       return;
     }
-    final picker = ImagePicker();
-    final XFile? file = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 85,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
+    final XFile? file;
+    final Uint8List bytes;
+    try {
+      final picker = ImagePicker();
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (mounted) setState(() => _error = "Accès à la galerie refusé ou indisponible: $e");
+      return;
+    }
     if (!mounted) return;
     final isPng = file.name.toLowerCase().endsWith('.png');
     setState(() => _sending = true);

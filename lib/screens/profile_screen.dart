@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -504,17 +505,30 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('photos_full'))));
       return;
     }
-    final picker = ImagePicker();
-    final XFile? file = await picker.pickImage(
-      source: ImageSource.gallery,
-      // The Discover card is portrait — keep more pixels than the avatar
-      // (1024² → 1600 max edge) so the photo doesn't look soft full-screen.
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 88,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
+    final XFile? file;
+    final Uint8List bytes;
+    try {
+      final picker = ImagePicker();
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        // The Discover card is portrait — keep more pixels than the avatar
+        // (1024² → 1600 max edge) so the photo doesn't look soft full-screen.
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 88,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
     try {
@@ -549,17 +563,30 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('backend_unavailable'))));
       return;
     }
-    final picker = ImagePicker();
-    final XFile? file = await picker.pickImage(
-      source: ImageSource.gallery,
-      // The avatar renders small and round — 1024² is plenty and keeps the
-      // upload light.
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 88,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
+    final XFile? file;
+    final Uint8List bytes;
+    try {
+      final picker = ImagePicker();
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        // The avatar renders small and round — 1024² is plenty and keeps the
+        // upload light.
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 88,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
     try {
