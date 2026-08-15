@@ -111,6 +111,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'On a besoin du micro pour qu\'on t\'entende pendant l\'appel.',
     'mic_prime_enable': 'Autoriser',
+    'speech_prime_title': 'Reconnaissance vocale',
+    'speech_prime_body':
+        'On a besoin de la reconnaissance vocale pour traduire ce que tu dis pendant l\'appel.',
+    'speech_prime_enable': 'Autoriser',
     'notif_banner_text':
         'Notifications désactivées — tu rates les messages et les appels.',
     'notif_banner_cta': 'Activer',
@@ -429,6 +433,8 @@ abstract final class AppStrings {
         'La conversation disparaîtra de ta liste. Elle réapparaîtra si la personne t’envoie un nouveau message.',
     'call_perm_required':
         'L’accès à la caméra et au micro est nécessaire pour rejoindre l’appel.',
+    'call_perm_required_speech':
+        'La reconnaissance vocale est nécessaire pour traduire l\'appel. Active-la dans Réglages pour appeler.',
     'call_could_not_join': 'Connexion impossible',
     'call_go_back': 'Retour',
     'call_connecting': 'Connexion à {room}…',
@@ -672,6 +678,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'We need the mic so the other person can hear you during the call.',
     'mic_prime_enable': 'Allow',
+    'speech_prime_title': 'Speech recognition',
+    'speech_prime_body':
+        'We need speech recognition to translate what you say during the call.',
+    'speech_prime_enable': 'Allow',
     'notif_banner_text':
         'Notifications are off — you\'re missing messages and calls.',
     'notif_banner_cta': 'Turn on',
@@ -981,6 +991,8 @@ abstract final class AppStrings {
         'The conversation will disappear from your list. It reappears if the person sends you a new message.',
     'call_perm_required':
         'Camera and microphone permission are required to join the call.',
+    'call_perm_required_speech':
+        'Speech recognition is required to translate the call. Enable it in Settings to call.',
     'call_could_not_join': 'Could not join',
     'call_go_back': 'Go back',
     'call_connecting': 'Connecting to {room}…',
@@ -1222,6 +1234,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Necesitamos el micrófono para que te oigan durante la llamada.',
     'mic_prime_enable': 'Permitir',
+    'speech_prime_title': 'Reconocimiento de voz',
+    'speech_prime_body':
+        'Necesitamos el reconocimiento de voz para traducir lo que dices durante la llamada.',
+    'speech_prime_enable': 'Permitir',
     'notif_banner_text':
         'Notificaciones desactivadas: te pierdes mensajes y llamadas.',
     'notif_banner_cta': 'Activar',
@@ -1475,6 +1491,8 @@ abstract final class AppStrings {
         'La conversación desaparecerá de tu lista. Reaparecerá si la persona te envía un nuevo mensaje.',
     'call_perm_required':
         'Se necesita permiso de cámara y micrófono para unirse a la llamada.',
+    'call_perm_required_speech':
+        'Se necesita el reconocimiento de voz para traducir la llamada. Actívalo en Ajustes para llamar.',
     'call_could_not_join': 'No se pudo unir',
     'call_go_back': 'Volver',
     'call_connecting': 'Conectando a {room}…',
@@ -1748,6 +1766,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Wir brauchen das Mikrofon, damit man dich im Anruf hört.',
     'mic_prime_enable': 'Erlauben',
+    'speech_prime_title': 'Spracherkennung',
+    'speech_prime_body':
+        'Wir brauchen die Spracherkennung, um zu übersetzen, was du im Anruf sagst.',
+    'speech_prime_enable': 'Erlauben',
     'notif_banner_text':
         'Benachrichtigungen aus — du verpasst Nachrichten und Anrufe.',
     'notif_banner_cta': 'Aktivieren',
@@ -1923,6 +1945,8 @@ abstract final class AppStrings {
         'Die Unterhaltung verschwindet aus deiner Liste. Sie erscheint wieder, wenn die Person dir eine neue Nachricht schickt.',
     'call_perm_required':
         'Kamera- und Mikrofonzugriff sind nötig, um dem Anruf beizutreten.',
+    'call_perm_required_speech':
+        'Für die Übersetzung des Anrufs ist Spracherkennung erforderlich. Aktiviere sie in den Einstellungen, um anzurufen.',
     'call_could_not_join': 'Beitritt fehlgeschlagen',
     'call_go_back': 'Zurück',
     'call_connecting': 'Verbinde mit {room}…',
@@ -2279,6 +2303,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Ci serve il microfono perché ti sentano durante la chiamata.',
     'mic_prime_enable': 'Consenti',
+    'speech_prime_title': 'Riconoscimento vocale',
+    'speech_prime_body':
+        'Ci serve il riconoscimento vocale per tradurre quello che dici durante la chiamata.',
+    'speech_prime_enable': 'Consenti',
     'notif_banner_text':
         'Notifiche disattivate: ti perdi messaggi e chiamate.',
     'notif_banner_cta': 'Attiva',
@@ -2452,6 +2480,8 @@ abstract final class AppStrings {
         'La conversazione sparirà dalla tua lista. Riapparirà se la persona ti invia un nuovo messaggio.',
     'call_perm_required':
         'Servono i permessi di fotocamera e microfono per unirti alla chiamata.',
+    'call_perm_required_speech':
+        'Il riconoscimento vocale è necessario per tradurre la chiamata. Attivalo nelle Impostazioni per chiamare.',
     'call_could_not_join': 'Impossibile unirsi',
     'call_go_back': 'Indietro',
     'call_connecting': 'Connessione a {room}…',
@@ -2804,6 +2834,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Precisamos do microfone para que te oiçam durante a chamada.',
     'mic_prime_enable': 'Permitir',
+    'speech_prime_title': 'Reconhecimento de voz',
+    'speech_prime_body':
+        'Precisamos do reconhecimento de voz para traduzir o que dizes durante a chamada.',
+    'speech_prime_enable': 'Permitir',
     'notif_banner_text':
         'Notificações desativadas — estás a perder mensagens e chamadas.',
     'notif_banner_cta': 'Ativar',
@@ -2978,6 +3012,8 @@ abstract final class AppStrings {
         'A conversa desaparecerá da tua lista. Reaparecerá se a pessoa te enviar uma nova mensagem.',
     'call_perm_required':
         'É necessária permissão de câmara e microfone para entrar na chamada.',
+    'call_perm_required_speech':
+        'O reconhecimento de voz é necessário para traduzir a chamada. Ativa-o nas Definições para ligar.',
     'call_could_not_join': 'Não foi possível entrar',
     'call_go_back': 'Voltar',
     'call_connecting': 'A ligar a {room}…',
@@ -3330,6 +3366,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'We hebben de microfoon nodig zodat men je hoort tijdens het gesprek.',
     'mic_prime_enable': 'Toestaan',
+    'speech_prime_title': 'Spraakherkenning',
+    'speech_prime_body':
+        'We hebben spraakherkenning nodig om te vertalen wat je tijdens het gesprek zegt.',
+    'speech_prime_enable': 'Toestaan',
     'notif_banner_text':
         'Meldingen staan uit — je mist berichten en oproepen.',
     'notif_banner_cta': 'Inschakelen',
@@ -3505,6 +3545,8 @@ abstract final class AppStrings {
         'Het gesprek verdwijnt uit je lijst. Het verschijnt weer als de persoon je een nieuw bericht stuurt.',
     'call_perm_required':
         'Toegang tot camera en microfoon is nodig om aan de oproep deel te nemen.',
+    'call_perm_required_speech':
+        'Spraakherkenning is nodig om het gesprek te vertalen. Zet het aan in Instellingen om te bellen.',
     'call_could_not_join': 'Deelnemen mislukt',
     'call_go_back': 'Terug',
     'call_connecting': 'Verbinden met {room}…',
@@ -3854,6 +3896,9 @@ abstract final class AppStrings {
     'mic_prime_title': 'الوصول إلى الميكروفون',
     'mic_prime_body': 'نحتاج إلى الميكروفون كي يسمعك الطرف الآخر أثناء المكالمة.',
     'mic_prime_enable': 'السماح',
+    'speech_prime_title': 'التعرف على الصوت',
+    'speech_prime_body': 'نحتاج إلى التعرف على الصوت لترجمة ما تقوله أثناء المكالمة.',
+    'speech_prime_enable': 'السماح',
     'notif_banner_text': 'الإشعارات معطّلة — أنت تفوّت رسائل ومكالمات.',
     'notif_banner_cta': 'تفعيل',
     'schedule_past_error': 'اختر وقتًا في المستقبل.',
@@ -4023,6 +4068,7 @@ abstract final class AppStrings {
         'ستختفي المحادثة من قائمتك. وستظهر مجددًا إذا أرسل لك الشخص رسالة جديدة.',
     'call_perm_required':
         'يلزم إذن الكاميرا والميكروفون للانضمام إلى المكالمة.',
+    'call_perm_required_speech': 'التعرف على الصوت ضروري لترجمة المكالمة. فعّله من الإعدادات للاتصال.',
     'call_could_not_join': 'تعذّر الانضمام',
     'call_go_back': 'رجوع',
     'call_connecting': 'جارٍ الاتصال بـ {room}…',
@@ -4367,6 +4413,10 @@ abstract final class AppStrings {
     'mic_prime_title': 'Доступ к микрофону',
     'mic_prime_body': 'Микрофон нужен, чтобы тебя слышали во время звонка.',
     'mic_prime_enable': 'Разрешить',
+    'speech_prime_title': 'Распознавание речи',
+    'speech_prime_body':
+        'Распознавание речи нужно, чтобы переводить то, что ты говоришь во время звонка.',
+    'speech_prime_enable': 'Разрешить',
     'notif_banner_text':
         'Уведомления выключены — ты пропускаешь сообщения и звонки.',
     'notif_banner_cta': 'Включить',
@@ -4541,6 +4591,8 @@ abstract final class AppStrings {
         'Переписка исчезнет из вашего списка. Она появится снова, если человек напишет вам.',
     'call_perm_required':
         'Для подключения к звонку нужен доступ к камере и микрофону.',
+    'call_perm_required_speech':
+        'Для перевода звонка нужно распознавание речи. Включи его в Настройках, чтобы звонить.',
     'call_could_not_join': 'Не удалось подключиться',
     'call_go_back': 'Назад',
     'call_connecting': 'Подключение к {room}…',
@@ -4887,6 +4939,9 @@ abstract final class AppStrings {
     'mic_prime_title': '麦克风权限',
     'mic_prime_body': '通话时需要麦克风，对方才能听到你。',
     'mic_prime_enable': '允许',
+    'speech_prime_title': '语音识别',
+    'speech_prime_body': '需要语音识别来翻译你在通话中说的话。',
+    'speech_prime_enable': '允许',
     'notif_banner_text': '通知已关闭——你正在错过消息和来电。',
     'notif_banner_cta': '开启',
     'schedule_past_error': '请选择一个将来的时间。',
@@ -5045,6 +5100,7 @@ abstract final class AppStrings {
     'delete_conversation': '删除对话',
     'delete_conversation_body': '该对话将从你的列表中消失。如果对方给你发送新消息，它会重新出现。',
     'call_perm_required': '加入通话需要摄像头和麦克风权限。',
+    'call_perm_required_speech': '翻译通话需要语音识别权限。请在设置中开启后再拨打。',
     'call_could_not_join': '无法加入',
     'call_go_back': '返回',
     'call_connecting': '正在连接 {room}…',
@@ -5388,6 +5444,9 @@ abstract final class AppStrings {
     'mic_prime_title': 'マイクへのアクセス',
     'mic_prime_body': '通話中に声を届けるためにマイクが必要です。',
     'mic_prime_enable': '許可',
+    'speech_prime_title': '音声認識',
+    'speech_prime_body': '通話中に話した内容を翻訳するために音声認識が必要です。',
+    'speech_prime_enable': '許可',
     'notif_banner_text': '通知がオフです — メッセージや電話を逃しています。',
     'notif_banner_cta': 'オンにする',
     'schedule_past_error': '未来の時間を選んでください。',
@@ -5549,6 +5608,7 @@ abstract final class AppStrings {
     'delete_conversation': '会話を削除',
     'delete_conversation_body': 'この会話はリストから消えます。相手が新しいメッセージを送ると再表示されます。',
     'call_perm_required': '通話に参加するにはカメラとマイクの許可が必要です。',
+    'call_perm_required_speech': '通話を翻訳するには音声認識が必要です。発信するには設定でオンにしてください。',
     'call_could_not_join': '参加できませんでした',
     'call_go_back': '戻る',
     'call_connecting': '{room} に接続中…',
@@ -5875,6 +5935,9 @@ abstract final class AppStrings {
     'mic_prime_title': '마이크 접근',
     'mic_prime_body': '통화 중 상대가 당신의 목소리를 들으려면 마이크가 필요해요.',
     'mic_prime_enable': '허용',
+    'speech_prime_title': '음성 인식',
+    'speech_prime_body': '통화 중 말하는 내용을 번역하려면 음성 인식이 필요해요.',
+    'speech_prime_enable': '허용',
     'notif_banner_text': '알림이 꺼져 있어요 — 메시지와 전화를 놓치고 있어요.',
     'notif_banner_cta': '켜기',
     'schedule_past_error': '미래 시간을 선택하세요.',
@@ -6035,6 +6098,7 @@ abstract final class AppStrings {
     'delete_conversation': '대화 삭제',
     'delete_conversation_body': '대화가 목록에서 사라집니다. 상대방이 새 메시지를 보내면 다시 나타납니다.',
     'call_perm_required': '통화에 참여하려면 카메라와 마이크 권한이 필요합니다.',
+    'call_perm_required_speech': '통화를 번역하려면 음성 인식이 필요합니다. 전화하려면 설정에서 켜주세요.',
     'call_could_not_join': '참여하지 못했습니다',
     'call_go_back': '뒤로',
     'call_connecting': '{room}에 연결 중…',

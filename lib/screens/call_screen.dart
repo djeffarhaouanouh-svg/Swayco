@@ -17,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
+import '../swayco/asr/apple_stt_channel.dart';
 import '../swayco/asr/asr_service.dart';
 import '../services/audio_controller.dart';
 import '../services/call_audio.dart';
@@ -1477,6 +1478,45 @@ class _CallScreenState extends State<CallScreen> {
         setState(() {
           _connecting = false;
           _connectError = AppStrings.t('call_perm_required');
+        });
+        return;
+      }
+    }
+
+    // iOS only: speech recognition is what actually translates a voice — a
+    // call running without it would connect and carry raw untranslated
+    // audio, which defeats the app's one job. So unlike the Apple STT probe
+    // in AsrService (silent fallback to on-device Whisper), THIS path is a
+    // hard gate: refuse and the call never connects, same as the mic above.
+    // Android has no equivalent OS permission for its native recogniser
+    // (just a device-capability check), so it keeps the Whisper fallback —
+    // this block is iOS-only on purpose.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      var speechAuth = await AppleSttChannel.instance.authStatus();
+      if (speechAuth != AppleSttAuth.authorized) {
+        if (!mounted) return;
+        final ok = await PermissionPriming.show(
+          context,
+          icon: Icons.record_voice_over_rounded,
+          title: AppStrings.t('speech_prime_title'),
+          body: AppStrings.t('speech_prime_body'),
+          confirmLabel: AppStrings.t('speech_prime_enable'),
+        );
+        if (!ok) {
+          if (mounted) {
+            setState(() {
+              _connecting = false;
+              _connectError = AppStrings.t('call_perm_required_speech');
+            });
+          }
+          return;
+        }
+        speechAuth = await AppleSttChannel.instance.requestAuth();
+      }
+      if (speechAuth != AppleSttAuth.authorized) {
+        setState(() {
+          _connecting = false;
+          _connectError = AppStrings.t('call_perm_required_speech');
         });
         return;
       }
