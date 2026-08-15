@@ -82,9 +82,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Map<String, ChatMessage> _latestByConv = const {};
   // Raw inbound messages (not yet known-seen at _reload() time) — the read
   // pointer itself is NOT cached here. [_isUnread]/[_unreadCountFor] read
-  // it live from [ChatUnread.seenAt] so a thread opened from ANY path
-  // (this list, a push notification, …) clears its row immediately,
-  // without needing that path to remember to trigger a reload.
+  // it live from [ChatUnread.threadSeenAt] (never the global floor — that
+  // would clear a row just for landing on this tab) so a thread opened
+  // from ANY path (this list, a push notification, …) clears its row
+  // immediately, without needing that path to remember to trigger a reload.
   List<({String conversationId, DateTime createdAt})> _inbound = const [];
   bool _loading = true;
   String? _error;
@@ -818,20 +819,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isUnread(RemoteProfile p) {
     final convId = _conversationIdFor(p.id);
     final last = _latestByConv[convId];
-    final seen = ChatUnread.seenAt(convId);
+    final seen = ChatUnread.threadSeenAt(convId);
     return last != null &&
         last.senderId != _myId &&
         (seen == null || last.createdAt.isAfter(seen));
   }
 
   /// Number of unread inbound messages in [p]'s conversation (0 = none).
-  /// Computed live against [ChatUnread.seenAt] rather than a snapshot taken
-  /// at the last [_reload] — the read pointer can move from outside this
-  /// list (a push notification opens the thread directly), and this must
-  /// reflect that the moment it happens, not at the next reload.
+  /// Computed live against [ChatUnread.threadSeenAt] rather than a snapshot
+  /// taken at the last [_reload] — the read pointer can move from outside
+  /// this list (a push notification opens the thread directly), and this
+  /// must reflect that the moment it happens, not at the next reload.
   int _unreadCountFor(RemoteProfile p) {
     final convId = _conversationIdFor(p.id);
-    final seen = ChatUnread.seenAt(convId);
+    final seen = ChatUnread.threadSeenAt(convId);
     var n = 0;
     for (final m in _inbound) {
       if (m.conversationId != convId) continue;

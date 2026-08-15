@@ -63,13 +63,22 @@ abstract final class ChatUnread {
     return own.isAfter(floor) ? own : floor;
   }
 
-  /// Public, live view of [_seenFor] — the single source of truth for
-  /// "is this conversation read," kept current in memory regardless of
-  /// which screen last marked it seen (chat list, thread, push
-  /// notification, …). Callers should prefer this over caching their own
-  /// snapshot: a cached copy only refreshes when someone remembers to
-  /// re-fetch it, which is exactly the class of bug this replaces.
+  /// Public, live view of [_seenFor] — the single source of truth for the
+  /// BADGE count, kept current in memory regardless of which screen last
+  /// marked it seen (chat list, thread, push notification, …). Merges the
+  /// global floor (bumped just by visiting the Messages tab), which is
+  /// correct for "is there something new anywhere" but WRONG for the blue
+  /// line / row pastille — see [threadSeenAt].
   static DateTime? seenAt(String convId) => _seenFor(convId);
+
+  /// The thread's OWN read pointer alone, never the global floor. The blue
+  /// line / unread pastille answer "was THIS conversation opened," not "was
+  /// Messages visited since" — merging the floor here would let landing on
+  /// the tab silently clear a row nobody actually read. That distinction is
+  /// the entire reason the floor and the per-conversation map are two
+  /// separate fields (see the class doc above); [_isUnread] in the chat
+  /// list must use this, not [seenAt].
+  static DateTime? threadSeenAt(String convId) => _convSeen[convId];
   static String _meId = '';
   static String _lastSeenIso = '';
 

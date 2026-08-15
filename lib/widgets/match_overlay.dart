@@ -103,7 +103,14 @@ class _MatchOverlayState extends State<MatchOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
+    // Pushed via a bare PageRouteBuilder (not MaterialPageRoute), so
+    // nothing above provides a Material ancestor — the previous route's
+    // Scaffold doesn't count, routes are siblings in the Overlay, not
+    // nested. Without this, Text here falls back to its "no Material
+    // found" debug style: a yellow double underline.
+    return Material(
+      type: MaterialType.transparency,
+      child: AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
         return Stack(
@@ -142,6 +149,7 @@ class _MatchOverlayState extends State<MatchOverlay>
           ],
         );
       },
+      ),
     );
   }
 }

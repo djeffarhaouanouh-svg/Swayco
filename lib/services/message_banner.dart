@@ -123,10 +123,16 @@ class _MessageBannerViewState extends State<_MessageBannerView>
               onVerticalDragEnd: (d) {
                 if ((d.primaryVelocity ?? 0) < -200) widget.onDismiss();
               },
-              child: GlassPanel(
-                borderRadius: 18,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
+              // The OverlayEntry sits directly on the root Overlay, outside
+              // any Scaffold — without a Material ancestor, Text falls back
+              // to its "no Material found" debug style (a yellow double
+              // underline), which is exactly what showed up here.
+              child: Material(
+                type: MaterialType.transparency,
+                child: GlassPanel(
+                  borderRadius: 18,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
                   children: [
                     const Text('💬', style: TextStyle(fontSize: 20)),
                     const SizedBox(width: 10),
@@ -165,6 +171,7 @@ class _MessageBannerViewState extends State<_MessageBannerView>
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),
