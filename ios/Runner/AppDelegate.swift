@@ -57,6 +57,30 @@ import FirebaseMessaging
                               forKey: "flutter.apns_native_status")
     application.registerForRemoteNotifications()
 
+    // A tapped push that COLD-launched the app (fully killed, not just
+    // backgrounded) arrives here as launchOptions[.remoteNotification] —
+    // this key is populated by UIKit unconditionally, independent of any
+    // UNUserNotificationCenterDelegate. That matters because our plugins
+    // (including firebase_messaging, which is what normally answers
+    // getInitialMessage()/onMessageOpenedApp) only register once the
+    // SceneDelegate connects, which happens AFTER this method returns —
+    // too late for firebase_messaging to have claimed the delegate slot
+    // in time to see the launch. Stash the payload natively now so Dart
+    // can pick it up as soon as SharedPreferences is available, instead
+    // of silently landing on whatever screen the app last showed.
+    if let remoteNotif = launchOptions?[.remoteNotification] as? [String: Any] {
+      var data: [String: String] = [:]
+      for (key, value) in remoteNotif where key != "aps" {
+        data[key] = "\(value)"
+      }
+      if !data.isEmpty,
+         let json = try? JSONSerialization.data(withJSONObject: data),
+         let jsonString = String(data: json, encoding: .utf8) {
+        UserDefaults.standard.set(jsonString,
+                                  forKey: "flutter.pending_notification_launch_data")
+      }
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

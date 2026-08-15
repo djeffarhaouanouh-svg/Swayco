@@ -15,6 +15,7 @@
 //     Console → Cloud Messaging → Apple app configuration.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -139,6 +140,31 @@ abstract final class NotificationClient {
     // Cold launch: the app was started by tapping a notification.
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) NotificationRouter.submit(initial.data);
+  }
+
+  /// Picks up a notification-tap payload that AppDelegate.swift stashed in
+  /// UserDefaults when a push COLD-launched the app (fully killed). On iOS,
+  /// FirebaseMessaging.getInitialMessage() can miss that case: our plugins
+  /// only register once the SceneDelegate connects, which is after
+  /// `didFinishLaunchingWithOptions` has already returned — too late for
+  /// firebase_messaging to claim the notification-response delegate in time
+  /// to see the launch. AppDelegate captures the raw payload synchronously
+  /// instead, unconditionally of any plugin timing; this reads it back as
+  /// soon as SharedPreferences is available and routes it exactly like a
+  /// normal tap. No-op (and harmless) on Android, where getInitialMessage()
+  /// already covers the cold-launch case reliably.
+  static Future<void> consumeColdLaunchIntent() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const key = 'pending_notification_launch_data';
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) return;
+      await prefs.remove(key);
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      NotificationRouter.submit(data);
+    } catch (e) {
+      debugPrint('[notify] consumeColdLaunchIntent failed: $e');
+    }
   }
 
   static Future<void> unregister(String userId) async {

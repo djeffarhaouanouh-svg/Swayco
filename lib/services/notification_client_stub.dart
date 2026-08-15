@@ -18,6 +18,10 @@ abstract final class NotificationClient {
   /// Best-effort cleanup on sign-out. No-op here.
   static Future<void> unregister(String userId) async {}
 
+  /// Mirrors the io client's cold-launch pickup. No native notification
+  /// tray on web — always a no-op.
+  static Future<void> consumeColdLaunchIntent() async {}
+
   /// Diagnostic for the in-app test button — not applicable on web/stub.
   static Future<String> debugInfo() async => 'Non disponible (web).';
 }

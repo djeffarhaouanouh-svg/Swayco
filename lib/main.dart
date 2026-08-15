@@ -149,6 +149,14 @@ Future<void> main() async {
     unawaited(RemoteConfig.load());
     // Per-device call-mute list — read once so the ring handler is sync.
     unawaited(MutedCalls.load());
+    // Pick up a notification tap that cold-launched the app (fully killed),
+    // stashed natively by AppDelegate.swift because FirebaseMessaging.
+    // getInitialMessage() can miss that case on iOS — no Firebase dependency,
+    // so this runs before Firebase.initializeApp below. Sets
+    // NotificationRouter.pending, which RootShell picks up once it mounts.
+    if (!kIsWeb) {
+      unawaited(NotificationClient.consumeColdLaunchIntent());
+    }
     // Native push (FCM). Best-effort — a missing google-services on a
     // dev build shouldn't crash the app.
     if (!kIsWeb) {
