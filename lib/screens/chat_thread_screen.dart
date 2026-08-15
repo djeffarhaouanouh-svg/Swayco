@@ -13,6 +13,7 @@ import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/open_thread.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
@@ -194,6 +195,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   @override
   void initState() {
     super.initState();
+    // So the in-app "new message" banner (MessageBanner) can suppress
+    // itself for this exact conversation — a message that's already
+    // appearing live in the list below doesn't need a banner on top of it.
+    OpenThread.conversationId.value = widget.conversationId;
     _bootstrap();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
@@ -509,6 +514,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   @override
   void dispose() {
+    // Only clear if it's still pointing at THIS thread — a second thread
+    // opened on top (push another conversation while this one is still in
+    // the stack underneath) would otherwise have its own value wiped out
+    // by this screen's dispose running after it.
+    if (OpenThread.conversationId.value == widget.conversationId) {
+      OpenThread.conversationId.value = '';
+    }
     _sub?.cancel();
     _peerReadSub?.cancel();
     _pollTimer?.cancel();

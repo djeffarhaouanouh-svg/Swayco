@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_strings.dart';
+import 'message_banner.dart';
 import 'supabase_service.dart';
 
 /// Tracks the count of unread messages addressed to the local user, so the
@@ -92,6 +94,7 @@ abstract final class ChatUnread {
     }
     _convSeen = await readPerConversationSeen();
 
+    _primed = false;
     await _sub?.cancel();
     _sub = Supabase.instance.client
         .from('messages')
@@ -104,9 +107,38 @@ abstract final class ChatUnread {
         );
   }
 
+  /// False until the first emission after [start] has been processed —
+  /// that first emission is the whole backlog, not new arrivals, and must
+  /// not fire a banner per unread message from before the app was open.
+  static bool _primed = false;
+
   static void _onRows(List<Map<String, dynamic>> rows) {
+    final previousIds = {for (final r in _lastRows) r['id']?.toString() ?? ''};
+    final skipBanners = !_primed;
+    _primed = true;
     _lastRows = rows;
     _recount();
+    if (!skipBanners) {
+      for (final r in rows) {
+        final id = r['id']?.toString() ?? '';
+        if (id.isEmpty || previousIds.contains(id)) continue;
+        _offerBanner(r);
+      }
+    }
+  }
+
+  static void _offerBanner(Map<String, dynamic> row) {
+    final convId = row['conversation_id']?.toString() ?? '';
+    final senderId = (row['sender'] ?? row['sender_id'])?.toString() ?? '';
+    if (convId.isEmpty || senderId.isEmpty) return;
+    final imageUrl = row['image_url']?.toString() ?? '';
+    final body = row['body']?.toString().trim() ?? '';
+    MessageBanner.offer(MessageBannerIntent(
+      conversationId: convId,
+      peerId: senderId,
+      senderName: row['sender_name']?.toString().trim() ?? '',
+      preview: imageUrl.isNotEmpty ? AppStrings.t('push_photo') : body,
+    ));
   }
 
   /// Recompte à partir de la dernière photo connue.
