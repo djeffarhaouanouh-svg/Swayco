@@ -91,6 +91,7 @@ const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
   AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
   AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
+  AppLanguage(code: 'de', flag: '🇩🇪', label: 'Deutsch'),
 ];
 
 /// The phone's own language, when we OFFER it — used to pre-select the
