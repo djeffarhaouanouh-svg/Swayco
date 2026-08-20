@@ -37,7 +37,7 @@ env:
 
 jobs:
   build-and-release:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
@@ -53,6 +53,22 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      # macos-15's default Xcode (16.4) predates the iOS 26 "Liquid Glass"
+      # APIs (.glassEffect, GlassEffectContainer, UIButton.Configuration.glass,
+      # NWPath.isUltraConstrained, ...) that cupertino_native_plus compiles
+      # against. Select the newest Xcode 26.x the image has installed instead
+      # of hardcoding a patch version, since GitHub bumps these over time.
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then
+            echo "::error::No Xcode 26.x found on this runner image. cupertino_native_plus needs the iOS 26 SDK. Check https://github.com/actions/runner-images for the current macos-15 Xcode list."
+            exit 1
+          fi
+          echo "Using $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+          xcodebuild -version
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
