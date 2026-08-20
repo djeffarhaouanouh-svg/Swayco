@@ -68,6 +68,10 @@ jobs:
           fi
           echo "Using $XCODE_PATH"
           sudo xcode-select -s "$XCODE_PATH"
+          # The runner pre-sets DEVELOPER_DIR to the default Xcode; that env
+          # var wins over the xcode-select symlink for every later step
+          # unless we override it here too.
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
 
       - name: Install Flutter
