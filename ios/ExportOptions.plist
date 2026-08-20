@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Matches the project's existing "Automatic" signing style (see
+	     DEVELOPMENT_TEAM in project.pbxproj) — no manually-managed
+	     certificate/profile is required. CI resolves signing via the
+	     App Store Connect API key (-allowProvisioningUpdates). -->
+	<key>method</key>
+	<string>app-store</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>teamID</key>
+	<string>VXYW3LN267</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+</dict>
+</plist>

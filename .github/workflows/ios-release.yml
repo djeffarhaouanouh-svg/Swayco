@@ -1,0 +1,154 @@
+name: iOS Release (TestFlight)
+
+# Manual only — an App Store Connect upload is not something we want to
+# trigger on every push. Run it from the Actions tab when a release build
+# is actually wanted.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Marketing version override (e.g. 6.1.6). Leave empty to use pubspec.yaml."
+        required: false
+        type: string
+      build_number:
+        description: "Build number override (e.g. 167). Leave empty to use pubspec.yaml (+166)."
+        required: false
+        type: string
+      upload_to_testflight:
+        description: "Upload the build to App Store Connect / TestFlight"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  APPLE_TEAM_ID: VXYW3LN267
+  ASC_KEY_ID: 69CRTT22QQ
+  ASC_ISSUER_ID: 2a9d2e9a-c1a1-4a7f-b390-8638f7f8b751
+  BUNDLE_ID: com.translate.livekit.livekitTranslate
+  FLUTTER_VERSION: 3.41.2
+  # Same public/non-secret values already committed in build-release.ps1 —
+  # Supabase publishable key and Google client IDs are meant to ship
+  # inside the client binary, they are not credentials.
+  SUPABASE_URL: https://rhxenzcdnfvpgjjefztx.supabase.co
+  SUPABASE_PUBLISHABLE_KEY: sb_publishable_5NZJowDX1ba6cGwuzFN08Q_j9GxFMXi
+  TOKEN_API_BASE: https://www.swayco.fr
+  GOOGLE_WEB_CLIENT_ID: 361554699132-vjspl0l68h93fg9vateiinb1ndboj4ge.apps.googleusercontent.com
+  GOOGLE_IOS_CLIENT_ID: 361554699132-7864a6b9g008r6do0gekdh4ddftcul48.apps.googleusercontent.com
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      # Fail fast, with an explicit message, before spending any runner
+      # time — signing on this project (Automatic style) is done via the
+      # App Store Connect API key, so this secret is required, not optional.
+      - name: Verify required secrets are configured
+        run: |
+          if [ -z "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" ]; then
+            echo "::error::Missing required GitHub secret APP_STORE_CONNECT_API_KEY_P8 (base64-encoded contents of SubscriptionKey_${ASC_KEY_ID}.p8). Add it under Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install Dart dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Decode App Store Connect API key
+        run: |
+          mkdir -p "$RUNNER_TEMP/private_keys"
+          KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Resolve version args
+        id: version
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.version_name }}" ]; then
+            ARGS="$ARGS --build-name=${{ inputs.version_name }}"
+          fi
+          if [ -n "${{ inputs.build_number }}" ]; then
+            ARGS="$ARGS --build-number=${{ inputs.build_number }}"
+          fi
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Flutter build (compile + assets, no codesign)
+        run: |
+          flutter build ios --release --no-codesign ${{ steps.version.outputs.args }} \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY \
+            --dart-define=TOKEN_API_BASE=$TOKEN_API_BASE \
+            --dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
+
+      - name: Xcode archive (Automatic signing via App Store Connect API key)
+        working-directory: ios
+        run: |
+          xcodebuild archive \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+
+      - name: Export .ipa
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload .ipa as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: swayco-ios-ipa
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload to App Store Connect / TestFlight
+        if: ${{ inputs.upload_to_testflight }}
+        run: |
+          UPLOAD_OPTIONS="$RUNNER_TEMP/ExportOptionsUpload.plist"
+          cp ios/ExportOptions.plist "$UPLOAD_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :destination upload" "$UPLOAD_OPTIONS"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -exportOptionsPlist "$UPLOAD_OPTIONS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Clean up decoded API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys"
