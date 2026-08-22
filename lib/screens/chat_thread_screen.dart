@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/analytics.dart';
 import '../services/app_strings.dart';
@@ -1417,8 +1419,8 @@ class _MessageBubble extends StatelessWidget {
         // When [displayBody] is empty, drop the Text node entirely so
         // the bubble shows no phantom line.
         if (displayBody.isNotEmpty)
-          Text(
-            displayBody,
+          _LinkifiedText(
+            text: displayBody,
             style: TextStyle(
               color: translating
                   ? bubbleText.withValues(alpha: 0.55)
@@ -1486,6 +1488,88 @@ class _MessageBubble extends StatelessWidget {
     // tap-to-dismiss). viewerMode hides the "set as Discover" button and a
     // single-photo list means no side arrows.
     showPhotoViewer(context, photos: [url], index: 0, viewerMode: true);
+  }
+}
+
+/// Renders [text] in [style], with any http(s)/www URL substring underlined
+/// and tappable (opens externally via url_launcher). A StatefulWidget rather
+/// than an inline TextSpan builder because each link needs its own
+/// TapGestureRecognizer, and those must be disposed explicitly — a bare
+/// `TapGestureRecognizer()` created straight in a build method leaks.
+class _LinkifiedText extends StatefulWidget {
+  const _LinkifiedText({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  State<_LinkifiedText> createState() => _LinkifiedTextState();
+}
+
+class _LinkifiedTextState extends State<_LinkifiedText> {
+  static final _urlRegex = RegExp(
+    r'(https?://[^\s]+|www\.[^\s]+)',
+    caseSensitive: false,
+  );
+
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  void _clearRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  @override
+  void dispose() {
+    _clearRecognizers();
+    super.dispose();
+  }
+
+  Future<void> _open(String rawUrl) async {
+    final withScheme = rawUrl.startsWith('http') ? rawUrl : 'https://$rawUrl';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _clearRecognizers();
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in _urlRegex.allMatches(widget.text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: widget.text.substring(last, m.start)));
+      }
+      // Trailing punctuation ('.', ',', ')', '!', '?') usually closes the
+      // sentence rather than belonging to the URL — keep it out of the link.
+      var url = m.group(0)!;
+      var trail = '';
+      while (url.isNotEmpty && '.,!?)'.contains(url[url.length - 1])) {
+        trail = url[url.length - 1] + trail;
+        url = url.substring(0, url.length - 1);
+      }
+      final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
+      _recognizers.add(recognizer);
+      spans.add(
+        TextSpan(
+          text: url,
+          recognizer: recognizer,
+          style: widget.style.copyWith(
+            decoration: TextDecoration.underline,
+            decorationColor: widget.style.color,
+          ),
+        ),
+      );
+      if (trail.isNotEmpty) spans.add(TextSpan(text: trail));
+      last = m.end;
+    }
+    if (last < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(last)));
+    }
+    return Text.rich(TextSpan(style: widget.style, children: spans));
   }
 }
 
