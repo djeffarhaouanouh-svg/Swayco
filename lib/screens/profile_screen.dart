@@ -33,6 +33,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
+import '../widgets/location_picker_sheet.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
@@ -790,6 +791,128 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (mounted) await _reload();
   }
 
+  /// Pencil next to the PDP — bottom sheet (same pattern as the language
+  /// wheel), not a full Settings push. First name / city / interface lang.
+  Future<void> _openEditAccountSheet() async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _EditAccountSheet(
+        displayName: _remote?.displayName.trim() ?? '',
+        avatarUrl: _remote?.avatarUrl ?? '',
+        city: _remote?.city.trim() ?? '',
+        languageCode: _languageCode,
+        onEditName: () async {
+          Navigator.of(ctx).pop();
+          await _promptEditName();
+        },
+        onEditCity: () async {
+          Navigator.of(ctx).pop();
+          await _promptEditCity();
+        },
+        onEditLanguage: () async {
+          Navigator.of(ctx).pop();
+          await _promptEditLanguage();
+        },
+      ),
+    );
+  }
+
+  Future<void> _promptEditName() async {
+    final current = _remote?.displayName ?? '';
+    final changedAt = _remote?.nameChangedAt;
+    if (changedAt != null) {
+      final elapsed = DateTime.now().difference(changedAt);
+      if (elapsed < profileNameChangeCooldown) {
+        final remaining = profileNameChangeCooldown - elapsed;
+        final daysLeft = (remaining.inDays + 1)
+            .clamp(1, profileNameChangeCooldown.inDays);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppStrings.t('name_change_cooldown', args: {'days': '$daysLeft'}),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    final ctrl = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _NamePromptDialog(
+        title: AppStrings.t('settings_first_name'),
+        controller: ctrl,
+        maxLength: profileNameMaxLength,
+      ),
+    );
+    ctrl.dispose();
+    if (result == null || !mounted) return;
+    await _saveName(result);
+  }
+
+  Future<void> _promptEditCity() async {
+    if (_deviceId.isEmpty || !mounted) return;
+    final result = await showModalBottomSheet<(String, String)>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => LocationPickerSheet(
+        initialCountry: _remote?.country ?? '',
+        initialCity: _remote?.city ?? '',
+      ),
+    );
+    if (result == null || !mounted) return;
+    final ok = await ProfileApi.updateMyLocation(
+      userId: _deviceId,
+      country: result.$1,
+      city: result.$2,
+    );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('save_failed'))),
+      );
+      return;
+    }
+    setState(
+      () => _remote = _remote?.copyWith(country: result.$1, city: result.$2),
+    );
+  }
+
+  Future<void> _promptEditLanguage() async {
+    final current = AppStrings.currentBcp47.value;
+    final langs = supportedLanguages;
+    final start = langs.indexWhere((l) => l.code == current);
+    final picked = await showWheelPicker(
+      context: context,
+      title: AppStrings.t('settings_lang_interface'),
+      emoji: '🌍',
+      labels: [for (final l in langs) '${l.flag}  ${l.label}'],
+      initialIndex: start < 0 ? 0 : start,
+    );
+    if (picked == null || !mounted) return;
+    final code = langs[picked].code;
+    if (code == current) return;
+    AppStrings.setFromCode(code);
+    await UserPrefs.setSourceLang(code);
+    final profile = _remote;
+    if (profile != null &&
+        profile.displayName.trim().isNotEmpty &&
+        _deviceId.isNotEmpty) {
+      await ProfileApi.upsertMyProfile(
+        deviceId: _deviceId,
+        displayName: profile.displayName,
+        language: code,
+        gender: profile.gender,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _remote = _remote?.copyWith(language: code));
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(_languageCode);
@@ -892,6 +1015,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onRemovePhoto: _removePhoto,
                             onEdit: _openEditor,
                             onSettings: _openSettings,
+                            onEditAccount: _openEditAccountSheet,
                             onPreview: _openSelfPreview,
                             preview: widget.preview,
                             onLikePeer: _likePeer,
@@ -1083,6 +1207,7 @@ class _IdentitySection extends StatelessWidget {
     required this.onRemovePhoto,
     required this.onEdit,
     required this.onSettings,
+    this.onEditAccount,
     this.onPreview,
     this.preview = false,
     this.viewerMode = false,
@@ -1163,9 +1288,14 @@ class _IdentitySection extends StatelessWidget {
   /// Own profile: remove the given gallery photo by URL.
   final void Function(String url) onRemovePhoto;
 
-  /// Own profile: open the editor (name / language) — the header pencil.
+  /// Own profile: open the name / language editor (legacy path).
   final VoidCallback onEdit;
+
+  /// Own profile: open Settings (gear next to the name).
   final VoidCallback onSettings;
+
+  /// Own profile: pencil beside the PDP — account edit bottom sheet.
+  final VoidCallback? onEditAccount;
 
   /// Own profile: ouvre l'aperçu "vu de l'extérieur" (bouton œil).
   final VoidCallback? onPreview;
@@ -1233,81 +1363,98 @@ class _IdentitySection extends StatelessWidget {
   /// shown as a circular avatar at the top of both layouts. On my own
   /// profile it carries the camera badge and a tap sets a new PDP (separate
   /// from the gallery); read-only (no badge / tap) in the viewer.
+  ///
+  /// Own profile: the edit pencil sits mid-height of the bubble, pushed to
+  /// the right into the empty space (not on the photo). A matching left
+  /// spacer keeps the bubble centred. Tap → account edit bottom sheet.
   Widget _pdpBubble({required bool editable}) {
     final pdp = avatarUrl.isEmpty ? null : avatarUrl;
-    return Center(
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          ProfileAvatar(
-            displayName: displayName,
-            avatarUrl: pdp,
-            size: 128,
-            fontSize: 54,
-            onTap: editable ? onPickAvatar : null,
+    const pencilSize = 36.0;
+    const pencilGap = 14.0;
+    final bubble = Stack(
+      alignment: Alignment.bottomRight,
+      children: [
+        ProfileAvatar(
+          displayName: displayName,
+          avatarUrl: pdp,
+          size: 128,
+          fontSize: 54,
+          onTap: editable ? onPickAvatar : null,
+        ),
+        if (editable)
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: SC.accent,
+              shape: BoxShape.circle,
+              border: Border.all(color: SC.bg, width: 2),
+            ),
+            child: const Icon(
+              Icons.camera_alt,
+              size: 14,
+              color: Colors.white,
+            ),
           ),
-          if (editable)
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
+        // Viewer mode: a green presence dot on the lower-right of the PDP
+        // when the peer is online (replaces the old "en ligne" text line).
+        if (!editable && online)
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: Container(
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
-                color: SC.accent,
+                color: SC.online,
                 shape: BoxShape.circle,
-                border: Border.all(color: SC.bg, width: 2),
-              ),
-              child: const Icon(
-                Icons.camera_alt,
-                size: 14,
-                color: Colors.white,
+                border: Border.all(color: SC.bg, width: 3),
               ),
             ),
-          // Crayon — coin libre opposé à la caméra. Ouvre Réglages, où se
-          // corrige tout le reste (email, prénom, ville, mot de passe) : la
-          // caméra ne change QUE la photo, ce badge couvre le reste du compte.
-          if (editable)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Material(
-                color: Colors.white.withValues(alpha: 0.10),
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: onSettings,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: SC.bg, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.edit,
-                      size: 14,
-                      color: SC.textPrimary,
-                    ),
-                  ),
-                ),
+          ),
+      ],
+    );
+    if (!editable) return Center(child: bubble);
+
+    final pencil = Material(
+      color: Colors.white.withValues(alpha: 0.10),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onEditAccount ?? onSettings,
+        child: Tooltip(
+          message: AppStrings.t('settings_section_account'),
+          child: Container(
+            width: pencilSize,
+            height: pencilSize,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.22),
               ),
             ),
-          // Viewer mode: a green presence dot on the lower-right of the PDP
-          // when the peer is online (replaces the old "en ligne" text line).
-          if (!editable && online)
-            Positioned(
-              right: 10,
-              bottom: 10,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: SC.online,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SC.bg, width: 3),
-                ),
-              ),
+            child: const Icon(
+              Icons.edit,
+              size: 18,
+              color: SC.textPrimary,
             ),
+          ),
+        ),
+      ),
+    );
+
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Mirror the pencil+gap so the bubble stays visually centred.
+          const SizedBox(width: pencilSize + pencilGap),
+          bubble,
+          const SizedBox(width: pencilGap),
+          pencil,
         ],
       ),
     );
@@ -3349,6 +3496,273 @@ class _GradientActionButton extends StatelessWidget {
         padding: padding,
         alignment: Alignment.center,
         child: content,
+      ),
+    );
+  }
+}
+
+/// Bottom sheet opened by the PDP pencil — same chrome as the language wheel
+/// (handle, dark panel, rounded top). Avatar on top, then name / city / language.
+class _EditAccountSheet extends StatelessWidget {
+  const _EditAccountSheet({
+    required this.displayName,
+    required this.avatarUrl,
+    required this.city,
+    required this.languageCode,
+    required this.onEditName,
+    required this.onEditCity,
+    required this.onEditLanguage,
+  });
+
+  final String displayName;
+  final String avatarUrl;
+  final String city;
+  final String languageCode;
+  final VoidCallback onEditName;
+  final VoidCallback onEditCity;
+  final VoidCallback onEditLanguage;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = findLanguageByCode(languageCode);
+    final langLabel = lang == null ? '—' : '${lang.flag}  ${lang.label}';
+    final name = displayName.isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : displayName;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: ColoredBox(
+        color: SC.bg,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ProfileAvatar(
+                displayName: name,
+                avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+                size: 88,
+                fontSize: 36,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    AppStrings.t('settings_section_account'),
+                    style: const TextStyle(
+                      color: SC.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: SC.menu,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    children: [
+                      _EditAccountRow(
+                        icon: Icons.badge_outlined,
+                        label: AppStrings.t('settings_first_name'),
+                        value: displayName.isEmpty ? '—' : displayName,
+                        onTap: onEditName,
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                      _EditAccountRow(
+                        icon: Icons.location_city_outlined,
+                        label: AppStrings.t('settings_city'),
+                        value: city.isEmpty ? '—' : city,
+                        onTap: onEditCity,
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                      _EditAccountRow(
+                        icon: Icons.language,
+                        label: AppStrings.t('settings_lang_interface'),
+                        value: langLabel,
+                        onTap: onEditLanguage,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditAccountRow extends StatelessWidget {
+  const _EditAccountRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: SC.textPrimary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(color: SC.textMuted, fontSize: 14),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right, size: 20, color: SC.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Same prompt as Settings' first-name dialog — kept local to avoid exporting
+/// a private widget across screens.
+class _NamePromptDialog extends StatelessWidget {
+  const _NamePromptDialog({
+    required this.title,
+    required this.controller,
+    required this.maxLength,
+  });
+
+  final String title;
+  final TextEditingController controller;
+  final int maxLength;
+
+  static const _fieldBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(14)),
+    borderSide: BorderSide(color: SC.glassBorder),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: SC.menu,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: maxLength,
+              textCapitalization: TextCapitalization.words,
+              cursorColor: SC.accent,
+              style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: SC.bg,
+                counterStyle: const TextStyle(color: SC.textMuted),
+                border: _fieldBorder,
+                enabledBorder: _fieldBorder,
+                focusedBorder: _fieldBorder.copyWith(
+                  borderSide: const BorderSide(color: SC.accent, width: 1.5),
+                ),
+              ),
+              onSubmitted: (v) => Navigator.of(context).pop(v),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      AppStrings.t('cancel'),
+                      style: const TextStyle(color: SC.textMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: SC.accent),
+                    onPressed: () =>
+                        Navigator.of(context).pop(controller.text),
+                    child: Text(AppStrings.t('save')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
