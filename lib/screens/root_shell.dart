@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
@@ -33,6 +35,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/sway_tip_dialog.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'chat_thread_screen.dart';
@@ -681,10 +684,11 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
-  /// Post-onboarding nudge to add a Discover photo (why, then where).
-  /// The "seen" flag is persisted UP FRONT, before any dialog is shown —
-  /// otherwise reloading the page mid-popup leaves the flag unset and the
-  /// nudge replays on every load. Skipped entirely if a photo is set.
+  /// Post-onboarding nudge to add a Discover photo. The "seen" flag is
+  /// persisted UP FRONT, before any dialog is shown — otherwise reloading
+  /// the page mid-popup leaves the flag unset and the nudge replays on
+  /// every load. Skipped entirely if a photo is set. The CTA opens the
+  /// gallery directly — no second "where do I add it" popup.
   Future<void> _maybeShowOnboardingTips() async {
     if (_tipBusy || !mounted) return;
     if (await UserPrefs.isOnboardingTipsSeen() || !mounted) return;
@@ -693,20 +697,13 @@ class _RootShellState extends State<RootShell> {
     if (await _hasDiscoverPhoto() || !mounted) return;
     _tipBusy = true;
     await _showTip(
-      icon: Icons.add_a_photo_rounded,
       title: AppStrings.t('tip_photo_title'),
       body: AppStrings.t('tip_photo_body'),
       buttonLabel: AppStrings.t('tip_next'),
+      art: SwayTipArt.discoverTiles,
     );
-    if (mounted) {
-      await _showTip(
-        icon: Icons.person_rounded,
-        title: AppStrings.t('tip_photo_where_title'),
-        body: AppStrings.t('tip_photo_where_body'),
-        buttonLabel: AppStrings.t('tip_got_it'),
-      );
-    }
     _tipBusy = false;
+    if (mounted) unawaited(_pickAndAddDiscoverPhoto());
   }
 
   /// Photo-nudge on the Profile tab. Shows on EVERY navigation into
@@ -722,50 +719,83 @@ class _RootShellState extends State<RootShell> {
     if (await _hasDiscoverPhoto() || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
     _tipBusy = true;
-    // Preload the illustration before showing the dialog so the image
-    // is in the cache when _TipDialog mounts — no flash of an empty
-    // square / popping pixels. Best-effort: a decode error still lets
-    // the dialog open with the icon fallback.
-    const asset = AssetImage('assets/add-picture.png');
-    try {
-      await precacheImage(asset, context);
-    } catch (_) {}
-    if (!mounted) {
-      _tipBusy = false;
-      return;
-    }
-    if (NavTab.index.value != NavTab.profile) {
-      _tipBusy = false;
-      return;
-    }
     await _showTip(
-      icon: Icons.add_a_photo_rounded,
       title: AppStrings.t('tip_profile_here_title'),
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
-      imageAsset: 'assets/add-picture.png',
     );
     _tipBusy = false;
   }
 
-  Future<void> _showTip({
-    required IconData icon,
+  Future<bool?> _showTip({
     required String title,
     required String body,
     required String buttonLabel,
-    String? imageAsset,
+    SwayTipArt art = SwayTipArt.profileRing,
   }) {
-    return showDialog<void>(
+    return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _TipDialog(
-        icon: icon,
+      barrierColor: const Color(0x99050608),
+      builder: (_) => SwayTipDialog(
+        art: art,
         title: title,
         body: body,
         buttonLabel: buttonLabel,
-        imageAsset: imageAsset,
       ),
     );
+  }
+
+  /// Opens the gallery and uploads the pick as the first Discover photo —
+  /// the destination the old second onboarding popup only described.
+  /// Fetches the profile's current photos/discover columns fresh (rather
+  /// than assuming they're empty) so [ProfileApi.addProfilePhoto] appends
+  /// instead of clobbering a gallery from another device.
+  Future<void> _pickAndAddDiscoverPhoto() async {
+    if (!isSupabaseReady || !mounted) return;
+    final XFile? file;
+    final Uint8List bytes;
+    try {
+      final picker = ImagePicker();
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 88,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    try {
+      final uid = await DeviceId.getOrCreate();
+      final me = await ProfileApi.fetchById(uid);
+      await ProfileApi.addProfilePhoto(
+        deviceId: uid,
+        bytes: bytes,
+        current: me?.photos ?? const <String>[],
+        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+        currentDiscover: me?.discoverPhotoUrl ?? '',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
   }
 
   @override
@@ -1039,102 +1069,3 @@ class _RoundActionButton extends StatelessWidget {
   }
 }
 
-/// Friendly one-shot coach-mark. Styled on the app's near-black scaffold
-/// colour with white copy; dismissed only by its button.
-class _TipDialog extends StatelessWidget {
-  const _TipDialog({
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.buttonLabel,
-    this.imageAsset,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final String buttonLabel;
-
-  /// Optional illustration asset shown in place of the round [icon].
-  /// Used by the "add your photo" tip to replace the camera bubble with
-  /// a richer drawing while keeping every other tip on the icon layout.
-  final String? imageAsset;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      // Surface propre à la popup, plus sombre que la page : elle doit se
-      // détacher du fond, pas s'y fondre. Codée en dur exprès — elle ne suit
-      // PAS SC.bg.
-      backgroundColor: const Color(0xFF0A0A0A),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 36),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (imageAsset != null)
-              // The source PNG ships with a black square framing the
-              // illustration — crop into the artwork (BoxFit.cover) so
-              // the popup shows just the picture, not the bleed.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  imageAsset!,
-                  width: 180,
-                  height: 180,
-                  fit: BoxFit.cover,
-                ),
-              )
-            else
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: SC.accent.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: SC.accent, size: 28),
-              ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14.5,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: SC.accent,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(buttonLabel),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

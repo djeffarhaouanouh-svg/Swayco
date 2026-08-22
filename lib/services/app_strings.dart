@@ -401,9 +401,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Apparais dans le Discover ✨',
     'tip_photo_body':
         'Ajoute une photo de toi pour apparaître dans le Discover et recevoir plein d’ajouts du monde entier 😉',
-    'tip_photo_where_title': 'Et ça se passe où ?',
-    'tip_photo_where_body':
-        'Tu peux ajouter ta photo dès maintenant depuis ta page Profil.',
     'tip_profile_here_title': 'Ta photo, c’est ici 👇',
     'tip_profile_here_body':
         'Ajoute une photo de toi et tu apparaîtras dans le Discover.',
@@ -962,9 +959,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Show up in Discover ✨',
     'tip_photo_body':
         'Add a photo of yourself to appear in Discover and get loads of adds from all over the world 😉',
-    'tip_photo_where_title': 'Where does it happen?',
-    'tip_photo_where_body':
-        'You can add your photo right now from your Profile page.',
     'tip_profile_here_title': 'Your photo goes here 👇',
     'tip_profile_here_body':
         'Add a photo of yourself and you’ll show up in Discover.',
@@ -1466,9 +1460,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Aparece en Discover ✨',
     'tip_photo_body':
         'Añade una foto tuya para aparecer en Discover y recibir un montón de contactos de todo el mundo 😉',
-    'tip_photo_where_title': '¿Y dónde se hace?',
-    'tip_photo_where_body':
-        'Puedes añadir tu foto ahora mismo desde tu página de Perfil.',
     'tip_profile_here_title': 'Tu foto va aquí 👇',
     'tip_profile_here_body': 'Añade una foto tuya y aparecerás en Discover.',
     'tip_next': 'Siguiente',
@@ -1943,9 +1934,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Erscheine im Discover ✨',
     'tip_photo_body':
         'Füge ein Foto von dir hinzu, um im Discover zu erscheinen und jede Menge Kontakte aus aller Welt zu bekommen 😉',
-    'tip_photo_where_title': 'Und wo geht das?',
-    'tip_photo_where_body':
-        'Du kannst dein Foto gleich jetzt auf deiner Profilseite hinzufügen.',
     'tip_profile_here_title': 'Dein Foto kommt hierhin 👇',
     'tip_profile_here_body':
         'Füge ein Foto von dir hinzu und du erscheinst im Discover.',
@@ -2482,9 +2470,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Mostrati nel Discover ✨',
     'tip_photo_body':
         'Aggiungi una tua foto per apparire nel Discover e ricevere un sacco di contatti da tutto il mondo 😉',
-    'tip_photo_where_title': 'E dove si fa?',
-    'tip_photo_where_body':
-        'Puoi aggiungere la tua foto subito dalla tua pagina Profilo.',
     'tip_profile_here_title': 'La tua foto va qui 👇',
     'tip_profile_here_body': 'Aggiungi una tua foto e apparirai nel Discover.',
     'tip_next': 'Avanti',
@@ -3016,9 +3001,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Apareça no Discover ✨',
     'tip_photo_body':
         'Adicione uma foto sua para aparecer no Discover e receber muitos contatos do mundo inteiro 😉',
-    'tip_photo_where_title': 'E onde é que se faz?',
-    'tip_photo_where_body':
-        'Você pode adicionar sua foto agora mesmo na sua página de Perfil.',
     'tip_profile_here_title': 'Sua foto vai aqui 👇',
     'tip_profile_here_body':
         'Adicione uma foto sua e você vai aparecer no Discover.',
@@ -3552,9 +3534,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Verschijn in Discover ✨',
     'tip_photo_body':
         'Voeg een foto van jezelf toe om in Discover te verschijnen en volop contacten van over de hele wereld te krijgen 😉',
-    'tip_photo_where_title': 'En waar doe je dat?',
-    'tip_photo_where_body':
-        'Je kunt je foto nu meteen toevoegen op je Profielpagina.',
     'tip_profile_here_title': 'Je foto komt hier 👇',
     'tip_profile_here_body':
         'Voeg een foto van jezelf toe en je verschijnt in Discover.',
@@ -4079,8 +4058,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'اظهر في Discover ✨',
     'tip_photo_body':
         'أضِف صورة لك لتظهر في Discover وتحصل على الكثير من الإضافات من جميع أنحاء العالم 😉',
-    'tip_photo_where_title': 'وأين يتم ذلك؟',
-    'tip_photo_where_body': 'يمكنك إضافة صورتك الآن من صفحة ملفك الشخصي.',
     'tip_profile_here_title': 'صورتك توضع هنا 👇',
     'tip_profile_here_body': 'أضِف صورة لك وستظهر في Discover.',
     'tip_next': 'التالي',
@@ -4603,9 +4580,6 @@ abstract final class AppStrings {
     'tip_photo_title': 'Появись в Discover ✨',
     'tip_photo_body':
         'Добавь своё фото, чтобы появиться в Discover и получать множество добавлений со всего мира 😉',
-    'tip_photo_where_title': 'А где это сделать?',
-    'tip_photo_where_body':
-        'Ты можешь добавить фото прямо сейчас на странице профиля.',
     'tip_profile_here_title': 'Твоё фото — сюда 👇',
     'tip_profile_here_body': 'Добавь своё фото, и ты появишься в Discover.',
     'tip_next': 'Далее',
@@ -5120,8 +5094,6 @@ abstract final class AppStrings {
     'tooltip_call': '通话',
     'tip_photo_title': '出现在 Discover 中 ✨',
     'tip_photo_body': '添加一张你的照片，出现在 Discover 中，收获来自世界各地的大量关注 😉',
-    'tip_photo_where_title': '在哪里操作？',
-    'tip_photo_where_body': '你现在就可以在个人主页添加照片。',
     'tip_profile_here_title': '你的照片放这里 👇',
     'tip_profile_here_body': '添加一张你的照片，你就会出现在 Discover 中。',
     'tip_next': '下一步',
@@ -5630,8 +5602,6 @@ abstract final class AppStrings {
     'tooltip_call': '通話',
     'tip_photo_title': 'Discover に表示されよう ✨',
     'tip_photo_body': '自分の写真を追加して Discover に表示され、世界中からたくさんの追加をもらおう 😉',
-    'tip_photo_where_title': 'どこでできるの？',
-    'tip_photo_where_body': 'プロフィールページから今すぐ写真を追加できます。',
     'tip_profile_here_title': '写真はここに 👇',
     'tip_profile_here_body': '自分の写真を追加すると Discover に表示されます。',
     'tip_next': '次へ',
@@ -6122,8 +6092,6 @@ abstract final class AppStrings {
     'tooltip_call': '전화',
     'tip_photo_title': 'Discover에 등장하세요 ✨',
     'tip_photo_body': '자기 사진을 추가하면 Discover에 표시되고 전 세계에서 많은 추가를 받을 수 있어요 😉',
-    'tip_photo_where_title': '어디서 하나요?',
-    'tip_photo_where_body': '지금 바로 프로필 페이지에서 사진을 추가할 수 있어요.',
     'tip_profile_here_title': '사진은 여기에 👇',
     'tip_profile_here_body': '자기 사진을 추가하면 Discover에 표시됩니다.',
     'tip_next': '다음',
