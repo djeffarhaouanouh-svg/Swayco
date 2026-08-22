@@ -1262,6 +1262,36 @@ class _IdentitySection extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
+          // Crayon — coin libre opposé à la caméra. Ouvre Réglages, où se
+          // corrige tout le reste (email, prénom, ville, mot de passe) : la
+          // caméra ne change QUE la photo, ce badge couvre le reste du compte.
+          if (editable)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Material(
+                color: Colors.white.withValues(alpha: 0.10),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onSettings,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: SC.bg, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.edit,
+                      size: 14,
+                      color: SC.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Viewer mode: a green presence dot on the lower-right of the PDP
           // when the peer is online (replaces the old "en ligne" text line).
           if (!editable && online)
