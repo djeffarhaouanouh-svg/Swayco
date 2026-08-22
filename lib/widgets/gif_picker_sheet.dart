@@ -251,7 +251,7 @@ class _GifTile extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: gif.aspect,
           child: ColoredBox(
-            color: SC.bubbleIn,
+            color: SC.menu,
             child: Image.network(
               gif.previewUrl,
               fit: BoxFit.cover,

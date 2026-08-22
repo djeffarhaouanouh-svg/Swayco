@@ -384,7 +384,7 @@ class _MyProfileStrip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.menu,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -456,7 +456,7 @@ class _CenteredHint extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: SC.bubbleIn,
+                color: SC.menu,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: SC.textMuted, size: 34),

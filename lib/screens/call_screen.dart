@@ -2727,7 +2727,7 @@ class _CallScreenState extends State<CallScreen> {
                   )
                 else
                   Container(
-                    color: SC.bubbleIn,
+                    color: SC.menu,
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

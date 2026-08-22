@@ -197,7 +197,7 @@ class _LikedRow extends StatelessWidget {
                   errorBuilder: (_, _, _) => Container(
                     width: 46,
                     height: 46,
-                    color: SC.bubbleIn,
+                    color: SC.menu,
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.broken_image_outlined,

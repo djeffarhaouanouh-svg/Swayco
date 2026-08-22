@@ -75,7 +75,7 @@ class ProfileAvatar extends StatelessWidget {
               loadingBuilder: (ctx, child, progress) {
                 if (progress == null) return child;
                 return Container(
-                  color: SC.bubbleIn,
+                  color: SC.menu,
                   alignment: Alignment.center,
                   child: SizedBox(
                     width: size * 0.4,

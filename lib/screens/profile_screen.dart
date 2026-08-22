@@ -3087,7 +3087,7 @@ class _PhotoCell extends StatelessWidget {
     // Trash button: only on my own profile when a photo is actually set.
     final showDeleteAction = !viewerMode && hasPhoto && onDelete != null;
     return Material(
-      color: SC.bubbleIn,
+      color: SC.menu,
       borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -3310,7 +3310,7 @@ class _GradientActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: subdued ? SC.bubbleIn : SC.accent,
+          color: subdued ? SC.menu : SC.accent,
           borderRadius: BorderRadius.circular(999),
         ),
         padding: padding,

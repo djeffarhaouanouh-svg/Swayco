@@ -1066,7 +1066,7 @@ class _TextPromptDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: SC.bubbleIn,
+      backgroundColor: SC.menu,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),

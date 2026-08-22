@@ -77,7 +77,7 @@ abstract final class SC {
     const base = ColorScheme.dark(
       primary: accent,
       onPrimary: Colors.white,
-      surface: bubbleIn,
+      surface: menu,
       onSurface: textPrimary,
       error: Color(0xFFE53935),
       onError: Colors.white,

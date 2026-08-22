@@ -1712,7 +1712,7 @@ class _NoFriendsEmpty extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: SC.bubbleIn,
+                color: SC.menu,
                 shape: BoxShape.circle,
               ),
               child: const Icon(

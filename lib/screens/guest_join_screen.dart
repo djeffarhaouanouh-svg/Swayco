@@ -226,7 +226,7 @@ class _LangChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? SC.accent : SC.bubbleIn;
+    final bg = selected ? SC.accent : SC.menu;
     final border =
         selected ? SC.accent : Colors.white.withValues(alpha: 0.08);
     final fg = selected ? Colors.white : SC.textPrimary;

@@ -786,7 +786,7 @@ class _GenderOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.bubbleIn;
+    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.menu;
     final fg = selected ? SC.accent : SC.textPrimary;
     final border = selected ? SC.accent : SC.glassBorder;
     return Material(
@@ -838,7 +838,7 @@ class _LanguageGrid extends StatelessWidget {
         : null;
     return Container(
       decoration: BoxDecoration(
-        color: SC.bubbleIn,
+        color: SC.menu,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: SC.glassBorder),
       ),
@@ -847,7 +847,7 @@ class _LanguageGrid extends StatelessWidget {
         child: DropdownButton<String>(
           isExpanded: true,
           value: value,
-          dropdownColor: SC.bubbleIn,
+          dropdownColor: SC.menu,
           borderRadius: BorderRadius.circular(14),
           iconEnabledColor: SC.textPrimary,
           hint: Text(
@@ -1033,7 +1033,7 @@ class _GlassSelectField extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasValue = value.trim().isNotEmpty;
     return Material(
-      color: SC.bubbleIn,
+      color: SC.menu,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),

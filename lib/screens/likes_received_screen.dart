@@ -105,7 +105,7 @@ class _LikerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SC.bubbleIn,
+      color: SC.menu,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),

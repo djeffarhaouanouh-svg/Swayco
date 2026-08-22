@@ -58,7 +58,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       expand: false,
       builder: (ctx, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: SC.bubbleIn,
+          color: SC.menu,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: Column(
