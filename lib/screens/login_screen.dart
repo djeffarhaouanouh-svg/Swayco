@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/sway_onb_kit.dart';
 
 /// Welcome screen shown when the user has no Supabase Auth session. Lets them
 /// either sign in or create a new account with email + password. After a
@@ -235,11 +236,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isSignUp = _mode == _Mode.signUp;
     return Scaffold(
-      // Solid black login backdrop (no navy / mesh) — on request.
-      backgroundColor: SC.bg,
+      backgroundColor: SwayOnb.screenBg,
       // No top SafeArea: the hero photo is meant to run under the status bar.
       // The form below re-applies the bottom inset.
-      body: SingleChildScrollView(
+      body: SwayHalo(
+        preset: SwayHaloPreset.login,
+        child: SingleChildScrollView(
         child: Column(
           children: [
             _LoginHero(height: MediaQuery.sizeOf(context).height * 0.30),
@@ -257,12 +259,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Centred under the photo, in the app's display face —
                         // the hero carries the screen now, so the title reads
                         // as its caption rather than a left-aligned form label.
-                        Text(
-                          isSignUp
-                              ? AppStrings.t('login_title_signup')
-                              : AppStrings.t('login_title_signin'),
-                          textAlign: TextAlign.center,
-                          style: SCText.h1.copyWith(fontSize: 32, height: 1.1),
+                        Center(
+                          child: SwayTitle(
+                            isSignUp
+                                ? AppStrings.t('login_title_signup')
+                                : AppStrings.t('login_title_signin'),
+                            size: 32,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -277,50 +280,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 26),
-                        TextField(
+                        SwayInput(
                           controller: _emailCtrl,
+                          hint: AppStrings.t('login_email_hint'),
                           keyboardType: TextInputType.emailAddress,
-                          autocorrect: false,
-                          enabled: !_busy,
                           textCapitalization: TextCapitalization.none,
-                          style: const TextStyle(
-                            color: SC.textPrimary,
-                            fontSize: 16,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: AppStrings.t('login_email_label'),
-                            hintText: AppStrings.t('login_email_hint'),
-                            prefixIcon: const Icon(
-                              Icons.alternate_email,
-                              color: SC.textMuted,
-                            ),
-                          ),
+                          enabled: !_busy,
                         ),
                         const SizedBox(height: 14),
-                        TextField(
+                        SwayInput(
                           controller: _passwordCtrl,
-                          obscureText: !_showPassword,
+                          hint: AppStrings.t('login_password_label'),
+                          obscure: !_showPassword,
                           enabled: !_busy,
-                          style: const TextStyle(
-                            color: SC.textPrimary,
-                            fontSize: 16,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: AppStrings.t('login_password_label'),
-                            prefixIcon: const Icon(
-                              Icons.lock_outline,
-                              color: SC.textMuted,
+                          trailing: IconButton(
+                            onPressed: () => setState(
+                              () => _showPassword = !_showPassword,
                             ),
-                            suffixIcon: IconButton(
-                              onPressed: () => setState(
-                                () => _showPassword = !_showPassword,
-                              ),
-                              icon: Icon(
-                                _showPassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: SC.textMuted,
-                              ),
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: SwayOnb.dim,
                             ),
                           ),
                         ),
@@ -371,31 +352,25 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                         const SizedBox(height: 20),
-                        FilledButton(
-                          onPressed: _busy ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: SC.accent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: _busy
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  isSignUp
-                                      ? AppStrings.t('login_btn_signup')
-                                      : AppStrings.t('login_btn_signin'),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SwayCta(
+                              label: isSignUp
+                                  ? AppStrings.t('login_btn_signup')
+                                  : AppStrings.t('login_btn_signin'),
+                              onPressed: _busy ? null : _submit,
+                            ),
+                            if (_busy)
+                              const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: SwayOnb.onAccent,
                                 ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 18),
                         Row(
@@ -468,6 +443,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

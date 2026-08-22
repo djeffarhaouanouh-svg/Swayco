@@ -14,7 +14,7 @@ import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/location_picker_sheet.dart';
-import '../widgets/mesh_background.dart';
+import '../widgets/sway_onb_kit.dart';
 
 /// First-run flow: first name + the user's own spoken language (stored locally).
 /// The remote participant's language is discovered from their LiveKit metadata
@@ -409,59 +409,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     final showGenderStep = !_genderAlreadySet;
 
-    return Scaffold(
-      backgroundColor: SC.bg,
-      body: MeshBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _OnboardingHeader(page: _page, pageCount: _pageCount),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (i) => setState(() => _page = i),
-                  children: [
-                    _StepWelcome(
-                      nameCtrl: _nameCtrl,
-                      onNext: () {
-                        if (_nameCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(AppStrings.t('onb_need_name')),
-                            ),
-                          );
-                          return;
-                        }
-                        _next();
-                      },
-                    ),
-                    _StepLanguage(
-                      selected: _selectedLang,
-                      onSelect: _onLanguageSelected,
-                      onBack: _back,
-                      onFinish: _goFromLanguage,
-                      // Last page when the gender step is skipped.
-                      finishLabelKey: showGenderStep
-                          ? 'onb_next'
-                          : 'onb_finish',
-                    ),
-                    if (showGenderStep)
-                      _StepGender(
-                        selected: _selectedGender,
-                        onSelect: (g) => setState(() => _selectedGender = g),
-                        onBack: _back,
-                        onFinish: _finish,
-                        finishLabelKey: 'onb_finish',
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return SwayOnbShell(
+      page: _page,
+      pageCount: _pageCount,
+      controller: _pageController,
+      onPageChanged: (i) => setState(() => _page = i),
+      pages: [
+        SwayStepWelcome(
+          nameCtrl: _nameCtrl,
+          onNext: () {
+            if (_nameCtrl.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(AppStrings.t('onb_need_name'))),
+              );
+              return;
+            }
+            _next();
+          },
         ),
-      ),
+        _StepLanguageKeepPicker(
+          selected: _selectedLang,
+          onSelect: _onLanguageSelected,
+          onBack: _back,
+          onFinish: _goFromLanguage,
+          // Last page when the gender step is skipped.
+          finishLabelKey: showGenderStep ? 'onb_next' : 'onb_finish',
+        ),
+        if (showGenderStep)
+          SwayStepGender(
+            selected: _selectedGender,
+            onSelect: (g) => setState(() => _selectedGender = g),
+            onBack: _back,
+            onFinish: _finish,
+          ),
+      ],
     );
   }
 
@@ -495,125 +476,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
 }
 
-class _OnboardingHeader extends StatelessWidget {
-  const _OnboardingHeader({required this.page, required this.pageCount});
-
-  final int page;
-  final int pageCount;
-
-  /// Maps the current PageView index to a title/subtitle key pair. Gender is
-  /// the only optional page and it sits last, so plain indices suffice.
-  (String, String) get _keys {
-    if (page == 0) return ('onb_welcome_title', 'onb_welcome_subtitle');
-    if (page == 1) return ('onb_language_title', 'onb_language_subtitle');
-    return ('onb_gender_title', 'onb_gender_subtitle');
-  }
-
-  String get _titleKey => _keys.$1;
-  String get _subtitleKey => _keys.$2;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppStrings.t(_titleKey),
-            style: SCText.h2.copyWith(fontSize: 26),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            AppStrings.t(_subtitleKey),
-            style: const TextStyle(
-              color: SC.textSecondary,
-              fontSize: 14,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              for (var i = 0; i < pageCount; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                _Dot(active: i == page),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.active});
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: active ? 22 : 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: active ? SC.accent : Colors.white.withValues(alpha: 0.30),
-        borderRadius: BorderRadius.circular(4),
-      ),
-    );
-  }
-}
-
-class _StepWelcome extends StatelessWidget {
-  const _StepWelcome({required this.nameCtrl, required this.onNext});
-
-  final TextEditingController nameCtrl;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _GlassTextField(
-            controller: nameCtrl,
-            textCapitalization: TextCapitalization.words,
-            label: AppStrings.t('onb_first_name_label'),
-            hint: AppStrings.t('onb_first_name_hint'),
-            icon: Icons.badge_outlined,
-          ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: onNext,
-            style: FilledButton.styleFrom(
-              backgroundColor: SC.accent,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Text(
-              AppStrings.t('onb_next'),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepLanguage extends StatelessWidget {
-  const _StepLanguage({
+/// Language step for the first-run wizard — same halo/title shell as the
+/// other [SwayOnbShell] pages, but keeps the existing dropdown [_LanguageGrid]
+/// instead of the kit's SwayPickRow list.
+class _StepLanguageKeepPicker extends StatelessWidget {
+  const _StepLanguageKeepPicker({
     required this.selected,
     required this.onSelect,
     required this.onBack,
@@ -632,194 +499,63 @@ class _StepLanguage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _LanguageGrid(selected: selected, onSelect: onSelect),
-          const SizedBox(height: 12),
-          Text(
-            AppStrings.t('onb_translation_help'),
-            style: const TextStyle(
-              color: SC.textMuted,
-              fontSize: 13,
-              height: 1.4,
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              SwayOnb.gutter,
+              48,
+              SwayOnb.gutter,
+              8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwayTitle(AppStrings.t('onb_language_title')),
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 310),
+                  child: Text(
+                    AppStrings.t('onb_language_subtitle'),
+                    style: SwayOnb.body,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                _LanguageGrid(selected: selected, onSelect: onSelect),
+                const SizedBox(height: 12),
+                Text(
+                  AppStrings.t('onb_translation_help'),
+                  style: SwayOnb.body.copyWith(fontSize: 14),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 28),
-          Row(
-            children: [
-              TextButton(
-                onPressed: onBack,
-                style: TextButton.styleFrom(foregroundColor: SC.textMuted),
-                child: Text(AppStrings.t('onb_back')),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: onFinish,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    AppStrings.t(finishLabelKey),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepGender extends StatelessWidget {
-  const _StepGender({
-    required this.selected,
-    required this.onSelect,
-    required this.onBack,
-    required this.onFinish,
-    this.finishLabelKey = 'onb_finish',
-  });
-
-  /// `m` / `f` / `x` or null (nothing picked yet).
-  final String? selected;
-  final ValueChanged<String> onSelect;
-  final VoidCallback onBack;
-  final VoidCallback onFinish;
-  final String finishLabelKey;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _GenderOption(
-            value: 'f',
-            label: AppStrings.t('onb_gender_female'),
-            icon: Icons.female,
-            selected: selected == 'f',
-            onTap: () => onSelect('f'),
-          ),
-          const SizedBox(height: 10),
-          _GenderOption(
-            value: 'm',
-            label: AppStrings.t('onb_gender_male'),
-            icon: Icons.male,
-            selected: selected == 'm',
-            onTap: () => onSelect('m'),
-          ),
-          const SizedBox(height: 10),
-          _GenderOption(
-            value: 'x',
-            label: AppStrings.t('onb_gender_neutral'),
-            icon: Icons.transgender,
-            selected: selected == 'x',
-            onTap: () => onSelect('x'),
-          ),
-          const SizedBox(height: 28),
-          Row(
-            children: [
-              TextButton(
-                onPressed: onBack,
-                style: TextButton.styleFrom(foregroundColor: SC.textMuted),
-                child: Text(AppStrings.t('onb_back')),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: selected == null ? null : onFinish,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    AppStrings.t(finishLabelKey),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GenderOption extends StatelessWidget {
-  const _GenderOption({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String value;
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = selected ? SC.accent.withValues(alpha: 0.18) : SC.menu;
-    final fg = selected ? SC.accent : SC.textPrimary;
-    final border = selected ? SC.accent : SC.glassBorder;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border, width: selected ? 1.5 : 1),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SwayOnb.gutter,
+            8,
+            SwayOnb.gutter,
+            40,
           ),
           child: Row(
             children: [
-              Icon(icon, color: fg, size: 22),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 16,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              SwayGhostButton(
+                label: AppStrings.t('onb_back'),
+                onPressed: onBack,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: SwayCta(
+                  label: AppStrings.t(finishLabelKey),
+                  onPressed: onFinish,
                 ),
               ),
-              const Spacer(),
-              if (selected)
-                const Icon(Icons.check_circle, color: SC.accent, size: 22),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
