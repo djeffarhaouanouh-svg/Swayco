@@ -91,10 +91,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final msg = e.message.toLowerCase();
       final notConfirmed =
           code == 'email_not_confirmed' || msg.contains('email not confirmed');
+      final invalidCredentials = code == 'invalid_credentials' ||
+          msg.contains('invalid login credentials');
       setState(() {
         _error = notConfirmed
             ? AppStrings.t('login_err_not_confirmed')
-            : e.message;
+            : invalidCredentials
+                ? AppStrings.t('login_err_invalid_credentials')
+                : e.message;
         _showResendConfirmation = notConfirmed;
         _busy = false;
       });

@@ -567,6 +567,7 @@ abstract final class AppStrings {
     'login_have_account': 'Déjà un compte ?',
     'login_err_email': 'Entre une adresse e-mail valide.',
     'login_err_password': 'Le mot de passe doit faire 6 caractères ou plus.',
+    'login_err_invalid_credentials': 'Mot de passe invalide.',
     'login_check_inbox':
         'Vérifie ta boîte mail : on t\'a envoyé un lien de confirmation.',
     'login_resend_confirm': 'Renvoyer le mail de confirmation',
@@ -1125,6 +1126,7 @@ abstract final class AppStrings {
     'login_have_account': 'Already have an account?',
     'login_err_email': 'Enter a valid email address.',
     'login_err_password': 'Password must be at least 6 characters.',
+    'login_err_invalid_credentials': 'Incorrect password.',
     'login_check_inbox': 'Check your inbox — we sent you a confirmation link.',
     'login_resend_confirm': 'Resend confirmation email',
     'login_resend_sent':
@@ -1712,6 +1714,7 @@ abstract final class AppStrings {
     'login_have_account': '¿Ya tienes una cuenta?',
     'login_err_email': 'Introduce un correo válido.',
     'login_err_password': 'La contraseña debe tener al menos 6 caracteres.',
+    'login_err_invalid_credentials': 'Contraseña incorrecta.',
     'login_check_inbox':
         'Revisa tu bandeja de entrada — te enviamos un enlace de confirmación.',
     'login_resend_confirm': 'Reenviar correo de confirmación',
@@ -2262,6 +2265,7 @@ abstract final class AppStrings {
     'login_have_account': 'Du hast bereits ein Konto?',
     'login_err_email': 'Gib eine gültige E-Mail-Adresse ein.',
     'login_err_password': 'Das Passwort muss mindestens 6 Zeichen lang sein.',
+    'login_err_invalid_credentials': 'Falsches Passwort.',
     'login_check_inbox':
         'Sieh in deinem Posteingang nach — wir haben dir einen Bestätigungslink gesendet.',
     'login_resend_confirm': 'Bestätigungs-E-Mail erneut senden',
@@ -2795,6 +2799,7 @@ abstract final class AppStrings {
     'login_have_account': 'Hai già un account?',
     'login_err_email': 'Inserisci un indirizzo email valido.',
     'login_err_password': 'La password deve contenere almeno 6 caratteri.',
+    'login_err_invalid_credentials': 'Password errata.',
     'login_check_inbox':
         'Controlla la tua casella di posta — ti abbiamo inviato un link di conferma.',
     'login_resend_confirm': 'Invia di nuovo l\'email di conferma',
@@ -3329,6 +3334,7 @@ abstract final class AppStrings {
     'login_have_account': 'Já tem uma conta?',
     'login_err_email': 'Introduza um endereço de e-mail válido.',
     'login_err_password': 'A palavra-passe deve ter pelo menos 6 caracteres.',
+    'login_err_invalid_credentials': 'Palavra-passe incorreta.',
     'login_check_inbox':
         'Verifique a sua caixa de entrada — enviámos-lhe um link de confirmação.',
     'login_resend_confirm': 'Reenviar e-mail de confirmação',
@@ -3863,6 +3869,7 @@ abstract final class AppStrings {
     'login_have_account': 'Heb je al een account?',
     'login_err_email': 'Voer een geldig e-mailadres in.',
     'login_err_password': 'Het wachtwoord moet minstens 6 tekens bevatten.',
+    'login_err_invalid_credentials': 'Onjuist wachtwoord.',
     'login_check_inbox':
         'Controleer je inbox — we hebben je een bevestigingslink gestuurd.',
     'login_resend_confirm': 'Bevestigingsmail opnieuw sturen',
@@ -4381,6 +4388,7 @@ abstract final class AppStrings {
     'login_have_account': 'لديك حساب بالفعل؟',
     'login_err_email': 'أدخل عنوان بريد إلكتروني صالحًا.',
     'login_err_password': 'يجب ألا تقل كلمة المرور عن 6 أحرف.',
+    'login_err_invalid_credentials': 'كلمة المرور غير صحيحة.',
     'login_check_inbox': 'تحقق من صندوق الوارد — أرسلنا لك رابط تأكيد.',
     'login_resend_confirm': 'إعادة إرسال بريد التأكيد',
     'login_resend_sent':
@@ -4911,6 +4919,7 @@ abstract final class AppStrings {
     'login_have_account': 'Уже есть аккаунт?',
     'login_err_email': 'Введите корректный адрес эл. почты.',
     'login_err_password': 'Пароль должен содержать не менее 6 символов.',
+    'login_err_invalid_credentials': 'Неверный пароль.',
     'login_check_inbox':
         'Проверьте почту — мы отправили вам ссылку для подтверждения.',
     'login_resend_confirm': 'Отправить письмо повторно',
@@ -5398,6 +5407,7 @@ abstract final class AppStrings {
     'login_have_account': '已有账户？',
     'login_err_email': '请输入有效的邮箱地址。',
     'login_err_password': '密码至少需要 6 个字符。',
+    'login_err_invalid_credentials': '密码错误。',
     'login_check_inbox': '请查收邮箱 — 我们已向你发送了一个确认链接。',
     'login_resend_confirm': '重新发送确认邮件',
     'login_resend_sent': '确认邮件已重新发送。请查收邮箱（以及垃圾邮件文件夹）。',
@@ -5913,6 +5923,7 @@ abstract final class AppStrings {
     'login_have_account': 'すでにアカウントをお持ちですか？',
     'login_err_email': '有効なメールアドレスを入力してください。',
     'login_err_password': 'パスワードは6文字以上で入力してください。',
+    'login_err_invalid_credentials': 'パスワードが間違っています。',
     'login_check_inbox': '受信トレイを確認してください — 確認リンクを送信しました。',
     'login_resend_confirm': '確認メールを再送信',
     'login_resend_sent': '確認メールを再送信しました。受信トレイ（と迷惑メールフォルダ）を確認してください。',
@@ -6402,6 +6413,7 @@ abstract final class AppStrings {
     'login_have_account': '이미 계정이 있으신가요?',
     'login_err_email': '유효한 이메일 주소를 입력하세요.',
     'login_err_password': '비밀번호는 최소 6자 이상이어야 해요.',
+    'login_err_invalid_credentials': '비밀번호가 올바르지 않아요.',
     'login_check_inbox': '받은편지함을 확인하세요 — 확인 링크를 보내드렸어요.',
     'login_resend_confirm': '확인 이메일 재전송',
     'login_resend_sent': '확인 이메일을 다시 보냈어요. 받은편지함(과 스팸함)을 확인하세요.',
