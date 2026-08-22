@@ -1469,7 +1469,10 @@ class _IdentitySection extends StatelessWidget {
         const SizedBox(height: 24),
         // "Mes infos" : un seul panneau qui porte la bio (en haut), les faits
         // perso, puis les centres d'intérêt (en bas).
-        _ProfileSectionHeader(AppStrings.t('info_section_title')),
+        _ProfileSectionHeader(
+          AppStrings.t('info_section_title'),
+          trailing: const _RewardHint(),
+        ),
         const SizedBox(height: 12),
         _PersonalInfoSection(
           profile: personalInfo,
