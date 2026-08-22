@@ -42,8 +42,8 @@ import '../widgets/swayco_dialog.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import 'chat_thread_screen.dart';
-// L'aperçu "ma carte" vit dans le Discover : il réutilise le widget de carte
-// du feed pour que l'aperçu soit le rendu réel, pas une copie qui dérive.
+// L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
+// du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
 import 'discover_screen.dart' show MyCardPreviewScreen;
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
@@ -51,12 +51,12 @@ import 'settings_screen.dart';
 
 /// Profile view. Two modes:
 ///
-///   * `userId` is null (default): "my own" profile — editable, shows the
-///     Free Account / Premium card, Edit + Paramètres buttons.
+///   * `userId` is null (default): "my own" profile â editable, shows the
+///     Free Account / Premium card, Edit + ParamÃ¨tres buttons.
 ///   * `userId` is set: another user's profile, viewed read-only. Camera /
 ///     edit affordances are hidden, premium card and the call-language
 ///     warning are dropped (private to me), and the action row becomes
-///     Bloquer / Débloquer instead of Edit / Paramètres.
+///     Bloquer / DÃ©bloquer instead of Edit / ParamÃ¨tres.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.userId, this.preview = false});
 
@@ -64,9 +64,9 @@ class ProfileScreen extends StatefulWidget {
   /// in read-only "viewer" mode rather than my own profile.
   final String? userId;
 
-  /// Aperçu de MON profil tel que les autres le voient : rendu viewer sur mes
-  /// propres données, mais sans les actions (Message / Matcher / bloquer) ni le
-  /// menu ⋮ — juste un bouton retour pour fermer.
+  /// AperÃ§u de MON profil tel que les autres le voient : rendu viewer sur mes
+  /// propres donnÃ©es, mais sans les actions (Message / Matcher / bloquer) ni le
+  /// menu â® â juste un bouton retour pour fermer.
   final bool preview;
 
   @override
@@ -78,7 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _deviceId = '';
   RemoteProfile? _remote;
   ProfileSnapshot? _local;
-  // Own profile: likes received per photo URL — drives each gallery photo's
+  // Own profile: likes received per photo URL â drives each gallery photo's
   // heart badge. Likes belong to a specific photo now.
   Map<String, int> _likesByPhoto = const {};
   bool _loading = true;
@@ -91,9 +91,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   // filled heart on each of the peer's gallery photos.
   Set<String> _likedPhotoUrls = const {};
   // Viewer-mode only: where the two of us stand.
-  //   `_matched`     → we liked each other: it's a match.
-  //   `_iLiked`      → my like is waiting for their answer.
-  //   `_peerLikedMe` → their like is waiting for mine (one tap = match).
+  //   `_matched`     â we liked each other: it's a match.
+  //   `_iLiked`      â my like is waiting for their answer.
+  //   `_peerLikedMe` â their like is waiting for mine (one tap = match).
   bool _matched = false;
   bool _iLiked = false;
   bool _peerLikedMe = false;
@@ -138,44 +138,44 @@ class _ProfileScreenState extends State<ProfileScreen>
     final deviceId = await DeviceId.getOrCreate();
     final targetId = widget.userId ?? deviceId;
 
-    // TOUT EN PARALLÈLE. Ces sept lectures s'attendaient les unes les autres :
-    // sept allers-retours réseau bout à bout, soit plusieurs secondes d'écran
-    // vide sur une connexion mobile ordinaire. Aucune ne dépend du résultat
-    // d'une autre — seule l'identité de l'appareil, obtenue au-dessus, leur est
-    // nécessaire. Elles partent donc ensemble : le temps d'attente devient
+    // TOUT EN PARALLÃLE. Ces sept lectures s'attendaient les unes les autres :
+    // sept allers-retours rÃ©seau bout Ã  bout, soit plusieurs secondes d'Ã©cran
+    // vide sur une connexion mobile ordinaire. Aucune ne dÃ©pend du rÃ©sultat
+    // d'une autre â seule l'identitÃ© de l'appareil, obtenue au-dessus, leur est
+    // nÃ©cessaire. Elles partent donc ensemble : le temps d'attente devient
     // celui de la plus lente, pas la somme.
     final viewer = _isViewingOther;
     final canQuery = isSupabaseReady && deviceId.isNotEmpty;
     final results = await Future.wait<Object?>([
-      // Cache local (mon profil seulement) : instantané, mais il attendait
-      // quand même son tour derrière le réseau.
+      // Cache local (mon profil seulement) : instantanÃ©, mais il attendait
+      // quand mÃªme son tour derriÃ¨re le rÃ©seau.
       viewer ? Future<Object?>.value() : UserPrefs.loadProfile(),
       isSupabaseReady
           ? ProfileApi.fetchById(targetId)
           : Future<Object?>.value(),
-      // Les likes reçus n'ont de sens que sur mon profil : le compte d'un pair
-      // trahirait qui l'a liké.
+      // Les likes reÃ§us n'ont de sens que sur mon profil : le compte d'un pair
+      // trahirait qui l'a likÃ©.
       !viewer && isSupabaseReady
           ? LikeApi.countLikesPerPhoto(targetId)
           : Future<Object?>.value(const <String, int>{}),
       viewer && canQuery
           ? BlockApi.isBlocked(blockerId: deviceId, otherId: targetId)
           : Future<Object?>.value(false),
-      // Ce pair m'a-t-il bloqué ? Si oui, les actions de match disparaissent —
-      // l'arête est morte de son côté.
+      // Ce pair m'a-t-il bloquÃ© ? Si oui, les actions de match disparaissent â
+      // l'arÃªte est morte de son cÃ´tÃ©.
       viewer && canQuery
           ? BlockApi.fetchMyBlockerIds().catchError(
               (_) => <String>{},
             )
           : Future<Object?>.value(<String>{}),
-      // Ses photos que j'ai likées, pour que chaque cœur soit dans le bon état
-      // dès le premier rendu.
+      // Ses photos que j'ai likÃ©es, pour que chaque cÅur soit dans le bon Ã©tat
+      // dÃ¨s le premier rendu.
       viewer && canQuery
           ? LikeApi.fetchMyLikedPhotos(deviceId).catchError(
               (_) => <String>{},
             )
           : Future<Object?>.value(<String>{}),
-      // L'état du match — c'est lui qui décide Matcher / Accepter / Matché.
+      // L'Ã©tat du match â c'est lui qui dÃ©cide Matcher / Accepter / MatchÃ©.
       viewer && canQuery
           ? FriendshipApi.matchStateWith(meId: deviceId, peerId: targetId)
           : Future<Object?>.value(),
@@ -325,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// "Matcher" — I like the peer. If they had already liked me the two likes
+  /// "Matcher" â I like the peer. If they had already liked me the two likes
   /// meet on the spot and it's a match (celebration overlay); otherwise the
   /// like lands as a pending request they'll answer from Demandes. Optimistic:
   /// flip the button first, roll back if the write fails.
@@ -357,7 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// "Accepter" — the peer liked me first, so saying yes IS the match.
+  /// "Accepter" â the peer liked me first, so saying yes IS the match.
   Future<void> _acceptPeer() async {
     if (_targetId.isEmpty || _deviceId.isEmpty) return;
     setState(() {
@@ -370,7 +370,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         peerId: _targetId,
       );
       if (pending == null) {
-        // Their like vanished (unmatched / rejected between two reads) —
+        // Their like vanished (unmatched / rejected between two reads) â
         // fall back to liking them, which re-opens a pending request.
         await FriendshipApi.like(meId: _deviceId, peerId: _targetId);
       } else {
@@ -395,7 +395,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// The "It's a match!" celebration. Needs MY profile too — in viewer mode
+  /// The "It's a match!" celebration. Needs MY profile too â in viewer mode
   /// `_remote` holds the PEER, so pull mine for the card.
   Future<void> _celebrateMatch() async {
     MatchCelebration.markShown(_targetId);
@@ -450,9 +450,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     await _reload();
   }
 
-  /// Bouton œil : ouvre MA CARTE Discover telle que les autres la voient —
-  /// mes photos, mon nom, et le panneau d'infos (bio / âge / intérêts) tel
-  /// qu'il se déplie chez eux. Pas la page profil : c'est la carte qui décide
+  /// Bouton Åil : ouvre MA CARTE Discover telle que les autres la voient â
+  /// mes photos, mon nom, et le panneau d'infos (bio / Ã¢ge / intÃ©rÃªts) tel
+  /// qu'il se dÃ©plie chez eux. Pas la page profil : c'est la carte qui dÃ©cide
   /// si on te like.
   Future<void> _openSelfPreview() async {
     await Navigator.of(context).push<void>(
@@ -478,17 +478,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     return '@${_deviceId.replaceAll('-', '').substring(0, 8)}';
   }
 
-  /// True when viewing a peer who is currently online — `last_seen`
-  /// within the last 2 minutes — and who has not hidden their status.
+  /// True when viewing a peer who is currently online â `last_seen`
+  /// within the last 2 minutes â and who has not hidden their status.
   bool get _peerOnline {
     if (!_isViewingOther) return false;
     final r = _remote;
-    // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
-    // son propre statut n'éteignait pas la pastille sur un profil visité.
+    // La rÃ¨gle commune : elle ajoute ici la rÃ©ciprocitÃ© qui manquait â masquer
+    // son propre statut n'Ã©teignait pas la pastille sur un profil visitÃ©.
     return r != null && isPeerOnline(r);
   }
 
-  /// "Tes photos" — pick an image and append it to the gallery. The first
+  /// "Tes photos" â pick an image and append it to the gallery. The first
   /// photo doubles as the PDP (avatar) + Discover photo; [ProfileApi.
   /// addProfilePhoto] keeps those columns in sync.
   Future<void> _pickAndAddPhoto() async {
@@ -512,8 +512,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       final picker = ImagePicker();
       file = await picker.pickImage(
         source: ImageSource.gallery,
-        // The Discover card is portrait — keep more pixels than the avatar
-        // (1024² → 1600 max edge) so the photo doesn't look soft full-screen.
+        // The Discover card is portrait â keep more pixels than the avatar
+        // (1024Â² â 1600 max edge) so the photo doesn't look soft full-screen.
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 88,
@@ -553,7 +553,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// PDP bubble — pick an image and set it as the (independent) profile
+  /// PDP bubble â pick an image and set it as the (independent) profile
   /// avatar via [ProfileApi.uploadAvatar]. Separate from the gallery: this
   /// only writes `avatar_url`, leaving "Tes photos" untouched.
   Future<void> _pickAndSetAvatar() async {
@@ -570,7 +570,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       final picker = ImagePicker();
       file = await picker.pickImage(
         source: ImageSource.gallery,
-        // The avatar renders small and round — 1024² is plenty and keeps the
+        // The avatar renders small and round â 1024Â² is plenty and keeps the
         // upload light.
         maxWidth: 1024,
         maxHeight: 1024,
@@ -661,7 +661,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _saveName(String name) async {
     if (_deviceId.isEmpty) return;
     final trimmed = name.trim();
-    // Ignore an empty name — a profile must keep one.
+    // Ignore an empty name â a profile must keep one.
     if (trimmed.isEmpty) return;
     // No-op when the name is unchanged: don't spend a cooldown on a re-save.
     if (trimmed == (_remote?.displayName ?? '')) return;
@@ -728,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   /// Persist one of the "Mes infos" facts (age, height, job, sign, looking
-  /// for). Empty clears the column. Optimistic — the panel on Discover reads
+  /// for). Empty clears the column. Optimistic â the panel on Discover reads
   /// the same row.
   Future<void> _savePersonalInfo({
     Object? age = _keep,
@@ -786,15 +786,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
     );
-    // Profile data may have changed (e.g. account deleted → ignored;
-    // sign-out → routed away by the auth listener).
+    // Profile data may have changed (e.g. account deleted â ignored;
+    // sign-out â routed away by the auth listener).
     if (mounted) await _reload();
   }
 
   /// Pencil next to the PDP — bottom sheet (same pattern as the language
-  /// wheel), not a full Settings push. First name / city / interface lang.
+  /// wheel), not a full Settings push. First name / city / live translation.
   Future<void> _openEditAccountSheet() async {
     if (!mounted) return;
+    final callLang = await UserPrefs.loadCallSpokenLang();
+    if (!mounted) return;
+    final liveCode = callLang.lang.isNotEmpty
+        ? callLang.lang
+        : (_languageCode.isNotEmpty
+            ? _languageCode
+            : AppStrings.currentBcp47.value);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -802,7 +809,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         displayName: _remote?.displayName.trim() ?? '',
         avatarUrl: _remote?.avatarUrl ?? '',
         city: _remote?.city.trim() ?? '',
-        languageCode: _languageCode,
+        languageCode: liveCode,
+        onPickAvatar: () async {
+          Navigator.of(ctx).pop();
+          await _pickAndSetAvatar();
+        },
         onEditName: () async {
           Navigator.of(ctx).pop();
           await _promptEditName();
@@ -813,7 +824,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         },
         onEditLanguage: () async {
           Navigator.of(ctx).pop();
-          await _promptEditLanguage();
+          await _promptEditLiveTranslation();
         },
       ),
     );
@@ -882,42 +893,33 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Future<void> _promptEditLanguage() async {
-    final current = AppStrings.currentBcp47.value;
+  Future<void> _promptEditLiveTranslation() async {
+    final saved = await UserPrefs.loadCallSpokenLang();
+    if (!mounted) return;
+    final current = saved.lang.isNotEmpty
+        ? saved.lang
+        : (_languageCode.isNotEmpty
+            ? _languageCode
+            : AppStrings.currentBcp47.value);
     final langs = supportedLanguages;
     final start = langs.indexWhere((l) => l.code == current);
     final picked = await showWheelPicker(
       context: context,
-      title: AppStrings.t('settings_lang_interface'),
-      emoji: '🌍',
+      title: AppStrings.t('settings_live_translation'),
+      emoji: '🗣️',
       labels: [for (final l in langs) '${l.flag}  ${l.label}'],
       initialIndex: start < 0 ? 0 : start,
     );
     if (picked == null || !mounted) return;
     final code = langs[picked].code;
-    if (code == current) return;
-    AppStrings.setFromCode(code);
-    await UserPrefs.setSourceLang(code);
-    final profile = _remote;
-    if (profile != null &&
-        profile.displayName.trim().isNotEmpty &&
-        _deviceId.isNotEmpty) {
-      await ProfileApi.upsertMyProfile(
-        deviceId: _deviceId,
-        displayName: profile.displayName,
-        language: code,
-        gender: profile.gender,
-      );
-    }
-    if (!mounted) return;
-    setState(() => _remote = _remote?.copyWith(language: code));
+    await UserPrefs.saveCallSpokenLang(code, dontAsk: saved.dontAsk);
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = findLanguageByCode(_languageCode);
     // Flag shown right of the name: the COUNTRY flag once a location is set
-    // (the spoken language doesn't always match — a Brazilian speaks
+    // (the spoken language doesn't always match â a Brazilian speaks
     // Portuguese), else the language flag. This is NOT the language card's
     // flag, which stays the spoken language on purpose.
     final nameFlag =
@@ -928,7 +930,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         '';
     return Scaffold(
       backgroundColor: SC.bg,
-      // No header bar. When viewing someone else, the back button + ⋮ menu
+      // No header bar. When viewing someone else, the back button + â® menu
       // float directly over the content (added to the Stack below) so the
       // whole profile reads as one continuous page. The "my profile" tab is
       // mounted in IndexedStack, so it never needed a back affordance.
@@ -982,7 +984,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         children: [
                           _IdentitySection(
-                            // Raw name (may be empty) — the section shows the
+                            // Raw name (may be empty) â the section shows the
                             // "anonymous" fallback itself in viewer mode and
                             // an editable field on my own profile.
                             displayName: _displayName,
@@ -1028,8 +1030,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
               ),
             ),
-            // Floating controls over the content — no header bar. Back on the
-            // left, the report/block ⋮ menu on the right; both sit
+            // Floating controls over the content â no header bar. Back on the
+            // left, the report/block â® menu on the right; both sit
             // transparently on top of the scrolling profile.
             if (_isViewingOther)
               Positioned(
@@ -1049,8 +1051,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
                         const Spacer(),
-                        // En aperçu de mon propre profil : pas de menu ⋮
-                        // (rien à signaler / bloquer sur soi-même).
+                        // En aperÃ§u de mon propre profil : pas de menu â®
+                        // (rien Ã  signaler / bloquer sur soi-mÃªme).
                         if (!widget.preview)
                         PopupMenuButton<String>(
                           tooltip: AppStrings.t('tooltip_more'),
@@ -1238,7 +1240,7 @@ class _IdentitySection extends StatelessWidget {
   final bool online;
   final String bio;
 
-  /// "Centres d'intérêt" the user picked (predefined tags). Rendered as
+  /// "Centres d'intÃ©rÃªt" the user picked (predefined tags). Rendered as
   /// colour-coded chips; editable on my own profile (opens the picker),
   /// read-only otherwise.
   final List<String> interests;
@@ -1247,11 +1249,11 @@ class _IdentitySection extends StatelessWidget {
   /// Editable (add / remove) on my own profile, read-only otherwise.
   final List<String> photos;
 
-  /// The profile picture (PDP) shown in the round bubble — an independent
+  /// The profile picture (PDP) shown in the round bubble â an independent
   /// image, no longer tied to `photos[0]`. Empty falls back to initials.
   final String avatarUrl;
 
-  /// Which gallery photo currently shows in Discover — gets the cyan ring.
+  /// Which gallery photo currently shows in Discover â gets the cyan ring.
   final String discoverPhotoUrl;
 
   /// Own profile: pick which gallery photo is the Discover photo (by URL).
@@ -1268,7 +1270,7 @@ class _IdentitySection extends StatelessWidget {
   final Future<void> Function(List<String>)? onEditInterests;
 
   /// The profile row behind the "Mes infos" section (age, height, job, star
-  /// sign, looking for) — the same facts the Discover card's panel shows.
+  /// sign, looking for) â the same facts the Discover card's panel shows.
   final RemoteProfile? personalInfo;
   final Future<void> Function({
     Object? age,
@@ -1294,37 +1296,37 @@ class _IdentitySection extends StatelessWidget {
   /// Own profile: open Settings (gear next to the name).
   final VoidCallback onSettings;
 
-  /// Own profile: pencil beside the PDP — account edit bottom sheet.
+  /// Own profile: pencil beside the PDP â account edit bottom sheet.
   final VoidCallback? onEditAccount;
 
-  /// Own profile: ouvre l'aperçu "vu de l'extérieur" (bouton œil).
+  /// Own profile: ouvre l'aperÃ§u "vu de l'extÃ©rieur" (bouton Åil).
   final VoidCallback? onPreview;
 
-  /// True quand CETTE instance EST l'aperçu (rendu viewer sur mes données) :
+  /// True quand CETTE instance EST l'aperÃ§u (rendu viewer sur mes donnÃ©es) :
   /// masque toutes les actions relationnelles.
   final bool preview;
 
   /// True when this section is rendering someone else's profile read-only.
-  /// Hides editing affordances and swaps Edit/Paramètres for Message /
+  /// Hides editing affordances and swaps Edit/ParamÃ¨tres for Message /
   /// Follow-back.
   final bool viewerMode;
 
-  /// Viewer-mode only: we liked each other — it's a match.
+  /// Viewer-mode only: we liked each other â it's a match.
   final bool matched;
 
   /// Viewer-mode only: my like is still waiting for their answer.
   final bool iLiked;
 
-  /// Viewer-mode only: they liked me — one tap on "Accepter" makes it a match.
+  /// Viewer-mode only: they liked me â one tap on "Accepter" makes it a match.
   final bool peerLikedMe;
 
   /// Viewer-mode only: have I blocked the displayed peer? When true the
-  /// action stack collapses to a single "Débloquer" button — the follow
+  /// action stack collapses to a single "DÃ©bloquer" button â the follow
   /// relation and Message CTA are meaningless on a profile I've cut off.
   final bool peerBlocked;
 
   /// Viewer-mode only: has the displayed peer blocked ME? When true the match
-  /// actions are hidden — the edge is dead on their side, so offering to
+  /// actions are hidden â the edge is dead on their side, so offering to
   /// manage it is misleading.
   final bool peerBlockedMe;
 
@@ -1335,7 +1337,7 @@ class _IdentitySection extends StatelessWidget {
   final VoidCallback? onAcceptPeer;
 
   /// Viewer-mode only: block / unblock the displayed peer. Drives the
-  /// "Débloquer" action button shown while [peerBlocked] is true.
+  /// "DÃ©bloquer" action button shown while [peerBlocked] is true.
   final VoidCallback? onToggleBlock;
 
   /// Viewer-mode only: the peer's photo URLs I've liked. Drives the filled
@@ -1352,24 +1354,24 @@ class _IdentitySection extends StatelessWidget {
   // language (fr / en / es supplied; others fall back to en).
   static String get _bioPlaceholder => AppStrings.t('profile_bio_placeholder');
 
-  /// Opens the "Centres d'intérêt" picker (a styled bottom sheet of coloured
+  /// Opens the "Centres d'intÃ©rÃªt" picker (a styled bottom sheet of coloured
   /// category groups) and persists the new selection.
   @override
   Widget build(BuildContext context) {
     return viewerMode ? _buildViewer(context) : _buildOwn(context);
   }
 
-  /// The round PDP bubble — the independent profile picture ([avatarUrl])
+  /// The round PDP bubble â the independent profile picture ([avatarUrl])
   /// shown as a circular avatar at the top of both layouts. On my own
   /// profile it carries the camera badge and a tap sets a new PDP (separate
   /// from the gallery); read-only (no badge / tap) in the viewer.
   ///
   /// Own profile: the edit pencil sits mid-height of the bubble, pushed to
   /// the right into the empty space (not on the photo). A matching left
-  /// spacer keeps the bubble centred. Tap → account edit bottom sheet.
+  /// spacer keeps the bubble centred. Tap â account edit bottom sheet.
   Widget _pdpBubble({required bool editable}) {
     final pdp = avatarUrl.isEmpty ? null : avatarUrl;
-    const pencilSize = 36.0;
+    const pencilSize = 30.0;
     const pencilGap = 14.0;
     final bubble = Stack(
       alignment: Alignment.bottomRight,
@@ -1437,7 +1439,7 @@ class _IdentitySection extends StatelessWidget {
             ),
             child: const Icon(
               Icons.edit,
-              size: 18,
+              size: 15,
               color: SC.textPrimary,
             ),
           ),
@@ -1460,7 +1462,7 @@ class _IdentitySection extends StatelessWidget {
     );
   }
 
-  /// My own profile — capture-1 layout: a "Ton profil" header with an edit
+  /// My own profile â capture-1 layout: a "Ton profil" header with an edit
   /// pencil, the round PDP bubble, name + @handle, the bio, the stats row
   /// (with the settings gear), then the "Tes photos" gallery and the
   /// "Emojis" section. Everything is editable in place; the pencil opens the
@@ -1472,7 +1474,7 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header — "Ton profil" title with the settings gear pinned to the
+        // Header â "Ton profil" title with the settings gear pinned to the
         // top-right corner of the page.
         Row(
           children: [
@@ -1485,8 +1487,8 @@ class _IdentitySection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Œil = aperçu de mon profil vu de l'extérieur. Couleur cyan
-            // (inversée avec l'engrenage, qui est passé en verre gris).
+            // Åil = aperÃ§u de mon profil vu de l'extÃ©rieur. Couleur cyan
+            // (inversÃ©e avec l'engrenage, qui est passÃ© en verre gris).
             Material(
               color: SC.accent.withValues(alpha: 0.15),
               shape: const CircleBorder(),
@@ -1514,7 +1516,7 @@ class _IdentitySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 26),
-        // Round PDP bubble (the independent avatar) — tap to set a new PDP.
+        // Round PDP bubble (the independent avatar) â tap to set a new PDP.
         _pdpBubble(editable: true),
         const SizedBox(height: 14),
         // Name centred under the PDP, with a cyan edit bubble towards the
@@ -1523,8 +1525,8 @@ class _IdentitySection extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 76 = le bouton (44) + sa marge droite (32) : le prénom reste
-            // centré malgré le bouton d'un seul côté.
+            // 76 = le bouton (44) + sa marge droite (32) : le prÃ©nom reste
+            // centrÃ© malgrÃ© le bouton d'un seul cÃ´tÃ©.
             const SizedBox(width: 76),
             Expanded(
               child: Row(
@@ -1550,8 +1552,8 @@ class _IdentitySection extends StatelessWidget {
                 ],
               ),
             ),
-            // Paramètres (à la place du crayon), en verre gris — couleur
-            // inversée avec l'œil. L'édition du nom / de la bio se fait en
+            // ParamÃ¨tres (Ã  la place du crayon), en verre gris â couleur
+            // inversÃ©e avec l'Åil. L'Ã©dition du nom / de la bio se fait en
             // tapant le texte directement.
             Material(
               color: Colors.white.withValues(alpha: 0.10),
@@ -1562,7 +1564,7 @@ class _IdentitySection extends StatelessWidget {
                 child: Tooltip(
                   message: AppStrings.t('settings_title'),
                   child: Container(
-                    // Même gabarit que l'œil : 44 de côté, icône 21.
+                    // MÃªme gabarit que l'Åil : 44 de cÃ´tÃ©, icÃ´ne 21.
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
@@ -1606,7 +1608,7 @@ class _IdentitySection extends StatelessWidget {
           onSelectDiscover: onSelectDiscover,
         ),
         const SizedBox(height: 10),
-        // ⓘ hint — juste sous le cadre photo. Taps jump to Settings where
+        // â hint â juste sous le cadre photo. Taps jump to Settings where
         // "Me cacher de mon pays" lives.
         _DiscoverVisibilityHint(
           onTap: () => Navigator.of(context).push<void>(
@@ -1615,7 +1617,7 @@ class _IdentitySection extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         // "Mes infos" : un seul panneau qui porte la bio (en haut), les faits
-        // perso, puis les centres d'intérêt (en bas).
+        // perso, puis les centres d'intÃ©rÃªt (en bas).
         _ProfileSectionHeader(
           AppStrings.t('info_section_title'),
           trailing: const _RewardHint(),
@@ -1624,7 +1626,7 @@ class _IdentitySection extends StatelessWidget {
         _PersonalInfoSection(
           profile: personalInfo,
           onSave: onSavePersonalInfo,
-          // Bio en haut du panneau — édition en place, placeholder si vide.
+          // Bio en haut du panneau â Ã©dition en place, placeholder si vide.
           top: _InlineEditable(
             value: bio,
             placeholder: _bioPlaceholder,
@@ -1637,7 +1639,7 @@ class _IdentitySection extends StatelessWidget {
               height: 1.4,
             ),
           ),
-          // Centres d'intérêt à l'intérieur du panneau (choix unique).
+          // Centres d'intÃ©rÃªt Ã  l'intÃ©rieur du panneau (choix unique).
           bottom: _InterestsSection(
             interests: interests,
             onSave: onEditInterests,
@@ -1657,7 +1659,7 @@ class _IdentitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Round PDP bubble (the first photo as a circular avatar) at the top —
+        // Round PDP bubble (the first photo as a circular avatar) at the top â
         // shows the user's initials when they have no photo yet.
         _pdpBubble(editable: false),
         const SizedBox(height: 16),
@@ -1695,8 +1697,8 @@ class _IdentitySection extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
-        // (Online presence is now a green dot on the PDP — see _pdpBubble.)
-        // Bio (read-only) — between the PDP/name block and the stats, centred.
+        // (Online presence is now a green dot on the PDP â see _pdpBubble.)
+        // Bio (read-only) â between the PDP/name block and the stats, centred.
         // Translated into the viewer's UI language when it differs from the
         // peer's spoken language.
         if (!emptyBio) ...[
@@ -1715,15 +1717,15 @@ class _IdentitySection extends StatelessWidget {
           ),
         ],
         // Action stack. When I've blocked this peer the whole stack
-        // collapses to a single "Débloquer" CTA — the match actions and the
+        // collapses to a single "DÃ©bloquer" CTA â the match actions and the
         // Message button would read as wrong on a profile I've cut off.
         // Otherwise: Message + one match action, by relation:
-        //  • we matched → "Matché" (inert badge).
-        //  • they liked me first → "Accepter" (one tap = match).
-        //  • I liked them, no answer yet → "Envoyé".
-        //  • nobody liked anybody → "Matcher" (sends the like).
-        // En aperçu de mon propre profil : aucune action (on ne se matche /
-        // bloque pas soi-même).
+        //  â¢ we matched â "MatchÃ©" (inert badge).
+        //  â¢ they liked me first â "Accepter" (one tap = match).
+        //  â¢ I liked them, no answer yet â "EnvoyÃ©".
+        //  â¢ nobody liked anybody â "Matcher" (sends the like).
+        // En aperÃ§u de mon propre profil : aucune action (on ne se matche /
+        // bloque pas soi-mÃªme).
         if (!preview) ...[
         const SizedBox(height: 16),
         if (peerBlocked) ...[
@@ -1744,7 +1746,7 @@ class _IdentitySection extends StatelessWidget {
             ),
             if (!peerBlockedMe) const SizedBox(height: 10),
           ],
-          // The peer blocked me → their edge with me is dead on their side,
+          // The peer blocked me â their edge with me is dead on their side,
           // so hide the match actions.
           if (!peerBlockedMe) ...[
             if (matched) ...[
@@ -1780,7 +1782,7 @@ class _IdentitySection extends StatelessWidget {
           ],
         ],
         ],
-        // Centres d'intérêt (read-only) — just above the photos.
+        // Centres d'intÃ©rÃªt (read-only) â just above the photos.
         if (interests.isNotEmpty) ...[
           const SizedBox(height: 24),
           _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
@@ -1809,8 +1811,8 @@ class _IdentitySection extends StatelessWidget {
   }
 }
 
-/// Grille 2 colonnes de photos sur le profil d'un pair. Tap → viewer plein
-/// écran ; cœur → like de cette photo.
+/// Grille 2 colonnes de photos sur le profil d'un pair. Tap â viewer plein
+/// Ã©cran ; cÅur â like de cette photo.
 class _PeerMediaStack extends StatelessWidget {
   const _PeerMediaStack({
     required this.photos,
@@ -1940,7 +1942,7 @@ class _RewardHint extends StatelessWidget {
 }
 
 /// Full-screen overlay for profile photos. Swipe or use the side arrows to
-/// move between several photos; pinch to zoom; the ✕ in the photo's top-right
+/// move between several photos; pinch to zoom; the â in the photo's top-right
 /// corner (or a tap on the backdrop) dismisses. On the own profile a "set as
 /// Discover photo" button sets whichever photo is currently in view.
 Future<void> showPhotoViewer(
@@ -2091,7 +2093,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                         ),
                       ),
                     ),
-                    // ✕ in the photo's top-right corner.
+                    // â in the photo's top-right corner.
                     Positioned(
                       top: 8,
                       right: 8,
@@ -2166,7 +2168,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 }
 
-/// "Tes photos" — a horizontal gallery of portrait photo tiles (capture-1
+/// "Tes photos" â a horizontal gallery of portrait photo tiles (capture-1
 /// style). On my own profile the first tile is the yellow/accent "+" add
 /// CTA, followed by each photo with a delete badge; the PDP (index 0) also
 /// carries the private likes badge. In viewer mode the gallery is read-only
@@ -2186,7 +2188,7 @@ class _PhotoGallery extends StatelessWidget {
 
   final List<String> photos;
 
-  /// Toujours false désormais — le profil d'un pair passe par [_PeerMediaStack].
+  /// Toujours false dÃ©sormais â le profil d'un pair passe par [_PeerMediaStack].
   /// Le param reste pour ne pas casser les points d'appel.
   final bool viewerMode;
   final VoidCallback onPick;
@@ -2198,15 +2200,15 @@ class _PhotoGallery extends StatelessWidget {
   final Map<String, int> likesByPhoto;
   final VoidCallback? onTapLikes;
 
-  // Portrait tiles (3:4) — a single horizontal, scrollable row of larger tiles.
+  // Portrait tiles (3:4) â a single horizontal, scrollable row of larger tiles.
   static const double _aspect = 216 / 162; // height / width
   static const double _spacing = 8;
 
   @override
   Widget build(BuildContext context) {
     final canAdd = photos.length < profilePhotosMax;
-    // "Tes photos" agrandies : une rangée horizontale de grandes tuiles (la
-    // tuile "+" d'abord), qu'on fait défiler.
+    // "Tes photos" agrandies : une rangÃ©e horizontale de grandes tuiles (la
+    // tuile "+" d'abord), qu'on fait dÃ©filer.
     const double tileWidth = 210;
     final double tileHeight = tileWidth * _aspect;
     final count = (canAdd ? 1 : 0) + photos.length;
@@ -2256,13 +2258,13 @@ class _PhotoGallery extends StatelessWidget {
   }
 }
 
-/// Inline, in-place text editor — no bottom sheet. Shows [value] (or the
+/// Inline, in-place text editor â no bottom sheet. Shows [value] (or the
 /// [placeholder] when empty) as centred tappable text; tapping turns it into
 /// a centred field that commits on submit (keyboard "done") or when focus
 /// leaves. Reused for the name and the bio on my own profile.
-/// Les 5 faits optionnels du profil, éditables en place. Une ligne vide se lit
-/// "Ajouter" : rien n'est obligatoire, et un champ vidé disparaît du panneau
-/// que la carte Discover déplie.
+/// Les 5 faits optionnels du profil, Ã©ditables en place. Une ligne vide se lit
+/// "Ajouter" : rien n'est obligatoire, et un champ vidÃ© disparaÃ®t du panneau
+/// que la carte Discover dÃ©plie.
 class _PersonalInfoSection extends StatelessWidget {
   const _PersonalInfoSection({
     required this.profile,
@@ -2283,7 +2285,7 @@ class _PersonalInfoSection extends StatelessWidget {
   /// Rendu EN HAUT du panneau, au-dessus des lignes d'infos (la bio).
   final Widget? top;
 
-  /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intérêt).
+  /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intÃ©rÃªt).
   final Widget? bottom;
 
   static Widget get _divider => Divider(
@@ -2313,7 +2315,7 @@ class _PersonalInfoSection extends StatelessWidget {
             ),
             _divider,
           ],
-          // Âge : roulette 15–40, plus de saisie libre.
+          // Ãge : roulette 15â40, plus de saisie libre.
           _PersonalInfoRow(
             emoji: kFactEmojiAge,
             label: AppStrings.t('info_age'),
@@ -2335,8 +2337,8 @@ class _PersonalInfoSection extends StatelessWidget {
               await save(age: kAgeOptions[picked]);
             },
           ),
-          // Métier / signe / looking-for : plus de champ libre. Une roulette
-          // écrit une clé FR stable ; l'affichage la localise pour le viewer.
+          // MÃ©tier / signe / looking-for : plus de champ libre. Une roulette
+          // Ã©crit une clÃ© FR stable ; l'affichage la localise pour le viewer.
           _PersonalInfoRow(
             emoji: kFactEmojiJob,
             label: AppStrings.t('info_job'),
@@ -2370,7 +2372,7 @@ class _PersonalInfoSection extends StatelessWidget {
                 title: AppStrings.t('info_zodiac'),
                 emoji: kFactEmojiZodiac,
                 labels: [
-                  // Months only in the wheel — cards show the sign alone.
+                  // Months only in the wheel â cards show the sign alone.
                   for (final k in kZodiacSigns) displayZodiacWithMonths(k),
                 ],
                 initialIndex: zodiacIndex(current),
@@ -2439,10 +2441,10 @@ class _PersonalInfoRow extends StatelessWidget {
   final bool numeric;
   final bool last;
 
-  /// Champ libre : la valeur s'édite en place.
+  /// Champ libre : la valeur s'Ã©dite en place.
   final Future<void> Function(String)? onSave;
 
-  /// Valeur à format imposé : un tap ouvre un sélecteur, il n'y a rien à
+  /// Valeur Ã  format imposÃ© : un tap ouvre un sÃ©lecteur, il n'y a rien Ã 
   /// taper. [onSave] est alors inutile.
   final Future<void> Function(BuildContext)? onPick;
 
@@ -2530,7 +2532,7 @@ class _InlineEditable extends StatefulWidget {
   /// Number pad for the numeric facts (age, height); null = plain text.
   final TextInputType? keyboardType;
 
-  /// Text style used both for the display text and the field — so editing
+  /// Text style used both for the display text and the field â so editing
   /// looks like the static text it replaces.
   final TextStyle style;
   final int maxLines;
@@ -2636,7 +2638,7 @@ class _InlineEditableState extends State<_InlineEditable> {
   }
 }
 
-/// A "centre d'intérêt" chip — a category-coloured pill. Used both on the
+/// A "centre d'intÃ©rÃªt" chip â a category-coloured pill. Used both on the
 /// profile (display) and, with [selected], inside the picker. Tapping it on
 /// my own profile opens the picker.
 /// The "+ Ajouter" chip that opens the interest picker on my own profile.
@@ -2678,9 +2680,9 @@ class _InterestAddChip extends StatelessWidget {
   }
 }
 
-/// The "Centres d'intérêt" section on my own profile: the picked chips plus
+/// The "Centres d'intÃ©rÃªt" section on my own profile: the picked chips plus
 /// an "add" chip. Tapping either UNFOLDS the category picker inline, right
-/// under the chips (no overlay / bottom sheet) — pick the tags, then tap
+/// under the chips (no overlay / bottom sheet) â pick the tags, then tap
 /// "Enregistrer" to fold it back and persist. Enforces [profileInterestsMax].
 class _InterestsSection extends StatefulWidget {
   const _InterestsSection({
@@ -2693,10 +2695,10 @@ class _InterestsSection extends StatefulWidget {
   final List<String> interests;
   final Future<void> Function(List<String>)? onSave;
 
-  /// The user's country — selects which interests taxonomy the picker shows.
+  /// The user's country â selects which interests taxonomy the picker shows.
   final String country;
 
-  /// Rendu dans le panneau "Mes infos" : un petit libellé muet façon ligne
+  /// Rendu dans le panneau "Mes infos" : un petit libellÃ© muet faÃ§on ligne
   /// d'info au lieu du gros titre de section (et pas de badge +20).
   final bool compact;
 
@@ -2707,8 +2709,8 @@ class _InterestsSection extends StatefulWidget {
 class _InterestsSectionState extends State<_InterestsSection> {
   late Set<String> _sel = {...widget.interests};
 
-  /// Vrai pendant que la feuille est ouverte : la sélection en cours est celle
-  /// de l'utilisateur, on ne la réaligne pas sur le parent tant qu'il choisit.
+  /// Vrai pendant que la feuille est ouverte : la sÃ©lection en cours est celle
+  /// de l'utilisateur, on ne la rÃ©aligne pas sur le parent tant qu'il choisit.
   bool _picking = false;
 
   @override
@@ -2724,7 +2726,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
   bool _sameSet(Set<String> a, List<String> b) =>
       a.length == b.length && a.containsAll(b);
 
-  // Auto-persist on every tap — the picker has no mandatory "Save" step, so
+  // Auto-persist on every tap â the picker has no mandatory "Save" step, so
   // whatever the user toggles is saved immediately. _close() flushes the final
   // state once more when folding, which also wins any rapid-tap race.
   void _toggle(String tag) {
@@ -2738,20 +2740,20 @@ class _InterestsSectionState extends State<_InterestsSection> {
     widget.onSave?.call(_sel.toList());
   }
 
-  /// Le sélecteur s'ouvre PAR-DESSUS la page, dans une feuille modale. En
-  /// ligne, il poussait tout le contenu vers le bas et débordait sous la barre
+  /// Le sÃ©lecteur s'ouvre PAR-DESSUS la page, dans une feuille modale. En
+  /// ligne, il poussait tout le contenu vers le bas et dÃ©bordait sous la barre
   /// de navigation.
   Future<void> _openPicker() async {
     setState(() => _picking = true);
     // Une POP-UP, pas une feuille : la feuille modale montait du bas et prenait
-    // toute la hauteur de l'écran, contenu collé en haut et grand vide noir en
+    // toute la hauteur de l'Ã©cran, contenu collÃ© en haut et grand vide noir en
     // dessous. Un dialogue se pose au centre et fait exactement la taille du
-    // panneau, qui est fixe (une page de catégorie + les points + le bouton).
+    // panneau, qui est fixe (une page de catÃ©gorie + les points + le bouton).
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         // Le dialogue a son propre cycle de rendu : sans ce setState local, les
-        // chips cochés ne changeraient d'état qu'à la fermeture.
+        // chips cochÃ©s ne changeraient d'Ã©tat qu'Ã  la fermeture.
         builder: (dialogCtx, setSheetState) => Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -2801,7 +2803,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
           const SizedBox(height: 12),
         ],
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
-        // feuille de sélection, qui se pose PAR-DESSUS la page.
+        // feuille de sÃ©lection, qui se pose PAR-DESSUS la page.
         Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -2822,10 +2824,10 @@ class _InterestsSectionState extends State<_InterestsSection> {
 }
 
 /// The inline body of the interest picker: a black rounded panel that is a
-/// CAROUSEL — one page per category. Swipe sideways (or tap a dot) to move
+/// CAROUSEL â one page per category. Swipe sideways (or tap a dot) to move
 /// between categories; each page shows that category's coloured header and its
 /// option chips. A live counter sits on top and an "Enregistrer" fold button
-/// at the bottom — but every chip tap is auto-saved by [_InterestsSection], so
+/// at the bottom â but every chip tap is auto-saved by [_InterestsSection], so
 /// the button is just a tidy way to fold back. Rendered inside the profile.
 class _InlineInterestPicker extends StatefulWidget {
   const _InlineInterestPicker({
@@ -2839,7 +2841,7 @@ class _InlineInterestPicker extends StatefulWidget {
   final void Function(String tag) onToggle;
   final VoidCallback onDone;
 
-  /// The user's country — selects which interests taxonomy to display.
+  /// The user's country â selects which interests taxonomy to display.
   final String country;
 
   @override
@@ -2869,8 +2871,8 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
     final canPrev = _page > 0;
     final canNext = _page < cats.length - 1;
     return Container(
-      // Plus de marge haute : elle datait du temps où ce panneau se dépliait
-      // sous les chips. Dans une pop-up centrée, elle décentrait le contenu.
+      // Plus de marge haute : elle datait du temps oÃ¹ ce panneau se dÃ©pliait
+      // sous les chips. Dans une pop-up centrÃ©e, elle dÃ©centrait le contenu.
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
       decoration: BoxDecoration(
         color: SC.bg,
@@ -2878,13 +2880,13 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
         border: Border.all(color: SC.glassBorderStrong),
       ),
       child: Column(
-        // SANS ça, la colonne prend toute la hauteur qu'on lui offre : dans un
-        // dialogue, elle s'étirait jusqu'en bas de l'écran et le panneau
-        // devenait un grand rectangle noir. Elle fait sa taille, désormais.
+        // SANS Ã§a, la colonne prend toute la hauteur qu'on lui offre : dans un
+        // dialogue, elle s'Ã©tirait jusqu'en bas de l'Ã©cran et le panneau
+        // devenait un grand rectangle noir. Elle fait sa taille, dÃ©sormais.
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Croix de fermeture en haut à droite — même teinte que paramètres.
+          // Croix de fermeture en haut Ã  droite â mÃªme teinte que paramÃ¨tres.
           Align(
             alignment: Alignment.centerRight,
             child: Material(
@@ -2912,7 +2914,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
             ),
           ),
           const SizedBox(height: 6),
-          // Flèches gauche / droite autour du carrousel de catégories.
+          // FlÃ¨ches gauche / droite autour du carrousel de catÃ©gories.
           SizedBox(
             height: 248,
             child: Row(
@@ -2989,8 +2991,8 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
   }
 }
 
-/// Chevron de navigation du carrousel d'intérêts — même teinte que
-/// l'icône paramètres du profil ([SC.textPrimary]).
+/// Chevron de navigation du carrousel d'intÃ©rÃªts â mÃªme teinte que
+/// l'icÃ´ne paramÃ¨tres du profil ([SC.textPrimary]).
 class _PickerNavArrow extends StatelessWidget {
   const _PickerNavArrow({
     required this.icon,
@@ -3025,7 +3027,7 @@ class _PickerNavArrow extends StatelessWidget {
   }
 }
 
-/// One carousel page of [_InlineInterestPicker]: a single category — coloured
+/// One carousel page of [_InlineInterestPicker]: a single category â coloured
 /// emoji-led header + a "picked" count badge, then that category's option
 /// chips (wrapping, scrollable vertically if they overflow the page).
 class _CategoryPage extends StatelessWidget {
@@ -3095,7 +3097,7 @@ class _CategoryPage extends StatelessWidget {
                   for (final opt in cat.options)
                     InterestTagChip(
                       label: opt,
-                      // Une seule couleur par catégorie (celle du header).
+                      // Une seule couleur par catÃ©gorie (celle du header).
                       color: cat.color,
                       selected: sel.contains(opt),
                       showCheck: sel.contains(opt),
@@ -3115,7 +3117,7 @@ class _CategoryPage extends StatelessWidget {
   }
 }
 
-/// Build a rich span from [raw], rendering any run wrapped in `**…**` in the
+/// Build a rich span from [raw], rendering any run wrapped in `**â¦**` in the
 /// cyan accent (the markers are stripped). Used to highlight a few keywords in
 /// the two-sentence Discover visibility hint, in every language.
 TextSpan _highlightKeywords(String raw) {
@@ -3133,9 +3135,9 @@ TextSpan _highlightKeywords(String raw) {
   );
 }
 
-/// Small ⓘ + text row rendered under the Discover photo tile on the
+/// Small â + text row rendered under the Discover photo tile on the
 /// user's own profile. Taps jump to Settings, where the "Hide me
-/// from my country" toggle lives — keeps the profile clean while
+/// from my country" toggle lives â keeps the profile clean while
 /// still pointing the user at the visibility control.
 class _DiscoverVisibilityHint extends StatelessWidget {
   const _DiscoverVisibilityHint({required this.onTap});
@@ -3161,7 +3163,7 @@ class _DiscoverVisibilityHint extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Flexible(
-                // Keywords wrapped in **…** in app_strings render cyan.
+                // Keywords wrapped in **â¦** in app_strings render cyan.
                 child: Text.rich(
                   _highlightKeywords(AppStrings.t('discover_visibility_hint')),
                   style: const TextStyle(
@@ -3239,7 +3241,7 @@ class _PhotoCell extends StatelessWidget {
   final bool viewerMode;
   final VoidCallback onTap;
 
-  /// True for the gallery photo currently shown in Discover — draws a thin
+  /// True for the gallery photo currently shown in Discover â draws a thin
   /// cyan ring around the tile.
   final bool isDiscover;
 
@@ -3255,7 +3257,7 @@ class _PhotoCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
     final tappable = !viewerMode;
-    // Only render the ❤ badge when there's actually a photo to attach it
+    // Only render the â¤ badge when there's actually a photo to attach it
     // to (else it floats above an empty "add photo" cell and looks broken)
     // and when there's at least one like to show.
     final showLikesBadge =
@@ -3274,7 +3276,7 @@ class _PhotoCell extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           InkWell(
-            // A real photo is always tappable to open it full-screen — on a
+            // A real photo is always tappable to open it full-screen â on a
             // peer's profile (viewer mode) too, not just my own. Only the
             // empty "add" cell is gated to my own profile (tappable).
             onTap: (hasPhoto || tappable) ? onTap : null,
@@ -3427,11 +3429,11 @@ class _GradientActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  /// Muted, non-emphasised style — used for the inert "Following" state.
+  /// Muted, non-emphasised style â used for the inert "Following" state.
   final bool subdued;
 
   /// Dark frosted-glass fill with a hairline border (same surface as the
-  /// language card) and white content — used for the primary "Message"
+  /// language card) and white content â used for the primary "Message"
   /// action.
   final bool glass;
 
@@ -3460,7 +3462,7 @@ class _GradientActionButton extends StatelessWidget {
     );
     const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
 
-    // Primary "Message" action → REAL frosted glass (BackdropFilter blur), like
+    // Primary "Message" action â REAL frosted glass (BackdropFilter blur), like
     // the header / nav glass; accent fill for the default action, dark bubble
     // for the subdued "Following" state.
     if (glass) {
@@ -3502,13 +3504,14 @@ class _GradientActionButton extends StatelessWidget {
 }
 
 /// Bottom sheet opened by the PDP pencil — same chrome as the language wheel
-/// (handle, dark panel, rounded top). Avatar on top, then name / city / language.
+/// (handle, dark panel, rounded top). Avatar on top, then name / city / live lang.
 class _EditAccountSheet extends StatelessWidget {
   const _EditAccountSheet({
     required this.displayName,
     required this.avatarUrl,
     required this.city,
     required this.languageCode,
+    required this.onPickAvatar,
     required this.onEditName,
     required this.onEditCity,
     required this.onEditLanguage,
@@ -3518,6 +3521,7 @@ class _EditAccountSheet extends StatelessWidget {
   final String avatarUrl;
   final String city;
   final String languageCode;
+  final VoidCallback onPickAvatar;
   final VoidCallback onEditName;
   final VoidCallback onEditCity;
   final VoidCallback onEditLanguage;
@@ -3553,6 +3557,7 @@ class _EditAccountSheet extends StatelessWidget {
                 avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
                 size: 88,
                 fontSize: 36,
+                onTap: onPickAvatar,
               ),
               const SizedBox(height: 10),
               Text(
@@ -3612,8 +3617,8 @@ class _EditAccountSheet extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.08),
                       ),
                       _EditAccountRow(
-                        icon: Icons.language,
-                        label: AppStrings.t('settings_lang_interface'),
+                        icon: Icons.translate,
+                        label: AppStrings.t('settings_live_translation'),
                         value: langLabel,
                         onTap: onEditLanguage,
                       ),
@@ -3681,7 +3686,7 @@ class _EditAccountRow extends StatelessWidget {
   }
 }
 
-/// Same prompt as Settings' first-name dialog — kept local to avoid exporting
+/// Same prompt as Settings' first-name dialog â kept local to avoid exporting
 /// a private widget across screens.
 class _NamePromptDialog extends StatelessWidget {
   const _NamePromptDialog({
