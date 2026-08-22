@@ -2288,11 +2288,12 @@ class _CallScreenState extends State<CallScreen> {
         debugPrint('[hangup] room.dispose timed out/failed: $e');
       }
     }
-    // If the call actually connected, show the black "call ended" summary
-    // (PDP + flag + minutes + share) instead of popping straight back. A call
-    // that never connected (declined / unanswered) just closes.
+    // Summary card only if a peer actually joined. The caller connects to
+    // LiveKit while still ringing ([_connectedAt] is set), so using that
+    // alone left them stuck on the "call ended" page after a decline /
+    // no-answer / hang-up-while-waiting.
     final startedAt = _connectedAt;
-    if (startedAt != null && mounted) {
+    if (_hadRemote && startedAt != null && mounted) {
       _finalDuration = DateTime.now().difference(startedAt);
       setState(() => _ended = true);
       return;

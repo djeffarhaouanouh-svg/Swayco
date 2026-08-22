@@ -2,12 +2,11 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/country_stats.dart';
 import '../services/friendship_api.dart';
 import '../services/profile_api.dart';
 import 'match_card.dart';
 
-/// The "It's a match!" celebration. Resolves first / rare / standard, then
+/// The "It's a match!" celebration. Resolves first / standard, then
 /// renders [MatchCard]. Push it with [showMatchOverlay].
 class MatchOverlay extends StatefulWidget {
   const MatchOverlay({
@@ -41,7 +40,6 @@ class _MatchOverlayState extends State<MatchOverlay>
   bool _peaked = false;
 
   MatchCardKind _kind = MatchCardKind.standard;
-  CountryShare? _share;
   bool _ready = false;
 
   @override
@@ -78,17 +76,9 @@ class _MatchOverlayState extends State<MatchOverlay>
     // Ensure the peer we just matched is counted even if the fetch raced.
     ids.add(widget.peer.id);
 
-    final share = widget.peer.country.trim().isEmpty
-        ? null
-        : await CountryStats.shareFor(widget.peer.country);
-
     if (!mounted) return;
     setState(() {
-      _share = share;
-      _kind = resolveMatchCardKind(
-        acceptedMatchCount: ids.length,
-        share: share,
-      );
+      _kind = resolveMatchCardKind(acceptedMatchCount: ids.length);
       _ready = true;
     });
     _c.forward();
@@ -127,9 +117,7 @@ class _MatchOverlayState extends State<MatchOverlay>
                   opacity: _body.value.clamp(0.0, 1.0),
                   child: MatchCard(
                     kind: _kind,
-                    me: widget.me,
                     peer: widget.peer,
-                    countryShare: _share,
                     onSayHi: widget.onSayHi,
                     onDismiss: widget.onDismiss,
                   ),

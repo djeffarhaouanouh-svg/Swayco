@@ -1,13 +1,9 @@
-// swaycø — MatchCard, ported from the design hand-off (variants 4a "first"
-// and 4b "rare", plus the plain "standard" match).
+// swaycø — MatchCard (variants 4a "first" + plain "standard").
 //
 // Selection rule:
 //   first accepted match       -> MatchCardKind.first
-//   country share  < 1 % 	    -> MatchCardKind.rare
 //   otherwise                  -> MatchCardKind.standard
 //
-// The flag badge is REAL artwork (flagcdn, by ISO-2) — never synthesised from
-// colour bands: nordic crosses, the Union Jack and disc flags aren't stripes.
 // Flag colours are only ever used for the round photo ring of `first`.
 
 import 'dart:math' as math;
@@ -16,40 +12,28 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
-import '../services/country_stats.dart';
-import '../services/demonyms.dart';
-import '../services/languages.dart';
-import '../services/locations.dart';
 import '../services/profile_api.dart';
 import 'flag_gradients.dart';
 import 'profile_avatar.dart';
 
-enum MatchCardKind { first, rare, standard }
+enum MatchCardKind { first, standard }
 
 const _cyan = Color(0xFF22D3EE);
 const _cyanInk = Color(0xFF04262D);
-const _gold1 = Color(0xFFF0C86E);
-const _gold2 = Color(0xFFFFF6DA);
-const _gold3 = Color(0xFFC9A24A);
-const _goldInk = Color(0xFF3A2C07);
 
 class MatchCard extends StatefulWidget {
   const MatchCard({
     super.key,
     required this.kind,
-    required this.me,
     required this.peer,
     required this.onSayHi,
     required this.onDismiss,
-    this.countryShare,
   });
 
   final MatchCardKind kind;
-  final RemoteProfile me;
   final RemoteProfile peer;
   final VoidCallback onSayHi;
   final VoidCallback onDismiss;
-  final CountryShare? countryShare;
 
   @override
   State<MatchCard> createState() => _MatchCardState();
@@ -86,13 +70,10 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  late final List<_ConfettiPiece> _confettiPieces = _buildConfetti(
-    widget.kind == MatchCardKind.rare,
-  );
+  late final List<_ConfettiPiece> _confettiPieces = _buildConfetti();
 
   RemoteProfile get _peer => widget.peer;
 
-  bool get _isRare => widget.kind == MatchCardKind.rare;
   bool get _isFirst => widget.kind == MatchCardKind.first;
 
   String get _name {
@@ -112,11 +93,6 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     return '';
   }
 
-  String get _flagSrc {
-    final iso = countryIso2For(_peer.country);
-    return iso.isEmpty ? '' : 'https://flagcdn.com/w80/$iso.png';
-  }
-
   /// "Alice, 24 ans, Paris"
   String get _who {
     final age = _peer.age;
@@ -128,43 +104,18 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     ].join(', ');
   }
 
-  /// "Katla, 27 · Reykjavík"
-  String get _rareMeta {
-    final age = _peer.age;
-    final city = _peer.city.trim();
-    return [
-      _name,
-      if (age != null) '$age',
-      if (city.isNotEmpty) city,
-    ].join(' · ');
-  }
-
-  String get _theirLang =>
-      findLanguageByCode(_peer.language)?.label ?? _peer.language.toUpperCase();
-
-  String get _myLang =>
-      findLanguageByCode(widget.me.language)?.label ??
-      findLanguageByCode(AppStrings.currentBcp47.value)?.label ??
-      AppStrings.currentBcp47.value.toUpperCase();
-
-  String get _translationNote => _isFirst
-      ? AppStrings.t('match_tip_auto_translate', args: {'name': _name})
-      : AppStrings.t(
-          'match_lang_bridge',
-          args: {'their': _theirLang, 'mine': _myLang},
-        );
+  String get _translationNote =>
+      AppStrings.t('match_tip_auto_translate', args: {'name': _name});
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: RadialGradient(
-          center: const Alignment(0, -0.64),
+          center: Alignment(0, -0.64),
           radius: 1.1,
-          colors: _isRare
-              ? const [Color(0xFF2A2410), Color(0xFF07070A)]
-              : const [Color(0xFF123C46), Color(0xFF05070A)],
-          stops: const [0, 0.6],
+          colors: [Color(0xFF123C46), Color(0xFF05070A)],
+          stops: [0, 0.6],
         ),
       ),
       child: Stack(
@@ -198,7 +149,7 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 300),
                       child: SingleChildScrollView(
-                        child: _isRare ? _rareBody() : _roundBody(),
+                        child: _roundBody(),
                       ),
                     ),
                   ),
@@ -228,7 +179,7 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        (_isRare ? _gold1 : _cyan).withValues(alpha: 0.4),
+                        _cyan.withValues(alpha: 0.4),
                         Colors.transparent,
                       ],
                       stops: const [0, 0.66],
@@ -241,7 +192,6 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
         ),
       );
 
-  // ── 4a "first" + standard ───────────────────────────────────────────────
   Widget _roundBody() {
     final ring = flagRingColors(
       country: _peer.country,
@@ -313,126 +263,6 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     );
   }
 
-  // ── 4b "rare" ───────────────────────────────────────────────────────────
-  Widget _rareBody() {
-    final pct = _formatPct(widget.countryShare?.percent ?? 0);
-    final headline = demonymHeadline(_peer.country, gender: _peer.gender);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _pill(
-          '✦ ${AppStrings.t('match_pill_rare', args: {'pct': pct}).toUpperCase()}',
-          gradient: const LinearGradient(colors: [_gold1, _gold2]),
-          fg: _goldInk,
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: 204,
-          height: 246,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 196,
-                height: 238,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [_gold1, _gold2, _gold3],
-                    stops: [0, 0.4, 1],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      blurRadius: 60,
-                      offset: const Offset(0, 24),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(17),
-                  child: _photo(),
-                ),
-              ),
-              if (_flagSrc.isNotEmpty)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(11),
-                      color: const Color(0xFF111111),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: Image.network(
-                        _flagSrc,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (headline.isNotEmpty) _goldTitle(headline),
-        const SizedBox(height: 3),
-        Text(
-          AppStrings.t('match_rare_liked'),
-          textAlign: TextAlign.center,
-          style: GoogleFonts.interTight(
-            fontSize: 20,
-            height: 1,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 9),
-        Text(
-          _rareMeta,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.interTight(
-            fontSize: 13.5,
-            height: 1.4,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.6),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _primaryButton(),
-        const SizedBox(height: 11),
-        Text(
-          _translationNote,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.interTight(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.45),
-          ),
-        ),
-        const SizedBox(height: 6),
-        _dismissLink(),
-      ],
-    );
-  }
-
-  // ── shared pieces ───────────────────────────────────────────────────────
   Widget _photo() {
     final url = _photoUrl;
     final fallback = ColoredBox(
@@ -449,33 +279,15 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
     );
   }
 
-  Widget _goldTitle(String text) => ShaderMask(
-        shaderCallback: (r) =>
-            const LinearGradient(colors: [_gold1, _gold2]).createShader(r),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.interTight(
-            fontSize: 34,
-            height: 1.1,
-            letterSpacing: -1.4,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      );
-
   Widget _pill(
     String text, {
-    Color? bg,
-    Gradient? gradient,
+    required Color bg,
     required Color fg,
   }) =>
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
           color: bg,
-          gradient: gradient,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
@@ -582,20 +394,10 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
           ),
         ),
       );
-
-  static String _formatPct(double pct) {
-    if (pct <= 0) return '—';
-    if (pct < 0.1) return pct.toStringAsFixed(2).replaceAll('.', ',');
-    return pct.toStringAsFixed(1).replaceAll('.', ',');
-  }
 }
 
-MatchCardKind resolveMatchCardKind({
-  required int acceptedMatchCount,
-  required CountryShare? share,
-}) {
+MatchCardKind resolveMatchCardKind({required int acceptedMatchCount}) {
   if (acceptedMatchCount <= 1) return MatchCardKind.first;
-  if (share != null && share.isRare) return MatchCardKind.rare;
   return MatchCardKind.standard;
 }
 
@@ -629,19 +431,17 @@ class _ConfettiPiece {
   final double drift;
 }
 
-List<_ConfettiPiece> _buildConfetti(bool rare) {
+List<_ConfettiPiece> _buildConfetti() {
   // Fixed seed: the burst is identical on every rebuild of the same card,
   // so a resize or a rebuild doesn't reshuffle mid-flight.
-  final rng = math.Random(rare ? 77 : 42);
-  final palette = rare
-      ? const [_gold1, _gold2, _gold3, Color(0xFFFFFFFF)]
-      : const [
-          _cyan,
-          Color(0xFFA78BFA),
-          Color(0xFFF472B6),
-          Color(0xFFFBBF24),
-          Color(0xFF34D399),
-        ];
+  final rng = math.Random(42);
+  const palette = [
+    _cyan,
+    Color(0xFFA78BFA),
+    Color(0xFFF472B6),
+    Color(0xFFFBBF24),
+    Color(0xFF34D399),
+  ];
   return [
     for (var i = 0; i < 46; i++)
       _ConfettiPiece(
