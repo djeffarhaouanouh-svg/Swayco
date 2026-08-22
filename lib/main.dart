@@ -34,7 +34,6 @@ import 'swayco/asr/asr_service.dart';
 import 'swayco/speech/speech_service.dart';
 import 'services/revenue_cat.dart';
 import 'services/supabase_service.dart';
-import 'services/debug_overlay.dart';
 import 'services/user_prefs.dart';
 import 'theme/swayco_theme.dart';
 // Streamed realtime translation (web + native). The live engine and chunk pipelines are
@@ -208,7 +207,6 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('Analytics start failed: $e');
     }
-    DebugOverlay.init();
     if (kIsWeb) {
       // Web stays EXACTLY as before — no Liquid Glass wrap, no shader
       // pre-warm. The whole redesign is native-only (iPhone build).
@@ -588,12 +586,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
               // (button, field, scrollable…) dismisses the keyboard, so no
               // screen can leave it stuck open. translucent = it only catches
               // taps that fall through, never blocks real taps.
-              child: DebugOverlay(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                  child: child ?? const SizedBox.shrink(),
-                ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: child ?? const SizedBox.shrink(),
               ),
             );
           },
