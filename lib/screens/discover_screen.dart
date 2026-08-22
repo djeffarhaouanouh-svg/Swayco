@@ -274,8 +274,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  /// Swipe right = a like. If the peer had already liked me the likes meet
-  /// and it's a match right away — celebrate it over the card stack.
+  /// Swipe left = a like (see the inversion note on [_onCardSwiped]). If the
+  /// peer had already liked me the likes meet and it's a match right away —
+  /// celebrate it over the card stack.
   Future<void> _likePeer(RemoteProfile peer) async {
     final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
     Analytics.track(
@@ -331,7 +332,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
     _closeInfo();
-    if (isRight) {
+    // Inverted on request: dragging/flying LEFT is now the like, RIGHT the
+    // refuse — the opposite of the original Tinder convention. Kept as a
+    // single flip here rather than renaming `isRight` everywhere upstream.
+    if (!isRight) {
       HapticFeedback.lightImpact();
       _likePeer(profile);
     }
@@ -577,8 +581,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ? _SwipeActionBar(
                     height: actionH,
                     topJoin: _infoOpen ? 0 : _kCardRadius,
-                    onNope: _onSwipeLeft,
-                    onLike: _onSwipeRight,
+                    // Buttons keep their usual left/right position; only which
+                    // physical fly-off they trigger is swapped, to match the
+                    // inverted drag semantics (left = like, right = refuse).
+                    onNope: _onSwipeRight,
+                    onLike: _onSwipeLeft,
                     onMessage: () {
                       if (!_hasActiveCard) return;
                       Navigator.of(context).push<void>(
@@ -1613,8 +1620,9 @@ class _DraggableCardState extends State<_DraggableCard>
   @override
   Widget build(BuildContext context) {
     final angle = (_pos.dx / 320.0) * 0.20;
-    final likeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
-    final nopeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
+    // Inverted on request: LIKE tracks the left drag, NOPE the right one.
+    final likeOpacity = (-_pos.dx / 65.0).clamp(0.0, 1.0);
+    final nopeOpacity = (_pos.dx / 65.0).clamp(0.0, 1.0);
 
     return Listener(
       onPointerDown: (e) {
@@ -1676,12 +1684,12 @@ class _DraggableCardState extends State<_DraggableCard>
           child: Stack(
             children: [
               widget.child,
-              // LIKE à DROITE (le côté vers lequel on glisse pour liker),
-              // NOPE à gauche.
+              // LIKE à GAUCHE (le côté vers lequel on glisse pour matcher),
+              // NOPE à droite — mouvement inversé sur demande.
               if (likeOpacity > 0.02)
                 Positioned(
                   top: 36,
-                  right: 24,
+                  left: 24,
                   child: Opacity(
                     opacity: likeOpacity,
                     child: const _SwipeStamp(text: 'LIKE', color: Color(0xFF3DCA72)),
@@ -1690,7 +1698,7 @@ class _DraggableCardState extends State<_DraggableCard>
               if (nopeOpacity > 0.02)
                 Positioned(
                   top: 36,
-                  left: 24,
+                  right: 24,
                   child: Opacity(
                     opacity: nopeOpacity,
                     child: const _SwipeStamp(text: 'NOPE', color: Color(0xFFFF4458)),
