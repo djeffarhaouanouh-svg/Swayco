@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -326,8 +327,13 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         return;
       }
       // Restore the UI language from local prefs so the login screen
-      // renders in whatever the user picked last time on this device
-      // (no-op for a fresh install — falls back to the default).
+      // renders in whatever the user picked last time on this device.
+      // Fresh install (no stored profile yet): guess from the OS locale
+      // instead of sitting on the hardcoded English default — the login /
+      // welcome screen is the very first thing a new user sees, before
+      // onboarding ever asks. AppStrings.setFromCode no-ops on a language
+      // it doesn't have a map for, so an unsupported OS locale just keeps
+      // the English default.
       try {
         final localProfile = await UserPrefs.loadProfile()
             .timeout(const Duration(seconds: 3), onTimeout: () => null);
@@ -346,6 +352,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
             unawaited(SpeechService.instance
                 .ensureLanguageInstalled(localProfile.sourceLang));
           }
+        } else {
+          AppStrings.setFromCode(PlatformDispatcher.instance.locale.languageCode);
         }
       } catch (e) {
         debugPrint('loadProfile failed: $e');
