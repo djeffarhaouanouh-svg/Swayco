@@ -90,7 +90,6 @@ const List<AppLanguage> allLanguages = <AppLanguage>[
 const List<AppLanguage> supportedLanguages = <AppLanguage>[
   AppLanguage(code: 'fr', flag: '🇫🇷', label: 'Français'),
   AppLanguage(code: 'en', flag: '🇬🇧', label: 'English'),
-  AppLanguage(code: 'ja', flag: '🇯🇵', label: '日本語'),
   AppLanguage(code: 'de', flag: '🇩🇪', label: 'Deutsch'),
 ];
 
