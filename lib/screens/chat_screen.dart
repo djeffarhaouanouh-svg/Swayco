@@ -89,6 +89,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<({String conversationId, DateTime createdAt})> _inbound = const [];
   bool _loading = true;
   String? _error;
+  /// Bumps on every [_reload] so an older in-flight fetch cannot overwrite
+  /// a newer one and yank a row (Alice flashing in, then out).
+  int _reloadSeq = 0;
   Timer? _pollTimer;
 
   /// Le rafraîchi de PRÉSENCE, lui, tourne aussi sur mobile : `last_seen` n'a
@@ -147,11 +150,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
     }
     // NOTE: we deliberately do NOT call ChatUnread.markAllSeen() here.
-    // ChatScreen lives inside IndexedStack, so initState fires at app
-    // launch even when the user is on another tab — calling markAllSeen
-    // here would silently wipe the unread badge before the user ever
-    // sees it. The badge is cleared in RootShell when the user actually
-    // taps the Chat tab destination.
+    // Visiting the list is not reading a thread — the nav badge must keep
+    // showing the same unread total as the row pastilles.
   }
 
   /// A new match must land in this list right away, not on the next resume.
@@ -240,7 +240,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _reload({bool silent = false}) async {
     if (!mounted) return;
-    if (!silent) {
+    final seq = ++_reloadSeq;
+    // After the first paint, keep the current rows on screen. Swapping in
+    // the skeleton made the 4th conversation (already opened) vanish, then
+    // FadeSlideIn replayed it as if it were new.
+    if (!silent && _friends.isEmpty && _newMatches.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
@@ -249,7 +253,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       final id = await DeviceId.getOrCreate();
       if (!isSupabaseReady) {
-        if (!mounted) return;
+        if (!mounted || seq != _reloadSeq) return;
         setState(() {
           _myId = id;
           _friends = const [];
@@ -323,7 +327,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return 'dm-${ids[0]}-${ids[1]}';
       }
 
-      final visible = byId.values.where((p) {
+      bool isVisible(RemoteProfile p) {
         final clearedAt = cleared[convIdFor(p.id)];
         if (clearedAt == null) return true;
         // A match made AFTER the row was cleared is a fresh relationship
@@ -334,7 +338,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Otherwise it re-surfaces once a newer message lands.
         final lm = latest[convIdFor(p.id)];
         return lm != null && lm.createdAt.isAfter(clearedAt);
-      }).toSet();
+      }
+
+      final visible = byId.values.where(isVisible).toSet();
+      // A racy second fetch can miss a peer the list already showed (limit
+      // window, fetchByIds hiccup). Keep the row the user already saw unless
+      // they blocked it or deleted it.
+      for (final p in _friends) {
+        if (hiddenPeers.contains(p.id)) continue;
+        if (visible.any((v) => v.id == p.id)) continue;
+        if (isVisible(p)) visible.add(p);
+      }
       // Une bulle ET une ligne, pas l'un OU l'autre. La bulle tient
       // [_kMatchBubbleLife] à partir du match (qu'on ait écrit ou non), puis
       // elle s'efface ; la ligne, elle, reste. `matches` arrive déjà du plus
@@ -379,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (lb == null) return -1;
           return lb.compareTo(la); // most recent first
         });
-      if (!mounted) return;
+      if (!mounted || seq != _reloadSeq) return;
       setState(() {
         _myId = id;
         _friends = friends;
@@ -393,7 +407,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Landed on Messages with fresh matches → start the "seen" countdown.
       _scheduleMatchSeen();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _reloadSeq) return;
       setState(() {
         _error = 'Erreur de chargement : $e';
         _loading = false;
@@ -470,7 +484,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-    _reload();
+    _reload(silent: true);
   }
 
   void _viewProfile(RemoteProfile peer) {
@@ -758,6 +772,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       // Conversation rows.
                       for (final (i, p) in _friends.indexed)
                         FadeSlideIn(
+                          key: ValueKey(p.id),
                           delay: Duration(milliseconds: i * 55),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,

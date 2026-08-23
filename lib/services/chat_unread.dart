@@ -54,23 +54,14 @@ abstract final class ChatUnread {
   /// ce qui rend l'extinction immédiate.
   static List<Map<String, dynamic>> _lastRows = const [];
 
-  /// Jusqu'où cette conversation est lue : son propre point s'il existe, le
-  /// plancher sinon — et le plus récent des deux, pour que relever le plancher
-  /// (toucher l'onglet) suffise à tout éteindre.
-  static DateTime? _seenFor(String convId) {
-    final floor = DateTime.tryParse(_lastSeenIso);
-    final own = _convSeen[convId];
-    if (own == null) return floor;
-    if (floor == null) return own;
-    return own.isAfter(floor) ? own : floor;
-  }
+  /// Point de lecture du fil, et lui seul. Le plancher `chat_last_seen_iso`
+  /// a longtemps été relevé à chaque visite de l'onglet Messages, donc
+  /// s'en servir ici laisserait la nav à 0 pendant que la liste affiche 17.
+  static DateTime? _seenFor(String convId) => _convSeen[convId];
 
-  /// Public, live view of [_seenFor] — the single source of truth for the
-  /// BADGE count, kept current in memory regardless of which screen last
-  /// marked it seen (chat list, thread, push notification, …). Merges the
-  /// global floor (bumped just by visiting the Messages tab), which is
-  /// correct for "is there something new anywhere" but WRONG for the blue
-  /// line / row pastille — see [threadSeenAt].
+  /// Public, live view of [_seenFor]. The nav badge and the list rows now
+  /// share the per-thread pointer: visiting Messages does not pretend
+  /// every conversation was read.
   static DateTime? seenAt(String convId) => _seenFor(convId);
 
   /// The thread's OWN read pointer alone, never the global floor. The blue
@@ -186,12 +177,10 @@ abstract final class ChatUnread {
     }
   }
 
-  /// Recompte à partir de la dernière photo connue.
-  ///
-  /// Les dates sont comparées comme des DateTime, plus comme des chaînes : le
-  /// point de lecture était écrit en `…Z` et Postgres rend `…+00:00`, deux
-  /// écritures du même instant qui ne se rangent pas pareil caractère par
-  /// caractère.
+  /// Recompte à partir de la dernière photo connue, avec la même règle que
+  /// les pastilles de ligne : un message est non lu tant que SON fil n'a
+  /// pas été ouvert (plus le plancher d'installation, pour le backlog
+  /// d'avant la première ouverture de l'app).
   static void _recount() {
     var n = 0;
     for (final r in _lastRows) {
@@ -203,18 +192,11 @@ abstract final class ChatUnread {
     if (count.value != n) count.value = n;
   }
 
-  /// Call when the user opens the Chat tab — moves the seen pointer to now
-  /// and resets the badge.
+  /// Kept for older call sites. Must NOT raise the install floor — that
+  /// used to blank the nav badge while the list still showed 17 on a row.
   static Future<void> markAllSeen() async {
-    final nowIso = DateTime.now().toUtc().toIso8601String();
-    _lastSeenIso = nowIso;
-    // Éteint AVANT l'écriture disque, et sans l'attendre : le badge doit
-    // tomber au moment du geste. Le compte se relit du plancher déjà posé en
-    // mémoire, donc une réémission du flux entre-temps ne le rallume pas.
     _recount();
     revision.value++;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_seenKey, nowIso);
   }
 
   static Future<void> stop() async {

@@ -1627,7 +1627,10 @@ class _IdentitySection extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         // Photos EN HAUT : "Tes photos (n)" + galerie horizontale.
-        _ProfileSectionHeader(photosTitle, trailing: const _RewardHint()),
+        _ProfileSectionHeader(
+          photosTitle,
+          trailing: const _RewardHint(points: 40),
+        ),
         const SizedBox(height: 12),
         _PhotoGallery(
           photos: photos,
@@ -1907,8 +1910,8 @@ class _ProfileSectionHeader extends StatelessWidget {
   const _ProfileSectionHeader(this.title, {this.trailing});
   final String title;
 
-  /// Optional widget pinned to the right of the title (e.g. a cyan "+20"
-  /// reward hint on the photos / interests sections).
+  /// Optional widget pinned to the right of the title (e.g. a cyan "+40"
+  /// reward hint on the photos section).
   final Widget? trailing;
 
   @override
@@ -1956,15 +1959,16 @@ class _EmptyPhotosPlaceholder extends StatelessWidget {
   }
 }
 
-/// Small cyan "+20" reward hint shown on the right of a section header to
+/// Small cyan reward hint shown on the right of a section header to
 /// nudge the user to complete it.
 class _RewardHint extends StatelessWidget {
-  const _RewardHint();
+  const _RewardHint({this.points = 20});
+  final int points;
   @override
   Widget build(BuildContext context) {
-    return const Text(
-      '+20',
-      style: TextStyle(
+    return Text(
+      '+$points',
+      style: const TextStyle(
         color: SC.accent,
         fontSize: 16,
         fontWeight: FontWeight.w800,

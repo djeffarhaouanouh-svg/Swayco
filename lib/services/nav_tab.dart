@@ -19,4 +19,20 @@ abstract final class NavTab {
   static void select(int i) {
     if (i != index.value) index.value = i;
   }
+
+  /// One-shot: the post-onboarding "Suivant" (tip #4) wants the own-profile
+  /// add-photo picker opened — the same sheet as tapping + on "Tes photos".
+  static bool _addPhotoPending = false;
+  static final ValueNotifier<int> addPhotoTick = ValueNotifier<int>(0);
+
+  static void requestAddPhoto() {
+    _addPhotoPending = true;
+    addPhotoTick.value++;
+  }
+
+  static bool takeAddPhotoRequest() {
+    if (!_addPhotoPending) return false;
+    _addPhotoPending = false;
+    return true;
+  }
 }

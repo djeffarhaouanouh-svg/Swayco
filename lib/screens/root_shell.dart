@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/app_strings.dart';
@@ -82,6 +80,10 @@ class _RootShellState extends State<RootShell> {
   /// Guards the one-shot coach-mark dialogs from overlapping each other.
   bool _tipBusy = false;
 
+  /// After the Discover-photo tip, we land on Profile and open the gallery
+  /// sheet — skip the "ta photo, c'est ici" dialog that would stack on top.
+  bool _skipNextProfileTip = false;
+
   /// Watches my friendship rows so a match created by the OTHER side (they
   /// accepted / liked back while I was elsewhere) still pops the celebration
   /// on this device.
@@ -97,11 +99,12 @@ class _RootShellState extends State<RootShell> {
   late final PageController _pageController =
       PageController(initialPage: NavTab.index.value);
 
-  /// Select a tab: update the shared index and clear the matching badges.
-  /// Shared by nav-bar taps and swipe (onPageChanged).
+  /// Select a tab: update the shared index. Unread badges clear when the
+  /// matching *content* is actually read (a thread opened, Demandes seen),
+  /// not merely because the tab was tapped — landing on Messages with 17
+  /// waiting in a row must still show on the nav icon.
   void _selectTab(int i) {
     NavTab.select(i);
-    if (i == NavTab.chat) ChatUnread.markAllSeen();
     if (i == NavTab.demandes) ReceivedActivityUnread.markSeen();
   }
 
@@ -191,9 +194,10 @@ class _RootShellState extends State<RootShell> {
         // `reaction` is the same door — a 👍 is not a new line, but tapping
         // it should still land in that conversation.
         NavTab.select(NavTab.chat);
-        // Le « 1 » de la barre s'éteint : arriver sur Messages est la réponse
-        // à la question qu'il posait.
-        unawaited(ChatUnread.markAllSeen());
+        // Opening the thread is what marks THAT conversation read. Wiping
+        // the global floor here used to extinguish the nav badge for every
+        // other unread chat too — a tap on Lenny's notification left the
+        // bar blank while Claire still had unread lines.
         unawaited(_openThreadFromPush(intent.data));
       case 'online_broadcast':
         // "5 Japonaises en ligne" pull notification → open Discover so they
@@ -687,11 +691,10 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
-  /// Post-onboarding nudge to add a Discover photo. The "seen" flag is
-  /// persisted UP FRONT, before any dialog is shown — otherwise reloading
-  /// the page mid-popup leaves the flag unset and the nudge replays on
-  /// every load. Skipped entirely if a photo is set. The CTA opens the
-  /// gallery directly — no second "where do I add it" popup.
+  /// Post-onboarding nudge to add a Discover photo (4th screen after the
+  /// wizard). "Suivant" sends the user to their Profil tab and opens the
+  /// same add-photo sheet as the + on "Tes photos" (Photothèque / caméra /
+  /// fichier) instead of picking from whatever tab they were on.
   Future<void> _maybeShowOnboardingTips() async {
     if (_tipBusy || !mounted) return;
     if (await UserPrefs.isOnboardingTipsSeen() || !mounted) return;
@@ -699,14 +702,20 @@ class _RootShellState extends State<RootShell> {
     if (!mounted) return;
     if (await _hasDiscoverPhoto() || !mounted) return;
     _tipBusy = true;
-    await _showTip(
+    final next = await _showTip(
       title: AppStrings.t('tip_photo_title'),
       body: AppStrings.t('tip_photo_body'),
       buttonLabel: AppStrings.t('tip_next'),
       art: SwayTipArt.discoverTiles,
     );
     _tipBusy = false;
-    if (mounted) unawaited(_pickAndAddDiscoverPhoto());
+    if (!mounted || next != true) return;
+    _skipNextProfileTip = true;
+    _selectTab(NavTab.profile);
+    // Let the profile page paint before the system picker covers it.
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    if (!mounted) return;
+    NavTab.requestAddPhoto();
   }
 
   /// Photo-nudge on the Profile tab. Shows on EVERY navigation into
@@ -717,6 +726,10 @@ class _RootShellState extends State<RootShell> {
   /// events (NavTab.index listener), so a user who stays on the
   /// profile tab does not get the dialog re-shown.
   Future<void> _maybeShowProfileTip() async {
+    if (_skipNextProfileTip) {
+      _skipNextProfileTip = false;
+      return;
+    }
     if (_tipBusy || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
     if (await _hasDiscoverPhoto() || !mounted) return;
@@ -747,58 +760,6 @@ class _RootShellState extends State<RootShell> {
         buttonLabel: buttonLabel,
       ),
     );
-  }
-
-  /// Opens the gallery and uploads the pick as the first Discover photo —
-  /// the destination the old second onboarding popup only described.
-  /// Fetches the profile's current photos/discover columns fresh (rather
-  /// than assuming they're empty) so [ProfileApi.addProfilePhoto] appends
-  /// instead of clobbering a gallery from another device.
-  Future<void> _pickAndAddDiscoverPhoto() async {
-    if (!isSupabaseReady || !mounted) return;
-    final XFile? file;
-    final Uint8List bytes;
-    try {
-      final picker = ImagePicker();
-      file = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 88,
-      );
-      if (file == null) return;
-      bytes = await file.readAsBytes();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
-      return;
-    }
-    if (!mounted) return;
-    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
-    try {
-      final uid = await DeviceId.getOrCreate();
-      final me = await ProfileApi.fetchById(uid);
-      await ProfileApi.addProfilePhoto(
-        deviceId: uid,
-        bytes: bytes,
-        current: me?.photos ?? const <String>[],
-        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
-        currentDiscover: me?.discoverPhotoUrl ?? '',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
-          duration: const Duration(seconds: 8),
-        ),
-      );
-    }
   }
 
   @override
