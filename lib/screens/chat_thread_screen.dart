@@ -453,7 +453,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
         if (!mounted) return;
-        setState(() => _messages = rows);
+        setState(() {
+          _messages = rows;
+          // The realtime channel retries with its own backoff — a delivery
+          // reaching here means it recovered, so the "connexion perdue"
+          // banner (never cleared before) would otherwise sit there forever.
+          _error = null;
+        });
         // Lu, puisque le fil est SOUS LES YEUX. Le point de lecture n'était
         // posé qu'à l'ouverture : un message reçu pendant qu'on lisait
         // rallumait le badge de la barre de nav derrière l'écran ouvert, et il
@@ -470,7 +476,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       },
       onError: (e) {
         if (!mounted) return;
-        setState(() => _error = 'Connexion temps réel perdue: $e');
+        // Not the raw exception: a Supabase RealtimeSubscribeException's
+        // toString() is meaningless to a user ("channelError, details:
+        // null") and untranslated. The channel retries on its own; this is
+        // purely a "hang tight" notice, cleared above once it reconnects.
+        setState(() => _error = AppStrings.t('chat_realtime_lost'));
       },
     );
 

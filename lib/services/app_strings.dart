@@ -387,6 +387,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Cette personne pourra à nouveau te trouver, te contacter et voir tes messages.',
     'no_messages': 'Aucun message — écris le premier !',
+    'chat_realtime_lost': 'Connexion temps réel perdue — reconnexion en cours…',
     'chat_day_today': "Aujourd'hui",
     'chat_day_yesterday': 'Hier',
     'weekday_mon': 'Lundi',
@@ -944,6 +945,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'They will be able to find you, contact you and see your messages again.',
     'no_messages': 'No messages — write the first one!',
+    'chat_realtime_lost': 'Realtime connection lost — reconnecting…',
     'chat_day_today': 'Today',
     'chat_day_yesterday': 'Yesterday',
     'weekday_mon': 'Monday',
@@ -1320,6 +1322,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Privacidad',
     'settings_section_lang': 'Interfaz',
     'settings_section_call_lang': 'Traducción en llamada',
+    'settings_live_translation': 'Traducción en directo de llamada',
     'settings_call_lang_default': 'Sigue la interfaz',
     'settings_section_subscription': 'Suscripción',
     'settings_section_help': 'Ayuda y legal',
@@ -1455,6 +1458,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Esta persona podrá encontrarte, contactarte y ver tus mensajes de nuevo.',
     'no_messages': 'Sin mensajes — ¡escribe el primero!',
+    'chat_realtime_lost': 'Conexión en tiempo real perdida — reconectando…',
     'tooltip_call': 'Llamar',
     'tip_photo_title': 'Aparece en Discover ✨',
     'tip_photo_body':
@@ -1918,6 +1922,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Diese Person kann dich wieder finden, kontaktieren und deine Nachrichten sehen.',
     'no_messages': 'Keine Nachrichten — schreibe die erste!',
+    'chat_realtime_lost': 'Echtzeitverbindung verloren — Verbindung wird wiederhergestellt…',
     'chat_day_today': 'Heute',
     'chat_day_yesterday': 'Gestern',
     'weekday_mon': 'Montag',
@@ -2114,6 +2119,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Privatsphäre',
     'settings_section_lang': 'Oberfläche',
     'settings_section_call_lang': 'Übersetzung im Anruf',
+    'settings_live_translation': 'Live-Übersetzung im Anruf',
     'settings_call_lang_default': 'Folgt der Oberfläche',
     'settings_section_subscription': 'Abo',
     'settings_section_help': 'Hilfe & Rechtliches',
@@ -2464,6 +2470,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Questa persona potrà di nuovo trovarti, contattarti e vedere i tuoi messaggi.',
     'no_messages': 'Nessun messaggio — scrivi il primo!',
+    'chat_realtime_lost': 'Connessione in tempo reale persa — riconnessione in corso…',
     'tooltip_call': 'Chiama',
     'tip_photo_title': 'Mostrati nel Discover ✨',
     'tip_photo_body':
@@ -2649,6 +2656,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Interfaccia',
     'settings_section_call_lang': 'Traduzione in chiamata',
+    'settings_live_translation': 'Traduzione dal vivo in chiamata',
     'settings_call_lang_default': "Segue l'interfaccia",
     'settings_section_subscription': 'Abbonamento',
     'settings_section_help': 'Aiuto e note legali',
@@ -2996,6 +3004,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Esta pessoa poderá encontrá-lo, contatá-lo e ver suas mensagens novamente.',
     'no_messages': 'Sem mensagens — escreva a primeira!',
+    'chat_realtime_lost': 'Ligação em tempo real perdida — a reconectar…',
     'tooltip_call': 'Ligar',
     'tip_photo_title': 'Apareça no Discover ✨',
     'tip_photo_body':
@@ -3180,6 +3189,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Privacidade',
     'settings_section_lang': 'Interface',
     'settings_section_call_lang': 'Tradução na chamada',
+    'settings_live_translation': 'Tradução em direto na chamada',
     'settings_call_lang_default': 'Segue a interface',
     'settings_section_subscription': 'Subscrição',
     'settings_section_help': 'Ajuda e jurídico',
@@ -3530,6 +3540,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Deze persoon kan jou weer vinden, contact opnemen en je berichten zien.',
     'no_messages': 'Geen berichten — schrijf het eerste!',
+    'chat_realtime_lost': 'Realtime verbinding verbroken — opnieuw verbinden…',
     'tooltip_call': 'Bellen',
     'tip_photo_title': 'Verschijn in Discover ✨',
     'tip_photo_body':
@@ -3715,6 +3726,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Privacy',
     'settings_section_lang': 'Interface',
     'settings_section_call_lang': 'Vertaling tijdens gesprek',
+    'settings_live_translation': 'Live vertaling tijdens gesprek',
     'settings_call_lang_default': 'Volgt de interface',
     'settings_section_subscription': 'Abonnement',
     'settings_section_help': 'Hulp en juridisch',
@@ -4055,6 +4067,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'سيتمكن هذا الشخص من العثور عليك ومراسلتك ورؤية رسائلك مرة أخرى.',
     'no_messages': 'لا توجد رسائل — اكتب الأولى!',
+    'chat_realtime_lost': 'انقطع الاتصال الفوري — جارٍ إعادة الاتصال…',
     'tooltip_call': 'اتصل',
     'tip_photo_title': 'اظهر في Discover ✨',
     'tip_photo_body':
@@ -4236,6 +4249,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'الخصوصية',
     'settings_section_lang': 'الواجهة',
     'settings_section_call_lang': 'الترجمة أثناء المكالمة',
+    'settings_live_translation': 'الترجمة الفورية أثناء المكالمة',
     'settings_call_lang_default': 'يتبع الواجهة',
     'settings_section_subscription': 'الاشتراك',
     'settings_section_help': 'المساعدة والشؤون القانونية',
@@ -4578,6 +4592,7 @@ abstract final class AppStrings {
     'unblock_peer_body':
         'Этот человек снова сможет тебя найти, связаться с тобой и видеть твои сообщения.',
     'no_messages': 'Нет сообщений — напиши первое!',
+    'chat_realtime_lost': 'Соединение в реальном времени потеряно — переподключение…',
     'tooltip_call': 'Позвонить',
     'tip_photo_title': 'Появись в Discover ✨',
     'tip_photo_body':
@@ -4762,6 +4777,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'Конфиденциальность',
     'settings_section_lang': 'Интерфейс',
     'settings_section_call_lang': 'Перевод в звонке',
+    'settings_live_translation': 'Синхронный перевод в звонке',
     'settings_call_lang_default': 'Как в интерфейсе',
     'settings_section_subscription': 'Подписка',
     'settings_section_help': 'Помощь и правовая информация',
@@ -5094,6 +5110,7 @@ abstract final class AppStrings {
     'block_peer_body': '此人将无法再找到你、联系你或拨打你的电话。你可以从设置 → 已屏蔽中撤销。',
     'unblock_peer_body': '此人将能够再次找到你、联系你并查看你的消息。',
     'no_messages': '没有消息——写下第一条！',
+    'chat_realtime_lost': '实时连接已断开——正在重新连接…',
     'tooltip_call': '通话',
     'tip_photo_title': '出现在 Discover 中 ✨',
     'tip_photo_body': '添加一张你的照片，出现在 Discover 中，收获来自世界各地的大量关注 😉',
@@ -5261,6 +5278,7 @@ abstract final class AppStrings {
     'settings_section_privacy': '隐私',
     'settings_section_lang': '界面',
     'settings_section_call_lang': '通话翻译',
+    'settings_live_translation': '通话实时翻译',
     'settings_call_lang_default': '跟随界面',
     'settings_section_subscription': '订阅',
     'settings_section_help': '帮助与法律',
@@ -5600,6 +5618,7 @@ abstract final class AppStrings {
         'この人はあなたを見つけたり、連絡したり、通話することができなくなります。設定 → ブロック済み から取り消せます。',
     'unblock_peer_body': 'この人は再びあなたを見つけたり、連絡したり、メッセージを見ることができます。',
     'no_messages': 'メッセージなし — 最初の一通を書きましょう！',
+    'chat_realtime_lost': 'リアルタイム接続が切断されました — 再接続中…',
     'tooltip_call': '通話',
     'tip_photo_title': 'Discover に表示されよう ✨',
     'tip_photo_body': '自分の写真を追加して Discover に表示され、世界中からたくさんの追加をもらおう 😉',
@@ -5769,6 +5788,7 @@ abstract final class AppStrings {
     'settings_section_privacy': 'プライバシー',
     'settings_section_lang': 'インターフェース',
     'settings_section_call_lang': '通話翻訳',
+    'settings_live_translation': '通話のライブ翻訳',
     'settings_call_lang_default': 'インターフェースに従う',
     'settings_section_subscription': 'サブスクリプション',
     'settings_section_help': 'ヘルプと規約',
@@ -6091,6 +6111,7 @@ abstract final class AppStrings {
         '이 사람은 더 이상 당신을 찾거나, 연락하거나, 전화할 수 없습니다. 설정 → 차단됨에서 취소할 수 있습니다.',
     'unblock_peer_body': '이 사람이 다시 당신을 찾고, 연락하고, 메시지를 볼 수 있게 됩니다.',
     'no_messages': '메시지 없음 — 첫 메시지를 작성하세요!',
+    'chat_realtime_lost': '실시간 연결이 끊어졌어요 — 재연결 중…',
     'tooltip_call': '전화',
     'tip_photo_title': 'Discover에 등장하세요 ✨',
     'tip_photo_body': '자기 사진을 추가하면 Discover에 표시되고 전 세계에서 많은 추가를 받을 수 있어요 😉',
@@ -6259,6 +6280,7 @@ abstract final class AppStrings {
     'settings_section_privacy': '개인정보',
     'settings_section_lang': '인터페이스',
     'settings_section_call_lang': '통화 번역',
+    'settings_live_translation': '통화 실시간 번역',
     'settings_call_lang_default': '인터페이스와 동일',
     'settings_section_subscription': '구독',
     'settings_section_help': '도움말 및 법적 고지',
