@@ -58,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _genderAlreadySet = false;
 
   /// One of `kPersonaCategories` (persona_categories.dart), or null. Asked
-  /// once right before the gender step. Same "asked once" pattern as
+  /// once right after the gender step. Same "asked once" pattern as
   /// [_selectedGender] — see [_personaAlreadySet].
   String? _selectedPersonaCategory;
 
@@ -70,8 +70,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _page = 0;
 
   /// Total pages shown in the first-run wizard:
-  ///   Welcome(0) · Language(1) · [PersonaCategory] · [Gender]
-  /// PersonaCategory and Gender are each omitted once already known, so the
+  ///   Welcome(0) · Language(1) · [Gender] · [PersonaCategory]
+  /// Gender and PersonaCategory are each omitted once already known, so the
   /// count flexes by up to two. City and interests are edited later from the
   /// profile, not here.
   int get _pageCount =>
@@ -221,16 +221,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       return;
     }
-    // Only enforce the persona-category pick on first run (when the step is
-    // actually shown). Same rationale as the gender check just below.
-    if (!widget.editing &&
-        !_personaAlreadySet &&
-        _selectedPersonaCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('onb_need_persona'))),
-      );
-      return;
-    }
     // Only enforce the gender pick on first run (when the step is actually
     // shown). In editing mode + on later sessions, [_genderAlreadySet] is
     // true and we accept whatever was saved before (or none).
@@ -238,6 +228,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('onb_need_gender'))));
+      return;
+    }
+    // Only enforce the persona-category pick on first run (when the step is
+    // actually shown). Same rationale as the gender check above.
+    if (!widget.editing &&
+        !_personaAlreadySet &&
+        _selectedPersonaCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('onb_need_persona'))),
+      );
       return;
     }
     final genderToSave = _selectedGender ?? '';
@@ -474,23 +474,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
-          // Last page when both the persona and gender steps are skipped.
+          // Last page when both the gender and persona steps are skipped.
           finishLabelKey:
-              (showPersonaStep || showGenderStep) ? 'onb_next' : 'onb_finish',
+              (showGenderStep || showPersonaStep) ? 'onb_next' : 'onb_finish',
         ),
-        if (showPersonaStep)
-          SwayStepPersonaCategory(
-            selected: _selectedPersonaCategory,
-            onSelect: (c) => setState(() => _selectedPersonaCategory = c),
-            onBack: _back,
-            onFinish: _goFromPersonaCategory,
-            // Last page when the gender step is skipped.
-            finishLabelKey: showGenderStep ? 'onb_next' : 'onb_finish',
-          ),
         if (showGenderStep)
           SwayStepGender(
             selected: _selectedGender,
             onSelect: (g) => setState(() => _selectedGender = g),
+            onBack: _back,
+            onFinish: _goFromGender,
+            // Last page when the persona step is skipped.
+            finishLabelKey: showPersonaStep ? 'onb_next' : 'onb_finish',
+          ),
+        if (showPersonaStep)
+          SwayStepPersonaCategory(
+            selected: _selectedPersonaCategory,
+            onSelect: (c) => setState(() => _selectedPersonaCategory = c),
             onBack: _back,
             onFinish: _finish,
           ),
@@ -527,17 +527,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _next();
   }
 
-  /// Persona category → next, but guard the required pick first. Mirrors
-  /// [_goFromLanguage]'s "skip to the end if what follows is already known"
-  /// pattern.
-  void _goFromPersonaCategory() {
-    if (_selectedPersonaCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('onb_need_persona'))),
-      );
-      return;
-    }
-    if (_genderAlreadySet) {
+  /// Gender → next, but skip straight to the end if persona category is the
+  /// only thing left and it's already known. Mirrors [_goFromLanguage]'s
+  /// "skip to the end if what follows is already known" pattern. No need to
+  /// re-validate [_selectedGender] here — [SwayStepGender] already disables
+  /// its own CTA until an option is picked.
+  void _goFromGender() {
+    if (_personaAlreadySet) {
       _finish();
       return;
     }
