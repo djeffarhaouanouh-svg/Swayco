@@ -25,6 +25,8 @@ abstract final class NavTab {
   static bool _addPhotoPending = false;
   static final ValueNotifier<int> addPhotoTick = ValueNotifier<int>(0);
 
+  static bool get hasAddPhotoRequest => _addPhotoPending;
+
   static void requestAddPhoto() {
     _addPhotoPending = true;
     addPhotoTick.value++;

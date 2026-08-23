@@ -123,7 +123,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _onAddPhotoRequest() {
     if (!mounted || _isViewingOther) return;
     if (!NavTab.takeAddPhotoRequest()) return;
-    unawaited(_pickAndAddPhoto());
+    // After the tab jump, wait one frame so this sheet isn't racing the
+    // closing onboarding dialog (which used to lose to "Ta photo, c'est ici").
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_pickAndAddPhoto());
+    });
   }
 
   @override
@@ -503,6 +507,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   /// photo doubles as the PDP (avatar) + Discover photo; [ProfileApi.
   /// addProfilePhoto] keeps those columns in sync.
   Future<void> _pickAndAddPhoto() async {
+    if (_deviceId.isEmpty) {
+      _deviceId = await DeviceId.getOrCreate();
+    }
     if (_deviceId.isEmpty) return;
     if (!isSupabaseReady) {
       ScaffoldMessenger.of(

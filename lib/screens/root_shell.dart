@@ -669,11 +669,18 @@ class _RootShellState extends State<RootShell> {
     // round-trip from a swipe (onPageChanged → NavTab.select → here) doesn't
     // re-animate to the page we're already on.
     if (_pageController.hasClients && _pageController.page?.round() != i) {
-      _pageController.animateToPage(
-        i,
-        duration: const Duration(milliseconds: 190),
-        curve: Curves.easeOutCubic,
-      );
+      // Tip #4 jumps Discover → Profile. Animating would pass Likes and
+      // fire onPageChanged(profile) a second time, which used to show
+      // "Ta photo, c'est ici" instead of the gallery picker.
+      if (_skipNextProfileTip) {
+        _pageController.jumpToPage(i);
+      } else {
+        _pageController.animateToPage(
+          i,
+          duration: const Duration(milliseconds: 190),
+          curve: Curves.easeOutCubic,
+        );
+      }
     }
     if (i == NavTab.profile) _maybeShowProfileTip();
   }
@@ -710,6 +717,9 @@ class _RootShellState extends State<RootShell> {
     );
     _tipBusy = false;
     if (!mounted || next != true) return;
+    // Keep this true for the rest of the session so a second tab event
+    // (PageView onPageChanged after the jump) cannot open "Ta photo,
+    // c'est ici" on top of — or instead of — the gallery sheet.
     _skipNextProfileTip = true;
     _selectTab(NavTab.profile);
     // Let the profile page paint before the system picker covers it.
@@ -726,10 +736,7 @@ class _RootShellState extends State<RootShell> {
   /// events (NavTab.index listener), so a user who stays on the
   /// profile tab does not get the dialog re-shown.
   Future<void> _maybeShowProfileTip() async {
-    if (_skipNextProfileTip) {
-      _skipNextProfileTip = false;
-      return;
-    }
+    if (_skipNextProfileTip || NavTab.hasAddPhotoRequest) return;
     if (_tipBusy || !mounted) return;
     if (NavTab.index.value != NavTab.profile) return;
     if (await _hasDiscoverPhoto() || !mounted) return;
