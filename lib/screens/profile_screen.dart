@@ -114,11 +114,22 @@ class _ProfileScreenState extends State<ProfileScreen>
       const Duration(seconds: 12),
       () => _reload(silent: true),
     );
+    if (!_isViewingOther) {
+      NavTab.addPhotoTick.addListener(_onAddPhotoRequest);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onAddPhotoRequest());
+    }
+  }
+
+  void _onAddPhotoRequest() {
+    if (!mounted || _isViewingOther) return;
+    if (!NavTab.takeAddPhotoRequest()) return;
+    unawaited(_pickAndAddPhoto());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NavTab.addPhotoTick.removeListener(_onAddPhotoRequest);
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -793,11 +804,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   /// Pencil next to the PDP — bottom sheet (same pattern as the language
   /// wheel), not a full Settings push. First name / city / live translation.
+  /// Stays open while a row's editor (dialog / nested sheet / gallery) is up.
   Future<void> _openEditAccountSheet() async {
     if (!mounted) return;
     final callLang = await UserPrefs.loadCallSpokenLang();
     if (!mounted) return;
-    final liveCode = callLang.lang.isNotEmpty
+    var displayName = _remote?.displayName.trim() ?? '';
+    var avatarUrl = _remote?.avatarUrl ?? '';
+    var city = _remote?.city.trim() ?? '';
+    var languageCode = callLang.lang.isNotEmpty
         ? callLang.lang
         : (_languageCode.isNotEmpty
             ? _languageCode
@@ -805,32 +820,46 @@ class _ProfileScreenState extends State<ProfileScreen>
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _EditAccountSheet(
-        displayName: _remote?.displayName.trim() ?? '',
-        avatarUrl: _remote?.avatarUrl ?? '',
-        city: _remote?.city.trim() ?? '',
-        languageCode: liveCode,
-        onPickAvatar: () async {
-          Navigator.of(ctx).pop();
-          await _pickAndSetAvatar();
-        },
-        onEditName: () async {
-          Navigator.of(ctx).pop();
-          await _promptEditName();
-        },
-        onEditCity: () async {
-          Navigator.of(ctx).pop();
-          await _promptEditCity();
-        },
-        onEditLanguage: () async {
-          Navigator.of(ctx).pop();
-          await _promptEditLiveTranslation();
-        },
-      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            return _EditAccountSheet(
+              displayName: displayName,
+              avatarUrl: avatarUrl,
+              city: city,
+              languageCode: languageCode,
+              onPickAvatar: () async {
+                await _pickAndSetAvatar();
+                if (!mounted) return;
+                setSheet(() => avatarUrl = _remote?.avatarUrl ?? '');
+              },
+              onEditName: () async {
+                await _promptEditName(overlay: sheetCtx);
+                if (!mounted) return;
+                setSheet(
+                  () => displayName = _remote?.displayName.trim() ?? '',
+                );
+              },
+              onEditCity: () async {
+                await _promptEditCity(overlay: sheetCtx);
+                if (!mounted) return;
+                setSheet(() => city = _remote?.city.trim() ?? '');
+              },
+              onEditLanguage: () async {
+                final code =
+                    await _promptEditLiveTranslation(overlay: sheetCtx);
+                if (!mounted || code == null) return;
+                setSheet(() => languageCode = code);
+              },
+            );
+          },
+        );
+      },
     );
   }
 
-  Future<void> _promptEditName() async {
+  Future<void> _promptEditName({BuildContext? overlay}) async {
+    final ctx = overlay ?? context;
     final current = _remote?.displayName ?? '';
     final changedAt = _remote?.nameChangedAt;
     if (changedAt != null) {
@@ -852,8 +881,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => _NamePromptDialog(
+      context: ctx,
+      builder: (dCtx) => _NamePromptDialog(
         title: AppStrings.t('settings_first_name'),
         controller: ctrl,
         maxLength: profileNameMaxLength,
@@ -864,13 +893,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     await _saveName(result);
   }
 
-  Future<void> _promptEditCity() async {
-    if (_deviceId.isEmpty || !mounted) return;
+  Future<void> _promptEditCity({BuildContext? overlay}) async {
+    final ctx = overlay ?? context;
+    if (_deviceId.isEmpty || !ctx.mounted) return;
     final result = await showModalBottomSheet<(String, String)>(
-      context: context,
+      context: ctx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => LocationPickerSheet(
+      builder: (c) => LocationPickerSheet(
         initialCountry: _remote?.country ?? '',
         initialCity: _remote?.city ?? '',
       ),
@@ -893,9 +923,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Future<void> _promptEditLiveTranslation() async {
+  /// Returns the newly saved call-spoken language code, or null if cancelled.
+  Future<String?> _promptEditLiveTranslation({BuildContext? overlay}) async {
+    final ctx = overlay ?? context;
     final saved = await UserPrefs.loadCallSpokenLang();
-    if (!mounted) return;
+    if (!ctx.mounted) return null;
     final current = saved.lang.isNotEmpty
         ? saved.lang
         : (_languageCode.isNotEmpty
@@ -904,15 +936,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     final langs = supportedLanguages;
     final start = langs.indexWhere((l) => l.code == current);
     final picked = await showWheelPicker(
-      context: context,
+      context: ctx,
       title: AppStrings.t('settings_live_translation'),
       emoji: '🗣️',
       labels: [for (final l in langs) '${l.flag}  ${l.label}'],
       initialIndex: start < 0 ? 0 : start,
     );
-    if (picked == null || !mounted) return;
+    if (picked == null || !mounted) return null;
     final code = langs[picked].code;
     await UserPrefs.saveCallSpokenLang(code, dontAsk: saved.dontAsk);
+    return code;
   }
 
   @override
@@ -1162,7 +1195,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                             unreadRequests: pending,
                             onSelect: (i) {
                               NavTab.select(i);
-                              if (i == NavTab.chat) ChatUnread.markAllSeen();
                               Navigator.of(
                                 context,
                               ).popUntil((route) => route.isFirst);
