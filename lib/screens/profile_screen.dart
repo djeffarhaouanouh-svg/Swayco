@@ -1403,7 +1403,7 @@ class _IdentitySection extends StatelessWidget {
   /// spacer keeps the bubble centred. Tap â account edit bottom sheet.
   Widget _pdpBubble({required bool editable}) {
     final pdp = avatarUrl.isEmpty ? null : avatarUrl;
-    const pencilSize = 30.0;
+    const pencilSize = 34.0;
     const pencilGap = 14.0;
     final bubble = Stack(
       alignment: Alignment.bottomRight,
@@ -1471,7 +1471,7 @@ class _IdentitySection extends StatelessWidget {
             ),
             child: const Icon(
               Icons.edit,
-              size: 15,
+              size: 17,
               color: SC.textPrimary,
             ),
           ),
