@@ -1700,9 +1700,15 @@ class _MessageBubbleState extends State<_MessageBubble> {
             ),
             if (chips.isNotEmpty)
               Positioned(
-                top: -12,
-                right: 6,
+                // Straddles the corner (half on the bubble, half hanging off
+                // it) instead of floating disconnected above it — the
+                // Instagram/WhatsApp tapback look.
+                top: -10,
+                right: -8,
                 child: _ReactionChip(
+                  // New key each time the reaction set changes → the pop
+                  // animation replays on every add/change, not just once.
+                  key: ValueKey(chips.join()),
                   emojis: chips,
                   mineHighlighted: _myEmoji != null,
                   onTap: () {
@@ -1806,9 +1812,12 @@ class _ReactionPicker extends StatelessWidget {
   }
 }
 
-/// WhatsApp-style chip sitting on the top-right corner of a bubble.
+/// Instagram/WhatsApp-style tapback sitting astride the bubble's top-right
+/// corner. Pops in with a small overshoot — [key] should change whenever the
+/// reaction set changes so the animation replays instead of only playing once.
 class _ReactionChip extends StatelessWidget {
   const _ReactionChip({
+    super.key,
     required this.emojis,
     required this.mineHighlighted,
     required this.onTap,
@@ -1820,25 +1829,35 @@ class _ReactionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF1C1C1E),
-      elevation: 2,
-      shadowColor: Colors.black54,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(6, 2, 6, 3),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: mineHighlighted ? SC.accent : const Color(0x33FFFFFF),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 340),
+      curve: Curves.elasticOut,
+      builder: (context, t, child) =>
+          Transform.scale(scale: t, alignment: Alignment.center, child: child),
+      child: Material(
+        color: const Color(0xFF1C1C1E),
+        elevation: 3,
+        shadowColor: Colors.black54,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(7, 3, 7, 3),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: mineHighlighted ? SC.accent : const Color(0x33FFFFFF),
+                width: mineHighlighted ? 1.4 : 1,
+              ),
             ),
-          ),
-          child: Text(
-            emojis.join(),
-            style: const TextStyle(fontSize: 14, height: 1.15),
+            child: Text(
+              emojis.join(),
+              style: const TextStyle(fontSize: 14, height: 1.15),
+            ),
           ),
         ),
       ),
