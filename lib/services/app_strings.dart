@@ -404,7 +404,7 @@ abstract final class AppStrings {
         'Ajoute une photo de toi pour apparaître dans le Discover et recevoir plein d’ajouts du monde entier 😉',
     'tip_profile_here_title': 'Ta photo, c’est ici',
     'tip_profile_here_body':
-        'Ajoute ta photo, pour recevoir plein d’ajouts.',
+        'Ajoute ta photo pour recevoir plein d’ajouts.',
     'tip_next': 'Suivant',
     'tip_got_it': 'J’ai compris',
     'live_search_failed': 'Impossible de lancer la recherche : {error}',
@@ -580,9 +580,9 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': "Comment veux-tu qu'on t'appelle ?",
     'onb_welcome_hint':
         "(C'est le prénom que les autres verront sur ton profil.)",
-    'onb_language_title': 'Quelle langue tu parles ?',
+    'onb_language_title': 'Quelle langue parles-tu ?',
     'onb_language_subtitle':
-        "Choisis la langue que tu parles. La langue de l'autre est détectée automatiquement quand il rejoint l'appel.",
+        "La langue de l'autre personne est détectée automatiquement quand elle rejoint l'appel.",
     'onb_first_name_label': 'Prénom',
     'onb_first_name_hint': 'ex. Alex',
     'onb_country_label': 'Pays',
@@ -1139,12 +1139,12 @@ abstract final class AppStrings {
         'If an account exists for that email, a reset link has been sent.',
 
     'onb_welcome_title': 'Welcome',
-    'onb_welcome_subtitle': 'How should we call you?',
+    'onb_welcome_subtitle': 'What should we call you?',
     'onb_welcome_hint':
         '(This is the first name others will see on your profile.)',
     'onb_language_title': 'What language do you speak?',
     'onb_language_subtitle':
-        "Pick the language you speak. The other person's language is detected automatically when they join the call.",
+        "The other person's language is detected automatically when they join the call.",
     'onb_first_name_label': 'First name',
     'onb_first_name_hint': 'e.g. Alex',
     'onb_country_label': 'Country',
@@ -1179,7 +1179,7 @@ abstract final class AppStrings {
     'onb_gender_neutral': 'Neutral',
     'onb_need_gender': 'Pick an option to continue.',
     'onb_persona_title': 'What defines you the most?',
-    'onb_persona_subtitle': 'Helps us show you people who share your vibe.',
+    'onb_persona_subtitle': 'This helps us show you people who are like you.',
     'onb_need_persona': 'Pick an option to continue.',
     'onb_interests_title': 'Your interests',
     'onb_interests_count': '{n} / {max} selected',
@@ -1478,7 +1478,7 @@ abstract final class AppStrings {
     'tip_photo_body':
         'Añade una foto tuya para aparecer en Discover y recibir un montón de contactos de todo el mundo 😉',
     'tip_profile_here_title': 'Tu foto va aquí',
-    'tip_profile_here_body': 'Añade tu foto, para recibir un montón de añadidos.',
+    'tip_profile_here_body': 'Añade tu foto para recibir un montón de añadidos.',
     'tip_next': 'Siguiente',
     'tip_got_it': 'Entendido',
     'live_search_failed': 'No se pudo iniciar la búsqueda: {error}',
@@ -1617,7 +1617,7 @@ abstract final class AppStrings {
         '(Es el nombre que los demás verán en tu perfil.)',
     'onb_language_title': '¿Qué idioma hablas?',
     'onb_language_subtitle':
-        'Elige el idioma que hablas. El idioma de la otra persona se detecta automáticamente cuando se une a la llamada.',
+        'El idioma de la otra persona se detecta automáticamente cuando se une a la llamada.',
     'onb_first_name_label': 'Nombre',
     'onb_first_name_hint': 'ej. Alex',
     'onb_country_label': 'País',
@@ -2082,7 +2082,7 @@ abstract final class AppStrings {
         '(Das ist der Vorname, den andere auf deinem Profil sehen.)',
     'onb_language_title': 'Welche Sprache sprichst du?',
     'onb_language_subtitle':
-        'Wähle die Sprache, die du sprichst. Die Sprache der anderen Person wird automatisch erkannt, wenn sie dem Anruf beitritt.',
+        'Die Sprache der anderen Person wird automatisch erkannt, wenn sie dem Anruf beitritt.',
     'onb_first_name_label': 'Vorname',
     'onb_first_name_hint': 'z.B. Alex',
     'onb_next': 'Weiter',
@@ -2504,7 +2504,7 @@ abstract final class AppStrings {
     'tip_photo_body':
         'Aggiungi una tua foto per apparire nel Discover e ricevere un sacco di contatti da tutto il mondo 😉',
     'tip_profile_here_title': 'La tua foto va qui',
-    'tip_profile_here_body': 'Aggiungi la tua foto, per ricevere tante aggiunte.',
+    'tip_profile_here_body': 'Aggiungi la tua foto per ricevere tante aggiunte.',
     'tip_next': 'Avanti',
     'tip_got_it': 'Ho capito',
     'live_search_failed': 'Impossibile avviare la ricerca: {error}',
@@ -2626,7 +2626,7 @@ abstract final class AppStrings {
         '(È il nome che gli altri vedranno sul tuo profilo.)',
     'onb_language_title': 'Che lingua parli?',
     'onb_language_subtitle':
-        "Scegli la lingua che parli. La lingua dell'altra persona viene rilevata automaticamente quando si unisce alla chiamata.",
+        "La lingua dell'altra persona viene rilevata automaticamente quando si unisce alla chiamata.",
     'onb_first_name_label': 'Nome',
     'onb_first_name_hint': 'es. Alex',
     'onb_next': 'Avanti',
@@ -3166,7 +3166,7 @@ abstract final class AppStrings {
         '(É o nome que os outros vão ver no teu perfil.)',
     'onb_language_title': 'Que língua falas?',
     'onb_language_subtitle':
-        'Escolhe a língua que falas. A língua da outra pessoa é detetada automaticamente quando entra na chamada.',
+        'A língua da outra pessoa é detetada automaticamente quando entra na chamada.',
     'onb_first_name_label': 'Primeiro nome',
     'onb_first_name_hint': 'ex. Alex',
     'onb_next': 'Seguinte',
@@ -3381,7 +3381,7 @@ abstract final class AppStrings {
     'loc_choose_city': 'Escolher uma cidade',
     'loc_other_city': 'Outra cidade…',
     'loc_other_city_hint': 'Introduza a sua cidade',
-    'onb_gender_title': 'Você é…',
+    'onb_gender_title': 'Tu és…',
     'onb_gender_subtitle':
         'Ajuda-nos a personalizar a tua experiência no Swayco.',
     'onb_gender_male': 'Homem',
@@ -3709,7 +3709,7 @@ abstract final class AppStrings {
         '(Dit is de voornaam die anderen op je profiel zien.)',
     'onb_language_title': 'Welke taal spreek je?',
     'onb_language_subtitle':
-        'Kies de taal die je spreekt. De taal van de andere persoon wordt automatisch gedetecteerd wanneer hij deelneemt aan het gesprek.',
+        'De taal van de andere persoon wordt automatisch herkend wanneer diegene deelneemt aan het gesprek.',
     'onb_first_name_label': 'Voornaam',
     'onb_first_name_hint': 'bijv. Alex',
     'onb_next': 'Volgende',
@@ -4119,7 +4119,7 @@ abstract final class AppStrings {
     'tip_photo_body':
         'أضِف صورة لك لتظهر في Discover وتحصل على الكثير من الإضافات من جميع أنحاء العالم 😉',
     'tip_profile_here_title': 'صورتك توضع هنا',
-    'tip_profile_here_body': 'أضِف صورتك، لتحصل على الكثير من الإضافات.',
+    'tip_profile_here_body': 'أضِف صورتك لتحصل على الكثير من الإضافات.',
     'tip_next': 'التالي',
     'tip_got_it': 'فهمت',
     'live_search_failed': 'تعذّر بدء البحث: {error}',
@@ -4239,7 +4239,7 @@ abstract final class AppStrings {
         '(هذا الاسم الذي سيراه الآخرون على ملفك.)',
     'onb_language_title': 'ما اللغة التي تتحدثها؟',
     'onb_language_subtitle':
-        'اختر اللغة التي تتحدثها. يتم اكتشاف لغة الشخص الآخر تلقائياً عند انضمامه إلى المكالمة.',
+        'يتم اكتشاف لغة الشخص الآخر تلقائياً عند انضمامه إلى المكالمة.',
     'onb_first_name_label': 'الاسم الأول',
     'onb_first_name_hint': 'مثل أليكس',
     'onb_next': 'التالي',
@@ -4773,7 +4773,7 @@ abstract final class AppStrings {
         '(Это имя, которое другие увидят в твоём профиле.)',
     'onb_language_title': 'На каком языке ты говоришь?',
     'onb_language_subtitle':
-        'Выбери язык, на котором ты говоришь. Язык собеседника определяется автоматически, когда он присоединяется к звонку.',
+        'Язык собеседника определяется автоматически, когда тот присоединяется к звонку.',
     'onb_first_name_label': 'Имя',
     'onb_first_name_hint': 'напр. Alex',
     'onb_next': 'Далее',
@@ -5282,7 +5282,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': '希望我们怎么称呼你？',
     'onb_welcome_hint': '（这是其他人会在你资料上看到的名字。）',
     'onb_language_title': '你说哪种语言？',
-    'onb_language_subtitle': '选择你使用的语言。对方加入通话时，他们的语言会自动检测。',
+    'onb_language_subtitle': '对方加入通话时，其语言会自动检测。',
     'onb_first_name_label': '名字',
     'onb_first_name_hint': '例如 Alex',
     'onb_next': '下一步',
@@ -5795,7 +5795,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': 'なんて呼べばいい？',
     'onb_welcome_hint': '（プロフィールに表示される名前です。）',
     'onb_language_title': 'どの言語を話しますか？',
-    'onb_language_subtitle': '話す言語を選んでください。相手の言語は通話に参加したときに自動的に検出されます。',
+    'onb_language_subtitle': '相手の言語は、通話に参加したときに自動的に検出されます。',
     'onb_first_name_label': '名前',
     'onb_first_name_hint': '例: Alex',
     'onb_next': '次へ',
@@ -6185,7 +6185,7 @@ abstract final class AppStrings {
     'tip_photo_title': 'Discover에 등장하세요 ✨',
     'tip_photo_body': '자기 사진을 추가하면 Discover에 표시되고 전 세계에서 많은 추가를 받을 수 있어요 😉',
     'tip_profile_here_title': '사진은 여기에',
-    'tip_profile_here_body': '사진을 추가하고, 많은 추가를 받으세요.',
+    'tip_profile_here_body': '사진을 추가하고 많은 추가를 받으세요.',
     'tip_next': '다음',
     'tip_got_it': '알겠어요',
     'live_search_failed': '검색을 시작할 수 없습니다: {error}',
@@ -6293,7 +6293,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': '어떻게 불러드릴까요?',
     'onb_welcome_hint': '(다른 사람이 프로필에서 보게 될 이름이에요.)',
     'onb_language_title': '어떤 언어를 하나요?',
-    'onb_language_subtitle': '사용하는 언어를 선택하세요. 상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
+    'onb_language_subtitle': '상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
     'onb_first_name_label': '이름',
     'onb_first_name_hint': '예: Alex',
     'onb_next': '다음',
