@@ -505,6 +505,202 @@ const Map<String, Map<String, String>> _kInterestI18n = {
     'ar': 'الريفييرا الفرنسية', 'ru': 'Лазурный берег', 'zh': '蔚蓝海岸',
     'ja': 'コート・ダジュール', 'ko': '코트다쥐르',
   },
+
+  // ─── Universal taxonomy — categories ───────────────────────────────────────
+  'Sport': {
+    'en': 'Sport', 'es': 'Deporte', 'de': 'Sport', 'it': 'Sport',
+    'pt': 'Esporte', 'nl': 'Sport', 'ar': 'الرياضة', 'ru': 'Спорт',
+    'zh': '运动', 'ja': 'スポーツ', 'ko': '스포츠',
+  },
+  'Musique': {
+    'en': 'Music', 'es': 'Música', 'de': 'Musik', 'it': 'Musica',
+    'pt': 'Música', 'nl': 'Muziek', 'ar': 'الموسيقى', 'ru': 'Музыка',
+    'zh': '音乐', 'ja': '音楽', 'ko': '음악',
+  },
+  'Gaming': {
+    'en': 'Gaming', 'es': 'Videojuegos', 'de': 'Gaming', 'it': 'Gaming',
+    'pt': 'Games', 'nl': 'Gaming', 'ar': 'الألعاب', 'ru': 'Игры',
+    'zh': '游戏', 'ja': 'ゲーム', 'ko': '게임',
+  },
+  'Divertissement': {
+    'en': 'Entertainment', 'es': 'Entretenimiento', 'de': 'Unterhaltung',
+    'it': 'Intrattenimento', 'pt': 'Entretenimento', 'nl': 'Entertainment',
+    'ar': 'الترفيه', 'ru': 'Развлечения', 'zh': '娱乐', 'ja': 'エンタメ',
+    'ko': '엔터테인먼트',
+  },
+  'Voyage': {
+    'en': 'Travel', 'es': 'Viajes', 'de': 'Reisen', 'it': 'Viaggi',
+    'pt': 'Viagem', 'nl': 'Reizen', 'ar': 'السفر', 'ru': 'Путешествия',
+    'zh': '旅行', 'ja': '旅行', 'ko': '여행',
+  },
+  'Nature & Bien-être': {
+    'en': 'Nature & Wellness', 'es': 'Naturaleza y bienestar',
+    'de': 'Natur & Wellness', 'it': 'Natura e benessere',
+    'pt': 'Natureza e bem-estar', 'nl': 'Natuur & welzijn',
+    'ar': 'الطبيعة والعافية', 'ru': 'Природа и велнес', 'zh': '自然与养生',
+    'ja': '自然・ウェルネス', 'ko': '자연 & 웰빙',
+  },
+  'Lifestyle': {
+    'en': 'Lifestyle', 'es': 'Estilo de vida', 'de': 'Lifestyle',
+    'it': 'Stile di vita', 'pt': 'Estilo de vida', 'nl': 'Lifestyle',
+    'ar': 'نمط الحياة', 'ru': 'Стиль жизни', 'zh': '生活方式',
+    'ja': 'ライフスタイル', 'ko': '라이프스타일',
+  },
+  'Ambition': {
+    'en': 'Ambition', 'es': 'Ambición', 'de': 'Ambition', 'it': 'Ambizione',
+    'pt': 'Ambição', 'nl': 'Ambitie', 'ar': 'الطموح', 'ru': 'Амбиции',
+    'zh': '志向', 'ja': '向上心', 'ko': '야망',
+  },
+
+  // ─── Universal taxonomy — new tags ─────────────────────────────────────────
+  'Football': {
+    'en': 'Football', 'es': 'Fútbol', 'de': 'Fußball', 'it': 'Calcio',
+    'pt': 'Futebol', 'nl': 'Voetbal', 'ar': 'كرة القدم', 'ru': 'Футбол',
+    'zh': '足球', 'ja': 'サッカー', 'ko': '축구',
+  },
+  'Basketball': {
+    'en': 'Basketball', 'es': 'Baloncesto', 'de': 'Basketball',
+    'it': 'Pallacanestro', 'pt': 'Basquete', 'nl': 'Basketbal',
+    'ar': 'كرة السلة', 'ru': 'Баскетбол', 'zh': '篮球', 'ja': 'バスケ',
+    'ko': '농구',
+  },
+  'Tennis': {
+    'en': 'Tennis', 'es': 'Tenis', 'de': 'Tennis', 'it': 'Tennis',
+    'pt': 'Tênis', 'nl': 'Tennis', 'ar': 'التنس', 'ru': 'Теннис',
+    'zh': '网球', 'ja': 'テニス', 'ko': '테니스',
+  },
+  'MMA': {
+    'en': 'MMA', 'es': 'MMA', 'de': 'MMA', 'it': 'MMA', 'pt': 'MMA',
+    'nl': 'MMA', 'ar': 'الفنون القتالية المختلطة', 'ru': 'ММА',
+    'zh': '综合格斗', 'ja': '総合格闘技', 'ko': '종합격투기',
+  },
+  'Formule 1': {
+    'en': 'Formula 1', 'es': 'Fórmula 1', 'de': 'Formel 1',
+    'it': 'Formula 1', 'pt': 'Fórmula 1', 'nl': 'Formule 1',
+    'ar': 'فورمولا 1', 'ru': 'Формула-1', 'zh': '一级方程式赛车', 'ja': 'F1',
+    'ko': '포뮬러 1',
+  },
+  'Course à pied': {
+    'en': 'Running', 'es': 'Running', 'de': 'Laufen', 'it': 'Corsa',
+    'pt': 'Corrida', 'nl': 'Hardlopen', 'ar': 'الجري', 'ru': 'Бег',
+    'zh': '跑步', 'ja': 'ランニング', 'ko': '러닝',
+  },
+  'Musculation': {
+    'en': 'Weightlifting', 'es': 'Musculación', 'de': 'Krafttraining',
+    'it': 'Palestra', 'pt': 'Musculação', 'nl': 'Krachttraining',
+    'ar': 'كمال الأجسام', 'ru': 'Силовые тренировки', 'zh': '健身',
+    'ja': '筋トレ', 'ko': '웨이트트레이닝',
+  },
+  'Yoga': {
+    'en': 'Yoga', 'es': 'Yoga', 'de': 'Yoga', 'it': 'Yoga', 'pt': 'Yoga',
+    'nl': 'Yoga', 'ar': 'اليوغا', 'ru': 'Йога', 'zh': '瑜伽', 'ja': 'ヨガ',
+    'ko': '요가',
+  },
+  'Rap': {
+    'en': 'Rap', 'es': 'Rap', 'de': 'Rap', 'it': 'Rap', 'pt': 'Rap',
+    'nl': 'Rap', 'ar': 'الراب', 'ru': 'Рэп', 'zh': '说唱', 'ja': 'ラップ',
+    'ko': '랩',
+  },
+  'R&B': {
+    'en': 'R&B', 'es': 'R&B', 'de': 'R&B', 'it': 'R&B', 'pt': 'R&B',
+    'nl': 'R&B', 'ar': 'آر أند بي', 'ru': 'Ар-н-би', 'zh': 'R&B',
+    'ja': 'R&B', 'ko': 'R&B',
+  },
+  'K-pop': {
+    'en': 'K-pop', 'es': 'K-pop', 'de': 'K-pop', 'it': 'K-pop', 'pt': 'K-pop',
+    'nl': 'K-pop', 'ar': 'كي بوب', 'ru': 'K-pop', 'zh': 'K-pop', 'ja': 'K-POP',
+    'ko': '케이팝',
+  },
+  'Rock': {
+    'en': 'Rock', 'es': 'Rock', 'de': 'Rock', 'it': 'Rock', 'pt': 'Rock',
+    'nl': 'Rock', 'ar': 'الروك', 'ru': 'Рок', 'zh': '摇滚', 'ja': 'ロック',
+    'ko': '록',
+  },
+  'Afrobeats': {
+    'en': 'Afrobeats', 'es': 'Afrobeats', 'de': 'Afrobeats',
+    'it': 'Afrobeats', 'pt': 'Afrobeats', 'nl': 'Afrobeats',
+    'ar': 'أفروبيتس', 'ru': 'Афробит', 'zh': '非洲节拍', 'ja': 'アフロビーツ',
+    'ko': '아프로비트',
+  },
+  'Compétitif': {
+    'en': 'Competitive', 'es': 'Competitivo', 'de': 'Kompetitiv',
+    'it': 'Competitivo', 'pt': 'Competitivo', 'nl': 'Competitief',
+    'ar': 'تنافسي', 'ru': 'Соревновательный', 'zh': '竞技', 'ja': '競技志向',
+    'ko': '경쟁전',
+  },
+  'Casual': {
+    'en': 'Casual', 'es': 'Casual', 'de': 'Casual', 'it': 'Casual',
+    'pt': 'Casual', 'nl': 'Casual', 'ar': 'عرضي', 'ru': 'Кэжуал',
+    'zh': '休闲', 'ja': 'カジュアル', 'ko': '캐주얼',
+  },
+  'PlayStation': {
+    'en': 'PlayStation', 'es': 'PlayStation', 'de': 'PlayStation',
+    'it': 'PlayStation', 'pt': 'PlayStation', 'nl': 'PlayStation',
+    'ar': 'بلايستيشن', 'ru': 'PlayStation', 'zh': 'PlayStation',
+    'ja': 'プレイステーション', 'ko': '플레이스테이션',
+  },
+  'PC': {
+    'en': 'PC', 'es': 'PC', 'de': 'PC', 'it': 'PC', 'pt': 'PC', 'nl': 'PC',
+    'ar': 'الحاسوب', 'ru': 'ПК', 'zh': '电脑', 'ja': 'PC', 'ko': 'PC',
+  },
+  'Mobile': {
+    'en': 'Mobile', 'es': 'Móvil', 'de': 'Mobile', 'it': 'Mobile',
+    'pt': 'Celular', 'nl': 'Mobiel', 'ar': 'الجوال', 'ru': 'Мобильные игры',
+    'zh': '手游', 'ja': 'モバイル', 'ko': '모바일',
+  },
+  'Séries': {
+    'en': 'TV Shows', 'es': 'Series', 'de': 'Serien', 'it': 'Serie TV',
+    'pt': 'Séries', 'nl': 'Series', 'ar': 'المسلسلات', 'ru': 'Сериалы',
+    'zh': '剧集', 'ja': 'ドラマ', 'ko': '드라마',
+  },
+  'Randonnée': {
+    'en': 'Hiking', 'es': 'Senderismo', 'de': 'Wandern',
+    'it': 'Escursionismo', 'pt': 'Trilhas', 'nl': 'Wandelen',
+    'ar': 'المشي لمسافات طويلة', 'ru': 'Пешие походы', 'zh': '徒步',
+    'ja': 'ハイキング', 'ko': '하이킹',
+  },
+  'Nature': {
+    'en': 'Nature', 'es': 'Naturaleza', 'de': 'Natur', 'it': 'Natura',
+    'pt': 'Natureza', 'nl': 'Natuur', 'ar': 'الطبيعة', 'ru': 'Природа',
+    'zh': '自然', 'ja': '自然', 'ko': '자연',
+  },
+  'Entrepreneuriat': {
+    'en': 'Entrepreneurship', 'es': 'Emprendimiento',
+    'de': 'Unternehmertum', 'it': 'Imprenditoria', 'pt': 'Empreendedorismo',
+    'nl': 'Ondernemerschap', 'ar': 'ريادة الأعمال', 'ru': 'Предпринимательство',
+    'zh': '创业', 'ja': '起業', 'ko': '창업',
+  },
+  'Startups': {
+    'en': 'Startups', 'es': 'Startups', 'de': 'Startups', 'it': 'Startup',
+    'pt': 'Startups', 'nl': 'Startups', 'ar': 'الشركات الناشئة',
+    'ru': 'Стартапы', 'zh': '初创公司', 'ja': 'スタートアップ', 'ko': '스타트업',
+  },
+  'Tech': {
+    'en': 'Tech', 'es': 'Tecnología', 'de': 'Technik', 'it': 'Tecnologia',
+    'pt': 'Tecnologia', 'nl': 'Tech', 'ar': 'التقنية', 'ru': 'Технологии',
+    'zh': '科技', 'ja': 'テック', 'ko': '테크',
+  },
+  'Finance': {
+    'en': 'Finance', 'es': 'Finanzas', 'de': 'Finanzen', 'it': 'Finanza',
+    'pt': 'Finanças', 'nl': 'Financiën', 'ar': 'المالية', 'ru': 'Финансы',
+    'zh': '金融', 'ja': '金融', 'ko': '금융',
+  },
+  'Investissement': {
+    'en': 'Investing', 'es': 'Inversión', 'de': 'Investieren',
+    'it': 'Investimenti', 'pt': 'Investimentos', 'nl': 'Beleggen',
+    'ar': 'الاستثمار', 'ru': 'Инвестиции', 'zh': '投资', 'ja': '投資',
+    'ko': '투자',
+  },
+  'Études': {
+    'en': 'Studies', 'es': 'Estudios', 'de': 'Studium', 'it': 'Studi',
+    'pt': 'Estudos', 'nl': 'Studie', 'ar': 'الدراسة', 'ru': 'Учёба',
+    'zh': '学业', 'ja': '勉強', 'ko': '공부',
+  },
+  'Carrière': {
+    'en': 'Career', 'es': 'Carrera', 'de': 'Karriere', 'it': 'Carriera',
+    'pt': 'Carreira', 'nl': 'Carrière', 'ar': 'المسار المهني', 'ru': 'Карьера',
+    'zh': '职业发展', 'ja': 'キャリア', 'ko': '커리어',
+  },
 };
 
 /// Localised display text for an interest [key] (a French category/tag label

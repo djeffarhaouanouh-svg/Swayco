@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
 import 'debug_overlay.dart';
+import 'looking_for.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
 
@@ -1161,8 +1162,26 @@ abstract final class ProfileApi {
     int positionInFetch,
     String myLang,
     int receivedLikes,
+    Set<String> myInterests,
+    String myLookingFor,
   ) {
     double s = 0;
+
+    // Shared interests: a common tag is a ready-made conversation opener
+    // even across a language barrier, so it outweighs the recency bonus.
+    // Capped at 4 tags so a maxed-out profile doesn't dwarf everything else.
+    if (myInterests.isNotEmpty && p.interests.isNotEmpty) {
+      final shared = p.interests.toSet().intersection(myInterests).length;
+      if (shared > 0) s += (shared > 4 ? 4 : shared) * 15;
+    }
+
+    // Same "looking for" intent (e.g. both want friendship, or both want a
+    // relationship) — a soft ranking bonus, never a filter, so nobody is
+    // ever hidden purely because their intent differs.
+    if (myLookingFor.isNotEmpty &&
+        normalizeLookingFor(p.lookingFor) == myLookingFor) {
+      s += 25;
+    }
 
     final ls = p.lastSeen;
     if (ls != null && !p.hideOnlineStatus) {
@@ -1267,14 +1286,19 @@ abstract final class ProfileApi {
           .toList(growable: false);
       if (candidates.isEmpty) return const [];
 
-      // Look up my language for the client-side scoring (cross-
-      // language bonus). The peer privacy filter that depends on it
-      // already ran server-side in the RPC, so we no longer need it
-      // for correctness — just for ranking.
+      // Look up my language, interests and intent for the client-side
+      // scoring (cross-language bonus, shared-interest bonus, same-intent
+      // bonus). The peer privacy filter that depends on language already
+      // ran server-side in the RPC, so we no longer need it for
+      // correctness here — just for ranking.
       String myLang = '';
+      Set<String> myInterests = const {};
+      String myLookingFor = '';
       try {
         final me = await fetchById(myId);
         myLang = me?.language.trim().toLowerCase() ?? '';
+        myInterests = me?.interests.toSet() ?? const {};
+        myLookingFor = normalizeLookingFor(me?.lookingFor ?? '');
       } catch (_) {}
 
       // Batched popularity counts for every candidate in one round-
@@ -1320,6 +1344,8 @@ abstract final class ProfileApi {
               i,
               myLang,
               likeCounts[candidates[i].id] ?? 0,
+              myInterests,
+              myLookingFor,
             ),
           ),
       ];

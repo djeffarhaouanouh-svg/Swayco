@@ -30,145 +30,127 @@ class InterestCategory {
   final List<String> options;
 }
 
-/// Two culture-specific taxonomies. The app bridges France ⇄ Japan, so the
-/// interests step asks each person what they love about the OTHER culture:
-/// someone from Japan picks what they like about France, everyone else picks
-/// what they like about Japan (see [interestCategoriesFor]). Tags are stored on
-/// the profile as their plain label string, so editing these lists later is
-/// safe as long as the labels stay stable.
-
-/// What (non-Japanese) users love about Japan — the default set. Generous but
-/// curated: every tag is an iconic, popular pick (no filler).
-const List<InterestCategory> kJapanInterestCategories = [
+/// A single universal taxonomy shared by every user regardless of
+/// nationality — the whole point is that two people who don't speak the same
+/// language can both pick "Football" or "Gaming" and have an instant, legible
+/// reason to talk to each other. (This replaces the earlier France⇄Japan
+/// "what do you love about the other culture" taxonomy, which by design could
+/// never produce a shared tag between two French or two Japanese users.)
+/// Tags are stored on the profile as their plain label string, so editing
+/// these lists later is safe as long as the labels stay stable.
+const List<InterestCategory> kInterestCategories = [
   InterestCategory(
-    label: 'Manga & Anime',
-    emoji: '🎌',
-    color: Color(0xFFFB7185), // rose
-    shape: InterestShape.stadium, // pill / "ovale"
+    label: 'Sport',
+    emoji: '⚽',
+    color: Color(0xFF22C55E), // vert
+    shape: InterestShape.stadium,
+    options: [
+      'Football', 'Basketball', 'Tennis', 'MMA', 'Formule 1',
+      'Course à pied', 'Musculation', 'Yoga',
+    ],
+  ),
+  InterestCategory(
+    label: 'Musique',
+    emoji: '🎵',
+    color: Color(0xFFF97316), // orange
+    shape: InterestShape.rounded,
+    options: [
+      'Rap', 'R&B', 'K-pop', 'J-pop', 'Rock', 'Afrobeats', 'Karaoké',
+      'Vocaloid',
+    ],
+  ),
+  InterestCategory(
+    label: 'Gaming',
+    emoji: '🎮',
+    color: Color(0xFFD946EF), // magenta
+    shape: InterestShape.rectangle,
+    options: [
+      'Nintendo', 'Pokémon', 'Arcades', 'Compétitif', 'Casual',
+      'PlayStation', 'PC', 'Mobile',
+    ],
+  ),
+  InterestCategory(
+    label: 'Divertissement',
+    emoji: '🎬',
+    color: Color(0xFF3B82F6), // bleu
+    shape: InterestShape.leaf,
     options: [
       'Manga', 'Anime', 'Studio Ghibli', 'One Piece', 'Naruto',
-      'Dragon Ball', 'Demon Slayer', 'Cosplay',
+      'Dragon Ball', 'Demon Slayer', 'Cosplay', 'Cinéma', 'Séries',
     ],
   ),
   InterestCategory(
     label: 'Cuisine',
     emoji: '🍜',
-    color: Color(0xFFFBBF24), // amber
-    shape: InterestShape.rectangle, // crisp rectangle
+    color: Color(0xFFEAB308), // jaune
+    shape: InterestShape.beveled,
     options: [
-      'Sushi', 'Ramen', 'Mochi', 'Takoyaki', 'Matcha', 'Wagyū', 'Tempura',
-      'Okonomiyaki',
+      'Sushi', 'Ramen', 'Matcha', 'Wagyū', 'Tempura', 'Croissant', 'Fromage',
+      'Pâtisserie', 'Vin', 'Café',
     ],
   ),
   InterestCategory(
-    label: 'Traditions',
-    emoji: '⛩️',
-    color: Color(0xFF22C55E), // green
-    shape: InterestShape.rounded, // soft rounded rectangle
+    label: 'Voyage',
+    emoji: '✈️',
+    color: Color(0xFFEC4899), // rose
+    shape: InterestShape.stadium,
     options: [
-      'Samouraïs', 'Ninjas', 'Geishas', 'Sakura', 'Onsen', 'Kimono', 'Sumo',
-      'Temples',
+      'Tour Eiffel', 'Paris', 'Versailles', 'Notre-Dame', 'Arc de Triomphe',
+      'Châteaux', 'Mont Fuji', 'Tokyo', 'Kyoto', 'Osaka',
     ],
   ),
   InterestCategory(
-    label: 'Pop & Tech',
-    emoji: '🎮',
-    color: Color(0xFF38BDF8), // sky blue
-    shape: InterestShape.beveled, // cut corners
+    label: 'Nature & Bien-être',
+    emoji: '🌿',
+    color: Color(0xFF8B5CF6), // violet
+    shape: InterestShape.rounded,
     options: [
-      'Nintendo', 'Pokémon', 'J-pop', 'Karaoké', 'Kawaii', 'Vocaloid',
-      'Arcades', 'Robots',
-    ],
-  ),
-  InterestCategory(
-    label: 'Voyage & Nature',
-    emoji: '🗻',
-    color: Color(0xFFA855F7), // violet
-    shape: InterestShape.leaf, // diagonally rounded
-    options: [
-      'Mont Fuji', 'Tokyo', 'Kyoto', 'Osaka', 'Jardins zen', 'Bonsaï',
-      'Calligraphie', 'Bambou',
-    ],
-  ),
-];
-
-/// What Japanese users love about France — shown only when the picked country
-/// is Japan. Generous but curated: Paris, gastronomy, fashion/luxury, art and
-/// the art de vivre, with only iconic, desirable picks.
-const List<InterestCategory> kFranceInterestCategories = [
-  InterestCategory(
-    label: 'Paris & Monuments',
-    emoji: '🗼',
-    color: Color(0xFF38BDF8), // sky blue
-    shape: InterestShape.beveled, // cut corners
-    options: [
-      'Tour Eiffel', 'Paris', 'Versailles', 'Mont-Saint-Michel', 'Notre-Dame',
-      'Arc de Triomphe', 'Châteaux',
-    ],
-  ),
-  InterestCategory(
-    label: 'Gastronomie',
-    emoji: '🥐',
-    color: Color(0xFFFBBF24), // amber
-    shape: InterestShape.rectangle, // crisp rectangle
-    options: [
-      'Croissant', 'Baguette', 'Fromage', 'Macarons', 'Crêpes', 'Pâtisserie',
-      'Escargots', 'Foie gras',
-    ],
-  ),
-  InterestCategory(
-    label: 'Vins & Café',
-    emoji: '🍷',
-    color: Color(0xFFFB7185), // rose
-    shape: InterestShape.stadium, // pill / "ovale"
-    options: [
-      'Vin', 'Champagne', 'Bordeaux', 'Café', 'Bistrot', 'Apéro',
-    ],
-  ),
-  InterestCategory(
-    label: 'Mode & Luxe',
-    emoji: '👜',
-    color: Color(0xFFF472B6), // pink
-    shape: InterestShape.leaf, // diagonally rounded
-    options: [
-      'Mode', 'Haute couture', 'Parfum', 'Luxe', 'Élégance', 'Bijoux',
+      'Onsen', 'Jardins zen', 'Bonsaï', 'Calligraphie', 'Bambou',
+      'Randonnée', 'Nature',
     ],
   ),
   InterestCategory(
     label: 'Art & Culture',
     emoji: '🎨',
-    color: Color(0xFFA855F7), // violet
-    shape: InterestShape.rounded, // soft rounded rectangle
+    color: Color(0xFF0EA5E9), // cyan
+    shape: InterestShape.rectangle,
     options: [
-      'Louvre', 'Impressionnisme', 'Monet', 'Cinéma', 'Littérature', 'Musées',
-      'Théâtre', 'Architecture',
+      'Samouraïs', 'Sakura', 'Kimono', 'Temples', 'Louvre', 'Monet',
+      'Littérature', 'Musées', 'Théâtre', 'Architecture',
     ],
   ),
   InterestCategory(
-    label: 'Art de vivre',
-    emoji: '✨',
-    color: Color(0xFF22C55E), // green
-    shape: InterestShape.stadium, // pill / "ovale"
+    label: 'Lifestyle',
+    emoji: '👗',
+    color: Color(0xFFEF4444), // rouge
+    shape: InterestShape.leaf,
     options: [
-      'Romance', 'Terrasses', 'Marchés', 'Flâner', 'Provence', "Côte d'Azur",
+      'Mode', 'Haute couture', 'Parfum', 'Luxe', 'Bijoux', 'Kawaii',
+      'Romance', 'Terrasses', 'Marchés', 'Flâner',
+    ],
+  ),
+  InterestCategory(
+    label: 'Ambition',
+    emoji: '💼',
+    color: Color(0xFF14B8A6), // teal
+    shape: InterestShape.beveled,
+    options: [
+      'Entrepreneuriat', 'Startups', 'Tech', 'Robots', 'Finance',
+      'Investissement', 'Études', 'Carrière',
     ],
   ),
 ];
 
-/// Every category across both cultures — lets [interestColor] / [interestShape]
-/// resolve a stored label's colour/shape regardless of which set it came from.
-const List<InterestCategory> kAllInterestCategories = [
-  ...kJapanInterestCategories,
-  ...kFranceInterestCategories,
-];
+/// Every category — kept as its own name (rather than inlining
+/// [kInterestCategories] at every call site) so helpers below read the same
+/// regardless of how many taxonomies existed historically.
+const List<InterestCategory> kAllInterestCategories = kInterestCategories;
 
-/// The category set to show for a given [country] (the verbatim name stored by
-/// the location picker, e.g. 'Japon'). People from Japan are asked what they
-/// like about France; everyone else is asked about Japan.
+/// The category set to show a user picking their interests. Every user sees
+/// the same universal taxonomy now — [country] is accepted (and ignored) so
+/// existing call sites don't need to change.
 List<InterestCategory> interestCategoriesFor(String country) {
-  return country.trim() == 'Japon'
-      ? kFranceInterestCategories
-      : kJapanInterestCategories;
+  return kInterestCategories;
 }
 
 /// Cyclic Relief-3D palette for interest tags (display order on the profile).
@@ -201,10 +183,9 @@ Color interestDarken(Color color, [double amount = 0.38]) {
   );
 }
 
-/// Colour for a chip [label] = its CATEGORY colour, resolved across BOTH the
-/// Japan and France taxonomies (so a stored label always finds its colour,
-/// whichever set the user picked from). Falls back to a neutral slate for a
-/// tag no longer in either taxonomy.
+/// Colour for a chip [label] = its CATEGORY colour. Falls back to a neutral
+/// slate for a tag no longer in the taxonomy (e.g. one picked under the old
+/// France/Japan taxonomy) so old selections keep rendering, just undyed.
 ///
 /// Prefer [interestPaletteColor] for profile / discover display chips (Relief
 /// 3D handoff). This helper remains for category-tinted picker headers.
@@ -215,11 +196,10 @@ Color interestColor(String label) {
   return const Color(0xFF64748B);
 }
 
-/// Shape for a chip [label] = its CATEGORY shape, resolved across both
-/// taxonomies. Mirrors [interestColor]; falls back to a pill for a tag no
-/// longer in either taxonomy. Picker rows know their own category, so they
-/// pass `cat.shape` directly instead (this is for the read-only profile
-/// display, where only the stored label is known).
+/// Shape for a chip [label] = its CATEGORY shape. Mirrors [interestColor];
+/// falls back to a pill for a tag no longer in the taxonomy. Picker rows know
+/// their own category, so they pass `cat.shape` directly instead (this is for
+/// the read-only profile display, where only the stored label is known).
 InterestShape interestShape(String label) {
   for (final c in kAllInterestCategories) {
     if (c.options.contains(label)) return c.shape;
