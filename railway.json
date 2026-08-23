@@ -12,6 +12,7 @@
       "assets/**",
       "pubspec.yaml",
       "pubspec.lock",
+      "dart_defines.env",
       "railway.json"
     ]
   },

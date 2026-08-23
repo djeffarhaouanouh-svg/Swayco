@@ -2,15 +2,6 @@
 # --- Flutter Web (release) ---
 FROM ghcr.io/cirruslabs/flutter:stable AS flutter-build
 
-# Build-time args. Accept either the Next.js-style names or the plain
-# Flutter-side names — Railway only forwards a service variable as a build
-# arg when the ARG name matches, so declaring both lets the same Dockerfile
-# work regardless of how the variables are named in the Railway dashboard.
-ARG NEXT_PUBLIC_SUPABASE_URL=""
-ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=""
-ARG SUPABASE_URL=""
-ARG SUPABASE_PUBLISHABLE_KEY=""
-
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./
 # pubspec.yaml carries `path:` overrides for the patched sherpa_onnx iOS/macOS
@@ -23,21 +14,13 @@ COPY analysis_options.yaml ./
 COPY lib ./lib
 COPY web ./web
 COPY assets ./assets
+COPY dart_defines.env ./dart_defines.env
 
-# Pick whichever set the user has defined in Railway, preferring the plain
-# SUPABASE_* names. Fail loudly if both are empty so the build doesn't
-# silently produce an unconfigured bundle.
+# Bake client config from dart_defines.env — never Railway ARG + `${VAR:-}`
+# inside RUN. That interpolation turns `https://….supabase.co` into
+# `https://….supabase.cO` and leaves TOKEN_API_BASE empty.
 RUN flutter config --no-analytics \
-  && URL="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL}}" \
-  && KEY="${SUPABASE_PUBLISHABLE_KEY:-${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}}" \
-  && if [ -z "$URL" ] || [ -z "$KEY" ]; then \
-       echo "ERROR: SUPABASE_URL/SUPABASE_PUBLISHABLE_KEY (or their NEXT_PUBLIC_* aliases) must be set as Railway service variables and forwarded as build args." >&2; \
-       exit 1; \
-     fi \
-  && flutter build web --release \
-       --dart-define=TOKEN_API_BASE= \
-       --dart-define=SUPABASE_URL="$URL" \
-       --dart-define=SUPABASE_PUBLISHABLE_KEY="$KEY"
+  && flutter build web --release --dart-define-from-file=dart_defines.env
 
 # --- Node: API + static web ---
 FROM node:22-alpine AS runtime
