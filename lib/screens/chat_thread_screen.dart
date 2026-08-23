@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,6 +14,7 @@ import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
+import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/open_thread.dart';
@@ -75,7 +77,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   );
 
   StreamSubscription<List<ChatMessage>>? _sub;
+  StreamSubscription<List<MessageReaction>>? _reactionSub;
   Timer? _pollTimer;
+
+  /// Reactions in this thread, keyed by message id. Rebuilt from the
+  /// realtime stream (and the web poll) so both sides see a 👍 land live.
+  Map<String, List<MessageReaction>> _reactionsByMessage = const {};
 
   /// La présence du pair n'a pas de canal Realtime : sans ce battement, la
   /// pastille verte de l'en-tête reste celle de l'ouverture du fil.
@@ -205,6 +212,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    // A picker pinned to a bubble would float in the wrong place once the
+    // list moves — drop it the moment the user scrolls.
+    _scrollCtrl.addListener(_MessageBubble.dismissActivePicker);
   }
 
   /// Local time at the peer's place, derived from the free-text city they
@@ -426,6 +436,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       );
       return;
     }
+    _reactionSub = MessageReactions.subscribeForConversation(
+      widget.conversationId,
+    ).listen((rows) {
+      if (!mounted) return;
+      setState(() => _reactionsByMessage = reactionsByMessage(rows));
+    });
+    // First paint shouldn't wait on the realtime hello — same snapshot the
+    // stream will confirm a moment later.
+    unawaited(MessageReactions.fetchForConversation(widget.conversationId)
+        .then((rows) {
+      if (!mounted || rows.isEmpty) return;
+      setState(() => _reactionsByMessage = reactionsByMessage(rows));
+    }));
+
     _sub = ChatApi.subscribeMessages(widget.conversationId).listen(
       (rows) {
         if (!mounted) return;
@@ -483,13 +507,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _pollTimer = WebPoll.every(const Duration(seconds: 5), () async {
       try {
         final rows = await ChatApi.fetchMessages(widget.conversationId);
+        final reacts = await MessageReactions.fetchForConversation(
+          widget.conversationId,
+        );
         if (!mounted) return;
+        final nextReactions = reactionsByMessage(reacts);
         // Only repaint when there's actually a new tail message — keeps
         // the chat from rebuilding constantly while the user is typing.
         final last = _messages.isEmpty ? null : _messages.last.id;
         final freshLast = rows.isEmpty ? null : rows.last.id;
-        if (last == freshLast && rows.length == _messages.length) return;
-        setState(() => _messages = rows);
+        if (last == freshLast && rows.length == _messages.length) {
+          setState(() => _reactionsByMessage = nextReactions);
+          return;
+        }
+        setState(() {
+          _messages = rows;
+          _reactionsByMessage = nextReactions;
+        });
         if (_autoTranslate) {
           for (final m in rows) {
             _maybeFetchTranslation(m);
@@ -523,7 +557,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     if (OpenThread.conversationId.value == widget.conversationId) {
       OpenThread.conversationId.value = '';
     }
+    _scrollCtrl.removeListener(_MessageBubble.dismissActivePicker);
+    _MessageBubble.dismissActivePicker();
     _sub?.cancel();
+    _reactionSub?.cancel();
     _peerReadSub?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
@@ -708,7 +745,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           children: [
                             GestureDetector(
                               behavior: HitTestBehavior.translucent,
-                              onTap: () => FocusScope.of(context).unfocus(),
+                              onTap: () {
+                                FocusScope.of(context).unfocus();
+                                _MessageBubble.dismissActivePicker();
+                              },
                               child: _buildMessageList(),
                             ),
                             // Top fade — messages dissolve into black under the
@@ -822,15 +862,81 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       confirmLabel: AppStrings.t('delete'),
     );
     if (ok != true) return;
+    _MessageBubble.dismissActivePicker();
     try {
       await ChatApi.deleteMessage(m.id);
       if (!mounted) return;
       setState(() {
         _messages = _messages.where((x) => x.id != m.id).toList();
+        final next = Map<String, List<MessageReaction>>.from(
+          _reactionsByMessage,
+        );
+        next.remove(m.id);
+        _reactionsByMessage = next;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  /// Apply [emoji] to [m]. Same emoji again removes it. Optimistic so the
+  /// chip lands before the round-trip; the realtime stream is the source
+  /// of truth afterwards.
+  Future<void> _react(ChatMessage m, String emoji) async {
+    if (_myId.isEmpty || m.id.isEmpty) return;
+    String? current;
+    final existing = _reactionsByMessage[m.id];
+    if (existing != null) {
+      for (final r in existing) {
+        if (r.userId == _myId) {
+          current = r.emoji;
+          break;
+        }
+      }
+    }
+    final next = nextReactionEmoji(current: current, tapped: emoji);
+    setState(() {
+      final list = [
+        ...?_reactionsByMessage[m.id]?.where((r) => r.userId != _myId),
+      ];
+      if (next != null) {
+        list.add(MessageReaction(
+          id: 'local-${m.id}-$_myId',
+          messageId: m.id,
+          conversationId: m.conversationId,
+          userId: _myId,
+          userName: _myName,
+          messageAuthorId: m.senderId,
+          emoji: next,
+          createdAt: DateTime.now(),
+        ));
+      }
+      _reactionsByMessage = {
+        ..._reactionsByMessage,
+        m.id: list,
+      };
+    });
+    try {
+      await MessageReactions.set(
+        messageId: m.id,
+        conversationId: m.conversationId.isNotEmpty
+            ? m.conversationId
+            : widget.conversationId,
+        userId: _myId,
+        userName: _myName.isEmpty ? 'Moi' : _myName,
+        messageAuthorId: m.senderId,
+        emoji: emoji,
+        currentEmoji: current,
+        authorLang: m.senderId == _myId ? _myLang : (_peer?.language ?? ''),
+      );
+    } catch (e) {
+      debugPrint('react failed: $e');
+      final rows = await MessageReactions.fetchForConversation(
+        widget.conversationId,
+      );
+      if (!mounted) return;
+      setState(() => _reactionsByMessage = reactionsByMessage(rows));
     }
   }
 
@@ -909,8 +1015,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           mine: mine,
           displayBody: _displayBodyFor(m),
           translating: _translatingIds.contains(m.id),
-          myLang: _myLang,
-          // Long-press to delete — only my own messages.
+          reactions: _reactionsByMessage[m.id] ?? const [],
+          myId: _myId,
+          onReact: (emoji) => _react(m, emoji),
           onLongPressDelete: mine ? () => _deleteMessage(m) : null,
         );
         if (m.id != lastReadMineId) return bubble;
@@ -1271,13 +1378,15 @@ class _PeerClockLine extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   const _MessageBubble({
     required this.message,
     required this.mine,
     required this.displayBody,
     required this.translating,
-    required this.myLang,
+    required this.reactions,
+    required this.myId,
+    required this.onReact,
     this.onLongPressDelete,
   });
   final ChatMessage message;
@@ -1293,8 +1402,97 @@ class _MessageBubble extends StatelessWidget {
   /// Show a subtle indicator while the translation is being fetched.
   final bool translating;
 
-  /// BCP-47 primary subtag of the local user's language.
-  final String myLang;
+  final List<MessageReaction> reactions;
+  final String myId;
+  final ValueChanged<String> onReact;
+
+  /// The picker currently on screen — at most one, dismissed on scroll /
+  /// tap-away / leaving the thread.
+  static OverlayEntry? _activePicker;
+
+  static void dismissActivePicker() {
+    _activePicker?.remove();
+    _activePicker = null;
+  }
+
+  @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  String? _burstEmoji;
+
+  ChatMessage get message => widget.message;
+  bool get mine => widget.mine;
+  String get displayBody => widget.displayBody;
+  bool get translating => widget.translating;
+  VoidCallback? get onLongPressDelete => widget.onLongPressDelete;
+
+  String? get _myEmoji {
+    for (final r in widget.reactions) {
+      if (r.userId == widget.myId) return r.emoji;
+    }
+    return null;
+  }
+
+  void _thumbsUp() {
+    HapticFeedback.lightImpact();
+    setState(() => _burstEmoji = kThumbsUpEmoji);
+    widget.onReact(kThumbsUpEmoji);
+  }
+
+  void _openPicker() {
+    HapticFeedback.mediumImpact();
+    _MessageBubble.dismissActivePicker();
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final origin = box.localToGlobal(Offset.zero);
+    final size = box.size;
+    final pickerWidth = onLongPressDelete == null ? 236.0 : 286.0;
+    final screen = MediaQuery.sizeOf(context);
+    final pad = MediaQuery.paddingOf(context);
+    var left = origin.dx + size.width / 2 - pickerWidth / 2;
+    left = left.clamp(12.0, screen.width - pickerWidth - 12);
+    var top = origin.dy - 58;
+    if (top < pad.top + 8) top = origin.dy + size.height + 8;
+
+    final selected = _myEmoji;
+    final entry = OverlayEntry(
+      builder: (ctx) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _MessageBubble.dismissActivePicker,
+              ),
+            ),
+            Positioned(
+              top: top,
+              left: left,
+              child: _ReactionPicker(
+                selected: selected,
+                onPick: (emoji) {
+                  _MessageBubble.dismissActivePicker();
+                  HapticFeedback.lightImpact();
+                  if (mounted) setState(() => _burstEmoji = emoji);
+                  widget.onReact(emoji);
+                },
+                onDelete: onLongPressDelete == null
+                    ? null
+                    : () {
+                        _MessageBubble.dismissActivePicker();
+                        onLongPressDelete!();
+                      },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    _MessageBubble._activePicker = entry;
+    Overlay.of(context).insert(entry);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1351,6 +1549,8 @@ class _MessageBubble extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: GestureDetector(
               onTap: () => _openFullImage(context, message.discoverPhoto),
+              onDoubleTap: _thumbsUp,
+              onLongPress: _openPicker,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: ConstrainedBox(
@@ -1382,6 +1582,8 @@ class _MessageBubble extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: GestureDetector(
               onTap: () => _openFullImage(context, message.imageUrl),
+              onDoubleTap: _thumbsUp,
+              onLongPress: _openPicker,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: ConstrainedBox(
@@ -1448,35 +1650,70 @@ class _MessageBubble extends StatelessWidget {
       ],
     );
 
+    final chips = reactionChipEmojis(widget.reactions);
+
     return Align(
       alignment: align,
-      child: GestureDetector(
-        // Long-press one of my own bubbles → offer to delete it.
-        onLongPress: onLongPressDelete,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: bareMedia
-              ? EdgeInsets.zero
-              : const EdgeInsets.fromLTRB(14, 10, 14, 8),
-          constraints: BoxConstraints(
-            // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
-            // proper bubble instead of a cramped little square. Une image nue
-            // n'a pas de plancher : elle fait sa taille.
-            minWidth: bareMedia ? 0 : 110,
-            maxWidth: MediaQuery.of(context).size.width * 0.78,
-          ),
-          decoration: bareMedia
-              ? null
-              : BoxDecoration(
-                  // Light "card" bubbles on the black message area: received =
-                  // neutral grey, sent = pale cyan with a cyan border.
-                  color: mine ? SC.msgOutBg : SC.msgInBg,
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: mine ? SC.msgOutBorder : SC.msgInBorder,
+      child: Padding(
+        padding: EdgeInsets.only(top: chips.isNotEmpty ? 12 : 4, bottom: 4),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: _thumbsUp,
+              onLongPress: _openPicker,
+              child: Container(
+                padding: bareMedia
+                    ? EdgeInsets.zero
+                    : const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                constraints: BoxConstraints(
+                  // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
+                  // proper bubble instead of a cramped little square. Une image nue
+                  // n'a pas de plancher : elle fait sa taille.
+                  minWidth: bareMedia ? 0 : 110,
+                  maxWidth: MediaQuery.of(context).size.width * 0.78,
+                ),
+                decoration: bareMedia
+                    ? null
+                    : BoxDecoration(
+                        // Light "card" bubbles on the black message area: received =
+                        // neutral grey, sent = pale cyan with a cyan border.
+                        color: mine ? SC.msgOutBg : SC.msgInBg,
+                        borderRadius: radius,
+                        border: Border.all(
+                          color: mine ? SC.msgOutBorder : SC.msgInBorder,
+                        ),
+                      ),
+                child: hugContent ? IntrinsicWidth(child: content) : content,
+              ),
+            ),
+            if (chips.isNotEmpty)
+              Positioned(
+                top: -12,
+                right: 6,
+                child: _ReactionChip(
+                  emojis: chips,
+                  mineHighlighted: _myEmoji != null,
+                  onTap: () {
+                    final mineEmoji = _myEmoji;
+                    widget.onReact(mineEmoji ?? chips.first);
+                  },
+                ),
+              ),
+            if (_burstEmoji != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _EmojiBurst(
+                    key: ValueKey(_burstEmoji),
+                    emoji: _burstEmoji!,
+                    onDone: () {
+                      if (mounted) setState(() => _burstEmoji = null);
+                    },
                   ),
                 ),
-          child: hugContent ? IntrinsicWidth(child: content) : content,
+              ),
+          ],
         ),
       ),
     );
@@ -1488,6 +1725,180 @@ class _MessageBubble extends StatelessWidget {
     // tap-to-dismiss). viewerMode hides the "set as Discover" button and a
     // single-photo list means no side arrows.
     showPhotoViewer(context, photos: [url], index: 0, viewerMode: true);
+  }
+}
+
+/// White pill of quick-react emojis, matching the iOS reaction strip.
+class _ReactionPicker extends StatelessWidget {
+  const _ReactionPicker({
+    required this.selected,
+    required this.onPick,
+    this.onDelete,
+  });
+
+  final String? selected;
+  final ValueChanged<String> onPick;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xF2FFFFFF),
+      elevation: 10,
+      shadowColor: Colors.black54,
+      borderRadius: BorderRadius.circular(28),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final emoji in kQuickReactionEmojis)
+              Pressable(
+                onTap: () => onPick(emoji),
+                scale: 0.88,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: selected == emoji
+                      ? BoxDecoration(
+                          color: const Color(0x22000000),
+                          borderRadius: BorderRadius.circular(21),
+                        )
+                      : null,
+                  child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                ),
+              ),
+            if (onDelete != null) ...[
+              Container(
+                width: 1,
+                height: 22,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: const Color(0x22000000),
+              ),
+              Pressable(
+                onTap: onDelete,
+                child: const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFF3A3A3C),
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// WhatsApp-style chip sitting on the top-right corner of a bubble.
+class _ReactionChip extends StatelessWidget {
+  const _ReactionChip({
+    required this.emojis,
+    required this.mineHighlighted,
+    required this.onTap,
+  });
+
+  final List<String> emojis;
+  final bool mineHighlighted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF1C1C1E),
+      elevation: 2,
+      shadowColor: Colors.black54,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(6, 2, 6, 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: mineHighlighted ? SC.accent : const Color(0x33FFFFFF),
+            ),
+          ),
+          child: Text(
+            emojis.join(),
+            style: const TextStyle(fontSize: 14, height: 1.15),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A handful of the chosen emoji rising and fading — the double-tap burst.
+class _EmojiBurst extends StatefulWidget {
+  const _EmojiBurst({super.key, required this.emoji, required this.onDone});
+
+  final String emoji;
+  final VoidCallback onDone;
+
+  @override
+  State<_EmojiBurst> createState() => _EmojiBurstState();
+}
+
+class _EmojiBurstState extends State<_EmojiBurst>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 720),
+  )..forward().whenComplete(widget.onDone);
+
+  static const _dx = <double>[-18, 4, 16, -8, 22];
+  static const _delay = <double>[0.0, 0.08, 0.04, 0.14, 0.1];
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        return Stack(
+          children: [
+            for (var i = 0; i < _dx.length; i++)
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Opacity(
+                    opacity: (1 - _c.value).clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(
+                        _dx[i] * _c.value,
+                        -86 *
+                            Curves.easeOut.transform(
+                              (((_c.value - _delay[i]) /
+                                          (1 - _delay[i]))
+                                      .clamp(0.0, 1.0))
+                                  .toDouble(),
+                            ),
+                      ),
+                      child: Text(
+                        widget.emoji,
+                        style: TextStyle(fontSize: 18 + i.toDouble()),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 

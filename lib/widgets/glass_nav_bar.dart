@@ -28,6 +28,13 @@ double _navPeakLens(int i, double frac, {double amp = 0.45}) {
   return 1.0 + amp * (1.0 - d);
 }
 
+/// Label painted on a nav-bar unread chip. A single arrival is a dot
+/// (`null`); two or more show `+N`, capped at `+99`.
+String? navBarUnreadLabel(int count) {
+  if (count <= 1) return null;
+  return '+${count > 99 ? 99 : count}';
+}
+
 /// Floating island-style glass nav bar. Rendered by [RootShell] as a centred
 /// pill that floats above the bottom safe area. Callers must reserve
 /// [totalReservedHeight] at the bottom of their content.
@@ -54,7 +61,7 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area.
-  static const double height = 56;
+  static const double height = 62;
 
   /// Gap between the pill bottom and the screen safe-area top. Volontairement
   /// court : la barre est posée bas, près du pouce.
@@ -412,62 +419,114 @@ class _NavItemState extends State<_NavItem>
     // on selection; the swipe lens magnifies as the pill nears.
     return SpringPress(
       onTap: widget.onTap,
-      child: Center(
-        child: _badged(
-          AnimatedBuilder(
-            animation: _popScale,
-            builder: (context, child) => Transform.scale(
-              // Swipe lens × selection pop.
-              scale: widget.magnify * _popScale.value,
-              child: child,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _badged(
+            AnimatedBuilder(
+              animation: _popScale,
+              builder: (context, child) => Transform.scale(
+                // Swipe lens × selection pop — icon only, the caption stays put.
+                scale: widget.magnify * _popScale.value,
+                child: child,
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: widget.data.assetIcon != null
+                    ? SvgPicture.asset(
+                        widget.selected
+                            ? widget.data.assetSelectedIcon!
+                            : widget.data.assetIcon!,
+                        key: ValueKey(widget.selected),
+                        width: 22,
+                        height: 22,
+                        // The filled coconut carries its own two-tone shading
+                        // (the dark rim of the opening) — flattening it through
+                        // a srcIn filter would erase that, so only the outline
+                        // one gets tinted, to the same muted white as the other
+                        // unselected tabs.
+                        colorFilter: widget.selected
+                            ? null
+                            : ColorFilter.mode(
+                                Colors.white.withValues(alpha: 0.50),
+                                BlendMode.srcIn,
+                              ),
+                      )
+                    : Icon(
+                        widget.selected
+                            ? widget.data.selectedIcon
+                            : widget.data.icon,
+                        key: ValueKey(widget.selected),
+                        size: 22,
+                        color: widget.selected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.50),
+                      ),
+              ),
             ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: widget.data.assetIcon != null
-                  ? SvgPicture.asset(
-                      widget.selected
-                          ? widget.data.assetSelectedIcon!
-                          : widget.data.assetIcon!,
-                      key: ValueKey(widget.selected),
-                      width: 28,
-                      height: 28,
-                      // The filled coconut carries its own two-tone shading
-                      // (the dark rim of the opening) — flattening it through
-                      // a srcIn filter would erase that, so only the outline
-                      // one gets tinted, to the same muted white as the other
-                      // unselected tabs.
-                      colorFilter: widget.selected
-                          ? null
-                          : ColorFilter.mode(
-                              Colors.white.withValues(alpha: 0.50),
-                              BlendMode.srcIn,
-                            ),
-                    )
-                  : Icon(
-                      widget.selected
-                          ? widget.data.selectedIcon
-                          : widget.data.icon,
-                      key: ValueKey(widget.selected),
-                      size: 28,
-                      color: widget.selected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.50),
-                    ),
+            widget.data.badge,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            widget.data.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+              letterSpacing: 0.1,
+              height: 1,
+              color: widget.selected
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.50),
             ),
           ),
-          widget.data.badge,
-        ),
+        ],
       ),
     );
   }
 
   Widget _badged(Widget child, int count) {
     if (count <= 0) return child;
-    return Badge.count(
-      count: count,
-      backgroundColor: SC.accent,
-      textColor: SC.bgDeep,
-      child: child,
+    final label = navBarUnreadLabel(count);
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        child,
+        Positioned(
+          top: label == null ? -1 : -6,
+          right: label == null ? -1 : -10,
+          child: label == null
+              ? Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: SC.accent,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : Container(
+                  height: 16,
+                  constraints: const BoxConstraints(minWidth: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: SC.accent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

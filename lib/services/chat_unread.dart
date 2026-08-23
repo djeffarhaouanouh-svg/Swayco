@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
 import 'message_banner.dart';
+import 'message_reactions.dart';
 import 'supabase_service.dart';
 
 /// Tracks the count of unread messages addressed to the local user, so the
@@ -36,6 +37,7 @@ abstract final class ChatUnread {
   /// Le point de lecture PAR conversation, relevé à l'ouverture d'un fil.
   static const _convSeenPrefix = 'chat_conv_seen_';
   static StreamSubscription<List<Map<String, dynamic>>>? _sub;
+  static StreamSubscription<List<MessageReaction>>? _reactionSub;
 
   /// Les points de lecture par conversation, en mémoire.
   ///
@@ -104,7 +106,9 @@ abstract final class ChatUnread {
     _convSeen = await readPerConversationSeen();
 
     _primed = false;
+    _reactionsPrimed = false;
     await _sub?.cancel();
+    await _reactionSub?.cancel();
     _sub = Supabase.instance.client
         .from('messages')
         .stream(primaryKey: ['id'])
@@ -114,6 +118,12 @@ abstract final class ChatUnread {
           onError: (e) =>
               debugPrint('ChatUnread stream error: $e'),
         );
+    // Reactions on MY messages — same in-app banner path as a new chat
+    // line, so a 👍 isn't silent just because it isn't a row in `messages`.
+    _reactionSub = MessageReactions.subscribeForAuthor(meId).listen(
+      _onReactions,
+      onError: (e) => debugPrint('ChatUnread reaction stream error: $e'),
+    );
   }
 
   /// False until the first emission after [start] has been processed —
@@ -150,6 +160,32 @@ abstract final class ChatUnread {
     ));
   }
 
+  /// False until the first reaction snapshot is in — that emission is the
+  /// backlog, not a fresh 👍, and must not toast every historical react.
+  static bool _reactionsPrimed = false;
+  static Set<String> _knownReactionIds = {};
+
+  static void _onReactions(List<MessageReaction> rows) {
+    final previous = _knownReactionIds;
+    _knownReactionIds = {
+      for (final r in rows)
+        if (r.id.isNotEmpty) r.id,
+    };
+    final skipBanners = !_reactionsPrimed;
+    _reactionsPrimed = true;
+    if (skipBanners) return;
+    for (final r in rows) {
+      if (r.id.isEmpty || previous.contains(r.id)) continue;
+      if (r.userId.isEmpty || r.userId == _meId) continue;
+      MessageBanner.offer(MessageBannerIntent(
+        conversationId: r.conversationId,
+        peerId: r.userId,
+        senderName: r.userName.trim(),
+        preview: AppStrings.t('push_reaction_body', args: {'emoji': r.emoji}),
+      ));
+    }
+  }
+
   /// Recompte à partir de la dernière photo connue.
   ///
   /// Les dates sont comparées comme des DateTime, plus comme des chaînes : le
@@ -184,7 +220,11 @@ abstract final class ChatUnread {
   static Future<void> stop() async {
     await _sub?.cancel();
     _sub = null;
+    await _reactionSub?.cancel();
+    _reactionSub = null;
     _meId = '';
+    _knownReactionIds = {};
+    _reactionsPrimed = false;
     count.value = 0;
   }
 

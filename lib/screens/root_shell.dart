@@ -184,9 +184,12 @@ class _RootShellState extends State<RootShell> {
         final peerId = intent.data['peerId']?.toString() ?? '';
         if (peerId.isNotEmpty) MatchCelebration.offer(peerId);
       case 'message':
+      case 'reaction':
         // L'onglet Messages ET le fil concerné : on a touché la notification
         // de QUELQU'UN, pas « des messages en général ». S'arrêter à la liste
         // laissait faire à la main le geste qu'on venait déjà de faire.
+        // `reaction` is the same door — a 👍 is not a new line, but tapping
+        // it should still land in that conversation.
         NavTab.select(NavTab.chat);
         // Le « 1 » de la barre s'éteint : arriver sur Messages est la réponse
         // à la question qu'il posait.

@@ -34,6 +34,7 @@ const EMAIL_TYPES = new Set([
   'friend_request',
   'call_invite',
   'call_scheduled',
+  'reaction',
 ]);
 
 // Email chrome, localised into the RECIPIENT's language. The headline + line

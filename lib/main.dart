@@ -29,6 +29,7 @@ import 'services/app_navigator.dart';
 import 'services/guest_invite_api.dart';
 import 'services/local_notifications.dart';
 import 'services/notification_client.dart';
+import 'services/open_thread.dart';
 import 'services/presence_service.dart';
 import 'services/profile_api.dart';
 import 'swayco/asr/asr_service.dart';
@@ -104,6 +105,11 @@ void _handleForegroundMessage(RemoteMessage message) {
   final title = (n?.title ?? data['title'] ?? '').toString().trim();
   final body = (n?.body ?? data['body'] ?? '').toString().trim();
   if (title.isEmpty) return;
+  // Already looking at this conversation — the bubble (or the 👍 chip) is
+  // on screen; a tray banner on top of it is the same noise MessageBanner
+  // already suppresses.
+  final convId = data['conversationId']?.toString() ?? '';
+  if (convId.isNotEmpty && OpenThread.conversationId.value == convId) return;
   unawaited(LocalNotifications.showMessage(
     id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
     title: title,
