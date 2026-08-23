@@ -576,9 +576,10 @@ abstract final class AppStrings {
     'login_reset_sent':
         'Si un compte existe pour cet e-mail, un lien de réinitialisation a été envoyé.',
 
-    'onb_welcome_title': 'Bienvenue',
-    'onb_welcome_subtitle': "Dis-nous comment t'appeler dans les appels.",
-    'onb_language_title': 'Ta langue',
+    'onb_welcome_title': "Comment veux-tu qu'on t'appelle ?",
+    'onb_welcome_subtitle':
+        "(C'est le prénom que les autres verront sur ton profil.)",
+    'onb_language_title': 'Quelle langue tu parles ?',
     'onb_language_subtitle':
         "Choisis la langue que tu parles. La langue de l'autre est détectée automatiquement quand il rejoint l'appel.",
     'onb_first_name_label': 'Prénom',
@@ -609,7 +610,7 @@ abstract final class AppStrings {
         "En appel, on traduira automatiquement la voix de l'autre dans ta langue, et la tienne dans la sienne.",
     'onb_gender_title': 'Toi, c\'est…',
     'onb_gender_subtitle':
-        "Ça nous aide à traduire correctement les accords (féminin, masculin) dans tes conversations.",
+        "Ça nous aide à personnaliser ton expérience sur Swayco.",
     'onb_gender_male': 'Masculin',
     'onb_gender_female': 'Féminin',
     'onb_gender_neutral': 'Neutre',
@@ -1136,9 +1137,10 @@ abstract final class AppStrings {
     'login_reset_sent':
         'If an account exists for that email, a reset link has been sent.',
 
-    'onb_welcome_title': 'Welcome',
-    'onb_welcome_subtitle': 'Tell us how to call you in calls.',
-    'onb_language_title': 'Your language',
+    'onb_welcome_title': 'How should we call you?',
+    'onb_welcome_subtitle':
+        '(This is the first name others will see on your profile.)',
+    'onb_language_title': 'What language do you speak?',
     'onb_language_subtitle':
         "Pick the language you speak. The other person's language is detected automatically when they join the call.",
     'onb_first_name_label': 'First name',
@@ -1169,7 +1171,7 @@ abstract final class AppStrings {
         "In a call, we'll automatically translate the other person's voice into your language and yours into theirs.",
     'onb_gender_title': 'You are…',
     'onb_gender_subtitle':
-        'Helps us get gender agreement right (feminine, masculine) when translating your messages.',
+        'This helps us personalize your experience on Swayco.',
     'onb_gender_male': 'Male',
     'onb_gender_female': 'Female',
     'onb_gender_neutral': 'Neutral',
@@ -1607,9 +1609,10 @@ abstract final class AppStrings {
     'profile_loading': 'Cargando...',
     'profile_anonymous': 'Sin nombre',
 
-    'onb_welcome_title': 'Bienvenido',
-    'onb_welcome_subtitle': 'Dinos cómo llamarte en las llamadas.',
-    'onb_language_title': 'Tu idioma',
+    'onb_welcome_title': '¿Cómo quieres que te llamemos?',
+    'onb_welcome_subtitle':
+        '(Es el nombre que los demás verán en tu perfil.)',
+    'onb_language_title': '¿Qué idioma hablas?',
     'onb_language_subtitle':
         'Elige el idioma que hablas. El idioma de la otra persona se detecta automáticamente cuando se une a la llamada.',
     'onb_first_name_label': 'Nombre',
@@ -1730,7 +1733,7 @@ abstract final class AppStrings {
         'Si existe una cuenta con ese correo, se ha enviado un enlace de restablecimiento.',
     'onb_gender_title': 'Eres…',
     'onb_gender_subtitle':
-        'Nos ayuda a acertar con la concordancia de género (femenino, masculino) al traducir tus mensajes.',
+        'Nos ayuda a personalizar tu experiencia en Swayco.',
     'onb_gender_male': 'Hombre',
     'onb_gender_female': 'Mujer',
     'onb_gender_neutral': 'Neutro',
@@ -2070,9 +2073,10 @@ abstract final class AppStrings {
     'profile_loading': 'Lädt...',
     'profile_anonymous': 'Ohne Namen',
 
-    'onb_welcome_title': 'Willkommen',
-    'onb_welcome_subtitle': 'Sag uns, wie wir dich in Anrufen nennen sollen.',
-    'onb_language_title': 'Deine Sprache',
+    'onb_welcome_title': 'Wie sollen wir dich nennen?',
+    'onb_welcome_subtitle':
+        '(Das ist der Vorname, den andere auf deinem Profil sehen.)',
+    'onb_language_title': 'Welche Sprache sprichst du?',
     'onb_language_subtitle':
         'Wähle die Sprache, die du sprichst. Die Sprache der anderen Person wird automatisch erkannt, wenn sie dem Anruf beitritt.',
     'onb_first_name_label': 'Vorname',
@@ -2293,7 +2297,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'Gib deine Stadt ein',
     'onb_gender_title': 'Du bist…',
     'onb_gender_subtitle':
-        'Hilft uns, die grammatische Form (weiblich, männlich) beim Übersetzen deiner Nachrichten richtig zu treffen.',
+        'Das hilft uns, dein Erlebnis auf Swayco persönlicher zu machen.',
     'onb_gender_male': 'Männlich',
     'onb_gender_female': 'Weiblich',
     'onb_gender_neutral': 'Neutral',
@@ -2612,9 +2616,10 @@ abstract final class AppStrings {
     'profile_loading': 'Caricamento...',
     'profile_anonymous': 'Senza nome',
 
-    'onb_welcome_title': 'Benvenuto',
-    'onb_welcome_subtitle': 'Dicci come chiamarti nelle chiamate.',
-    'onb_language_title': 'La tua lingua',
+    'onb_welcome_title': 'Come vuoi che ti chiamiamo?',
+    'onb_welcome_subtitle':
+        '(È il nome che gli altri vedranno sul tuo profilo.)',
+    'onb_language_title': 'Che lingua parli?',
     'onb_language_subtitle':
         "Scegli la lingua che parli. La lingua dell'altra persona viene rilevata automaticamente quando si unisce alla chiamata.",
     'onb_first_name_label': 'Nome',
@@ -2832,7 +2837,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'Inserisci la tua città',
     'onb_gender_title': 'Tu sei…',
     'onb_gender_subtitle':
-        'Ci aiuta a usare il genere corretto (femminile, maschile) nella traduzione dei tuoi messaggi.',
+        'Ci aiuta a personalizzare la tua esperienza su Swayco.',
     'onb_gender_male': 'Uomo',
     'onb_gender_female': 'Donna',
     'onb_gender_neutral': 'Neutro',
@@ -3150,9 +3155,10 @@ abstract final class AppStrings {
     'profile_loading': 'A carregar...',
     'profile_anonymous': 'Sem nome',
 
-    'onb_welcome_title': 'Bem-vindo',
-    'onb_welcome_subtitle': 'Diz-nos como te chamar nas chamadas.',
-    'onb_language_title': 'A tua língua',
+    'onb_welcome_title': 'Como queres que te chamemos?',
+    'onb_welcome_subtitle':
+        '(É o nome que os outros vão ver no teu perfil.)',
+    'onb_language_title': 'Que língua falas?',
     'onb_language_subtitle':
         'Escolhe a língua que falas. A língua da outra pessoa é detetada automaticamente quando entra na chamada.',
     'onb_first_name_label': 'Primeiro nome',
@@ -3371,7 +3377,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'Introduza a sua cidade',
     'onb_gender_title': 'Você é…',
     'onb_gender_subtitle':
-        'Ajuda-nos a acertar a concordância de género (feminino, masculino) ao traduzir as suas mensagens.',
+        'Ajuda-nos a personalizar a tua experiência no Swayco.',
     'onb_gender_male': 'Homem',
     'onb_gender_female': 'Mulher',
     'onb_gender_neutral': 'Neutro',
@@ -3691,9 +3697,10 @@ abstract final class AppStrings {
     'profile_loading': 'Laden...',
     'profile_anonymous': 'Geen naam',
 
-    'onb_welcome_title': 'Welkom',
-    'onb_welcome_subtitle': 'Vertel ons hoe we je in gesprekken kunnen noemen.',
-    'onb_language_title': 'Jouw taal',
+    'onb_welcome_title': 'Hoe zullen we je noemen?',
+    'onb_welcome_subtitle':
+        '(Dit is de voornaam die anderen op je profiel zien.)',
+    'onb_language_title': 'Welke taal spreek je?',
     'onb_language_subtitle':
         'Kies de taal die je spreekt. De taal van de andere persoon wordt automatisch gedetecteerd wanneer hij deelneemt aan het gesprek.',
     'onb_first_name_label': 'Voornaam',
@@ -3910,7 +3917,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'Voer je stad in',
     'onb_gender_title': 'Jij bent…',
     'onb_gender_subtitle':
-        'Helpt ons de juiste vorm (vrouwelijk, mannelijk) te kiezen bij het vertalen van je berichten.',
+        'Dit helpt ons je ervaring op Swayco persoonlijker te maken.',
     'onb_gender_male': 'Man',
     'onb_gender_female': 'Vrouw',
     'onb_gender_neutral': 'Neutraal',
@@ -4219,9 +4226,10 @@ abstract final class AppStrings {
     'profile_loading': 'جارٍ التحميل...',
     'profile_anonymous': 'بدون اسم',
 
-    'onb_welcome_title': 'مرحباً',
-    'onb_welcome_subtitle': 'أخبرنا كيف نناديك في المكالمات.',
-    'onb_language_title': 'لغتك',
+    'onb_welcome_title': 'كيف تريد أن نناديك؟',
+    'onb_welcome_subtitle':
+        '(هذا الاسم الذي سيراه الآخرون على ملفك.)',
+    'onb_language_title': 'ما اللغة التي تتحدثها؟',
     'onb_language_subtitle':
         'اختر اللغة التي تتحدثها. يتم اكتشاف لغة الشخص الآخر تلقائياً عند انضمامه إلى المكالمة.',
     'onb_first_name_label': 'الاسم الأول',
@@ -4433,7 +4441,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'أدخل مدينتك',
     'onb_gender_title': 'أنت…',
     'onb_gender_subtitle':
-        'يساعدنا ذلك على ضبط التذكير والتأنيث بشكل صحيح عند ترجمة رسائلك.',
+        'يساعدنا ذلك على تخصيص تجربتك على Swayco.',
     'onb_gender_male': 'ذكر',
     'onb_gender_female': 'أنثى',
     'onb_gender_neutral': 'محايد',
@@ -4751,9 +4759,10 @@ abstract final class AppStrings {
     'profile_loading': 'Загрузка...',
     'profile_anonymous': 'Без имени',
 
-    'onb_welcome_title': 'Добро пожаловать',
-    'onb_welcome_subtitle': 'Скажи, как тебя называть в звонках.',
-    'onb_language_title': 'Твой язык',
+    'onb_welcome_title': 'Как тебя называть?',
+    'onb_welcome_subtitle':
+        '(Это имя, которое другие увидят в твоём профиле.)',
+    'onb_language_title': 'На каком языке ты говоришь?',
     'onb_language_subtitle':
         'Выбери язык, на котором ты говоришь. Язык собеседника определяется автоматически, когда он присоединяется к звонку.',
     'onb_first_name_label': 'Имя',
@@ -4969,7 +4978,7 @@ abstract final class AppStrings {
     'loc_other_city_hint': 'Введите свой город',
     'onb_gender_title': 'Вы…',
     'onb_gender_subtitle':
-        'Помогает нам правильно согласовывать род (женский, мужской) при переводе ваших сообщений.',
+        'Это помогает персонализировать твой опыт в Swayco.',
     'onb_gender_male': 'Мужчина',
     'onb_gender_female': 'Женщина',
     'onb_gender_neutral': 'Нейтрально',
@@ -5260,9 +5269,9 @@ abstract final class AppStrings {
     'profile_loading': '加载中...',
     'profile_anonymous': '无名',
 
-    'onb_welcome_title': '欢迎',
-    'onb_welcome_subtitle': '告诉我们在通话中如何称呼你。',
-    'onb_language_title': '你的语言',
+    'onb_welcome_title': '希望我们怎么称呼你？',
+    'onb_welcome_subtitle': '（这是其他人会在你资料上看到的名字。）',
+    'onb_language_title': '你说哪种语言？',
     'onb_language_subtitle': '选择你使用的语言。对方加入通话时，他们的语言会自动检测。',
     'onb_first_name_label': '名字',
     'onb_first_name_hint': '例如 Alex',
@@ -5458,7 +5467,7 @@ abstract final class AppStrings {
     'loc_other_city': '其他城市…',
     'loc_other_city_hint': '输入你的城市',
     'onb_gender_title': '你是…',
-    'onb_gender_subtitle': '帮助我们在翻译你的消息时正确处理性别（阴性、阳性）。',
+    'onb_gender_subtitle': '这能帮助我们为你个性化 Swayco 体验。',
     'onb_gender_male': '男性',
     'onb_gender_female': '女性',
     'onb_gender_neutral': '中性',
@@ -5772,9 +5781,9 @@ abstract final class AppStrings {
     'profile_loading': '読み込み中...',
     'profile_anonymous': '名前なし',
 
-    'onb_welcome_title': 'ようこそ',
-    'onb_welcome_subtitle': '通話で呼ばれる名前を教えてください。',
-    'onb_language_title': 'あなたの言語',
+    'onb_welcome_title': 'なんて呼べばいい？',
+    'onb_welcome_subtitle': '（プロフィールに表示される名前です。）',
+    'onb_language_title': 'どの言語を話しますか？',
     'onb_language_subtitle': '話す言語を選んでください。相手の言語は通話に参加したときに自動的に検出されます。',
     'onb_first_name_label': '名前',
     'onb_first_name_hint': '例: Alex',
@@ -5976,7 +5985,7 @@ abstract final class AppStrings {
     'loc_other_city': 'その他の都市…',
     'loc_other_city_hint': '都市名を入力',
     'onb_gender_title': 'あなたは…',
-    'onb_gender_subtitle': 'メッセージを翻訳する際の性別（女性・男性）の一致を正しくするために役立ちます。',
+    'onb_gender_subtitle': 'Swaycoでの体験をあなた向けにカスタマイズするのに役立ちます。',
     'onb_gender_male': '男性',
     'onb_gender_female': '女性',
     'onb_gender_neutral': 'ニュートラル',
@@ -6269,9 +6278,9 @@ abstract final class AppStrings {
     'profile_loading': '불러오는 중...',
     'profile_anonymous': '이름 없음',
 
-    'onb_welcome_title': '환영합니다',
-    'onb_welcome_subtitle': '통화에서 어떻게 부를지 알려주세요.',
-    'onb_language_title': '당신의 언어',
+    'onb_welcome_title': '어떻게 불러드릴까요?',
+    'onb_welcome_subtitle': '(다른 사람이 프로필에서 보게 될 이름이에요.)',
+    'onb_language_title': '어떤 언어를 하나요?',
     'onb_language_subtitle': '사용하는 언어를 선택하세요. 상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
     'onb_first_name_label': '이름',
     'onb_first_name_hint': '예: Alex',
@@ -6471,7 +6480,7 @@ abstract final class AppStrings {
     'loc_other_city': '다른 도시…',
     'loc_other_city_hint': '도시를 입력하세요',
     'onb_gender_title': '당신은…',
-    'onb_gender_subtitle': '메시지를 번역할 때 성별 표현(여성형, 남성형)을 정확히 맞추는 데 도움이 돼요.',
+    'onb_gender_subtitle': 'Swayco 경험을 더 개인화하는 데 도움이 돼요.',
     'onb_gender_male': '남성',
     'onb_gender_female': '여성',
     'onb_gender_neutral': '중성',

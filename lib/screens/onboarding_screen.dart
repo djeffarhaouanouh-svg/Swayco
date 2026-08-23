@@ -588,11 +588,6 @@ class _StepLanguageKeepPicker extends StatelessWidget {
                 ),
                 const SizedBox(height: 30),
                 _LanguageGrid(selected: selected, onSelect: onSelect),
-                const SizedBox(height: 12),
-                Text(
-                  AppStrings.t('onb_translation_help'),
-                  style: SwayOnb.body.copyWith(fontSize: 14),
-                ),
               ],
             ),
           ),

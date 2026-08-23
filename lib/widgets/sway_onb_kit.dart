@@ -764,11 +764,6 @@ class SwayStepLanguage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                 ],
-                const SizedBox(height: 6),
-                Text(
-                  AppStrings.t('onb_translation_help'),
-                  style: SwayOnb.body.copyWith(fontSize: 14),
-                ),
               ],
             ),
           ),
