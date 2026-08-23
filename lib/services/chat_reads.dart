@@ -92,4 +92,62 @@ abstract final class ChatReads {
           debugPrint('ChatReads.watchPeerLastRead failed: $e');
         });
   }
+
+  /// Où EN SUIS-je, moi, dans chaque fil — toutes conversations confondues,
+  /// en un aller-retour. C'est la moitié qui manquait à [ChatUnread] : son
+  /// pointeur de lecture vit dans les SharedPreferences de CET appareil, donc
+  /// lire un fil sur un autre téléphone (même compte) n'y change rien. Cette
+  /// table, elle, est déjà écrite par [markRead] quel que soit l'appareil —
+  /// il ne restait qu'à la relire pour moi-même, pas seulement pour le pair.
+  static Future<Map<String, DateTime>> fetchMyLastReads({
+    required String userId,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return const {};
+    try {
+      final rows = await _c
+          .from('conversation_reads')
+          .select('conversation_id, last_read_at')
+          .eq('user_id', userId);
+      final out = <String, DateTime>{};
+      for (final r in rows) {
+        final convId = r['conversation_id']?.toString() ?? '';
+        final v = r['last_read_at'];
+        if (convId.isEmpty || v == null) continue;
+        final dt = DateTime.tryParse(v.toString())?.toLocal();
+        if (dt != null) out[convId] = dt;
+      }
+      return out;
+    } catch (e) {
+      debugPrint('ChatReads.fetchMyLastReads failed: $e');
+      return const {};
+    }
+  }
+
+  /// Le même, en direct : lire un fil sur un autre appareil (même compte)
+  /// éteint le badge et la ligne bleue ICI, sans attendre un redémarrage.
+  static Stream<Map<String, DateTime>> watchMyLastReads({
+    required String userId,
+  }) {
+    if (!isSupabaseReady || userId.isEmpty) {
+      return const Stream<Map<String, DateTime>>.empty();
+    }
+    return _c
+        .from('conversation_reads')
+        .stream(primaryKey: ['conversation_id', 'user_id'])
+        .eq('user_id', userId)
+        .map((rows) {
+          final out = <String, DateTime>{};
+          for (final r in rows) {
+            final convId = r['conversation_id']?.toString() ?? '';
+            final v = r['last_read_at'];
+            if (convId.isEmpty || v == null) continue;
+            final dt = DateTime.tryParse(v.toString())?.toLocal();
+            if (dt != null) out[convId] = dt;
+          }
+          return out;
+        })
+        .handleError((Object e) {
+          debugPrint('ChatReads.watchMyLastReads failed: $e');
+        });
+  }
 }

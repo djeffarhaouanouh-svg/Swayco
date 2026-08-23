@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'chat_reads.dart';
 import 'message_banner.dart';
 import 'message_reactions.dart';
 import 'supabase_service.dart';
@@ -38,6 +39,7 @@ abstract final class ChatUnread {
   static const _convSeenPrefix = 'chat_conv_seen_';
   static StreamSubscription<List<Map<String, dynamic>>>? _sub;
   static StreamSubscription<List<MessageReaction>>? _reactionSub;
+  static StreamSubscription<Map<String, DateTime>>? _readsSub;
 
   /// Les points de lecture par conversation, en mémoire.
   ///
@@ -96,10 +98,22 @@ abstract final class ChatUnread {
     }
     _convSeen = await readPerConversationSeen();
 
+    // Où j'en suis MOI, tous appareils confondus (table `conversation_reads`,
+    // déjà écrite par [ChatReads.markRead] à chaque ouverture de fil, quel
+    // que soit le téléphone). Sans ça, lire un fil sur un autre appareil du
+    // même compte laissait son badge/ligne bleue bloqués ici pour toujours —
+    // le pointeur local ne bougeait que quand CET appareil ouvrait le fil.
+    await _mergeServerReads(await ChatReads.fetchMyLastReads(userId: meId));
+
     _primed = false;
     _reactionsPrimed = false;
     await _sub?.cancel();
     await _reactionSub?.cancel();
+    await _readsSub?.cancel();
+    _readsSub = ChatReads.watchMyLastReads(userId: meId).listen(
+      (rows) => unawaited(_mergeServerReads(rows)),
+      onError: (e) => debugPrint('ChatUnread reads stream error: $e'),
+    );
     _sub = Supabase.instance.client
         .from('messages')
         .stream(primaryKey: ['id'])
@@ -204,6 +218,8 @@ abstract final class ChatUnread {
     _sub = null;
     await _reactionSub?.cancel();
     _reactionSub = null;
+    await _readsSub?.cancel();
+    _readsSub = null;
     _meId = '';
     _knownReactionIds = {};
     _reactionsPrimed = false;
@@ -224,6 +240,36 @@ abstract final class ChatUnread {
     revision.value++;
     final p = await SharedPreferences.getInstance();
     await p.setString('$_convSeenPrefix$convId', now.toIso8601String());
+  }
+
+  /// Fold [serverReads] (my own `conversation_reads` rows, any device) into
+  /// the local pointer map, keeping whichever timestamp is newer per
+  /// conversation. A thread read on another device can only ever push the
+  /// pointer forward here — it must never un-clear a row this device already
+  /// marked seen more recently (e.g. a stale row from before that device's
+  /// own read caught up).
+  static Future<void> _mergeServerReads(
+    Map<String, DateTime> serverReads,
+  ) async {
+    if (serverReads.isEmpty) return;
+    final changed = <String, DateTime>{};
+    for (final entry in serverReads.entries) {
+      final local = _convSeen[entry.key];
+      if (local == null || entry.value.isAfter(local)) {
+        _convSeen[entry.key] = entry.value;
+        changed[entry.key] = entry.value;
+      }
+    }
+    if (changed.isEmpty) return;
+    _recount();
+    revision.value++;
+    final p = await SharedPreferences.getInstance();
+    for (final entry in changed.entries) {
+      await p.setString(
+        '$_convSeenPrefix${entry.key}',
+        entry.value.toIso8601String(),
+      );
+    }
   }
 
   /// Le plancher courant, pour que la LISTE juge « non lu » exactement comme
