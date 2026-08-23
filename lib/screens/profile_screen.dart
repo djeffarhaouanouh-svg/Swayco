@@ -2412,6 +2412,37 @@ class _PersonalInfoSection extends StatelessWidget {
             },
           ),
           _PersonalInfoRow(
+            emoji: kFactEmojiPersonaCategory,
+            label: AppStrings.t('info_persona_category'),
+            value: () {
+              final cat = personaCategoryByLabel(p?.personaCategory ?? '');
+              return cat == null
+                  ? ''
+                  : '${cat.emoji} ${personaCategoryLabel(cat.label)}';
+            }(),
+            onPick: (ctx) async {
+              final current = p?.personaCategory ?? '';
+              final currentIndex = kPersonaCategoryLabels.indexOf(current);
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_persona_category'),
+                emoji: kFactEmojiPersonaCategory,
+                labels: [
+                  for (final cat in kPersonaCategories)
+                    '${cat.emoji} ${personaCategoryLabel(cat.label)}',
+                ],
+                initialIndex: currentIndex < 0 ? 0 : currentIndex,
+                allowClear: current.isNotEmpty,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(personaCategory: '');
+                return;
+              }
+              await save(personaCategory: kPersonaCategoryLabels[picked]);
+            },
+          ),
+          _PersonalInfoRow(
             emoji: kFactEmojiZodiac,
             label: AppStrings.t('info_zodiac'),
             value: displayZodiac(p?.zodiac ?? ''),
@@ -2458,37 +2489,6 @@ class _PersonalInfoSection extends StatelessWidget {
                 return;
               }
               await save(lookingFor: kLookingForOptions[picked]);
-            },
-          ),
-          _PersonalInfoRow(
-            emoji: kFactEmojiPersonaCategory,
-            label: AppStrings.t('info_persona_category'),
-            value: () {
-              final cat = personaCategoryByLabel(p?.personaCategory ?? '');
-              return cat == null
-                  ? ''
-                  : '${cat.emoji} ${personaCategoryLabel(cat.label)}';
-            }(),
-            onPick: (ctx) async {
-              final current = p?.personaCategory ?? '';
-              final currentIndex = kPersonaCategoryLabels.indexOf(current);
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_persona_category'),
-                emoji: kFactEmojiPersonaCategory,
-                labels: [
-                  for (final cat in kPersonaCategories)
-                    '${cat.emoji} ${personaCategoryLabel(cat.label)}',
-                ],
-                initialIndex: currentIndex < 0 ? 0 : currentIndex,
-                allowClear: current.isNotEmpty,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(personaCategory: '');
-                return;
-              }
-              await save(personaCategory: kPersonaCategoryLabels[picked]);
             },
             last: bottom == null,
           ),
