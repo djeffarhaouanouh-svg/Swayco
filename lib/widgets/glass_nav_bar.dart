@@ -60,9 +60,10 @@ class GlassNavBar extends StatefulWidget {
   final ValueChanged<int> onSelect;
   final bool hugTopCorners; // no-op with floating design
 
-  /// Height of the pill content area. Tall enough that the sliding island
-  /// covers both the glyph and its caption without looking like a thin strip.
-  static const double height = 70;
+  /// Height of the pill content area. A 22px icon + 3px gap + 9px caption is
+  /// ~34px of actual content — 70 left it visibly padded/thick top and
+  /// bottom; 60 keeps it a comfortable tap target without the extra bulk.
+  static const double height = 60;
 
   /// Gap between the pill bottom and the screen safe-area top. Volontairement
   /// court : la barre est posée bas, près du pouce.
@@ -298,14 +299,18 @@ class _GlassNavBarState extends State<GlassNavBar>
           ),
       );
 
-    const radius = BorderRadius.all(Radius.circular(36));
+    // Half the (now shorter) bar height, so the outer shell stays a true
+    // pill instead of over-rounding into a blob at the new proportions.
+    const radius = BorderRadius.all(Radius.circular(GlassNavBar.height / 2));
 
     // Shader Liquid Glass path (iOS native).
     if (useShaderGlass) {
       return lg.GlassContainer(
         useOwnLayer: true,
         clipBehavior: Clip.antiAlias,
-        shape: const lg.LiquidRoundedSuperellipse(borderRadius: 36),
+        shape: const lg.LiquidRoundedSuperellipse(
+          borderRadius: GlassNavBar.height / 2,
+        ),
         settings: const lg.LiquidGlassSettings(
           blur: 12,
           thickness: 14,
