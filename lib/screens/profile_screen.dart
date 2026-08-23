@@ -3660,7 +3660,7 @@ class _EditAccountSheet extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.08),
                       ),
                       _EditAccountRow(
-                        icon: Icons.translate,
+                        emoji: '📞',
                         label: AppStrings.t('settings_live_translation'),
                         value: langLabel,
                         onTap: onEditLanguage,
@@ -3679,13 +3679,15 @@ class _EditAccountSheet extends StatelessWidget {
 
 class _EditAccountRow extends StatelessWidget {
   const _EditAccountRow({
-    required this.icon,
+    this.icon,
+    this.emoji,
     required this.label,
     required this.value,
     required this.onTap,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final String? emoji;
   final String label;
   final String value;
   final VoidCallback onTap;
@@ -3699,7 +3701,10 @@ class _EditAccountRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: SC.textPrimary),
+            if (emoji != null)
+              Text(emoji!, style: const TextStyle(fontSize: 20))
+            else
+              Icon(icon, size: 22, color: SC.textPrimary),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
