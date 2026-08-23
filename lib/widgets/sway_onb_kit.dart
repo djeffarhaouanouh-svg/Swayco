@@ -879,39 +879,39 @@ class SwayStepPersonaCategory extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Fixed header (unlike the other steps' single scrolling column) —
+        // with 18 cards below, the title/subtitle staying put while only the
+        // grid scrolls reads much better than the whole page scrolling.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              SwayOnb.gutter, 30, SwayOnb.gutter, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwayTitle(AppStrings.t('onb_persona_title'), size: 30),
+              const SizedBox(height: 12),
+              Text(AppStrings.t('onb_persona_subtitle'), style: SwayOnb.body),
+            ],
+          ),
+        ),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-                SwayOnb.gutter, 48, SwayOnb.gutter, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _StepHead(
-                  titleKey: 'onb_persona_title',
-                  subtitleKey: 'onb_persona_subtitle',
-                ),
-                const SizedBox(height: 28),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: kPersonaCategories.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.92,
-                  ),
-                  itemBuilder: (context, i) {
-                    final cat = kPersonaCategories[i];
-                    return _PersonaCard(
-                      category: cat,
-                      selected: selected == cat.label,
-                      onTap: () => onSelect(cat.label),
-                    );
-                  },
-                ),
-              ],
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.92,
             ),
+            itemCount: kPersonaCategories.length,
+            itemBuilder: (context, i) {
+              final cat = kPersonaCategories[i];
+              return _PersonaCard(
+                category: cat,
+                selected: selected == cat.label,
+                onTap: () => onSelect(cat.label),
+              );
+            },
           ),
         ),
         _StepFooter(
@@ -939,14 +939,14 @@ class _PersonaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: SwayOnb.fieldBg,
-      borderRadius: BorderRadius.circular(SwayOnb.radius),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(SwayOnb.radius),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(SwayOnb.radius),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected ? SC.accent : SwayOnb.fieldBorder,
               width: selected ? 1.5 : 1,
@@ -956,43 +956,54 @@ class _PersonaCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(category.emoji, style: const TextStyle(fontSize: 24)),
+                  Text(category.emoji,
+                      style: const TextStyle(fontSize: 24, height: 1)),
                   const Spacer(),
                   if (selected)
                     Container(
-                      width: 20,
-                      height: 20,
+                      width: 19,
+                      height: 19,
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(
                         color: SC.accent,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.check_rounded,
-                          size: 13, color: SwayOnb.onAccent),
+                          size: 12, color: SwayOnb.onAccent),
+                    )
+                  else
+                    Container(
+                      width: 19,
+                      height: 19,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: SwayOnb.fieldBorder, width: 1.5),
+                      ),
                     ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 9),
               Text(
                 personaCategoryLabel(category.label),
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.spaceGrotesk(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFFE6EBEF),
                 ),
               ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: Text(
-                  personaCategoryExamples(category.label, category.examplesFr),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.dmSans(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: SwayOnb.dim,
-                  ),
+              const SizedBox(height: 3),
+              Text(
+                personaCategoryExamples(category.label, category.examplesFr),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.dmSans(
+                  fontSize: 12,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                  color: SwayOnb.dim,
                 ),
               ),
             ],
