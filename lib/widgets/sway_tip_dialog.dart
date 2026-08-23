@@ -1,14 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// sway_tip_dialog.dart — écrans 04 (Discover) et 05 (Profil) de la maquette
+// sway_tip_dialog.dart — écrans 04 (Discover) et 05 (Profil, version finale)
 //
-// Où le mettre :  lib/widgets/sway_tip_dialog.dart
-// Dépend de :     lib/widgets/sway_onb_kit.dart (SwayOnb, SwayCta) — déjà livré.
+// Où le mettre :  lib/widgets/sway_tip_dialog.dart  (remplace le fichier livré
+//                 précédemment — même API, illustration 05 mise à jour)
+// Dépend de :     lib/widgets/sway_onb_kit.dart
 // Dépendances pubspec : aucune nouvelle.
 //
-// ── PATCH — lib/screens/root_shell.dart ─────────────────────────────────────
-// 1. ajouter :        import '../widgets/sway_tip_dialog.dart';
-//
-// 2. remplacer la méthode `_showTip({...})` par :
+// ── PATCH — lib/screens/root_shell.dart (inchangé) ──────────────────────────
+// 1. import '../widgets/sway_tip_dialog.dart';
+// 2. corps de _showTip :
 //
 //      Future<void> _showTip({
 //        required IconData icon,
@@ -16,7 +16,7 @@
 //        required String body,
 //        required String buttonLabel,
 //        String? imageAsset,
-//        SwayTipArt art = SwayTipArt.profileRing,
+//        SwayTipArt art = SwayTipArt.addsPile,
 //      }) {
 //        return showDialog<void>(
 //          context: context,
@@ -31,33 +31,15 @@
 //        );
 //      }
 //
-//    (`icon` et `imageAsset` restent dans la signature pour ne rien casser
-//    aux 3 appels existants ; ils ne sont simplement plus utilisés. L'asset
-//    assets/add-picture.png et son precacheImage deviennent inutiles —
-//    supprimables dans _maybeShowProfileTip.)
+// 3. premier tip (photo) : ajouter `art: SwayTipArt.discoverTiles`.
+//    Les tips `tip_photo_where_*` et `tip_profile_here_*` gardent le défaut
+//    SwayTipArt.addsPile (= écran 05).
+// 4. `_TipDialog`, assets/add-picture.png et son precacheImage : supprimables.
 //
-// 3. dans `_maybeShowOnboardingTips()`, sur le PREMIER tip seulement, ajouter
-//    l'argument d'illustration :
-//
-//      await _showTip(
-//        icon: Icons.add_a_photo_rounded,
-//        title: AppStrings.t('tip_photo_title'),
-//        body: AppStrings.t('tip_photo_body'),
-//        buttonLabel: AppStrings.t('tip_next'),
-//        art: SwayTipArt.discoverTiles,          // ← écran 04
-//      );
-//
-//    Les deux autres appels (`tip_photo_where_*` et `tip_profile_here_*`)
-//    n'ont rien à changer : ils prennent SwayTipArt.profileRing par défaut,
-//    qui est l'écran 05.
-//
-// 4. la classe privée `_TipDialog` en bas du fichier devient inutilisée :
-//    supprimable.
-//
-// Option « Plus tard » (présente sur la maquette 04, absente de ton code
-// actuel) : passer `secondaryLabel: AppStrings.t('later')` au SwayTipDialog
-// et récupérer le résultat — showDialog<bool> renvoie false sur ce bouton.
-// Laissée désactivée par défaut pour ne pas changer le comportement.
+// ⚠️ Textes : sur l'écran 05 la maquette met le bénéfice dans la phrase grise
+// (« Ajoute ta photo, pour recevoir plein d'ajout. ») et le titre reste
+// « Ta photo, c'est ici » — sans emoji 👇, l'illustration ayant changé.
+// Mets à jour tip_profile_here_body / tip_photo_where_body en conséquence.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:ui' as ui;
@@ -68,20 +50,15 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/swayco_theme.dart';
 import 'sway_onb_kit.dart';
 
-/// Les deux illustrations dessinées de la maquette.
 enum SwayTipArt {
-  /// Écran 04 — trois vignettes façon rangée Discover, celle du centre
-  /// en avant avec le contour cyan et le badge « + ».
+  /// Écran 04 — rangée de vignettes Discover, celle du centre en avant.
   discoverTiles,
 
-  /// Écran 05 — l'emplacement de photo lui-même : anneau pointillé,
-  /// cercle qui glow, badge « + ».
-  profileRing,
+  /// Écran 05 — la pile de demandes d'ajout reçues (bénéfice).
+  addsPile,
 }
 
-/// Coach-mark de la direction 1e : carte noire à halos, titre display avec
-/// le dernier mot surligné en cyan, CTA plein.
-///
+/// Coach-mark 1e : carte noire à halos, titre surligné cyan, CTA plein.
 /// Pop `true` sur le bouton principal, `false` sur le lien secondaire.
 class SwayTipDialog extends StatelessWidget {
   const SwayTipDialog({
@@ -101,6 +78,7 @@ class SwayTipDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final discover = art == SwayTipArt.discoverTiles;
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 22),
@@ -122,42 +100,36 @@ class SwayTipDialog extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Les mêmes halos que l'onboarding, orientés selon l'illustration.
               Positioned.fill(
                 child: ClipRect(
                   child: Stack(
-                    children: art == SwayTipArt.discoverTiles
+                    children: discover
                         ? const [
-                            _CardHalo(SwayOnb.haloCyan, .26, 320,
-                                top: -130, left: -90),
-                            _CardHalo(SwayOnb.haloBlue, .22, 260,
-                                top: -60, right: -110),
-                            _CardHalo(SwayOnb.haloPink, .14, 270,
-                                bottom: -110, left: -50),
+                            _CardHalo(SwayOnb.haloCyan, .26, 320, top: -130, left: -90),
+                            _CardHalo(SwayOnb.haloBlue, .22, 260, top: -60, right: -110),
+                            _CardHalo(SwayOnb.haloPink, .14, 270, bottom: -110, left: -50),
                           ]
                         : const [
-                            _CardHalo(SwayOnb.haloCyan, .26, 320,
-                                top: -130, right: -90),
-                            _CardHalo(SwayOnb.haloBlue, .22, 260,
-                                top: -70, left: -110),
-                            _CardHalo(SwayOnb.haloPink, .14, 270,
-                                bottom: -110, right: -50),
+                            _CardHalo(SwayOnb.haloCyan, .26, 320, top: -130, right: -90),
+                            _CardHalo(SwayOnb.haloBlue, .22, 260, top: -70, left: -110),
+                            _CardHalo(SwayOnb.haloPink, .14, 270, bottom: -110, right: -50),
                           ],
                   ),
                 ),
               ),
+              // Rythme : 32 de marge haute, 26 entre les blocs.
               Padding(
-                padding: const EdgeInsets.fromLTRB(26, 36, 26, 26),
+                padding: const EdgeInsets.fromLTRB(26, 32, 26, 26),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    switch (art) {
-                      SwayTipArt.discoverTiles => const _DiscoverTilesArt(),
-                      SwayTipArt.profileRing => const _ProfileRingArt(),
-                    },
-                    const SizedBox(height: 26),
+                    // Écran 04 : illustration au-dessus du texte.
+                    if (discover) ...[
+                      const _DiscoverTilesArt(),
+                      const SizedBox(height: 26),
+                    ],
                     _TipTitle(title),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Text(
                       body,
                       textAlign: TextAlign.center,
@@ -168,7 +140,12 @@ class SwayTipDialog extends StatelessWidget {
                         color: SwayOnb.muted,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    // Écran 05 : la pile s'intercale entre la phrase et le CTA.
+                    if (!discover) ...[
+                      const SizedBox(height: 26),
+                      const _AddsPileArt(),
+                    ],
+                    const SizedBox(height: 26),
                     SwayCta(
                       label: buttonLabel,
                       onPressed: () => Navigator.of(context).pop(true),
@@ -184,9 +161,7 @@ class SwayTipDialog extends StatelessWidget {
                         child: Text(
                           secondaryLabel!,
                           style: GoogleFonts.dmSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
+                              fontSize: 14, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
@@ -201,41 +176,27 @@ class SwayTipDialog extends StatelessWidget {
   }
 }
 
-/// Titre du coach-mark : dernier mot (hors emoji final) surligné en cyan.
-/// L'emoji reste collé à ce mot — sinon il tombe seul sur la ligne suivante.
+/// Titre du coach-mark : la fin du titre est surlignée en cyan.
 class _TipTitle extends StatelessWidget {
   const _TipTitle(this.text);
 
   final String text;
 
-  /// « Ta photo, c'est ici 👇 » → ('Ta photo, ', "c'est ici", ' 👇')
-  /// Le surlignage porte sur les deux derniers mots quand le titre en a ≥ 4,
-  /// sur le dernier sinon — ce qui donne « Discover » et « c'est ici ».
-  (String, String, String) get _parts {
-    var t = text.trim();
-    var emoji = '';
-    final words = t.split(' ');
-    if (words.length > 1 && _isEmoji(words.last)) {
-      emoji = '\u00A0${words.removeLast()}';
-      t = words.join(' ');
-    }
+  (String, String) get _parts {
+    final words = text.trim().split(' ');
     if (words.length >= 4) {
       final tail = words.sublist(words.length - 2).join(' ');
-      return ('${words.sublist(0, words.length - 2).join(' ')} ', tail, emoji);
+      return ('${words.sublist(0, words.length - 2).join(' ')} ', tail);
     }
     if (words.length > 1) {
-      return ('${words.sublist(0, words.length - 1).join(' ')} ',
-          words.last, emoji);
+      return ('${words.sublist(0, words.length - 1).join(' ')} ', words.last);
     }
-    return ('', t, emoji);
+    return ('', text.trim());
   }
-
-  static bool _isEmoji(String s) =>
-      s.isNotEmpty && s.codeUnits.first > 0x2000;
 
   @override
   Widget build(BuildContext context) {
-    final (head, tail, emoji) = _parts;
+    final (head, tail) = _parts;
     final style = GoogleFonts.archivoBlack(
       fontSize: 24,
       height: 1.25,
@@ -263,13 +224,201 @@ class _TipTitle extends StatelessWidget {
             child: Text(tail, style: style.copyWith(color: SwayOnb.onAccent)),
           ),
         ),
-        if (emoji.isNotEmpty) Text(emoji, style: style),
       ],
     );
   }
 }
 
-/// Écran 04 : la rangée de vignettes Discover.
+// ── Écran 05 : la pile de demandes ──────────────────────────────────────────
+
+/// Carte « Léa veut t'ajouter » posée sur deux cartes qui reculent.
+class _AddsPileArt extends StatelessWidget {
+  const _AddsPileArt();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 82,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Positioned(
+            top: 36,
+            child: _RearLayer(width: 188, height: 46, opacity: .6,
+                fill: Color(0xFF14181D), border: SwayOnb.fieldBorder),
+          ),
+          Positioned(
+            top: 20,
+            child: _RearLayer(width: 222, height: 50, opacity: .9,
+                fill: Color(0xFF12161A), border: Color(0xFF262B31)),
+          ),
+          const Positioned(top: 0, child: _FrontRequestCard()),
+        ],
+      ),
+    );
+  }
+}
+
+class _RearLayer extends StatelessWidget {
+  const _RearLayer({
+    required this.width,
+    required this.height,
+    required this.opacity,
+    required this.fill,
+    required this.border,
+  });
+
+  final double width, height, opacity;
+  final Color fill, border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: border),
+        ),
+      ),
+    );
+  }
+}
+
+class _FrontRequestCard extends StatelessWidget {
+  const _FrontRequestCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 258,
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: SwayOnb.fieldBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SwayOnb.pinBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xE6000000),
+            blurRadius: 34,
+            spreadRadius: -16,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: Color(0xFF191D22),
+              shape: BoxShape.circle,
+            ),
+            child: const ClipOval(
+              child: _AvatarGlyph(headSize: 10, shoulderWidth: 20, white: true),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Léa',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFE6EBEF),
+                  ),
+                ),
+                Text(
+                  "veut t'ajouter",
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: SwayOnb.dim,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const _HeartCounter(label: '+248'),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compteur d'ajouts : cœur cyan, chiffre sombre dedans.
+class _HeartCounter extends StatelessWidget {
+  const _HeartCounter({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 40,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _HeartPainter(color: SC.accent)),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Text(
+              label,
+              style: GoogleFonts.archivoBlack(
+                fontSize: 12,
+                letterSpacing: -0.24,
+                color: SwayOnb.onAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeartPainter extends CustomPainter {
+  const _HeartPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.5, h * 0.97)
+      ..cubicTo(w * 0.02, h * 0.66, w * 0.02, h * 0.30, w * 0.24, h * 0.10)
+      ..cubicTo(w * 0.38, h * -0.01, w * 0.47, h * 0.09, w * 0.5, h * 0.16)
+      ..cubicTo(w * 0.53, h * 0.09, w * 0.62, h * -0.01, w * 0.76, h * 0.10)
+      ..cubicTo(w * 0.98, h * 0.30, w * 0.98, h * 0.66, w * 0.5, h * 0.97)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color.withValues(alpha: 0.5)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8),
+    );
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_HeartPainter old) => old.color != color;
+}
+
+// ── Écran 04 : la rangée Discover ───────────────────────────────────────────
+
 class _DiscoverTilesArt extends StatelessWidget {
   const _DiscoverTilesArt();
 
@@ -306,7 +455,7 @@ class _DiscoverTilesArt extends StatelessWidget {
                   ),
                   child: const ClipRRect(
                     borderRadius: BorderRadius.all(Radius.circular(21)),
-                    child: _AvatarGlyph(headSize: 26, shoulderWidth: 50),
+                    child: _AvatarGlyph(headSize: 26, shoulderWidth: 50, white: true),
                   ),
                 ),
                 const Positioned(top: -10, right: -10, child: _PlusBadge()),
@@ -343,64 +492,21 @@ class _SideTile extends StatelessWidget {
   }
 }
 
-/// Écran 05 : l'emplacement de photo, anneau pointillé + badge « + ».
-class _ProfileRingArt extends StatelessWidget {
-  const _ProfileRingArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 118,
-      height: 118,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _DashedRingPainter(
-                color: SC.accent.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            left: 13,
-            top: 13,
-            right: 13,
-            bottom: 13,
-            child: Container(
-              decoration: BoxDecoration(
-                color: SwayOnb.fieldBg,
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.accent, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: SC.accent.withValues(alpha: 0.7),
-                    blurRadius: 34,
-                    spreadRadius: -6,
-                  ),
-                ],
-              ),
-              child: const ClipOval(
-                child: _AvatarGlyph(headSize: 28, shoulderWidth: 56),
-              ),
-            ),
-          ),
-          const Positioned(top: 6, right: 2, child: _PlusBadge(size: 32)),
-        ],
-      ),
-    );
-  }
-}
-
-/// Silhouette cyan (tête + épaules) commune aux deux illustrations.
+/// Silhouette tête + épaules. `white: true` = version blanche de la maquette.
 class _AvatarGlyph extends StatelessWidget {
-  const _AvatarGlyph({required this.headSize, required this.shoulderWidth});
+  const _AvatarGlyph({
+    required this.headSize,
+    required this.shoulderWidth,
+    this.white = false,
+  });
 
   final double headSize;
   final double shoulderWidth;
+  final bool white;
 
   @override
   Widget build(BuildContext context) {
+    final color = (white ? Colors.white : SC.accent).withValues(alpha: 0.9);
     return LayoutBuilder(
       builder: (context, box) => Stack(
         alignment: Alignment.center,
@@ -410,10 +516,7 @@ class _AvatarGlyph extends StatelessWidget {
             child: Container(
               width: headSize,
               height: headSize,
-              decoration: BoxDecoration(
-                color: SC.accent.withValues(alpha: 0.9),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
           ),
           Positioned(
@@ -422,7 +525,7 @@ class _AvatarGlyph extends StatelessWidget {
               width: shoulderWidth,
               height: shoulderWidth * 0.54,
               decoration: BoxDecoration(
-                color: SC.accent.withValues(alpha: 0.9),
+                color: color,
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(shoulderWidth),
                 ),
@@ -457,37 +560,11 @@ class _PlusBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(Icons.add_rounded,
-          size: size * 0.62, color: SwayOnb.onAccent),
+      child: Icon(Icons.add_rounded, size: size * 0.62, color: SwayOnb.onAccent),
     );
   }
 }
 
-class _DashedRingPainter extends CustomPainter {
-  const _DashedRingPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final rect = Offset.zero & size;
-    const dash = 0.13; // radians de trait
-    const gap = 0.09; // radians de vide
-    for (var a = 0.0; a < 6.28318; a += dash + gap) {
-      canvas.drawArc(rect, a, dash, false, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedRingPainter old) => old.color != color;
-}
-
-/// Halo flou d'angle de carte (même recette que SwayHalo, en plus petit).
 class _CardHalo extends StatelessWidget {
   const _CardHalo(this.color, this.opacity, this.size,
       {this.top, this.left, this.right, this.bottom});

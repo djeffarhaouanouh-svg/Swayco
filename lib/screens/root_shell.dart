@@ -746,6 +746,7 @@ class _RootShellState extends State<RootShell> {
       title: AppStrings.t('tip_profile_here_title'),
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
+      art: SwayTipArt.addsPile,
     );
     _tipBusy = false;
   }
@@ -754,7 +755,7 @@ class _RootShellState extends State<RootShell> {
     required String title,
     required String body,
     required String buttonLabel,
-    SwayTipArt art = SwayTipArt.profileRing,
+    SwayTipArt art = SwayTipArt.addsPile,
   }) {
     return showDialog<bool>(
       context: context,
