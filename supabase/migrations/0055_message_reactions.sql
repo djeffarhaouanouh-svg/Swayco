@@ -9,11 +9,14 @@
 -- equality filter). `message_author_id` lets the recipient's client watch
 -- "reactions on MY messages" for in-app banners without joining.
 --
+-- `messages.id` in production is bigint (the live table predates the uuid
+-- sketch in this folder). The FK must match or Postgres raises 42804.
+--
 -- Idempotent: sûr à rejouer.
 
 create table if not exists public.message_reactions (
   id                 uuid        primary key default gen_random_uuid(),
-  message_id         uuid        not null references public.messages(id) on delete cascade,
+  message_id         bigint      not null references public.messages(id) on delete cascade,
   conversation_id    text        not null,
   user_id            uuid        not null,
   user_name          text        not null default '',

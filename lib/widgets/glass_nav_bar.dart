@@ -68,6 +68,10 @@ class GlassNavBar extends StatefulWidget {
   /// court : la barre est posée bas, près du pouce.
   static const double floatBottom = 8.0;
 
+  /// Side inset of the floating island. Tight enough that four labelled
+  /// tabs have room, without kissing the screen edge.
+  static const double floatSide = 20.0;
+
   /// Total vertical space to reserve below content (height + float gap).
   static const double totalReservedHeight = height + floatBottom;
 
