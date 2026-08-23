@@ -713,6 +713,7 @@ class _RootShellState extends State<RootShell> {
       title: AppStrings.t('tip_photo_title'),
       body: AppStrings.t('tip_photo_body'),
       buttonLabel: AppStrings.t('tip_next'),
+      secondaryLabel: AppStrings.t('tip_later'),
       art: SwayTipArt.discoverTiles,
     );
     _tipBusy = false;
@@ -746,6 +747,7 @@ class _RootShellState extends State<RootShell> {
       title: AppStrings.t('tip_profile_here_title'),
       body: AppStrings.t('tip_profile_here_body'),
       buttonLabel: AppStrings.t('tip_got_it'),
+      secondaryLabel: AppStrings.t('tip_later'),
       art: SwayTipArt.addsPile,
     );
     _tipBusy = false;
@@ -755,6 +757,7 @@ class _RootShellState extends State<RootShell> {
     required String title,
     required String body,
     required String buttonLabel,
+    String? secondaryLabel,
     SwayTipArt art = SwayTipArt.addsPile,
   }) {
     return showDialog<bool>(
@@ -766,6 +769,7 @@ class _RootShellState extends State<RootShell> {
         title: title,
         body: body,
         buttonLabel: buttonLabel,
+        secondaryLabel: secondaryLabel,
       ),
     );
   }
