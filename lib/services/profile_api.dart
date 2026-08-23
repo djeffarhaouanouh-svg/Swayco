@@ -1140,6 +1140,11 @@ abstract final class ProfileApi {
   /// Score a Discover candidate from the local user's point of view.
   /// Higher is "show me sooner". Components, all additive:
   ///
+  /// • Shared interests — up to 4 common tags at +15 each, since a common
+  ///   tag is an instant conversation opener even across a language
+  ///   barrier.
+  /// • Same "looking for" intent — +25 flat when both sides picked the
+  ///   same answer.
   /// • Activity recency (gated on the peer not hiding their online
   ///   status). A peer active in the last 5 min beats a week-old one.
   /// • Fetch-order bonus — the DB returns rows pre-sorted by
