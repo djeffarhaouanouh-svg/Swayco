@@ -60,8 +60,9 @@ class GlassNavBar extends StatefulWidget {
   final ValueChanged<int> onSelect;
   final bool hugTopCorners; // no-op with floating design
 
-  /// Height of the pill content area.
-  static const double height = 62;
+  /// Height of the pill content area. Tall enough that the sliding island
+  /// covers both the glyph and its caption without looking like a thin strip.
+  static const double height = 70;
 
   /// Gap between the pill bottom and the screen safe-area top. Volontairement
   /// court : la barre est posée bas, près du pouce.
@@ -219,8 +220,8 @@ class _GlassNavBarState extends State<GlassNavBar>
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutBack,
                   child: Container(
-                    width: slot - 24,
-                    height: height - 16,
+                    width: slot - 20,
+                    height: height - 10,
                     decoration: BoxDecoration(
                       color: Colors.white
                           .withValues(alpha: _dragging ? 0.26 : 0.18),
