@@ -659,10 +659,16 @@ class SwayOnbShell extends StatelessWidget {
 
 /// En-tête de contenu commun aux 3 étapes : titre surligné + sous-titre.
 class _StepHead extends StatelessWidget {
-  const _StepHead({required this.titleKey, required this.subtitleKey, this.maxWidth = 310});
+  const _StepHead({
+    required this.titleKey,
+    required this.subtitleKey,
+    this.hintKey,
+    this.maxWidth = 310,
+  });
 
   final String titleKey;
   final String subtitleKey;
+  final String? hintKey;
   final double maxWidth;
 
   @override
@@ -676,6 +682,20 @@ class _StepHead extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: Text(AppStrings.t(subtitleKey), style: SwayOnb.body),
         ),
+        if (hintKey != null) ...[
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Text(
+              AppStrings.t(hintKey!),
+              style: SwayOnb.body.copyWith(
+                fontSize: 13,
+                height: 1.4,
+                color: SwayOnb.dim,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -703,6 +723,7 @@ class SwayStepWelcome extends StatelessWidget {
                 const _StepHead(
                   titleKey: 'onb_welcome_title',
                   subtitleKey: 'onb_welcome_subtitle',
+                  hintKey: 'onb_welcome_hint',
                   maxWidth: 290,
                 ),
                 const SizedBox(height: 34),

@@ -576,8 +576,9 @@ abstract final class AppStrings {
     'login_reset_sent':
         'Si un compte existe pour cet e-mail, un lien de réinitialisation a été envoyé.',
 
-    'onb_welcome_title': "Comment veux-tu qu'on t'appelle ?",
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Bienvenue',
+    'onb_welcome_subtitle': "Comment veux-tu qu'on t'appelle ?",
+    'onb_welcome_hint':
         "(C'est le prénom que les autres verront sur ton profil.)",
     'onb_language_title': 'Quelle langue tu parles ?',
     'onb_language_subtitle':
@@ -1137,8 +1138,9 @@ abstract final class AppStrings {
     'login_reset_sent':
         'If an account exists for that email, a reset link has been sent.',
 
-    'onb_welcome_title': 'How should we call you?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Welcome',
+    'onb_welcome_subtitle': 'How should we call you?',
+    'onb_welcome_hint':
         '(This is the first name others will see on your profile.)',
     'onb_language_title': 'What language do you speak?',
     'onb_language_subtitle':
@@ -1609,8 +1611,9 @@ abstract final class AppStrings {
     'profile_loading': 'Cargando...',
     'profile_anonymous': 'Sin nombre',
 
-    'onb_welcome_title': '¿Cómo quieres que te llamemos?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Bienvenido',
+    'onb_welcome_subtitle': '¿Cómo quieres que te llamemos?',
+    'onb_welcome_hint':
         '(Es el nombre que los demás verán en tu perfil.)',
     'onb_language_title': '¿Qué idioma hablas?',
     'onb_language_subtitle':
@@ -2073,8 +2076,9 @@ abstract final class AppStrings {
     'profile_loading': 'Lädt...',
     'profile_anonymous': 'Ohne Namen',
 
-    'onb_welcome_title': 'Wie sollen wir dich nennen?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Willkommen',
+    'onb_welcome_subtitle': 'Wie sollen wir dich nennen?',
+    'onb_welcome_hint':
         '(Das ist der Vorname, den andere auf deinem Profil sehen.)',
     'onb_language_title': 'Welche Sprache sprichst du?',
     'onb_language_subtitle':
@@ -2616,8 +2620,9 @@ abstract final class AppStrings {
     'profile_loading': 'Caricamento...',
     'profile_anonymous': 'Senza nome',
 
-    'onb_welcome_title': 'Come vuoi che ti chiamiamo?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Benvenuto',
+    'onb_welcome_subtitle': 'Come vuoi che ti chiamiamo?',
+    'onb_welcome_hint':
         '(È il nome che gli altri vedranno sul tuo profilo.)',
     'onb_language_title': 'Che lingua parli?',
     'onb_language_subtitle':
@@ -3155,8 +3160,9 @@ abstract final class AppStrings {
     'profile_loading': 'A carregar...',
     'profile_anonymous': 'Sem nome',
 
-    'onb_welcome_title': 'Como queres que te chamemos?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Bem-vindo',
+    'onb_welcome_subtitle': 'Como queres que te chamemos?',
+    'onb_welcome_hint':
         '(É o nome que os outros vão ver no teu perfil.)',
     'onb_language_title': 'Que língua falas?',
     'onb_language_subtitle':
@@ -3697,8 +3703,9 @@ abstract final class AppStrings {
     'profile_loading': 'Laden...',
     'profile_anonymous': 'Geen naam',
 
-    'onb_welcome_title': 'Hoe zullen we je noemen?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Welkom',
+    'onb_welcome_subtitle': 'Hoe zullen we je noemen?',
+    'onb_welcome_hint':
         '(Dit is de voornaam die anderen op je profiel zien.)',
     'onb_language_title': 'Welke taal spreek je?',
     'onb_language_subtitle':
@@ -4226,8 +4233,9 @@ abstract final class AppStrings {
     'profile_loading': 'جارٍ التحميل...',
     'profile_anonymous': 'بدون اسم',
 
-    'onb_welcome_title': 'كيف تريد أن نناديك؟',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'مرحباً',
+    'onb_welcome_subtitle': 'كيف تريد أن نناديك؟',
+    'onb_welcome_hint':
         '(هذا الاسم الذي سيراه الآخرون على ملفك.)',
     'onb_language_title': 'ما اللغة التي تتحدثها؟',
     'onb_language_subtitle':
@@ -4759,8 +4767,9 @@ abstract final class AppStrings {
     'profile_loading': 'Загрузка...',
     'profile_anonymous': 'Без имени',
 
-    'onb_welcome_title': 'Как тебя называть?',
-    'onb_welcome_subtitle':
+    'onb_welcome_title': 'Добро пожаловать',
+    'onb_welcome_subtitle': 'Как тебя называть?',
+    'onb_welcome_hint':
         '(Это имя, которое другие увидят в твоём профиле.)',
     'onb_language_title': 'На каком языке ты говоришь?',
     'onb_language_subtitle':
@@ -5269,8 +5278,9 @@ abstract final class AppStrings {
     'profile_loading': '加载中...',
     'profile_anonymous': '无名',
 
-    'onb_welcome_title': '希望我们怎么称呼你？',
-    'onb_welcome_subtitle': '（这是其他人会在你资料上看到的名字。）',
+    'onb_welcome_title': '欢迎',
+    'onb_welcome_subtitle': '希望我们怎么称呼你？',
+    'onb_welcome_hint': '（这是其他人会在你资料上看到的名字。）',
     'onb_language_title': '你说哪种语言？',
     'onb_language_subtitle': '选择你使用的语言。对方加入通话时，他们的语言会自动检测。',
     'onb_first_name_label': '名字',
@@ -5781,8 +5791,9 @@ abstract final class AppStrings {
     'profile_loading': '読み込み中...',
     'profile_anonymous': '名前なし',
 
-    'onb_welcome_title': 'なんて呼べばいい？',
-    'onb_welcome_subtitle': '（プロフィールに表示される名前です。）',
+    'onb_welcome_title': 'ようこそ',
+    'onb_welcome_subtitle': 'なんて呼べばいい？',
+    'onb_welcome_hint': '（プロフィールに表示される名前です。）',
     'onb_language_title': 'どの言語を話しますか？',
     'onb_language_subtitle': '話す言語を選んでください。相手の言語は通話に参加したときに自動的に検出されます。',
     'onb_first_name_label': '名前',
@@ -6278,8 +6289,9 @@ abstract final class AppStrings {
     'profile_loading': '불러오는 중...',
     'profile_anonymous': '이름 없음',
 
-    'onb_welcome_title': '어떻게 불러드릴까요?',
-    'onb_welcome_subtitle': '(다른 사람이 프로필에서 보게 될 이름이에요.)',
+    'onb_welcome_title': '환영합니다',
+    'onb_welcome_subtitle': '어떻게 불러드릴까요?',
+    'onb_welcome_hint': '(다른 사람이 프로필에서 보게 될 이름이에요.)',
     'onb_language_title': '어떤 언어를 하나요?',
     'onb_language_subtitle': '사용하는 언어를 선택하세요. 상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
     'onb_first_name_label': '이름',
