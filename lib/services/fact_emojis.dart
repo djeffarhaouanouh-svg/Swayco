@@ -13,4 +13,5 @@ const String kFactEmojiJob = '💼';
 const String kFactEmojiZodiac = '🔮';
 const String kFactEmojiLookingFor = '💘';
 const String kFactEmojiInterests = '🎯';
+const String kFactEmojiPersonaCategory = '🏆';
 const String kFactEmojiPlace = '📍';

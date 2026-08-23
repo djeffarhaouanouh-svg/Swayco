@@ -38,6 +38,7 @@ class RemoteProfile {
     this.job = '',
     this.zodiac = '',
     this.lookingFor = '',
+    this.personaCategory = '',
   });
 
   final String id;
@@ -89,6 +90,14 @@ class RemoteProfile {
   final String job;
   final String zodiac;
   final String lookingFor;
+
+  /// The single "what defines you most" identity picked at onboarding — one
+  /// of `kPersonaCategories` (persona_categories.dart), stored as its French
+  /// label. Distinct from the multi-select [interests] tags: this one drives
+  /// the single chip on the Discover card and a same-category bonus in the
+  /// Discover scoring. Empty for profiles onboarded before this field
+  /// existed.
+  final String personaCategory;
 
   /// Self-declared grammatical gender. One of:
   ///   'm' — masculine
@@ -221,6 +230,7 @@ class RemoteProfile {
     job: m['job']?.toString() ?? '',
     zodiac: m['zodiac']?.toString() ?? '',
     lookingFor: m['looking_for']?.toString() ?? '',
+    personaCategory: m['persona_category']?.toString() ?? '',
     gender: () {
       final g = m['gender']?.toString().trim() ?? '';
       return (g == 'm' || g == 'f' || g == 'x') ? g : '';
@@ -265,6 +275,7 @@ class RemoteProfile {
     String? job,
     String? zodiac,
     String? lookingFor,
+    String? personaCategory,
     String? gender,
     bool? hideOnlineStatus,
     bool? hideFromCountry,
@@ -292,6 +303,7 @@ class RemoteProfile {
     job: job ?? this.job,
     zodiac: zodiac ?? this.zodiac,
     lookingFor: lookingFor ?? this.lookingFor,
+    personaCategory: personaCategory ?? this.personaCategory,
     city: city ?? this.city,
     gender: gender ?? this.gender,
     hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
@@ -929,6 +941,31 @@ abstract final class ProfileApi {
     }
   }
 
+  /// Save the single "what defines you most" persona category (one of
+  /// `kPersonaCategories`, persona_categories.dart) — picked once at
+  /// onboarding, editable later from the profile. Returns the saved value on
+  /// success, null on failure.
+  static Future<String?> updateMyCategory({
+    required String userId,
+    required String category,
+  }) async {
+    if (!isSupabaseReady || userId.isEmpty) return null;
+    final cleaned = category.trim();
+    try {
+      await _c
+          .from('profiles')
+          .update({
+            'persona_category': cleaned,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+      return cleaned;
+    } catch (e) {
+      debugPrint('ProfileApi.updateMyCategory failed: $e');
+      return null;
+    }
+  }
+
   /// Toggle the privacy bit that hides this user's online presence from
   /// other clients. Returns true on success so the caller can keep the
   /// optimistic UI in sync if the request failed.
@@ -963,6 +1000,7 @@ abstract final class ProfileApi {
     Object? job = unset,
     Object? zodiac = unset,
     Object? lookingFor = unset,
+    Object? personaCategory = unset,
   }) async {
     if (!isSupabaseReady || userId.isEmpty) return false;
     final patch = <String, dynamic>{};
@@ -971,6 +1009,9 @@ abstract final class ProfileApi {
     if (!identical(job, unset)) patch['job'] = job;
     if (!identical(zodiac, unset)) patch['zodiac'] = zodiac;
     if (!identical(lookingFor, unset)) patch['looking_for'] = lookingFor;
+    if (!identical(personaCategory, unset)) {
+      patch['persona_category'] = personaCategory;
+    }
     if (patch.isEmpty) return true;
     try {
       patch['updated_at'] = DateTime.now().toUtc().toIso8601String();
@@ -1140,6 +1181,8 @@ abstract final class ProfileApi {
   /// Score a Discover candidate from the local user's point of view.
   /// Higher is "show me sooner". Components, all additive:
   ///
+  /// • Same persona category ("what defines you most") — +30 flat, the
+  ///   strongest single "who you are" signal.
   /// • Shared interests — up to 4 common tags at +15 each, since a common
   ///   tag is an instant conversation opener even across a language
   ///   barrier.
@@ -1169,8 +1212,17 @@ abstract final class ProfileApi {
     int receivedLikes,
     Set<String> myInterests,
     String myLookingFor,
+    String myPersonaCategory,
   ) {
     double s = 0;
+
+    // Same persona category ("what defines you most", e.g. both "Sportif")
+    // — one flat bonus, the strongest single "who you are" signal, on par
+    // with the same-intent bonus below.
+    if (myPersonaCategory.isNotEmpty &&
+        p.personaCategory.trim() == myPersonaCategory) {
+      s += 30;
+    }
 
     // Shared interests: a common tag is a ready-made conversation opener
     // even across a language barrier, so it outweighs the recency bonus.
@@ -1299,11 +1351,13 @@ abstract final class ProfileApi {
       String myLang = '';
       Set<String> myInterests = const {};
       String myLookingFor = '';
+      String myPersonaCategory = '';
       try {
         final me = await fetchById(myId);
         myLang = me?.language.trim().toLowerCase() ?? '';
         myInterests = me?.interests.toSet() ?? const {};
         myLookingFor = normalizeLookingFor(me?.lookingFor ?? '');
+        myPersonaCategory = me?.personaCategory.trim() ?? '';
       } catch (_) {}
 
       // Batched popularity counts for every candidate in one round-
@@ -1351,6 +1405,7 @@ abstract final class ProfileApi {
               likeCounts[candidates[i].id] ?? 0,
               myInterests,
               myLookingFor,
+              myPersonaCategory,
             ),
           ),
       ];

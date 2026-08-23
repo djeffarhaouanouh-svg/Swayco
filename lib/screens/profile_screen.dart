@@ -23,6 +23,7 @@ import '../services/looking_for.dart';
 import '../services/like_api.dart';
 import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
+import '../services/persona_categories.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
@@ -754,6 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     Object? job = _keep,
     Object? zodiac = _keep,
     Object? lookingFor = _keep,
+    Object? personaCategory = _keep,
   }) async {
     if (_deviceId.isEmpty) return;
     await ProfileApi.updatePersonalInfo(
@@ -764,6 +766,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       zodiac: identical(zodiac, _keep) ? ProfileApi.unset : zodiac,
       lookingFor:
           identical(lookingFor, _keep) ? ProfileApi.unset : lookingFor,
+      personaCategory: identical(personaCategory, _keep)
+          ? ProfileApi.unset
+          : personaCategory,
     );
     if (mounted) await _reload(silent: true);
   }
@@ -1317,6 +1322,7 @@ class _IdentitySection extends StatelessWidget {
     Object? job,
     Object? zodiac,
     Object? lookingFor,
+    Object? personaCategory,
   })? onSavePersonalInfo;
   final VoidCallback onTapLikes;
 
@@ -2323,6 +2329,7 @@ class _PersonalInfoSection extends StatelessWidget {
     Object? job,
     Object? zodiac,
     Object? lookingFor,
+    Object? personaCategory,
   })? onSave;
 
   /// Rendu EN HAUT du panneau, au-dessus des lignes d'infos (la bio).
@@ -2451,6 +2458,37 @@ class _PersonalInfoSection extends StatelessWidget {
                 return;
               }
               await save(lookingFor: kLookingForOptions[picked]);
+            },
+          ),
+          _PersonalInfoRow(
+            emoji: kFactEmojiPersonaCategory,
+            label: AppStrings.t('info_persona_category'),
+            value: () {
+              final cat = personaCategoryByLabel(p?.personaCategory ?? '');
+              return cat == null
+                  ? ''
+                  : '${cat.emoji} ${personaCategoryLabel(cat.label)}';
+            }(),
+            onPick: (ctx) async {
+              final current = p?.personaCategory ?? '';
+              final currentIndex = kPersonaCategoryLabels.indexOf(current);
+              final picked = await showWheelPicker(
+                context: ctx,
+                title: AppStrings.t('info_persona_category'),
+                emoji: kFactEmojiPersonaCategory,
+                labels: [
+                  for (final cat in kPersonaCategories)
+                    '${cat.emoji} ${personaCategoryLabel(cat.label)}',
+                ],
+                initialIndex: currentIndex < 0 ? 0 : currentIndex,
+                allowClear: current.isNotEmpty,
+              );
+              if (picked == null) return;
+              if (picked < 0) {
+                await save(personaCategory: '');
+                return;
+              }
+              await save(personaCategory: kPersonaCategoryLabels[picked]);
             },
             last: bottom == null,
           ),

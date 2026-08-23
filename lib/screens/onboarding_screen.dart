@@ -8,6 +8,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/persona_categories.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
@@ -56,13 +57,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// page is omitted from the flow ("Une fois choisi, plus s'afficher").
   bool _genderAlreadySet = false;
 
+  /// One of `kPersonaCategories` (persona_categories.dart), or null. Asked
+  /// once right before the gender step. Same "asked once" pattern as
+  /// [_selectedGender] — see [_personaAlreadySet].
+  String? _selectedPersonaCategory;
+
+  /// Set in [_prefill] from [UserPrefs.isPersonaCategorySet]. When true the
+  /// persona-category page is omitted from the flow, mirroring
+  /// [_genderAlreadySet].
+  bool _personaAlreadySet = false;
+
   int _page = 0;
 
   /// Total pages shown in the first-run wizard:
-  ///   Welcome(0) · Language(1) · [Gender(2)]
-  /// Gender is omitted once already known, so the count flexes by one.
-  /// City and interests are edited later from the profile, not here.
-  int get _pageCount => 2 + (_genderAlreadySet ? 0 : 1);
+  ///   Welcome(0) · Language(1) · [PersonaCategory] · [Gender]
+  /// PersonaCategory and Gender are each omitted once already known, so the
+  /// count flexes by up to two. City and interests are edited later from the
+  /// profile, not here.
+  int get _pageCount =>
+      2 + (_personaAlreadySet ? 0 : 1) + (_genderAlreadySet ? 0 : 1);
 
   @override
   void initState() {
@@ -76,6 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _prefill() async {
     final snap = await UserPrefs.loadProfile();
     final genderAlready = await UserPrefs.isGenderSet();
+    final personaAlready = await UserPrefs.isPersonaCategorySet();
     if (!mounted) return;
     if (snap != null) {
       setState(() {
@@ -103,6 +117,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (snap.gender == 'm' || snap.gender == 'f' || snap.gender == 'x') {
           _selectedGender = snap.gender;
         }
+        if (snap.personaCategory.isNotEmpty) {
+          _selectedPersonaCategory = snap.personaCategory;
+        }
       });
     }
     // Brand-new user, nothing stored: guess from the phone's own language so the
@@ -120,6 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (mounted) {
       setState(() {
         _genderAlreadySet = genderAlready;
+        _personaAlreadySet = personaAlready;
         _prefillDone = true;
       });
     }
@@ -144,6 +162,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (remote.language.trim().isNotEmpty &&
             isOfferedLanguage(remote.language)) {
           _selectedLang = remote.language;
+        }
+        if (remote.personaCategory.trim().isNotEmpty) {
+          _selectedPersonaCategory = remote.personaCategory.trim();
         }
       });
     } catch (_) {}
@@ -200,6 +221,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       return;
     }
+    // Only enforce the persona-category pick on first run (when the step is
+    // actually shown). Same rationale as the gender check just below.
+    if (!widget.editing &&
+        !_personaAlreadySet &&
+        _selectedPersonaCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('onb_need_persona'))),
+      );
+      return;
+    }
     // Only enforce the gender pick on first run (when the step is actually
     // shown). In editing mode + on later sessions, [_genderAlreadySet] is
     // true and we accept whatever was saved before (or none).
@@ -210,12 +241,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     final genderToSave = _selectedGender ?? '';
+    final personaCategoryToSave = _selectedPersonaCategory ?? '';
     await UserPrefs.completeOnboarding(
       firstName: name,
       sourceLang: _selectedLang!,
       // Other person's language is now discovered live from their metadata.
       targetLang: '',
       gender: genderToSave,
+      personaCategory: personaCategoryToSave,
     );
     // Make the rest of the app speak the user's chosen language right away.
     AppStrings.setFromCode(_selectedLang!);
@@ -249,6 +282,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await ProfileApi.updateMyBio(
           userId: deviceId,
           bio: _bioCtrl.text.trim(),
+        );
+      }
+      // Persona category isn't carried by upsertMyProfile either — persist
+      // it separately, same shape as location/bio above.
+      if (personaCategoryToSave.isNotEmpty) {
+        await ProfileApi.updateMyCategory(
+          userId: deviceId,
+          category: personaCategoryToSave,
         );
       }
     }
@@ -407,6 +448,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
+    final showPersonaStep = !_personaAlreadySet;
     final showGenderStep = !_genderAlreadySet;
 
     return SwayOnbShell(
@@ -432,9 +474,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
-          // Last page when the gender step is skipped.
-          finishLabelKey: showGenderStep ? 'onb_next' : 'onb_finish',
+          // Last page when both the persona and gender steps are skipped.
+          finishLabelKey:
+              (showPersonaStep || showGenderStep) ? 'onb_next' : 'onb_finish',
         ),
+        if (showPersonaStep)
+          SwayStepPersonaCategory(
+            selected: _selectedPersonaCategory,
+            onSelect: (c) => setState(() => _selectedPersonaCategory = c),
+            onBack: _back,
+            onFinish: _goFromPersonaCategory,
+            // Last page when the gender step is skipped.
+            finishLabelKey: showGenderStep ? 'onb_next' : 'onb_finish',
+          ),
         if (showGenderStep)
           SwayStepGender(
             selected: _selectedGender,
@@ -466,14 +518,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       return;
     }
-    // Language is the last page once the gender step is out of the way.
-    if (_genderAlreadySet) {
+    // Language is the last page once both persona category and gender are
+    // already known.
+    if (_personaAlreadySet && _genderAlreadySet) {
       _finish();
       return;
     }
     _next();
   }
 
+  /// Persona category → next, but guard the required pick first. Mirrors
+  /// [_goFromLanguage]'s "skip to the end if what follows is already known"
+  /// pattern.
+  void _goFromPersonaCategory() {
+    if (_selectedPersonaCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('onb_need_persona'))),
+      );
+      return;
+    }
+    if (_genderAlreadySet) {
+      _finish();
+      return;
+    }
+    _next();
+  }
 }
 
 /// Language step for the first-run wizard — same halo/title shell as the

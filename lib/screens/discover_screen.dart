@@ -16,6 +16,7 @@ import '../services/languages.dart';
 import '../services/locations.dart';
 import '../services/looking_for.dart';
 import '../services/match_celebration.dart';
+import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
@@ -1924,9 +1925,26 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ],
-                // Interests — un seul chip sur la carte (le reste est dans le
-                // panneau info).
-                if (p.interests.isNotEmpty) ...[
+                // One chip on the card (the rest lives in the info panel):
+                // the persona category ("what defines you most") when set —
+                // the higher-signal, deliberate answer — else fall back to
+                // the first interest tag for profiles onboarded before this
+                // field existed.
+                if (personaCategoryByLabel(p.personaCategory) != null) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      InterestTagChip(
+                        label:
+                            '${personaCategoryByLabel(p.personaCategory)!.emoji} '
+                            '${personaCategoryLabel(p.personaCategory)}',
+                        color: const Color(0xFF22D3EE),
+                      ),
+                    ],
+                  ),
+                ] else if (p.interests.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Row(
                     mainAxisSize: MainAxisSize.min,

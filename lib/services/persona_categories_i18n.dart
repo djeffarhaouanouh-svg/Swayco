@@ -1,0 +1,381 @@
+import 'app_strings.dart';
+
+/// Display translations for persona-category labels (French labels from
+/// `persona_categories.dart`). The profile stores the FRENCH label as the
+/// stable key (so existing data and matching keep working regardless of the
+/// viewer's language); this map only localises what is shown on screen.
+/// Missing entries fall back to the French key, and the `fr` locale always
+/// returns the key verbatim (no entry needed) — same convention as
+/// `interests_i18n.dart`.
+const Map<String, Map<String, String>> _kPersonaLabelI18n = {
+  'Sportif': {
+    'en': 'Athletic', 'es': 'Deportista', 'de': 'Sportlich',
+    'it': 'Sportivo', 'pt': 'Esportista', 'nl': 'Sportief',
+    'ar': 'رياضي', 'ru': 'Спортивный', 'zh': '运动型', 'ja': 'スポーツ好き',
+    'ko': '스포츠인',
+  },
+  'Mélomane': {
+    'en': 'Music lover', 'es': 'Melómano', 'de': 'Musikliebhaber',
+    'it': 'Melomane', 'pt': 'Melômano', 'nl': 'Muziekliefhebber',
+    'ar': 'عاشق الموسيقى', 'ru': 'Меломан', 'zh': '音乐爱好者',
+    'ja': '音楽好き', 'ko': '음악 애호가',
+  },
+  'Gamer': {
+    'en': 'Gamer', 'es': 'Gamer', 'de': 'Gamer', 'it': 'Gamer', 'pt': 'Gamer',
+    'nl': 'Gamer', 'ar': 'لاعب ألعاب', 'ru': 'Геймер', 'zh': '游戏玩家',
+    'ja': 'ゲーマー', 'ko': '게이머',
+  },
+  'Voyageur': {
+    'en': 'Traveler', 'es': 'Viajero', 'de': 'Reisender',
+    'it': 'Viaggiatore', 'pt': 'Viajante', 'nl': 'Reiziger',
+    'ar': 'مسافر', 'ru': 'Путешественник', 'zh': '旅行者', 'ja': '旅行好き',
+    'ko': '여행가',
+  },
+  'Gourmet': {
+    'en': 'Foodie', 'es': 'Gourmet', 'de': 'Feinschmecker',
+    'it': 'Buongustaio', 'pt': 'Gourmet', 'nl': 'Fijnproever',
+    'ar': 'عاشق الطعام', 'ru': 'Гурман', 'zh': '美食家', 'ja': 'グルメ',
+    'ko': '미식가',
+  },
+  'Cinéphile': {
+    'en': 'Movie buff', 'es': 'Cinéfilo', 'de': 'Filmfan',
+    'it': 'Cinefilo', 'pt': 'Cinéfilo', 'nl': 'Filmfanaat',
+    'ar': 'عاشق السينما', 'ru': 'Киноман', 'zh': '影迷', 'ja': '映画好き',
+    'ko': '영화광',
+  },
+  'Fashion': {
+    'en': 'Fashionista', 'es': 'Fashionista', 'de': 'Modebewusst',
+    'it': 'Fashionista', 'pt': 'Fashionista', 'nl': 'Modebewust',
+    'ar': 'عاشق الموضة', 'ru': 'Модник', 'zh': '时尚达人',
+    'ja': 'ファッション好き', 'ko': '패셔니스타',
+  },
+  'Fitness': {
+    'en': 'Fitness', 'es': 'Fitness', 'de': 'Fitness', 'it': 'Fitness',
+    'pt': 'Fitness', 'nl': 'Fitness', 'ar': 'اللياقة البدنية',
+    'ru': 'Фитнес', 'zh': '健身达人', 'ja': 'フィットネス', 'ko': '피트니스',
+  },
+  'Ambitieux': {
+    'en': 'Ambitious', 'es': 'Ambicioso', 'de': 'Ambitioniert',
+    'it': 'Ambizioso', 'pt': 'Ambicioso', 'nl': 'Ambitieus',
+    'ar': 'طموح', 'ru': 'Амбициозный', 'zh': '有野心', 'ja': '向上心がある',
+    'ko': '야망가',
+  },
+  'Créatif': {
+    'en': 'Creative', 'es': 'Creativo', 'de': 'Kreativ', 'it': 'Creativo',
+    'pt': 'Criativo', 'nl': 'Creatief', 'ar': 'مبدع', 'ru': 'Творческий',
+    'zh': '有创造力', 'ja': 'クリエイティブ', 'ko': '크리에이티브',
+  },
+  'Curieux': {
+    'en': 'Curious mind', 'es': 'Curioso', 'de': 'Wissbegierig',
+    'it': 'Curioso', 'pt': 'Curioso', 'nl': 'Nieuwsgierig',
+    'ar': 'فضولي', 'ru': 'Любознательный', 'zh': '好奇心强',
+    'ja': '好奇心旺盛', 'ko': '호기심 많은',
+  },
+  'Tech': {
+    'en': 'Tech enthusiast', 'es': 'Apasionado de la tecnología',
+    'de': 'Technikbegeistert', 'it': 'Appassionato di tech',
+    'pt': 'Entusiasta de tecnologia', 'nl': 'Techneut',
+    'ar': 'عاشق التقنية', 'ru': 'Технофил', 'zh': '科技迷', 'ja': 'テック好き',
+    'ko': '테크 애호가',
+  },
+  'Nature': {
+    'en': 'Nature lover', 'es': 'Amante de la naturaleza',
+    'de': 'Naturliebhaber', 'it': 'Amante della natura',
+    'pt': 'Amante da natureza', 'nl': 'Natuurliefhebber',
+    'ar': 'عاشق الطبيعة', 'ru': 'Любитель природы', 'zh': '自然爱好者',
+    'ja': '自然好き', 'ko': '자연 애호가',
+  },
+  'Fêtard': {
+    'en': 'Party lover', 'es': 'Fiestero', 'de': 'Partylöwe',
+    'it': 'Amante delle feste', 'pt': 'Festeiro', 'nl': 'Feestbeest',
+    'ar': 'محب للحفلات', 'ru': 'Тусовщик', 'zh': '派对达人',
+    'ja': 'パーティー好き', 'ko': '파티광',
+  },
+  'Culturel': {
+    'en': 'Culture enthusiast', 'es': 'Amante de la cultura',
+    'de': 'Kulturinteressiert', 'it': 'Amante della cultura',
+    'pt': 'Amante da cultura', 'nl': 'Cultuurliefhebber',
+    'ar': 'عاشق الثقافة', 'ru': 'Любитель культуры', 'zh': '文化爱好者',
+    'ja': '文化好き', 'ko': '문화 애호가',
+  },
+  'Romantique': {
+    'en': 'Romantic', 'es': 'Romántico', 'de': 'Romantisch',
+    'it': 'Romantico', 'pt': 'Romântico', 'nl': 'Romantisch',
+    'ar': 'رومانسي', 'ru': 'Романтик', 'zh': '浪漫主义者', 'ja': 'ロマンチスト',
+    'ko': '로맨티스트',
+  },
+  'Zen': {
+    'en': 'Zen', 'es': 'Zen', 'de': 'Zen', 'it': 'Zen', 'pt': 'Zen',
+    'nl': 'Zen', 'ar': 'هادئ', 'ru': 'Дзен', 'zh': '禅意', 'ja': '禅',
+    'ko': '젠',
+  },
+  "Passionné d'automobile": {
+    'en': 'Car enthusiast', 'es': 'Apasionado de los coches',
+    'de': 'Autobegeistert', 'it': 'Appassionato di auto',
+    'pt': 'Apaixonado por carros', 'nl': 'Autofanaat',
+    'ar': 'عاشق السيارات', 'ru': 'Автолюбитель', 'zh': '汽车爱好者',
+    'ja': '車好き', 'ko': '자동차 애호가',
+  },
+};
+
+/// Display translations for the [PersonaCategory.examplesFr] hint line —
+/// purely illustrative text, keyed by the same French label as
+/// [_kPersonaLabelI18n].
+const Map<String, Map<String, String>> _kPersonaExamplesI18n = {
+  'Sportif': {
+    'en': 'Football, Basketball, Tennis, MMA, F1, Running, Gym',
+    'es': 'Fútbol, Baloncesto, Tenis, MMA, F1, Running, Gimnasio',
+    'de': 'Fußball, Basketball, Tennis, MMA, F1, Laufen, Fitnessstudio',
+    'it': 'Calcio, Basket, Tennis, MMA, F1, Corsa, Palestra',
+    'pt': 'Futebol, Basquete, Tênis, MMA, F1, Corrida, Academia',
+    'nl': 'Voetbal, Basketbal, Tennis, MMA, F1, Hardlopen, Sportschool',
+    'ar': 'كرة القدم، كرة السلة، التنس، الفنون القتالية، الفورمولا 1، الجري، الجيم',
+    'ru': 'Футбол, Баскетбол, Теннис, ММА, Формула-1, Бег, Тренажёрный зал',
+    'zh': '足球、篮球、网球、综合格斗、一级方程式赛车、跑步、健身房',
+    'ja': 'サッカー、バスケ、テニス、総合格闘技、F1、ランニング、ジム',
+    'ko': '축구, 농구, 테니스, 종합격투기, F1, 러닝, 헬스장',
+  },
+  'Mélomane': {
+    'en': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'es': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'de': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'it': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'pt': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'nl': 'Rap, R&B, K-pop, Rock, Afrobeat, EDM',
+    'ar': 'الراب، آر أند بي، الكي بوب، الروك، الأفروبيت، الإلكترونية',
+    'ru': 'Рэп, Ар-н-би, K-pop, Рок, Afrobeat, Электроника',
+    'zh': '说唱、R&B、K-pop、摇滚、非洲节拍、电子舞曲',
+    'ja': 'ラップ、R&B、K-POP、ロック、アフロビート、EDM',
+    'ko': '랩, R&B, 케이팝, 록, 아프로비트, EDM',
+  },
+  'Gamer': {
+    'en': 'FPS, RPG, Nintendo, PlayStation, PC, Mobile',
+    'es': 'FPS, RPG, Nintendo, PlayStation, PC, Móvil',
+    'de': 'FPS, RPG, Nintendo, PlayStation, PC, Mobile',
+    'it': 'FPS, RPG, Nintendo, PlayStation, PC, Mobile',
+    'pt': 'FPS, RPG, Nintendo, PlayStation, PC, Celular',
+    'nl': 'FPS, RPG, Nintendo, PlayStation, PC, Mobiel',
+    'ar': 'FPS، RPG، نينتندو، بلايستيشن، حاسوب، جوال',
+    'ru': 'Шутеры, RPG, Nintendo, PlayStation, ПК, Мобильные игры',
+    'zh': 'FPS、RPG、任天堂、PlayStation、电脑、手游',
+    'ja': 'FPS、RPG、任天堂、プレイステーション、PC、モバイル',
+    'ko': 'FPS, RPG, 닌텐도, 플레이스테이션, PC, 모바일',
+  },
+  'Voyageur': {
+    'en': 'Japan, Europe, Backpacking, Road trips, Solo travel',
+    'es': 'Japón, Europa, Mochilero, Road trips, Viajes en solitario',
+    'de': 'Japan, Europa, Backpacking, Roadtrips, Alleinreisen',
+    'it': 'Giappone, Europa, Backpacking, Road trip, Viaggi da solo',
+    'pt': 'Japão, Europa, Mochilão, Road trips, Viagens sozinho',
+    'nl': 'Japan, Europa, Backpacken, Roadtrips, Alleen reizen',
+    'ar': 'اليابان، أوروبا، السفر بحقيبة الظهر، رحلات برية، السفر منفردًا',
+    'ru': 'Япония, Европа, Бэкпекинг, Автопутешествия, Соло-путешествия',
+    'zh': '日本、欧洲、背包旅行、自驾游、独自旅行',
+    'ja': '日本、ヨーロッパ、バックパッキング、ロードトリップ、ひとり旅',
+    'ko': '일본, 유럽, 배낭여행, 로드트립, 혼자 여행',
+  },
+  'Gourmet': {
+    'en': 'Japanese food, Street food, Restaurants, Pastries',
+    'es': 'Cocina japonesa, Street food, Restaurantes, Repostería',
+    'de': 'Japanische Küche, Street Food, Restaurants, Patisserie',
+    'it': 'Cucina giapponese, Street food, Ristoranti, Pasticceria',
+    'pt': 'Culinária japonesa, Street food, Restaurantes, Confeitaria',
+    'nl': 'Japanse keuken, Streetfood, Restaurants, Patisserie',
+    'ar': 'المطبخ الياباني، أطعمة الشارع، المطاعم، الحلويات',
+    'ru': 'Японская кухня, Стритфуд, Рестораны, Кондитерские изделия',
+    'zh': '日本料理、街头小吃、餐厅、甜点',
+    'ja': '和食、屋台グルメ、レストラン、スイーツ',
+    'ko': '일식, 길거리 음식, 레스토랑, 디저트',
+  },
+  'Cinéphile': {
+    'en': 'Movies, TV Shows, Anime, K-dramas, Marvel, Disney',
+    'es': 'Películas, Series, Anime, K-dramas, Marvel, Disney',
+    'de': 'Filme, Serien, Anime, K-Dramas, Marvel, Disney',
+    'it': 'Film, Serie TV, Anime, K-drama, Marvel, Disney',
+    'pt': 'Filmes, Séries, Anime, K-dramas, Marvel, Disney',
+    'nl': "Films, Series, Anime, K-drama's, Marvel, Disney",
+    'ar': 'الأفلام، المسلسلات، الأنمي، الدراما الكورية، مارفل، ديزني',
+    'ru': 'Фильмы, Сериалы, Аниме, Корейские дорамы, Marvel, Disney',
+    'zh': '电影、剧集、动漫、韩剧、漫威、迪士尼',
+    'ja': '映画、ドラマ、アニメ、韓国ドラマ、マーベル、ディズニー',
+    'ko': '영화, 드라마, 애니메이션, 한드, 마블, 디즈니',
+  },
+  'Fashion': {
+    'en': 'Streetwear, Luxury, Sneakers, Vintage, Beauty',
+    'es': 'Streetwear, Lujo, Zapatillas, Vintage, Belleza',
+    'de': 'Streetwear, Luxus, Sneaker, Vintage, Beauty',
+    'it': 'Streetwear, Lusso, Sneakers, Vintage, Bellezza',
+    'pt': 'Streetwear, Luxo, Tênis, Vintage, Beleza',
+    'nl': 'Streetwear, Luxe, Sneakers, Vintage, Beauty',
+    'ar': 'الستريتوير، الفخامة، الأحذية الرياضية، القديم الأنيق، الجمال',
+    'ru': 'Стритвир, Люкс, Кроссовки, Винтаж, Красота',
+    'zh': '街头风、奢侈品、运动鞋、复古、美妆',
+    'ja': 'ストリートウェア、ラグジュアリー、スニーカー、ヴィンテージ、ビューティー',
+    'ko': '스트리트웨어, 럭셔리, 스니커즈, 빈티지, 뷰티',
+  },
+  'Fitness': {
+    'en': 'Weightlifting, Running, Nutrition, CrossFit, Wellness',
+    'es': 'Musculación, Running, Nutrición, CrossFit, Bienestar',
+    'de': 'Krafttraining, Laufen, Ernährung, CrossFit, Wellness',
+    'it': 'Palestra, Corsa, Nutrizione, CrossFit, Benessere',
+    'pt': 'Musculação, Corrida, Nutrição, CrossFit, Bem-estar',
+    'nl': 'Krachttraining, Hardlopen, Voeding, CrossFit, Wellness',
+    'ar': 'كمال الأجسام، الجري، التغذية، الكروسفت، العافية',
+    'ru': 'Силовые тренировки, Бег, Питание, Кроссфит, Велнес',
+    'zh': '健身、跑步、营养、CrossFit、养生',
+    'ja': '筋トレ、ランニング、栄養、クロスフィット、ウェルネス',
+    'ko': '웨이트트레이닝, 러닝, 영양, 크로스핏, 웰빙',
+  },
+  'Ambitieux': {
+    'en': 'Entrepreneurship, Business, Finance, Career, Leadership',
+    'es': 'Emprendimiento, Negocios, Finanzas, Carrera, Liderazgo',
+    'de': 'Unternehmertum, Business, Finanzen, Karriere, Führung',
+    'it': 'Imprenditoria, Business, Finanza, Carriera, Leadership',
+    'pt': 'Empreendedorismo, Negócios, Finanças, Carreira, Liderança',
+    'nl': 'Ondernemerschap, Business, Financiën, Carrière, Leiderschap',
+    'ar': 'ريادة الأعمال، الأعمال، المالية، المسار المهني، القيادة',
+    'ru': 'Предпринимательство, Бизнес, Финансы, Карьера, Лидерство',
+    'zh': '创业、商业、金融、职业发展、领导力',
+    'ja': '起業、ビジネス、金融、キャリア、リーダーシップ',
+    'ko': '창업, 비즈니스, 금융, 커리어, 리더십',
+  },
+  'Créatif': {
+    'en': 'Drawing, Photography, Video, Design, Music',
+    'es': 'Dibujo, Fotografía, Vídeo, Diseño, Música',
+    'de': 'Zeichnen, Fotografie, Video, Design, Musik',
+    'it': 'Disegno, Fotografia, Video, Design, Musica',
+    'pt': 'Desenho, Fotografia, Vídeo, Design, Música',
+    'nl': 'Tekenen, Fotografie, Video, Design, Muziek',
+    'ar': 'الرسم، التصوير، الفيديو، التصميم، الموسيقى',
+    'ru': 'Рисование, Фотография, Видео, Дизайн, Музыка',
+    'zh': '绘画、摄影、视频、设计、音乐',
+    'ja': '絵、写真、動画、デザイン、音楽',
+    'ko': '그림, 사진, 영상, 디자인, 음악',
+  },
+  'Curieux': {
+    'en': 'History, Science, Philosophy, Psychology, Culture',
+    'es': 'Historia, Ciencia, Filosofía, Psicología, Cultura',
+    'de': 'Geschichte, Wissenschaft, Philosophie, Psychologie, Kultur',
+    'it': 'Storia, Scienza, Filosofia, Psicologia, Cultura',
+    'pt': 'História, Ciência, Filosofia, Psicologia, Cultura',
+    'nl': 'Geschiedenis, Wetenschap, Filosofie, Psychologie, Cultuur',
+    'ar': 'التاريخ، العلوم، الفلسفة، علم النفس، الثقافة',
+    'ru': 'История, Наука, Философия, Психология, Культура',
+    'zh': '历史、科学、哲学、心理学、文化',
+    'ja': '歴史、科学、哲学、心理学、文化',
+    'ko': '역사, 과학, 철학, 심리학, 문화',
+  },
+  'Tech': {
+    'en': 'AI, Coding, Startups, Gadgets, Crypto',
+    'es': 'IA, Programación, Startups, Gadgets, Cripto',
+    'de': 'KI, Programmieren, Startups, Gadgets, Krypto',
+    'it': 'IA, Programmazione, Startup, Gadget, Crypto',
+    'pt': 'IA, Programação, Startups, Gadgets, Cripto',
+    'nl': 'AI, Programmeren, Startups, Gadgets, Crypto',
+    'ar': 'الذكاء الاصطناعي، البرمجة، الشركات الناشئة، الأجهزة الذكية، العملات المشفرة',
+    'ru': 'ИИ, Программирование, Стартапы, Гаджеты, Крипта',
+    'zh': '人工智能、编程、初创公司、数码产品、加密货币',
+    'ja': 'AI、プログラミング、スタートアップ、ガジェット、暗号資産',
+    'ko': 'AI, 코딩, 스타트업, 가젯, 코인',
+  },
+  'Nature': {
+    'en': 'Hiking, Camping, Animals, Beach, Mountains',
+    'es': 'Senderismo, Camping, Animales, Playa, Montaña',
+    'de': 'Wandern, Camping, Tiere, Strand, Berge',
+    'it': 'Escursionismo, Campeggio, Animali, Spiaggia, Montagna',
+    'pt': 'Trilhas, Acampamento, Animais, Praia, Montanha',
+    'nl': 'Wandelen, Kamperen, Dieren, Strand, Bergen',
+    'ar': 'المشي لمسافات طويلة، التخييم، الحيوانات، الشاطئ، الجبال',
+    'ru': 'Пешие походы, Кемпинг, Животные, Пляж, Горы',
+    'zh': '徒步、露营、动物、海滩、山',
+    'ja': 'ハイキング、キャンプ、動物、ビーチ、山',
+    'ko': '하이킹, 캠핑, 동물, 해변, 산',
+  },
+  'Fêtard': {
+    'en': 'Clubs, Festivals, Concerts, Nightlife, Events',
+    'es': 'Discotecas, Festivales, Conciertos, Vida nocturna, Eventos',
+    'de': 'Clubs, Festivals, Konzerte, Nachtleben, Events',
+    'it': 'Locali, Festival, Concerti, Vita notturna, Eventi',
+    'pt': 'Baladas, Festivais, Shows, Vida noturna, Eventos',
+    'nl': 'Clubs, Festivals, Concerten, Nachtleven, Events',
+    'ar': 'النوادي، المهرجانات، الحفلات الموسيقية، الحياة الليلية، الفعاليات',
+    'ru': 'Клубы, Фестивали, Концерты, Ночная жизнь, Мероприятия',
+    'zh': '夜店、音乐节、演唱会、夜生活、活动',
+    'ja': 'クラブ、フェス、コンサート、ナイトライフ、イベント',
+    'ko': '클럽, 페스티벌, 콘서트, 나이트라이프, 이벤트',
+  },
+  'Culturel': {
+    'en': 'Traditions, Languages, Art, History, Foreign cultures',
+    'es': 'Tradiciones, Idiomas, Arte, Historia, Culturas extranjeras',
+    'de': 'Traditionen, Sprachen, Kunst, Geschichte, Fremde Kulturen',
+    'it': 'Tradizioni, Lingue, Arte, Storia, Culture straniere',
+    'pt': 'Tradições, Idiomas, Arte, História, Culturas estrangeiras',
+    'nl': 'Tradities, Talen, Kunst, Geschiedenis, Vreemde culturen',
+    'ar': 'التقاليد، اللغات، الفن، التاريخ، الثقافات الأجنبية',
+    'ru': 'Традиции, Языки, Искусство, История, Иностранные культуры',
+    'zh': '传统、语言、艺术、历史、异国文化',
+    'ja': '伝統、言語、アート、歴史、異文化',
+    'ko': '전통, 언어, 예술, 역사, 외국 문화',
+  },
+  'Romantique': {
+    'en': 'Dating, Couples, Romance, Relationships',
+    'es': 'Citas, Parejas, Romance, Relaciones',
+    'de': 'Dating, Paare, Romantik, Beziehungen',
+    'it': 'Dating, Coppie, Romanticismo, Relazioni',
+    'pt': 'Encontros, Casais, Romance, Relacionamentos',
+    'nl': 'Dating, Koppels, Romantiek, Relaties',
+    'ar': 'المواعدة، الأزواج، الرومانسية، العلاقات',
+    'ru': 'Свидания, Пары, Романтика, Отношения',
+    'zh': '约会、情侣、浪漫、恋爱关系',
+    'ja': 'デート、カップル、ロマンス、恋愛',
+    'ko': '데이트, 커플, 로맨스, 연애',
+  },
+  'Zen': {
+    'en': 'Meditation, Yoga, Wellness, Spirituality',
+    'es': 'Meditación, Yoga, Bienestar, Espiritualidad',
+    'de': 'Meditation, Yoga, Wellness, Spiritualität',
+    'it': 'Meditazione, Yoga, Benessere, Spiritualità',
+    'pt': 'Meditação, Yoga, Bem-estar, Espiritualidade',
+    'nl': 'Meditatie, Yoga, Wellness, Spiritualiteit',
+    'ar': 'التأمل، اليوغا، العافية، الروحانية',
+    'ru': 'Медитация, Йога, Велнес, Духовность',
+    'zh': '冥想、瑜伽、养生、灵性',
+    'ja': '瞑想、ヨガ、ウェルネス、スピリチュアル',
+    'ko': '명상, 요가, 웰빙, 영성',
+  },
+  "Passionné d'automobile": {
+    'en': 'Cars, JDM, Supercars, Motorsport, Tuning',
+    'es': 'Coches, JDM, Superdeportivos, Motorsport, Tuning',
+    'de': 'Autos, JDM, Supersportwagen, Motorsport, Tuning',
+    'it': 'Auto, JDM, Supercar, Motorsport, Tuning',
+    'pt': 'Carros, JDM, Supercarros, Automobilismo, Tuning',
+    'nl': "Auto's, JDM, Supercars, Motorsport, Tuning",
+    'ar': 'السيارات، JDM، السيارات الخارقة، رياضة السيارات، التعديل',
+    'ru': 'Машины, JDM, Суперкары, Автоспорт, Тюнинг',
+    'zh': '汽车、JDM、超跑、赛车运动、改装',
+    'ja': '車、JDM、スーパーカー、モータースポーツ、チューニング',
+    'ko': '자동차, JDM, 슈퍼카, 모터스포츠, 튜닝',
+  },
+};
+
+/// Localised display text for a persona-category [key] (a French label from
+/// `persona_categories.dart`). Returns the key itself for French and for any
+/// term without a translation, so display always degrades to the stored
+/// French label rather than throwing.
+String personaCategoryLabel(String key) {
+  final lang = AppStrings.currentBcp47.value;
+  if (lang == 'fr') return key;
+  return _kPersonaLabelI18n[key]?[lang] ?? key;
+}
+
+/// Localised display text for the illustrative examples line under a
+/// persona-category [key]. [fallbackFr] is that category's
+/// `PersonaCategory.examplesFr` — passed in by the caller (rather than
+/// looked up here) so this file doesn't need to import
+/// `persona_categories.dart`, which already exports this one. Same fallback
+/// rules as [personaCategoryLabel].
+String personaCategoryExamples(String key, String fallbackFr) {
+  final lang = AppStrings.currentBcp47.value;
+  if (lang == 'fr') return fallbackFr;
+  return _kPersonaExamplesI18n[key]?[lang] ?? fallbackFr;
+}

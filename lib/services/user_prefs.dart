@@ -10,6 +10,12 @@ abstract final class UserPrefs {
   /// Asked once during onboarding right after the language step and never
   /// shown again. Empty when not yet provided.
   static const String keyGender = 'profile_gender';
+  /// The single "what defines you most" persona category (one of
+  /// `kPersonaCategories`, persona_categories.dart). Asked once during
+  /// onboarding right after gender and never shown again — same "asked
+  /// once, editable later from the profile" pattern as [keyGender]. Empty
+  /// when not yet provided.
+  static const String keyPersonaCategory = 'profile_persona_category';
   static const String keyTranslatedVolume = 'audio_translated_volume';
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
@@ -107,6 +113,7 @@ abstract final class UserPrefs {
     required String sourceLang,
     required String targetLang,
     String gender = '',
+    String personaCategory = '',
   }) async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(keyOnboardingDone, true);
@@ -116,6 +123,10 @@ abstract final class UserPrefs {
     final g = gender.trim();
     if (g == 'm' || g == 'f' || g == 'x') {
       await p.setString(keyGender, g);
+    }
+    final pc = personaCategory.trim();
+    if (pc.isNotEmpty) {
+      await p.setString(keyPersonaCategory, pc);
     }
   }
 
@@ -137,6 +148,7 @@ abstract final class UserPrefs {
       sourceLang: p.getString(keySourceLang) ?? '',
       targetLang: p.getString(keyTargetLang) ?? '',
       gender: (g == 'm' || g == 'f' || g == 'x') ? g : '',
+      personaCategory: (p.getString(keyPersonaCategory) ?? '').trim(),
     );
   }
 
@@ -146,6 +158,13 @@ abstract final class UserPrefs {
     final p = await SharedPreferences.getInstance();
     final g = (p.getString(keyGender) ?? '').trim();
     return g == 'm' || g == 'f' || g == 'x';
+  }
+
+  /// True once the user picked a persona category at least once. Mirrors
+  /// [isGenderSet] — the onboarding step is skipped on subsequent runs.
+  static Future<bool> isPersonaCategorySet() async {
+    final p = await SharedPreferences.getInstance();
+    return (p.getString(keyPersonaCategory) ?? '').trim().isNotEmpty;
   }
 
   /// Clears onboarding flag so the welcome flow shows again (e.g. from
@@ -270,6 +289,7 @@ class ProfileSnapshot {
     required this.sourceLang,
     required this.targetLang,
     this.gender = '',
+    this.personaCategory = '',
   });
 
   final String firstName;
@@ -278,4 +298,7 @@ class ProfileSnapshot {
 
   /// `m` / `f` / `x` / `''` — see [UserPrefs.keyGender].
   final String gender;
+
+  /// A `kPersonaCategories` label, or `''` — see [UserPrefs.keyPersonaCategory].
+  final String personaCategory;
 }

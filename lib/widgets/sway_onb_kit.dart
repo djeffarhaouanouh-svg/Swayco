@@ -78,6 +78,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
 import '../services/languages.dart';
+import '../services/persona_categories.dart';
 import '../theme/swayco_theme.dart';
 
 /// Jetons de la direction 1e. Le cyan reste [SC.accent] du thème.
@@ -850,6 +851,154 @@ class SwayStepGender extends StatelessWidget {
           finishLabelKey: finishLabelKey,
         ),
       ],
+    );
+  }
+}
+
+/// "Qu'est-ce qui te définit le plus ?" — single choice among the 18
+/// `kPersonaCategories`. Unlike the short 2-3 option lists elsewhere
+/// ([SwayStepGender], the language grid), 18 options need a 2-column grid
+/// rather than a tall list of full-width [SwayPickRow]s.
+class SwayStepPersonaCategory extends StatelessWidget {
+  const SwayStepPersonaCategory({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+    required this.onBack,
+    required this.onFinish,
+    this.finishLabelKey = 'onb_finish',
+  });
+
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onBack;
+  final VoidCallback onFinish;
+  final String finishLabelKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                SwayOnb.gutter, 48, SwayOnb.gutter, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _StepHead(
+                  titleKey: 'onb_persona_title',
+                  subtitleKey: 'onb_persona_subtitle',
+                ),
+                const SizedBox(height: 28),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: kPersonaCategories.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.92,
+                  ),
+                  itemBuilder: (context, i) {
+                    final cat = kPersonaCategories[i];
+                    return _PersonaCard(
+                      category: cat,
+                      selected: selected == cat.label,
+                      onTap: () => onSelect(cat.label),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        _StepFooter(
+          onBack: onBack,
+          onFinish: selected == null ? null : onFinish,
+          finishLabelKey: finishLabelKey,
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonaCard extends StatelessWidget {
+  const _PersonaCard({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PersonaCategory category;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SwayOnb.fieldBg,
+      borderRadius: BorderRadius.circular(SwayOnb.radius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(SwayOnb.radius),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(SwayOnb.radius),
+            border: Border.all(
+              color: selected ? SC.accent : SwayOnb.fieldBorder,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(category.emoji, style: const TextStyle(fontSize: 24)),
+                  const Spacer(),
+                  if (selected)
+                    Container(
+                      width: 20,
+                      height: 20,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: SC.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_rounded,
+                          size: 13, color: SwayOnb.onAccent),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                personaCategoryLabel(category.label),
+                style: GoogleFonts.dmSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFFE6EBEF),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: Text(
+                  personaCategoryExamples(category.label, category.examplesFr),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: SwayOnb.dim,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
