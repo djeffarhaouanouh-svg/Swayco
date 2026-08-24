@@ -68,6 +68,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
             widget.asset,
             controller: _controller,
             fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
             onLoaded: (composition) {
               if (_started) return;
               _started = true;
