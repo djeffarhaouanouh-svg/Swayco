@@ -1,55 +1,84 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import 'package:video_player/video_player.dart';
 
-/// Boot splash for Swayco — renders the `assets/Traduction.json` Lottie
-/// animation (cyan + white line-art) centred on pure black.
+/// Boot splash for Swayco — plays `assets/splash.mp4` (Ring+Arrow, cassure
+/// nette) centred on pure black.
 ///
-/// Plays through exactly ONCE (no infinite loop) and fires [onComplete] when
-/// done, so `main.dart` can hand off to the first real screen. The web boot
-/// page (`web/index.html`) plays the SAME Lottie during engine download, so
-/// the hand-off from the HTML splash to this one is invisible.
+/// Decorative only: `main.dart` dismisses this overlay as soon as the landing
+/// screen is ready, even if the clip is still playing. The video itself plays
+/// once (no loop) and holds its last frame if it finishes first. The web boot
+/// page (`web/index.html`) plays the SAME file during engine download.
 class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,
-    this.asset = 'assets/Traduction.json',
+    this.asset = 'assets/splash.mp4',
     this.background = const Color(0xFF000000),
     this.onComplete,
   });
 
-  /// Lottie animation rendered at the centre of the screen.
+  /// Video rendered at the centre of the screen.
   final String asset;
 
   /// Pure black by design — matches the web boot page and the app theme.
   final Color background;
 
-  /// Fired once, after the animation has played through a single time.
+  /// Optional. Boot does **not** wait on this — the overlay is dismissed by
+  /// `main.dart` when the landing screen is ready, even mid-playback.
   final VoidCallback? onComplete;
 
   @override
   State<SplashScreenAnimation> createState() => _SplashScreenAnimationState();
 }
 
-class _SplashScreenAnimationState extends State<SplashScreenAnimation>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  bool _started = false;
+class _SplashScreenAnimationState extends State<SplashScreenAnimation> {
+  VideoPlayerController? _controller;
+  bool _completed = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this)
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          widget.onComplete?.call();
-        }
-      });
+    final controller = VideoPlayerController.asset(widget.asset);
+    _controller = controller;
+    controller.initialize().then((_) {
+      if (!mounted) return;
+      controller
+        ..setLooping(false)
+        ..setVolume(0)
+        ..addListener(_onTick)
+        ..play();
+      setState(() {});
+    }).catchError((Object e) {
+      debugPrint('splash video failed to load: $e');
+      _fireComplete();
+    });
+  }
+
+  void _onTick() {
+    final c = _controller;
+    if (c == null || _completed) return;
+    final v = c.value;
+    if (v.isCompleted ||
+        (v.duration > Duration.zero &&
+            v.position >= v.duration &&
+            !v.isPlaying)) {
+      _fireComplete();
+    }
+  }
+
+  void _fireComplete() {
+    if (_completed) return;
+    _completed = true;
+    widget.onComplete?.call();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    final c = _controller;
+    _controller = null;
+    c?.removeListener(_onTick);
+    c?.dispose();
     super.dispose();
   }
 
@@ -57,6 +86,8 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
   Widget build(BuildContext context) {
     final shortest = MediaQuery.sizeOf(context).shortestSide;
     final size = math.min(shortest * 0.80, 500.0);
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized;
 
     return Scaffold(
       backgroundColor: widget.background,
@@ -64,21 +95,16 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
         child: SizedBox(
           width: size,
           height: size,
-          child: Lottie.asset(
-            widget.asset,
-            // Driven by [_controller] → plays once, then holds the last frame
-            // until main.dart swaps in the next screen (never loops).
-            controller: _controller,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            onLoaded: (composition) {
-              if (_started) return;
-              _started = true;
-              _controller
-                ..duration = composition.duration
-                ..forward();
-            },
-          ),
+          child: ready
+              ? FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: c.value.size.width,
+                    height: c.value.size.height,
+                    child: VideoPlayer(c),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ),
     );

@@ -14,7 +14,7 @@ import 'package:livekit_translate/main.dart' as app;
 /// emulator without API keys some platform-channel inits never fully settle,
 /// and an unbounded `await main()` would hang the whole test (12-min default
 /// timeout). Pumping FIXED frames afterwards (never `pumpAndSettle` — the
-/// Lottie splash animates forever) clears the splash and lands the first real
+/// splash video / pending timers) clears the splash and lands the first real
 /// screen.
 Future<List<FlutterErrorDetails>> bootApp(WidgetTester tester) async {
   final errors = <FlutterErrorDetails>[];

@@ -40,7 +40,7 @@ gap by forwarding every `.env` key as a `--dart-define`.
 
 ## Gotchas
 
-- Never `pumpAndSettle()` here — the Lottie splash animates forever and it would
+- Never `pumpAndSettle()` here — the boot splash / pending timers would
   spin. Use the fixed-frame `bootApp()` / `pumpUntilFound()` helpers in
   `helpers/boot.dart`.
 - `await app.main()` must be timeout-bounded (the helper does this) or the test

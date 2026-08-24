@@ -613,7 +613,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
               // Keep the boot splash up until the landing screen is FULLY
               // ready: past bootstrap AND its content loaded (e.g. the Discover
               // feed reports via AppBoot) — so the app appears complete, never
-              // as a spinner behind the splash. No artificial minimum.
+              // as a spinner behind the splash. The MP4 is decoration only:
+              // never wait for it to finish (no artificial minimum).
               final showSplash = _loading || !homeReady;
               return Stack(
                 children: [
@@ -625,13 +626,14 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
                         ? const ColoredBox(color: Color(0xFF000000))
                         : _buildHome(),
                   ),
-                  // Splash overlay — cross-fades out once everything is ready.
+                  // Splash overlay — cross-fades out once everything is ready,
+                  // even if splash.mp4 is still playing.
                   Positioned.fill(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 450),
                       child: showSplash
-                          ? const SplashScreenAnimation()
-                          : const SizedBox.shrink(),
+                          ? const SplashScreenAnimation(key: ValueKey('splash'))
+                          : const SizedBox.shrink(key: ValueKey('home')),
                     ),
                   ),
                 ],
