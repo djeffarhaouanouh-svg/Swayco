@@ -250,7 +250,12 @@ class LiveKitTranslateApp extends StatefulWidget {
 }
 
 class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
+  static const _minSplash = Duration(seconds: 3);
+
   bool _loading = true;
+  /// False until [_minSplash] has elapsed since this state was created, so
+  /// a fast bootstrap still shows the boot video for a beat.
+  bool _minSplashElapsed = false;
   bool _needsOnboarding = false;
   bool _authed = false;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
@@ -278,6 +283,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   @override
   void initState() {
     super.initState();
+    Future<void>.delayed(_minSplash, () {
+      if (mounted) setState(() => _minSplashElapsed = true);
+    });
     _bootstrap();
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
@@ -613,9 +621,11 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
               // Keep the boot splash up until the landing screen is FULLY
               // ready: past bootstrap AND its content loaded (e.g. the Discover
               // feed reports via AppBoot) — so the app appears complete, never
-              // as a spinner behind the splash. The MP4 is decoration only:
-              // never wait for it to finish (no artificial minimum).
-              final showSplash = _loading || !homeReady;
+              // as a spinner behind the splash. Always hold at least 3s so a
+              // fast load doesn't skip the animation; dismiss afterwards even
+              // if the clip is still playing.
+              final showSplash =
+                  _loading || !homeReady || !_minSplashElapsed;
               return Stack(
                 children: [
                   // The real screen is built as soon as bootstrap resolves so
@@ -627,7 +637,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
                         : _buildHome(),
                   ),
                   // Splash overlay — cross-fades out once everything is ready,
-                  // even if splash.mp4 is still playing.
+                  // even if the Lottie is still playing.
                   Positioned.fill(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 450),

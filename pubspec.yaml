@@ -79,8 +79,8 @@ dependencies:
   sign_in_with_apple: ^8.1.0
   crypto: ^3.0.7
   flutter_callkit_incoming: ^3.1.1
-  # Plays the boot splash MP4 (SplashScreenAnimation).
-  video_player: ^2.9.5
+  # Plays the boot splash Lottie (SplashScreenAnimation).
+  lottie: ^3.1.0
   # Renders the official multicolour Google "G" on the login social button
   # (a font IconData can't carry Google's 4 brand colours).
   flutter_svg: ^2.0.0
@@ -200,8 +200,8 @@ flutter:
     - assets/test-logo.png
     # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
-    # Boot splash — Ring+Arrow "cassure nette" (same file as web/splash.mp4).
-    - assets/splash.mp4
+    # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
+    - assets/splash.json
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
     # Short chime played when the "It's a match" badge pops.
