@@ -95,22 +95,30 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 32),
                 child: Center(
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(text: 'swayc'),
-                        TextSpan(
-                          text: 'ø',
-                          style: TextStyle(color: SC.accent),
-                        ),
-                      ],
+                  // Fades in after the ring's own entrance instead of
+                  // popping in on frame 0, ahead of the icon animating in.
+                  child: FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: _controller,
+                      curve: const Interval(0.08, 0.32, curve: Curves.easeOut),
                     ),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: SC.brandFont,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(text: 'swayc'),
+                          TextSpan(
+                            text: 'ø',
+                            style: TextStyle(color: SC.accent),
+                          ),
+                        ],
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: SC.brandFont,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
                     ),
                   ),
                 ),
