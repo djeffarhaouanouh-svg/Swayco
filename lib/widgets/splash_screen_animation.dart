@@ -8,8 +8,7 @@ import 'package:lottie/lottie.dart';
 ///
 /// Plays through once (no loop) and holds the last frame. `main.dart` keeps
 /// the overlay up for at least 3s and until the landing screen is ready, then
-/// dismisses it even if the clip is still playing. The web boot page
-/// (`web/index.html`) plays the SAME file during engine download.
+/// dismisses it even if the clip is still playing. This is the only player.
 class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,

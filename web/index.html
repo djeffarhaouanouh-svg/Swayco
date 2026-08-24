@@ -29,9 +29,6 @@
 
   <title>Swayco</title>
   <link rel="manifest" href="manifest.json">
-  <!-- Start fetching the boot Lottie immediately so the HTML splash (and
-       the in-app SplashScreenAnimation) share a warm cache. -->
-  <link rel="preload" href="splash.json" as="fetch">
 
   <!-- Preload the on-device VAD model + ONNX runtime in the background so the
        first call's speech recognition is ready immediately, instead of these
@@ -112,28 +109,7 @@
         background-color: #0E0E0E;
           }
     }
-
-    /* Boot splash: splash.json Lottie, centred on the app background.
-       Shown immediately while the Flutter engine downloads + boots, then
-       removed by removeSplashFromWeb() once the first Flutter frame renders
-       (the in-app SplashScreenAnimation plays the SAME file, so the hand-off
-       is invisible). */
-    #splash {
-      position: fixed;
-      inset: 0;
-      margin: 0;
-      background-color: #0E0E0E;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2147483647;
-    }
-    #splash-lottie {
-      width: min(80vmin, 500px);
-      height: min(80vmin, 500px);
-    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
 
   <!--
     TEST — non-streaming STT (Silero VAD + Whisper). WEB ONLY, TO BE REVERTED.
@@ -146,47 +122,8 @@
   -->
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.wasm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.29/dist/bundle.min.js"></script>
-  <script id="splash-screen-script">
-    function removeSplashFromWeb() {
-      try { window.__splashAnim?.destroy(); } catch (e) {}
-      document.getElementById("splash")?.remove();
-      document.getElementById("splash-branding")?.remove();
-      // Stay on the app background behind Flutter (no white flash on first frame).
-      document.body.style.background = "#0E0E0E";
-    }
-    // Flutter fires "flutter-first-frame" once its first frame is painted —
-    // that's our cue to pull the HTML boot splash so the (identical) in-app
-    // Lottie shows through. WITHOUT this, the #splash overlay (z-index max)
-    // covers the running app forever (flutter_native_splash, which used to
-    // call removeSplashFromWeb, was retired). The timeout is a backstop in
-    // case the event never fires.
-    window.addEventListener("flutter-first-frame", removeSplashFromWeb);
-    window.setTimeout(removeSplashFromWeb, 15000);
-  </script>
 </head>
 <body>
-  <!-- Boot splash: splash.json Lottie on deep black. This is the very first
-       image on web; removeSplashFromWeb() removes it once the Flutter first
-       frame is up. Canvas renderer: the composition embeds a webp bitmap.
-       loop covers a long engine download, then the in-app player takes over. -->
-  <div id="splash">
-    <div id="splash-lottie"></div>
-  </div>
-  <script>
-    (function () {
-      try {
-        if (window.lottie) {
-          window.__splashAnim = lottie.loadAnimation({
-            container: document.getElementById("splash-lottie"),
-            renderer: "canvas",
-            loop: true,
-            autoplay: true,
-            path: "splash.json",
-          });
-        }
-      } catch (e) {}
-    })();
-  </script>
 
   <!--
     You can customize the "flutter_bootstrap.js" script.
