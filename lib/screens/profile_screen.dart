@@ -1802,7 +1802,6 @@ class _IdentitySection extends StatelessWidget {
                 label: AppStrings.t('match_matched'),
                 icon: Icons.favorite,
                 onTap: () {},
-                subdued: true,
               ),
             ] else if (peerLikedMe) ...[
               const SizedBox(height: 10),
