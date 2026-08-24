@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import '../theme/swayco_theme.dart';
+
 /// Boot splash for Swayco — plays `assets/splash.json` (Splash Sync Call —
 /// cassure nette) centred on pure black.
 ///
@@ -60,24 +62,62 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
 
     return Scaffold(
       backgroundColor: widget.background,
-      body: Center(
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Lottie.asset(
-            widget.asset,
-            controller: _controller,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            onLoaded: (composition) {
-              if (_started) return;
-              _started = true;
-              _controller
-                ..duration = composition.duration
-                ..forward();
-            },
+      body: Stack(
+        children: [
+          Center(
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Lottie.asset(
+                widget.asset,
+                controller: _controller,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                onLoaded: (composition) {
+                  if (_started) return;
+                  _started = true;
+                  _controller
+                    ..duration = composition.duration
+                    ..forward();
+                },
+              ),
+            ),
           ),
-        ),
+          // Wordmark anchored to the real bottom of the screen (safe area),
+          // independent of the Lottie's own square box — the square sits
+          // centred well above the physical bottom edge, so baking the
+          // wordmark into the composition itself would strand it mid-screen.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 32),
+                child: Center(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'swayc'),
+                        TextSpan(
+                          text: 'ø',
+                          style: TextStyle(color: SC.accent),
+                        ),
+                      ],
+                    ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: SC.brandFont,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
