@@ -2004,7 +2004,7 @@ Future<void> showPhotoViewer(
   return Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
       opaque: false,
-      barrierColor: Colors.black,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (ctx, anim, _) => _PhotoViewer(
         photos: photos,
