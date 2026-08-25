@@ -19,7 +19,6 @@ class SwaycoLogo extends StatelessWidget {
     this.wordColor = Colors.white,
     this.accentColor = const Color(0xFF22C8DE),
     this.shadows = const <Shadow>[],
-    this.ringScale = 1.0,
   });
 
   /// Taille du mot en px logiques. 23 correspond à l'en-tête Discover.
@@ -32,20 +31,14 @@ class SwaycoLogo extends StatelessWidget {
   /// sinon le "ø" décrocherait du reste sur les images claires.
   final List<Shadow> shadows;
 
-  /// Grossit ou réduit le "o" seul, le mot restant à [fontSize].
-  final double ringScale;
-
   @override
   Widget build(BuildContext context) {
-    // Toutes les mesures sont proportionnelles à fontSize (ratios du design).
-    // L'anneau monte au-dessus de la hauteur d'x : à la hauteur de capitale,
-    // il se lit comme le "o" du mot. Calé sur la hauteur d'x il passait pour
-    // une puce posée après "swayc". Les quatre mesures de l'anneau bougent
-    // ensemble via [ringScale] — le dessin garde ses proportions.
-    final ringSize = fontSize * 0.72 * ringScale;
-    final ringStroke = fontSize * 0.175 * ringScale;
-    final barLength = fontSize * 0.84 * ringScale;
-    final barThickness = fontSize * 0.125 * ringScale;
+    // Toutes les mesures sont proportionnelles à fontSize (ratios du design,
+    // voir swayco_logo_spec.md — elles ne se retouchent pas à l'oeil).
+    final ringSize = fontSize * 0.522; // hauteur d'x
+    final ringStroke = fontSize * 0.152;
+    final barLength = fontSize * 0.609;
+    final barThickness = fontSize * 0.109;
     final gap = fontSize * 0.065;
 
     final boxShadows = shadows
@@ -79,14 +72,8 @@ class SwaycoLogo extends StatelessWidget {
         ),
         SizedBox(width: gap),
         Padding(
-          // Assied l'anneau sur la ligne de base du mot, avec le léger
-          // débord qu'a toute lettre ronde. 0.176 = la descente de Plus
-          // Jakarta (222/1260 d'em) : avec height:1 c'est ce qui sépare la
-          // ligne de base du bas de la boîte de texte, sur laquelle la Row
-          // aligne l'anneau.
-          padding: EdgeInsets.only(
-            bottom: math.max(0.0, fontSize * 0.176 - ringSize * 0.021),
-          ),
+          // aligne l'anneau sur la ligne de base du mot
+          padding: EdgeInsets.only(bottom: fontSize * 0.03),
           child: SizedBox(
             width: ringSize,
             height: ringSize,
