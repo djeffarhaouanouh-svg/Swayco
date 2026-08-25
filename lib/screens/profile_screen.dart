@@ -2348,6 +2348,10 @@ class _PersonalInfoSection extends StatelessWidget {
     final p = profile;
     final save = onSave;
     if (save == null) return const SizedBox.shrink();
+    // La catégorie choisie porte son propre emoji : c'est LUI qui tient la
+    // colonne de gauche de la ligne. La coupe n'est que le pictogramme du
+    // champ vide — une fois "Mélomane" choisi, la ligne s'annonce en 🎵.
+    final personaCat = personaCategoryByLabel(p?.personaCategory ?? '');
     return Container(
       decoration: BoxDecoration(
         color: SC.glassStrong,
@@ -2411,14 +2415,13 @@ class _PersonalInfoSection extends StatelessWidget {
             },
           ),
           _PersonalInfoRow(
-            emoji: kFactEmojiPersonaCategory,
+            emoji: personaCat?.emoji ?? kFactEmojiPersonaCategory,
             label: AppStrings.t('info_persona_category'),
-            value: () {
-              final cat = personaCategoryByLabel(p?.personaCategory ?? '');
-              return cat == null
-                  ? ''
-                  : '${cat.emoji} ${personaCategoryLabel(cat.label)}';
-            }(),
+            // Sans emoji ici : il est passé à gauche, l'écrire deux fois sur
+            // la même ligne le ferait passer pour une décoration.
+            value: personaCat == null
+                ? ''
+                : personaCategoryLabel(personaCat.label),
             onPick: (ctx) async {
               final current = p?.personaCategory ?? '';
               final currentIndex = kPersonaCategoryLabels.indexOf(current);
