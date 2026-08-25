@@ -21,7 +21,8 @@ DEFINES="$ROOT/dart_defines.env"
 ART="${1:-$ROOT/build/app/outputs/bundle/release/app-release.aab}"
 
 [ -f "$DEFINES" ] || { echo "FAIL: $DEFINES introuvable."; exit 1; }
-[ -f "$ART" ]     || { echo "FAIL: artefact introuvable : $ART"; exit 1; }
+# -e, pas -f : un .app iOS est un DOSSIER (bundle), pas un fichier.
+[ -e "$ART" ]     || { echo "FAIL: artefact introuvable : $ART"; exit 1; }
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -40,7 +41,11 @@ case "$ART" in
 esac
 
 BINS="$(find "$WORK" -type f \( -name 'libapp.so' -o -name 'App' \) | sort)"
-[ -n "$BINS" ] || { echo "FAIL: aucun binaire Dart trouve dans l'artefact."; exit 1; }
+[ -n "$BINS" ] || {
+  echo "FAIL: aucun binaire Dart trouve dans $ART"
+  echo "      (attendu : lib/*/libapp.so, ou Frameworks/App.framework/App)"
+  exit 1
+}
 
 fail=0
 
