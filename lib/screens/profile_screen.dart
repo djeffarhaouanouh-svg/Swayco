@@ -3765,7 +3765,14 @@ class _EditAccountRow extends StatelessWidget {
                 ),
               ),
             ),
-            Flexible(
+            const SizedBox(width: 12),
+            // Largeur PLAFONNÉE, pas partagée. En Flexible, la valeur prenait
+            // la moitié de l'espace libre au même titre que le libellé : elle
+            // commençait donc au milieu de la ligne quel que soit sa longueur,
+            // et avait l'air centrée. Bornée, elle est poussée contre le
+            // chevron par le libellé, qui absorbe tout le reste.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 170),
               child: Text(
                 value,
                 maxLines: 1,
