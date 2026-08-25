@@ -757,6 +757,26 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                     },
                                   ),
                                 ),
+                              // Et une fois déplié, la photo restée visible
+                              // referme — au tap comme au glissement vers le
+                              // bas, comme dans le feed.
+                              if (_infoOpen)
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  top: 0,
+                                  bottom: panelH,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () =>
+                                        setState(() => _infoOpen = false),
+                                    onVerticalDragEnd: (d) {
+                                      if ((d.primaryVelocity ?? 0) > 0) {
+                                        setState(() => _infoOpen = false);
+                                      }
+                                    },
+                                  ),
+                                ),
                               AnimatedPositioned(
                                 duration: const Duration(milliseconds: 280),
                                 curve: Curves.easeOutCubic,
@@ -1114,10 +1134,11 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               child: _buildCard(widget.cards[i]),
             ),
           ),
-          // Au-dessus du panneau, la photo reste vivante : les taps
-          // gauche/droite continuent de faire défiler le carrousel. Seul un
-          // glissement vers le BAS est capté ici, pour rabattre le panneau —
-          // d'où le translucent (il ne réclame pas le tap).
+          // Au-dessus du panneau : la bande de photo qui reste sert à
+          // REFERMER. Un tap y rabat le panneau — c'est le geste que tout le
+          // monde tente en premier — et un glissement vers le bas aussi. Le
+          // carrousel de photos y perd ses taps gauche/droite tant que le
+          // panneau est ouvert : sortir d'abord, feuilleter ensuite.
           if (widget.infoOpen)
             Positioned(
               left: 0,
@@ -1125,7 +1146,8 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               top: 0,
               bottom: panelH,
               child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onCloseInfo,
                 onVerticalDragEnd: (d) {
                   if ((d.primaryVelocity ?? 0) > 0) widget.onCloseInfo();
                 },
@@ -1182,15 +1204,26 @@ class _TinderCardStackState extends State<_TinderCardStack> {
 /// personne a choisi de partager (âge, taille, métier, signe, ce qu'elle
 /// cherche), puis ses centres d'intérêt. Il reste DANS la carte — on ne change
 /// pas de page — et se rabat d'un glissement vers le bas.
-class _ProfileInfoPanel extends StatelessWidget {
+class _ProfileInfoPanel extends StatefulWidget {
   const _ProfileInfoPanel({required this.profile, required this.onClose});
 
   final RemoteProfile profile;
   final VoidCallback onClose;
 
   @override
+  State<_ProfileInfoPanel> createState() => _ProfileInfoPanelState();
+}
+
+class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
+  /// Distance parcourue vers le bas depuis le début du geste. Fermer sur le
+  /// seul élan demandait un coup sec : un glissement lent, celui qu'on fait
+  /// quand on croit scroller, mourait à zéro de vélocité et le panneau
+  /// restait planté là.
+  double _dragDy = 0;
+
+  @override
   Widget build(BuildContext context) {
-    final p = profile;
+    final p = widget.profile;
     final place = [p.city.trim(), p.country.trim()]
         .where((e) => e.isNotEmpty)
         .join(', ');
@@ -1234,9 +1267,12 @@ class _ProfileInfoPanel extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      // Un glissement vers le bas suffit à le rabattre — pas de bouton.
+      // Un glissement vers le bas suffit à le rabattre — pas de bouton. Un
+      // coup sec OU 56 px parcourus : les deux ferment.
+      onVerticalDragStart: (_) => _dragDy = 0,
+      onVerticalDragUpdate: (d) => _dragDy += d.delta.dy,
       onVerticalDragEnd: (d) {
-        if ((d.primaryVelocity ?? 0) > 120) onClose();
+        if ((d.primaryVelocity ?? 0) > 120 || _dragDy > 56) widget.onClose();
       },
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -1276,15 +1312,17 @@ class _ProfileInfoPanel extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  // Ceinture : le panneau est taillé pour tout contenir (bio
-                  // plafonnée à 80 caractères, un seul centre d'intérêt), donc
-                  // il ne défile pas. Mais sur un très petit écran — ou pour un
-                  // ancien profil à plusieurs intérêts — le contenu peut
-                  // dépasser : la hauteur minimale rend alors la vue défilable
-                  // au lieu de couper la fin.
+                  // Contenu FIXE. Le panneau est taillé pour tout contenir
+                  // (bio plafonnée à 80 caractères, un seul centre d'intérêt)
+                  // et il défilait "au cas où" : le geste vers le bas partait
+                  // alors dans le défilement au lieu de rabattre le panneau,
+                  // qui devenait très dur à refermer. Rien ne défile ici, donc
+                  // tout glissement revient au panneau. La vue reste une
+                  // SingleChildScrollView pour qu'un dépassement se coupe
+                  // proprement plutôt que de barrer l'écran.
                   child: LayoutBuilder(
                     builder: (ctx, c) => SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
+                    physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
                     child: ConstrainedBox(
                       // 102 = le padding vertical ci-dessus ; sans lui la
