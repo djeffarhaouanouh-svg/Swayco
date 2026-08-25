@@ -1221,6 +1221,27 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
   /// restait planté là.
   double _dragDy = 0;
 
+  /// Vrai depuis l'instant où le débord a demandé la fermeture jusqu'au retour
+  /// de la liste à sa position haute : sans lui, chaque image du geste
+  /// rappellerait onClose.
+  bool _dismissing = false;
+
+  /// Le débord vers le haut vaut fermeture. [ScrollUpdateNotification] porte
+  /// des pixels négatifs quand la liste est tirée sous son point de départ —
+  /// c'est là, et seulement là, que le glissement cesse d'être du défilement.
+  bool _onPanelScroll(ScrollNotification n) {
+    if (n is ScrollUpdateNotification) {
+      final over = n.metrics.pixels;
+      if (over >= 0) {
+        _dismissing = false;
+      } else if (!_dismissing && over < -70) {
+        _dismissing = true;
+        widget.onClose();
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
@@ -1312,14 +1333,18 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                   ),
                 ),
                 Expanded(
-                  // Contenu FIXE : plus aucune vue défilante ici. Le panneau
-                  // est taillé pour tout contenir (bio plafonnée à 80
-                  // caractères, un seul centre d'intérêt) ; il défilait "au cas
-                  // où", et ce défilement s'appropriait le glissement vers le
-                  // bas au lieu de laisser le panneau se rabattre. Le ClipRect
-                  // borde le débordement d'un profil hors normes.
-                  child: ClipRect(
-                    child: Padding(
+                  // Le contenu défile. Et comme un défilement s'approprie tout
+                  // glissement vertical, c'est LUI qui porte la fermeture :
+                  // tiré vers le bas alors qu'on est déjà en haut de la liste,
+                  // le geste n'est plus du défilement, c'est un « referme-moi »
+                  // (70 px de débord suffisent). D'où la physique élastique,
+                  // AlwaysScrollable pour qu'un profil court se tire aussi.
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _onPanelScroll,
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
                       padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
