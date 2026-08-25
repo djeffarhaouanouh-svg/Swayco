@@ -32,6 +32,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_logo.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -861,24 +862,7 @@ class _TopTabBar extends StatelessWidget {
                 onTap: onSettings,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'swayc'),
-                        TextSpan(
-                          text: 'ø',
-                          style: TextStyle(color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: SC.brandFont,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                  child: SwaycoLogo(fontSize: 23),
                 ),
               ),
               // Onglets retirés — logo à gauche, actions à droite.

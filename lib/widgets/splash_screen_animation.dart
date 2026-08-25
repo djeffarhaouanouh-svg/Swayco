@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-import '../theme/swayco_theme.dart';
+import 'swayco_logo.dart';
 
 /// Boot splash for Swayco — plays `assets/splash.json` (Splash Sync Call —
 /// cassure nette) centred on pure black.
@@ -102,24 +102,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                       parent: _controller,
                       curve: const Interval(0.08, 0.32, curve: Curves.easeOut),
                     ),
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(text: 'swayc'),
-                          TextSpan(
-                            text: 'ø',
-                            style: TextStyle(color: SC.accent),
-                          ),
-                        ],
-                      ),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontFamily: SC.brandFont,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+                    child: const SwaycoLogo(fontSize: 18),
                   ),
                 ),
               ),
