@@ -1312,24 +1312,15 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                   ),
                 ),
                 Expanded(
-                  // Contenu FIXE. Le panneau est taillé pour tout contenir
-                  // (bio plafonnée à 80 caractères, un seul centre d'intérêt)
-                  // et il défilait "au cas où" : le geste vers le bas partait
-                  // alors dans le défilement au lieu de rabattre le panneau,
-                  // qui devenait très dur à refermer. Rien ne défile ici, donc
-                  // tout glissement revient au panneau. La vue reste une
-                  // SingleChildScrollView pour qu'un dépassement se coupe
-                  // proprement plutôt que de barrer l'écran.
-                  child: LayoutBuilder(
-                    builder: (ctx, c) => SingleChildScrollView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
-                    child: ConstrainedBox(
-                      // 102 = le padding vertical ci-dessus ; sans lui la
-                      // hauteur minimale déborderait toujours d'autant.
-                      constraints: BoxConstraints(
-                        minHeight: (c.maxHeight - 102).clamp(0.0, double.infinity),
-                      ),
+                  // Contenu FIXE : plus aucune vue défilante ici. Le panneau
+                  // est taillé pour tout contenir (bio plafonnée à 80
+                  // caractères, un seul centre d'intérêt) ; il défilait "au cas
+                  // où", et ce défilement s'appropriait le glissement vers le
+                  // bas au lieu de laisser le panneau se rabattre. Le ClipRect
+                  // borde le débordement d'un profil hors normes.
+                  child: ClipRect(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 96),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -1403,7 +1394,6 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                       ],
                       ],
                       ),
-                    ),
                     ),
                   ),
                 ),
