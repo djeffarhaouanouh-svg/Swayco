@@ -2543,8 +2543,13 @@ class _PersonalInfoRow extends StatelessWidget {
                 label,
                 style: const TextStyle(color: SC.textMuted, fontSize: 14),
               ),
-              const Spacer(),
-              Flexible(
+              const SizedBox(width: 12),
+              // La valeur prend TOUT ce qui reste de la ligne. Avec un Spacer
+              // elle n'en avait que la moitié : sur un libellé long ("Ce qui
+              // me définit", "Das bin ich") il restait moins que le mot
+              // "Ajouter", qui se coupait en plein milieu. Le texte est calé à
+              // droite dans cette largeur, donc la ligne se lit pareil.
+              Expanded(
                 child: pick != null
                     ? GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -2554,6 +2559,10 @@ class _PersonalInfoRow extends StatelessWidget {
                           child: Text(
                             value.isEmpty ? AppStrings.t('info_add') : value,
                             textAlign: TextAlign.right,
+                            // Une valeur trop longue s'abrège par la fin —
+                            // jamais une césure au milieu d'un mot.
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: value.isEmpty
                                   ? SC.textMuted
