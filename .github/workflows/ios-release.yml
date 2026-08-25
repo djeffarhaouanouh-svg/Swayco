@@ -120,6 +120,13 @@ jobs:
             --dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID \
             --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
 
+      # Reread the compiled binary instead of trusting the flags above. A
+      # define silently dropped here produces a build that installs, opens,
+      # and cannot log in - which is how the Android AAB reached Google Play
+      # and got the app suspended. Fails the job before anything is signed.
+      - name: Verify the compiled client config
+        run: ./scripts/verify-release.sh build/ios/iphoneos/Runner.app
+
       - name: Xcode archive (Automatic signing via App Store Connect API key)
         working-directory: ios
         run: |
