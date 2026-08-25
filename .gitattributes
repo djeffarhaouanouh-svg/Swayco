@@ -1,0 +1,4 @@
+# Shell scripts run on the macOS CI runner and on the build Mac: a CRLF
+# here makes the shebang unusable ("bad interpreter: /usr/bin/env bash^M"),
+# so keep them LF whatever the committing machine does.
+*.sh text eol=lf
