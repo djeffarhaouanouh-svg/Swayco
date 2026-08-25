@@ -1,108 +1,88 @@
-import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 /// Wordmark Swayco — variante 6d.
-/// Le mot est en Plus Jakarta Sans ExtraBold italique, légèrement penché ;
-/// le "o" est un anneau cyan barré d'un trait en diagonale, resté droit.
 ///
-/// pubspec.yaml :
-///   fonts:
-///     - family: PlusJakartaSans
-///       fonts:
-///         - asset: assets/fonts/PlusJakartaSans-ExtraBoldItalic.ttf
-///           weight: 800
-///           style: italic
+/// C'est le PNG du designer (`assets/swayco_logo_6d.png`, fond transparent,
+/// mot blanc + "ø" cyan), et pas un dessin refait au widget : l'anneau barré
+/// ne se retrouve pas à coups de ratios, chaque tentative retombait sur un
+/// panneau d'interdiction. L'image fait foi.
+///
+/// Le logo est blanc : il n'existe que sur les fonds sombres de l'app.
 class SwaycoLogo extends StatelessWidget {
   const SwaycoLogo({
     super.key,
     this.fontSize = 23,
-    this.wordColor = Colors.white,
-    this.accentColor = const Color(0xFF22C8DE),
     this.shadows = const <Shadow>[],
   });
 
-  /// Taille du mot en px logiques. 23 correspond à l'en-tête Discover.
+  /// Taille du mot en px logiques, dans la continuité du wordmark texte qu'il
+  /// remplace : 23 = l'en-tête Discover. Ce n'est plus une taille de police,
+  /// c'est l'em avec lequel le PNG a été composé — la hauteur réelle du
+  /// dessin en découle par [_heightPerEm].
   final double fontSize;
-  final Color wordColor;
-  final Color accentColor;
 
   /// Ombres portées — le logo posé sur une vidéo (l'appel) en a besoin pour
-  /// rester lisible sur un fond clair. Elles habillent le mot ET l'anneau,
-  /// sinon le "ø" décrocherait du reste sur les images claires.
+  /// rester lisible sur un fond clair. Peintes comme une silhouette floutée
+  /// derrière le dessin, donc elles habillent le mot ET l'anneau.
   final List<Shadow> shadows;
+
+  static const String _asset = 'assets/swayco_logo_6d.png';
+
+  /// Le PNG (1354 × 291 après recadrage sur ses marges transparentes) a été
+  /// composé à un em de ~378 px : le mot y mesure 286 px du haut d'x au bas
+  /// du "y", soit les 0,756 em que valent la hauteur d'x et la descendante de
+  /// Plus Jakarta. D'où hauteur du dessin ÷ em = 291/378.
+  static const double _heightPerEm = 0.77;
+  static const double _aspect = 1354 / 291;
 
   @override
   Widget build(BuildContext context) {
-    // Toutes les mesures sont proportionnelles à fontSize (ratios du design,
-    // voir swayco_logo_spec.md — elles ne se retouchent pas à l'oeil).
-    final ringSize = fontSize * 0.522; // hauteur d'x
-    final ringStroke = fontSize * 0.152;
-    final barLength = fontSize * 0.609;
-    final barThickness = fontSize * 0.109;
-    final gap = fontSize * 0.065;
+    final height = fontSize * _heightPerEm;
+    final width = height * _aspect;
 
-    final boxShadows = shadows
-        .map((s) => BoxShadow(
-              color: s.color,
-              blurRadius: s.blurRadius,
-              offset: s.offset,
-            ))
-        .toList(growable: false);
+    // Le fichier source est 15× plus large que son rendu : sans cette
+    // consigne, Flutter décode 1,5 Mpx pour peindre 80 px de large.
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = (width * dpr).round();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
+    final Widget mark = Image.asset(
+      _asset,
+      width: width,
+      height: height,
+      fit: BoxFit.contain,
+      cacheWidth: cacheWidth,
+      filterQuality: FilterQuality.medium,
+    );
+
+    if (shadows.isEmpty) return mark;
+
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Transform(
-          alignment: Alignment.bottomCenter,
-          transform: Matrix4.skewX(-0.157), // -9°
-          child: Text(
-            'swayc',
-            style: TextStyle(
-              fontFamily: 'PlusJakartaSans',
-              fontWeight: FontWeight.w800,
-              fontStyle: FontStyle.italic,
-              fontSize: fontSize,
-              height: 1,
-              letterSpacing: fontSize * -0.04,
-              color: wordColor,
-              shadows: shadows.isEmpty ? null : shadows,
+        for (final s in shadows)
+          Transform.translate(
+            offset: s.offset,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(
+                sigmaX: Shadow.convertRadiusToSigma(s.blurRadius),
+                sigmaY: Shadow.convertRadiusToSigma(s.blurRadius),
+              ),
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(s.color, BlendMode.srcATop),
+                child: Image.asset(
+                  _asset,
+                  width: width,
+                  height: height,
+                  fit: BoxFit.contain,
+                  cacheWidth: cacheWidth,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
             ),
           ),
-        ),
-        SizedBox(width: gap),
-        Padding(
-          // aligne l'anneau sur la ligne de base du mot
-          padding: EdgeInsets.only(bottom: fontSize * 0.03),
-          child: SizedBox(
-            width: ringSize,
-            height: ringSize,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: accentColor, width: ringStroke),
-                    boxShadow: boxShadows.isEmpty ? null : boxShadows,
-                  ),
-                ),
-                Transform.rotate(
-                  angle: -math.pi / 4,
-                  child: Container(
-                    width: barLength,
-                    height: barThickness,
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      boxShadow: boxShadows.isEmpty ? null : boxShadows,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        mark,
       ],
     );
   }

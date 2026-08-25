@@ -198,6 +198,8 @@ flutter:
     - assets/bienvenue.jpg
     # Cyan Ø brand mark (cropped from test-logo.png).
     - assets/test-logo.png
+    # Le wordmark swaycø lui-même (PNG du designer, variante 6d).
+    - assets/swayco_logo_6d.png
     # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
     # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
@@ -218,12 +220,6 @@ flutter:
         - asset: assets/fonts/GlacialIndifference-Regular.ttf
         - asset: assets/fonts/GlacialIndifference-Bold.ttf
           weight: 700
-    # Le wordmark swaycø, et lui seul : ExtraBold italique.
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans-ExtraBoldItalic.ttf
-          weight: 800
-          style: italic
 
   # To add assets to your application, add an assets section, like this:
   # assets:
