@@ -483,10 +483,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     // 58 (bouton) + 2 × 9 (respiration) : la bande blanche serre les boutons
-    // au lieu de leur faire un socle. Elle garde son bord bas à 22 au-dessus
-    // de la nav ; c'est son haut — donc le bas de la photo — qui redescend.
+    // au lieu de leur faire un socle.
     const actionH = 76.0;
-    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + 22;
+    // Écart entre le bas de la bande blanche et la nav. Tout le reste en
+    // découle : `cardBottom` se calcule à partir de `btnBottom`, donc monter
+    // cette valeur remonte la bande ET raccourcit la photo d'autant. C'est la
+    // seule ligne à toucher pour régler la respiration au-dessus de la nav.
+    const gapToNav = 32.0;
+    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + gapToNav;
     // La photo s'arrête PILE sur la bande — mais avec des coins bas arrondis,
     // donc le blanc doit aussi passer DERRIÈRE elle (voir le socle plus bas),
     // sinon les arrondis s'ouvriraient sur le fond noir de la page.
