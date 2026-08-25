@@ -40,7 +40,6 @@ import '../swayco/translation_route.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/swayco_logo.dart';
 
 /// The connecting-splash ("sas") mark, decoded at boot and pinned for the
 /// process lifetime.
@@ -2346,11 +2345,26 @@ class _CallScreenState extends State<CallScreen> {
                         left: 0,
                         right: 0,
                         child: Center(
-                          child: SwaycoLogo(
-                            fontSize: 26,
-                            shadows: [
-                              Shadow(color: Colors.black54, blurRadius: 8),
-                            ],
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: 'swayc'),
+                                TextSpan(
+                                  text: 'ø',
+                                  style: TextStyle(color: SC.accent),
+                                ),
+                              ],
+                            ),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: SC.brandFont,
+                              fontSize: 29,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 8),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -3289,14 +3303,29 @@ class _CallScreenState extends State<CallScreen> {
                       padding: const EdgeInsets.only(top: 8),
                       child: Opacity(
                         opacity: 0.7,
-                        child: SwaycoLogo(
-                          fontSize: 26,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                            ),
-                          ],
+                        child: Text.rich(
+                          const TextSpan(
+                            children: [
+                              TextSpan(text: 'swayc'),
+                              TextSpan(
+                                text: 'ø',
+                                style: TextStyle(color: SC.accent),
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: SC.brandFont,
+                            fontSize: 29,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

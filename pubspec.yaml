@@ -198,8 +198,6 @@ flutter:
     - assets/bienvenue.jpg
     # Cyan Ø brand mark (cropped from test-logo.png).
     - assets/test-logo.png
-    # Le wordmark swaycø lui-même (PNG du designer, variante 6d).
-    - assets/swayco_logo_6d.png
     # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
     # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
