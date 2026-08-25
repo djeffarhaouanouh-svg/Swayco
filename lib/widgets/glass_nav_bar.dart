@@ -225,7 +225,9 @@ class _GlassNavBarState extends State<GlassNavBar>
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutBack,
                   child: Container(
-                    width: slot - 20,
+                    // Marge latérale dans le slot : 6 de chaque côté. La pastille
+                    // enveloppe l'icône ET sa légende plutôt que de les serrer.
+                    width: slot - 12,
                     height: height - 10,
                     decoration: BoxDecoration(
                       color: Colors.white

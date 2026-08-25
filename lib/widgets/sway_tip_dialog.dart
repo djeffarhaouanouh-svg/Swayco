@@ -364,8 +364,10 @@ class _HeartCounter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 42,
-      height: 40,
+      // Le chiffre remplissait le cœur bord à bord : élargi (même rapport
+      // largeur/hauteur, le dessin n'est pas déformé) pour lui rendre de l'air.
+      width: 50,
+      height: 48,
       child: Stack(
         alignment: Alignment.center,
         children: [
