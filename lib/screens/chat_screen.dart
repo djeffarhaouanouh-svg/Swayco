@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
-import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/debug_overlay.dart';
@@ -24,6 +24,7 @@ import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
+import '../services/wave_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
@@ -105,6 +106,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// missed-message notification matters most. Dismissible per session.
   bool _notifBlocked = false;
   bool _notifBannerDismissed = false;
+
+  /// Ce qu'il me reste de signes 👋 vers chaque personne, tel que le serveur
+  /// le compte. Une personne absente de la carte n'a rien reçu ces 24 h :
+  /// tout lui est ouvert. Rechargé à chaque [_reload] pour que les boutons
+  /// déjà à sec partent grisés au lieu de se découvrir sous le doigt.
+  Map<String, WaveQuota> _waveQuota = const {};
+
+  /// Les signes qu'on m'a faits et que je n'ai pas encore vus, par personne.
+  /// La ligne les affiche à la place du dernier message.
+  Map<String, DateTime> _wavesToMe = const {};
+
+  /// Envoi en cours — le bouton de CETTE ligne tourne au lieu de réagir deux
+  /// fois à un doigt nerveux.
+  final Set<String> _waving = <String>{};
 
   Future<void> _checkNotifStatus() async {
     final blocked = (await NotificationClient.notifStatus()) != 'enabled';
@@ -404,6 +419,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _inbound = inbound;
         _loading = false;
       });
+      // Les signes 👋 arrivent APRÈS la liste, exprès : ce sont deux requêtes
+      // de plus, et une liste qui attend après elles s'afficherait plus tard
+      // pour tout le monde, y compris ceux à qui personne n'a fait signe.
+      unawaited(_reloadWaves());
       // Landed on Messages with fresh matches → start the "seen" countdown.
       _scheduleMatchSeen();
     } catch (e) {
@@ -469,6 +488,56 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return 'dm-${ids[0]}-${ids[1]}';
   }
 
+  /// Les deux moitiés du 👋 : ce qu'il me reste à donner, et ce qu'on m'a
+  /// donné. Silencieux — un plafond qu'on n'a pas pu lire laisse simplement
+  /// les boutons actifs, et le serveur tranchera au moment du clic.
+  Future<void> _reloadWaves() async {
+    if (!isSupabaseReady) return;
+    final quota = await WaveApi.quotas();
+    final inbound = await WaveApi.unseenInbound();
+    if (!mounted) return;
+    setState(() {
+      _waveQuota = quota;
+      _wavesToMe = inbound;
+    });
+  }
+
+  /// Faire signe à [peer]. Le plafond est compté par le serveur ; ici on ne
+  /// fait qu'afficher ce qu'il répond et éteindre le bouton quand il n'y a
+  /// plus de signe à donner.
+  Future<void> _wave(RemoteProfile peer) async {
+    if (_waving.contains(peer.id)) return;
+    setState(() => _waving.add(peer.id));
+    final me = await ProfileApi.fetchById(_myId);
+    final res = await WaveApi.send(
+      peerId: peer.id,
+      peerLang: peer.language,
+      myName: me?.displayName ?? '',
+    );
+    if (!mounted) return;
+    final name = peer.displayName.isNotEmpty
+        ? peer.displayName
+        : AppStrings.t('call_locked_peer_fallback');
+    setState(() {
+      _waving.remove(peer.id);
+      // Ce que le serveur vient de dire fait autorité sur ce qu'on croyait.
+      _waveQuota = {
+        ..._waveQuota,
+        peer.id: WaveQuota(
+          remainingStreak: res.remainingStreak,
+          remainingDaily: res.remainingDaily,
+        ),
+      };
+    });
+    final key = res.messageKey;
+    if (res.ok) {
+      _showTopToast(AppStrings.t('wave_sent', args: {'name': name}));
+      Analytics.track('wave_sent', props: {'source': 'messages'});
+    } else if (key != null) {
+      _showTopToast(AppStrings.t(key, args: {'name': name}));
+    }
+  }
+
   Future<void> _openThread(RemoteProfile peer) async {
     final convId = _conversationIdFor(peer.id);
     final title = peer.displayName.isNotEmpty
@@ -484,6 +553,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+    // Ouvrir le fil, c'est avoir vu le signe — et ça rouvre du même coup le
+    // compteur d'affilée de la personne qui l'a fait.
+    if (_wavesToMe.containsKey(peer.id)) {
+      unawaited(WaveApi.markSeen(peer.id));
+      if (mounted) {
+        setState(() => _wavesToMe = {..._wavesToMe}..remove(peer.id));
+      }
+    }
     _reload(silent: true);
   }
 
@@ -794,17 +871,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 onReport: () => _reportPeer(p),
                                 onDeleteConversation: () =>
                                     _deleteConversation(p),
-                                onCall: () => CallLauncher.startCall(
-                                  context,
-                                  peerDeviceId: p.id,
-                                  translation: widget.translation,
-                                ),
-                                onCallVideo: () => CallLauncher.startCall(
-                                  context,
-                                  peerDeviceId: p.id,
-                                  translation: widget.translation,
-                                  startWithCamera: true,
-                                ),
+                                onWave: () => _wave(p),
+                                // Rien de connu sur cette personne = rien
+                                // d'envoyé ces 24 h : le bouton est ouvert.
+                                canWave: _waveQuota[p.id]?.canWave ?? true,
+                                waving: _waving.contains(p.id),
+                                wavedMeAt: _wavesToMe[p.id],
                               ),
                             ],
                           ),
@@ -871,8 +943,10 @@ class _FriendChatRow extends StatelessWidget {
     required this.onBlock,
     required this.onReport,
     required this.onDeleteConversation,
-    required this.onCall,
-    required this.onCallVideo,
+    required this.onWave,
+    required this.canWave,
+    required this.waving,
+    this.wavedMeAt,
   });
   final RemoteProfile profile;
   final ChatMessage? lastMessage;
@@ -894,11 +968,19 @@ class _FriendChatRow extends StatelessWidget {
   final VoidCallback onReport;
   /// Removes this conversation from the chat list (local "delete for me").
   final VoidCallback onDeleteConversation;
-  /// Dials this friend (audio) — same call path as the chat thread header.
-  final VoidCallback onCall;
+  /// Fait signe à cette personne (le 👋 en bout de ligne).
+  final VoidCallback onWave;
 
-  /// Dials this friend with the camera on (video call).
-  final VoidCallback onCallVideo;
+  /// Faux quand le plafond vers elle est atteint — le rond s'éteint.
+  final bool canWave;
+
+  /// Envoi en cours vers elle.
+  final bool waving;
+
+  /// Quand ELLE m'a fait signe sans que je l'aie encore vu. La ligne le dit
+  /// à la place du dernier message : un signe qu'on ne voit pas n'a servi à
+  /// rien, et la notification a très bien pu ne jamais arriver.
+  final DateTime? wavedMeAt;
 
   /// True when the peer was active in the last 2 minutes, has not
   /// hidden their own online status, AND the local user has not
@@ -1027,7 +1109,18 @@ class _FriendChatRow extends StatelessWidget {
             : AppStrings.t('chat_no_name'));
 
     final subtitleParts = <InlineSpan>[];
-    if (lastMessage != null && (lastMessage!.body.isNotEmpty || lastMessage!.isImage)) {
+    if (wavedMeAt != null) {
+      // Un signe non vu passe DEVANT le dernier message : c'est le plus
+      // récent, et c'est le seul des deux qui attend quelque chose de moi.
+      subtitleParts.add(TextSpan(
+        text: '👋 ${AppStrings.t('wave_received')}',
+        style: const TextStyle(
+          color: SC.accent,
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+    } else if (lastMessage != null &&
+        (lastMessage!.body.isNotEmpty || lastMessage!.isImage)) {
       if (isMine) {
         subtitleParts.add(const TextSpan(
           text: 'Vous : ',
@@ -1170,9 +1263,13 @@ class _FriendChatRow extends StatelessWidget {
                     ),
                   )
                 else
-                  // Fil à jour : l'appel passe en touche fantôme. Il ne
-                  // dispute plus la ligne au prénom.
-                  _RowCallButton(onTap: onCall),
+                  // Fil à jour : la place revient au 👋. C'est le geste de la
+                  // page — faire signe sans rien avoir à écrire.
+                  _RowWaveButton(
+                    onWave: onWave,
+                    enabled: canWave,
+                    busy: waving,
+                  ),
               ],
             ),
           ],
@@ -1367,32 +1464,129 @@ class _TopToastState extends State<_TopToast>
   }
 }
 
-/// Small round audio-call shortcut at the far-right of every chat-list row.
+/// Le 👋 au bout de chaque ligne : « je suis là, viens si tu veux ».
 ///
-/// Touche fantôme : un simple cercle tracé, l'icône en creux. Le verre et le
-/// cyan en faisaient le point le plus vif de la ligne, alors qu'il n'y est que
-/// pour les fils déjà lus — un raccourci, pas une invitation.
-class _RowCallButton extends StatelessWidget {
-  const _RowCallButton({required this.onTap});
+/// Il a remplacé le raccourci d'appel, et ce n'est pas la même promesse. Un
+/// appel sonne, interrompt, et se rate — ce bouton-là ne fait qu'un ping :
+/// la personne reçoit une notification et vient quand elle veut. C'est le
+/// geste de Houseparty, celui qui coûte assez peu pour qu'on ose, et qu'on
+/// plafonne (voir `send_wave`, migration 0057) pour qu'il reste un signe et
+/// pas du bruit.
+///
+/// Le cyan plein est assumé : c'est LE geste de la page, il doit se voir.
+/// Quand il n'y a plus de signe à donner, le rond s'éteint (cyan éteint,
+/// emoji à demi effacé) sans disparaître — un bouton qui s'évanouit laisse
+/// croire à un bug, un bouton gris se comprend.
+class _RowWaveButton extends StatefulWidget {
+  const _RowWaveButton({
+    required this.onWave,
+    required this.enabled,
+    required this.busy,
+  });
 
-  final VoidCallback onTap;
+  final VoidCallback onWave;
+
+  /// Faux quand le plafond est atteint vers cette personne.
+  final bool enabled;
+
+  /// Envoi en cours : on n'accepte pas un deuxième doigt.
+  final bool busy;
+
+  @override
+  State<_RowWaveButton> createState() => _RowWaveButtonState();
+}
+
+class _RowWaveButtonState extends State<_RowWaveButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 620),
+  );
+
+  /// Elle grossit d'un coup, puis redescend en dépassant un peu : le rebond
+  /// est ce qui fait qu'on sent le geste PARTIR, au lieu de voir une icône
+  /// changer d'état.
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.45)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 30,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.45, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 70,
+    ),
+  ]).animate(_c);
+
+  /// Et elle remue : quatre allers-retours qui s'amortissent, comme une vraie
+  /// main. L'amplitude décroît avec le temps (le `(1 - t)`), sinon ça vibre
+  /// au lieu de saluer.
+  late final Animation<double> _wobble = _c.drive(
+    TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween<double>(0), weight: 12),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 88),
+    ]),
+  );
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _tap() {
+    if (!widget.enabled || widget.busy) {
+      // Même à sec, le bouton bouge : sans retour au doigt on croit que le
+      // tap n'a pas pris. C'est le message qui dit pourquoi, pas l'inertie.
+      widget.onWave();
+      return;
+    }
+    _c.forward(from: 0);
+    widget.onWave();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final live = widget.enabled && !widget.busy;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
+      onTap: _tap,
+      child: SizedBox(
         width: 32,
         height: 32,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-        ),
-        child: Icon(
-          Icons.call_outlined,
-          size: 16,
-          color: Colors.white.withValues(alpha: 0.5),
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: live ? SC.accent : SC.accent.withValues(alpha: 0.18),
+            ),
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _c,
+                builder: (context, child) {
+                  final t = _wobble.value;
+                  // sin(4 tours) amorti : part à droite, revient, et meurt.
+                  final angle = t == 0
+                      ? 0.0
+                      : 0.42 * (1 - t) * math.sin(t * math.pi * 8);
+                  return Transform.scale(
+                    scale: _scale.value,
+                    child: Transform.rotate(angle: angle, child: child),
+                  );
+                },
+                child: Opacity(
+                  opacity: live ? 1 : 0.45,
+                  child: const Text(
+                    '👋',
+                    style: TextStyle(fontSize: 15, height: 1.15),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
