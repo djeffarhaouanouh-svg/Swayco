@@ -856,6 +856,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      // Les deux sorties, écrites noir sur blanc : le voile se tape pour
+      // fermer, la feuille se tire vers le bas.
+      isDismissible: true,
+      enableDrag: true,
+      // Et de quoi taper à côté : sans plafond, sur un écran court la feuille
+      // montait jusqu'au bord haut et il ne restait aucun voile à toucher.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
       builder: (sheetCtx) {
         return StatefulBuilder(
           builder: (context, setSheet) {
@@ -3657,7 +3666,8 @@ class _EditAccountSheet extends StatelessWidget {
     final name = displayName.isEmpty
         ? AppStrings.t('profile_anonymous')
         : displayName;
-    return ClipRRect(
+    return _DragDownToClose(
+      child: ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: ColoredBox(
         color: SC.bg,
@@ -3784,6 +3794,38 @@ class _EditAccountSheet extends StatelessWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Rabat la feuille qui la porte d'un glissement vers le bas — coup sec (120
+/// px/s) OU 56 px parcourus, les mêmes seuils que le panneau du Discover. Le
+/// glissement natif de showModalBottomSheet demande, lui, un vrai coup sec :
+/// un glissement lent mourait à zéro de vélocité et ne fermait rien.
+class _DragDownToClose extends StatefulWidget {
+  const _DragDownToClose({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_DragDownToClose> createState() => _DragDownToCloseState();
+}
+
+class _DragDownToCloseState extends State<_DragDownToClose> {
+  double _dy = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onVerticalDragStart: (_) => _dy = 0,
+      onVerticalDragUpdate: (d) => _dy += d.delta.dy,
+      onVerticalDragEnd: (d) {
+        if ((d.primaryVelocity ?? 0) > 120 || _dy > 56) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: widget.child,
     );
   }
 }
