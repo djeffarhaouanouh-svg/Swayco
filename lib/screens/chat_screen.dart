@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
 
@@ -1473,10 +1475,13 @@ class _TopToastState extends State<_TopToast>
 /// plafonne (voir `send_wave`, migration 0057) pour qu'il reste un signe et
 /// pas du bruit.
 ///
-/// Le cyan plein est assumé : c'est LE geste de la page, il doit se voir.
-/// Quand il n'y a plus de signe à donner, le rond s'éteint (cyan éteint,
-/// emoji à demi effacé) sans disparaître — un bouton qui s'évanouit laisse
-/// croire à un bug, un bouton gris se comprend.
+/// Verre dépoli, pas de cyan plein : le même [BackdropFilter] que le dock
+/// d'appel et le bouton « Message » du profil. Le cyan plein posait un point
+/// vif sur CHAQUE ligne — vingt conversations, vingt pastilles qui crient. Le
+/// verre laisse la ligne au prénom, et c'est le geste, pas le bouton, qui se
+/// voit. Quand il n'y a plus de signe à donner, le verre s'assombrit et
+/// l'emoji s'efface à demi — un bouton qui disparaît laisse croire à un bug,
+/// un bouton éteint se comprend.
 class _RowWaveButton extends StatefulWidget {
   const _RowWaveButton({
     required this.onWave,
@@ -1500,34 +1505,44 @@ class _RowWaveButtonState extends State<_RowWaveButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 620),
+    duration: const Duration(milliseconds: 900),
   );
 
-  /// Elle grossit d'un coup, puis redescend en dépassant un peu : le rebond
-  /// est ce qui fait qu'on sent le geste PARTIR, au lieu de voir une icône
-  /// changer d'état.
+  /// Elle bondit hors du rond, tient un instant en l'air, puis retombe en
+  /// dépassant. Le pic est à 2,1 — beaucoup, volontairement : l'emoji sort de
+  /// son cercle de 32 px et c'est CE débordement qui fait qu'on voit le geste
+  /// partir depuis l'autre bout de l'écran. Un bouton qui frémit ne dit rien.
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 1.45)
+      tween: Tween(begin: 1.0, end: 2.1)
           .chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 30,
+      weight: 22,
     ),
+    TweenSequenceItem(tween: ConstantTween<double>(2.1), weight: 26),
     TweenSequenceItem(
-      tween: Tween(begin: 1.45, end: 1.0)
-          .chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 70,
+      tween: Tween(begin: 2.1, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 52,
     ),
   ]).animate(_c);
 
-  /// Et elle remue : quatre allers-retours qui s'amortissent, comme une vraie
-  /// main. L'amplitude décroît avec le temps (le `(1 - t)`), sinon ça vibre
-  /// au lieu de saluer.
+  /// Et elle salue vraiment : cinq allers-retours à presque un radian, qui
+  /// s'amortissent. L'amplitude décroît avec le temps (le `1 - t`), sinon la
+  /// main vibre au lieu de saluer.
   late final Animation<double> _wobble = _c.drive(
     TweenSequence<double>([
-      TweenSequenceItem(tween: ConstantTween<double>(0), weight: 12),
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 88),
+      TweenSequenceItem(tween: ConstantTween<double>(0), weight: 14),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 86),
     ]),
   );
+
+  /// Le verre s'allume au passage — un souffle de cyan dans le dépoli, le
+  /// temps du salut. C'est ce qui rattache le geste À CETTE ligne quand
+  /// l'emoji, lui, a débordé du rond.
+  late final Animation<double> _flash = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 15),
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 85),
+  ]).animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
 
   @override
   void dispose() {
@@ -1536,13 +1551,12 @@ class _RowWaveButtonState extends State<_RowWaveButton>
   }
 
   void _tap() {
-    if (!widget.enabled || widget.busy) {
-      // Même à sec, le bouton bouge : sans retour au doigt on croit que le
-      // tap n'a pas pris. C'est le message qui dit pourquoi, pas l'inertie.
-      widget.onWave();
-      return;
+    // Même à sec le bouton répond : sans retour au doigt on croit que le tap
+    // n'a pas pris. C'est le message qui dit pourquoi, pas l'inertie.
+    if (widget.enabled && !widget.busy) {
+      HapticFeedback.mediumImpact();
+      _c.forward(from: 0);
     }
-    _c.forward(from: 0);
     widget.onWave();
   }
 
@@ -1552,41 +1566,64 @@ class _RowWaveButtonState extends State<_RowWaveButton>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _tap,
+      // L'emoji dépasse largement du rond pendant le salut. La pile ne clippe
+      // pas (`Clip.none` est le défaut d'un Stack) et le SizedBox garde la
+      // ligne à 32 px : le débordement est purement peint, il ne pousse rien.
       child: SizedBox(
         width: 32,
         height: 32,
-        child: Center(
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: live ? SC.accent : SC.accent.withValues(alpha: 0.18),
-            ),
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _c,
-                builder: (context, child) {
-                  final t = _wobble.value;
-                  // sin(4 tours) amorti : part à droite, revient, et meurt.
-                  final angle = t == 0
-                      ? 0.0
-                      : 0.42 * (1 - t) * math.sin(t * math.pi * 8);
-                  return Transform.scale(
-                    scale: _scale.value,
-                    child: Transform.rotate(angle: angle, child: child),
-                  );
-                },
-                child: Opacity(
-                  opacity: live ? 1 : 0.45,
-                  child: const Text(
-                    '👋',
-                    style: TextStyle(fontSize: 15, height: 1.15),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = _wobble.value;
+            // sin de cinq tours, amorti : part à droite, revient, et meurt.
+            final angle =
+                t == 0 ? 0.0 : 0.95 * (1 - t) * math.sin(t * math.pi * 10);
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Le verre reste à sa taille : c'est le socle, il ne bouge
+                // pas. Seul ce qu'il y a dessus s'agite.
+                ClipOval(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color.lerp(
+                          live ? SC.glassStrong : SC.glass,
+                          SC.accent.withValues(alpha: 0.55),
+                          _flash.value,
+                        ),
+                        border: Border.all(
+                          color: Color.lerp(
+                            live ? SC.glassBorder : SC.glass,
+                            SC.accent,
+                            _flash.value,
+                          )!,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
+                Transform.scale(
+                  scale: _scale.value,
+                  child: Transform.rotate(
+                    angle: angle,
+                    child: Opacity(
+                      opacity: live ? 1 : 0.45,
+                      child: const Text(
+                        '👋',
+                        style: TextStyle(fontSize: 15, height: 1.15),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
