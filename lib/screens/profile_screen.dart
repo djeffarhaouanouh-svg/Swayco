@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/analytics.dart';
@@ -658,18 +658,36 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// Choose which gallery photo shows in Discover. Optimistically moves the
-  /// cyan selection ring, then persists the pointer (no gallery reorder).
-  Future<void> _setDiscoverPhoto(String url) async {
-    if (_deviceId.isEmpty || url.isEmpty) return;
+  /// Déplacer une photo change son RANG d'apparition : [from] et [to] sont des
+  /// positions finales dans la galerie. C'est ce classement qui pilote la carte
+  /// Discover, qui les déroule toutes dans l'ordre — il n'y a plus de photo à
+  /// désigner, il y a une première.
+  ///
+  /// Optimiste : la galerie se réordonne sous le doigt, l'écriture rattrape
+  /// derrière. Si elle échoue, l'ordre d'avant revient — un classement qui
+  /// n'existerait que sur cet écran serait pire que pas de déplacement.
+  Future<void> _reorderPhotos(int from, int to) async {
     final prev = _remote;
-    if (prev == null || prev.discoverPhotoUrl == url) return;
-    setState(() => _remote = prev.copyWith(discoverPhotoUrl: url));
+    if (prev == null || _deviceId.isEmpty) return;
+    final photos = [...prev.photos];
+    if (from < 0 || from >= photos.length) return;
+    final target = to.clamp(0, photos.length - 1);
+    if (target == from) return;
+    photos.insert(target, photos.removeAt(from));
+    setState(
+      () => _remote = prev.copyWith(
+        photos: photos,
+        discoverPhotoUrl: photos.first,
+      ),
+    );
     try {
-      await ProfileApi.setDiscoverPhoto(deviceId: _deviceId, url: url);
+      await ProfileApi.reorderProfilePhotos(
+        deviceId: _deviceId,
+        photos: photos,
+      );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _remote = prev); // revert on failure
+      setState(() => _remote = prev); // on remet l'ordre d'avant
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(
@@ -1041,8 +1059,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             interests: _remote?.interests ?? const [],
                             photos: _remote?.photos ?? const [],
                             avatarUrl: _remote?.avatarUrl ?? '',
-                            discoverPhotoUrl: _remote?.discoverPhotoUrl ?? '',
-                            onSelectDiscover: _setDiscoverPhoto,
+                            onReorderPhotos: _reorderPhotos,
                             likesByPhoto: _likesByPhoto,
                             viewerMode: _isViewingOther,
                             matched: _matched,
@@ -1239,8 +1256,7 @@ class _IdentitySection extends StatelessWidget {
     required this.interests,
     required this.photos,
     required this.avatarUrl,
-    this.discoverPhotoUrl = '',
-    this.onSelectDiscover,
+    this.onReorderPhotos,
     required this.likesByPhoto,
     required this.onEditName,
     required this.onEditBio,
@@ -1298,10 +1314,9 @@ class _IdentitySection extends StatelessWidget {
   final String avatarUrl;
 
   /// Which gallery photo currently shows in Discover â gets the cyan ring.
-  final String discoverPhotoUrl;
-
-  /// Own profile: pick which gallery photo is the Discover photo (by URL).
-  final void Function(String url)? onSelectDiscover;
+  /// Nouveau rang d'une photo dans la galerie : positions FINALES, la liste
+  /// est déjà celle d'après le déplacement. Voir _reorderPhotos.
+  final void Function(int from, int to)? onReorderPhotos;
 
   /// Likes received per photo URL. Only shown on my own profile (private).
   final Map<String, int> likesByPhoto;
@@ -1652,8 +1667,7 @@ class _IdentitySection extends StatelessWidget {
           onRemove: onRemovePhoto,
           likesByPhoto: likesByPhoto,
           onTapLikes: onTapLikes,
-          discoverPhotoUrl: discoverPhotoUrl,
-          onSelectDiscover: onSelectDiscover,
+          onReorderPhotos: onReorderPhotos,
         ),
         const SizedBox(height: 10),
         // â hint â juste sous le cadre photo. Taps jump to Settings where
@@ -1991,14 +2005,14 @@ class _RewardHint extends StatelessWidget {
 
 /// Full-screen overlay for profile photos. Swipe or use the side arrows to
 /// move between several photos; pinch to zoom; the â in the photo's top-right
-/// corner (or a tap on the backdrop) dismisses. On the own profile a "set as
-/// Discover photo" button sets whichever photo is currently in view.
+/// corner (or a tap on the backdrop) dismisses. Plus rien d'autre : la carte
+/// Discover déroule toute la galerie, il n'y a donc plus de photo à y désigner
+/// — c'est l'ordre des tuiles, réglable au doigt, qui décide.
 Future<void> showPhotoViewer(
   BuildContext context, {
   required List<String> photos,
   required int index,
   bool viewerMode = false,
-  void Function(String url)? onSetDiscover,
 }) {
   if (photos.isEmpty) return Future<void>.value();
   return Navigator.of(context).push<void>(
@@ -2010,7 +2024,6 @@ Future<void> showPhotoViewer(
         photos: photos,
         initialIndex: index.clamp(0, photos.length - 1),
         viewerMode: viewerMode,
-        onSetDiscover: onSetDiscover,
       ),
       // Fade + grow-in (scale from 90%) instead of a flat fade, so the photo
       // eases open instead of popping.
@@ -2034,12 +2047,10 @@ class _PhotoViewer extends StatefulWidget {
     required this.photos,
     required this.initialIndex,
     this.viewerMode = false,
-    this.onSetDiscover,
   });
   final List<String> photos;
   final int initialIndex;
   final bool viewerMode;
-  final void Function(String url)? onSetDiscover;
 
   @override
   State<_PhotoViewer> createState() => _PhotoViewerState();
@@ -2099,7 +2110,6 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final bottom = MediaQuery.paddingOf(context).bottom;
     final multi = widget.photos.length > 1;
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: 0.78),
@@ -2182,34 +2192,6 @@ class _PhotoViewerState extends State<_PhotoViewer> {
               ),
             ),
           ],
-          if (!widget.viewerMode && widget.onSetDiscover != null)
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: bottom + 28,
-              child: GestureDetector(
-                onTap: () {
-                  widget.onSetDiscover!(widget.photos[_index]);
-                  Navigator.of(context).pop();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: SC.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    AppStrings.t('set_discover_photo'),
-                    style: const TextStyle(
-                      color: SC.bgDeep,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -2230,8 +2212,7 @@ class _PhotoGallery extends StatelessWidget {
     required this.onRemove,
     this.likesByPhoto = const {},
     this.onTapLikes,
-    this.discoverPhotoUrl = '',
-    this.onSelectDiscover,
+    this.onReorderPhotos,
   });
 
   final List<String> photos;
@@ -2241,9 +2222,8 @@ class _PhotoGallery extends StatelessWidget {
   final bool viewerMode;
   final VoidCallback onPick;
   final void Function(String url) onRemove;
-  // Own profile: URL of the Discover photo (cyan ring) + select-by-tap.
-  final String discoverPhotoUrl;
-  final void Function(String url)? onSelectDiscover;
+  // Own profile: reorder the gallery by dragging a tile (final positions).
+  final void Function(int from, int to)? onReorderPhotos;
   // Own profile: likes received per photo URL.
   final Map<String, int> likesByPhoto;
   final VoidCallback? onTapLikes;
@@ -2260,44 +2240,93 @@ class _PhotoGallery extends StatelessWidget {
     const double tileWidth = 210;
     final double tileHeight = tileWidth * _aspect;
     final count = (canAdd ? 1 : 0) + photos.length;
+    final offset = canAdd ? 1 : 0;
     return SizedBox(
       height: tileHeight,
-      child: ListView.separated(
+      child: ReorderableListView.builder(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
+        // Pas de poignée dessinée : c'est l'appui long SUR la photo qui la
+        // décroche (voir ReorderableDelayedDragStartListener plus bas). Une
+        // poignée sur une grille de photos n'aurait nulle part où se poser.
+        buildDefaultDragHandles: false,
+        // Le doigt décroche la tuile : petit coup sec, elle grossit et prend
+        // une ombre — c'est ce qui fait qu'on la sent quitter la rangée. Au
+        // repos, un second cran plus discret confirme qu'elle est reposée.
+        onReorderStart: (_) => HapticFeedback.mediumImpact(),
+        onReorderEnd: (_) => HapticFeedback.selectionClick(),
+        proxyDecorator: (child, index, animation) => AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final t = Curves.easeOut.transform(animation.value);
+            return Transform.scale(
+              scale: 1 + 0.06 * t,
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                shadowColor: Colors.black,
+                elevation: 18 * t,
+                child: child,
+              ),
+            );
+          },
+        ),
+        // onReorderItem (et non onReorder, obsolète) : newIndex y tient déjà
+        // compte de la tuile retirée, il n'y a pas de -1 à faire ici.
+        onReorderItem: (oldIndex, newIndex) {
+          final move = onReorderPhotos;
+          if (move == null) return;
+          final from = oldIndex - offset;
+          final to = newIndex - offset;
+          // La tuile "+" ne se déplace pas, et rien ne se glisse devant elle.
+          if (from < 0) return;
+          move(from, to < 0 ? 0 : to);
+        },
         itemCount: count,
-        separatorBuilder: (_, _) => const SizedBox(width: _spacing),
         itemBuilder: (context, index) {
           if (canAdd && index == 0) {
-            return SizedBox(
-              width: tileWidth,
-              height: tileHeight,
-              child: _AddDiscoverPhotoCta(onTap: onPick),
+            return Padding(
+              key: const ValueKey('add-photo-tile'),
+              padding: const EdgeInsets.only(right: _spacing),
+              child: SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _AddDiscoverPhotoCta(onTap: onPick),
+              ),
             );
           }
-          final url = photos[canAdd ? index - 1 : index];
-          return SizedBox(
-            width: tileWidth,
-            height: tileHeight,
-            child: _PhotoCell(
-              photoUrl: url,
-              viewerMode: false,
-              isDiscover:
-                  discoverPhotoUrl.isNotEmpty &&
-                  url.split('?').first == discoverPhotoUrl.split('?').first,
-              onTap: () => showPhotoViewer(
-                context,
-                photos: photos,
-                index: canAdd ? index - 1 : index,
-                onSetDiscover: onSelectDiscover,
+          final photoIndex = index - offset;
+          final url = photos[photoIndex];
+          // L'écart entre tuiles est porté par chaque tuile (une
+          // ReorderableListView n'a pas de separatorBuilder) ; la dernière n'en
+          // met pas, sinon la rangée traînerait un vide à son bout.
+          return Padding(
+            key: ValueKey(url),
+            padding: EdgeInsets.only(
+              right: photoIndex == photos.length - 1 ? 0 : _spacing,
+            ),
+            child: ReorderableDelayedDragStartListener(
+              index: index,
+              child: SizedBox(
+                width: tileWidth,
+                height: tileHeight,
+                child: _PhotoCell(
+                  photoUrl: url,
+                  viewerMode: false,
+                  onTap: () => showPhotoViewer(
+                    context,
+                    photos: photos,
+                    index: photoIndex,
+                  ),
+                  onDelete: () => onRemove(url),
+                  likesCount: likesByPhoto[LikeApi.stablePhotoUrl(url)] ??
+                      likesByPhoto[url] ??
+                      0,
+                  onTapLikes: onTapLikes,
+                  iLikePeer: false,
+                  onTogglePeerLike: null,
+                ),
               ),
-              onDelete: () => onRemove(url),
-              likesCount: likesByPhoto[LikeApi.stablePhotoUrl(url)] ??
-                  likesByPhoto[url] ??
-                  0,
-              onTapLikes: onTapLikes,
-              iLikePeer: false,
-              onTogglePeerLike: null,
             ),
           );
         },
@@ -3326,16 +3355,11 @@ class _PhotoCell extends StatelessWidget {
     this.onTapLikes,
     this.iLikePeer = false,
     this.onTogglePeerLike,
-    this.isDiscover = false,
   });
 
   final String? photoUrl;
   final bool viewerMode;
   final VoidCallback onTap;
-
-  /// True for the gallery photo currently shown in Discover â draws a thin
-  /// cyan ring around the tile.
-  final bool isDiscover;
 
   /// When non-null and a photo is set on my own profile, a small trash
   /// button appears top-right to delete the photo.
@@ -3490,8 +3514,10 @@ class _PhotoCell extends StatelessWidget {
                 ),
               ),
             ),
-          // Thin cyan ring marking the photo currently shown in Discover.
-          if (isDiscover)
+          // Le liseré cyan cercle CHAQUE photo : il ne désigne plus la photo
+          // Discover (il n'y en a plus, la carte les déroule toutes), c'est le
+          // cadre de la tuile. Pas sur la cellule vide, qui n'est pas une photo.
+          if (hasPhoto)
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(

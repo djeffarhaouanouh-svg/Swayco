@@ -579,29 +579,6 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
-  /// Point the Discover card at a SPECIFIC gallery photo [url] (the user
-  /// chooses which of their photos appears in Discover). Unlike
-  /// [addProfilePhoto] this does NOT reorder the gallery — it only moves the
-  /// `discover_photo_url` pointer. [url] must already be one of the user's
-  /// `photos`.
-  static Future<void> setDiscoverPhoto({
-    required String deviceId,
-    required String url,
-  }) async {
-    if (!isSupabaseReady) {
-      throw StateError('Supabase non configuré');
-    }
-    if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
-    if (url.isEmpty) throw ArgumentError('url vide');
-    await _c
-        .from('profiles')
-        .update({
-          'discover_photo_url': url,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('id', deviceId);
-  }
-
   /// Append [bytes] as a new photo in the user's gallery ("Tes photos").
   /// Each upload gets a unique storage path so the gallery can hold several
   /// distinct files. `photos[0]` still drives the Discover-card photo
@@ -735,6 +712,31 @@ abstract final class ProfileApi {
       }
     }
     return next;
+  }
+
+  /// Réécrit l'ORDRE de la galerie ([photos] est la liste complète, déjà dans
+  /// son nouvel ordre). Aucune photo n'est ajoutée ni retirée ici.
+  ///
+  /// `discover_photo_url` suit la première photo : depuis que la carte Discover
+  /// déroule toute la galerie, le rang EST le choix — laisser le pointeur sur
+  /// une photo que l'utilisateur vient de reléguer en dernier ferait ouvrir la
+  /// carte sur elle.
+  static Future<void> reorderProfilePhotos({
+    required String deviceId,
+    required List<String> photos,
+  }) async {
+    if (!isSupabaseReady) {
+      throw StateError('Supabase non configuré');
+    }
+    if (deviceId.isEmpty) throw ArgumentError('deviceId vide');
+    await _c
+        .from('profiles')
+        .update({
+          'photos': photos,
+          'discover_photo_url': photos.isEmpty ? '' : photos.first,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
   }
 
   /// Case-insensitive substring search across display name AND handle.
