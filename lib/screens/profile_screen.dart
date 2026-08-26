@@ -3676,12 +3676,39 @@ class _EditAccountSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              ProfileAvatar(
-                displayName: name,
-                avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
-                size: 88,
-                fontSize: 36,
-                onTap: onPickAvatar,
+              // Même bulle qu'en haut du profil, pastille comprise : c'est ici
+              // qu'on vient changer sa photo, et sans la pastille la bulle ne
+              // disait pas qu'elle se touchait.
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  ProfileAvatar(
+                    displayName: name,
+                    avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+                    size: 88,
+                    fontSize: 36,
+                    onTap: onPickAvatar,
+                  ),
+                  // 22 et non 28 : la bulle fait 88 ici contre 128 là-haut, la
+                  // pastille garde la même part d'elle.
+                  IgnorePointer(
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: SC.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: SC.bg, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               Text(
@@ -3741,7 +3768,10 @@ class _EditAccountSheet extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.08),
                       ),
                       _EditAccountRow(
-                        emoji: '📞',
+                        // Une icône de l'app et non l'emoji 📞, qui arrivait
+                        // avec ses propres couleurs — un combiné gris sale au
+                        // milieu de deux glyphes blancs.
+                        icon: Icons.call_outlined,
                         label: AppStrings.t('settings_live_translation'),
                         value: langLabel,
                         onTap: onEditLanguage,
@@ -3760,15 +3790,13 @@ class _EditAccountSheet extends StatelessWidget {
 
 class _EditAccountRow extends StatelessWidget {
   const _EditAccountRow({
-    this.icon,
-    this.emoji,
+    required this.icon,
     required this.label,
     required this.value,
     required this.onTap,
   });
 
-  final IconData? icon;
-  final String? emoji;
+  final IconData icon;
   final String label;
   final String value;
   final VoidCallback onTap;
@@ -3782,10 +3810,7 @@ class _EditAccountRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            if (emoji != null)
-              Text(emoji!, style: const TextStyle(fontSize: 20))
-            else
-              Icon(icon, size: 22, color: SC.textPrimary),
+            Icon(icon, size: 22, color: SC.textPrimary),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
