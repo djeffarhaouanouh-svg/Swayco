@@ -500,6 +500,8 @@ abstract final class AppStrings {
         'Tu pourras changer de prénom dans {days} j.',
     'delete_photo_body':
         'Ta photo Discover sera retirée. Tu pourras en uploader une nouvelle à tout moment.',
+    'delete_photo_body_last':
+        "C'est ta dernière photo. Sans photo, ta carte ne passe plus dans Discover : personne ne pourra plus t'ajouter tant que tu n'en remets pas une.",
     'bio_editor_title': 'Ta présentation',
     // Incoming call modal
     'incoming_someone': "Quelqu'un",
@@ -1064,6 +1066,8 @@ abstract final class AppStrings {
         'You can change your name again in {days} day(s).',
     'delete_photo_body':
         'Your Discover photo will be removed. You can upload a new one at any time.',
+    'delete_photo_body_last':
+        'This is your last photo. Without one, your card no longer shows in Discover: nobody can add you until you upload a new one.',
     'bio_editor_title': 'Your bio',
     'incoming_someone': 'Someone',
     'cant_join_call': "Can't join the call: {msg}",
@@ -1593,6 +1597,8 @@ abstract final class AppStrings {
         'Podrás cambiar tu nombre en {days} día(s).',
     'delete_photo_body':
         'Tu foto de Discover será eliminada. Podrás subir una nueva en cualquier momento.',
+    'delete_photo_body_last':
+        'Es tu última foto. Sin foto, tu tarjeta ya no aparece en Discover: nadie podrá añadirte hasta que subas una nueva.',
     'bio_editor_title': 'Tu presentación',
     'incoming_someone': 'Alguien',
     'cant_join_call': 'No se puede unirse a la llamada: {msg}',
@@ -2073,6 +2079,8 @@ abstract final class AppStrings {
         'Du kannst deinen Namen in {days} Tag(en) wieder ändern.',
     'delete_photo_body':
         'Dein Discover-Foto wird entfernt. Du kannst jederzeit ein neues hochladen.',
+    'delete_photo_body_last':
+        'Das ist dein letztes Foto. Ohne Foto erscheint deine Karte nicht mehr in Discover: Niemand kann dich hinzufügen, bis du ein neues hochlädst.',
     'bio_editor_title': 'Deine Vorstellung',
     'incoming_someone': 'Jemand',
     'cant_join_call': 'Anruf kann nicht beigetreten werden: {msg}',
@@ -2636,6 +2644,8 @@ abstract final class AppStrings {
         'Potrai cambiare nome tra {days} giorno/i.',
     'delete_photo_body':
         'La tua foto Discover sarà rimossa. Puoi caricarne una nuova in qualsiasi momento.',
+    'delete_photo_body_last':
+        'È la tua ultima foto. Senza foto la tua scheda non compare più in Discover: nessuno potrà aggiungerti finché non ne carichi una nuova.',
     'bio_editor_title': 'La tua presentazione',
     'incoming_someone': 'Qualcuno',
     'cant_join_call': 'Impossibile unirsi alla chiamata: {msg}',
@@ -3194,6 +3204,8 @@ abstract final class AppStrings {
         'Você poderá mudar seu nome em {days} dia(s).',
     'delete_photo_body':
         'Sua foto Discover será removida. Você pode enviar uma nova a qualquer momento.',
+    'delete_photo_body_last':
+        'Esta é sua última foto. Sem foto, seu cartão não aparece mais no Discover: ninguém poderá adicionar você até enviar uma nova.',
     'bio_editor_title': 'Sua apresentação',
     'incoming_someone': 'Alguém',
     'cant_join_call': 'Impossível entrar na chamada: {msg}',
@@ -3755,6 +3767,8 @@ abstract final class AppStrings {
         'Je kunt je naam over {days} dag(en) opnieuw wijzigen.',
     'delete_photo_body':
         'Je Discover-foto wordt verwijderd. Je kunt op elk moment een nieuwe uploaden.',
+    'delete_photo_body_last':
+        'Dit is je laatste foto. Zonder foto verschijnt je kaart niet meer in Discover: niemand kan je toevoegen tot je een nieuwe uploadt.',
     'bio_editor_title': 'Jouw bio',
     'incoming_someone': 'Iemand',
     'cant_join_call': 'Kan niet deelnemen aan de oproep: {msg}',
@@ -4303,6 +4317,8 @@ abstract final class AppStrings {
         'يمكنك تغيير اسمك بعد {days} يوم.',
     'delete_photo_body':
         'سيتم إزالة صورة Discover الخاصة بك. يمكنك تحميل صورة جديدة في أي وقت.',
+    'delete_photo_body_last':
+        'هذه آخر صورة لديك. بدون صورة لن تظهر بطاقتك في Discover: لن يتمكن أحد من إضافتك حتى ترفع صورة جديدة.',
     'bio_editor_title': 'نبذة عنك',
     'incoming_someone': 'شخص ما',
     'cant_join_call': 'تعذر الانضمام للمكالمة: {msg}',
@@ -4855,6 +4871,8 @@ abstract final class AppStrings {
         'Изменить имя можно через {days} дн.',
     'delete_photo_body':
         'Твоё фото Discover будет удалено. Ты можешь загрузить новое в любой момент.',
+    'delete_photo_body_last':
+        'Это твоё последнее фото. Без фото твоя карточка не появляется в Discover: никто не сможет тебя добавить, пока ты не загрузишь новое.',
     'bio_editor_title': 'О себе',
     'incoming_someone': 'Кто-то',
     'cant_join_call': 'Не удалось присоединиться к звонку: {msg}',
@@ -5384,6 +5402,8 @@ abstract final class AppStrings {
     'delete_photo_q': '删除照片？',
     'name_change_cooldown': '{days} 天后可再次修改名字。',
     'delete_photo_body': '你的 Discover 照片将被删除。你可以随时上传新的。',
+    'delete_photo_body_last':
+        '这是你最后一张照片。没有照片，你的卡片将不再出现在 Discover 中：在你上传新照片前，没有人能添加你。',
     'bio_editor_title': '你的简介',
     'incoming_someone': '某人',
     'cant_join_call': '无法加入通话：{msg}',
@@ -5897,6 +5917,8 @@ abstract final class AppStrings {
     'delete_photo_q': '写真を削除しますか？',
     'name_change_cooldown': '名前は {days} 日後に変更できます。',
     'delete_photo_body': 'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
+    'delete_photo_body_last':
+        '最後の写真です。写真がないとカードは Discover に表示されません。新しい写真をアップロードするまで、誰もあなたを追加できません。',
     'bio_editor_title': '自己紹介',
     'incoming_someone': '誰か',
     'cant_join_call': '通話に参加できません: {msg}',
@@ -6412,6 +6434,8 @@ abstract final class AppStrings {
     'delete_photo_q': '사진을 삭제하시겠습니까?',
     'name_change_cooldown': '{days}일 후에 이름을 다시 변경할 수 있습니다.',
     'delete_photo_body': 'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',
+    'delete_photo_body_last':
+        '마지막 사진이에요. 사진이 없으면 카드가 Discover에 표시되지 않아, 새 사진을 올리기 전까지는 아무도 회원님을 추가할 수 없어요.',
     'bio_editor_title': '자기소개',
     'incoming_someone': '누군가',
     'cant_join_call': '통화에 참여할 수 없습니다: {msg}',

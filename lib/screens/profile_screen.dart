@@ -633,10 +633,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   /// [ProfileApi.removeProfilePhoto]).
   Future<void> _removePhoto(String url) async {
     if (_deviceId.isEmpty) return;
+    // Supprimer LA dernière, ce n'est pas supprimer une photo : c'est sortir de
+    // Discover. Sans photo la carte ne passe plus, donc plus personne ne peut
+    // ajouter — ça se dit avant, pas après.
+    final isLast = (_remote?.photos.length ?? 0) <= 1;
     final ok = await showSwaycoConfirm(
       context: context,
       title: AppStrings.t('delete_photo_q'),
-      body: AppStrings.t('delete_photo_body'),
+      body: AppStrings.t(
+        isLast ? 'delete_photo_body_last' : 'delete_photo_body',
+      ),
       confirmLabel: AppStrings.t('delete'),
     );
     if (ok != true) return;
