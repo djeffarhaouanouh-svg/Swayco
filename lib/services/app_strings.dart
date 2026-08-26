@@ -501,7 +501,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Ta photo Discover sera retirée. Tu pourras en uploader une nouvelle à tout moment.',
     'delete_photo_body_last':
-        "Ton profil quitte le Discover : tu n'y recevras plus d'ajouts.",
+        "Ton profil quitte le Discover 😭 : tu n'y recevras plus d'ajouts.",
     'bio_editor_title': 'Ta présentation',
     // Incoming call modal
     'incoming_someone': "Quelqu'un",
@@ -1067,7 +1067,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Your Discover photo will be removed. You can upload a new one at any time.',
     'delete_photo_body_last':
-        'Your profile leaves Discover: no more adds.',
+        'Your profile leaves Discover 😭: no more adds.',
     'bio_editor_title': 'Your bio',
     'incoming_someone': 'Someone',
     'cant_join_call': "Can't join the call: {msg}",
@@ -1598,7 +1598,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Tu foto de Discover será eliminada. Podrás subir una nueva en cualquier momento.',
     'delete_photo_body_last':
-        'Tu perfil sale de Discover: no recibirás más contactos.',
+        'Tu perfil sale de Discover 😭: no recibirás más contactos.',
     'bio_editor_title': 'Tu presentación',
     'incoming_someone': 'Alguien',
     'cant_join_call': 'No se puede unirse a la llamada: {msg}',
@@ -2080,7 +2080,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Dein Discover-Foto wird entfernt. Du kannst jederzeit ein neues hochladen.',
     'delete_photo_body_last':
-        'Dein Profil verlässt Discover: keine Kontakte mehr.',
+        'Dein Profil verlässt Discover 😭: keine Kontakte mehr.',
     'bio_editor_title': 'Deine Vorstellung',
     'incoming_someone': 'Jemand',
     'cant_join_call': 'Anruf kann nicht beigetreten werden: {msg}',
@@ -2645,7 +2645,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'La tua foto Discover sarà rimossa. Puoi caricarne una nuova in qualsiasi momento.',
     'delete_photo_body_last':
-        'Il tuo profilo esce dal Discover: niente più contatti.',
+        'Il tuo profilo esce dal Discover 😭: niente più contatti.',
     'bio_editor_title': 'La tua presentazione',
     'incoming_someone': 'Qualcuno',
     'cant_join_call': 'Impossibile unirsi alla chiamata: {msg}',
@@ -3205,7 +3205,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Sua foto Discover será removida. Você pode enviar uma nova a qualquer momento.',
     'delete_photo_body_last':
-        'Seu perfil sai do Discover: sem mais contatos.',
+        'Seu perfil sai do Discover 😭: sem mais contatos.',
     'bio_editor_title': 'Sua apresentação',
     'incoming_someone': 'Alguém',
     'cant_join_call': 'Impossível entrar na chamada: {msg}',
@@ -3768,7 +3768,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Je Discover-foto wordt verwijderd. Je kunt op elk moment een nieuwe uploaden.',
     'delete_photo_body_last':
-        'Je profiel verlaat Discover: geen contacten meer.',
+        'Je profiel verlaat Discover 😭: geen contacten meer.',
     'bio_editor_title': 'Jouw bio',
     'incoming_someone': 'Iemand',
     'cant_join_call': 'Kan niet deelnemen aan de oproep: {msg}',
@@ -4318,7 +4318,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'سيتم إزالة صورة Discover الخاصة بك. يمكنك تحميل صورة جديدة في أي وقت.',
     'delete_photo_body_last':
-        'يخرج ملفك من Discover: لا مزيد من الإضافات.',
+        'يخرج ملفك من Discover 😭: لا مزيد من الإضافات.',
     'bio_editor_title': 'نبذة عنك',
     'incoming_someone': 'شخص ما',
     'cant_join_call': 'تعذر الانضمام للمكالمة: {msg}',
@@ -4872,7 +4872,7 @@ abstract final class AppStrings {
     'delete_photo_body':
         'Твоё фото Discover будет удалено. Ты можешь загрузить новое в любой момент.',
     'delete_photo_body_last':
-        'Твой профиль уходит из Discover: добавлений больше не будет.',
+        'Твой профиль уходит из Discover 😭: добавлений больше не будет.',
     'bio_editor_title': 'О себе',
     'incoming_someone': 'Кто-то',
     'cant_join_call': 'Не удалось присоединиться к звонку: {msg}',
@@ -5403,7 +5403,7 @@ abstract final class AppStrings {
     'name_change_cooldown': '{days} 天后可再次修改名字。',
     'delete_photo_body': '你的 Discover 照片将被删除。你可以随时上传新的。',
     'delete_photo_body_last':
-        '你的资料将退出 Discover：不会再有关注。',
+        '你的资料将退出 Discover 😭：不会再有关注。',
     'bio_editor_title': '你的简介',
     'incoming_someone': '某人',
     'cant_join_call': '无法加入通话：{msg}',
@@ -5918,7 +5918,7 @@ abstract final class AppStrings {
     'name_change_cooldown': '名前は {days} 日後に変更できます。',
     'delete_photo_body': 'Discover 写真が削除されます。いつでも新しい写真をアップロードできます。',
     'delete_photo_body_last':
-        'プロフィールが Discover から外れます。追加はもう届きません。',
+        'プロフィールが Discover から外れます 😭。追加はもう届きません。',
     'bio_editor_title': '自己紹介',
     'incoming_someone': '誰か',
     'cant_join_call': '通話に参加できません: {msg}',
@@ -6435,7 +6435,7 @@ abstract final class AppStrings {
     'name_change_cooldown': '{days}일 후에 이름을 다시 변경할 수 있습니다.',
     'delete_photo_body': 'Discover 사진이 제거됩니다. 언제든지 새 사진을 업로드할 수 있습니다.',
     'delete_photo_body_last':
-        '프로필이 Discover에서 빠져요. 더 이상 추가를 받을 수 없어요.',
+        '프로필이 Discover에서 빠져요 😭. 더 이상 추가를 받을 수 없어요.',
     'bio_editor_title': '자기소개',
     'incoming_someone': '누군가',
     'cant_join_call': '통화에 참여할 수 없습니다: {msg}',
