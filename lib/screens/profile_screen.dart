@@ -2286,11 +2286,16 @@ class _PhotoGallery extends StatelessWidget {
             );
           },
         ),
-        // onReorderItem (et non onReorder, obsolète) : newIndex y tient déjà
-        // compte de la tuile retirée, il n'y a pas de -1 à faire ici.
-        onReorderItem: (oldIndex, newIndex) {
+        // onReorder, et PAS onReorderItem : ce dernier n'existe qu'à partir de
+        // Flutter 3.47, que la chaîne de build ne peut pas prendre tant que
+        // livekit_client 2.7.0 ne compile pas dessus (worktree 3.41.2 en local,
+        // FLUTTER_VERSION 3.41.2 sur la CI iOS). onReorder donne un newIndex
+        // calculé AVANT le retrait de la tuile — le -1 en descente refait ce
+        // que onReorderItem faisait tout seul, le comportement est identique.
+        onReorder: (oldIndex, newIndex) {
           final move = onReorderPhotos;
           if (move == null) return;
+          if (newIndex > oldIndex) newIndex -= 1;
           final from = oldIndex - offset;
           final to = newIndex - offset;
           // La tuile "+" ne se déplace pas, et rien ne se glisse devant elle.
