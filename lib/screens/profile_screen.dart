@@ -1936,7 +1936,8 @@ class _PeerMediaStack extends StatelessWidget {
                   onTogglePeerLike: onTogglePhotoLike != null
                       ? () => onTogglePhotoLike!(photos[i])
                       : null,
-                  isPrimary: i == 0,
+                  // Chez un pair : aucun lisere. Le cadre cyan dit "ta photo
+                  // de profil", ce qui n'a de sens que sur mon propre profil.
                 ),
               ),
           ],
