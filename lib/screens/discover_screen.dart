@@ -909,17 +909,7 @@ class _TopTabBar extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: searchExpanded ? null : onSearch,
-                // Le verre de la barre de navigation, aux mêmes valeurs : flou
-                // 28, voile blanc à 13 %, liseré à 22 % sur 1,2 px. Fermée, la
-                // loupe flottait sur rien ; c'est un bouton maintenant, et le
-                // même verre que le reste de l'app. Ouverte, la pastille garde
-                // ce verre au lieu de virer à un gris plus pâle — la largeur
-                // seule s'anime.
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                    child: AnimatedContainer(
+                child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
                   width: searchExpanded
@@ -929,17 +919,18 @@ class _TopTabBar extends StatelessWidget {
                         )
                       : 40,
                   height: 40,
-                  // 6 fermée et pas 8 : avec le liseré, 8 laissait moins de
-                  // place à la loupe (24 px) que la pastille n'en a (40).
                   padding: EdgeInsets.symmetric(
-                    horizontal: searchExpanded ? 14 : 6,
+                    horizontal: searchExpanded ? 14 : 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.13),
+                    color: searchExpanded
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      width: 1.2,
+                      color: searchExpanded
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.transparent,
                     ),
                   ),
                   child: Row(
@@ -998,8 +989,6 @@ class _TopTabBar extends StatelessWidget {
                         ),
                       ],
                     ],
-                  ),
-                ),
                   ),
                 ),
               ),
