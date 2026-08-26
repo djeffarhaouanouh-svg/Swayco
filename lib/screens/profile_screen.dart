@@ -1936,6 +1936,7 @@ class _PeerMediaStack extends StatelessWidget {
                   onTogglePeerLike: onTogglePhotoLike != null
                       ? () => onTogglePhotoLike!(photos[i])
                       : null,
+                  isPrimary: i == 0,
                 ),
               ),
           ],
@@ -2345,6 +2346,7 @@ class _PhotoGallery extends StatelessWidget {
                   onTapLikes: onTapLikes,
                   iLikePeer: false,
                   onTogglePeerLike: null,
+                  isPrimary: photoIndex == 0,
                 ),
               ),
             ),
@@ -3375,6 +3377,7 @@ class _PhotoCell extends StatelessWidget {
     this.onTapLikes,
     this.iLikePeer = false,
     this.onTogglePeerLike,
+    this.isPrimary = false,
   });
 
   final String? photoUrl;
@@ -3388,6 +3391,9 @@ class _PhotoCell extends StatelessWidget {
   final VoidCallback? onTapLikes;
   final bool iLikePeer;
   final VoidCallback? onTogglePeerLike;
+
+  /// Premiere photo de la galerie : elle seule porte le lisere cyan.
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
@@ -3534,10 +3540,10 @@ class _PhotoCell extends StatelessWidget {
                 ),
               ),
             ),
-          // Le liseré cyan cercle CHAQUE photo : il ne désigne plus la photo
-          // Discover (il n'y en a plus, la carte les déroule toutes), c'est le
-          // cadre de la tuile. Pas sur la cellule vide, qui n'est pas une photo.
-          if (hasPhoto)
+          // Le lisere cyan ne designe QUE la premiere photo de la galerie
+          // (la photo de profil) : sur les suivantes il transformait la rangee
+          // en mur de cadres. Pas sur la cellule vide, qui n'est pas une photo.
+          if (hasPhoto && isPrimary)
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(
