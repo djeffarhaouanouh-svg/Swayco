@@ -21,6 +21,14 @@ enum MatchCardKind { first, standard }
 const _cyan = Color(0xFF22D3EE);
 const _cyanInk = Color(0xFF04262D);
 
+/// Le rond photo : 150 de diamètre, 3 de liseré, donc 144 de trou. Les trois
+/// nombres vivent ensemble parce qu'ils doivent bouger ensemble — c'est un
+/// repli figé à 96 dans ce trou de 144 qui dessinait un anneau noir autour de
+/// l'initiale, là où la photo, elle, remplissait tout.
+const double _ringSize = 150;
+const double _ringWidth = 3;
+const double _photoSize = _ringSize - _ringWidth * 2;
+
 class MatchCard extends StatefulWidget {
   const MatchCard({
     super.key,
@@ -209,9 +217,9 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
           const SizedBox(height: 22),
         ],
         Container(
-          width: 150,
-          height: 150,
-          padding: const EdgeInsets.all(3),
+          width: _ringSize,
+          height: _ringSize,
+          padding: const EdgeInsets.all(_ringWidth),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
@@ -265,10 +273,10 @@ class _MatchCardState extends State<MatchCard> with TickerProviderStateMixin {
 
   Widget _photo() {
     final url = _photoUrl;
-    final fallback = ColoredBox(
-      color: const Color(0xFF111111),
-      child: Center(child: ProfileAvatar(displayName: _name, size: 96)),
-    );
+    // Sans photo, l'initiale colorée occupe TOUT le rond. Elle vivait à 96 au
+    // centre d'un disque noir : le liseré aux couleurs du drapeau cerclait
+    // alors un trou, et non un visage.
+    final fallback = ProfileAvatar(displayName: _name, size: _photoSize);
     if (url.isEmpty) return fallback;
     return Image.network(
       url,
