@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
@@ -893,23 +894,26 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swayco — bitmap (swayco_logo_6d.png, transparent,
-              // 1354×291). Le SVG équivalent a été essayé et retiré : son
-              // <text> dépend d'une police que flutter_svg ne charge pas
-              // (voir la note dans le commit "revert(discover)"). Le PNG,
-              // lui, est déjà rastérisé — pas de dépendance de police, très
-              // large marge de résolution à la taille d'en-tête (26 px de
-              // haut). S'efface pendant la recherche pour laisser le champ
-              // s'étirer sur toute la barre.
+              // Wordmark swayco — vecteur (swayco_logo_6d.svg). Le premier
+              // essai avait un <text> dépendant d'une police que flutter_svg
+              // ne charge pas (rendu cassé) ; cette version a le "swayc"
+              // détouré en <path> — plus aucune dépendance de police. S'efface
+              // pendant la recherche pour laisser le champ s'étirer sur toute
+              // la barre.
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Image(
-                    image: AssetImage('assets/swayco_logo_6d.png'),
-                    height: 26,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  // Échelle de référence du spec (fontSize 23) : le SVG est
+                  // dessiné à 4× (font-size 92, viewBox 383×140) pour la
+                  // précision, donc on le réduit d'un quart au rendu — ne
+                  // pas l'agrandir au-delà.
+                  child: SizedBox(
+                    height: 35,
+                    width: 95.75,
+                    child: SvgPicture.asset('assets/swayco_logo_6d.svg'),
                   ),
                 ),
               ),
