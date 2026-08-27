@@ -216,7 +216,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // appearing live in the list below doesn't need a banner on top of it.
     OpenThread.conversationId.value = widget.conversationId;
     _bootstrap();
-    _maybeShowCallPromo();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -431,6 +430,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
     });
+    // Vend la traduction : inutile si les deux comptes parlent déjà la
+    // même langue. Ne bloque pas quand l'une des deux est inconnue — on
+    // ne sait pas alors qu'elles sont identiques.
+    final peerLang = peer?.language.trim().toLowerCase() ?? '';
+    final sameLang = _myLang.isNotEmpty &&
+        peerLang.isNotEmpty &&
+        _myLang.trim().toLowerCase() == peerLang;
+    if (!sameLang) _maybeShowCallPromo();
 
     // Les traductions déjà obtenues, relues du disque AVANT que les messages
     // arrivent : sans ça, le fil s'affiche dans la langue de l'autre puis
