@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
@@ -894,23 +893,43 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swayco — vecteur (swayco_logo_spec.md), remplace le
-              // texte + glyphe ø dessinés à la main. S'efface pendant la
+              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
               // recherche pour laisser le champ s'étirer sur toute la barre.
+              //
+              // Le SVG vectoriel (swayco_logo_6d.svg / swayco_logo_spec.md)
+              // a été essayé ici et RETIRÉ : son <text> "swayc" dépend d'une
+              // police (Plus Jakarta Sans italique) que flutter_svg ne sait
+              // pas charger — elle n'est enregistrée nulle part comme asset
+              // Flutter, google_fonts ne l'expose pas au moteur SVG — donc au
+              // rendu ça retombait sur une police système droite, sans le
+              // skew, et l'anneau+barre cyan de le "o" s'écrasait en un blob
+              // à cette taille. Il faudra soit détourer le texte en chemins
+              // vectoriels (Illustrator/Figma "create outlines", ou un TTF →
+              // SVG path) avant de le réintroduire, soit livrer un widget
+              // Dart dessiné (police + skew + CustomPainter pour le "o").
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  // Échelle de référence du spec (fontSize 23) : le SVG est
-                  // dessiné à 4× (font-size 92, viewBox 383×140) pour la
-                  // précision, donc on le réduit d'un quart au rendu — ne
-                  // pas l'agrandir au-delà.
-                  child: SizedBox(
-                    height: 35,
-                    width: 95.75,
-                    child: SvgPicture.asset('assets/swayco_logo_6d.svg'),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'swayc'),
+                        TextSpan(
+                          text: 'ø',
+                          style: TextStyle(color: Color(0xFF22D3EE)),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: SC.brandFont,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
               ),
