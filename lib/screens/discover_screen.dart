@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
@@ -32,6 +33,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
@@ -160,12 +162,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   int _activeTab = 0;
   static const _tabs = ['Pour vous', 'Double Date', 'Astrologie'];
 
+  // "Glisse pour choisir" one-shot coach — the very first time this screen
+  // is reached (right after onboarding). Starts closed: it only opens once
+  // the flag lookup confirms it has never played.
+  bool _showSwipeCoach = false;
+
   @override
   void initState() {
     super.initState();
     Analytics.track('screen_view', props: {'screen': 'discover'});
     _bootstrap();
+    _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
+  }
+
+  Future<void> _maybeShowSwipeCoach() async {
+    if (await UserPrefs.isSwipeCoachSeen()) return;
+    await UserPrefs.markSwipeCoachSeen();
+    if (!mounted) return;
+    setState(() => _showSwipeCoach = true);
   }
 
   @override
@@ -630,6 +645,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ),
               ),
           ],
+
+          // ── Coach "glisse pour choisir" — une seule fois, à l'arrivée ────
+          if (_showSwipeCoach)
+            SwipeCoachOverlay(
+              onDismiss: () => setState(() => _showSwipeCoach = false),
+            ),
         ],
       ),
     );
@@ -873,31 +894,23 @@ class _TopTabBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
       child: Row(
             children: [
-              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
+              // Wordmark swayco — vecteur (swayco_logo_spec.md), remplace le
+              // texte + glyphe ø dessinés à la main. S'efface pendant la
               // recherche pour laisser le champ s'étirer sur toute la barre.
               if (!searchExpanded)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSettings,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'swayc'),
-                        TextSpan(
-                          text: 'ø',
-                          style: TextStyle(color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: SC.brandFont,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  // Échelle de référence du spec (fontSize 23) : le SVG est
+                  // dessiné à 4× (font-size 92, viewBox 383×140) pour la
+                  // précision, donc on le réduit d'un quart au rendu — ne
+                  // pas l'agrandir au-delà.
+                  child: SizedBox(
+                    height: 35,
+                    width: 95.75,
+                    child: SvgPicture.asset('assets/swayco_logo_6d.svg'),
                   ),
                 ),
               ),

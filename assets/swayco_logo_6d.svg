@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="383" height="140" viewBox="0 0 383 140" fill="none">
+  <g fill="#FFFFFF">
+    <text x="24" y="106" font-family="Plus Jakarta Sans, Helvetica, Arial, sans-serif" font-weight="800" font-style="italic" font-size="92" letter-spacing="-3.68" transform="skewX(-9) translate(11.4 0)">swayc</text>
+  </g>
+  <g transform="translate(299 47)">
+    <circle cx="29" cy="29" r="22" fill="none" stroke="#22C8DE" stroke-width="14"></circle>
+    <rect x="-4" y="24" width="66" height="10" fill="#22C8DE" transform="rotate(-45 29 29)"></rect>
+  </g>
+</svg>

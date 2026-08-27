@@ -26,6 +26,7 @@ import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
+import '../services/user_prefs.dart';
 import '../services/wave_api.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -35,6 +36,7 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_wave_promo.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -122,6 +124,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Envoi en cours — le bouton de CETTE ligne tourne au lieu de réagir deux
   /// fois à un doigt nerveux.
   final Set<String> _waving = <String>{};
+
+  /// One-shot "faire signe" coach, montré une seule fois au-dessus de la nav,
+  /// dès qu'il y a au moins une conversation à prévisualiser.
+  bool _showWavePromo = false;
+
+  Future<void> _maybeShowWavePromo() async {
+    if (await UserPrefs.isWavePromoSeen()) return;
+    await UserPrefs.markWavePromoSeen();
+    if (!mounted) return;
+    setState(() => _showWavePromo = true);
+  }
 
   Future<void> _checkNotifStatus() async {
     final blocked = (await NotificationClient.notifStatus()) != 'enabled';
@@ -427,6 +440,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       unawaited(_reloadWaves());
       // Landed on Messages with fresh matches → start the "seen" countdown.
       _scheduleMatchSeen();
+      if (friends.isNotEmpty) unawaited(_maybeShowWavePromo());
     } catch (e) {
       if (!mounted || seq != _reloadSeq) return;
       setState(() {
@@ -667,25 +681,48 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final navBody =
+        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       // Classic flat black, matching the conversation thread — no blue mesh.
       backgroundColor: SC.bg,
-      body: SafeArea(
-        bottom: false,
-        // Fixed "Messages" band at the top; the conversation list scrolls
-        // underneath it (the band stays pinned, it doesn't scroll away).
-        child: Column(
-          children: [
-            _titleBar,
-            // Le liseré qui ferme le header : pleine largeur, bord à bord.
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: Colors.white.withValues(alpha: 0.10),
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            // Fixed "Messages" band at the top; the conversation list scrolls
+            // underneath it (the band stays pinned, it doesn't scroll away).
+            child: Column(
+              children: [
+                _titleBar,
+                // Le liseré qui ferme le header : pleine largeur, bord à bord.
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Colors.white.withValues(alpha: 0.10),
+                ),
+                Expanded(child: _buildBody()),
+              ],
             ),
-            Expanded(child: _buildBody()),
-          ],
-        ),
+          ),
+          if (_showWavePromo)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: navBody,
+              child: SwaycoWavePromo(
+                peers: [
+                  for (final p in _friends.take(4))
+                    WavePromoPeer(
+                      avatarUrl: p.avatarUrl,
+                      displayName: p.displayName,
+                    ),
+                ],
+                onCta: () => setState(() => _showWavePromo = false),
+                onDismiss: () => setState(() => _showWavePromo = false),
+              ),
+            ),
+        ],
       ),
     );
   }
