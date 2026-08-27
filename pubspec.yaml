@@ -204,9 +204,6 @@ flutter:
     - assets/splash.json
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
-    # Swayco wordmark — vector, "swayc" outlined to paths (no font
-    # dependency). Discover header.
-    - assets/swayco_logo_6d.svg
     # Short chime played when the "It's a match" badge pops.
     - assets/sounds/match_pop.wav
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
