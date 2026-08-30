@@ -1804,18 +1804,18 @@ class _SwipeStamp extends StatelessWidget {
     return Transform.rotate(
       angle: text == 'LIKE' ? -0.26 : 0.26,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color, width: 3.5),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: color, width: 2.5),
         ),
         child: Text(
           text,
           style: TextStyle(
             color: color,
-            fontSize: 32,
+            fontSize: 22,
             fontWeight: FontWeight.w900,
-            letterSpacing: 3,
+            letterSpacing: 2,
           ),
         ),
       ),
