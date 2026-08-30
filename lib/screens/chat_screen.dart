@@ -1150,6 +1150,10 @@ class _FriendChatRow extends StatelessWidget {
             : AppStrings.t('chat_no_name'));
 
     final subtitleParts = <InlineSpan>[];
+    // Point levé + date : ce qui a quitté la colonne de droite se retrouve
+    // ici, en bout d'aperçu. À PART du flux tronquable — un message long
+    // ne doit jamais manger la date, seulement le texte qui la précède.
+    String? dateSuffix;
     if (wavedMeAt != null) {
       // Un signe non vu passe DEVANT le dernier message : c'est le plus
       // récent, et c'est le seul des deux qui attend quelque chose de moi.
@@ -1176,11 +1180,7 @@ class _FriendChatRow extends StatelessWidget {
             ? AppStrings.t('push_photo')
             : lastMessage!.body,
       ));
-      // Point levé + date : ce qui a quitté la colonne de droite se
-      // retrouve ici, en bout d'aperçu, qui revient tout au 👋.
-      subtitleParts.add(
-        TextSpan(text: ' · ${_formatTime(lastMessage!.createdAt)}'),
-      );
+      dateSuffix = ' · ${_formatTime(lastMessage!.createdAt)}';
     } else {
       // Jamais un mot échangé : on le dit, au lieu d'inviter à toucher — la
       // ligne entière est déjà la touche.
@@ -1260,18 +1260,37 @@ class _FriendChatRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  RichText(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.3,
-                        color: unread ? SC.textSecondary : SC.textMuted,
+                  Row(
+                    children: [
+                      // Tronquable : c'est le texte du message qui cède la
+                      // place, jamais la date.
+                      Flexible(
+                        child: RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.3,
+                              color: unread ? SC.textSecondary : SC.textMuted,
+                            ),
+                            children: subtitleParts,
+                          ),
+                        ),
                       ),
-                      children: subtitleParts,
-                    ),
+                      if (dateSuffix != null)
+                        Text(
+                          dateSuffix,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.3,
+                            color: unread ? SC.textSecondary : SC.textMuted,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
