@@ -1149,6 +1149,7 @@ class _FriendChatRow extends StatelessWidget {
             ? '@${profile.handle}'
             : AppStrings.t('chat_no_name'));
 
+    final subtitleColor = unread ? SC.textSecondary : SC.textMuted;
     final subtitleParts = <InlineSpan>[];
     // Point levé + date : ce qui a quitté la colonne de droite se retrouve
     // ici, en bout d'aperçu. À PART du flux tronquable — un message long
@@ -1273,7 +1274,7 @@ class _FriendChatRow extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.3,
-                              color: unread ? SC.textSecondary : SC.textMuted,
+                              color: subtitleColor,
                             ),
                             children: subtitleParts,
                           ),
@@ -1284,10 +1285,14 @@ class _FriendChatRow extends StatelessWidget {
                           dateSuffix,
                           maxLines: 1,
                           softWrap: false,
+                          // Un cran plus discrète que le texte du message —
+                          // même couleur de base, alpha réduit.
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.3,
-                            color: unread ? SC.textSecondary : SC.textMuted,
+                            color: subtitleColor.withValues(
+                              alpha: subtitleColor.a * 0.7,
+                            ),
                           ),
                         ),
                     ],
