@@ -1027,28 +1027,6 @@ class _FriendChatRow extends StatelessWidget {
   /// see anyone else's dot either).
   bool get _peerOnline => isPeerOnline(profile);
 
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final isSameDay = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    if (isSameDay) {
-      final h = dt.hour.toString().padLeft(2, '0');
-      final m = dt.minute.toString().padLeft(2, '0');
-      return '$h:$m';
-    }
-    final yesterday = now.subtract(const Duration(days: 1));
-    final wasYesterday =
-        dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
-    if (wasYesterday) return 'hier';
-    final daysAgo = now.difference(dt).inDays;
-    if (daysAgo < 7) {
-      const weekdays = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
-      return weekdays[(dt.weekday - 1).clamp(0, 6)];
-    }
-    final d = dt.day.toString().padLeft(2, '0');
-    final mo = dt.month.toString().padLeft(2, '0');
-    return '$d/$mo';
-  }
-
   /// Long-press menu: mute / unmatch / block / report / delete conversation.
   void _showRowActions(BuildContext context) {
     showModalBottomSheet<void>(
@@ -1174,6 +1152,9 @@ class _FriendChatRow extends StatelessWidget {
             ? AppStrings.t('push_photo')
             : lastMessage!.body,
       ));
+      // Point levé en fin de ligne — remplace l'heure/la date retirées de la
+      // colonne de droite, qui revient tout au 👋.
+      subtitleParts.add(const TextSpan(text: ' ·'));
     } else {
       // Jamais un mot échangé : on le dit, au lieu d'inviter à toucher — la
       // ligne entière est déjà la touche.
@@ -1274,22 +1255,13 @@ class _FriendChatRow extends StatelessWidget {
             // touche d'appel. Jamais les deux — une conversation qui attend
             // une réponse ne propose pas d'appeler à la place, et une
             // conversation à jour n'a pas de chiffre à montrer.
+            //
+            // La date/l'heure est partie : le point levé en fin d'aperçu la
+            // remplace, et la colonne revient tout entière au 👋.
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (lastMessage != null) ...[
-                  Text(
-                    _formatTime(lastMessage!.createdAt),
-                    style: TextStyle(
-                      fontFamily: _kMono,
-                      fontSize: 11.5,
-                      fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
-                      color: unread ? SC.accent : SC.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                ],
                 if (unreadCount > 0)
                   _UnreadBadge(count: unreadCount)
                 else if (unread)
