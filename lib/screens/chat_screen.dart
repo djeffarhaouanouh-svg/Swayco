@@ -1041,7 +1041,9 @@ class _FriendChatRow extends StatelessWidget {
     if (wasYesterday) return 'hier';
     final daysAgo = now.difference(dt).inDays;
     if (daysAgo < 7) {
-      const weekdays = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+      const weekdays = [
+        'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
+      ];
       return weekdays[(dt.weekday - 1).clamp(0, 6)];
     }
     final d = dt.day.toString().padLeft(2, '0');
