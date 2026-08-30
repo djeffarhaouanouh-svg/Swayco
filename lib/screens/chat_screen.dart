@@ -1545,7 +1545,7 @@ class _RowWaveButtonState extends State<_RowWaveButton>
 
   /// Elle bondit hors du rond, tient un instant en l'air, puis retombe en
   /// dépassant. Le pic est à 2,1 — beaucoup, volontairement : l'emoji sort de
-  /// son cercle de 32 px et c'est CE débordement qui fait qu'on voit le geste
+  /// son cercle de 38 px et c'est CE débordement qui fait qu'on voit le geste
   /// partir depuis l'autre bout de l'écran. Un bouton qui frémit ne dit rien.
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
@@ -1556,6 +1556,25 @@ class _RowWaveButtonState extends State<_RowWaveButton>
     TweenSequenceItem(tween: ConstantTween<double>(2.1), weight: 26),
     TweenSequenceItem(
       tween: Tween(begin: 2.1, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 52,
+    ),
+  ]).animate(_c);
+
+  /// Le vrai bond : `_scale` grossit symétriquement autour du centre, donc
+  /// SEUL ce décalage vers le haut fait que l'emoji "monte" au lieu de
+  /// juste gonfler sur place. Mêmes poids/courbes que `_scale` — elle monte
+  /// pendant qu'elle grossit, tient en l'air, retombe en même temps qu'elle
+  /// rapetisse.
+  late final Animation<double> _lift = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 0.0, end: -16.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 22,
+    ),
+    TweenSequenceItem(tween: ConstantTween<double>(-16.0), weight: 26),
+    TweenSequenceItem(
+      tween: Tween(begin: -16.0, end: 0.0)
           .chain(CurveTween(curve: Curves.elasticOut)),
       weight: 52,
     ),
@@ -1643,15 +1662,18 @@ class _RowWaveButtonState extends State<_RowWaveButton>
                     ),
                   ),
                 ),
-                Transform.scale(
-                  scale: _scale.value,
-                  child: Transform.rotate(
-                    angle: angle,
-                    child: Opacity(
-                      opacity: live ? 1 : 0.45,
-                      child: const Text(
-                        '👋',
-                        style: TextStyle(fontSize: 18, height: 1.15),
+                Transform.translate(
+                  offset: Offset(0, _lift.value),
+                  child: Transform.scale(
+                    scale: _scale.value,
+                    child: Transform.rotate(
+                      angle: angle,
+                      child: Opacity(
+                        opacity: live ? 1 : 0.45,
+                        child: const Text(
+                          '👋',
+                          style: TextStyle(fontSize: 18, height: 1.15),
+                        ),
                       ),
                     ),
                   ),
