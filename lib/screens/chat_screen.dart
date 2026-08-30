@@ -1601,10 +1601,10 @@ class _RowWaveButtonState extends State<_RowWaveButton>
       onTap: _tap,
       // L'emoji dépasse largement du rond pendant le salut. La pile ne clippe
       // pas (`Clip.none` est le défaut d'un Stack) et le SizedBox garde la
-      // ligne à 32 px : le débordement est purement peint, il ne pousse rien.
+      // ligne à 38 px : le débordement est purement peint, il ne pousse rien.
       child: SizedBox(
-        width: 32,
-        height: 32,
+        width: 38,
+        height: 38,
         child: AnimatedBuilder(
           animation: _c,
           builder: (context, _) {
@@ -1621,8 +1621,8 @@ class _RowWaveButtonState extends State<_RowWaveButton>
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                     child: Container(
-                      width: 32,
-                      height: 32,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color.lerp(
@@ -1649,7 +1649,7 @@ class _RowWaveButtonState extends State<_RowWaveButton>
                       opacity: live ? 1 : 0.45,
                       child: const Text(
                         '👋',
-                        style: TextStyle(fontSize: 15, height: 1.15),
+                        style: TextStyle(fontSize: 18, height: 1.15),
                       ),
                     ),
                   ),
