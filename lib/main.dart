@@ -14,6 +14,7 @@ import 'firebase_options.dart';
 import 'screens/call_screen.dart';
 import 'screens/guest_join_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/new_password_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/muted_calls.dart';
@@ -117,6 +118,14 @@ void _handleForegroundMessage(RemoteMessage message) {
   ));
 }
 
+/// Captured from the launch URL *before* `Supabase.initialize` consumes and
+/// clears it. True when the app was opened from a Supabase password-recovery
+/// email link (implicit flow: `#…&type=recovery`). `main.dart` then shows
+/// [NewPasswordScreen] instead of routing on the short-lived session the link
+/// establishes. The PKCE flow (`?code=…`, no `type` marker) is caught instead
+/// by the `AuthChangeEvent.passwordRecovery` listener below.
+bool _launchedForPasswordRecovery = false;
+
 Future<void> main() async {
   // Wrap the whole boot in runZonedGuarded + FlutterError.onError so a
   // silent Release-mode throw never ends up as a blank screen with
@@ -141,6 +150,15 @@ Future<void> main() async {
     // the stream (see CallSplashImage) also keeps the cache from evicting
     // it behind a few hundred scrolled Discover photos.
     CallSplashImage.warm();
+    // Read the launch URL for a recovery link BEFORE Supabase.initialize —
+    // on web it detects the session in the URL and then rewrites the address
+    // bar, so `type=recovery` is gone by the time bootstrap runs.
+    if (kIsWeb) {
+      final u = Uri.base;
+      final frag = Uri.splitQueryString(u.fragment);
+      _launchedForPasswordRecovery = frag['type'] == 'recovery' ||
+          u.queryParameters['type'] == 'recovery';
+    }
     // Supabase keys come from --dart-define at build time. 15s cap so a
     // reviewer device on a bad network still boots — the earlier 5s cap
     // was actively harmful (it cut Hive session recovery mid-flight and
@@ -258,6 +276,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   bool _minSplashElapsed = false;
   bool _needsOnboarding = false;
   bool _authed = false;
+  /// Opened from a password-recovery link. Takes priority over every other
+  /// route in [_buildHome]: the link hands us a live session, but the user
+  /// must set a new password (and re-login) rather than land in the app.
+  bool _passwordRecovery = _launchedForPasswordRecovery;
   /// Set when the app was opened via a guest-invite link (`/c/<room>` on
   /// web). Non-null → skip login entirely and show [GuestJoinScreen].
   GuestInvite? _guestInvite;
@@ -290,6 +312,15 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     // React to sign-in / sign-out events anywhere in the app.
     if (isSupabaseReady) {
       _authSub = AuthService.onAuthStateChange.listen((state) {
+        // A recovery link (PKCE `?code=` flow, where the launch URL carries
+        // no `type=recovery` marker for the check in main()) surfaces only
+        // as this event. Show the set-a-new-password screen and ignore the
+        // session it just opened.
+        if (state.event == AuthChangeEvent.passwordRecovery) {
+          if (mounted) setState(() => _passwordRecovery = true);
+          return;
+        }
+        if (_passwordRecovery) return;
         final wasAuthed = _authed;
         final nowAuthed = AuthService.isAuthenticated;
         if (wasAuthed != nowAuthed) {
@@ -374,7 +405,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       }
       authed = AuthService.isAuthenticated;
       debugPrint('bootstrap: authed=$authed');
-      if (authed) {
+      // A recovery link opens a session too, but it must not be treated as a
+      // sign-in — no onboarding check, no presence, no shell. [_buildHome]
+      // shows [NewPasswordScreen] instead.
+      if (authed && !_passwordRecovery) {
         // Bound the whole authed-state load: any Supabase call inside that
         // never returns (a true hang, which try/catch can't catch) would
         // otherwise leave _loading true forever → user stuck on the splash.
@@ -402,8 +436,10 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
         // Only the authed RootShell waits on heavy landing content (the
         // Discover feed reports readiness itself via AppBoot). Guest join,
         // login and onboarding have nothing to load → ready immediately.
-        final showsRootShell =
-            _guestInvite == null && authed && !needsOnboarding;
+        final showsRootShell = _guestInvite == null &&
+            authed &&
+            !needsOnboarding &&
+            !_passwordRecovery;
         if (!showsRootShell) AppBoot.markHomeReady();
       }
     }
@@ -656,6 +692,21 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
   }
 
   Widget _buildHome() {
+    // Password-recovery link → set a new password, then back to login.
+    // Checked first: the link also opens a session, which every branch
+    // below would otherwise route into the app.
+    if (_passwordRecovery) {
+      return NewPasswordScreen(
+        onDone: () {
+          if (!mounted) return;
+          setState(() {
+            _passwordRecovery = false;
+            // NewPasswordScreen signs the recovery session out on success.
+            _authed = AuthService.isAuthenticated;
+          });
+        },
+      );
+    }
     // Guest-invite link → straight to the join screen, no login.
     if (_guestInvite != null) {
       return GuestJoinScreen(
