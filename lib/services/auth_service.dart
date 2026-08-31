@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:crypto/crypto.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -80,7 +81,16 @@ abstract final class AuthService {
     if (!isSupabaseReady) {
       throw StateError('Supabase non configuré');
     }
-    return _auth.resetPasswordForEmail(email.trim().toLowerCase());
+    return _auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      // Web: the default flow is PKCE, whose return URL is a bare `?code=…`
+      // with no `type` marker — indistinguishable from a sign-up
+      // confirmation, so the app would just log the user in. Send them back
+      // to `…/?type=recovery` instead, which `main()` recognises and routes
+      // to the set-a-new-password screen. This URL must be on the Supabase
+      // Auth → Redirect URLs allowlist (add `https://www.swayco.fr/**`).
+      redirectTo: kIsWeb ? '${Uri.base.origin}/?type=recovery' : null,
+    );
   }
 
   /// Re-trigger the signup confirmation email for users who never clicked
