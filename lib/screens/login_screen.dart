@@ -9,6 +9,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/sway_onb_kit.dart';
+import 'forgot_password_screen.dart';
 
 /// Welcome screen shown when the user has no Supabase Auth session. Lets them
 /// either sign in or create a new account with email + password. After a
@@ -144,31 +145,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _forgotPassword() async {
-    final email = _emailCtrl.text.trim();
-    if (!_emailRegex.hasMatch(email)) {
-      setState(() => _error = AppStrings.t('login_err_email'));
-      return;
-    }
+  void _openForgotPassword() {
     setState(() {
-      _busy = true;
       _error = null;
       _info = null;
+      _showResendConfirmation = false;
     });
-    try {
-      await AuthService.resetPassword(email);
-      if (!mounted) return;
-      setState(() {
-        _info = AppStrings.t('login_reset_sent');
-        _busy = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _busy = false;
-      });
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ForgotPasswordScreen(initialEmail: _emailCtrl.text.trim()),
+      ),
+    );
   }
 
   void _toggleMode() {
@@ -314,7 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: _busy ? null : _forgotPassword,
+                              onPressed: _busy ? null : _openForgotPassword,
                               child: Text(AppStrings.t('login_forgot')),
                             ),
                           ),

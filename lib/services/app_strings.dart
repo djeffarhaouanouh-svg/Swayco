@@ -606,6 +606,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Lien expiré ou déjà utilisé. Redemande une réinitialisation.',
     'reset_pw_same': 'Le nouveau mot de passe doit être différent de l\'ancien.',
+    'forgot_pw_title': 'Mot de passe oublié',
+    'forgot_pw_subtitle':
+        'Entre ton adresse e-mail : on t\'envoie un lien pour créer un nouveau mot de passe.',
+    'forgot_pw_cta': 'Envoyer',
 
     'onb_welcome_title': 'Bienvenue',
     'onb_welcome_subtitle': "Comment veux-tu qu'on t'appelle ?",
@@ -1197,6 +1201,10 @@ abstract final class AppStrings {
     'reset_pw_success': 'Password changed. Sign in with the new one.',
     'reset_pw_expired': 'Link expired or already used. Request a new reset.',
     'reset_pw_same': 'The new password must be different from the old one.',
+    'forgot_pw_title': 'Forgot password',
+    'forgot_pw_subtitle':
+        'Enter your email and we\'ll send you a link to set a new password.',
+    'forgot_pw_cta': 'Send',
 
     'onb_welcome_title': 'Welcome',
     'onb_welcome_subtitle': 'What should we call you?',
@@ -1843,6 +1851,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Enlace caducado o ya utilizado. Solicita un nuevo restablecimiento.',
     'reset_pw_same': 'La nueva contraseña debe ser distinta de la anterior.',
+    'forgot_pw_title': 'Contraseña olvidada',
+    'forgot_pw_subtitle':
+        'Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña.',
+    'forgot_pw_cta': 'Enviar',
     'onb_gender_title': 'Eres…',
     'onb_gender_subtitle':
         'Nos ayuda a personalizar tu experiencia en Swayco.',
@@ -2429,6 +2441,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Link abgelaufen oder bereits verwendet. Fordere eine neue Zurücksetzung an.',
     'reset_pw_same': 'Das neue Passwort muss sich vom alten unterscheiden.',
+    'forgot_pw_title': 'Passwort vergessen',
+    'forgot_pw_subtitle':
+        'Gib deine E-Mail ein, wir senden dir einen Link für ein neues Passwort.',
+    'forgot_pw_cta': 'Senden',
     'onb_country_label': 'Land',
     'onb_country_hint': 'z. B. Frankreich',
     'onb_city_label': 'Stadt',
@@ -3019,6 +3035,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Link scaduto o già utilizzato. Richiedi un nuovo ripristino.',
     'reset_pw_same': 'La nuova password deve essere diversa da quella precedente.',
+    'forgot_pw_title': 'Password dimenticata',
+    'forgot_pw_subtitle':
+        'Inserisci la tua email: ti inviamo un link per creare una nuova password.',
+    'forgot_pw_cta': 'Invia',
     'onb_country_label': 'Paese',
     'onb_country_hint': 'es. Italia',
     'onb_city_label': 'Città',
@@ -3609,6 +3629,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Ligação expirada ou já utilizada. Pede uma nova reposição.',
     'reset_pw_same': 'A nova palavra-passe tem de ser diferente da anterior.',
+    'forgot_pw_title': 'Palavra-passe esquecida',
+    'forgot_pw_subtitle':
+        'Introduz o teu e-mail e enviamos-te uma ligação para definir uma nova palavra-passe.',
+    'forgot_pw_cta': 'Enviar',
     'onb_country_label': 'País',
     'onb_country_hint': 'ex.: Portugal',
     'onb_city_label': 'Cidade',
@@ -4199,6 +4223,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Link verlopen of al gebruikt. Vraag een nieuwe reset aan.',
     'reset_pw_same': 'Het nieuwe wachtwoord moet anders zijn dan het oude.',
+    'forgot_pw_title': 'Wachtwoord vergeten',
+    'forgot_pw_subtitle':
+        'Vul je e-mailadres in, dan sturen we je een link voor een nieuw wachtwoord.',
+    'forgot_pw_cta': 'Versturen',
     'onb_country_label': 'Land',
     'onb_country_hint': 'bijv. Frankrijk',
     'onb_city_label': 'Stad',
@@ -4773,6 +4801,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'الرابط منتهي الصلاحية أو مُستخدَم من قبل. اطلب إعادة تعيين جديدة.',
     'reset_pw_same': 'يجب أن تختلف كلمة المرور الجديدة عن القديمة.',
+    'forgot_pw_title': 'إعادة تعيين كلمة المرور',
+    'forgot_pw_subtitle':
+        'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لتعيين كلمة مرور جديدة.',
+    'forgot_pw_cta': 'إرسال',
     'onb_country_label': 'الدولة',
     'onb_country_hint': 'مثال: فرنسا',
     'onb_city_label': 'المدينة',
@@ -5360,6 +5392,10 @@ abstract final class AppStrings {
     'reset_pw_expired':
         'Ссылка устарела или уже использована. Запросите сброс заново.',
     'reset_pw_same': 'Новый пароль должен отличаться от старого.',
+    'forgot_pw_title': 'Сброс пароля',
+    'forgot_pw_subtitle':
+        'Введите e-mail — мы отправим ссылку для создания нового пароля.',
+    'forgot_pw_cta': 'Отправить',
     'onb_country_label': 'Страна',
     'onb_country_hint': 'например, Франция',
     'onb_city_label': 'Город',
@@ -5897,6 +5933,9 @@ abstract final class AppStrings {
     'reset_pw_success': '密码已修改。请使用新密码登录。',
     'reset_pw_expired': '链接已失效或已被使用。请重新申请重置。',
     'reset_pw_same': '新密码必须与旧密码不同。',
+    'forgot_pw_title': '重置密码',
+    'forgot_pw_subtitle': '输入你的邮箱，我们会发送重置密码的链接。',
+    'forgot_pw_cta': '发送',
     'onb_country_label': '国家',
     'onb_country_hint': '例如：法国',
     'onb_city_label': '城市',
@@ -6445,6 +6484,9 @@ abstract final class AppStrings {
     'reset_pw_success': 'パスワードを変更しました。新しいパスワードでログインしてください。',
     'reset_pw_expired': 'リンクの有効期限が切れているか、すでに使用されています。もう一度リセットを申請してください。',
     'reset_pw_same': '新しいパスワードは以前のものと異なる必要があります。',
+    'forgot_pw_title': 'パスワードの再設定',
+    'forgot_pw_subtitle': 'メールアドレスを入力してください。新しいパスワードを設定するリンクをお送りします。',
+    'forgot_pw_cta': '送信',
     'onb_country_label': '国',
     'onb_country_hint': '例: 日本',
     'onb_city_label': '市区町村',
@@ -6988,6 +7030,9 @@ abstract final class AppStrings {
     'reset_pw_success': '비밀번호를 변경했어요. 새 비밀번호로 로그인하세요.',
     'reset_pw_expired': '링크가 만료되었거나 이미 사용되었어요. 재설정을 다시 요청하세요.',
     'reset_pw_same': '새 비밀번호는 이전 비밀번호와 달라야 해요.',
+    'forgot_pw_title': '비밀번호 재설정',
+    'forgot_pw_subtitle': '이메일을 입력하면 새 비밀번호를 설정할 링크를 보내드려요.',
+    'forgot_pw_cta': '보내기',
     'onb_country_label': '국가',
     'onb_country_hint': '예: 프랑스',
     'onb_city_label': '도시',
