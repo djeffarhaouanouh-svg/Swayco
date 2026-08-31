@@ -146,12 +146,12 @@ abstract final class WaveApi {
       final name = myName.trim();
       await PushDispatcher.notify(
         recipientUid: peerId,
-        // Le prénom en titre, comme un message : c'est de QUI que ça vient
-        // qui décide si on ouvre. L'emoji le distingue au premier coup d'œil
-        // d'un message écrit.
+        // Le prénom seul en titre, comme un message : c'est de QUI que ça
+        // vient qui décide si on ouvre. L'emoji reste dans le corps
+        // ("te fait signe 👋") — pas besoin de le répéter ici.
         title: name.isEmpty
             ? AppStrings.tIn(lang, 'push_wave_title_anon')
-            : '👋 $name',
+            : name,
         body: AppStrings.tIn(lang, 'push_wave_body'),
         type: 'wave',
         data: {'senderId': AuthService.currentUserId},
