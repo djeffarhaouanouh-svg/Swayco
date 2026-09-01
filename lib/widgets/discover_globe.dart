@@ -250,9 +250,6 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final globeSide =
-        math.min(size.width - 56, math.min(size.height * 0.52, 420.0));
     final canLaunch = _selected.isNotEmpty;
 
     return Material(
@@ -267,125 +264,140 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
               child: const ColoredBox(color: Color(0x99000000)),
             ),
           ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 460),
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141517),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF26262D)),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x66000000), blurRadius: 40, offset: Offset(0, 18)),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            AppStrings.t('globe_title'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
+          // Panneau quasi plein écran : il couvre la carte / la photo.
+          Positioned.fill(
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141517),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFF26262D)),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Color(0x66000000),
+                          blurRadius: 40,
+                          offset: Offset(0, 18)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              AppStrings.t('globe_title'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
-                        ),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(Icons.close_rounded,
-                                color: Color(0xFF9A9AA2), size: 22),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => Navigator.of(context).pop(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.close_rounded,
+                                  color: Color(0xFF9A9AA2), size: 22),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: globeSide,
-                      height: globeSide,
-                      child: Center(
-                        child: _world == null
-                            ? const SizedBox(
-                                width: 26,
-                                height: 26,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white24, strokeWidth: 2),
-                              )
-                            : Stack(
-                                alignment: Alignment.center,
-                                clipBehavior: Clip.none,
-                                children: [
-                                  // Lueur diffuse derrière le globe : un halo
-                                  // cyan serré sur le disque, prolongé d'une
-                                  // brume bleutée plus large.
-                                  IgnorePointer(
-                                    child: Container(
-                                      width: globeSide * 0.92,
-                                      height: globeSide * 0.92,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: SC.accent
-                                                .withValues(alpha: 0.34),
-                                            blurRadius: 42,
-                                            spreadRadius: -6,
+                        ],
+                      ),
+                      // Le globe occupe tout l'espace libre du panneau.
+                      Expanded(
+                        child: Center(
+                          child: _world == null
+                              ? const SizedBox(
+                                  width: 26,
+                                  height: 26,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white24, strokeWidth: 2),
+                                )
+                              : LayoutBuilder(
+                                  builder: (context, c) {
+                                    final globeSide = math.min(
+                                      math.min(c.maxWidth, c.maxHeight),
+                                      520.0,
+                                    );
+                                    return SizedBox(
+                                      width: globeSide,
+                                      height: globeSide,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          // Lueur : halo cyan serré + brume
+                                          // bleutée plus large.
+                                          IgnorePointer(
+                                            child: Container(
+                                              width: globeSide * 0.92,
+                                              height: globeSide * 0.92,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: SC.accent
+                                                        .withValues(alpha: 0.34),
+                                                    blurRadius: 42,
+                                                    spreadRadius: -6,
+                                                  ),
+                                                  BoxShadow(
+                                                    color: const Color(
+                                                            0xFF7FA8BD)
+                                                        .withValues(alpha: 0.20),
+                                                    blurRadius: 85,
+                                                    spreadRadius: -18,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
-                                          BoxShadow(
-                                            color: const Color(0xFF7FA8BD)
-                                                .withValues(alpha: 0.20),
-                                            blurRadius: 85,
-                                            spreadRadius: -18,
+                                          RepaintBoundary(
+                                            child: _GlobeView(
+                                              world: _world!,
+                                              selected: _selected,
+                                              onToggle: _toggle,
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ),
-                                  RepaintBoundary(
-                                    child: _GlobeView(
-                                      world: _world!,
-                                      selected: _selected,
-                                      onToggle: _toggle,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      AppStrings.t('globe_hint'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.42),
-                        fontSize: 12.5,
-                        height: 1.4,
-                      ),
-                    ),
-                    // Le bouton n'apparaît qu'une fois un pays touché, et se
-                    // pose en bas à DROITE — il ne prend pas toute la ligne.
-                    if (canLaunch) ...[
-                      const SizedBox(height: 14),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _LaunchButton(
-                          label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
-                              '   ${AppStrings.t('globe_launch')}',
-                          onTap: () => Navigator.of(context).pop(_selected),
+                                    );
+                                  },
+                                ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppStrings.t('globe_hint'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.42),
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
+                      ),
+                      // Le bouton n'apparaît qu'une fois un pays touché, et se
+                      // pose en bas à DROITE — il ne prend pas toute la ligne.
+                      if (canLaunch) ...[
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _LaunchButton(
+                            label:
+                                '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
+                                '   ${AppStrings.t('globe_launch')}',
+                            onTap: () => Navigator.of(context).pop(_selected),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -407,9 +419,11 @@ class _LaunchButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        alignment: Alignment.center,
+        // Ni `alignment` ni `width` : un Container avec `alignment` non nul
+        // s'étire sur toute la largeur dispo (contraintes bornées) et le
+        // bouton cesse d'être « à droite ». Le padding suffit à lui donner
+        // sa forme de pilule autour du texte.
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
         decoration: BoxDecoration(
           color: SC.accent,
           borderRadius: BorderRadius.circular(999),
