@@ -321,12 +321,44 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                 child: CircularProgressIndicator(
                                   color: Colors.white24, strokeWidth: 2),
                               )
-                            : RepaintBoundary(
-                                child: _GlobeView(
-                                  world: _world!,
-                                  selected: _selected,
-                                  onToggle: _toggle,
-                                ),
+                            : Stack(
+                                alignment: Alignment.center,
+                                clipBehavior: Clip.none,
+                                children: [
+                                  // Lueur diffuse derrière le globe : un halo
+                                  // cyan serré sur le disque, prolongé d'une
+                                  // brume bleutée plus large.
+                                  IgnorePointer(
+                                    child: Container(
+                                      width: globeSide * 0.92,
+                                      height: globeSide * 0.92,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: SC.accent
+                                                .withValues(alpha: 0.34),
+                                            blurRadius: 42,
+                                            spreadRadius: -6,
+                                          ),
+                                          BoxShadow(
+                                            color: const Color(0xFF7FA8BD)
+                                                .withValues(alpha: 0.20),
+                                            blurRadius: 85,
+                                            spreadRadius: -18,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  RepaintBoundary(
+                                    child: _GlobeView(
+                                      world: _world!,
+                                      selected: _selected,
+                                      onToggle: _toggle,
+                                    ),
+                                  ),
+                                ],
                               ),
                       ),
                     ),
