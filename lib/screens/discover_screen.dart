@@ -666,6 +666,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             onPullUp: _openInfo,
                             infoOpen: _infoOpen,
                             onCloseInfo: _closeInfo,
+                            // Les deux chips du haut vivent DANS la carte :
+                            // elles glissent avec elle au swipe. Retirées
+                            // pendant la transition "Go" et le panneau infos.
+                            topLeftBadge: (!_infoOpen &&
+                                    !_searchExpanded &&
+                                    !_showFilterTransition)
+                                ? _GlobeFilterBar(
+                                    countryKeys: _countryKeys,
+                                    onOpen: _openGlobe,
+                                    onClear: _clearCountryFilter,
+                                  )
+                                : null,
+                            topRightBadge:
+                                (!_infoOpen && !_showFilterTransition)
+                                    ? _CardUndoButton(onTap: _onActionUndo)
+                                    : null,
                           ),
           ),
 
@@ -700,17 +716,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               ),
             ),
 
-          // ── Retour arrière — coin haut-DROIT de la photo, verre nu (pas de
-          //    liseré cyan : seule l'icône est colorée). ─────────────────────
-          if (_hasActiveCard && !_infoOpen)
-            Positioned(
-              top: tabBarH + 20,
-              right: _kCardInset + 12,
-              child: _CardUndoButton(onTap: _onActionUndo),
-            ),
-
-          // ── Pastille « Filtrer » — SUR la photo, coin haut-gauche ─────────
-          if (showBar)
+          // ── Pastille « Filtrer » — coin haut-gauche. Quand une carte est
+          //    active elle est DANS la carte (topLeftBadge, elle glisse au
+          //    swipe) ; sur l'écran vide / fin de deck, elle flotte ici pour
+          //    rester accessible. ─────────────────────────────────────────────
+          if (showBar && !_hasActiveCard && !_showFilterTransition)
             Positioned(
               top: tabBarH + 20,
               left: _kCardInset + 12,
@@ -754,7 +764,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             right: 0,
             bottom: _infoOpen ? safeBottom + 4 : btnBottom,
             height: actionH + (_infoOpen ? 0 : _kCardRadius),
-            child: _hasActiveCard
+            child: _hasActiveCard && !_showFilterTransition
                 ? _SwipeActionBar(
                     height: actionH,
                     topJoin: _infoOpen ? 0 : _kCardRadius,
@@ -1286,6 +1296,8 @@ class _TinderCardStack extends StatefulWidget {
     required this.onPullUp,
     required this.infoOpen,
     required this.onCloseInfo,
+    this.topLeftBadge,
+    this.topRightBadge,
   });
 
   final List<({RemoteProfile profile, List<String> photos})> cards;
@@ -1298,6 +1310,10 @@ class _TinderCardStack extends StatefulWidget {
   /// True while that panel is up — it covers the bottom half of the card.
   final bool infoOpen;
   final VoidCallback onCloseInfo;
+
+  /// Chips pinned to the top card's corners (they ride the swipe transform).
+  final Widget? topLeftBadge;
+  final Widget? topRightBadge;
 
   @override
   State<_TinderCardStack> createState() => _TinderCardStackState();
@@ -1406,6 +1422,8 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               // Pulling the photo up is what opens the panel — no chevron.
               onPullUp: widget.onPullUp,
               locked: widget.infoOpen,
+              topLeftBadge: widget.topLeftBadge,
+              topRightBadge: widget.topRightBadge,
               child: _buildCard(widget.cards[i]),
             ),
           ),
@@ -1853,6 +1871,8 @@ class _DraggableCard extends StatefulWidget {
     required this.onProgress,
     this.onPullUp,
     this.locked = false,
+    this.topLeftBadge,
+    this.topRightBadge,
   });
   final Widget child;
   final ValueChanged<bool> onSwiped;
@@ -1864,6 +1884,12 @@ class _DraggableCard extends StatefulWidget {
 
   /// True while the panel is up: the card must not swipe under it.
   final bool locked;
+
+  /// Floating chips pinned to the card's top corners (filter pill / undo).
+  /// They live INSIDE the card's transform so they slide and tilt with it
+  /// during a swipe.
+  final Widget? topLeftBadge;
+  final Widget? topRightBadge;
 
   @override
   State<_DraggableCard> createState() => _DraggableCardState();
@@ -2015,6 +2041,7 @@ class _DraggableCardState extends State<_DraggableCard>
         child: Transform.rotate(
           angle: angle,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               widget.child,
               // LIKE à GAUCHE (le côté vers lequel on glisse pour matcher),
@@ -2039,6 +2066,12 @@ class _DraggableCardState extends State<_DraggableCard>
                     child: const _SwipeStamp(text: 'NOPE', color: Color(0xFFFF4458)),
                   ),
                 ),
+              // Pastille filtre / retour — dans le transform de la carte, donc
+              // elles glissent et s'inclinent avec elle.
+              if (widget.topLeftBadge != null)
+                Positioned(top: 12, left: 12, child: widget.topLeftBadge!),
+              if (widget.topRightBadge != null)
+                Positioned(top: 12, right: 12, child: widget.topRightBadge!),
             ],
           ),
         ),
