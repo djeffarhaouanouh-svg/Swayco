@@ -285,20 +285,31 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Pas de titre — juste la croix, alignée à droite.
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.of(context).pop(),
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Icon(Icons.close_rounded,
-                              color: Color(0xFF9A9AA2), size: 22),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            AppStrings.t('globe_title'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
                         ),
-                      ),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close_rounded,
+                                color: Color(0xFF9A9AA2), size: 22),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: globeSide,
                       height: globeSide,
@@ -329,13 +340,17 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                         height: 1.4,
                       ),
                     ),
-                    // Le bouton n'apparaît qu'une fois un pays touché.
+                    // Le bouton n'apparaît qu'une fois un pays touché, et se
+                    // pose en bas à DROITE — il ne prend pas toute la ligne.
                     if (canLaunch) ...[
                       const SizedBox(height: 14),
-                      _LaunchButton(
-                        label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
-                            '   ${AppStrings.t('globe_launch')}',
-                        onTap: () => Navigator.of(context).pop(_selected),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _LaunchButton(
+                          label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
+                              '   ${AppStrings.t('globe_launch')}',
+                          onTap: () => Navigator.of(context).pop(_selected),
+                        ),
                       ),
                     ],
                   ],
@@ -360,7 +375,8 @@ class _LaunchButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 52,
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 22),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: SC.accent,
