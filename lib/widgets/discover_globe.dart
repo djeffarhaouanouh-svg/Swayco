@@ -256,19 +256,21 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
       type: MaterialType.transparency,
       child: Stack(
         children: [
-          // Scrim — tap outside to dismiss.
+          // Scrim — assez léger pour laisser deviner le logo et la nav
+          // autour du panneau ; tap pour fermer.
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).pop(),
-              child: const ColoredBox(color: Color(0x99000000)),
+              child: const ColoredBox(color: Color(0x66000000)),
             ),
           ),
-          // Panneau quasi plein écran : il couvre la carte / la photo.
+          // Panneau : couvre la carte / la photo, mais laisse voir le logo en
+          // haut (barre d'onglets ~52) et la barre de nav en bas (~68).
           Positioned.fill(
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(14, 66, 14, 82),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
                   decoration: BoxDecoration(
