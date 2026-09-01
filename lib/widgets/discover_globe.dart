@@ -167,6 +167,30 @@ Path _landPath(
   return path;
 }
 
+/// Where each country's white label bubble floats, relative to its anchor
+/// point on the globe (screen px, matches the prototype's `off`).
+const Map<String, Offset> _kBubbleOffset = {
+  'France': Offset(-42, 26),
+  'Germany': Offset(38, -32),
+};
+
+const double _kBubbleR = 18;
+
+/// Anchor (true geo point) + bubble centre for a selectable country, or null
+/// when the country is on the hidden hemisphere.
+({Offset anchor, Offset bubble})? _bubbleFor(
+  String key,
+  double rotLon,
+  double rotLat,
+  double radius,
+  Offset center,
+) {
+  final c = kGlobeCountries[key]!.center;
+  final a = _project(c.dx, c.dy, rotLon, rotLat, radius, center);
+  if (a == null) return null;
+  return (anchor: a, bubble: a + (_kBubbleOffset[key] ?? const Offset(0, -28)));
+}
+
 Color _terrain(double lat) {
   final a = lat.abs();
   if (a > 66) return const Color(0xFFF2F6F7);
@@ -284,9 +308,19 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                               ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    Text(
+                      AppStrings.t('globe_hint'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.42),
+                        fontSize: 12.5,
+                        height: 1.4,
+                      ),
+                    ),
                     // Le bouton n'apparaît qu'une fois un pays touché.
                     if (canLaunch) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       _LaunchButton(
                         label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' ')}'
                             '  ${AppStrings.t('globe_launch')}',
@@ -416,21 +450,36 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _flyCtrl.forward(from: 0);
   }
 
+  void _select(String key) {
+    final adding = !widget.selected.contains(key);
+    widget.onToggle(key);
+    if (adding) _flyTo(kGlobeCountries[key]!.center);
+  }
+
   void _handleTapUp(TapUpDetails d, Size size) {
     final radius = size.shortestSide / 2 - 8;
     final center = Offset(size.width / 2, size.height / 2);
     final r = radius * _scale;
+    final p = d.localPosition;
+
+    // The white label bubbles first — they're the easy target on small
+    // countries.
+    for (final key in kGlobeCountries.keys) {
+      final b = _bubbleFor(key, _rotLon, _rotLat, r, center);
+      if (b != null && (p - b.bubble).distance <= _kBubbleR + 4) {
+        _select(key);
+        return;
+      }
+    }
+    // Then the country shapes themselves.
     for (final key in kGlobeCountries.keys) {
       final land = widget.world.firstWhere(
         (l) => l.name == key,
         orElse: () => _Land(key, const []),
       );
       if (land.polygons.isEmpty) continue;
-      final path = _landPath(land, _rotLon, _rotLat, r, center);
-      if (path.contains(d.localPosition)) {
-        final adding = !widget.selected.contains(key);
-        widget.onToggle(key);
-        if (adding) _flyTo(kGlobeCountries[key]!.center);
+      if (_landPath(land, _rotLon, _rotLat, r, center).contains(p)) {
+        _select(key);
         return;
       }
     }
@@ -563,6 +612,75 @@ class _GlobePainter extends CustomPainter {
         ..strokeWidth = 1.4
         ..color = _rim.withValues(alpha: 0.8),
     );
+
+    // ── White label bubbles (FR / DE) — outside the clip so they can float
+    //    over the rim, like the prototype's pins. ─────────────────────────
+    for (final key in kGlobeCountries.keys) {
+      final b = _bubbleFor(key, rotLon, rotLat, radius, center);
+      if (b == null) continue;
+      final picked = selected.contains(key);
+
+      // Connector.
+      canvas.drawLine(
+        b.anchor,
+        b.bubble,
+        Paint()
+          ..color = const Color(0x8A3D3A33)
+          ..strokeWidth = 1.6,
+      );
+      // Anchor dot on the true location.
+      canvas.drawCircle(b.anchor, 4, Paint()..color = SC.accent);
+      canvas.drawCircle(
+        b.anchor,
+        4,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = Colors.white,
+      );
+      // Bubble shadow + white disc.
+      canvas.drawCircle(
+        b.bubble.translate(0, 2),
+        _kBubbleR,
+        Paint()
+          ..color = const Color(0x33000000)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+      canvas.drawCircle(b.bubble, _kBubbleR, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        b.bubble,
+        _kBubbleR,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = picked ? 2 : 1
+          ..color = picked ? SC.accent : const Color(0xFFC9C2B2),
+      );
+      // Country code.
+      final tp = TextPainter(
+        text: TextSpan(
+          text: kGlobeCountries[key]!.lang.toUpperCase(),
+          style: const TextStyle(
+            color: Color(0xFF1B1B1F),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, b.bubble - Offset(tp.width / 2, tp.height / 2));
+      // Small cyan accent dot on the bubble's shoulder.
+      final acc = b.bubble + const Offset(13, -13);
+      canvas.drawCircle(acc, 4.5, Paint()..color = SC.accent);
+      canvas.drawCircle(
+        acc,
+        4.5,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..color = Colors.white,
+      );
+    }
   }
 
   @override

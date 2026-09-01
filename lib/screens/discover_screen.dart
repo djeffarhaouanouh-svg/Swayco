@@ -602,12 +602,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final openCardBottom = safeBottom + 12;
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
 
-    // Pastille « Filtrer » : posée entre les onglets et la carte. Son
-    // emplacement reste RÉSERVÉ tant que le panneau infos n'est pas ouvert —
-    // ouvrir la recherche masque la pastille mais ne fait pas grandir la carte.
-    final barSpace = _infoOpen ? 0.0 : _kGlobeBarH + 10;
+    // Pastille « Filtrer » : posée SUR la photo, coin haut-gauche (là où était
+    // le retour). Le retour arrière passe à droite.
     final showBar = !_infoOpen && !_searchExpanded;
-    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8 + barSpace;
+    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8;
 
     return Scaffold(
       backgroundColor: SC.bg,
@@ -649,23 +647,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           ),
           ),
 
-          // ── Retour arrière — coin haut-GAUCHE de la photo, verre nu (pas de
+          // ── Retour arrière — coin haut-DROIT de la photo, verre nu (pas de
           //    liseré cyan : seule l'icône est colorée). ─────────────────────
           if (_hasActiveCard && !_infoOpen)
             Positioned(
-              top: tabBarH + 20 + barSpace,
-              // Même retrait DANS la carte qu'avant : il suit sa marge.
-              left: _kCardInset + 12,
+              top: tabBarH + 20,
+              right: _kCardInset + 12,
               child: _CardUndoButton(onTap: _onActionUndo),
             ),
 
-          // ── Barre « Filtrer » — pastille compacte à gauche, ouvre le globe ─
+          // ── Pastille « Filtrer » — SUR la photo, coin haut-gauche ─────────
           if (showBar)
             Positioned(
-              top: tabBarH + 8,
-              left: _kCardInset,
-              // pas de `right:` — la pastille serre son contenu et reste
-              // loin de la loupe (coin haut-droit).
+              top: tabBarH + 20,
+              left: _kCardInset + 12,
               child: _GlobeFilterBar(
                 countryKeys: _countryKeys,
                 onOpen: _openGlobe,
@@ -1163,53 +1158,62 @@ class _GlobeFilterBar extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onOpen,
-      child: Container(
-        height: _kGlobeBarH,
-        padding: EdgeInsets.only(left: 14, right: selected ? 8 : 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF141517),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected
-                ? SC.accent.withValues(alpha: 0.55)
-                : const Color(0xFF262530),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            height: _kGlobeBarH,
+            padding: EdgeInsets.only(left: 13, right: selected ? 8 : 14),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? SC.accent.withValues(alpha: 0.60)
+                    : Colors.white.withValues(alpha: 0.14),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  selected ? Icons.public_rounded : Icons.tune_rounded,
+                  size: 17,
+                  color: selected ? SC.accent : Colors.white,
+                ),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth:
+                        MediaQuery.sizeOf(context).width - 2 * _kCardInset - 130,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.92),
+                      fontSize: 13.5,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onClear,
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.close_rounded,
+                          size: 17, color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? Icons.public_rounded : Icons.tune_rounded,
-              size: 17,
-              color: selected ? SC.accent : const Color(0xFF8A8A94),
-            ),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width - 2 * _kCardInset - 90,
-              ),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : const Color(0xFFC8C8CF),
-                  fontSize: 13.5,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ),
-            if (selected)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onClear,
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 6),
-                  child: Icon(Icons.close_rounded,
-                      size: 17, color: Color(0xFF8A8A94)),
-                ),
-              ),
-          ],
         ),
       ),
     );
@@ -2068,6 +2072,10 @@ class _TinderCardState extends State<_TinderCard> {
     // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
     // son propre statut n'éteignait pas les pastilles des autres sur Discover.
     final online = isPeerOnline(p);
+    // Aucune pastille (persona / intérêt) à afficher → on colle le prénom et
+    // le drapeau tout en bas de la photo au lieu de les laisser flotter.
+    final hasChip = personaCategoryByLabel(p.personaCategory) != null ||
+        p.interests.isNotEmpty;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2124,8 +2132,9 @@ class _TinderCardState extends State<_TinderCard> {
             left: 14,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Posé au-dessus des chevrons, qui sont tout en bas.
-            bottom: 66,
+            // Avec une pastille : au-dessus des chevrons. Sans : le prénom
+            // descend se poser au bas de la photo.
+            bottom: hasChip ? 66 : 24,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
