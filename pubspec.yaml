@@ -202,6 +202,8 @@ flutter:
     - assets/icon-saas.png
     # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
     - assets/splash.json
+    # Discover globe filter — "Go" transition (Ring+Arrow, no wordmark).
+    - assets/discover_filter_transition.json
     # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
     # Short chime played when the "It's a match" badge pops.

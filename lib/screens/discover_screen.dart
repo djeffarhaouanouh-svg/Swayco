@@ -31,6 +31,7 @@ import '../widgets/flag_gradients.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
+import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swipe_coach_overlay.dart';
@@ -158,6 +159,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Set<String> _countryKeys = {};
   bool get _filtered => _countryKeys.isNotEmpty;
 
+  // Ring+Arrow transition shown while the globe-filtered feed loads — hidden
+  // once BOTH the clip has played through AND the feed has actually landed,
+  // so a slow network doesn't cut the animation short.
+  bool _showFilterTransition = false;
+  bool _transitionAnimDone = false;
+  bool _transitionFeedDone = false;
+
+  void _maybeHideFilterTransition() {
+    if (_transitionAnimDone && _transitionFeedDone && mounted) {
+      setState(() => _showFilterTransition = false);
+    }
+  }
+
   List<String> get _filterLangs => _countryKeys
       .map(globeLangForCountry)
       .whereType<String>()
@@ -184,10 +198,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ),
     );
     if (!mounted || keys == null || keys.isEmpty) return;
-    setState(() => _countryKeys = keys);
+    setState(() {
+      _countryKeys = keys;
+      _showFilterTransition = true;
+      _transitionAnimDone = false;
+      _transitionFeedDone = false;
+    });
     Analytics.track('screen_view',
         props: {'screen': 'discover', 'country_filter': keys.join(',')});
     await _loadFeed(languages: _filterLangs);
+    if (!mounted) return;
+    _transitionFeedDone = true;
+    _maybeHideFilterTransition();
   }
 
   void _clearCountryFilter() {
@@ -646,6 +668,37 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             onCloseInfo: _closeInfo,
                           ),
           ),
+
+          // ── Transition "Go" du filtre globe — icône Ring+Arrow (SANS
+          //    wordmark, contrairement au splash de boot) + un "Chargement"
+          //    séparé, plus haut et plus grand que le wordmark du boot (celui-là
+          //    est du texte de statut à lire, pas une signature discrète en
+          //    bas d'écran). ──────────────────────────────────────────────
+          if (_showFilterTransition)
+            Positioned.fill(
+              child: Stack(
+                children: [
+                  LottieIconTransition(
+                    asset: 'assets/discover_filter_transition.json',
+                    onComplete: () {
+                      _transitionAnimDone = true;
+                      _maybeHideFilterTransition();
+                    },
+                  ),
+                  Align(
+                    alignment: const Alignment(0, 0.6),
+                    child: Text(
+                      AppStrings.t('profile_loading'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // ── Retour arrière — coin haut-DROIT de la photo, verre nu (pas de
           //    liseré cyan : seule l'icône est colorée). ─────────────────────
