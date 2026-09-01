@@ -1207,15 +1207,19 @@ class _GlobeFilterBar extends StatelessWidget {
         countryKeys.where(kGlobeCountries.containsKey).toList(growable: false);
     final selected = keys.isNotEmpty;
 
-    // Selected: flags of every picked country, plus the name when there's just
-    // one. Otherwise the short "Filtrer" label.
+    // Rien : libellé court "Filtrer". 1 pays : drapeau + nom. 2-3 : les
+    // drapeaux. Au-delà : 3 drapeaux puis "+N" — la pastille ne s'allonge
+    // jamais indéfiniment quelle que soit la sélection.
     final String label;
     if (!selected) {
       label = AppStrings.t('globe_filter_cta');
     } else if (keys.length == 1) {
       label = '${kGlobeCountries[keys.first]!.flag}  ${globeCountryLabel(keys.first)}';
-    } else {
+    } else if (keys.length <= 3) {
       label = keys.map((k) => kGlobeCountries[k]!.flag).join(' ');
+    } else {
+      label = '${keys.take(3).map((k) => kGlobeCountries[k]!.flag).join(' ')}'
+          '  +${keys.length - 3}';
     }
 
     return GestureDetector(
