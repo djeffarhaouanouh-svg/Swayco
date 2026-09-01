@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart';
 
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
@@ -228,6 +229,8 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     });
   }
 
+  bool _transitionPrecached = false;
+
   void _toggle(String key) {
     HapticFeedback.selectionClick();
     setState(() {
@@ -235,6 +238,14 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
           ? (_selected.difference({key}))
           : ({..._selected, key});
     });
+    // Fires the decode (JSON parse + the 88 embedded WebP frames) the moment
+    // a country is picked, not when "Go" is tapped — by then the composition
+    // is already sitting in lottie's sharedLottieCache, so the transition in
+    // DiscoverScreen starts on its very first frame instead of a beat late.
+    if (!_transitionPrecached) {
+      _transitionPrecached = true;
+      AssetLottie('assets/discover_filter_transition.json').load();
+    }
   }
 
   @override
