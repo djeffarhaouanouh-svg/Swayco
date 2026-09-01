@@ -1,17 +1,18 @@
 -- Discover: optional spoken-language filter, used by the globe country picker.
--- Selecting a country on the globe filters the deck to profiles whose
--- `language` matches that country's language (France -> fr, Germany -> de).
+-- Selecting one or more countries on the globe filters the deck to profiles
+-- whose `language` is one of those countries' languages (France -> fr,
+-- Germany -> de).
 --
--- Adds p_language (NULL / '' keeps the previous unfiltered behaviour). The old
--- 2-arg signature is dropped so PostgREST doesn't see an ambiguous overload
--- when the app calls with named params.
+-- Adds p_languages (NULL / empty array keeps the previous unfiltered
+-- behaviour). The old 2-arg signature is dropped so PostgREST doesn't see an
+-- ambiguous overload when the app calls with named params.
 
 drop function if exists public.discover_feed(uuid, int);
 
 create or replace function public.discover_feed(
-  p_user_id  uuid,
-  p_limit    int  default 50,
-  p_language text default null
+  p_user_id   uuid,
+  p_limit     int    default 50,
+  p_languages text[] default null
 )
 returns setof public.profiles
 language sql
@@ -37,18 +38,25 @@ as $$
       from public.friendships
      where status = 'accepted'
        and (requester = p_user_id or addressee = p_user_id)
+  ),
+  langs as (
+    select array(
+             select lower(x)
+               from unnest(coalesce(p_languages, '{}'::text[])) as x
+              where coalesce(x, '') <> ''
+           ) as list
   )
   select p.*
     from public.profiles p
     cross join me
+    cross join langs
    where p.id <> p_user_id
      and coalesce(p.discover_photo_url, '') <> ''
      and p.id not in (select peer from blocked)
      and p.id not in (select peer from matched)
      and (
-       p_language is null
-       or p_language = ''
-       or lower(coalesce(p.language, '')) = lower(p_language)
+       cardinality(langs.list) = 0
+       or lower(coalesce(p.language, '')) = any (langs.list)
      )
      and not (
        coalesce(p.hide_from_country, false) = true
@@ -59,6 +67,6 @@ as $$
    limit greatest(coalesce(p_limit, 50), 0);
 $$;
 
-revoke all on function public.discover_feed(uuid, int, text) from public;
-grant execute on function public.discover_feed(uuid, int, text)
+revoke all on function public.discover_feed(uuid, int, text[]) from public;
+grant execute on function public.discover_feed(uuid, int, text[])
   to anon, authenticated;

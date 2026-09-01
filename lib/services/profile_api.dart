@@ -1323,17 +1323,21 @@ abstract final class ProfileApi {
   static Future<List<RemoteProfile>> fetchDiscoverFeed({
     required String myId,
     int limit = 50,
-    String? language,
+    List<String>? languages,
   }) async {
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
-      final lang = language?.trim() ?? '';
+      final langs = (languages ?? const <String>[])
+          .map((l) => l.trim().toLowerCase())
+          .where((l) => l.isNotEmpty)
+          .toSet()
+          .toList();
       final result = await _c.rpc(
         'discover_feed',
         params: {
           'p_user_id': myId,
           'p_limit': limit,
-          if (lang.isNotEmpty) 'p_language': lang,
+          if (langs.isNotEmpty) 'p_languages': langs,
         },
       );
       if (result is! List) return const [];

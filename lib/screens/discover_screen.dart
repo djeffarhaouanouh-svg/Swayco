@@ -151,23 +151,29 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// the ✕ / ♥ float on top of the card.
   bool _infoOpen = false;
 
-  /// Country picked on the globe filter bar (world-atlas key, e.g. 'France'),
-  /// or null for the unfiltered deck. When set, the feed is reloaded with the
-  /// country's spoken language and today's deck state is NOT persisted (the
-  /// filtered view is ephemeral).
-  String? _countryKey;
-  bool get _filtered => _countryKey != null;
+  /// Countries picked on the globe filter bar (world-atlas keys, e.g.
+  /// {'France', 'Germany'}), empty for the unfiltered deck. When non-empty the
+  /// feed is reloaded filtered to those countries' spoken languages and today's
+  /// deck state is NOT persisted (the filtered view is ephemeral).
+  Set<String> _countryKeys = {};
+  bool get _filtered => _countryKeys.isNotEmpty;
 
-  /// Opens the spinning-globe country picker. A non-null result reloads the
-  /// feed filtered to that country's language.
+  List<String> get _filterLangs => _countryKeys
+      .map(globeLangForCountry)
+      .whereType<String>()
+      .toSet()
+      .toList();
+
+  /// Opens the spinning-globe country picker (multi-select). A non-empty
+  /// result reloads the feed filtered to those countries' languages.
   Future<void> _openGlobe() async {
-    final key = await showGeneralDialog<String>(
+    final keys = await showGeneralDialog<Set<String>>(
       context: context,
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKey),
+      pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKeys),
       transitionBuilder: (_, anim, _, child) => FadeTransition(
         opacity: anim,
         child: ScaleTransition(
@@ -177,21 +183,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
       ),
     );
-    if (!mounted || key == null) return;
-    setState(() => _countryKey = key);
+    if (!mounted || keys == null || keys.isEmpty) return;
+    setState(() => _countryKeys = keys);
     Analytics.track('screen_view',
-        props: {'screen': 'discover', 'country_filter': key});
-    await _loadFeed(language: globeLangForCountry(key));
+        props: {'screen': 'discover', 'country_filter': keys.join(',')});
+    await _loadFeed(languages: _filterLangs);
   }
 
   void _clearCountryFilter() {
-    if (_countryKey == null) return;
-    setState(() => _countryKey = null);
-    _loadFeed(language: null);
+    if (_countryKeys.isEmpty) return;
+    setState(() => _countryKeys = {});
+    _loadFeed(languages: null);
   }
 
-  /// Reloads the Discover deck, optionally filtered by spoken [language].
-  Future<void> _loadFeed({required String? language}) async {
+  /// Reloads the Discover deck, optionally filtered by spoken [languages].
+  Future<void> _loadFeed({required List<String>? languages}) async {
     if (_myId.isEmpty || !isSupabaseReady) return;
     setState(() {
       _feedLoading = true;
@@ -203,7 +209,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     try {
       final feed = await ProfileApi.fetchDiscoverFeed(
         myId: _myId,
-        language: language,
+        languages: languages,
       ).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
@@ -215,7 +221,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (mounted && !_deckDone) _precacheAround(0);
       });
     } catch (e) {
-      debugPrint('discover: _loadFeed(lang=$language) failed: $e');
+      debugPrint('discover: _loadFeed(langs=$languages) failed: $e');
       if (mounted) setState(() => _feedLoading = false);
     }
   }
@@ -653,14 +659,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               child: _CardUndoButton(onTap: _onActionUndo),
             ),
 
-          // ── Barre « Filtrer par pays » — ouvre le globe tournant ──────────
+          // ── Barre « Filtrer » — pastille compacte à gauche, ouvre le globe ─
           if (barVisible)
             Positioned(
               top: tabBarH + 8,
               left: _kCardInset,
-              right: _kCardInset,
+              // pas de `right:` — la pastille serre son contenu et reste
+              // loin de la loupe (coin haut-droit).
               child: _GlobeFilterBar(
-                countryKey: _countryKey,
+                countryKeys: _countryKeys,
                 onOpen: _openGlobe,
                 onClear: _clearCountryFilter,
               ),
@@ -1122,32 +1129,43 @@ class _TopTabBar extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Globe filter bar — "Filtrer par pays", sits above the card
+// Globe filter bar — compact "Filtrer" pill, left-aligned above the card
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _GlobeFilterBar extends StatelessWidget {
   const _GlobeFilterBar({
-    required this.countryKey,
+    required this.countryKeys,
     required this.onOpen,
     required this.onClear,
   });
 
-  final String? countryKey;
+  final Set<String> countryKeys;
   final VoidCallback onOpen;
   final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    final selected =
-        countryKey != null && kGlobeCountries.containsKey(countryKey);
-    final meta = selected ? kGlobeCountries[countryKey!]! : null;
+    final keys =
+        countryKeys.where(kGlobeCountries.containsKey).toList(growable: false);
+    final selected = keys.isNotEmpty;
+
+    // Selected: flags of every picked country, plus the name when there's just
+    // one. Otherwise the short "Filtrer" label.
+    final String label;
+    if (!selected) {
+      label = AppStrings.t('globe_filter_cta');
+    } else if (keys.length == 1) {
+      label = '${kGlobeCountries[keys.first]!.flag}  ${globeCountryLabel(keys.first)}';
+    } else {
+      label = keys.map((k) => kGlobeCountries[k]!.flag).join(' ');
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onOpen,
       child: Container(
         height: _kGlobeBarH,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.only(left: 14, right: selected ? 8 : 14),
         decoration: BoxDecoration(
           color: const Color(0xFF141517),
           borderRadius: BorderRadius.circular(999),
@@ -1158,23 +1176,25 @@ class _GlobeFilterBar extends StatelessWidget {
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              selected ? Icons.public_rounded : Icons.public_outlined,
-              size: 18,
+              selected ? Icons.public_rounded : Icons.tune_rounded,
+              size: 17,
               color: selected ? SC.accent : const Color(0xFF8A8A94),
             ),
-            const SizedBox(width: 10),
-            Expanded(
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width - 2 * _kCardInset - 90,
+              ),
               child: Text(
-                selected
-                    ? '${meta!.flag}  ${globeCountryLabel(countryKey!)}'
-                    : AppStrings.t('globe_filter_cta'),
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: selected ? Colors.white : const Color(0xFFC8C8CF),
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
@@ -1184,14 +1204,11 @@ class _GlobeFilterBar extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 onTap: onClear,
                 child: const Padding(
-                  padding: EdgeInsets.only(left: 8),
+                  padding: EdgeInsets.only(left: 6),
                   child: Icon(Icons.close_rounded,
-                      size: 18, color: Color(0xFF8A8A94)),
+                      size: 17, color: Color(0xFF8A8A94)),
                 ),
-              )
-            else
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 20, color: Color(0xFF6B6B74)),
+              ),
           ],
         ),
       ),

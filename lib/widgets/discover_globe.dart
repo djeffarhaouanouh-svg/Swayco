@@ -181,11 +181,12 @@ Color _terrain(double lat) {
 // ── The sheet ───────────────────────────────────────────────────────────────
 
 /// Full-screen overlay: a dark card with the spinning globe and a cyan
-/// "🔍 Lancer" button. Pops the selected country key (or null on dismiss).
+/// "🔍 Lancer" button. Pops the set of selected country keys — never null:
+/// an empty set (or a scrim/✕ dismiss) leaves the caller's filter untouched.
 class DiscoverGlobeSheet extends StatefulWidget {
-  const DiscoverGlobeSheet({super.key, this.initial});
+  const DiscoverGlobeSheet({super.key, this.initial = const {}});
 
-  final String? initial;
+  final Set<String> initial;
 
   @override
   State<DiscoverGlobeSheet> createState() => _DiscoverGlobeSheetState();
@@ -193,14 +194,22 @@ class DiscoverGlobeSheet extends StatefulWidget {
 
 class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
   List<_Land>? _world;
-  String? _selected;
+  late Set<String> _selected = {...widget.initial};
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.initial;
     _WorldGeo.load().then((w) {
       if (mounted) setState(() => _world = w);
+    });
+  }
+
+  void _toggle(String key) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selected = _selected.contains(key)
+          ? (_selected.difference({key}))
+          : ({..._selected, key});
     });
   }
 
@@ -209,7 +218,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     final size = MediaQuery.sizeOf(context);
     final globeSide =
         math.min(size.width - 56, math.min(size.height * 0.52, 420.0));
-    final canLaunch = _selected != null;
+    final canLaunch = _selected.isNotEmpty;
 
     return Material(
       type: MaterialType.transparency,
@@ -281,36 +290,20 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                 child: _GlobeView(
                                   world: _world!,
                                   selected: _selected,
-                                  onPicked: (key) {
-                                    HapticFeedback.selectionClick();
-                                    setState(() => _selected = key);
-                                  },
+                                  onToggle: _toggle,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      AppStrings.t('globe_hint'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.42),
-                        fontSize: 12.5,
-                        height: 1.4,
+                    // Le bouton n'apparaît qu'une fois un pays touché.
+                    if (canLaunch) ...[
+                      const SizedBox(height: 16),
+                      _LaunchButton(
+                        label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' ')}'
+                            '  ${AppStrings.t('globe_launch')}',
+                        onTap: () => Navigator.of(context).pop(_selected),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _LaunchButton(
-                      enabled: canLaunch,
-                      label: canLaunch
-                          ? '${kGlobeCountries[_selected]!.flag}  '
-                              '${AppStrings.t('globe_launch')} · '
-                              '${globeCountryLabel(_selected!)}'
-                          : AppStrings.t('globe_launch'),
-                      onTap: canLaunch
-                          ? () => Navigator.of(context).pop(_selected)
-                          : null,
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -323,34 +316,28 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
 }
 
 class _LaunchButton extends StatelessWidget {
-  const _LaunchButton({
-    required this.enabled,
-    required this.label,
-    required this.onTap,
-  });
+  const _LaunchButton({required this.label, required this.onTap});
 
-  final bool enabled;
   final String label;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+      child: Container(
         height: 52,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? SC.accent : const Color(0xFF1E1E23),
+          color: SC.accent,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: enabled ? const Color(0xFF08080A) : const Color(0xFF5A5A62),
+          style: const TextStyle(
+            color: Color(0xFF08080A),
             fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
@@ -366,12 +353,12 @@ class _GlobeView extends StatefulWidget {
   const _GlobeView({
     required this.world,
     required this.selected,
-    required this.onPicked,
+    required this.onToggle,
   });
 
   final List<_Land> world;
-  final String? selected;
-  final ValueChanged<String> onPicked;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
 
   @override
   State<_GlobeView> createState() => _GlobeViewState();
@@ -399,9 +386,9 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 700),
     )..addListener(_onFly);
-    if (widget.selected != null) {
-      // Land already on the pre-selected country.
-      final c = kGlobeCountries[widget.selected!]!.center;
+    if (widget.selected.isNotEmpty) {
+      // Land already on the first pre-selected country.
+      final c = kGlobeCountries[widget.selected.first]!.center;
       _rotLon = -c.dx;
       _rotLat = c.dy;
     }
@@ -415,7 +402,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   }
 
   void _onSpin(Duration _) {
-    if (_dragging || _flying || widget.selected != null) return;
+    if (_dragging || _flying || widget.selected.isNotEmpty) return;
     setState(() => _rotLon += 0.14);
   }
 
@@ -452,8 +439,9 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
       if (land.polygons.isEmpty) continue;
       final path = _landPath(land, _rotLon, _rotLat, r, center);
       if (path.contains(d.localPosition)) {
-        widget.onPicked(key);
-        _flyTo(kGlobeCountries[key]!.center);
+        final adding = !widget.selected.contains(key);
+        widget.onToggle(key);
+        if (adding) _flyTo(kGlobeCountries[key]!.center);
         return;
       }
     }
@@ -510,7 +498,7 @@ class _GlobePainter extends CustomPainter {
   });
 
   final List<_Land> world;
-  final String? selected;
+  final Set<String> selected;
   final double rotLon;
   final double rotLat;
   final double scale;
@@ -553,8 +541,9 @@ class _GlobePainter extends CustomPainter {
     for (final land in world) {
       final path = _landPath(land, rotLon, rotLat, radius, center);
       final isCountry = kGlobeCountries.containsKey(land.name);
+      final isSelected = selected.contains(land.name);
       final Color fill;
-      if (land.name == selected) {
+      if (isSelected) {
         fill = _selectedFill;
       } else if (isCountry) {
         fill = _pickableFill;
@@ -563,7 +552,7 @@ class _GlobePainter extends CustomPainter {
       }
       canvas.drawPath(path, Paint()..color = fill);
       canvas.drawPath(path, borderPaint);
-      if (isCountry && land.name != selected) {
+      if (isCountry && !isSelected) {
         canvas.drawPath(
           path,
           Paint()
@@ -592,6 +581,7 @@ class _GlobePainter extends CustomPainter {
       old.rotLon != rotLon ||
       old.rotLat != rotLat ||
       old.scale != scale ||
-      old.selected != selected ||
+      old.selected.length != selected.length ||
+      !old.selected.containsAll(selected) ||
       !identical(old.world, world);
 }
