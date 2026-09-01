@@ -266,11 +266,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
             ),
           ),
           // Panneau : couvre la carte / la photo, mais laisse voir le logo en
-          // haut (barre d'onglets ~52) et la barre de nav en bas (~68).
+          // haut et la barre de nav en bas. Le haut s'aligne PILE sous la
+          // rangée du logo (~52) — sinon le bord de la carte dépasse au-dessus.
           Positioned.fill(
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 66, 14, 82),
+                padding: const EdgeInsets.fromLTRB(14, 52, 14, 82),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
                   decoration: BoxDecoration(
