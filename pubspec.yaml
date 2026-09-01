@@ -208,6 +208,9 @@ flutter:
     - assets/sounds/match_pop.wav
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
+    # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) —
+    # drives the Discover country-picker globe (lib/widgets/discover_globe.dart).
+    - assets/geo/world-110m.geo.json
 
   # The swaycø wordmark is set in Glacial Indifference (SIL Open Font
   # License — see assets/fonts/OFL.txt). Brand type only: the rest of the UI

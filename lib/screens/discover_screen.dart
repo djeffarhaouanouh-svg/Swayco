@@ -25,6 +25,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/discover_globe.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass.dart';
@@ -48,6 +49,9 @@ const double _kCardInset = 16.0;
 
 /// Rayon des coins de la carte photo — et de ce qui doit s'y raccorder.
 const double _kCardRadius = 28.0;
+
+/// Hauteur de la barre « Filtrer par pays » posée au-dessus de la carte.
+const double _kGlobeBarH = 46.0;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
@@ -75,7 +79,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       }
       if (photos.isNotEmpty) _cards.add((profile: p, photos: photos));
     }
-    if (_cards.isNotEmpty) {
+    if (_cards.isNotEmpty && !_filtered) {
       UserPrefs.saveDiscoverDeck([for (final c in _cards) c.profile.id]);
     }
   }
@@ -115,8 +119,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _infoOpen = false;
     });
     NavChrome.show();
-    UserPrefs.clearDiscoverDone();
-    UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+    if (!_filtered) {
+      UserPrefs.clearDiscoverDone();
+      UserPrefs.saveDiscoverCursor(_cards.first.profile.id);
+    }
     _precacheAround(0);
   }
 
@@ -144,6 +150,75 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// drag or a tap on the scrim. While it's open the nav bar slides away and
   /// the ✕ / ♥ float on top of the card.
   bool _infoOpen = false;
+
+  /// Country picked on the globe filter bar (world-atlas key, e.g. 'France'),
+  /// or null for the unfiltered deck. When set, the feed is reloaded with the
+  /// country's spoken language and today's deck state is NOT persisted (the
+  /// filtered view is ephemeral).
+  String? _countryKey;
+  bool get _filtered => _countryKey != null;
+
+  /// Opens the spinning-globe country picker. A non-null result reloads the
+  /// feed filtered to that country's language.
+  Future<void> _openGlobe() async {
+    final key = await showGeneralDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKey),
+      transitionBuilder: (_, anim, _, child) => FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.96, end: 1.0)
+              .animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+          child: child,
+        ),
+      ),
+    );
+    if (!mounted || key == null) return;
+    setState(() => _countryKey = key);
+    Analytics.track('screen_view',
+        props: {'screen': 'discover', 'country_filter': key});
+    await _loadFeed(language: globeLangForCountry(key));
+  }
+
+  void _clearCountryFilter() {
+    if (_countryKey == null) return;
+    setState(() => _countryKey = null);
+    _loadFeed(language: null);
+  }
+
+  /// Reloads the Discover deck, optionally filtered by spoken [language].
+  Future<void> _loadFeed({required String? language}) async {
+    if (_myId.isEmpty || !isSupabaseReady) return;
+    setState(() {
+      _feedLoading = true;
+      _currentIndex = 0;
+      _deckDone = false;
+      _infoOpen = false;
+    });
+    NavChrome.show();
+    try {
+      final feed = await ProfileApi.fetchDiscoverFeed(
+        myId: _myId,
+        language: language,
+      ).timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      setState(() {
+        _profiles = feed;
+        _rebuildCards();
+        _feedLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_deckDone) _precacheAround(0);
+      });
+    } catch (e) {
+      debugPrint('discover: _loadFeed(lang=$language) failed: $e');
+      if (mounted) setState(() => _feedLoading = false);
+    }
+  }
 
   void _openInfo() {
     if (_infoOpen || !_hasActiveCard) return;
@@ -361,14 +436,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _currentIndex = _cards.length;
         _deckDone = true;
       });
-      UserPrefs.markDiscoverDoneToday();
-      UserPrefs.saveDiscoverCursor('');
+      if (!_filtered) {
+        UserPrefs.markDiscoverDoneToday();
+        UserPrefs.saveDiscoverCursor('');
+      }
       return;
     }
     setState(() {
       _currentIndex = next;
       _deckDone = false;
-      UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
+      if (!_filtered) {
+        UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
+      }
       _precacheAround(_currentIndex);
     });
   }
@@ -516,7 +595,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // gagne assez de place pour tout montrer sans qu'on ait à faire défiler.
     final openCardBottom = safeBottom + 12;
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
-    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8;
+
+    // Barre « Filtrer par pays » : posée entre les onglets et la carte, elle
+    // pousse la carte (et le bouton retour) d'autant vers le bas. Masquée quand
+    // le panneau infos ou la recherche prennent l'écran.
+    final barVisible = !_infoOpen && !_searchExpanded;
+    final barSpace = barVisible ? _kGlobeBarH + 10 : 0.0;
+    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8 + barSpace;
 
     return Scaffold(
       backgroundColor: SC.bg,
@@ -539,7 +624,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     ),
                   )
                 : _cards.isEmpty
-                    ? _Empty(onReset: _reset)
+                    ? _Empty(
+                        onReset: _filtered ? _clearCountryFilter : _reset,
+                        body: _filtered
+                            ? AppStrings.t('globe_filter_empty')
+                            : null,
+                      )
                     : _deckDone
                         ? _DiscoverDone(onRestart: _restartDeck)
                         : _TinderCardStack(
@@ -557,10 +647,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           //    liseré cyan : seule l'icône est colorée). ─────────────────────
           if (_hasActiveCard && !_infoOpen)
             Positioned(
-              top: tabBarH + 20,
+              top: tabBarH + 20 + barSpace,
               // Même retrait DANS la carte qu'avant : il suit sa marge.
               left: _kCardInset + 12,
               child: _CardUndoButton(onTap: _onActionUndo),
+            ),
+
+          // ── Barre « Filtrer par pays » — ouvre le globe tournant ──────────
+          if (barVisible)
+            Positioned(
+              top: tabBarH + 8,
+              left: _kCardInset,
+              right: _kCardInset,
+              child: _GlobeFilterBar(
+                countryKey: _countryKey,
+                onOpen: _openGlobe,
+                onClear: _clearCountryFilter,
+              ),
             ),
 
           // ── Top bar — flotte sur la card ──────────────────────────────────
@@ -1015,6 +1118,84 @@ class _TopTabBar extends StatelessWidget {
             ],
           ),
         );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Globe filter bar — "Filtrer par pays", sits above the card
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _GlobeFilterBar extends StatelessWidget {
+  const _GlobeFilterBar({
+    required this.countryKey,
+    required this.onOpen,
+    required this.onClear,
+  });
+
+  final String? countryKey;
+  final VoidCallback onOpen;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected =
+        countryKey != null && kGlobeCountries.containsKey(countryKey);
+    final meta = selected ? kGlobeCountries[countryKey!]! : null;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpen,
+      child: Container(
+        height: _kGlobeBarH,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141517),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? SC.accent.withValues(alpha: 0.55)
+                : const Color(0xFF262530),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.public_rounded : Icons.public_outlined,
+              size: 18,
+              color: selected ? SC.accent : const Color(0xFF8A8A94),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                selected
+                    ? '${meta!.flag}  ${globeCountryLabel(countryKey!)}'
+                    : AppStrings.t('globe_filter_cta'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFC8C8CF),
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onClear,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.close_rounded,
+                      size: 18, color: Color(0xFF8A8A94)),
+                ),
+              )
+            else
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 20, color: Color(0xFF6B6B74)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2650,8 +2831,11 @@ class _DiscoverDone extends StatelessWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.onReset});
+  const _Empty({required this.onReset, this.body});
   final VoidCallback onReset;
+
+  /// Override for the sub-line — used by the country filter's empty state.
+  final String? body;
 
   @override
   Widget build(BuildContext context) {
@@ -2687,7 +2871,7 @@ class _Empty extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              AppStrings.t('discover_empty_body'),
+              body ?? AppStrings.t('discover_empty_body'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.45),

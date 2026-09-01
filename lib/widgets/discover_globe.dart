@@ -1,0 +1,597 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
+
+import '../services/app_strings.dart';
+import '../theme/swayco_theme.dart';
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Discover globe — a spinning orthographic Earth used to pick a country, which
+// the Discover feed then filters on (by the country's spoken language).
+//
+// Only the countries in [kGlobeCountries] are selectable. Everything else is
+// drawn as context so the sphere reads as Earth, not two floating shapes.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Selectable countries. `center` is (longitude, latitude) in degrees; `lang`
+/// is the BCP-47 code the Discover feed filters on when this country is chosen.
+const Map<String, ({String flag, Offset center, String lang})> kGlobeCountries = {
+  'France': (flag: '🇫🇷', center: Offset(2.4, 46.6), lang: 'fr'),
+  'Germany': (flag: '🇩🇪', center: Offset(10.3, 51.1), lang: 'de'),
+};
+
+/// The BCP-47 language a globe country key maps to, or null if it isn't one of
+/// the selectable countries.
+String? globeLangForCountry(String? key) =>
+    key == null ? null : kGlobeCountries[key]?.lang;
+
+/// Localised display name for a selectable country key (falls back to the key).
+String globeCountryLabel(String key) {
+  final lang = kGlobeCountries[key]?.lang;
+  if (lang == null) return key;
+  return AppStrings.t('country_$lang');
+}
+
+// ── GeoJSON world outline ────────────────────────────────────────────────────
+
+class _Land {
+  _Land(this.name, this.polygons) {
+    // Rough centroid latitude of the first ring — enough to tint the fill by
+    // climate band without a real area-weighted centroid.
+    final ring = polygons.isNotEmpty && polygons.first.isNotEmpty
+        ? polygons.first.first
+        : const <Offset>[];
+    if (ring.isEmpty) {
+      avgLat = 0;
+    } else {
+      var s = 0.0;
+      for (final p in ring) {
+        s += p.dy;
+      }
+      avgLat = s / ring.length;
+    }
+  }
+
+  final String name;
+
+  /// polygon → ring → point, each point an Offset(longitude, latitude).
+  final List<List<List<Offset>>> polygons;
+  late final double avgLat;
+}
+
+/// Loads and caches `assets/geo/world-110m.geo.json` (Natural Earth 110m,
+/// pre-converted to GeoJSON, coordinates rounded to 2 decimals).
+class _WorldGeo {
+  static List<_Land>? _cache;
+  static Future<List<_Land>>? _inFlight;
+
+  static Future<List<_Land>> load() {
+    if (_cache != null) return Future.value(_cache);
+    return _inFlight ??= _read();
+  }
+
+  static Future<List<_Land>> _read() async {
+    final raw = await rootBundle.loadString('assets/geo/world-110m.geo.json');
+    final fc = json.decode(raw) as Map<String, dynamic>;
+    final out = <_Land>[];
+    for (final f in (fc['features'] as List)) {
+      final m = f as Map<String, dynamic>;
+      final name = (m['properties'] as Map)['name']?.toString() ?? '';
+      final g = m['geometry'] as Map<String, dynamic>;
+      final type = g['type'];
+      final coords = g['coordinates'] as List;
+      final polys = <List<List<Offset>>>[];
+      if (type == 'Polygon') {
+        polys.add(_rings(coords));
+      } else if (type == 'MultiPolygon') {
+        for (final poly in coords) {
+          polys.add(_rings(poly as List));
+        }
+      }
+      if (polys.isNotEmpty) out.add(_Land(name, polys));
+    }
+    _cache = out;
+    _inFlight = null;
+    return out;
+  }
+
+  static List<List<Offset>> _rings(List rings) => [
+        for (final r in rings)
+          [
+            for (final p in (r as List))
+              Offset(
+                (p[0] as num).toDouble(),
+                (p[1] as num).toDouble(),
+              ),
+          ],
+      ];
+}
+
+// ── Projection ──────────────────────────────────────────────────────────────
+
+const double _deg = math.pi / 180;
+
+/// Orthographic projection. [rotLon]/[rotLat] are the globe rotation in
+/// degrees; returns null for points on the hidden hemisphere.
+Offset? _project(
+  double lon,
+  double lat,
+  double rotLon,
+  double rotLat,
+  double radius,
+  Offset center,
+) {
+  final l = (lon + rotLon) * _deg;
+  final p = lat * _deg;
+  final r0 = rotLat * _deg;
+  final cosP = math.cos(p);
+  final x = cosP * math.sin(l);
+  final y = math.cos(r0) * math.sin(p) - math.sin(r0) * cosP * math.cos(l);
+  final z = math.sin(r0) * math.sin(p) + math.cos(r0) * cosP * math.cos(l);
+  if (z < 0) return null;
+  return Offset(center.dx + x * radius, center.dy - y * radius);
+}
+
+/// Builds the screen-space path for one land feature at the given rotation.
+/// A vertex on the hidden hemisphere lifts the pen; the next visible vertex
+/// starts a fresh sub-path.
+Path _landPath(
+  _Land land,
+  double rotLon,
+  double rotLat,
+  double radius,
+  Offset center,
+) {
+  final path = Path();
+  for (final poly in land.polygons) {
+    for (final ring in poly) {
+      var pen = false;
+      for (final pt in ring) {
+        final o = _project(pt.dx, pt.dy, rotLon, rotLat, radius, center);
+        if (o == null) {
+          pen = false;
+          continue;
+        }
+        if (!pen) {
+          path.moveTo(o.dx, o.dy);
+          pen = true;
+        } else {
+          path.lineTo(o.dx, o.dy);
+        }
+      }
+    }
+  }
+  return path;
+}
+
+Color _terrain(double lat) {
+  final a = lat.abs();
+  if (a > 66) return const Color(0xFFF2F6F7);
+  if (a > 55) return const Color(0xFFDFE7D6);
+  if (a > 40) return const Color(0xFFD9E4CB);
+  if (a > 30) return const Color(0xFFEAE3CD);
+  if (a > 22) return const Color(0xFFEFE6CA);
+  if (a > 12) return const Color(0xFFD5E3C2);
+  return const Color(0xFFC9DFB6);
+}
+
+// ── The sheet ───────────────────────────────────────────────────────────────
+
+/// Full-screen overlay: a dark card with the spinning globe and a cyan
+/// "🔍 Lancer" button. Pops the selected country key (or null on dismiss).
+class DiscoverGlobeSheet extends StatefulWidget {
+  const DiscoverGlobeSheet({super.key, this.initial});
+
+  final String? initial;
+
+  @override
+  State<DiscoverGlobeSheet> createState() => _DiscoverGlobeSheetState();
+}
+
+class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
+  List<_Land>? _world;
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial;
+    _WorldGeo.load().then((w) {
+      if (mounted) setState(() => _world = w);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final globeSide =
+        math.min(size.width - 56, math.min(size.height * 0.52, 420.0));
+    final canLaunch = _selected != null;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        children: [
+          // Scrim — tap outside to dismiss.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+              child: const ColoredBox(color: Color(0x99000000)),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 460),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141517),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF26262D)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x66000000), blurRadius: 40, offset: Offset(0, 18)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            AppStrings.t('globe_title'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close_rounded,
+                                color: Color(0xFF9A9AA2), size: 22),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: globeSide,
+                      height: globeSide,
+                      child: Center(
+                        child: _world == null
+                            ? const SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white24, strokeWidth: 2),
+                              )
+                            : RepaintBoundary(
+                                child: _GlobeView(
+                                  world: _world!,
+                                  selected: _selected,
+                                  onPicked: (key) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _selected = key);
+                                  },
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      AppStrings.t('globe_hint'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.42),
+                        fontSize: 12.5,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _LaunchButton(
+                      enabled: canLaunch,
+                      label: canLaunch
+                          ? '${kGlobeCountries[_selected]!.flag}  '
+                              '${AppStrings.t('globe_launch')} · '
+                              '${globeCountryLabel(_selected!)}'
+                          : AppStrings.t('globe_launch'),
+                      onTap: canLaunch
+                          ? () => Navigator.of(context).pop(_selected)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LaunchButton extends StatelessWidget {
+  const _LaunchButton({
+    required this.enabled,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool enabled;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: enabled ? SC.accent : const Color(0xFF1E1E23),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: enabled ? const Color(0xFF08080A) : const Color(0xFF5A5A62),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── The interactive globe ───────────────────────────────────────────────────
+
+class _GlobeView extends StatefulWidget {
+  const _GlobeView({
+    required this.world,
+    required this.selected,
+    required this.onPicked,
+  });
+
+  final List<_Land> world;
+  final String? selected;
+  final ValueChanged<String> onPicked;
+
+  @override
+  State<_GlobeView> createState() => _GlobeViewState();
+}
+
+class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
+  double _rotLon = -12;
+  double _rotLat = 12;
+  double _scale = 1;
+
+  bool _dragging = false;
+  bool get _flying => _flyCtrl.isAnimating;
+
+  late final Ticker _spin;
+  late final AnimationController _flyCtrl;
+  double _flyFromLon = 0, _flyFromLat = 0, _flyToLon = 0, _flyToLat = 0;
+
+  double _scaleStart = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _spin = createTicker(_onSpin)..start();
+    _flyCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..addListener(_onFly);
+    if (widget.selected != null) {
+      // Land already on the pre-selected country.
+      final c = kGlobeCountries[widget.selected!]!.center;
+      _rotLon = -c.dx;
+      _rotLat = c.dy;
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    _flyCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSpin(Duration _) {
+    if (_dragging || _flying || widget.selected != null) return;
+    setState(() => _rotLon += 0.14);
+  }
+
+  void _onFly() {
+    final t = Curves.easeOutCubic.transform(_flyCtrl.value);
+    setState(() {
+      _rotLon = _flyFromLon + (_flyToLon - _flyFromLon) * t;
+      _rotLat = _flyFromLat + (_flyToLat - _flyFromLat) * t;
+    });
+  }
+
+  void _flyTo(Offset center) {
+    _flyFromLon = _rotLon;
+    _flyFromLat = _rotLat;
+    // Shortest angular path — `_rotLon` may have wound up over many turns
+    // while the globe auto-span; without this the fly-to whirls the long way.
+    var delta = (-center.dx - _rotLon) % 360;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    _flyToLon = _rotLon + delta;
+    _flyToLat = center.dy;
+    _flyCtrl.forward(from: 0);
+  }
+
+  void _handleTapUp(TapUpDetails d, Size size) {
+    final radius = size.shortestSide / 2 - 8;
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = radius * _scale;
+    for (final key in kGlobeCountries.keys) {
+      final land = widget.world.firstWhere(
+        (l) => l.name == key,
+        orElse: () => _Land(key, const []),
+      );
+      if (land.polygons.isEmpty) continue;
+      final path = _landPath(land, _rotLon, _rotLat, r, center);
+      if (path.contains(d.localPosition)) {
+        widget.onPicked(key);
+        _flyTo(kGlobeCountries[key]!.center);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final size = Size(c.maxWidth, c.maxHeight);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onScaleStart: (d) {
+            _dragging = true;
+            _scaleStart = _scale;
+            _flyCtrl.stop();
+          },
+          onScaleUpdate: (d) {
+            setState(() {
+              if (d.scale != 1.0) {
+                _scale = (_scaleStart * d.scale).clamp(1.0, 4.0);
+              }
+              final k = 0.25 / _scale;
+              final delta = d.focalPointDelta;
+              _rotLon += delta.dx * k;
+              _rotLat = (_rotLat + delta.dy * k).clamp(-82.0, 82.0);
+            });
+          },
+          onScaleEnd: (d) => _dragging = false,
+          onTapUp: (d) => _handleTapUp(d, size),
+          child: CustomPaint(
+            size: size,
+            painter: _GlobePainter(
+              world: widget.world,
+              selected: widget.selected,
+              rotLon: _rotLon,
+              rotLat: _rotLat,
+              scale: _scale,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GlobePainter extends CustomPainter {
+  _GlobePainter({
+    required this.world,
+    required this.selected,
+    required this.rotLon,
+    required this.rotLat,
+    required this.scale,
+  });
+
+  final List<_Land> world;
+  final String? selected;
+  final double rotLon;
+  final double rotLat;
+  final double scale;
+
+  static const _ocean = [Color(0xFFBFE0EF), Color(0xFFA4D0E6), Color(0xFF8BBEDB)];
+  static const _selectedFill = Color(0xFF8EC06A);
+  static const _pickableFill = Color(0xFFB6D59A);
+  static const _border = Color(0xFFB9B3A3);
+  static const _rim = Color(0xFF7FA8BD);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide / 2 - 8) * scale;
+
+    // Everything the globe draws stays inside its disc — keeps horizon
+    // chords from the projection tucked behind the rim.
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: radius)));
+
+    // Ocean.
+    final oceanRect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.24, -0.36),
+          radius: 0.95,
+          colors: _ocean,
+          stops: const [0.0, 0.62, 1.0],
+        ).createShader(oceanRect),
+    );
+
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5
+      ..color = _border.withValues(alpha: 0.5);
+
+    for (final land in world) {
+      final path = _landPath(land, rotLon, rotLat, radius, center);
+      final isCountry = kGlobeCountries.containsKey(land.name);
+      final Color fill;
+      if (land.name == selected) {
+        fill = _selectedFill;
+      } else if (isCountry) {
+        fill = _pickableFill;
+      } else {
+        fill = _terrain(land.avgLat);
+      }
+      canvas.drawPath(path, Paint()..color = fill);
+      canvas.drawPath(path, borderPaint);
+      if (isCountry && land.name != selected) {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2
+            ..color = SC.accent.withValues(alpha: 0.75),
+        );
+      }
+    }
+
+    canvas.restore();
+
+    // Rim.
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = _rim.withValues(alpha: 0.8),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GlobePainter old) =>
+      old.rotLon != rotLon ||
+      old.rotLat != rotLat ||
+      old.scale != scale ||
+      old.selected != selected ||
+      !identical(old.world, world);
+}
