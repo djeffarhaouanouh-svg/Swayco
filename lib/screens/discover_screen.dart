@@ -602,11 +602,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final openCardBottom = safeBottom + 12;
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
 
-    // Barre « Filtrer par pays » : posée entre les onglets et la carte, elle
-    // pousse la carte (et le bouton retour) d'autant vers le bas. Masquée quand
-    // le panneau infos ou la recherche prennent l'écran.
-    final barVisible = !_infoOpen && !_searchExpanded;
-    final barSpace = barVisible ? _kGlobeBarH + 10 : 0.0;
+    // Pastille « Filtrer » : posée entre les onglets et la carte. Son
+    // emplacement reste RÉSERVÉ tant que le panneau infos n'est pas ouvert —
+    // ouvrir la recherche masque la pastille mais ne fait pas grandir la carte.
+    final barSpace = _infoOpen ? 0.0 : _kGlobeBarH + 10;
+    final showBar = !_infoOpen && !_searchExpanded;
     final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8 + barSpace;
 
     return Scaffold(
@@ -660,7 +660,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
 
           // ── Barre « Filtrer » — pastille compacte à gauche, ouvre le globe ─
-          if (barVisible)
+          if (showBar)
             Positioned(
               top: tabBarH + 8,
               left: _kCardInset,
