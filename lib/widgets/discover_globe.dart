@@ -322,8 +322,8 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     if (canLaunch) ...[
                       const SizedBox(height: 14),
                       _LaunchButton(
-                        label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' ')}'
-                            '  ${AppStrings.t('globe_launch')}',
+                        label: '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
+                            '   ${AppStrings.t('globe_launch')}',
                         onTap: () => Navigator.of(context).pop(_selected),
                       ),
                     ],

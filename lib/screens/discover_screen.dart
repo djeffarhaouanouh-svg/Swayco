@@ -1048,15 +1048,11 @@ class _TopTabBar extends StatelessWidget {
                     horizontal: searchExpanded ? 14 : 8,
                   ),
                   decoration: BoxDecoration(
-                    color: searchExpanded
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.transparent,
+                    // Toujours transparent : la loupe s'allonge simplement en
+                    // champ, sans ouvrir de « panneau » d'une autre couleur.
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: searchExpanded
-                          ? Colors.white.withValues(alpha: 0.18)
-                          : Colors.transparent,
-                    ),
+                    border: Border.all(color: Colors.transparent),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1966,9 +1962,11 @@ class _DraggableCardState extends State<_DraggableCard>
               widget.child,
               // LIKE à GAUCHE (le côté vers lequel on glisse pour matcher),
               // NOPE à droite — mouvement inversé sur demande.
+              // Descendus sous la pastille filtre / le bouton retour, sinon
+              // ils passaient à moitié dessous et on ne les voyait pas.
               if (likeOpacity > 0.02)
                 Positioned(
-                  top: 36,
+                  top: 66,
                   left: 24,
                   child: Opacity(
                     opacity: likeOpacity,
@@ -1977,7 +1975,7 @@ class _DraggableCardState extends State<_DraggableCard>
                 ),
               if (nopeOpacity > 0.02)
                 Positioned(
-                  top: 36,
+                  top: 66,
                   right: 24,
                   child: Opacity(
                     opacity: nopeOpacity,
