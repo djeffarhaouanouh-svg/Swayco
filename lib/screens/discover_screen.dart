@@ -691,7 +691,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       AppStrings.t('profile_loading'),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
