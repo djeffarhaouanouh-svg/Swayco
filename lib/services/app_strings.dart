@@ -662,6 +662,8 @@ abstract final class AppStrings {
     'onb_persona_subtitle':
         'Ça nous aide à te proposer des profils qui te ressemblent.',
     'onb_need_persona': 'Choisis une option pour continuer.',
+    'onb_reminder_title': 'Prêt·e à faire des rencontres ?',
+    'onb_reminder_body': 'Tu y es presque ! Termine ton profil pour commencer à discuter sur Swayco.',
     'onb_interests_title': 'Tes centres d\'intérêt',
     'onb_interests_count': '{n} / {max} sélectionnés',
 
@@ -1263,6 +1265,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'What defines you the most?',
     'onb_persona_subtitle': 'This helps us show you people who are like you.',
     'onb_need_persona': 'Pick an option to continue.',
+    'onb_reminder_title': 'Ready to start meeting people?',
+    'onb_reminder_body': 'You\'re almost there! Finish your profile to start chatting on Swayco.',
     'onb_interests_title': 'Your interests',
     'onb_interests_count': '{n} / {max} selected',
 
@@ -1887,6 +1891,8 @@ abstract final class AppStrings {
     'onb_persona_subtitle':
         'Nos ayuda a mostrarte perfiles que se parecen a ti.',
     'onb_need_persona': 'Elige una opción para continuar.',
+    'onb_reminder_title': '¿List@ para conocer gente?',
+    'onb_reminder_body': '¡Ya casi! Termina tu perfil para empezar a chatear en Swayco.',
     'onb_interests_title': 'Tus intereses',
     'onb_interests_count': '{n} / {max} seleccionados',
   };
@@ -2494,6 +2500,8 @@ abstract final class AppStrings {
     'onb_persona_subtitle':
         'Hilft uns, dir Profile zu zeigen, die zu dir passen.',
     'onb_need_persona': 'Wähle eine Option, um fortzufahren.',
+    'onb_reminder_title': 'Bereit, Leute kennenzulernen?',
+    'onb_reminder_body': 'Fast geschafft! Vervollständige dein Profil, um auf Swayco zu chatten.',
     'onb_interests_title': 'Deine Interessen',
     'onb_interests_count': '{n} / {max} ausgewählt',
   };
@@ -3094,6 +3102,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'Cosa ti descrive di più?',
     'onb_persona_subtitle': 'Ci aiuta a mostrarti profili che ti somigliano.',
     'onb_need_persona': 'Scegli un\'opzione per continuare.',
+    'onb_reminder_title': 'Pronto a conoscere gente?',
+    'onb_reminder_body': 'Ci sei quasi! Completa il profilo per iniziare a chattare su Swayco.',
     'onb_interests_title': 'I tuoi interessi',
     'onb_interests_count': '{n} / {max} selezionati',
   };
@@ -3695,6 +3705,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'O que mais te define?',
     'onb_persona_subtitle': 'Ajuda-nos a mostrar-te perfis parecidos contigo.',
     'onb_need_persona': 'Escolha uma opção para continuar.',
+    'onb_reminder_title': 'Pronto para conhecer gente?',
+    'onb_reminder_body': 'Está quase! Conclui o teu perfil para começar a conversar no Swayco.',
     'onb_interests_title': 'Os seus interesses',
     'onb_interests_count': '{n} / {max} selecionados',
   };
@@ -4296,6 +4308,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'Wat omschrijft jou het best?',
     'onb_persona_subtitle': 'Helpt ons je profielen te tonen die bij je passen.',
     'onb_need_persona': 'Kies een optie om door te gaan.',
+    'onb_reminder_title': 'Klaar om mensen te ontmoeten?',
+    'onb_reminder_body': 'Je bent er bijna! Maak je profiel af om te chatten op Swayco.',
     'onb_interests_title': 'Jouw interesses',
     'onb_interests_count': '{n} / {max} geselecteerd',
   };
@@ -4881,6 +4895,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'ما الذي يعبّر عنك أكثر؟',
     'onb_persona_subtitle': 'يساعدنا ذلك على عرض ملفات شخصية تشبهك.',
     'onb_need_persona': 'اختر خيارًا للمتابعة.',
+    'onb_reminder_title': 'جاهز للتعارف؟',
+    'onb_reminder_body': 'أوشكت على الانتهاء! أكمل ملفك الشخصي لبدء الدردشة على Swayco.',
     'onb_interests_title': 'اهتماماتك',
     'onb_interests_count': 'تم اختيار {n} / {max}',
   };
@@ -5480,6 +5496,8 @@ abstract final class AppStrings {
     'onb_persona_subtitle':
         'Это поможет нам показывать тебе похожих на тебя людей.',
     'onb_need_persona': 'Выберите вариант, чтобы продолжить.',
+    'onb_reminder_title': 'Готовы знакомиться?',
+    'onb_reminder_body': 'Почти готово! Заполните профиль, чтобы начать общение в Swayco.',
     'onb_interests_title': 'Ваши интересы',
     'onb_interests_count': 'Выбрано {n} / {max}',
   };
@@ -6025,6 +6043,8 @@ abstract final class AppStrings {
     'onb_persona_title': '什么最能代表你？',
     'onb_persona_subtitle': '帮助我们向你展示与你相似的人。',
     'onb_need_persona': '请选择一个选项以继续。',
+    'onb_reminder_title': '准备好认识新朋友了吗？',
+    'onb_reminder_body': '就差一步！完成个人资料，即可在 Swayco 上开始聊天。',
     'onb_interests_title': '你的兴趣',
     'onb_interests_count': '已选 {n} / {max}',
   };
@@ -6583,6 +6603,8 @@ abstract final class AppStrings {
     'onb_persona_title': 'あなたを一番よく表すものは？',
     'onb_persona_subtitle': 'あなたに似たプロフィールを表示するのに役立ちます。',
     'onb_need_persona': '続けるには選択してください。',
+    'onb_reminder_title': '出会いをはじめる準備はできましたか？',
+    'onb_reminder_body': 'あと少しです！プロフィールを完成させて Swayco で会話を始めましょう。',
     'onb_interests_title': 'あなたの興味',
     'onb_interests_count': '{n} / {max} 選択中',
   };
@@ -7136,6 +7158,8 @@ abstract final class AppStrings {
     'onb_persona_title': '당신을 가장 잘 나타내는 것은?',
     'onb_persona_subtitle': '당신과 비슷한 프로필을 보여주는 데 도움이 돼요.',
     'onb_need_persona': '계속하려면 옵션을 선택하세요.',
+    'onb_reminder_title': '새로운 사람들을 만날 준비 되셨어요?',
+    'onb_reminder_body': '거의 다 됐어요! 프로필을 완성하고 Swayco에서 대화를 시작하세요.',
     'onb_interests_title': '내 관심사',
     'onb_interests_count': '{n} / {max} 선택됨',
   };

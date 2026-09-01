@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 /// On-device notification presentation. FCM only carries the data — this
 /// is what actually rings / shows the banner once a push arrives.
@@ -21,6 +22,10 @@ abstract final class LocalNotifications {
   /// Stable id for the single ringing-call notification so we can cancel
   /// it the moment the call is answered / declined / cancelled.
   static const int callNotificationId = 424242;
+
+  /// Stable id for the "you didn't finish onboarding" reminder — one at a
+  /// time, replaced/cancelled by id.
+  static const int onboardingReminderId = 424243;
 
   static final AndroidNotificationChannel _callsChannel =
       const AndroidNotificationChannel(
@@ -119,6 +124,56 @@ abstract final class LocalNotifications {
     if (kIsWeb) return;
     await ensureReady();
     await _plugin.cancel(callNotificationId);
+  }
+
+  /// Schedule the "you haven't finished setting up your account" reminder to
+  /// fire [after] from now (default 5 min) — WhatsApp-style. Best-effort:
+  /// no-ops on web and, silently, when notifications aren't permitted.
+  /// Scheduling again replaces the pending one (fixed [onboardingReminderId]),
+  /// so calling this every time the app is backgrounded mid-onboarding just
+  /// pushes the reminder back.
+  static Future<void> scheduleOnboardingReminder({
+    required String title,
+    required String body,
+    Duration after = const Duration(minutes: 5),
+  }) async {
+    if (kIsWeb) return;
+    await ensureReady();
+    // An absolute instant — `after` from now. `tz.UTC` needs no timezone-db
+    // init, and "now + Duration" is the same moment in any zone.
+    final when = tz.TZDateTime.now(tz.UTC).add(after);
+    final android = AndroidNotificationDetails(
+      _messagesChannel.id,
+      _messagesChannel.name,
+      channelDescription: _messagesChannel.description,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const darwin = DarwinNotificationDetails();
+    try {
+      await _plugin.zonedSchedule(
+        onboardingReminderId,
+        title,
+        body,
+        when,
+        NotificationDetails(android: android, iOS: darwin),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'onboarding_reminder',
+      );
+    } catch (_) {
+      // e.g. exact-alarm permission quirks on some OEMs — the reminder is a
+      // nice-to-have, never worth surfacing an error for.
+    }
+  }
+
+  /// Drop the pending onboarding reminder (called once onboarding completes,
+  /// or when the user comes back to the app before it fires).
+  static Future<void> cancelOnboardingReminder() async {
+    if (kIsWeb) return;
+    await ensureReady();
+    await _plugin.cancel(onboardingReminderId);
   }
 
   /// Standard heads-up banner for a non-call event (chat / friend / like).

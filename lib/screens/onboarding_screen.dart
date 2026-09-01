@@ -8,6 +8,7 @@ import '../services/app_strings.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/local_notifications.dart';
 import '../services/persona_categories.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
@@ -36,8 +37,13 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with WidgetsBindingObserver {
   final _pageController = PageController();
+
+  /// Flips true the instant onboarding is actually completed — stops the
+  /// "finish your profile" reminder from being (re)scheduled on the way out.
+  bool _finished = false;
   final _nameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _countryCtrl = TextEditingController();
@@ -81,6 +87,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _prefill();
+    // Only the real first-run flow nags — not the "edit profile" reuse from
+    // Settings.
+    if (!widget.editing) WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// WhatsApp-style: leave the app mid-onboarding and, 5 min later, a reminder
+  /// to come back and finish. Coming back before it fires cancels it.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.editing || _finished) return;
+    if (state == AppLifecycleState.paused) {
+      LocalNotifications.scheduleOnboardingReminder(
+        title: AppStrings.t('onb_reminder_title'),
+        body: AppStrings.t('onb_reminder_body'),
+      );
+    } else if (state == AppLifecycleState.resumed) {
+      LocalNotifications.cancelOnboardingReminder();
+    }
   }
 
   /// Local UserPrefs first (instant), then — in editing mode — overlay with
@@ -199,6 +223,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   void dispose() {
+    if (!widget.editing) WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _nameCtrl.dispose();
     _bioCtrl.dispose();
@@ -250,6 +275,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       gender: genderToSave,
       personaCategory: personaCategoryToSave,
     );
+    // Done — kill the "finish your profile" reminder (pending or not).
+    _finished = true;
+    LocalNotifications.cancelOnboardingReminder();
     // Make the rest of the app speak the user's chosen language right away.
     AppStrings.setFromCode(_selectedLang!);
     // Only push to Supabase if we already have an auth user — otherwise
