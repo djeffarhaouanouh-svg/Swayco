@@ -1048,11 +1048,15 @@ class _TopTabBar extends StatelessWidget {
                     horizontal: searchExpanded ? 14 : 8,
                   ),
                   decoration: BoxDecoration(
-                    // Toujours transparent : la loupe s'allonge simplement en
-                    // champ, sans ouvrir de « panneau » d'une autre couleur.
-                    color: Colors.transparent,
+                    color: searchExpanded
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.transparent),
+                    border: Border.all(
+                      color: searchExpanded
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.transparent,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
