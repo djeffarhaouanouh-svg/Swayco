@@ -871,6 +871,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             return _EditAccountSheet(
               displayName: displayName,
               avatarUrl: avatarUrl,
+              fallbackUrl: _remote?.fallbackPhotoUrl ?? '',
               city: city,
               languageCode: languageCode,
               onPickAvatar: () async {
@@ -3662,6 +3663,7 @@ class _EditAccountSheet extends StatelessWidget {
   const _EditAccountSheet({
     required this.displayName,
     required this.avatarUrl,
+    this.fallbackUrl = '',
     required this.city,
     required this.languageCode,
     required this.onPickAvatar,
@@ -3672,6 +3674,9 @@ class _EditAccountSheet extends StatelessWidget {
 
   final String displayName;
   final String avatarUrl;
+
+  /// Photo Discover en repli quand [avatarUrl] est vide ou mort.
+  final String fallbackUrl;
   final String city;
   final String languageCode;
   final VoidCallback onPickAvatar;
@@ -3715,6 +3720,7 @@ class _EditAccountSheet extends StatelessWidget {
                   ProfileAvatar(
                     displayName: name,
                     avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+                    fallbackUrl: fallbackUrl.isEmpty ? null : fallbackUrl,
                     size: 88,
                     fontSize: 36,
                     onTap: onPickAvatar,
