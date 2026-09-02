@@ -471,6 +471,10 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   bool _dragging = false;
   bool get _flying => _flyCtrl.isAnimating;
 
+  // Inertie : vitesse résiduelle après un lâcher, en °/frame, amortie à
+  // chaque tick jusqu'à retomber sur la rotation d'inactivité.
+  double _velLon = 0, _velLat = 0;
+
   late final Ticker _spin;
   late final AnimationController _flyCtrl;
   double _flyFromLon = 0, _flyFromLat = 0, _flyToLon = 0, _flyToLat = 0;
@@ -501,7 +505,19 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   }
 
   void _onSpin(Duration _) {
-    if (_dragging || _flying || widget.selected.isNotEmpty) return;
+    if (_dragging || _flying) return;
+    // Fling en cours : on glisse sur l'élan, amorti à ~0.93/frame.
+    if (_velLon.abs() > 0.02 || _velLat.abs() > 0.02) {
+      setState(() {
+        _rotLon += _velLon;
+        _rotLat = (_rotLat + _velLat).clamp(-82.0, 82.0);
+        _velLon *= 0.93;
+        _velLat *= 0.93;
+      });
+      return;
+    }
+    _velLon = _velLat = 0;
+    if (widget.selected.isNotEmpty) return; // plus de rotation auto une fois choisi
     setState(() => _rotLon += 0.14);
   }
 
@@ -514,6 +530,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
   }
 
   void _flyTo(Offset center) {
+    _velLon = _velLat = 0;
     _flyFromLon = _rotLon;
     _flyFromLat = _rotLat;
     // Shortest angular path — `_rotLon` may have wound up over many turns
@@ -571,6 +588,7 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
           onScaleStart: (d) {
             _dragging = true;
             _scaleStart = _scale;
+            _velLon = _velLat = 0;
             _flyCtrl.stop();
           },
           onScaleUpdate: (d) {
@@ -578,13 +596,20 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
               if (d.scale != 1.0) {
                 _scale = (_scaleStart * d.scale).clamp(1.0, 4.0);
               }
-              final k = 0.25 / _scale;
+              // ~1:1 avec le doigt (0.42), plus fin quand on est zoomé.
+              final k = 0.42 / _scale;
               final delta = d.focalPointDelta;
               _rotLon += delta.dx * k;
               _rotLat = (_rotLat + delta.dy * k).clamp(-82.0, 82.0);
             });
           },
-          onScaleEnd: (d) => _dragging = false,
+          onScaleEnd: (d) {
+            _dragging = false;
+            // Reprend la vitesse du lâcher pour prolonger le mouvement.
+            final v = d.velocity.pixelsPerSecond;
+            _velLon = (v.dx * 0.007 / _scale).clamp(-9.0, 9.0);
+            _velLat = (v.dy * 0.007 / _scale).clamp(-6.0, 6.0);
+          },
           onTapUp: (d) => _handleTapUp(d, size),
           child: CustomPaint(
             size: size,
