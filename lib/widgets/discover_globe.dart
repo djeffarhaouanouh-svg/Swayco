@@ -393,7 +393,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                           alignment: Alignment.centerRight,
                           child: _LaunchButton(
                             label:
-                                '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' ')}'
+                                '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
                                 '   ${AppStrings.t('globe_launch')}',
                             onTap: () => Navigator.of(context).pop(_selected),
                           ),
