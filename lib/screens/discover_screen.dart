@@ -1213,13 +1213,13 @@ class _GlobeFilterBar extends StatelessWidget {
         : '${keys.take(3).map((k) => kGlobeCountries[k]!.flag).join(' ')}'
             '  +${keys.length - 3}';
 
-    return ClipRRect(
+    final pill = ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           height: _kGlobeBarH,
-          padding: EdgeInsets.only(left: selected ? 14 : 12, right: selected ? 4 : 12),
+          padding: EdgeInsets.only(left: selected ? 14 : 4, right: selected ? 4 : 4),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
             borderRadius: BorderRadius.circular(999),
@@ -1229,18 +1229,23 @@ class _GlobeFilterBar extends StatelessWidget {
                   : Colors.white.withValues(alpha: 0.14),
             ),
           ),
-          // Deux zones de tap DISTINCTES (pas imbriquées) : les drapeaux
-          // rouvrent le globe, la croix supprime vraiment le filtre.
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Zone d'ouverture : replié = toute la pastille (grande cible),
+              // déplié = juste les drapeaux (la croix a sa propre zone).
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onOpen,
                 child: selected
                     ? Text(flags,
                         style: const TextStyle(fontSize: 15, height: 1))
-                    : const Icon(Icons.tune_rounded, size: 18, color: Colors.white),
+                    : const SizedBox(
+                        width: 44,
+                        height: _kGlobeBarH,
+                        child: Icon(Icons.tune_rounded,
+                            size: 18, color: Colors.white),
+                      ),
               ),
               if (selected)
                 GestureDetector(
@@ -1248,7 +1253,7 @@ class _GlobeFilterBar extends StatelessWidget {
                   onTap: onClear,
                   child: Container(
                     color: Colors.transparent,
-                    padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
+                    padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
                     child: const Icon(Icons.close_rounded,
                         size: 18, color: Colors.white),
                   ),
@@ -1258,6 +1263,15 @@ class _GlobeFilterBar extends StatelessWidget {
         ),
       ),
     );
+
+    // Replié : toute la pastille est cliquable, hit-area élargi.
+    return selected
+        ? pill
+        : GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onOpen,
+            child: pill,
+          );
   }
 }
 
