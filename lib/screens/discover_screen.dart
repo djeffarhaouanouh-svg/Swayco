@@ -2217,8 +2217,8 @@ class _TinderCardState extends State<_TinderCard> {
           // jusqu'au noir en bas où reposent nom + boutons.
           // ── Bottom info (net, au-dessus des chevrons) ───────────────────
           Positioned(
-            // Décalé de 4 px vers la droite (14 -> 18).
-            left: 18,
+            // Poussé vers la gauche.
+            left: 8,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
             // Bas de la photo, avec une petite respiration.
