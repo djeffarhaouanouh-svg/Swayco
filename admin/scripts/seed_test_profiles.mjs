@@ -62,10 +62,12 @@ if (process.argv.includes('--delete')) {
 }
 
 // ── photo folders ─────────────────────────────────────────────────────────
+// Order is by filename (alphabetical). KEEP THE SAME FILENAMES when swapping
+// photos in so a --reupload maps to the same profiles.
 const DL = resolve(import.meta.dirname, '..', '..', '..'); // .../Downloads
 const pick = (dir, gender) =>
   readdirSync(join(DL, dir))
-    .filter((f) => f.toLowerCase().endsWith('.jpg'))
+    .filter((f) => /\.(jpe?g|png)$/i.test(f))
     .sort()
     .map((f) => ({ file: join(DL, dir, f), gender }));
 
@@ -80,6 +82,48 @@ for (let i = 0; i < Math.max(men.length, women.length); i++) {
   if (women[i]) photos.push(women[i]);
 }
 const half = Math.ceil(photos.length / 2);
+
+// ── reupload mode ─────────────────────────────────────────────────────────
+// Replace every existing seed_* profile's photo with the folder photo at the
+// same position (profiles ordered by created_at = original insert order).
+// New storage key each time so the public CDN URL can't serve a stale image.
+if (process.argv.includes('--reupload')) {
+  const { data: rows, error } = await db
+    .from('profiles')
+    .select('id, display_name')
+    .like('handle', 'seed\\_%')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  if (rows.length !== photos.length) {
+    console.warn(`⚠ ${rows.length} seed profiles vs ${photos.length} photos — mapping by index up to the shorter.`);
+  }
+  const n = Math.min(rows.length, photos.length);
+  let done = 0;
+  for (let i = 0; i < n; i++) {
+    const { id, display_name } = rows[i];
+    const { file } = photos[i];
+    const ext = extname(file).toLowerCase().replace('.jpeg', '.jpg') || '.jpg';
+    const key = `seed/${id}/v${Date.now()}${ext}`;
+    const up = await db.storage.from(BUCKET).upload(key, readFileSync(file), {
+      contentType: ext === '.png' ? 'image/png' : 'image/jpeg',
+      upsert: true,
+    });
+    if (up.error) { console.error(`✗ ${display_name}:`, up.error.message); continue; }
+    const url = db.storage.from(BUCKET).getPublicUrl(key).data.publicUrl;
+    const upd = await db.from('profiles')
+      .update({ avatar_url: url, discover_photo_url: url, photos: [url], updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (upd.error) { console.error(`✗ ${display_name}:`, upd.error.message); continue; }
+    // Drop older files for this profile.
+    const { data: olds } = await db.storage.from(BUCKET).list(`seed/${id}`);
+    const stale = (olds ?? []).map((f) => `seed/${id}/${f.name}`).filter((k) => !k.endsWith(key.split('/').pop()));
+    if (stale.length) await db.storage.from(BUCKET).remove(stale);
+    done++;
+    console.log(`✓ ${display_name}  <- ${file.split(/[\\/]/).pop()}`);
+  }
+  console.log(`\n${done}/${n} photos replaced.`);
+  process.exit(0);
+}
 
 // ── vocab ────────────────────────────────────────────────────────────────
 const rnd = (a) => a[Math.floor(Math.random() * a.length)];
