@@ -11,6 +11,7 @@ class ProfileAvatar extends StatelessWidget {
     super.key,
     required this.displayName,
     this.avatarUrl,
+    this.fallbackUrl,
     this.size = 44,
     this.fontSize,
     this.onTap,
@@ -19,6 +20,10 @@ class ProfileAvatar extends StatelessWidget {
   /// Public URL of the uploaded avatar. Null / empty → fall back to the
   /// colored-letter placeholder.
   final String? avatarUrl;
+
+  /// Tried when [avatarUrl] fails to load (e.g. a stale PDP whose file was
+  /// deleted) before dropping to the colored-letter placeholder.
+  final String? fallbackUrl;
   final String displayName;
   final double size;
   final double? fontSize;
@@ -71,7 +76,19 @@ class ProfileAvatar extends StatelessWidget {
               fit: BoxFit.cover,
               width: size,
               height: size,
-              errorBuilder: (_, _, _) => _letterFallback(letterFontSize),
+              errorBuilder: (_, _, _) {
+                final fb = fallbackUrl?.trim() ?? '';
+                if (fb.isEmpty || fb == avatarUrl!.trim()) {
+                  return _letterFallback(letterFontSize);
+                }
+                return Image.network(
+                  fb,
+                  fit: BoxFit.cover,
+                  width: size,
+                  height: size,
+                  errorBuilder: (_, _, _) => _letterFallback(letterFontSize),
+                );
+              },
               loadingBuilder: (ctx, child, progress) {
                 if (progress == null) return child;
                 return Container(

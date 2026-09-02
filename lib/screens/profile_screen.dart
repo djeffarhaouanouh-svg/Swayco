@@ -1445,8 +1445,9 @@ class _IdentitySection extends StatelessWidget {
   /// the right into the empty space (not on the photo). A matching left
   /// spacer keeps the bubble centred. Tap â account edit bottom sheet.
   Widget _pdpBubble({required bool editable}) {
-    // Pas de PDP dédiée -> on reprend la photo Discover (photos[0]), pas
-    // les initiales.
+    // Par défaut la PDP EST la photo Discover (photos[0]). Une PDP choisie
+    // manuellement (avatar_url, via le badge appareil-photo) la remplace.
+    // Sans photo du tout -> initiales.
     final pdp = avatarUrl.isNotEmpty
         ? avatarUrl
         : (photos.isNotEmpty ? photos.first : null);
@@ -1458,6 +1459,9 @@ class _IdentitySection extends StatelessWidget {
         ProfileAvatar(
           displayName: displayName,
           avatarUrl: pdp,
+          // Un avatar_url périmé (fichier supprimé) retombe sur la photo
+          // Discover au lieu des initiales.
+          fallbackUrl: photos.isNotEmpty ? photos.first : null,
           size: 128,
           fontSize: 54,
           onTap: editable ? onPickAvatar : null,
