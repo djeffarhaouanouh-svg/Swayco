@@ -2290,8 +2290,7 @@ class _TinderCardState extends State<_TinderCard> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.location_on, size: 13,
-                          color: Color(0xFFB4B4BC)),
+                      const Icon(Icons.location_on, size: 13, color: Colors.white),
                       const SizedBox(width: 3),
                       Flexible(
                         child: Text(
@@ -2299,7 +2298,7 @@ class _TinderCardState extends State<_TinderCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFFB4B4BC),
+                            color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
