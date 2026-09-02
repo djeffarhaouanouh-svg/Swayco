@@ -67,6 +67,13 @@ class RemoteProfile {
       ? discoverPhotoUrl
       : (photos.isNotEmpty ? photos.first : '');
 
+  /// Single best URL to show for this person: the dedicated PDP if set,
+  /// otherwise the Discover photo. For call sites that take one plain string
+  /// (no `ProfileAvatar(fallbackUrl:)` retry-on-error) — e.g. the in-call
+  /// chat bubbles.
+  String get bestAvatarUrl =>
+      avatarUrl.isNotEmpty ? avatarUrl : fallbackPhotoUrl;
+
   /// Free-form short tagline shown on the user's own profile and on their
   /// Discover card. Capped at [profileBioMaxLength] characters.
   final String bio;

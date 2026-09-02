@@ -3074,7 +3074,7 @@ class _CallScreenState extends State<CallScreen> {
                                                         ?.displayName ??
                                                     '',
                                                 peerAvatarUrl:
-                                                    _peerProfile?.avatarUrl ??
+                                                    _peerProfile?.bestAvatarUrl ??
                                                         '',
                                                 onToggle: _closeTurns,
                                                 chatController: _chatCtrl,
@@ -3090,7 +3090,7 @@ class _CallScreenState extends State<CallScreen> {
                                                         ?.displayName ??
                                                     '',
                                                 peerAvatarUrl:
-                                                    _peerProfile?.avatarUrl ??
+                                                    _peerProfile?.bestAvatarUrl ??
                                                         '',
                                                 // Le tap sur une phrase la
                                                 // RETIRE, il n'ouvre pas la
