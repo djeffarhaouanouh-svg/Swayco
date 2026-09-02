@@ -169,7 +169,70 @@ const PERSONA = {
   Fêtard: { fr: 'Toujours partant pour sortir', de: 'Immer für eine Party zu haben' },
 };
 const INTERESTS = ['Football', 'Basketball', 'Tennis', 'Musculation', 'Rap', 'K-pop', 'Rock', 'Anime', 'Cinéma', 'Séries', 'Cuisine', 'Sushi', 'Café', 'Voyage', 'Randonnée', 'Gaming', 'PlayStation', 'Nintendo', 'Mode', 'Photographie', 'Musique'];
-const BIO_TAIL = { fr: 'Toujours partant·e pour discuter.', de: 'Immer für einen Chat zu haben.' };
+// Punchy one-liner bios. One per profile, no repeats within a language.
+const BIOS = {
+  fr: [
+    'Je ris à mes blagues avant de les finir.',
+    'Aussi fiable qu’une story : je disparais au bout de 24 h.',
+    'Je connais un bon resto. Non je mens, mais on trouvera.',
+    'Je danse mal, mais avec une conviction rare.',
+    'Team « je réponds vite », sauf si je vois pas la notif pendant 3 jours.',
+    'Je mets le pain à l’envers dans le grille-pain. Assume.',
+    'Ex-enfant précoce, adulte très moyen.',
+    'Swipe à droite si tu sais siffler.',
+    'J’apporte les memes, tu apportes les frites.',
+    'Capable de citer tout Kaamelott, incapable de faire un créneau.',
+    'Plus drôle après 21 h et deux cafés.',
+    'Mon chat me juge. Viens l’aider.',
+    'Niveau cuisine : je réussis les pâtes une fois sur deux.',
+    'Attention, je vais te parler de mon voyage au Japon.',
+    'Je cherche quelqu’un pour partager l’addition.',
+    'Je perds à Mario Kart mais je gueule plus fort que toi.',
+  ],
+  de: [
+    'Lache über meine Witze, bevor ich sie zu Ende erzähle.',
+    'Kann jede Serie empfehlen und keine zu Ende schauen.',
+    'Parke schlechter als ich koche. Und ich koche nicht.',
+    'Team „antworte sofort“ – außer ich seh die Nachricht 3 Tage nicht.',
+    'Tanze schlecht, aber mit voller Überzeugung.',
+    'Kenne ein gutes Restaurant. Lüge. Wir finden eins.',
+    'Ex-Hochbegabter, sehr durchschnittlicher Erwachsener.',
+    'Swipe rechts, wenn du gute Playlists baust.',
+    'Ich bring die Memes mit, du bringst die Pommes.',
+    'Witziger nach 21 Uhr und zwei Kaffee.',
+    'Mein Kater urteilt über mich. Komm, hilf mir.',
+    'Koch-Level: Nudeln klappen jedes zweite Mal.',
+    'Achtung, ich rede gleich über meine Japan-Reise.',
+    'Suche jemanden zum Rechnung-Teilen.',
+    'Verliere bei Mario Kart, schreie aber lauter als du.',
+    'Pizza mit Ananas ist okay. Kämpf mich.',
+  ],
+};
+
+// ── bios mode ────────────────────────────────────────────────────────────
+// Rewrite every seed_* profile's bio with a fresh one-liner (no photo touch).
+if (process.argv.includes('--bios')) {
+  const { data: rows, error } = await db
+    .from('profiles')
+    .select('id, display_name, language')
+    .like('handle', 'seed\\_%')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const pool = { fr: [...BIOS.fr], de: [...BIOS.de] };
+  for (const k of ['fr', 'de']) pool[k].sort(() => Math.random() - 0.5);
+  const take = { fr: 0, de: 0 };
+  let done = 0;
+  for (const { id, display_name, language } of rows) {
+    const lang = language === 'de' ? 'de' : 'fr';
+    const bio = pool[lang][take[lang]++ % pool[lang].length];
+    const { error: e } = await db.from('profiles').update({ bio }).eq('id', id);
+    if (e) { console.error(`✗ ${display_name}:`, e.message); continue; }
+    done++;
+    console.log(`✓ ${display_name.padEnd(11)} ${lang}  "${bio}"`);
+  }
+  console.log(`\n${done}/${rows.length} bios rewritten.`);
+  process.exit(0);
+}
 
 // ── run ──────────────────────────────────────────────────────────────────
 let ok = 0;
@@ -220,7 +283,7 @@ for (let i = 0; i < photos.length; i++) {
     zodiac: rnd(ZODIAC),
     looking_for: rnd(LOOKING),
     persona_category: persona,
-    bio: `${PERSONA[persona][lang]}. ${BIO_TAIL[lang]}`,
+    bio: rnd(BIOS[lang]),
     interests: sample(INTERESTS, 2 + Math.floor(Math.random() * 3)),
     avatar_url: url,
     discover_photo_url: url,
