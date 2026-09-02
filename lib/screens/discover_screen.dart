@@ -2229,8 +2229,16 @@ class _TinderCardState extends State<_TinderCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Name + flag + online dot
-                Row(
+                // Name + flag + online dot — tap the name row to open the
+                // peer's profile page.
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ProfileScreen(userId: p.id),
+                    ),
+                  ),
+                  child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Flexible(
@@ -2274,6 +2282,7 @@ class _TinderCardState extends State<_TinderCard> {
                       ),
                     ],
                   ],
+                  ),
                 ),
                 // Location
                 if (location.isNotEmpty) ...[

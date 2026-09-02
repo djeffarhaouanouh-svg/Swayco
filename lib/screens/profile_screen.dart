@@ -1445,7 +1445,11 @@ class _IdentitySection extends StatelessWidget {
   /// the right into the empty space (not on the photo). A matching left
   /// spacer keeps the bubble centred. Tap â account edit bottom sheet.
   Widget _pdpBubble({required bool editable}) {
-    final pdp = avatarUrl.isEmpty ? null : avatarUrl;
+    // Pas de PDP dédiée -> on reprend la photo Discover (photos[0]), pas
+    // les initiales.
+    final pdp = avatarUrl.isNotEmpty
+        ? avatarUrl
+        : (photos.isNotEmpty ? photos.first : null);
     const pencilSize = 34.0;
     const pencilGap = 14.0;
     final bubble = Stack(
