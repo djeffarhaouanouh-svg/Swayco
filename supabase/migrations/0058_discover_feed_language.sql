@@ -7,7 +7,12 @@
 -- behaviour). The old 2-arg signature is dropped so PostgREST doesn't see an
 -- ambiguous overload when the app calls with named params.
 
+-- Drop every prior signature so PostgREST is left with exactly one candidate.
+-- (An earlier draft of this migration shipped a `p_language text` 3-arg
+--  version; if it was applied it must go too, otherwise the plain
+--  `discover_feed(p_user_id, p_limit)` call becomes ambiguous.)
 drop function if exists public.discover_feed(uuid, int);
+drop function if exists public.discover_feed(uuid, int, text);
 
 create or replace function public.discover_feed(
   p_user_id   uuid,
