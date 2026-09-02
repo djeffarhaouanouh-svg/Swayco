@@ -2164,10 +2164,6 @@ class _TinderCardState extends State<_TinderCard> {
     // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
     // son propre statut n'éteignait pas les pastilles des autres sur Discover.
     final online = isPeerOnline(p);
-    // Aucune pastille (persona / intérêt) à afficher → on colle le prénom et
-    // le drapeau tout en bas de la photo au lieu de les laisser flotter.
-    final hasChip = personaCategoryByLabel(p.personaCategory) != null ||
-        p.interests.isNotEmpty;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2221,12 +2217,12 @@ class _TinderCardState extends State<_TinderCard> {
           // jusqu'au noir en bas où reposent nom + boutons.
           // ── Bottom info (net, au-dessus des chevrons) ───────────────────
           Positioned(
-            left: 14,
+            // Décalé de 4 px vers la droite (14 -> 18).
+            left: 18,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Avec une pastille : au-dessus des chevrons. Sans : le prénom
-            // descend se poser au bas de la photo.
-            bottom: hasChip ? 66 : 24,
+            // Tout en bas de la photo, pastille ou pas.
+            bottom: 12,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
