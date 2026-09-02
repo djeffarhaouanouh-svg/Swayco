@@ -40,7 +40,19 @@ class ProfileAvatar extends StatelessWidget {
     return n.characters.first.toUpperCase();
   }
 
-  bool get _hasPhoto => avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+  String get _primary => avatarUrl?.trim() ?? '';
+  String get _fallback => fallbackUrl?.trim() ?? '';
+
+  /// The URL to show first: the dedicated avatar if set, otherwise the
+  /// fallback (e.g. the Discover photo). A broken primary is caught at load
+  /// time and retried with the fallback before dropping to initials.
+  String? get _photoUrl {
+    if (_primary.isNotEmpty) return _primary;
+    if (_fallback.isNotEmpty) return _fallback;
+    return null;
+  }
+
+  bool get _hasPhoto => _photoUrl != null;
 
   /// FNV-1a over the name — the old `hash * 31` collapsed half the names onto
   /// the same swatch (Lenny, Djeffar and Alice all came out yellow); FNV
@@ -72,22 +84,24 @@ class ProfileAvatar extends StatelessWidget {
       ),
       child: _hasPhoto
           ? Image.network(
-              avatarUrl!,
+              _photoUrl!,
               fit: BoxFit.cover,
               width: size,
               height: size,
               errorBuilder: (_, _, _) {
-                final fb = fallbackUrl?.trim() ?? '';
-                if (fb.isEmpty || fb == avatarUrl!.trim()) {
-                  return _letterFallback(letterFontSize);
+                // Primary failed → try the fallback once, else initials.
+                if (_photoUrl == _primary &&
+                    _fallback.isNotEmpty &&
+                    _fallback != _primary) {
+                  return Image.network(
+                    _fallback,
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                    errorBuilder: (_, _, _) => _letterFallback(letterFontSize),
+                  );
                 }
-                return Image.network(
-                  fb,
-                  fit: BoxFit.cover,
-                  width: size,
-                  height: size,
-                  errorBuilder: (_, _, _) => _letterFallback(letterFontSize),
-                );
+                return _letterFallback(letterFontSize);
               },
               loadingBuilder: (ctx, child, progress) {
                 if (progress == null) return child;

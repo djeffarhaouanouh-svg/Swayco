@@ -1250,6 +1250,7 @@ class _ThreadHeader extends StatelessWidget {
                   ProfileAvatar(
                     displayName: title,
                     avatarUrl: peer?.avatarUrl,
+                    fallbackUrl: peer?.fallbackPhotoUrl,
                     size: 36,
                   ),
                   if (_peerOnline)

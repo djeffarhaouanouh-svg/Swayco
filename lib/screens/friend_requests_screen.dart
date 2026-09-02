@@ -357,6 +357,7 @@ class _AvatarWithFlag extends StatelessWidget {
           ProfileAvatar(
             displayName: p?.displayName ?? '',
             avatarUrl: p?.avatarUrl,
+            fallbackUrl: p?.fallbackPhotoUrl,
             size: 52,
             onTap: onTap,
           ),

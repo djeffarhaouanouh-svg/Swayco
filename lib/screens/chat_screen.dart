@@ -1220,6 +1220,7 @@ class _FriendChatRow extends StatelessWidget {
                   ProfileAvatar(
                     displayName: profile.displayName,
                     avatarUrl: profile.avatarUrl,
+                    fallbackUrl: profile.fallbackPhotoUrl,
                     size: 52,
                   ),
                   if (_peerOnline)
@@ -1859,6 +1860,7 @@ class _MatchBubble extends StatelessWidget {
                 child: ProfileAvatar(
                   displayName: profile.displayName,
                   avatarUrl: profile.avatarUrl,
+                  fallbackUrl: profile.fallbackPhotoUrl,
                   size: 56,
                 ),
               ),

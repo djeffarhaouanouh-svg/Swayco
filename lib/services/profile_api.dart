@@ -60,6 +60,13 @@ class RemoteProfile {
   /// separately via [ProfileApi.uploadAvatar].
   final List<String> photos;
 
+  /// Photo to show when [avatarUrl] is unset or dead: the Discover photo, then
+  /// the first gallery photo. Pass to `ProfileAvatar(fallbackUrl:)` so a peer
+  /// with photos but no dedicated PDP still shows a face everywhere.
+  String get fallbackPhotoUrl => discoverPhotoUrl.isNotEmpty
+      ? discoverPhotoUrl
+      : (photos.isNotEmpty ? photos.first : '');
+
   /// Free-form short tagline shown on the user's own profile and on their
   /// Discover card. Capped at [profileBioMaxLength] characters.
   final String bio;

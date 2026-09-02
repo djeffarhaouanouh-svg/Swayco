@@ -2379,6 +2379,7 @@ class _CallScreenState extends State<CallScreen> {
                             ProfileAvatar(
                               displayName: name,
                               avatarUrl: profile?.avatarUrl,
+                              fallbackUrl: profile?.fallbackPhotoUrl,
                               size: 132,
                             ),
                             const SizedBox(height: 20),

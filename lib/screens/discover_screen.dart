@@ -2783,6 +2783,7 @@ class _SearchRow extends StatelessWidget {
             ProfileAvatar(
               displayName: profile.displayName,
               avatarUrl: profile.avatarUrl,
+              fallbackUrl: profile.fallbackPhotoUrl,
               size: 38,
             ),
             const SizedBox(width: 12),
