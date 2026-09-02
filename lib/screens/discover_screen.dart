@@ -2209,12 +2209,23 @@ class _TinderCardState extends State<_TinderCard> {
               ),
             ),
 
-          // ── Bottom info + verre dépoli (épouse le contenu jusqu'en bas) ──
-          // Verre dépoli décoratif au bas de la carte : il FOND en douceur
-          // vers le haut (masque dégradé, pas de bord net) et reste concentré
-          // Dégradé noir LISSE sur toute la carte (comme Tinder) — aucun
-          // rectangle, aucun blur : transparent en haut, fondu progressif
-          // jusqu'au noir en bas où reposent nom + boutons.
+          // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,
+          //    fondu progressif jusqu'au noir sous le nom / la ville, pour que
+          //    le texte reste lisible sur n'importe quelle photo. ────────────
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment(0, 0.15),
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0xCC000000)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ── Bottom info (net, au-dessus des chevrons) ───────────────────
           Positioned(
             // Poussé vers la gauche.
