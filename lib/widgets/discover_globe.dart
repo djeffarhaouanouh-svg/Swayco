@@ -596,8 +596,8 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
               if (d.scale != 1.0) {
                 _scale = (_scaleStart * d.scale).clamp(1.0, 4.0);
               }
-              // ~1:1 avec le doigt (0.42), plus fin quand on est zoomé.
-              final k = 0.42 / _scale;
+              // Sensibilité d'origine (0.25), très légèrement relevée.
+              final k = 0.28 / _scale;
               final delta = d.focalPointDelta;
               _rotLon += delta.dx * k;
               _rotLat = (_rotLat + delta.dy * k).clamp(-82.0, 82.0);
