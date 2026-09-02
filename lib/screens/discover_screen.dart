@@ -2221,8 +2221,8 @@ class _TinderCardState extends State<_TinderCard> {
             left: 18,
             // Plus de bouton dans le coin : le bloc peut aller au bord.
             right: 20,
-            // Tout en bas de la photo, pastille ou pas.
-            bottom: 12,
+            // Bas de la photo, avec une petite respiration.
+            bottom: 22,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -2279,18 +2279,19 @@ class _TinderCardState extends State<_TinderCard> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.location_on, size: 13,
-                          color: Colors.white.withValues(alpha: 0.70)),
+                      const Icon(Icons.location_on, size: 13,
+                          color: Color(0xFFB4B4BC)),
                       const SizedBox(width: 3),
                       Flexible(
                         child: Text(
                           location,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
+                          style: const TextStyle(
+                            color: Color(0xFFB4B4BC),
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
+                            shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
                           ),
                         ),
                       ),
