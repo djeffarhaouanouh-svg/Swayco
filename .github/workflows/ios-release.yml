@@ -99,6 +99,15 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      # `xcodebuild -allowProvisioningUpdates` (below) mints a fresh
+      # "Created via API" cert every run; its private key dies with this
+      # runner. Left alone they pile up until the account hits Apple's
+      # "maximum number of certificates" and every archive fails. Revoke the
+      # dead ones now — the archive re-creates exactly one it can use.
+      # Best-effort: never fails the build.
+      - name: Revoke stale CI-created certificates
+        run: node scripts/revoke_ci_certs.mjs "$ASC_KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER_ID"
+
       - name: Resolve version args
         id: version
         run: |
