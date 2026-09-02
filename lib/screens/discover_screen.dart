@@ -1207,79 +1207,71 @@ class _GlobeFilterBar extends StatelessWidget {
         countryKeys.where(kGlobeCountries.containsKey).toList(growable: false);
     final selected = keys.isNotEmpty;
 
-    // Rien : libellé court "Filtrer". 1 pays : drapeau + nom. 2-3 : les
-    // drapeaux. Au-delà : 3 drapeaux puis "+N" — la pastille ne s'allonge
-    // jamais indéfiniment quelle que soit la sélection.
-    final String label;
-    if (!selected) {
-      label = AppStrings.t('globe_filter_cta');
-    } else if (keys.length == 1) {
-      label = '${kGlobeCountries[keys.first]!.flag}  ${globeCountryLabel(keys.first)}';
-    } else if (keys.length <= 3) {
-      label = keys.map((k) => kGlobeCountries[k]!.flag).join(' ');
-    } else {
-      label = '${keys.take(3).map((k) => kGlobeCountries[k]!.flag).join(' ')}'
-          '  +${keys.length - 3}';
-    }
+    // Sélectionné : UNIQUEMENT le(s) drapeau(x) (3 max, puis "+N").
+    final flags = keys.length <= 3
+        ? keys.map((k) => kGlobeCountries[k]!.flag).join(' ')
+        : '${keys.take(3).map((k) => kGlobeCountries[k]!.flag).join(' ')}'
+            '  +${keys.length - 3}';
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onOpen,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            height: _kGlobeBarH,
-            padding: EdgeInsets.only(left: 13, right: selected ? 8 : 14),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected
-                    ? SC.accent.withValues(alpha: 0.60)
-                    : Colors.white.withValues(alpha: 0.14),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          height: _kGlobeBarH,
+          padding: EdgeInsets.only(left: selected ? 14 : 13, right: selected ? 4 : 14),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? SC.accent.withValues(alpha: 0.60)
+                  : Colors.white.withValues(alpha: 0.14),
+            ),
+          ),
+          // Deux zones de tap DISTINCTES (pas imbriquées) : les drapeaux
+          // rouvrent le globe, la croix supprime vraiment le filtre.
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onOpen,
+                child: selected
+                    ? Text(flags,
+                        style: const TextStyle(fontSize: 15, height: 1))
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.tune_rounded,
+                              size: 17, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            AppStrings.t('globe_filter_cta'),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 18, color: Colors.white70),
+                        ],
+                      ),
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  selected ? Icons.public_rounded : Icons.tune_rounded,
-                  size: 17,
-                  color: selected ? SC.accent : Colors.white,
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth:
-                        MediaQuery.sizeOf(context).width - 2 * _kCardInset - 130,
-                  ),
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.92),
-                      fontSize: 13.5,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    ),
+              if (selected)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClear,
+                  child: Container(
+                    color: Colors.transparent,
+                    padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
+                    child: const Icon(Icons.close_rounded,
+                        size: 18, color: Colors.white),
                   ),
                 ),
-                if (selected)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onClear,
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 6),
-                      child: Icon(Icons.close_rounded,
-                          size: 17, color: Colors.white),
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
