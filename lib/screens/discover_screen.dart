@@ -1219,7 +1219,7 @@ class _GlobeFilterBar extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           height: _kGlobeBarH,
-          padding: EdgeInsets.only(left: selected ? 14 : 13, right: selected ? 4 : 14),
+          padding: EdgeInsets.only(left: selected ? 14 : 12, right: selected ? 4 : 12),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
             borderRadius: BorderRadius.circular(999),
@@ -1240,25 +1240,7 @@ class _GlobeFilterBar extends StatelessWidget {
                 child: selected
                     ? Text(flags,
                         style: const TextStyle(fontSize: 15, height: 1))
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.tune_rounded,
-                              size: 17, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text(
-                            AppStrings.t('globe_filter_cta'),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.92),
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.keyboard_arrow_down_rounded,
-                              size: 18, color: Colors.white70),
-                        ],
-                      ),
+                    : const Icon(Icons.tune_rounded, size: 18, color: Colors.white),
               ),
               if (selected)
                 GestureDetector(
