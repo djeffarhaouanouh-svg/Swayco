@@ -312,12 +312,11 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                           ),
                         ],
                       ),
-                      // Le globe occupe l'espace libre mais se cale EN BAS de
-                      // sa zone : l'air libre passe sous le titre, et la
-                      // phrase d'aide reste collée au globe.
+                      // Globe centré dans l'espace libre ; la phrase d'aide est
+                      // collée juste dessous (dans la même colonne), donc elle
+                      // remonte sans que le globe bouge.
                       Expanded(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
+                        child: Center(
                           child: _world == null
                               ? const SizedBox(
                                   width: 26,
@@ -328,64 +327,68 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                               : LayoutBuilder(
                                   builder: (context, c) {
                                     final globeSide = math.min(
-                                      math.min(c.maxWidth, c.maxHeight),
+                                      math.min(c.maxWidth, c.maxHeight - 24),
                                       520.0,
                                     );
-                                    return SizedBox(
-                                      width: globeSide,
-                                      height: globeSide,
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          // Lueur : halo cyan serré + brume
-                                          // bleutée plus large.
-                                          IgnorePointer(
-                                            child: Container(
-                                              width: globeSide * 0.92,
-                                              height: globeSide * 0.92,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: SC.accent
-                                                        .withValues(alpha: 0.34),
-                                                    blurRadius: 42,
-                                                    spreadRadius: -6,
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: globeSide,
+                                          height: globeSide,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              // Lueur : halo cyan + brume bleutée.
+                                              IgnorePointer(
+                                                child: Container(
+                                                  width: globeSide * 0.92,
+                                                  height: globeSide * 0.92,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: SC.accent
+                                                            .withValues(alpha: 0.34),
+                                                        blurRadius: 42,
+                                                        spreadRadius: -6,
+                                                      ),
+                                                      BoxShadow(
+                                                        color: const Color(0xFF7FA8BD)
+                                                            .withValues(alpha: 0.20),
+                                                        blurRadius: 85,
+                                                        spreadRadius: -18,
+                                                      ),
+                                                    ],
                                                   ),
-                                                  BoxShadow(
-                                                    color: const Color(
-                                                            0xFF7FA8BD)
-                                                        .withValues(alpha: 0.20),
-                                                    blurRadius: 85,
-                                                    spreadRadius: -18,
-                                                  ),
-                                                ],
+                                                ),
                                               ),
-                                            ),
+                                              RepaintBoundary(
+                                                child: _GlobeView(
+                                                  world: _world!,
+                                                  selected: _selected,
+                                                  onToggle: _toggle,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          RepaintBoundary(
-                                            child: _GlobeView(
-                                              world: _world!,
-                                              selected: _selected,
-                                              onToggle: _toggle,
-                                            ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          AppStrings.t('globe_hint'),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.42),
+                                            fontSize: 10,
+                                            height: 1.25,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     );
                                   },
                                 ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        AppStrings.t('globe_hint'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.42),
-                          fontSize: 11,
-                          height: 1.3,
                         ),
                       ),
                       // Le bouton n'apparaît qu'une fois un pays touché, et se
