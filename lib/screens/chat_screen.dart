@@ -1565,23 +1565,21 @@ class _RowWaveButtonState extends State<_RowWaveButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 760),
   );
 
-  /// Elle bondit hors du rond, tient un instant en l'air, puis retombe en
-  /// dépassant. Le pic est à 2,1 — beaucoup, volontairement : l'emoji sort de
-  /// son cercle de 38 px et c'est CE débordement qui fait qu'on voit le geste
-  /// partir depuis l'autre bout de l'écran. Un bouton qui frémit ne dit rien.
+  /// Elle sort un peu du rond, tient un instant, puis revient sans rebondir.
+  /// Pic à 1,55 : assez pour qu'on voie le geste partir, sans effet ressort.
   late final Animation<double> _scale = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 1.0, end: 2.1)
+      tween: Tween(begin: 1.0, end: 1.55)
           .chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 22,
+      weight: 24,
     ),
-    TweenSequenceItem(tween: ConstantTween<double>(2.1), weight: 26),
+    TweenSequenceItem(tween: ConstantTween<double>(1.55), weight: 24),
     TweenSequenceItem(
-      tween: Tween(begin: 2.1, end: 1.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
+      tween: Tween(begin: 1.55, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
       weight: 52,
     ),
   ]).animate(_c);
@@ -1593,21 +1591,20 @@ class _RowWaveButtonState extends State<_RowWaveButton>
   /// rapetisse.
   late final Animation<double> _lift = TweenSequence<double>([
     TweenSequenceItem(
-      tween: Tween(begin: 0.0, end: -16.0)
+      tween: Tween(begin: 0.0, end: -10.0)
           .chain(CurveTween(curve: Curves.easeOutBack)),
-      weight: 22,
+      weight: 24,
     ),
-    TweenSequenceItem(tween: ConstantTween<double>(-16.0), weight: 26),
+    TweenSequenceItem(tween: ConstantTween<double>(-10.0), weight: 24),
     TweenSequenceItem(
-      tween: Tween(begin: -16.0, end: 0.0)
-          .chain(CurveTween(curve: Curves.elasticOut)),
+      tween: Tween(begin: -10.0, end: 0.0)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
       weight: 52,
     ),
   ]).animate(_c);
 
-  /// Et elle salue vraiment : cinq allers-retours à presque un radian, qui
-  /// s'amortissent. L'amplitude décroît avec le temps (le `1 - t`), sinon la
-  /// main vibre au lieu de saluer.
+  /// Et elle salue : trois allers-retours d'une demi-amplitude, amortis
+  /// (le `1 - t`) — un salut, pas une vibration.
   late final Animation<double> _wobble = _c.drive(
     TweenSequence<double>([
       TweenSequenceItem(tween: ConstantTween<double>(0), weight: 14),
@@ -1655,9 +1652,9 @@ class _RowWaveButtonState extends State<_RowWaveButton>
           animation: _c,
           builder: (context, _) {
             final t = _wobble.value;
-            // sin de cinq tours, amorti : part à droite, revient, et meurt.
+            // 3 oscillations amorties, amplitude modérée.
             final angle =
-                t == 0 ? 0.0 : 0.95 * (1 - t) * math.sin(t * math.pi * 10);
+                t == 0 ? 0.0 : 0.5 * (1 - t) * math.sin(t * math.pi * 6);
             return Stack(
               alignment: Alignment.center,
               children: [
