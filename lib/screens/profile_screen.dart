@@ -1049,16 +1049,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // Reserve room for the floating bottom nav (height 54 + 12 gap)
                         // plus the device's bottom safe-area inset, otherwise the last
                         // card gets occluded.
-                        // Horizontal gutter matches the chat / discover headers so
-                        // the avatar and bio don't run into the screen edge.
+                        // Gouttière latérale de 16 : PILE la même que la liste
+                        // des pages Likes / Messages (fromLTRB(16, ...)), pour
+                        // que les cartes ("Compte", "Mes infos"…) s'alignent
+                        // sur le bord gauche des cartes de ces pages.
                         padding: EdgeInsets.fromLTRB(
-                          28,
+                          16,
                           // Own profile: title sits at the very top like the
                           // other tabs (Discover / Messages). Viewer: just
                           // clear the transparent AppBar drawn behind it, kept
                           // tight so the whole profile sits higher on screen.
                           _isViewingOther ? 36 : 12,
-                          28,
+                          16,
                           32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
                         children: [
