@@ -374,7 +374,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                             ],
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
+                                        const SizedBox(height: 14),
                                         Text(
                                           AppStrings.t('globe_hint'),
                                           textAlign: TextAlign.center,
