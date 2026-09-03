@@ -33,6 +33,12 @@ class FlagBorder extends StatelessWidget {
   /// Affiche (ou non) l'ombre portée sous la carte. (design 2a : activée)
   final bool dropShadow;
 
+  /// Affiche (ou non) la lueur colorée autour du contour. À couper quand la
+  /// carte est posée dans une zone rognée au rectangle (pile Tinder) : la
+  /// lueur remplit alors les coins arrondis et se fait couper au carré —
+  /// les coins du haut ont l'air droits.
+  final bool glow;
+
   const FlagBorder({
     super.key,
     required this.child,
@@ -41,6 +47,7 @@ class FlagBorder extends StatelessWidget {
     this.radius = 28.0,
     this.glowBlur = 30.0,
     this.dropShadow = true,
+    this.glow = true,
   });
 
   @override
@@ -59,7 +66,7 @@ class FlagBorder extends StatelessWidget {
           stops: g.stops,
         ),
         boxShadow: [
-          BoxShadow(color: g.glow, blurRadius: glowBlur),
+          if (glow) BoxShadow(color: g.glow, blurRadius: glowBlur),
           if (dropShadow)
             const BoxShadow(
               color: Color(0x8C000000),

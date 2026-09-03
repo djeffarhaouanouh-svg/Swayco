@@ -1475,6 +1475,11 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               country: country,
               radius: _kCardRadius,
               borderWidth: 3,
+              // La pile de cartes est rognée au rectangle : lueur et ombre
+              // rempliraient les coins arrondis du haut et se feraient couper
+              // au carré. On les coupe ici -> coins nets.
+              glow: false,
+              dropShadow: false,
               child: tinderCard,
             )
           : ClipRRect(
