@@ -52,15 +52,15 @@ class _InterestTagChipState extends State<InterestTagChip> {
   Widget build(BuildContext context) {
     final lip = interestDarken(widget.color, 0.38);
     final c = widget.compact;
-    final fontSize = c ? 12.5 : 16.0;
+    final fontSize = c ? 14.0 : 16.0;
     final chip = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       curve: const Cubic(0.2, 0.8, 0.3, 1.0),
       transform: Matrix4.translationValues(0, _pressed ? 2.0 : 0.0, 0),
       transformAlignment: Alignment.center,
       padding: EdgeInsets.symmetric(
-        horizontal: c ? 12 : 18,
-        vertical: c ? 6 : 10,
+        horizontal: c ? 14 : 18,
+        vertical: c ? 8 : 10,
       ),
       decoration: BoxDecoration(
         color: widget.color,
