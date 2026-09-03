@@ -312,9 +312,12 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                           ),
                         ],
                       ),
-                      // Le globe occupe tout l'espace libre du panneau.
+                      // Le globe occupe l'espace libre mais se cale EN BAS de
+                      // sa zone : l'air libre passe sous le titre, et la
+                      // phrase d'aide reste collée au globe.
                       Expanded(
-                        child: Center(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
                           child: _world == null
                               ? const SizedBox(
                                   width: 26,
@@ -375,14 +378,14 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         AppStrings.t('globe_hint'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.42),
-                          fontSize: 12.5,
-                          height: 1.4,
+                          fontSize: 11,
+                          height: 1.3,
                         ),
                       ),
                       // Le bouton n'apparaît qu'une fois un pays touché, et se
