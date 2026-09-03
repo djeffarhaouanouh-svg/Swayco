@@ -14,8 +14,13 @@ class InterestTagChip extends StatefulWidget {
     required this.color,
     this.selected = true,
     this.showCheck = false,
+    this.compact = false,
     this.onTap,
   });
+
+  /// Tighter pill — smaller text/padding/shadow. Used on the Discover card
+  /// where the persona chip shares the frame with the name and location.
+  final bool compact;
 
   /// Raw stored interest key (localised via [interestLabel] for display).
   final String label;
@@ -46,25 +51,30 @@ class _InterestTagChipState extends State<InterestTagChip> {
   @override
   Widget build(BuildContext context) {
     final lip = interestDarken(widget.color, 0.38);
+    final c = widget.compact;
+    final fontSize = c ? 12.5 : 16.0;
     final chip = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       curve: const Cubic(0.2, 0.8, 0.3, 1.0),
       transform: Matrix4.translationValues(0, _pressed ? 2.0 : 0.0, 0),
       transformAlignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: c ? 12 : 18,
+        vertical: c ? 6 : 10,
+      ),
       decoration: BoxDecoration(
         color: widget.color,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(c ? 10 : 13),
         boxShadow: [
           BoxShadow(
             color: lip,
-            offset: const Offset(0, 5),
+            offset: Offset(0, c ? 3 : 5),
             blurRadius: 0,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            offset: const Offset(0, 10),
-            blurRadius: 20,
+            color: Colors.black.withValues(alpha: c ? 0.35 : 0.45),
+            offset: Offset(0, c ? 6 : 10),
+            blurRadius: c ? 12 : 20,
           ),
         ],
       ),
@@ -72,16 +82,16 @@ class _InterestTagChipState extends State<InterestTagChip> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.showCheck) ...[
-            const Icon(Icons.check_rounded, size: 18, color: Colors.white),
-            const SizedBox(width: 6),
+            Icon(Icons.check_rounded, size: c ? 14 : 18, color: Colors.white),
+            SizedBox(width: c ? 4 : 6),
           ],
           Text(
             interestLabel(widget.label),
             style: GoogleFonts.archivo(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: fontSize,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.005 * 16,
+              letterSpacing: 0.005 * fontSize,
               height: 1.0,
             ),
           ),

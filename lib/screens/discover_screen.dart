@@ -2244,7 +2244,7 @@ class _TinderCardState extends State<_TinderCard> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 34,
+                          fontSize: 28,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.4,
                           shadows: [Shadow(color: Color(0x66000000), blurRadius: 10)],
@@ -2310,7 +2310,7 @@ class _TinderCardState extends State<_TinderCard> {
                 // the first interest tag for profiles onboarded before this
                 // field existed.
                 if (personaCategoryByLabel(p.personaCategory) != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -2320,22 +2320,23 @@ class _TinderCardState extends State<_TinderCard> {
                             '${personaCategoryByLabel(p.personaCategory)!.emoji} '
                             '${personaCategoryLabel(p.personaCategory)}',
                         color: const Color(0xFF22D3EE),
+                        compact: true,
                       ),
                     ],
                   ),
                 ] else if (p.interests.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.apps_rounded, size: 13,
+                      Icon(Icons.apps_rounded, size: 12,
                           color: Colors.white.withValues(alpha: 0.65)),
                       const SizedBox(width: 5),
                       Text(
                         'Centres d\'intérêt',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.70),
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
                           shadows: const [
@@ -2345,7 +2346,7 @@ class _TinderCardState extends State<_TinderCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 6),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -2354,6 +2355,7 @@ class _TinderCardState extends State<_TinderCard> {
                         InterestTagChip(
                           label: tag,
                           color: interestColor(tag),
+                          compact: true,
                         ),
                     ],
                   ),
