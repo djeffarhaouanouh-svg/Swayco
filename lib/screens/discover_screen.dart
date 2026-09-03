@@ -2310,7 +2310,7 @@ class _TinderCardState extends State<_TinderCard> {
                 // the first interest tag for profiles onboarded before this
                 // field existed.
                 if (personaCategoryByLabel(p.personaCategory) != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -2325,7 +2325,7 @@ class _TinderCardState extends State<_TinderCard> {
                     ],
                   ),
                 ] else if (p.interests.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2346,7 +2346,7 @@ class _TinderCardState extends State<_TinderCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
