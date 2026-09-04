@@ -325,6 +325,7 @@ class _FrontRequestCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 fit: BoxFit.cover,
+                alignment: const Alignment(0, 0.35),
               ),
             ),
           ),
