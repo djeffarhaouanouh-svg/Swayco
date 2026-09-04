@@ -348,7 +348,12 @@ class _FrontRequestCard extends StatelessWidget {
               ],
             ),
           ),
-          const _HeartCounter(label: '+248'),
+          const _HeartCounter(
+            label: '+248',
+            // Même rouge que le cœur "a aimé ta photo" des Likes reçus —
+            // pas un nouveau ton inventé pour ce dialogue.
+            color: Color(0xFFFF3B5C),
+          ),
         ],
       ),
     );
@@ -357,9 +362,15 @@ class _FrontRequestCard extends StatelessWidget {
 
 /// Compteur d'ajouts : cœur cyan, chiffre sombre dedans.
 class _HeartCounter extends StatelessWidget {
-  const _HeartCounter({required this.label});
+  const _HeartCounter({required this.label, this.color = SC.accent});
 
   final String label;
+
+  /// Couleur du cœur. Le chiffre reste blanc dessus (lisible sur rouge
+  /// comme sur cyan), contrairement à `SwayOnb.onAccent` qui suppose un
+  /// fond clair — ce token est partagé par d'autres éléments cyan de
+  /// l'onboarding et ne doit pas changer pour eux.
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -372,7 +383,7 @@ class _HeartCounter extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Positioned.fill(
-            child: CustomPaint(painter: _HeartPainter(color: SC.accent)),
+            child: CustomPaint(painter: _HeartPainter(color: color)),
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 3),
@@ -381,7 +392,7 @@ class _HeartCounter extends StatelessWidget {
               style: GoogleFonts.archivoBlack(
                 fontSize: 12,
                 letterSpacing: -0.24,
-                color: SwayOnb.onAccent,
+                color: Colors.white,
               ),
             ),
           ),
