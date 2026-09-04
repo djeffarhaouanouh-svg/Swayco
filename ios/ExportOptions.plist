@@ -7,7 +7,7 @@
 	     certificate/profile is required. CI resolves signing via the
 	     App Store Connect API key (-allowProvisioningUpdates). -->
 	<key>method</key>
-	<string>app-store</string>
+	<string>app-store-connect</string>
 	<key>destination</key>
 	<string>export</string>
 	<key>teamID</key>
