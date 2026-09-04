@@ -553,6 +553,25 @@ abstract final class ProfileApi {
     return urlWithBuster;
   }
 
+  /// Remove the dedicated PDP: clear `avatar_url` (the app then falls back to
+  /// the Discover photo, then initials) and best-effort delete the file. The
+  /// gallery / Discover photo are untouched.
+  static Future<void> clearAvatar(String deviceId) async {
+    if (!isSupabaseReady || deviceId.isEmpty) return;
+    await _c
+        .from('profiles')
+        .update({
+          'avatar_url': '',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', deviceId);
+    try {
+      await _c.storage
+          .from('avatars')
+          .remove(['$deviceId.jpg', '$deviceId.png']);
+    } catch (_) {/* orphan file, few KB — ignore */}
+  }
+
   /// Upload [bytes] as the user's Discover-card photo. Same `avatars` bucket
   /// as the avatar (RLS already configured) but stored under a `discover/`
   /// prefix so the two photos can have different sizes / aspect ratios

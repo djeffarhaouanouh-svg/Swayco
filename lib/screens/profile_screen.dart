@@ -628,6 +628,24 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  /// Clear the dedicated PDP (the ✕ on the edit-account sheet's bubble). The
+  /// avatar then falls back to the Discover photo / initials. Gallery untouched.
+  Future<void> _clearAvatar() async {
+    if (_deviceId.isEmpty || !isSupabaseReady) return;
+    try {
+      await ProfileApi.clearAvatar(_deviceId);
+      if (!mounted) return;
+      await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('upload_failed', args: {'msg': '$e'})),
+        ),
+      );
+    }
+  }
+
   /// Remove a single gallery photo. Re-syncs the Discover photo server-side;
   /// cascades a like wipe only when the gallery becomes empty (see
   /// [ProfileApi.removeProfilePhoto]).
@@ -876,6 +894,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               languageCode: languageCode,
               onPickAvatar: () async {
                 await _pickAndSetAvatar();
+                if (!mounted) return;
+                setSheet(() => avatarUrl = _remote?.avatarUrl ?? '');
+              },
+              onRemoveAvatar: () async {
+                await _clearAvatar();
                 if (!mounted) return;
                 setSheet(() => avatarUrl = _remote?.avatarUrl ?? '');
               },
@@ -3669,6 +3692,7 @@ class _EditAccountSheet extends StatelessWidget {
     required this.city,
     required this.languageCode,
     required this.onPickAvatar,
+    required this.onRemoveAvatar,
     required this.onEditName,
     required this.onEditCity,
     required this.onEditLanguage,
@@ -3682,6 +3706,10 @@ class _EditAccountSheet extends StatelessWidget {
   final String city;
   final String languageCode;
   final VoidCallback onPickAvatar;
+
+  /// Retire la PDP dédiée (la ✕ en haut à droite de la bulle) — visible
+  /// seulement quand [avatarUrl] est renseignée.
+  final VoidCallback onRemoveAvatar;
   final VoidCallback onEditName;
   final VoidCallback onEditCity;
   final VoidCallback onEditLanguage;
@@ -3718,6 +3746,7 @@ class _EditAccountSheet extends StatelessWidget {
               // disait pas qu'elle se touchait.
               Stack(
                 alignment: Alignment.bottomRight,
+                clipBehavior: Clip.none,
                 children: [
                   ProfileAvatar(
                     displayName: name,
@@ -3746,6 +3775,32 @@ class _EditAccountSheet extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // ✕ en haut à droite — seulement quand une PDP dédiée est
+                  // posée : elle la retire (repli sur la photo Discover).
+                  if (avatarUrl.isNotEmpty)
+                    Positioned(
+                      top: -1,
+                      right: -1,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onRemoveAvatar,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2E),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: SC.bg, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 10),
