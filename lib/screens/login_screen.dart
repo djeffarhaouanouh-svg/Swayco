@@ -531,7 +531,10 @@ class _SocialButton extends StatelessWidget {
       ),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(50),
-        side: const BorderSide(color: SC.glassBorder),
+        // Pastille sombre pleine (plus le verre transparent) : les boutons
+        // Google / Apple se lisent comme des boutons sur le fond dégradé.
+        backgroundColor: const Color(0xFF16161B),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
