@@ -77,7 +77,8 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                   if (_started) return;
                   _started = true;
                   _controller
-                    ..duration = composition.duration
+                    // Joué 1,1× plus vite que la vitesse d'origine du clip.
+                    ..duration = composition.duration * (1 / 1.1)
                     ..forward();
                 },
               ),
