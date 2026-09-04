@@ -320,7 +320,12 @@ class _FrontRequestCard extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const ClipOval(
-              child: _AvatarGlyph(headSize: 10, shoulderWidth: 20, white: true),
+              child: Image(
+                image: AssetImage('assets/tips/lea_preview.jpg'),
+                width: 34,
+                height: 34,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 11),

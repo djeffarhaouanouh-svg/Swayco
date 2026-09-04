@@ -214,6 +214,8 @@ flutter:
     - assets/sounds/match_pop.wav
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
+    # Preview photo in the "Léa veut t'ajouter" onboarding tip card.
+    - assets/tips/lea_preview.jpg
     # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) —
     # drives the Discover country-picker globe (lib/widgets/discover_globe.dart).
     - assets/geo/world-110m.geo.json
