@@ -367,7 +367,7 @@ class _FrontRequestCard extends StatelessWidget {
 }
 
 /// Compteur d'ajouts : cœur cyan, chiffre sombre dedans.
-class _HeartCounter extends StatelessWidget {
+class _HeartCounter extends StatefulWidget {
   const _HeartCounter({required this.label, this.color = SC.accent});
 
   final String label;
@@ -379,30 +379,78 @@ class _HeartCounter extends StatelessWidget {
   final Color color;
 
   @override
+  State<_HeartCounter> createState() => _HeartCounterState();
+}
+
+class _HeartCounterState extends State<_HeartCounter>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  /// Un battement de cœur — deux pulsations puis une pause — pas un rebond
+  /// continu qui fatiguerait l'œil sur une carte statique.
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.16)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 10,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.16, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 10,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 1.10)
+          .chain(CurveTween(curve: Curves.easeOut)),
+      weight: 9,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.10, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeIn)),
+      weight: 9,
+    ),
+    TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 62),
+  ]).animate(_c);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      // Le chiffre remplissait le cœur bord à bord : élargi (même rapport
-      // largeur/hauteur, le dessin n'est pas déformé) pour lui rendre de l'air.
-      width: 50,
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: CustomPaint(painter: _HeartPainter(color: color)),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 3),
-            child: Text(
-              label,
-              style: GoogleFonts.archivoBlack(
-                fontSize: 12,
-                letterSpacing: -0.24,
-                color: Colors.white,
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, child) =>
+          Transform.scale(scale: _scale.value, child: child),
+      child: SizedBox(
+        // Le chiffre remplissait le cœur bord à bord : élargi (même rapport
+        // largeur/hauteur, le dessin n'est pas déformé) pour lui rendre de l'air.
+        width: 50,
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _HeartPainter(color: widget.color)),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(
+                widget.label,
+                style: GoogleFonts.archivoBlack(
+                  fontSize: 12,
+                  letterSpacing: -0.24,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
