@@ -710,34 +710,30 @@ class SwayStepWelcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: box.maxHeight),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SwayOnb.gutter),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 48),
-                const _StepHead(
-                  titleKey: 'onb_welcome_title',
-                  subtitleKey: 'onb_welcome_subtitle',
-                  hintKey: 'onb_welcome_hint',
-                  maxWidth: 290,
-                ),
-                const SizedBox(height: 34),
-                SwayInput(
-                  controller: nameCtrl,
-                  hint: AppStrings.t('onb_first_name_hint'),
-                ),
-                const SizedBox(height: 16),
-                SwayCta(label: AppStrings.t('onb_next'), onPressed: onNext),
-                const Expanded(child: SwayPins()),
-              ],
-            ),
+    // Pas de scroll : la page tient dans la hauteur donnée par le PageView.
+    // SwayPins remplit tout le bas via l'Expanded — avant, un
+    // SingleChildScrollView laissait défiler dans ce vide.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: SwayOnb.gutter),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 44),
+          const _StepHead(
+            titleKey: 'onb_welcome_title',
+            subtitleKey: 'onb_welcome_subtitle',
+            hintKey: 'onb_welcome_hint',
+            maxWidth: 290,
           ),
-        ),
+          const SizedBox(height: 32),
+          SwayInput(
+            controller: nameCtrl,
+            hint: AppStrings.t('onb_first_name_hint'),
+          ),
+          const SizedBox(height: 16),
+          SwayCta(label: AppStrings.t('onb_next'), onPressed: onNext),
+          const Expanded(child: SwayPins()),
+        ],
       ),
     );
   }
