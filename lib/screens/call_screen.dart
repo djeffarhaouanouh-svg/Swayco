@@ -583,6 +583,29 @@ class _CallScreenState extends State<CallScreen> {
       text: line.text,
       delivered: line.delivered,
     ));
+    _trackDeliveryStreak(line);
+  }
+
+  /// Suit les phrases dites qui n'arrivent pas jusqu'au pair. Une qui passe —
+  /// même un seul mot — remet tout à zéro ; [_kLangCheckThreshold] refus
+  /// d'affilée déclenchent, UNE fois par appel, la question « bonne langue ? »
+  /// avec le sélecteur de langues à la clé.
+  void _trackDeliveryStreak(SpokenLine line) {
+    if (line.delivered) {
+      _undeliveredStreak = 0;
+      return;
+    }
+    // Un segment vide n'est pas un échec de traduction, juste du silence capté.
+    if (line.text.trim().isEmpty) return;
+    if (++_undeliveredStreak < _kLangCheckThreshold ||
+        _langCheckShown ||
+        _sheetOpen ||
+        !mounted) {
+      return;
+    }
+    _langCheckShown = true;
+    _undeliveredStreak = 0;
+    _promptSpokenLanguageCheck();
   }
 
   bool _micOn = true;
@@ -1281,6 +1304,20 @@ class _CallScreenState extends State<CallScreen> {
   /// Déjà dit pendant cet appel : le bandeau ne revient pas à chaque phrase.
   bool _sttRefusalShown = false;
 
+  /// Phrases dites d'affilée que la traduction n'a pas pu rendre — la route de
+  /// réparation les a refusées (`unclear`), elles ne sont jamais parties chez le
+  /// pair. Une seule phrase, ou un seul mot, qui PASSE remet le compteur à zéro.
+  /// Trois d'affilée, c'est presque toujours la langue d'envoi qui n'est pas
+  /// celle qu'on parle : le recogniser tourne sur la mauvaise et ne rend que du
+  /// charabia.
+  int _undeliveredStreak = 0;
+
+  /// Combien d'échecs consécutifs avant de demander si la langue est la bonne.
+  static const int _kLangCheckThreshold = 3;
+
+  /// Déjà proposé pendant cet appel : on ne redemande pas à chaque phrase.
+  bool _langCheckShown = false;
+
   /// Le système a refusé la reconnaissance vocale. On le dit UNE fois, en clair
   /// et longuement — c'est la moitié de la fonctionnalité qui vient de tomber,
   /// et l'utilisateur n'a aucun autre moyen de le savoir : sa voix part bien,
@@ -1331,6 +1368,62 @@ class _CallScreenState extends State<CallScreen> {
               child: FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: Text(AppStrings.t('tip_got_it')),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// Trois phrases dites d'affilée qui ne sont pas passées. La cause la plus
+  /// probable, et la seule sur laquelle l'utilisateur peut agir : la langue
+  /// d'envoi n'est pas celle qu'il parle. On le demande franchement, une seule
+  /// fois par appel ; « Changer la langue » ouvre le même sélecteur que la
+  /// pastille.
+  void _promptSpokenLanguageCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: SC.menu,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          icon: const Icon(
+            Icons.translate_rounded,
+            color: SC.accent,
+            size: 34,
+          ),
+          content: Text(
+            AppStrings.t('call_lang_check_q'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: SC.textPrimary,
+              fontSize: 15,
+              height: 1.45,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _openLanguagePairSheet();
+                },
+                child: Text(AppStrings.t('call_lang_check_change')),
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(AppStrings.t('call_lang_check_keep')),
               ),
             ),
           ],
