@@ -44,6 +44,7 @@ import 'theme/swayco_theme.dart';
 import 'swayco/sway_stream_translation.dart';
 import 'swayco/realtime_translation_port.dart';
 import 'widgets/splash_screen_animation.dart';
+import 'widgets/web_access_gate.dart';
 
 /// Runs in a dedicated background isolate when a data push lands while the
 /// app is backgrounded or killed. For an incoming call it rings a
@@ -234,8 +235,9 @@ Future<void> main() async {
     }
     if (kIsWeb) {
       // Web stays EXACTLY as before — no Liquid Glass wrap, no shader
-      // pre-warm. The whole redesign is native-only (iPhone build).
-      runApp(const LiveKitTranslateApp());
+      // pre-warm. The whole redesign is native-only (iPhone build). Gated
+      // behind an access code so the public URL isn't wide open pre-launch.
+      runApp(const WebAccessGate(child: LiveKitTranslateApp()));
     } else {
       // Native (iOS/Android): pre-warm the Liquid Glass shaders so the first
       // glass surface doesn't flash white, then wrap the app.
