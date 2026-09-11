@@ -62,54 +62,60 @@ class _WebAccessGateState extends State<WebAccessGate> {
       return const ColoredBox(color: Color(0xFF000000));
     }
     if (_unlocked == true) return widget.child;
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: ColoredBox(
-        color: const Color(0xFF000000),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 320),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Accès restreint',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    obscureText: true,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Code d’accès',
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      errorText: _error,
-                      enabledBorder: const UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white24),
-                      ),
-                      focusedBorder: const UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
+    // Own MaterialApp: this gate sits ABOVE LiveKitTranslateApp's, so
+    // TextField/ElevatedButton have no Material ancestor otherwise — without
+    // one they don't paint (a blank/grey box instead of the form).
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(),
+      home: Scaffold(
+        backgroundColor: const Color(0xFF000000),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Accès restreint',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      child: const Text('Valider'),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Code d’accès',
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        errorText: _error,
+                        enabledBorder: const UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: const UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white),
+                        ),
+                      ),
+                      onSubmitted: (_) => _submit(),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _submit,
+                        child: const Text('Valider'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
