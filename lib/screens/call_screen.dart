@@ -666,15 +666,29 @@ class _CallScreenState extends State<CallScreen> {
     //
     // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE est l'usage prévu pour être entendu
     // PENDANT un appel (c'est celui de la voix du GPS), et c'est le seul que le
-    // plugin expose. Gardé pour Android : ailleurs la méthode n'existe pas côté
-    // natif et remonte un MissingPluginException.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      unawaited(
-        _deviceTts.setAudioAttributesForNavigation().then(
-          (_) => DebugOverlay.log('tts: android audio usage = navigation'),
-          onError: (Object e) => DebugOverlay.log('tts audio attrs failed: $e'),
-        ),
-      );
+    // plugin expose.
+    unawaited(_applyAndroidTtsRouting());
+  }
+
+  /// Pose l'usage audio Android, et le REPOSE avant chaque phrase.
+  ///
+  /// Côté natif, l'attribut est posé sur l'instance `TextToSpeech` courante. Or
+  /// le plugin en reconstruit une silencieusement dès que sa liaison de service
+  /// est tombée (`ismServiceConnectionUsable` faux dans `speak`), et la neuve
+  /// repart sur l'usage par défaut. Posé une seule fois au démarrage de l'écran,
+  /// l'attribut se perdait donc à la première reconstruction, et la voix
+  /// redevenait inaudible pour tout le reste de l'appel sans que rien ne change
+  /// visiblement.
+  ///
+  /// Le coût est un passage de canal par phrase, quelques-unes par minute, et
+  /// l'opération est idempotente. Gardé pour Android : ailleurs la méthode
+  /// n'existe pas côté natif et remonte un MissingPluginException.
+  Future<void> _applyAndroidTtsRouting() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _deviceTts.setAudioAttributesForNavigation();
+    } catch (e) {
+      DebugOverlay.log('tts audio attrs failed: $e');
     }
   }
 
@@ -850,7 +864,13 @@ class _CallScreenState extends State<CallScreen> {
   /// la phrase est REDITE : le refus n'a rien joué, il n'y a rien à couper.
   Future<void> _speakOsVoice(String text, String lang) async {
     final tag = _voiceTagFor(lang);
-    DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
+    // Le volume est sur LA MÊME ligne que la phrase, à dessein : c'est un
+    // réglage PERSISTÉ, propre à ce téléphone, et un zéro qui y traîne rend la
+    // voix inaudible sur ce téléphone-là seulement. Deux Android côte à côte, le
+    // même build, l'un parle et l'autre est muet — sans ce chiffre dans la même
+    // ligne, rien ne permet de le voir.
+    DebugOverlay.log('speak lang=$lang (voice $tag) '
+        'vol=${_audio.translatedVolume.toStringAsFixed(2)} text="$text"');
     markTranslationPlaying(textLength: text.length);
     try {
       if (tag.isNotEmpty && tag != _deviceTtsLang) {
@@ -859,6 +879,7 @@ class _CallScreenState extends State<CallScreen> {
           _deviceTtsLang = tag;
         } catch (_) {}
       }
+      await _applyAndroidTtsRouting();
       await _applyTranslatedVolumeToDeviceTts();
       // Mobile Chrome auto-pauses speechSynthesis after a stretch of inactivity;
       // speak() then plays nothing and fires no event.
