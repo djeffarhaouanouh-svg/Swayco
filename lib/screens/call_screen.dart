@@ -867,12 +867,18 @@ class _CallScreenState extends State<CallScreen> {
     // on interroge le moteur lui-même avant de renoncer — voir [_probeVoiceTag].
     var tag = _voiceTagFor(lang);
     if (tag.isEmpty) tag = await _probeVoiceTag(lang);
+    var fallbackVoice = false;
+    if (tag.isEmpty) {
+      tag = _anyAvailableVoiceTag();
+      fallbackVoice = tag.isNotEmpty;
+    }
     // Le volume est sur LA MÊME ligne que la phrase, à dessein : c'est un
     // réglage PERSISTÉ, propre à ce téléphone, et un zéro qui y traîne rend la
     // voix inaudible sur ce téléphone-là seulement. Deux Android côte à côte, le
     // même build, l'un parle et l'autre est muet — sans ce chiffre dans la même
     // ligne, rien ne permet de le voir.
-    DebugOverlay.log('speak lang=$lang (voice $tag) '
+    DebugOverlay.log('speak lang=$lang '
+        '(voice $tag${fallbackVoice ? " — PAR DÉFAUT, pas la bonne langue" : ""}) '
         'vol=${_audio.translatedVolume.toStringAsFixed(2)} text="$text"');
     markTranslationPlaying(textLength: text.length);
     try {
@@ -1157,6 +1163,30 @@ class _CallScreenState extends State<CallScreen> {
     }
     DebugOverlay.log('tts: le moteur ne connaît aucun tag pour "$base"');
     return '';
+  }
+
+  /// À défaut de la bonne langue, une langue que le moteur a VRAIMENT.
+  ///
+  /// « Garder la voix en place » supposait qu'il y en ait une de valide en
+  /// place. Rien ne le garantit : le plugin ne pose la langue par défaut du
+  /// moteur que si elle est disponible, donc le moteur peut tourner sans aucune
+  /// langue posée — et `speak()` ne rend alors rien du tout, sans le moindre
+  /// événement. C'est le silence complet observé sur un Android, pendant que le
+  /// même code parlait sur iPhone.
+  ///
+  /// Une voix française qui lit de l'anglais s'entend mal. Elle s'entend, et
+  /// c'est tout l'écart avec le silence : on sait que la traduction est
+  /// arrivée, on la comprend de travers au pire, et le bouton de langue reste à
+  /// portée pour corriger. Le tag vient de la liste du moteur, donc
+  /// `setLanguage` ne peut pas le refuser.
+  ///
+  /// Ma propre langue d'abord : c'est celle que ce téléphone a le plus de
+  /// chances d'avoir installée, et l'accent le moins surprenant pour celui qui
+  /// le tient.
+  String _anyAvailableVoiceTag() {
+    if (_deviceVoiceTags.isEmpty) return '';
+    return _deviceVoiceTags[_baseLang(_mySourceLang)] ??
+        _deviceVoiceTags.values.first;
   }
 
   /// QUEL moteur de synthèse répond, et lesquels sont installés.
