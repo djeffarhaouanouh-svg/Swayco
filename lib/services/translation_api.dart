@@ -545,7 +545,22 @@ Future<TranscriptFix> fetchTranscriptFixStream({
     var cacheHit = 0, cacheMiss = 0, outTokens = 0;
     var unclear = false;
     var buf = '';
-    await for (final chunk in resp.stream.transform(utf8.decoder)) {
+    // BORNÉ, et pas par confort : cette boucle tourne SUR la file de
+    // reconnaissance (`_asrQueue` chaîne le décodage ET la traduction, pour
+    // garder les phrases dans l'ordre). Un flux qui s'ouvre, rend une phrase,
+    // puis ne se ferme jamais — connexion morte que ni l'OS ni le serveur ne
+    // clôt — bloquait donc la file POUR TOUT LE RESTE DE L'APPEL : une phrase
+    // traduite, puis plus une seule, sans le moindre message d'erreur.
+    //
+    // Le délai se compte entre deux morceaux, pas sur la durée totale : une
+    // longue réponse qui arrive phrase par phrase le réarme à chaque fois.
+    // Trente secondes de silence d'un flux déjà ouvert, c'est un flux mort — on
+    // le ferme et on garde ce qui était arrivé.
+    final stream = resp.stream.transform(utf8.decoder).timeout(
+      const Duration(seconds: 30),
+      onTimeout: (sink) => sink.close(),
+    );
+    await for (final chunk in stream) {
       buf += chunk;
       var nl = buf.indexOf('\n');
       while (nl >= 0) {

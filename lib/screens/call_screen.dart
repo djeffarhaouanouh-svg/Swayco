@@ -656,6 +656,26 @@ class _CallScreenState extends State<CallScreen> {
     // Make speak() resolve when the sentence has FINISHED, not when it starts.
     // Without it the queue below cannot know when to start the next one.
     unawaited(_deviceTts.awaitSpeakCompletion(true));
+    // ANDROID : la traduction doit sortir SUR l'appel, pas à côté.
+    //
+    // Par défaut le moteur Android parle en USAGE_MEDIA (STREAM_MUSIC). Pendant
+    // un appel WebRTC l'AudioManager est en MODE_IN_COMMUNICATION, et la sortie
+    // média n'est pas sur la route de l'appel : selon le constructeur elle est
+    // fortement atténuée, ou pas jouée du tout. La phrase est bien synthétisée,
+    // le moteur annonce même sa fin — et personne ne l'entend.
+    //
+    // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE est l'usage prévu pour être entendu
+    // PENDANT un appel (c'est celui de la voix du GPS), et c'est le seul que le
+    // plugin expose. Gardé pour Android : ailleurs la méthode n'existe pas côté
+    // natif et remonte un MissingPluginException.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(
+        _deviceTts.setAudioAttributesForNavigation().then(
+          (_) => DebugOverlay.log('tts: android audio usage = navigation'),
+          onError: (Object e) => DebugOverlay.log('tts audio attrs failed: $e'),
+        ),
+      );
+    }
   }
 
   /// Translations are SPOKEN one after another, never on top of each other.
@@ -809,6 +829,25 @@ class _CallScreenState extends State<CallScreen> {
     return Duration(milliseconds: ms > 20000 ? 20000 : ms);
   }
 
+  /// ANDROID : le moteur se VERROUILLE sur une phrase dont la fin ne s'annonce
+  /// jamais, et il ne le dit pas.
+  ///
+  /// `flutter_tts` arme un drapeau `speaking` à chaque `speak()` attendu (c'est
+  /// [awaitSpeakCompletion], qu'on veut pour enchaîner les phrases) et ne le
+  /// désarme que sur un événement DU MOTEUR — onDone, onStop, onError. Une
+  /// phrase qui ne rend aucun des trois laisse donc le drapeau armé pour de
+  /// bon, et le plugin répond ensuite `0` à TOUS les `speak()` suivants,
+  /// immédiatement, sans rien jouer et sans lever d'erreur. Une seule fin
+  /// manquée rend la traduction muette pour tout le reste de l'appel : « la
+  /// voix passe une fois, puis plus rien ».
+  ///
+  /// iOS n'a pas ce garde — le plugin y réarme à chaque phrase — et c'est
+  /// exactement pourquoi iOS ↔ iOS n'a jamais montré la panne.
+  ///
+  /// [_unlockDeviceTts] est le seul moyen de désarmer le drapeau : côté natif,
+  /// `stop()` remet `speaking = false`. On le passe sur les deux sorties
+  /// anormales — le garde-fou de temps, et le `0` de refus. Dans ce second cas
+  /// la phrase est REDITE : le refus n'a rien joué, il n'y a rien à couper.
   Future<void> _speakOsVoice(String text, String lang) async {
     final tag = _voiceTagFor(lang);
     DebugOverlay.log('speak lang=$lang (voice $tag) text="$text"');
@@ -824,13 +863,38 @@ class _CallScreenState extends State<CallScreen> {
       // Mobile Chrome auto-pauses speechSynthesis after a stretch of inactivity;
       // speak() then plays nothing and fires no event.
       resumeSpeechSynthesisIfPaused();
-      await _deviceTts.speak(text).timeout(_speakCap(text));
-      DebugOverlay.log('speak done');
+      final res = await _deviceTts.speak(text).timeout(_speakCap(text));
+      if (res == 0) {
+        DebugOverlay.log('speak REFUSED (engine still marked speaking) — '
+            'unlocking and saying it again');
+        await _unlockDeviceTts();
+        final retry = await _deviceTts.speak(text).timeout(_speakCap(text));
+        DebugOverlay.log('speak retry → $retry');
+        if (retry == 0) await _unlockDeviceTts();
+      } else {
+        DebugOverlay.log('speak done');
+      }
     } catch (e) {
-      DebugOverlay.log('speak FAILED: $e');
+      // Le garde-fou a sauté : ou la phrase joue encore et on la coupe (elle
+      // dépasse déjà largement sa durée estimée), ou elle n'a jamais joué et
+      // c'est le verrou qu'on lève. Ne rien faire ici, c'était perdre la voix
+      // pour le reste de l'appel.
+      DebugOverlay.log('speak FAILED: $e — unlocking the engine');
+      await _unlockDeviceTts();
     } finally {
       markTranslationDone();
     }
+  }
+
+  /// Désarme le drapeau `speaking` du plugin — voir [_speakOsVoice]. Silencieux :
+  /// un `stop()` qui échoue ne doit pas remonter dans la file de parole.
+  Future<void> _unlockDeviceTts() async {
+    try {
+      await _deviceTts.stop();
+    } catch (e) {
+      DebugOverlay.log('tts stop failed: $e');
+    }
+    ttsSpeaking.value = false;
   }
 
   /// Play the WAV the premium voice already synthesised, and hold the queue

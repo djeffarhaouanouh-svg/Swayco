@@ -14,6 +14,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -51,6 +52,32 @@ class SwayAndroidStt(private val context: Context) {
 
   companion object {
     private const val CHANNEL = "swayco/android_stt"
+    private const val TAG = "SwayAndroidStt"
+
+    /// The RecognitionListener error codes, by name. A bare number in a log is
+    /// a number; the name says whether the recogniser heard nothing (NO_MATCH,
+    /// normal on a cough) or refused to listen at all (CLIENT,
+    /// RECOGNIZER_BUSY), which is the failure that repeats for the whole call.
+    private fun errorName(code: Int): String = when (code) {
+      // The codes start at 1, so 0 is "no error reported" — an empty clip that
+      // simply held no speech, which is not a failure to report.
+      0 -> ""
+      SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "NETWORK_TIMEOUT"
+      SpeechRecognizer.ERROR_NETWORK -> "NETWORK"
+      SpeechRecognizer.ERROR_AUDIO -> "AUDIO"
+      SpeechRecognizer.ERROR_SERVER -> "SERVER"
+      SpeechRecognizer.ERROR_CLIENT -> "CLIENT"
+      SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "SPEECH_TIMEOUT"
+      SpeechRecognizer.ERROR_NO_MATCH -> "NO_MATCH"
+      SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "RECOGNIZER_BUSY"
+      SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "INSUFFICIENT_PERMISSIONS"
+      SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "TOO_MANY_REQUESTS"
+      SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "SERVER_DISCONNECTED"
+      SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "LANGUAGE_NOT_SUPPORTED"
+      SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "LANGUAGE_UNAVAILABLE"
+      SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT -> "CANNOT_CHECK_SUPPORT"
+      else -> "code $code"
+    }
 
     fun register(messenger: BinaryMessenger, context: Context) {
       val instance = SwayAndroidStt(context.applicationContext)
@@ -76,6 +103,13 @@ class SwayAndroidStt(private val context: Context) {
   // Touched only on the main thread.
   private var pending: ((List<String>) -> Unit)? = null
   private var lastPartial = ""
+
+  // The last error the recogniser reported, travelling back to Dart with the
+  // clip as `err`. It used to be dropped on the floor: `onError` returned the
+  // partials and threw the code away, so "nobody spoke" and "the recogniser
+  // refused to listen" were the same empty string from Dart's side. The second
+  // one repeats for the whole call, and there was no line anywhere that said so.
+  @Volatile private var lastError = 0
 
   // How many hypotheses to ask the recogniser for, and how many rivals to pass
   // on. Google ranks several transcriptions of the same audio and hands over
@@ -165,6 +199,7 @@ class SwayAndroidStt(private val context: Context) {
       val hyps = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         ?.filter { it.isNotBlank() }
         .orEmpty()
+      lastError = 0
       val p = pending; pending = null
       p?.invoke(if (hyps.isNotEmpty()) hyps else listOfNotNull(lastPartial.ifBlank { null }))
     }
@@ -172,6 +207,8 @@ class SwayAndroidStt(private val context: Context) {
       // NO_MATCH / SPEECH_TIMEOUT after good partials is the empty-final quirk:
       // return what the partials captured rather than dropping it. Partials carry
       // no ranked list, so this path has a best guess and nothing else.
+      lastError = e
+      Log.w(TAG, "recognition error ${errorName(e)} — partial=\"$lastPartial\"")
       val p = pending; pending = null
       p?.invoke(listOfNotNull(lastPartial.ifBlank { null }))
     }
@@ -275,10 +312,20 @@ class SwayAndroidStt(private val context: Context) {
       try {
         sr.startListening(intentFor(locale, pfd, 16000, requireOnDevice))
       } catch (t: Throwable) {
+        Log.w(TAG, "warmup startListening refused: ${t.message}")
         finish(emptyList())
       }
-      // Cold-start can be ~1.4 s; give it room.
-      main.postDelayed({ finish(emptyList()) }, 10000)
+      // Cold-start can be ~1.4 s; give it room. CANCEL before giving up: a
+      // session still listening answers the next startListening with
+      // ERROR_CLIENT, and this one runs at connect time — right before the
+      // first real phrase.
+      main.postDelayed({
+        if (!done) {
+          Log.w(TAG, "warmup: no callback in 10s — cancelling the session")
+          try { sr.cancel() } catch (_: Throwable) {}
+        }
+        finish(emptyList())
+      }, 10000)
     }
   }
 
@@ -357,6 +404,8 @@ class SwayAndroidStt(private val context: Context) {
             "onDevice" to useOnDevice,
             "alts" to hyps.drop(1).take(maxAlternatives),
             "lowConf" to emptyList<String>(),
+            // Why this clip came back empty, when it did. Dart logs it.
+            "err" to (if (hyps.isEmpty()) errorName(lastError) else ""),
           ),
         )
       }
@@ -364,10 +413,21 @@ class SwayAndroidStt(private val context: Context) {
       try {
         sr.startListening(intentFor(locale, pfd, sampleRate, requireOnDevice))
       } catch (t: Throwable) {
+        Log.w(TAG, "startListening refused: ${t.message}")
         finish(listOfNotNull(lastPartial.ifBlank { null }))
       }
       // Watchdog: never let one clip wedge the queue if no callback fires.
-      main.postDelayed({ finish(listOfNotNull(lastPartial.ifBlank { null })) }, 12000)
+      // CANCEL the session before giving up on it, or the recogniser is still
+      // listening when the NEXT clip calls startListening — which then fails
+      // with ERROR_CLIENT, and every clip after it fails the same way. That is
+      // how one stuck clip turns into a call with nothing transcribed at all.
+      main.postDelayed({
+        if (!replied) {
+          Log.w(TAG, "no callback in 12s — cancelling the session")
+          try { sr.cancel() } catch (_: Throwable) {}
+        }
+        finish(listOfNotNull(lastPartial.ifBlank { null }))
+      }, 12000)
     }
   }
 

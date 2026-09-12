@@ -148,6 +148,13 @@ class AndroidSttEngine extends AsrEngine {
       );
       DebugOverlay.log('stt android native=${res.ms}ms '
           '${res.onDevice ? "on-device" : "CLOUD"} → "${res.text}"');
+      // Pourquoi le clip est revenu vide. NO_MATCH sur une toux est normal ;
+      // CLIENT ou RECOGNIZER_BUSY veut dire que le moteur a refusé d'écouter, et
+      // celui-là se répète — c'est la panne « une phrase puis plus rien ». Sans
+      // cette ligne les deux cas se lisaient pareil : une chaîne vide.
+      if (res.text.trim().isEmpty && res.error.isNotEmpty) {
+        DebugOverlay.log('  vide   : ${res.error}');
+      }
       if (res.alternatives.isNotEmpty) {
         DebugOverlay.log('  alt    : ${res.alternatives.join(" | ")}');
       }
