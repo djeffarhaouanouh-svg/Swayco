@@ -1110,6 +1110,23 @@ class LocalSttMicStreamer implements SwayMicStreamer {
   /// same audio is the one thing that tells the repair model WHERE to look, and
   /// it costs nothing to obtain — the OS already computed it. Absent (ONNX
   /// engines, streaming flush) it degrades to exactly the previous behaviour.
+  /// Le plafond de l'aller-retour de traduction, et ce n'est pas un réglage de
+  /// confort.
+  ///
+  /// Cette requête tourne SUR [_asrQueue] : le décodage ET la traduction y sont
+  /// chaînés, pour que les phrases arrivent chez le pair dans l'ordre où elles
+  /// ont été dites. La conséquence, elle, n'était pas voulue — une requête qui
+  /// ne revient jamais (flux ouvert que ni le serveur ni l'OS ne referme) bloque
+  /// alors TOUTES les phrases suivantes de l'appel. Une seule traduction arrive
+  /// chez le pair, puis plus rien, et pas une ligne ne le dit : le téléphone
+  /// continue de capter, de segmenter et d'empiler, sagement, derrière une
+  /// phrase qui n'aura jamais de réponse.
+  ///
+  /// Mesurée, la route rend en une seconde et demie. Douze secondes, c'est huit
+  /// fois le temps normal : on n'y arrive que si quelque chose est cassé, et
+  /// rendre la main perd UNE phrase au lieu de toutes celles d'après.
+  static const Duration _kFixCap = Duration(seconds: 12);
+
   Future<void> _translateAndSend(
     String orig,
     void Function(String, String, String, String) onTranslation,
@@ -1142,7 +1159,7 @@ class LocalSttMicStreamer implements SwayMicStreamer {
         onSentence: (sentence) {
           _publish('', sentence, onTranslation, force: force);
         },
-      );
+      ).timeout(_kFixCap);
     } catch (e) {
       DebugOverlay.log('stt translate FAILED ($_sourceLang→$_targetLang): $e');
       onError?.call('translate:$e');
