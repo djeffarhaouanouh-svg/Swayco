@@ -161,15 +161,32 @@ dev_dependencies:
 flutter_launcher_icons:
   image_path: "assets/icon-app.png"
   android: true
-  # Android 8+ needs an adaptive icon. The whole tile goes in the
-  # BACKGROUND layer, which fills the icon edge to edge with no inset —
-  # so the tile fills whatever mask shape the launcher applies, instead
-  # of floating as a small square. The foreground layer is left
-  # transparent (the plugin still requires one) — it MUST be genuinely
-  # empty: icon-fg-transparent.png only looked empty and was in fact the
-  # old filled-Ø, which stacked over the tile and hid the real icon.
-  adaptive_icon_background: "assets/icon-app.png"
-  adaptive_icon_foreground: "assets/icon-fg-empty.png"
+  # Android 8+ needs an adaptive icon, drawn on a 108dp canvas of which
+  # only the CENTER 72dp is ever shown — the outer ring is clipped
+  # outright before any mask shape even runs, on every launcher, no
+  # exceptions. Guaranteed-visible content must stay within a 66dp
+  # "safe zone" circle (source: Android's adaptive icon spec — see
+  # developer.android.com/develop/ui/views/launch/icon_design_adaptive).
+  #
+  # The whole flat tile used to go in the BACKGROUND layer — logo baked
+  # in, edge to edge, foreground left transparent. Measured on
+  # icon-app.png: the arrow's tip sits at 85% of the way to the edge,
+  # more than double the 61% (33dp of 54dp half-canvas) the safe zone
+  # actually guarantees. Every real device was cropping the tip clean
+  # off, and what stayed on screen read as a zoomed-in, cropped logo —
+  # "the icon looks too big" once installed from the store, though the
+  # flat 1024×1024 preview (and the separate 512×512 Play Store listing
+  # icon, assets/icon-android.png — untouched, uploaded by hand, not
+  # part of this pipeline) looked perfectly normal.
+  #
+  # Split in two, as adaptive icons are meant to be: icon-adaptive-bg.png
+  # is the gradient ALONE, still edge to edge — a plain fill is exactly
+  # what is safe to bleed into the clipped ring. icon-adaptive-fg.png is
+  # the white logo ALONE, transparent elsewhere, rescaled so its
+  # farthest point sits at 30% of canvas width from centre — inside the
+  # 30.6% safe-zone radius, not merely inside the 33% viewport crop.
+  adaptive_icon_background: "assets/icon-adaptive-bg.png"
+  adaptive_icon_foreground: "assets/icon-adaptive-fg.png"
   ios: true
   # iOS icons may not carry transparency — flatten the rounded-corner
   # alpha onto the icon's own near-black background.
