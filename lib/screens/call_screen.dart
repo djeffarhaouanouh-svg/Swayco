@@ -863,7 +863,10 @@ class _CallScreenState extends State<CallScreen> {
   /// anormales — le garde-fou de temps, et le `0` de refus. Dans ce second cas
   /// la phrase est REDITE : le refus n'a rien joué, il n'y a rien à couper.
   Future<void> _speakOsVoice(String text, String lang) async {
-    final tag = _voiceTagFor(lang);
+    // La liste des voix peut être partielle. Si elle ne connaît pas la langue,
+    // on interroge le moteur lui-même avant de renoncer — voir [_probeVoiceTag].
+    var tag = _voiceTagFor(lang);
+    if (tag.isEmpty) tag = await _probeVoiceTag(lang);
     // Le volume est sur LA MÊME ligne que la phrase, à dessein : c'est un
     // réglage PERSISTÉ, propre à ce téléphone, et un zéro qui y traîne rend la
     // voix inaudible sur ce téléphone-là seulement. Deux Android côte à côte, le
@@ -1031,12 +1034,6 @@ class _CallScreenState extends State<CallScreen> {
     _loadingVoiceLangs = true;
     try {
       final ok = await _readDeviceVoiceLangs();
-      if (ok && mounted) {
-        // La liste est là, mais elle peut ne pas contenir la langue qu'on doit
-        // entendre. C'est le cas qui rendait un Android muet tout l'appel, et
-        // il a une sortie sur l'appareil lui-même : un autre moteur.
-        await _switchToAnEngineThatSpeaks(_myOutputLang);
-      }
       if (ok || !mounted) return;
       if (attempt >= _kVoiceLoadTries) {
         DebugOverlay.log('device voices: still none after $attempt tries');
@@ -1110,73 +1107,56 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
-  /// Déjà tenté pendant cet appel. Changer de moteur reconstruit l'objet natif,
-  /// ce n'est pas quelque chose qu'on refait à chaque phrase.
-  bool _engineSwitchTried = false;
+  /// La région à essayer pour chacune des langues de l'app quand la liste des
+  /// voix ne mentionne pas la langue. `Locale` veut la région : un `en` nu ne
+  /// résout rien, `en-US` oui.
+  static const Map<String, String> _defaultVoiceRegion = {
+    'fr': 'fr-FR', 'en': 'en-US', 'es': 'es-ES', 'it': 'it-IT',
+    'pt': 'pt-BR', 'nl': 'nl-NL', 'ar': 'ar-SA', 'ru': 'ru-RU',
+    'zh': 'zh-CN', 'ko': 'ko-KR', 'de': 'de-DE', 'ja': 'ja-JP',
+  };
 
-  /// Si le moteur en place ne dit pas [lang], prendre un moteur qui la dit.
+  /// Demander AU MOTEUR si une langue existe, au lieu de croire son inventaire.
   ///
-  /// Android accepte PLUSIEURS moteurs de synthèse, et celui par défaut n'est
-  /// pas forcément le mieux fourni : un moteur constructeur à sept langues peut
-  /// être devant celui de Google, qui en a des dizaines. C'est ce qu'un appel
-  /// réel a montré, `device voices: 7 langs (en=—)` — l'anglais introuvable sur
-  /// un téléphone parfaitement capable de le dire avec l'autre moteur installé.
+  /// `getLanguages` peut rendre une liste PARTIELLE quand le moteur vient de
+  /// démarrer, et notre relance ne se déclenchait que sur une liste VIDE. Une
+  /// liste courte était donc prise pour définitive et gelée pour tout l'appel :
+  /// [_voiceTagFor] rendait '' à chaque phrase, `setLanguage` n'était jamais
+  /// appelé, et le moteur lisait un texte anglais avec la voix qu'il avait —
+  /// c'est-à-dire rien, sans le moindre événement. Journal d'un vrai appel :
+  /// « device voices: 7 langs (en=—) », sur un téléphone qui sait évidemment
+  /// dire l'anglais. Sept, ce n'était pas l'inventaire du téléphone, c'était ce
+  /// que le moteur avait eu le temps d'énumérer.
   ///
-  /// Tout se joue sur l'appareil : on ne fait qu'élire, parmi ce qui est déjà
-  /// installé, celui qui connaît la langue. Rien ne sort du téléphone.
-  ///
-  /// Si AUCUN moteur ne la dit, on remet celui du départ. Le mauvais réflexe
-  /// serait de laisser le dernier essayé en place : il ne dit pas la langue non
-  /// plus, et il n'est même pas celui que l'utilisateur a choisi.
-  Future<void> _switchToAnEngineThatSpeaks(String lang) async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
-    if (_engineSwitchTried || lang.isEmpty) return;
+  /// `isLanguageAvailable` interroge le moteur sur UN tag précis, sans passer
+  /// par l'énumération. C'est cette réponse-là qui fait foi.
+  Future<String> _probeVoiceTag(String lang) async {
     final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
-    if (base.isEmpty || _deviceVoiceTags.containsKey(base)) return;
-    _engineSwitchTried = true;
-
-    String original = '';
-    try {
-      original = (await _deviceTts.getDefaultEngine)?.toString() ?? '';
-      final raw = await _deviceTts.getEngines;
-      final others = raw is List
-          ? raw.whereType<String>().where((e) => e != original).toList()
-          : const <String>[];
-      if (others.isEmpty) {
-        DebugOverlay.log('tts: aucun autre moteur installé — "$base" restera '
-            'muet jusqu\'à ce que sa voix soit installée');
-        return;
-      }
-      for (final engine in others) {
-        await _deviceTts.setEngine(engine);
-        // L'inventaire des voix appartient au MOTEUR : il faut le relire, sinon
-        // on jugerait le nouveau sur les voix de l'ancien.
-        _deviceVoiceTags = const {};
-        await _readDeviceVoiceLangs();
-        if (_deviceVoiceTags.containsKey(base)) {
-          DebugOverlay.log('tts: moteur → $engine (lui sait dire "$base")');
-          // Deux états à reprendre après une reconstruction du moteur natif :
-          // la langue posée par setLanguage, qu'il ignore, et l'usage audio,
-          // qui vit sur l'instance et repart par défaut.
-          _deviceTtsLang = '';
-          await _applyAndroidTtsRouting();
-          return;
+    if (base.isEmpty) return '';
+    final candidates = <String>[
+      if (lang.contains('-') || lang.contains('_')) lang.replaceAll('_', '-'),
+      ...?_preferredVoiceRegions[base],
+      if (_defaultVoiceRegion[base] != null) _defaultVoiceRegion[base]!,
+      base,
+    ];
+    for (final tag in candidates) {
+      try {
+        if (await _deviceTts.isLanguageAvailable(tag) == true) {
+          DebugOverlay.log('tts: le moteur confirme "$tag", absent de sa liste');
+          // Retenu : une phrase ne doit pas repayer l'interrogation du moteur,
+          // et les suivantes trouveront le tag par le chemin normal.
+          if (mounted) {
+            setState(() =>
+                _deviceVoiceTags = {..._deviceVoiceTags, base: tag});
+          }
+          return tag;
         }
+      } catch (_) {
+        // Un moteur qui refuse la question n'invalide pas les autres tags.
       }
-      DebugOverlay.log('tts: aucun moteur ne dit "$base" — retour à $original');
-    } catch (e) {
-      DebugOverlay.log('tts: changement de moteur impossible ($e)');
     }
-    // Sortie par l'échec ou par l'exception : on rend l'appareil tel qu'il
-    // était, puis on relit son inventaire pour ne pas rester sur celui d'un
-    // moteur qu'on vient d'abandonner.
-    try {
-      if (original.isNotEmpty) await _deviceTts.setEngine(original);
-    } catch (_) {}
-    _deviceVoiceTags = const {};
-    _deviceTtsLang = '';
-    await _readDeviceVoiceLangs();
-    await _applyAndroidTtsRouting();
+    DebugOverlay.log('tts: le moteur ne connaît aucun tag pour "$base"');
+    return '';
   }
 
   /// QUEL moteur de synthèse répond, et lesquels sont installés.
