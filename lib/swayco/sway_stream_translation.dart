@@ -110,45 +110,6 @@ class SwayStreamTranslation extends ChangeNotifier
     } catch (_) {}
   }
 
-  /// Quand la dernière reprise du pipeline d'envoi a été lancée.
-  ///
-  /// [LocalSttMicStreamer.start] n'échoue pas en levant : il attrape, prévient
-  /// par `onError` et s'arrête proprement. Personne ne reprenait derrière — donc
-  /// UNE seule ouverture ratée coupait la traduction de ce côté pour tout le
-  /// reste de l'appel, en silence. Le cas qui la rate est connu : le
-  /// RÉ-attachement en cours d'appel, quand le pair annonce une langue d'écoute
-  /// différente de celle de ses métadonnées, redémarre le streamer alors que
-  /// l'ancienne capture n'a pas encore rendu le micro.
-  ///
-  /// Limité en CADENCE plutôt qu'en nombre : cet objet vit pour toute l'appli,
-  /// pas pour un appel, donc un compteur à vie finirait par refuser de reprendre
-  /// dans un appel bien plus tard. Une tentative toutes les dix secondes ne peut
-  /// pas boucler, et un micro qui redevient disponible est récupéré tout seul.
-  int _lastStartRetryMs = 0;
-  static const int _kStartRetryGapMs = 10000;
-
-  /// Le pipeline d'envoi est mort à l'ouverture : on le relance une fois.
-  void _retryStartAfterFailure(String code) {
-    if (!code.startsWith('start_failed') &&
-        !code.startsWith('capture_reopen_failed')) {
-      return;
-    }
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastStartRetryMs < _kStartRetryGapMs) return;
-    _lastStartRetryMs = nowMs;
-    final room = _room;
-    final route = _route;
-    if (room == null || route == null) return;
-    DebugOverlay.log('send pipeline died on open ($code) — re-attaching in 800ms');
-    Timer(const Duration(milliseconds: 800), () {
-      // Entre-temps il a pu repartir tout seul (bascule de micro, changement de
-      // langue) : on ne casse pas une capture qui marche pour la rouvrir.
-      if (_sendStreamer?.isStreaming ?? false) return;
-      if (_room != room || _route != route) return;
-      unawaited(attachToRoom(room, route: route));
-    });
-  }
-
   /// Held as well as forwarded: the peer's profile is fetched asynchronously and
   /// can land either side of the streamer being created, so whichever happens
   /// first, the other picks it up (see the hand-off after `createSwayMicStreamer`).
@@ -264,7 +225,6 @@ class SwayStreamTranslation extends ChangeNotifier
             onError: (code) {
               _lastError = 'send:$code';
               notifyListeners();
-              _retryStartAfterFailure(code);
             },
           )
           .catchError((Object e) {

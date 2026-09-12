@@ -11,15 +11,8 @@ class AndroidSttResult {
     this.ms,
     this.onDevice, {
     this.alternatives = const [],
-    this.error = '',
   });
   final String text;
-
-  /// Why an empty [text] came back, named (`NO_MATCH`, `CLIENT`,
-  /// `RECOGNIZER_BUSY`, …), or empty when something was recognised. Empty text
-  /// alone cannot tell "nobody spoke" from "the recogniser refused", and only
-  /// the second one keeps happening for the rest of the call.
-  final String error;
 
   /// Native recognition time, milliseconds.
   final int ms;
@@ -134,7 +127,6 @@ class AndroidSttChannel {
       alternatives: raw is List
           ? raw.whereType<String>().where((s) => s.trim().isNotEmpty).toList()
           : const [],
-      error: (res?['err'] as String?) ?? '',
     );
   }
 }

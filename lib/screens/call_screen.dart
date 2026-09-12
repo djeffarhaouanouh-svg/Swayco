@@ -1011,6 +1011,91 @@ class _CallScreenState extends State<CallScreen> {
     'en': ['en-US', 'en-GB'],
   };
 
+  /// ISO 639-2 (trois lettres) → ISO 639-1 (deux lettres).
+  ///
+  /// Les moteurs de synthèse ne parlent pas tous le même dialecte de BCP-47.
+  /// iOS et celui de Google énumèrent `en-US`, `fr-FR`. Celui de Samsung
+  /// (`com.samsung.SMT`) énumère `eng-default`, `fra-default`,
+  /// `por-x-lvariant-f00` : trois lettres, et une pseudo-variante. Notre
+  /// extraction prenait le morceau avant le tiret, obtenait `eng`, et cherchait
+  /// `en` — d'où le fameux « 7 langs (en=—) » sur un téléphone qui a
+  /// évidemment l'anglais. La liste n'était pas incomplète, elle était écrite
+  /// dans un autre alphabet.
+  ///
+  /// Les VINGT premières lignes sont les langues à deux codes à trois lettres,
+  /// un « bibliographique » et un « terminologique » selon la norme. Les deux
+  /// désignent la même langue et un moteur peut rendre l'un ou l'autre, donc
+  /// les deux sont ici. Le français et le chinois en font partie, et ce sont
+  /// deux des langues de l'app.
+  static const Map<String, String> _iso6392to1 = {
+    'alb': 'sq', 'sqi': 'sq',
+    'arm': 'hy', 'hye': 'hy',
+    'baq': 'eu', 'eus': 'eu',
+    'bur': 'my', 'mya': 'my',
+    'chi': 'zh', 'zho': 'zh',
+    'cze': 'cs', 'ces': 'cs',
+    'dut': 'nl', 'nld': 'nl',
+    'fre': 'fr', 'fra': 'fr',
+    'geo': 'ka', 'kat': 'ka',
+    'ger': 'de', 'deu': 'de',
+    'gre': 'el', 'ell': 'el',
+    'ice': 'is', 'isl': 'is',
+    'mac': 'mk', 'mkd': 'mk',
+    'mao': 'mi', 'mri': 'mi',
+    'may': 'ms', 'msa': 'ms',
+    'per': 'fa', 'fas': 'fa',
+    'rum': 'ro', 'ron': 'ro',
+    'slo': 'sk', 'slk': 'sk',
+    'tib': 'bo', 'bod': 'bo',
+    'wel': 'cy', 'cym': 'cy',
+    // Un seul code à trois lettres pour les autres.
+    'eng': 'en', 'spa': 'es', 'ita': 'it', 'por': 'pt', 'rus': 'ru',
+    'ara': 'ar', 'jpn': 'ja', 'kor': 'ko', 'hin': 'hi', 'pol': 'pl',
+    'tur': 'tr', 'ukr': 'uk', 'swe': 'sv', 'dan': 'da', 'fin': 'fi',
+    'nor': 'no', 'nob': 'nb', 'nno': 'nn', 'tha': 'th', 'ind': 'id',
+    'vie': 'vi', 'heb': 'he', 'hun': 'hu', 'hrv': 'hr', 'cat': 'ca',
+    'bul': 'bg', 'srp': 'sr', 'slv': 'sl', 'est': 'et', 'lav': 'lv',
+    'lit': 'lt', 'ben': 'bn', 'tam': 'ta', 'tel': 'te', 'mar': 'mr',
+    'urd': 'ur', 'guj': 'gu', 'kan': 'kn', 'mal': 'ml', 'pan': 'pa',
+    'swa': 'sw', 'afr': 'af', 'tgl': 'tl', 'fil': 'fil',
+  };
+
+  /// Ramène n'importe quel tag de moteur à un couple (langue, tag utilisable).
+  ///
+  /// Null quand la chaîne n'est pas une langue reconnaissable : mieux vaut
+  /// ignorer une entrée que remplir la table d'une clé qui ne sera jamais
+  /// cherchée.
+  ///
+  /// Le tag rendu est celui qu'on passera à `setLanguage`, et il doit donc être
+  /// du BCP-47 que l'OS sait résoudre. D'où les deux cas :
+  ///
+  ///  * langue à DEUX lettres — le tag est déjà canonique, on le garde entier,
+  ///    région comprise. C'est le cas d'iOS et de Google, et la région compte :
+  ///    `AVSpeechSynthesisVoice(language:)` rend nil sur un code nu.
+  ///  * langue à TROIS lettres — ni `eng-default` ni `eng-USA` ne sont du
+  ///    BCP-47 résoluble. On garde la région si elle fait deux lettres, sinon
+  ///    on prend la région canonique de la langue ([_defaultVoiceRegion]), qui
+  ///    est exactement le tag que le moteur Samsung a confirmé connaître.
+  static (String, String)? _normaliseVoiceTag(String raw) {
+    var s = raw.trim().replaceAll('_', '-');
+    if (s.isEmpty) return null;
+    // Java émet l'extension privée `-x-lvariant-…` pour toute variante que
+    // BCP-47 refuse : c'est ce qui produit `por-x-lvariant-f00`. Rien après
+    // `-x-` ne parle de la langue.
+    final x = s.toLowerCase().indexOf('-x-');
+    if (x > 0) s = s.substring(0, x);
+    final parts = s.split('-').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return null;
+    final lang = parts.first.toLowerCase();
+    if (!RegExp(r'^[a-z]{2,3}$').hasMatch(lang)) return null;
+    if (lang.length == 2) return (lang, s);
+    final base = _iso6392to1[lang];
+    if (base == null) return null;
+    final region = parts.length > 1 ? parts[1].toUpperCase() : '';
+    if (RegExp(r'^[A-Z]{2}$').hasMatch(region)) return (base, '$base-$region');
+    return (base, _defaultVoiceRegion[base] ?? base);
+  }
+
   /// Un chargement de la liste est déjà en vol : on n'en lance pas un second.
   bool _loadingVoiceLangs = false;
 
@@ -1062,12 +1147,13 @@ class _CallScreenState extends State<CallScreen> {
       final all = <String, List<String>>{};
       for (final t in raw) {
         if (t == null) continue;
-        final full = t.toString().trim();
-        if (full.isEmpty) continue;
-        final base = full.toLowerCase().split(RegExp(r'[-_]')).first;
-        if (base.isEmpty) continue;
-        (all[base] ??= <String>[]).add(full);
-        tags.putIfAbsent(base, () => full);
+        // Normalisé, et pas découpé au premier tiret : voir [_normaliseVoiceTag]
+        // pour les trois dialectes de BCP-47 que les moteurs rendent.
+        final norm = _normaliseVoiceTag(t.toString());
+        if (norm == null) continue;
+        final (base, tag) = norm;
+        (all[base] ??= <String>[]).add(tag);
+        tags.putIfAbsent(base, () => tag);
       }
       // Les préférées passent devant ce que la liste avait donné.
       _preferredVoiceRegions.forEach((base, wanted) {
