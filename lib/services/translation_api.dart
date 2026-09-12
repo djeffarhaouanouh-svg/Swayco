@@ -84,24 +84,8 @@ Uri _translationTextUri() {
   return Uri.parse('$b/translation/text');
 }
 
-Uri _translationTtsUri() {
-  const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
-  if (fromEnv.isNotEmpty) {
-    final b = fromEnv.replaceAll(RegExp(r'/$'), '');
-    return Uri.parse('$b/translation/tts');
-  }
-  if (kIsWeb) {
-    final o = Uri.base.removeFragment();
-    return Uri(
-      scheme: o.scheme,
-      host: o.host,
-      port: o.hasPort ? o.port : null,
-      path: '/translation/tts',
-    );
-  }
-  final b = resolvedTokenApiBase().replaceAll(RegExp(r'/$'), '');
-  return Uri.parse('$b/translation/tts');
-}
+// `_translationTtsUri()` est partie avec `fetchSpeech()`, son unique
+// utilisatrice : plus personne dans l'app ne demande une voix au serveur.
 
 Uri _translationVoiceUri() {
   const fromEnv = String.fromEnvironment('TOKEN_API_BASE');
@@ -617,34 +601,18 @@ Future<TranscriptFix> fetchTranscriptFixStream({
   }
 }
 
-/// Text-to-speech via the backend (`/translation/tts`, which drives the cloud
-/// voice engine). POSTs the text (+ optional BCP-47 [lang] and [voice])
-/// and returns the spoken audio bytes (mp3), or null on any error so the
-/// caller can silently skip playback. The backend is expected to return the
-/// raw audio body (Content-Type audio/mpeg).
-Future<Uint8List?> fetchSpeech({
-  required String text,
-  String? lang,
-  String voice = 'alloy',
-}) async {
-  if (text.trim().isEmpty) return null;
-  final uri = _translationTtsUri();
-  try {
-    final res = await http.post(
-      uri,
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'text': text,
-        if (lang != null && lang.isNotEmpty) 'lang': lang,
-        'voice': voice,
-      }),
-    );
-    if (res.statusCode < 200 || res.statusCode >= 300) return null;
-    return res.bodyBytes.isEmpty ? null : res.bodyBytes;
-  } catch (_) {
-    return null;
-  }
-}
+// `fetchSpeech()` a été retiré ici.
+//
+// Il était le seul client de `/translation/tts`, et cette route-là est une voix
+// de SERVEUR. La synthèse de l'app est celle de l'appareil : seule la
+// traduction sort du téléphone. Faire dire une phrase par un service distant
+// parce qu'un Android n'a pas la voix installée réglait le symptôme en
+// déplaçant la chaîne audio hors de la machine, ce qui n'est pas le contrat.
+//
+// La sortie est restée sur l'appareil : quand le moteur en place ne connaît pas
+// la langue, `call_screen._switchToAnEngineThatSpeaks` élit un autre moteur
+// DÉJÀ INSTALLÉ qui la connaît. La route existe toujours côté backend, sans
+// appelant.
 
 /// Result of the cloud engine TEST pipeline: translated speech [audio] (mp3) plus the
 /// recognised [transcript] and [translation] (echoed by the backend headers,

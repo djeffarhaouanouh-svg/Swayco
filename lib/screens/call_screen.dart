@@ -791,30 +791,6 @@ class _CallScreenState extends State<CallScreen> {
       // second contrôle, elle se dirait quand même à la fin du silence.
       if (!mounted || generation != _ttsGeneration) return;
       if (synth == null) {
-        // Ce téléphone ne SAIT PAS dire cette langue : sa voix ne rendra rien
-        // du tout, et elle ne le dira pas non plus. Journal d'un vrai appel,
-        // Android, traduction vers l'anglais :
-        //
-        //   device voices: 7 langs (en=—)
-        //   no device voice for "en" — keeping current voice
-        //   speak lang=en (voice ) vol=0.50 text="Hey, how's it going?"
-        //   speak FAILED: TimeoutException after 0:00:04.7
-        //
-        // Le moteur du système n'avait que sept langues, sans l'anglais. Faute
-        // de tag, `setLanguage` n'est pas appelé, le moteur garde sa langue par
-        // défaut, et on lui demande de lire un texte anglais avec une voix qui
-        // ne l'est pas : il ne joue rien ET n'annonce aucune fin. La phrase
-        // meurt sur le garde-fou, et l'appel entier est muet.
-        //
-        // La voix du serveur passe DEVANT dans ce cas précis. Elle ne dépend pas
-        // de ce qui est installé sur l'appareil, ce qui est exactement la
-        // propriété qui manquait — deux téléphones, le même build, l'un parle et
-        // l'autre est muet. Elle ne remplace pas la voix du système ailleurs :
-        // celle-ci est instantanée et gratuite quand elle existe.
-        if (_deviceKnowsVoiceFor(lang) == false &&
-            await _speakCloudVoice(text, lang)) {
-          return;
-        }
         await _speakOsVoice(text, lang);
         return;
       }
@@ -927,68 +903,6 @@ class _CallScreenState extends State<CallScreen> {
       DebugOverlay.log('speak FAILED: $e — unlocking the engine');
       await _unlockDeviceTts();
     } finally {
-      markTranslationDone();
-    }
-  }
-
-  /// Ce téléphone connaît-il une voix pour [lang] ? TROIS réponses, pas deux.
-  ///
-  /// `null` veut dire « on ne sait pas encore » : la liste des voix n'est pas
-  /// rendue. La distinction compte — répondre `false` pendant que la liste est
-  /// en vol enverrait toutes les premières phrases de l'appel au serveur alors
-  /// que la voix du système allait très bien.
-  bool? _deviceKnowsVoiceFor(String lang) {
-    if (_deviceVoiceTags.isEmpty) return null;
-    final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
-    return _deviceVoiceTags.containsKey(base);
-  }
-
-  /// Combien de temps on laisse au serveur pour rendre la phrase parlée.
-  ///
-  /// Le même raisonnement que partout ailleurs sur ce chemin : la file de parole
-  /// est sérielle, donc une requête sans borne tiendrait toutes les phrases
-  /// suivantes derrière elle. Huit secondes pour une phrase de conversation, et
-  /// au-delà on tente quand même la voix du système plutôt que rien.
-  static const Duration _kCloudVoiceCap = Duration(seconds: 8);
-
-  /// Dire [text] avec la voix du serveur. Rend `true` si ça a réellement joué.
-  ///
-  /// Passe par le même lecteur que l'audio mp3 déjà reçu du pair, donc rien de
-  /// nouveau sur la couche audio. Le volume suit le curseur « voix traduite »,
-  /// comme la voix du système : c'est le même réglage pour l'oreille, il ne doit
-  /// pas dépendre de quel moteur a parlé.
-  Future<bool> _speakCloudVoice(String text, String lang) async {
-    DebugOverlay.log('speak lang=$lang (voix serveur) text="$text"');
-    markTranslationPlaying(textLength: text.length);
-    try {
-      final bytes =
-          await fetchSpeech(text: text, lang: lang).timeout(_kCloudVoiceCap);
-      if (bytes == null || bytes.isEmpty) {
-        DebugOverlay.log('voix serveur: rien rendu — on tente le système');
-        return false;
-      }
-      ttsSpeaking.value = true;
-      // Souscrire AVANT de jouer : un clip court peut finir avant que l'attente
-      // ne commence, et on resterait alors sur la fin d'une phrase déjà dite.
-      final done = _ttsPlayer.onPlayerComplete.first;
-      await _ttsPlayer.stop();
-      await _ttsPlayer
-          .setVolume(_audio.translatedVolume.clamp(0.0, 1.0));
-      await _ttsPlayer.play(BytesSource(bytes));
-      await done.timeout(const Duration(seconds: 20));
-      DebugOverlay.log('voix serveur: dit (${bytes.length}o)');
-      return true;
-    } on TimeoutException {
-      // Ça joue peut-être encore, ou la fin ne s'est jamais annoncée. On rend
-      // la main en disant que c'est dit : redire la phrase avec l'autre moteur
-      // la ferait entendre deux fois.
-      DebugOverlay.log('voix serveur: fin non annoncée — on passe à la suite');
-      return true;
-    } catch (e) {
-      DebugOverlay.log('voix serveur FAILED: $e');
-      return false;
-    } finally {
-      ttsSpeaking.value = false;
       markTranslationDone();
     }
   }
@@ -1117,6 +1031,12 @@ class _CallScreenState extends State<CallScreen> {
     _loadingVoiceLangs = true;
     try {
       final ok = await _readDeviceVoiceLangs();
+      if (ok && mounted) {
+        // La liste est là, mais elle peut ne pas contenir la langue qu'on doit
+        // entendre. C'est le cas qui rendait un Android muet tout l'appel, et
+        // il a une sortie sur l'appareil lui-même : un autre moteur.
+        await _switchToAnEngineThatSpeaks(_myOutputLang);
+      }
       if (ok || !mounted) return;
       if (attempt >= _kVoiceLoadTries) {
         DebugOverlay.log('device voices: still none after $attempt tries');
@@ -1188,6 +1108,75 @@ class _CallScreenState extends State<CallScreen> {
       debugPrint('[speech] getLanguages failed: $e');
       return false;
     }
+  }
+
+  /// Déjà tenté pendant cet appel. Changer de moteur reconstruit l'objet natif,
+  /// ce n'est pas quelque chose qu'on refait à chaque phrase.
+  bool _engineSwitchTried = false;
+
+  /// Si le moteur en place ne dit pas [lang], prendre un moteur qui la dit.
+  ///
+  /// Android accepte PLUSIEURS moteurs de synthèse, et celui par défaut n'est
+  /// pas forcément le mieux fourni : un moteur constructeur à sept langues peut
+  /// être devant celui de Google, qui en a des dizaines. C'est ce qu'un appel
+  /// réel a montré, `device voices: 7 langs (en=—)` — l'anglais introuvable sur
+  /// un téléphone parfaitement capable de le dire avec l'autre moteur installé.
+  ///
+  /// Tout se joue sur l'appareil : on ne fait qu'élire, parmi ce qui est déjà
+  /// installé, celui qui connaît la langue. Rien ne sort du téléphone.
+  ///
+  /// Si AUCUN moteur ne la dit, on remet celui du départ. Le mauvais réflexe
+  /// serait de laisser le dernier essayé en place : il ne dit pas la langue non
+  /// plus, et il n'est même pas celui que l'utilisateur a choisi.
+  Future<void> _switchToAnEngineThatSpeaks(String lang) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (_engineSwitchTried || lang.isEmpty) return;
+    final base = lang.toLowerCase().split(RegExp(r'[-_]')).first;
+    if (base.isEmpty || _deviceVoiceTags.containsKey(base)) return;
+    _engineSwitchTried = true;
+
+    String original = '';
+    try {
+      original = (await _deviceTts.getDefaultEngine)?.toString() ?? '';
+      final raw = await _deviceTts.getEngines;
+      final others = raw is List
+          ? raw.whereType<String>().where((e) => e != original).toList()
+          : const <String>[];
+      if (others.isEmpty) {
+        DebugOverlay.log('tts: aucun autre moteur installé — "$base" restera '
+            'muet jusqu\'à ce que sa voix soit installée');
+        return;
+      }
+      for (final engine in others) {
+        await _deviceTts.setEngine(engine);
+        // L'inventaire des voix appartient au MOTEUR : il faut le relire, sinon
+        // on jugerait le nouveau sur les voix de l'ancien.
+        _deviceVoiceTags = const {};
+        await _readDeviceVoiceLangs();
+        if (_deviceVoiceTags.containsKey(base)) {
+          DebugOverlay.log('tts: moteur → $engine (lui sait dire "$base")');
+          // Deux états à reprendre après une reconstruction du moteur natif :
+          // la langue posée par setLanguage, qu'il ignore, et l'usage audio,
+          // qui vit sur l'instance et repart par défaut.
+          _deviceTtsLang = '';
+          await _applyAndroidTtsRouting();
+          return;
+        }
+      }
+      DebugOverlay.log('tts: aucun moteur ne dit "$base" — retour à $original');
+    } catch (e) {
+      DebugOverlay.log('tts: changement de moteur impossible ($e)');
+    }
+    // Sortie par l'échec ou par l'exception : on rend l'appareil tel qu'il
+    // était, puis on relit son inventaire pour ne pas rester sur celui d'un
+    // moteur qu'on vient d'abandonner.
+    try {
+      if (original.isNotEmpty) await _deviceTts.setEngine(original);
+    } catch (_) {}
+    _deviceVoiceTags = const {};
+    _deviceTtsLang = '';
+    await _readDeviceVoiceLangs();
+    await _applyAndroidTtsRouting();
   }
 
   /// QUEL moteur de synthèse répond, et lesquels sont installés.
