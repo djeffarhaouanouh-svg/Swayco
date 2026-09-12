@@ -60,7 +60,17 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "==> Verification de l'AAB (config reellement compilee ?)" -ForegroundColor Cyan
 $Aab = Join-Path $Root "build\app\outputs\bundle\release\app-release.aab"
-bash (Join-Path $Root "scripts/verify-release.sh") $Aab
+
+# La verification passe par PowerShell quand bash n'est pas la, et c'est le cas
+# de la machine de build Windows : `bash verify-release.sh` n'y demarrait pas du
+# tout, donc la seule garde qui aurait attrape la suspension de 6.1.7 ne
+# tournait jamais pour Android. Un garde-fou qu'on ne peut pas executer n'en est
+# pas un.
+if (Get-Command bash -ErrorAction SilentlyContinue) {
+  bash (Join-Path $Root "scripts/verify-release.sh") $Aab
+} else {
+  & (Join-Path $Root "scripts/verify-release.ps1") $Aab
+}
 
 if ($LASTEXITCODE -ne 0) {
   Write-Host "AAB REFUSE - ne l'envoie pas sur le Play Store." -ForegroundColor Red
