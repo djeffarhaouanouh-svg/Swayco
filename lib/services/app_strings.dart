@@ -423,7 +423,7 @@ abstract final class AppStrings {
     'tip_later': 'Plus tard',
     'swipe_coach_title': 'Glisse pour choisir',
     'swipe_coach_body':
-        'À gauche pour ajouter, à droite pour passer au suivant.',
+        'À droite pour ajouter, à gauche pour passer au suivant.',
     'swipe_coach_like': 'J’aime',
     'swipe_coach_pass': 'Passer',
     'swipe_coach_cta': 'Touche pour continuer',
@@ -1034,7 +1034,7 @@ abstract final class AppStrings {
     'tip_got_it': 'Got it',
     'tip_later': 'Later',
     'swipe_coach_title': 'Swipe to choose',
-    'swipe_coach_body': 'Swipe left to like, right to pass to the next one.',
+    'swipe_coach_body': 'Swipe right to like, left to pass to the next one.',
     'swipe_coach_like': 'Like',
     'swipe_coach_pass': 'Pass',
     'swipe_coach_cta': 'Tap to continue',
@@ -1607,7 +1607,7 @@ abstract final class AppStrings {
     'tip_later': 'Más tarde',
     'swipe_coach_title': 'Desliza para elegir',
     'swipe_coach_body':
-        'Desliza a la izquierda para dar like, a la derecha para pasar al siguiente.',
+        'Desliza a la derecha para dar like, a la izquierda para pasar al siguiente.',
     'swipe_coach_like': 'Me gusta',
     'swipe_coach_pass': 'Pasar',
     'swipe_coach_cta': 'Toca para continuar',
@@ -2135,7 +2135,7 @@ abstract final class AppStrings {
     'tip_later': 'Später',
     'swipe_coach_title': 'Wisch, um zu wählen',
     'swipe_coach_body':
-        'Nach links wischen zum Liken, nach rechts, um zum Nächsten zu wechseln.',
+        'Nach rechts wischen zum Liken, nach links, um zum Nächsten zu wechseln.',
     'swipe_coach_like': 'Gefällt mir',
     'swipe_coach_pass': 'Weiter',
     'swipe_coach_cta': 'Tippen zum Fortfahren',
@@ -2745,7 +2745,7 @@ abstract final class AppStrings {
     'tip_later': 'Più tardi',
     'swipe_coach_title': 'Scorri per scegliere',
     'swipe_coach_body':
-        'Scorri a sinistra per mettere like, a destra per passare al successivo.',
+        'Scorri a destra per mettere like, a sinistra per passare al successivo.',
     'swipe_coach_like': 'Mi piace',
     'swipe_coach_pass': 'Passa',
     'swipe_coach_cta': 'Tocca per continuare',
@@ -3351,7 +3351,7 @@ abstract final class AppStrings {
     'tip_later': 'Mais tarde',
     'swipe_coach_title': 'Deslize para escolher',
     'swipe_coach_body':
-        'Deslize para a esquerda para curtir, para a direita para passar ao próximo.',
+        'Deslize para a direita para curtir, para a esquerda para passar ao próximo.',
     'swipe_coach_like': 'Curtir',
     'swipe_coach_pass': 'Passar',
     'swipe_coach_cta': 'Toque para continuar',
@@ -3958,7 +3958,7 @@ abstract final class AppStrings {
     'tip_later': 'Later',
     'swipe_coach_title': 'Swipe om te kiezen',
     'swipe_coach_body':
-        'Swipe naar links om te liken, naar rechts om door te gaan naar de volgende.',
+        'Swipe naar rechts om te liken, naar links om door te gaan naar de volgende.',
     'swipe_coach_like': 'Vind ik leuk',
     'swipe_coach_pass': 'Overslaan',
     'swipe_coach_cta': 'Tik om door te gaan',
@@ -4555,7 +4555,7 @@ abstract final class AppStrings {
     'tip_later': 'لاحقًا',
     'swipe_coach_title': 'اسحب للاختيار',
     'swipe_coach_body':
-        'اسحب لليسار للإعجاب، ولليمين للانتقال إلى التالي.',
+        'اسحب لليمين للإعجاب، ولليسار للانتقال إلى التالي.',
     'swipe_coach_like': 'إعجاب',
     'swipe_coach_pass': 'تخطي',
     'swipe_coach_cta': 'اضغط للمتابعة',
@@ -5151,7 +5151,7 @@ abstract final class AppStrings {
     'tip_later': 'Позже',
     'swipe_coach_title': 'Свайп, чтобы выбрать',
     'swipe_coach_body':
-        'Свайп влево — лайк, вправо — переход к следующему.',
+        'Свайп вправо — лайк, влево — переход к следующему.',
     'swipe_coach_like': 'Нравится',
     'swipe_coach_pass': 'Пропустить',
     'swipe_coach_cta': 'Нажмите, чтобы продолжить',
@@ -5738,7 +5738,7 @@ abstract final class AppStrings {
     'tip_got_it': '知道了',
     'tip_later': '以后再说',
     'swipe_coach_title': '滑动来选择',
-    'swipe_coach_body': '向左滑动表示喜欢，向右滑动跳到下一个。',
+    'swipe_coach_body': '向右滑动表示喜欢，向左滑动跳到下一个。',
     'swipe_coach_like': '喜欢',
     'swipe_coach_pass': '跳过',
     'swipe_coach_cta': '点击继续',
@@ -6295,7 +6295,7 @@ abstract final class AppStrings {
     'tip_got_it': 'わかりました',
     'tip_later': 'あとで',
     'swipe_coach_title': 'スワイプして選ぼう',
-    'swipe_coach_body': '左にスワイプでいいね、右にスワイプで次の人へ。',
+    'swipe_coach_body': '右にスワイプでいいね、左にスワイプで次の人へ。',
     'swipe_coach_like': 'いいね',
     'swipe_coach_pass': 'パス',
     'swipe_coach_cta': 'タップして続ける',
@@ -6855,7 +6855,7 @@ abstract final class AppStrings {
     'tip_later': '나중에',
     'swipe_coach_title': '스와이프로 선택하기',
     'swipe_coach_body':
-        '왼쪽으로 스와이프하면 좋아요, 오른쪽으로 스와이프하면 다음으로 넘어가요.',
+        '오른쪽으로 스와이프하면 좋아요, 왼쪽으로 스와이프하면 다음으로 넘어가요.',
     'swipe_coach_like': '좋아요',
     'swipe_coach_pass': '패스',
     'swipe_coach_cta': '탭하여 계속하기',

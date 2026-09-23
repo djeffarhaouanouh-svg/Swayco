@@ -2,10 +2,8 @@
 // seule fois : à la toute fin de l'onboarding, quand l'utilisateur arrive
 // sur le Discover pour la première fois.
 //
-// Attention au sens : dans Swayco le geste est INVERSÉ par rapport à la
-// convention Tinder (voir `_onCardSwiped` dans discover_screen.dart) —
-// glisser à GAUCHE, c'est aimer ; à DROITE, c'est passer. L'animation et
-// les textes suivent cette règle, pas l'habitude.
+// Convention Tinder standard (voir `_onCardSwiped` dans discover_screen.dart)
+// — glisser à DROITE, c'est aimer ; à GAUCHE, c'est passer.
 //
 // Le parent affiche l'overlay dans un Stack et le retire dans [onDismiss].
 
@@ -75,7 +73,7 @@ class _SwipeCoachOverlayState extends State<SwipeCoachOverlay>
   }
 
   /// Décalage horizontal de la carte, en px : reprise de la timeline
-  /// d'origine (0-100 %). Négatif d'abord — le like part à gauche.
+  /// d'origine (0-100 %). Négatif d'abord — le refus part à gauche.
   double _cardDx(double t) {
     if (t < 0.12) return 0;
     if (t < 0.30) return _lerp(0, -104, (t - 0.12) / 0.18);
@@ -129,23 +127,23 @@ class _SwipeCoachOverlayState extends State<SwipeCoachOverlay>
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                // Gauche = j'aime.
+                                // Gauche = je passe.
                                 Positioned(
                                   left: 0,
-                                  child: _SideHint(
-                                    icon: Icons.favorite_rounded,
-                                    color: _like,
-                                    label: AppStrings.t('swipe_coach_like'),
-                                    opacity: leftActive,
-                                  ),
-                                ),
-                                // Droite = je passe.
-                                Positioned(
-                                  right: 0,
                                   child: _SideHint(
                                     icon: Icons.close_rounded,
                                     color: _nope,
                                     label: AppStrings.t('swipe_coach_pass'),
+                                    opacity: leftActive,
+                                  ),
+                                ),
+                                // Droite = j'aime.
+                                Positioned(
+                                  right: 0,
+                                  child: _SideHint(
+                                    icon: Icons.favorite_rounded,
+                                    color: _like,
+                                    label: AppStrings.t('swipe_coach_like'),
                                     opacity: rightActive,
                                   ),
                                 ),
