@@ -626,8 +626,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         "(C'est le prénom que les autres verront sur ton profil.)",
     'onb_language_title': 'Quelle langue parles-tu ?',
-    'onb_language_subtitle':
-        "La langue de l'autre personne est détectée automatiquement quand elle rejoint l'appel.",
+    'onb_language_subtitle': 'Utilisée pour traduire pendant tes appels.',
     'onb_first_name_label': 'Prénom',
     'onb_first_name_hint': 'ex. Alex',
     'onb_country_label': 'Pays',
@@ -1233,8 +1232,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         '(This is the first name others will see on your profile.)',
     'onb_language_title': 'What language do you speak?',
-    'onb_language_subtitle':
-        "The other person's language is detected automatically when they join the call.",
+    'onb_language_subtitle': 'Used to translate during your calls.',
     'onb_first_name_label': 'First name',
     'onb_first_name_hint': 'e.g. Alex',
     'onb_country_label': 'Country',
@@ -1757,8 +1755,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         '(Es el nombre que los demás verán en tu perfil.)',
     'onb_language_title': '¿Qué idioma hablas?',
-    'onb_language_subtitle':
-        'El idioma de la otra persona se detecta automáticamente cuando se une a la llamada.',
+    'onb_language_subtitle': 'Se usa para traducir durante tus llamadas.',
     'onb_first_name_label': 'Nombre',
     'onb_first_name_hint': 'ej. Alex',
     'onb_country_label': 'País',
@@ -2270,7 +2267,7 @@ abstract final class AppStrings {
         '(Das ist der Vorname, den andere auf deinem Profil sehen.)',
     'onb_language_title': 'Welche Sprache sprichst du?',
     'onb_language_subtitle':
-        'Die Sprache der anderen Person wird automatisch erkannt, wenn sie dem Anruf beitritt.',
+        'Wird verwendet, um deine Anrufe zu übersetzen.',
     'onb_first_name_label': 'Vorname',
     'onb_first_name_hint': 'z.B. Alex',
     'onb_next': 'Weiter',
@@ -2878,8 +2875,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         '(È il nome che gli altri vedranno sul tuo profilo.)',
     'onb_language_title': 'Che lingua parli?',
-    'onb_language_subtitle':
-        "La lingua dell'altra persona viene rilevata automaticamente quando si unisce alla chiamata.",
+    'onb_language_subtitle': 'Usata per tradurre durante le tue chiamate.',
     'onb_first_name_label': 'Nome',
     'onb_first_name_hint': 'es. Alex',
     'onb_next': 'Avanti',
@@ -3483,8 +3479,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         '(É o nome que os outros vão ver no teu perfil.)',
     'onb_language_title': 'Que língua falas?',
-    'onb_language_subtitle':
-        'A língua da outra pessoa é detetada automaticamente quando entra na chamada.',
+    'onb_language_subtitle': 'Usada para traduzir durante as tuas chamadas.',
     'onb_first_name_label': 'Primeiro nome',
     'onb_first_name_hint': 'ex. Alex',
     'onb_next': 'Seguinte',
@@ -4092,7 +4087,7 @@ abstract final class AppStrings {
         '(Dit is de voornaam die anderen op je profiel zien.)',
     'onb_language_title': 'Welke taal spreek je?',
     'onb_language_subtitle':
-        'De taal van de andere persoon wordt automatisch herkend wanneer diegene deelneemt aan het gesprek.',
+        'Wordt gebruikt om te vertalen tijdens je gesprekken.',
     'onb_first_name_label': 'Voornaam',
     'onb_first_name_hint': 'bijv. Alex',
     'onb_next': 'Volgende',
@@ -4686,8 +4681,7 @@ abstract final class AppStrings {
     'onb_welcome_hint':
         '(هذا الاسم الذي سيراه الآخرون على ملفك.)',
     'onb_language_title': 'ما اللغة التي تتحدثها؟',
-    'onb_language_subtitle':
-        'يتم اكتشاف لغة الشخص الآخر تلقائياً عند انضمامه إلى المكالمة.',
+    'onb_language_subtitle': 'تُستخدم للترجمة أثناء مكالماتك.',
     'onb_first_name_label': 'الاسم الأول',
     'onb_first_name_hint': 'مثل أليكس',
     'onb_next': 'التالي',
@@ -5286,7 +5280,7 @@ abstract final class AppStrings {
         '(Это имя, которое другие увидят в твоём профиле.)',
     'onb_language_title': 'На каком языке ты говоришь?',
     'onb_language_subtitle':
-        'Язык собеседника определяется автоматически, когда тот присоединяется к звонку.',
+        'Используется для перевода во время звонков.',
     'onb_first_name_label': 'Имя',
     'onb_first_name_hint': 'напр. Alex',
     'onb_next': 'Далее',
@@ -5858,7 +5852,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': '希望我们怎么称呼你？',
     'onb_welcome_hint': '（这是其他人会在你资料上看到的名字。）',
     'onb_language_title': '你说哪种语言？',
-    'onb_language_subtitle': '对方加入通话时，其语言会自动检测。',
+    'onb_language_subtitle': '用于在通话中进行翻译。',
     'onb_first_name_label': '名字',
     'onb_first_name_hint': '例如 Alex',
     'onb_next': '下一步',
@@ -6415,7 +6409,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': 'なんて呼べばいい？',
     'onb_welcome_hint': '（プロフィールに表示される名前です。）',
     'onb_language_title': 'どの言語を話しますか？',
-    'onb_language_subtitle': '相手の言語は、通話に参加したときに自動的に検出されます。',
+    'onb_language_subtitle': '通話中の翻訳に使われます。',
     'onb_first_name_label': '名前',
     'onb_first_name_hint': '例: Alex',
     'onb_next': '次へ',
@@ -6975,7 +6969,7 @@ abstract final class AppStrings {
     'onb_welcome_subtitle': '어떻게 불러드릴까요?',
     'onb_welcome_hint': '(다른 사람이 프로필에서 보게 될 이름이에요.)',
     'onb_language_title': '어떤 언어를 하나요?',
-    'onb_language_subtitle': '상대방의 언어는 통화에 참여할 때 자동으로 감지됩니다.',
+    'onb_language_subtitle': '통화 중 번역에 사용돼요.',
     'onb_first_name_label': '이름',
     'onb_first_name_hint': '예: Alex',
     'onb_next': '다음',
