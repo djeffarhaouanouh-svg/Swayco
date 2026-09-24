@@ -27,9 +27,8 @@ Future<void> showPaywallSheet(BuildContext context) {
 /// Subscription paywall — Swayco "Midnight" reskin of the classic store
 /// layout, presented as a bottom sheet: grab handle + close, a
 /// social-proof pill, a bold headline + value prop, the logo as hero
-/// art, a stack of radio-selectable plan cards (prices mirror the
-/// profile tiers), a single CTA acting on the selected plan, and the
-/// legal / restore footer.
+/// art, the single Pro plan card (price from the store via RevenueCat),
+/// the subscribe CTA, and the legal / restore footer.
 ///
 /// Dark navy surface, hairline grey card borders, cyan accent on the
 /// selected card + CTA — matching [SC] everywhere instead of the pink
@@ -42,48 +41,39 @@ class _PaywallSheet extends StatefulWidget {
 }
 
 class _PaywallSheetState extends State<_PaywallSheet> {
-  /// Currently highlighted plan (cyan border + filled radio + cyan
-  /// price). Defaults to the entry paid tier — the subscribe CTA
-  /// converts best anchored on the cheaper recurring plan, with the
-  /// pricier tier sitting just above as an upsell.
-  String _selected = 'plus';
+  /// Backend tier the web Stripe checkout sells for the Pro plan.
+  static const String _stripeTier = 'plus';
 
   bool _busy = false;
 
-  // Plan copy. Prices are the single source of truth shared with the
-  // profile tier ladder — keep them in sync (9,99 / 15,99).
-  static const List<_Plan> _plans = [
-    _Plan(
-      tier: 'plus',
-      name: 'Plus',
-      price: '9,99 €',
-      // Sublabel resolved at render via AppStrings; highlighted (cyan)
-      // fragments are wrapped in *asterisks* and split out at render time.
-      subKey: 'paywall_plus_sub',
-      popular: true,
-    ),
-    _Plan(
-      tier: 'ultra_plus',
-      name: 'Ultra Plus',
-      price: '15,99 €',
-      subKey: 'paywall_ultra_sub',
-      popular: false,
-    ),
-  ];
+  /// Store-localized price from RevenueCat ("6,99 €"). Null while loading,
+  /// on web (Stripe shows its own price) or when the package can't load.
+  String? _price;
 
-  /// Maps a paywall plan tier to its RevenueCat product + entitlement id.
-  /// Plus (9,99 €) = the "pro" product; Ultra Plus (15,99 €) = "ultra".
-  ({String productId, String entitlement}) _rcFor(String tier) =>
-      tier == 'ultra_plus'
-          ? (productId: 'ultra_monthly', entitlement: 'ultra')
-          : (productId: 'pro_monthly', entitlement: 'pro');
+  @override
+  void initState() {
+    super.initState();
+    if (RevenueCat.isSupported) {
+      RevenueCat.priceOf(RevenueCat.proPackageId).then((p) {
+        if (mounted) setState(() => _price = p);
+      });
+    }
+  }
+
+  _Plan get _plan => _Plan(
+    name: 'Pro',
+    price: _price,
+    // Highlighted (cyan) fragments are wrapped in *asterisks*.
+    subKey: 'paywall_plus_sub',
+  );
 
   Future<void> _subscribe() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      // Mobile (iOS/Android) → RevenueCat / native store. Web → Stripe.
-      if (RevenueCat.isConfigured) {
+      // iOS/Android → always the native store (Stripe is forbidden there,
+      // even if RevenueCat failed to configure). Web/desktop → Stripe.
+      if (RevenueCat.isSupported) {
         await _subscribeViaStore();
       } else {
         await _subscribeViaStripe();
@@ -94,10 +84,9 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   }
 
   Future<void> _subscribeViaStore() async {
-    final rc = _rcFor(_selected);
-    final outcome = await RevenueCat.purchaseProduct(
-      productId: rc.productId,
-      entitlementId: rc.entitlement,
+    final outcome = await RevenueCat.purchasePackage(
+      packageId: RevenueCat.proPackageId,
+      entitlementId: RevenueCat.proEntitlementId,
     );
     if (!mounted) return;
     if (outcome == PurchaseOutcome.success) {
@@ -118,7 +107,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   }
 
   Future<void> _subscribeViaStripe() async {
-    final url = await StripeApi.startCheckout(_selected);
+    final url = await StripeApi.startCheckout(_stripeTier);
     if (!mounted) return;
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,12 +139,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// toast on native where the portal is unavailable.
   Future<void> _restore() async {
     // Mobile → RevenueCat restore. Web → the Stripe customer portal.
-    if (RevenueCat.isConfigured) {
+    if (RevenueCat.isSupported) {
       setState(() => _busy = true);
       final active = await RevenueCat.restoreEntitlements();
       if (!mounted) return;
       setState(() => _busy = false);
-      if (active.isNotEmpty) {
+      if (active.contains(RevenueCat.proEntitlementId)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppStrings.t('paywall_snack_restored'))),
         );
@@ -197,8 +186,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// cancellation terms — shown on the paywall, next to the functional
   /// Conditions / Confidentialité links in the footer below.
   Widget _legalDisclosure() {
-    final period = AppStrings.t('paywall_period_month');
-    final tiers = _plans.map((p) => '${p.name} ${p.price}$period').join(', ');
+    final plan = _plan;
+    final tiers = plan.price == null
+        ? plan.name
+        : '${plan.name} ${plan.price}${AppStrings.t('paywall_period_month')}';
     return Text(
       AppStrings.t(
         'paywall_legal',
@@ -298,15 +289,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     const SizedBox(height: 22),
                     const _HeroLogo(),
                     const SizedBox(height: 26),
-                    for (var i = 0; i < _plans.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 14),
-                      _PlanTile(
-                        plan: _plans[i],
-                        selected: _selected == _plans[i].tier,
-                        onTap: () =>
-                            setState(() => _selected = _plans[i].tier),
-                      ),
-                    ],
+                    _PlanTile(plan: _plan),
                     const SizedBox(height: 18),
                     _legalDisclosure(),
                   ],
@@ -383,19 +366,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
 /// Plain data holder for a single plan row.
 class _Plan {
   const _Plan({
-    required this.tier,
     required this.name,
     required this.price,
     required this.subKey,
-    required this.popular,
   });
 
-  final String tier;
   final String name;
-  final String price;
+  /// Store-localized price; null hides the price column.
+  final String? price;
   /// AppStrings key for the localized sublabel (with *highlight* markers).
   final String subKey;
-  final bool popular;
 }
 
 /// Social-proof chip at the top — glass pill, cyan verified badge.
@@ -459,39 +439,26 @@ class _HeroLogo extends StatelessWidget {
   }
 }
 
-/// One selectable plan card: radio on the left, name + sub-label
-/// in the middle, price on the right. Selected → cyan border, faint cyan
-/// fill, filled radio, cyan price.
+/// The plan card: tick on the left, name + sub-label in the middle, price
+/// on the right, drawn in the selected style (cyan border, faint cyan fill).
 class _PlanTile extends StatelessWidget {
-  const _PlanTile({
-    required this.plan,
-    required this.selected,
-    required this.onTap,
-  });
+  const _PlanTile({required this.plan});
 
   final _Plan plan;
-  final bool selected;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOut,
+    final price = plan.price;
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: selected
-            ? SC.accent.withValues(alpha: 0.08)
-            : SC.glassStrong,
+        color: SC.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: selected ? SC.accent : const Color(0xFF2A3942),
-          width: selected ? 1.6 : 1,
-        ),
+        border: Border.all(color: SC.accent, width: 1.6),
       ),
       child: Row(
         children: [
-          _Radio(selected: selected),
+          const _Radio(selected: true),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -510,69 +477,32 @@ class _PlanTile extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                plan.price,
-                style: TextStyle(
-                  color: selected ? SC.accent : SC.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
+          if (price != null) ...[
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  price,
+                  style: const TextStyle(
+                    color: SC.accent,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              Text(
-                AppStrings.t('paywall_period_month'),
-                style: const TextStyle(
-                  color: SC.textMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                Text(
+                  AppStrings.t('paywall_period_month'),
+                  style: const TextStyle(
+                    color: SC.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
-    );
-
-    final tappable = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: card,
-      ),
-    );
-
-    if (!plan.popular) return tappable;
-
-    // "Populaire" ribbon clipped to the top-right corner of the card.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        tappable,
-        Positioned(
-          top: -10,
-          right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: SC.accent,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              AppStrings.t('paywall_popular'),
-              style: const TextStyle(
-                color: SC.bgDeep,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.4,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

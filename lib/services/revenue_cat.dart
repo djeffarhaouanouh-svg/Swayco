@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -26,6 +28,15 @@ abstract final class RevenueCat {
 
   /// Android public SDK key (from the RevenueCat dashboard → API keys → Google).
   static const String _googleApiKey = 'goog_peRXRVHvLKErMZAtOqvGlbPuBvu';
+
+  /// Package identifier in the RevenueCat offering — the same on both stores
+  /// (iOS product `pro_monthly`, Android `pro_monthly:monthly`).
+  static const String proPackageId = 'pro_monthly';
+  static const String proEntitlementId = 'pro';
+
+  /// Whether the `pro` entitlement is active for the current store user. Kept
+  /// current by the SDK listener and after every purchase / restore / login.
+  static final ValueNotifier<bool> proActive = ValueNotifier(false);
 
   static bool _configured = false;
 
@@ -56,6 +67,8 @@ abstract final class RevenueCat {
         PurchasesConfiguration(apiKey)..appUserID = appUserId,
       );
       _configured = true;
+      Purchases.addCustomerInfoUpdateListener(_onCustomerInfo);
+      unawaited(Purchases.getCustomerInfo().then(_onCustomerInfo, onError: (_) {}));
       debugPrint('RevenueCat configured (appUserID=${appUserId ?? '<anon>'})');
     } catch (e) {
       debugPrint('RevenueCat configure failed: $e');
@@ -66,7 +79,7 @@ abstract final class RevenueCat {
   static Future<void> identify(String userId) async {
     if (!_configured || userId.isEmpty) return;
     try {
-      await Purchases.logIn(userId);
+      _onCustomerInfo((await Purchases.logIn(userId)).customerInfo);
     } catch (e) {
       debugPrint('RevenueCat logIn failed: $e');
     }
@@ -75,6 +88,7 @@ abstract final class RevenueCat {
   /// Detach the user on sign-out (reverts to an anonymous RevenueCat id).
   static Future<void> logOut() async {
     if (!_configured) return;
+    proActive.value = false;
     try {
       await Purchases.logOut();
     } catch (e) {
@@ -109,24 +123,39 @@ abstract final class RevenueCat {
     }
   }
 
-  /// High-level purchase: find the package whose store product is [productId]
-  /// in the current offering, buy it, and report whether [entitlementId] is
-  /// active afterwards. Keeps `purchases_flutter` types out of the UI.
-  static Future<PurchaseOutcome> purchaseProduct({
-    required String productId,
+  /// The package whose RevenueCat identifier is [packageId] in the current
+  /// offering. Matched on the package id, never the store product id, which
+  /// differs per store (Android appends the base plan: `pro_monthly:monthly`).
+  static Future<Package?> _package(String packageId) async {
+    final packages = await fetchPackages();
+    for (final p in packages) {
+      if (p.identifier == packageId) return p;
+    }
+    debugPrint(
+      'RevenueCat: package "$packageId" not in current offering '
+      '(has: ${packages.map((p) => p.identifier).join(', ')})',
+    );
+    return null;
+  }
+
+  /// Store-localized price of [packageId] (e.g. "6,99 €"), or null when the
+  /// package can't be loaded.
+  static Future<String?> priceOf(String packageId) async =>
+      (await _package(packageId))?.storeProduct.priceString;
+
+  /// High-level purchase: buy the offering package [packageId] and report
+  /// whether [entitlementId] is active afterwards. Keeps `purchases_flutter`
+  /// types out of the UI.
+  static Future<PurchaseOutcome> purchasePackage({
+    required String packageId,
     required String entitlementId,
   }) async {
     if (!_configured) return PurchaseOutcome.unavailable;
-    Package? pkg;
-    for (final p in await fetchPackages()) {
-      if (p.storeProduct.identifier == productId) {
-        pkg = p;
-        break;
-      }
-    }
+    final pkg = await _package(packageId);
     if (pkg == null) return PurchaseOutcome.unavailable;
     try {
       final result = await Purchases.purchase(PurchaseParams.package(pkg));
+      _onCustomerInfo(result.customerInfo);
       return result.customerInfo.entitlements.active.containsKey(entitlementId)
           ? PurchaseOutcome.success
           : PurchaseOutcome.error;
@@ -155,11 +184,12 @@ abstract final class RevenueCat {
   }
 
   /// Restore purchases and return the set of entitlement ids active after —
-  /// e.g. `{'pro'}` or `{'ultra'}`. Empty when nothing to restore.
+  /// e.g. `{'pro'}`. Empty when nothing to restore.
   static Future<Set<String>> restoreEntitlements() async {
     if (!_configured) return const {};
     try {
       final info = await Purchases.restorePurchases();
+      _onCustomerInfo(info);
       return info.entitlements.active.keys.toSet();
     } catch (e) {
       debugPrint('RevenueCat restore failed: $e');
@@ -177,5 +207,9 @@ abstract final class RevenueCat {
       debugPrint('RevenueCat getCustomerInfo failed: $e');
       return false;
     }
+  }
+
+  static void _onCustomerInfo(CustomerInfo info) {
+    proActive.value = info.entitlements.active.containsKey(proEntitlementId);
   }
 }
