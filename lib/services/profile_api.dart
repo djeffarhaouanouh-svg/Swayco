@@ -1386,6 +1386,9 @@ abstract final class ProfileApi {
   ///   • peers with hide_from_country=true AND a matching language
   ///     excluded — opt-out can't be bypassed by a tampered client
   ///     because the rows never leave the database.
+  /// [countries] filters to peers whose actual `profiles.country` is one of
+  /// the given values (the globe picker) — independent of [languages], which
+  /// exists separately for the language-based privacy heuristic above.
   ///
   /// The composite scoring lives client-side: it carries a random
   /// jitter between refreshes and only affects display order, so
@@ -1394,6 +1397,7 @@ abstract final class ProfileApi {
     required String myId,
     int limit = 50,
     List<String>? languages,
+    List<String>? countries,
   }) async {
     if (!isSupabaseReady || myId.isEmpty) return const [];
     try {
@@ -1402,12 +1406,18 @@ abstract final class ProfileApi {
           .where((l) => l.isNotEmpty)
           .toSet()
           .toList();
+      final countryList = (countries ?? const <String>[])
+          .map((c) => c.trim().toLowerCase())
+          .where((c) => c.isNotEmpty)
+          .toSet()
+          .toList();
       final result = await _c.rpc(
         'discover_feed',
         params: {
           'p_user_id': myId,
           'p_limit': limit,
           if (langs.isNotEmpty) 'p_languages': langs,
+          if (countryList.isNotEmpty) 'p_countries': countryList,
         },
       );
       if (result is! List) return const [];

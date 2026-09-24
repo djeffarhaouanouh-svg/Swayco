@@ -111,6 +111,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'On a besoin du micro pour qu\'on t\'entende pendant l\'appel.',
     'mic_prime_enable': 'Autoriser',
+    'location_prime_title': 'Ta position',
+    'location_prime_body':
+        'On l\'utilise pour deviner ton pays et te proposer des rencontres ailleurs dans le monde — jamais partagée publiquement.',
+    'location_prime_enable': 'Autoriser',
     'speech_prime_title': 'Reconnaissance vocale',
     'speech_prime_body':
         'On a besoin de la reconnaissance vocale pour traduire ce que tu dis pendant l\'appel.',
@@ -663,6 +667,11 @@ abstract final class AppStrings {
     'onb_profile_title': 'Profil',
     'onb_translation_help':
         "En appel, on traduira automatiquement la voix de l'autre dans ta langue, et la tienne dans la sienne.",
+    'onb_location_title': 'Où es-tu ?',
+    'onb_location_subtitle':
+        'On s\'en sert pour te faire découvrir des gens ailleurs dans le monde.',
+    'onb_location_autodetect': 'Détecter ma position',
+    'onb_location_manual': 'Choisir manuellement',
     'onb_gender_title': 'Toi, c\'est…',
     'onb_gender_subtitle':
         "Ça nous aide à personnaliser ton expérience sur Swayco.",
@@ -741,6 +750,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'We need the mic so the other person can hear you during the call.',
     'mic_prime_enable': 'Allow',
+    'location_prime_title': 'Your location',
+    'location_prime_body':
+        'We use it to guess your country and show you people from elsewhere in the world — never shared publicly.',
+    'location_prime_enable': 'Allow',
     'speech_prime_title': 'Speech recognition',
     'speech_prime_body':
         'We need speech recognition to translate what you say during the call.',
@@ -1279,6 +1292,11 @@ abstract final class AppStrings {
     'onb_profile_title': 'Profile',
     'onb_translation_help':
         "In a call, we'll automatically translate the other person's voice into your language and yours into theirs.",
+    'onb_location_title': 'Where are you?',
+    'onb_location_subtitle':
+        'We use this to show you people from elsewhere in the world.',
+    'onb_location_autodetect': 'Detect my location',
+    'onb_location_manual': 'Choose manually',
     'onb_gender_title': 'You are…',
     'onb_gender_subtitle':
         'This helps us personalize your experience on Swayco.',
@@ -1357,6 +1375,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Necesitamos el micrófono para que te oigan durante la llamada.',
     'mic_prime_enable': 'Permitir',
+    'location_prime_title': 'Tu ubicación',
+    'location_prime_body':
+        'La usamos para adivinar tu país y mostrarte gente de otras partes del mundo — nunca se comparte públicamente.',
+    'location_prime_enable': 'Permitir',
     'speech_prime_title': 'Reconocimiento de voz',
     'speech_prime_body':
         'Necesitamos el reconocimiento de voz para traducir lo que dices durante la llamada.',
@@ -1916,6 +1938,11 @@ abstract final class AppStrings {
     'forgot_pw_subtitle':
         'Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña.',
     'forgot_pw_cta': 'Enviar',
+    'onb_location_title': '¿Dónde estás?',
+    'onb_location_subtitle':
+        'Lo usamos para mostrarte gente de otras partes del mundo.',
+    'onb_location_autodetect': 'Detectar mi ubicación',
+    'onb_location_manual': 'Elegir manualmente',
     'onb_gender_title': 'Eres…',
     'onb_gender_subtitle':
         'Nos ayuda a personalizar tu experiencia en Swayco.',
@@ -1973,6 +2000,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Wir brauchen das Mikrofon, damit man dich im Anruf hört.',
     'mic_prime_enable': 'Erlauben',
+    'location_prime_title': 'Dein Standort',
+    'location_prime_body':
+        'Wir nutzen ihn, um dein Land zu erkennen und dir Leute aus anderen Teilen der Welt zu zeigen — nie öffentlich sichtbar.',
+    'location_prime_enable': 'Erlauben',
     'speech_prime_title': 'Spracherkennung',
     'speech_prime_body':
         'Wir brauchen die Spracherkennung, um zu übersetzen, was du im Anruf sagst.',
@@ -2538,6 +2569,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'Stadt auswählen',
     'loc_other_city': 'Andere Stadt…',
     'loc_other_city_hint': 'Gib deine Stadt ein',
+    'onb_location_title': 'Wo bist du?',
+    'onb_location_subtitle':
+        'Damit zeigen wir dir Leute aus anderen Teilen der Welt.',
+    'onb_location_autodetect': 'Standort erkennen',
+    'onb_location_manual': 'Manuell auswählen',
     'onb_gender_title': 'Du bist…',
     'onb_gender_subtitle':
         'Das hilft uns, dein Erlebnis auf Swayco persönlicher zu machen.',
@@ -2595,6 +2631,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Ci serve il microfono perché ti sentano durante la chiamata.',
     'mic_prime_enable': 'Consenti',
+    'location_prime_title': 'La tua posizione',
+    'location_prime_body':
+        'La usiamo per capire il tuo paese e mostrarti persone da altre parti del mondo — mai condivisa pubblicamente.',
+    'location_prime_enable': 'Consenti',
     'speech_prime_title': 'Riconoscimento vocale',
     'speech_prime_body':
         'Ci serve il riconoscimento vocale per tradurre quello che dici durante la chiamata.',
@@ -3153,6 +3193,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'Scegli una città',
     'loc_other_city': 'Altra città…',
     'loc_other_city_hint': 'Inserisci la tua città',
+    'onb_location_title': 'Dove sei?',
+    'onb_location_subtitle':
+        'Lo usiamo per mostrarti persone da altre parti del mondo.',
+    'onb_location_autodetect': 'Rileva la mia posizione',
+    'onb_location_manual': 'Scegli manualmente',
     'onb_gender_title': 'Tu sei…',
     'onb_gender_subtitle':
         'Ci aiuta a personalizzare la tua esperienza su Swayco.',
@@ -3209,6 +3254,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'Precisamos do microfone para que te oiçam durante a chamada.',
     'mic_prime_enable': 'Permitir',
+    'location_prime_title': 'Sua localização',
+    'location_prime_body':
+        'Usamos para descobrir seu país e mostrar pessoas de outras partes do mundo — nunca compartilhada publicamente.',
+    'location_prime_enable': 'Permitir',
     'speech_prime_title': 'Reconhecimento de voz',
     'speech_prime_body':
         'Precisamos do reconhecimento de voz para traduzir o que dizes durante a chamada.',
@@ -3768,6 +3817,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'Escolher uma cidade',
     'loc_other_city': 'Outra cidade…',
     'loc_other_city_hint': 'Introduza a sua cidade',
+    'onb_location_title': 'Onde você está?',
+    'onb_location_subtitle':
+        'Usamos isso para mostrar pessoas de outras partes do mundo.',
+    'onb_location_autodetect': 'Detectar minha localização',
+    'onb_location_manual': 'Escolher manualmente',
     'onb_gender_title': 'Tu és…',
     'onb_gender_subtitle':
         'Ajuda-nos a personalizar a tua experiência no Swayco.',
@@ -3824,6 +3878,10 @@ abstract final class AppStrings {
     'mic_prime_body':
         'We hebben de microfoon nodig zodat men je hoort tijdens het gesprek.',
     'mic_prime_enable': 'Toestaan',
+    'location_prime_title': 'Je locatie',
+    'location_prime_body':
+        'We gebruiken dit om je land te bepalen en je mensen uit andere delen van de wereld te tonen — nooit publiek gedeeld.',
+    'location_prime_enable': 'Toestaan',
     'speech_prime_title': 'Spraakherkenning',
     'speech_prime_body':
         'We hebben spraakherkenning nodig om te vertalen wat je tijdens het gesprek zegt.',
@@ -4384,6 +4442,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'Een stad kiezen',
     'loc_other_city': 'Andere stad…',
     'loc_other_city_hint': 'Voer je stad in',
+    'onb_location_title': 'Waar ben je?',
+    'onb_location_subtitle':
+        'We gebruiken dit om je mensen uit andere delen van de wereld te laten ontdekken.',
+    'onb_location_autodetect': 'Mijn locatie detecteren',
+    'onb_location_manual': 'Handmatig kiezen',
     'onb_gender_title': 'Jij bent…',
     'onb_gender_subtitle':
         'Dit helpt ons je ervaring op Swayco persoonlijker te maken.',
@@ -4438,6 +4501,10 @@ abstract final class AppStrings {
     'mic_prime_title': 'الوصول إلى الميكروفون',
     'mic_prime_body': 'نحتاج إلى الميكروفون كي يسمعك الطرف الآخر أثناء المكالمة.',
     'mic_prime_enable': 'السماح',
+    'location_prime_title': 'موقعك',
+    'location_prime_body':
+        'نستخدمه لتحديد بلدك وعرض أشخاص من أماكن أخرى حول العالم — لا يُشارك علنًا أبدًا.',
+    'location_prime_enable': 'السماح',
     'speech_prime_title': 'التعرف على الصوت',
     'speech_prime_body': 'نحتاج إلى التعرف على الصوت لترجمة ما تقوله أثناء المكالمة.',
     'speech_prime_enable': 'السماح',
@@ -4983,6 +5050,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'اختر مدينة',
     'loc_other_city': 'مدينة أخرى…',
     'loc_other_city_hint': 'أدخل مدينتك',
+    'onb_location_title': 'أين أنت؟',
+    'onb_location_subtitle':
+        'نستخدم هذا لعرض أشخاص من أماكن أخرى حول العالم.',
+    'onb_location_autodetect': 'كشف موقعي',
+    'onb_location_manual': 'الاختيار يدويًا',
     'onb_gender_title': 'أنت…',
     'onb_gender_subtitle':
         'يساعدنا ذلك على تخصيص تجربتك على Swayco.',
@@ -5038,6 +5110,10 @@ abstract final class AppStrings {
     'mic_prime_title': 'Доступ к микрофону',
     'mic_prime_body': 'Микрофон нужен, чтобы тебя слышали во время звонка.',
     'mic_prime_enable': 'Разрешить',
+    'location_prime_title': 'Твоё местоположение',
+    'location_prime_body':
+        'Мы используем его, чтобы определить твою страну и показать людей из других стран — никогда не публикуется.',
+    'location_prime_enable': 'Разрешить',
     'speech_prime_title': 'Распознавание речи',
     'speech_prime_body':
         'Распознавание речи нужно, чтобы переводить то, что ты говоришь во время звонка.',
@@ -5596,6 +5672,11 @@ abstract final class AppStrings {
     'loc_choose_city': 'Выберите город',
     'loc_other_city': 'Другой город…',
     'loc_other_city_hint': 'Введите свой город',
+    'onb_location_title': 'Где ты?',
+    'onb_location_subtitle':
+        'Это поможет показать тебе людей из других стран мира.',
+    'onb_location_autodetect': 'Определить моё местоположение',
+    'onb_location_manual': 'Выбрать вручную',
     'onb_gender_title': 'Вы…',
     'onb_gender_subtitle':
         'Это помогает персонализировать твой опыт в Swayco.',
@@ -5649,6 +5730,9 @@ abstract final class AppStrings {
     'mic_prime_title': '麦克风权限',
     'mic_prime_body': '通话时需要麦克风，对方才能听到你。',
     'mic_prime_enable': '允许',
+    'location_prime_title': '你的位置',
+    'location_prime_body': '我们用它来判断你所在的国家，向你展示世界各地的人——绝不会公开分享。',
+    'location_prime_enable': '允许',
     'speech_prime_title': '语音识别',
     'speech_prime_body': '需要语音识别来翻译你在通话中说的话。',
     'speech_prime_enable': '允许',
@@ -6156,6 +6240,10 @@ abstract final class AppStrings {
     'loc_choose_city': '选择城市',
     'loc_other_city': '其他城市…',
     'loc_other_city_hint': '输入你的城市',
+    'onb_location_title': '你在哪里？',
+    'onb_location_subtitle': '我们用它向你展示世界各地的人。',
+    'onb_location_autodetect': '检测我的位置',
+    'onb_location_manual': '手动选择',
     'onb_gender_title': '你是…',
     'onb_gender_subtitle': '这能帮助我们为你个性化 Swayco 体验。',
     'onb_gender_male': '男性',
@@ -6228,6 +6316,9 @@ abstract final class AppStrings {
     'mic_prime_title': 'マイクへのアクセス',
     'mic_prime_body': '通話中に声を届けるためにマイクが必要です。',
     'mic_prime_enable': '許可',
+    'location_prime_title': '位置情報',
+    'location_prime_body': 'あなたの国を判定し、世界の他の場所の人を紹介するために使います。公開されることはありません。',
+    'location_prime_enable': '許可',
     'speech_prime_title': '音声認識',
     'speech_prime_body': '通話中に話した内容を翻訳するために音声認識が必要です。',
     'speech_prime_enable': '許可',
@@ -6727,6 +6818,10 @@ abstract final class AppStrings {
     'loc_choose_city': '都市を選択',
     'loc_other_city': 'その他の都市…',
     'loc_other_city_hint': '都市名を入力',
+    'onb_location_title': 'どこにいますか？',
+    'onb_location_subtitle': '世界の他の場所にいる人を紹介するために使います。',
+    'onb_location_autodetect': '現在地を検出',
+    'onb_location_manual': '手動で選択',
     'onb_gender_title': 'あなたは…',
     'onb_gender_subtitle': 'Swaycoでの体験をあなた向けにカスタマイズするのに役立ちます。',
     'onb_gender_male': '男性',
@@ -6779,6 +6874,9 @@ abstract final class AppStrings {
     'mic_prime_title': '마이크 접근',
     'mic_prime_body': '통화 중 상대가 당신의 목소리를 들으려면 마이크가 필요해요.',
     'mic_prime_enable': '허용',
+    'location_prime_title': '위치 정보',
+    'location_prime_body': '당신의 국가를 파악해 세계 다른 곳의 사람들을 보여주는 데 사용해요. 공개적으로 공유되지 않아요.',
+    'location_prime_enable': '허용',
     'speech_prime_title': '음성 인식',
     'speech_prime_body': '통화 중 말하는 내용을 번역하려면 음성 인식이 필요해요.',
     'speech_prime_enable': '허용',
@@ -7293,6 +7391,10 @@ abstract final class AppStrings {
     'loc_choose_city': '도시 선택',
     'loc_other_city': '다른 도시…',
     'loc_other_city_hint': '도시를 입력하세요',
+    'onb_location_title': '어디에 있나요?',
+    'onb_location_subtitle': '세계 다른 곳의 사람들을 보여주는 데 사용해요.',
+    'onb_location_autodetect': '내 위치 감지',
+    'onb_location_manual': '직접 선택',
     'onb_gender_title': '당신은…',
     'onb_gender_subtitle': 'Swayco 경험을 더 개인화하는 데 도움이 돼요.',
     'onb_gender_male': '남성',

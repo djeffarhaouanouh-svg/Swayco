@@ -9,6 +9,8 @@ import '../services/auth_service.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/local_notifications.dart';
+import '../services/onboarding_location.dart';
+import '../services/permission_priming.dart';
 import '../services/persona_categories.dart';
 import '../services/profile_api.dart';
 import '../services/supabase_service.dart';
@@ -73,15 +75,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   /// [_genderAlreadySet].
   bool _personaAlreadySet = false;
 
+  /// Set in [_prefill] from [UserPrefs.isLocationSet]. When true the
+  /// location page is omitted from the flow, mirroring [_genderAlreadySet].
+  bool _locationAlreadySet = false;
+
+  /// True while [OnboardingLocation.detectCountry] is running, so the
+  /// location step can show a spinner instead of a dead tap target.
+  bool _locating = false;
+
   int _page = 0;
 
   /// Total pages shown in the first-run wizard:
-  ///   Welcome(0) · Language(1) · [Gender] · [PersonaCategory]
-  /// Gender and PersonaCategory are each omitted once already known, so the
-  /// count flexes by up to two. City and interests are edited later from the
+  ///   Welcome(0) · Language(1) · [Location] · [Gender] · [PersonaCategory]
+  /// Location, Gender and PersonaCategory are each omitted once already
+  /// known, so the count flexes. Interests are edited later from the
   /// profile, not here.
   int get _pageCount =>
-      2 + (_personaAlreadySet ? 0 : 1) + (_genderAlreadySet ? 0 : 1);
+      2 +
+      (_locationAlreadySet ? 0 : 1) +
+      (_personaAlreadySet ? 0 : 1) +
+      (_genderAlreadySet ? 0 : 1);
 
   @override
   void initState() {
@@ -114,10 +127,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final snap = await UserPrefs.loadProfile();
     final genderAlready = await UserPrefs.isGenderSet();
     final personaAlready = await UserPrefs.isPersonaCategorySet();
+    final locationAlready = await UserPrefs.isLocationSet();
     if (!mounted) return;
     if (snap != null) {
       setState(() {
         _nameCtrl.text = snap.firstName;
+        if (snap.country.isNotEmpty) _countryCtrl.text = snap.country;
       });
     }
     // Brand-new social sign-in: no local profile yet, but Google/Apple handed
@@ -162,6 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       setState(() {
         _genderAlreadySet = genderAlready;
         _personaAlreadySet = personaAlready;
+        _locationAlreadySet = locationAlready;
         _prefillDone = true;
       });
     }
@@ -221,6 +237,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     });
   }
 
+  /// GPS auto-detect for the new onboarding location step: prime, request,
+  /// resolve. Any failure (denied, no fix, unsupported country) just leaves
+  /// [_countryCtrl] empty — the step's "Choisir manuellement" link (which
+  /// reuses [_openLocationPicker]) is always there as a fallback, so
+  /// onboarding can never get stuck on this.
+  Future<void> _requestLocationAuto() async {
+    if (_locating) return;
+    final ok = await PermissionPriming.show(
+      context,
+      icon: Icons.location_on_rounded,
+      title: AppStrings.t('location_prime_title'),
+      body: AppStrings.t('location_prime_body'),
+      confirmLabel: AppStrings.t('location_prime_enable'),
+    );
+    if (!ok || !mounted) return;
+    setState(() => _locating = true);
+    final country = await OnboardingLocation.detectCountry();
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      if (country != null) _countryCtrl.text = country;
+    });
+  }
+
   @override
   void dispose() {
     if (!widget.editing) WidgetsBinding.instance.removeObserver(this);
@@ -274,6 +314,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       targetLang: '',
       gender: genderToSave,
       personaCategory: personaCategoryToSave,
+      country: _countryCtrl.text.trim(),
     );
     // Done — kill the "finish your profile" reminder (pending or not).
     _finished = true;
@@ -292,9 +333,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         language: _selectedLang!,
         gender: genderToSave,
       );
-      // Location only comes from the editing form now (the first-run wizard
-      // stops at name + language + gender), but persist it whenever it holds
-      // a value — upsertMyProfile doesn't carry these columns.
+      // Location comes from the editing form, or the fresh wizard's GPS /
+      // manual location step — either way, persist it whenever it holds a
+      // value; upsertMyProfile doesn't carry these columns.
       if (_countryCtrl.text.trim().isNotEmpty ||
           _cityCtrl.text.trim().isNotEmpty) {
         await ProfileApi.updateMyLocation(
@@ -478,6 +519,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     final showPersonaStep = !_personaAlreadySet;
     final showGenderStep = !_genderAlreadySet;
+    final showLocationStep = !_locationAlreadySet;
 
     return SwayOnbShell(
       page: _page,
@@ -502,10 +544,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           onSelect: _onLanguageSelected,
           onBack: _back,
           onFinish: _goFromLanguage,
-          // Last page when both the gender and persona steps are skipped.
-          finishLabelKey:
-              (showGenderStep || showPersonaStep) ? 'onb_next' : 'onb_finish',
+          // Last page when the location, gender and persona steps are all
+          // skipped.
+          finishLabelKey: (showLocationStep || showGenderStep || showPersonaStep)
+              ? 'onb_next'
+              : 'onb_finish',
         ),
+        if (showLocationStep)
+          SwayStepLocation(
+            country: _countryCtrl.text,
+            detecting: _locating,
+            onAutoDetect: _requestLocationAuto,
+            onManual: _openLocationPicker,
+            onBack: _back,
+            onFinish: _goFromLocation,
+            // Last page when both the gender and persona steps are skipped.
+            finishLabelKey:
+                (showGenderStep || showPersonaStep) ? 'onb_next' : 'onb_finish',
+          ),
         if (showGenderStep)
           SwayStepGender(
             selected: _selectedGender,
@@ -546,9 +602,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       );
       return;
     }
-    // Language is the last page once both persona category and gender are
-    // already known.
-    if (_personaAlreadySet && _genderAlreadySet) {
+    // Location comes right after language whenever it's still unknown.
+    if (_locationAlreadySet && _personaAlreadySet && _genderAlreadySet) {
+      _finish();
+      return;
+    }
+    _next();
+  }
+
+  /// Location → next, but skip straight to the end if gender and persona
+  /// category are the only things left and both are already known. Mirrors
+  /// [_goFromLanguage]'s "skip to the end if what follows is already known"
+  /// pattern. No need to re-validate the country here — [SwayStepLocation]
+  /// already disables its own CTA until one is known.
+  void _goFromLocation() {
+    if (_genderAlreadySet && _personaAlreadySet) {
       _finish();
       return;
     }

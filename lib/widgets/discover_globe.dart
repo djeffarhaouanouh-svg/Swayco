@@ -10,30 +10,44 @@ import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Discover globe — a spinning orthographic Earth used to pick a country, which
-// the Discover feed then filters on (by the country's spoken language).
+// Discover globe — a spinning orthographic Earth used to pick a country. The
+// Discover feed filters on the peer's actual `profiles.country`, regardless of
+// what they speak — that's the whole point (a Québécois and a Parisian both
+// speak French but are not "elsewhere" from each other the way the app means).
 //
 // Only the countries in [kGlobeCountries] are selectable. Everything else is
 // drawn as context so the sphere reads as Earth, not two floating shapes.
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Selectable countries. `center` is (longitude, latitude) in degrees; `lang`
-/// is the BCP-47 code the Discover feed filters on when this country is chosen.
-const Map<String, ({String flag, Offset center, String lang})> kGlobeCountries = {
-  'France': (flag: '🇫🇷', center: Offset(2.4, 46.6), lang: 'fr'),
-  'Germany': (flag: '🇩🇪', center: Offset(10.3, 51.1), lang: 'de'),
+/// Selectable countries. `center` is (longitude, latitude) in degrees. `code`
+/// is the ISO2 shown on the bubble. `dbName` is the EXACT string stored in
+/// `profiles.country` (`lib/services/locations.dart`'s `kCountries`) — not
+/// always the same as the map key, e.g. `'Germany'` (key) vs `'Allemagne'`
+/// (dbName) — and is what's actually sent to the Discover feed as a filter.
+const Map<String, ({String flag, Offset center, String code, String dbName})>
+kGlobeCountries = {
+  'France': (flag: '🇫🇷', center: Offset(2.4, 46.6), code: 'fr', dbName: 'France'),
+  'Germany': (flag: '🇩🇪', center: Offset(10.3, 51.1), code: 'de', dbName: 'Allemagne'),
+  'Canada': (flag: '🇨🇦', center: Offset(-96.5, 62.4), code: 'ca', dbName: 'Canada'),
+  'Japan': (flag: '🇯🇵', center: Offset(138.3, 36.3), code: 'jp', dbName: 'Japon'),
+  'Belgium': (flag: '🇧🇪', center: Offset(4.5, 50.6), code: 'be', dbName: 'Belgique'),
+  'Brazil': (flag: '🇧🇷', center: Offset(-53.1, -10.8), code: 'br', dbName: 'Brésil'),
 };
 
-/// The BCP-47 language a globe country key maps to, or null if it isn't one of
-/// the selectable countries.
-String? globeLangForCountry(String? key) =>
-    key == null ? null : kGlobeCountries[key]?.lang;
+/// The `profiles.country` value a globe country key maps to, or null if it
+/// isn't one of the selectable countries. This is what the Discover feed
+/// filters on — see [kGlobeCountries]'s `dbName`.
+String? globeCountryDbName(String? key) =>
+    key == null ? null : kGlobeCountries[key]?.dbName;
 
-/// Localised display name for a selectable country key (falls back to the key).
+/// Localised display name for a selectable country key (falls back to the
+/// key). Unused today (no call sites) — only `country_fr`/`country_de` exist
+/// in AppStrings; add `country_ca`/`country_jp`/`country_be`/`country_br`
+/// (12 locales) before wiring this up for the 4 newer countries.
 String globeCountryLabel(String key) {
-  final lang = kGlobeCountries[key]?.lang;
-  if (lang == null) return key;
-  return AppStrings.t('country_$lang');
+  final code = kGlobeCountries[key]?.code;
+  if (code == null) return key;
+  return AppStrings.t('country_$code');
 }
 
 // ── GeoJSON world outline ────────────────────────────────────────────────────
@@ -173,6 +187,14 @@ Path _landPath(
 const Map<String, Offset> _kBubbleOffset = {
   'France': Offset(-42, 26),
   'Germany': Offset(38, -32),
+  // Best-effort placement for the 4 new countries — not visually tuned on a
+  // running globe (no device/simulator in the session that added them).
+  // Check these on a real build and adjust if a bubble overlaps its own
+  // country shape or another bubble.
+  'Canada': Offset(-46, -34),
+  'Japan': Offset(34, 10),
+  'Belgium': Offset(30, 24),
+  'Brazil': Offset(-40, 30),
 };
 
 const double _kBubbleR = 18;
@@ -720,8 +742,8 @@ class _GlobePainter extends CustomPainter {
         ..color = _rim.withValues(alpha: 0.8),
     );
 
-    // ── White label bubbles (FR / DE) — outside the clip so they can float
-    //    over the rim, like the prototype's pins. ─────────────────────────
+    // ── White label bubbles (FR / DE / CA / JP / BE / BR) — outside the
+    //    clip so they can float over the rim, like the prototype's pins. ──
     for (final key in kGlobeCountries.keys) {
       final b = _bubbleFor(key, rotLon, rotLat, radius, center);
       if (b == null) continue;
@@ -765,7 +787,7 @@ class _GlobePainter extends CustomPainter {
       // Country code.
       final tp = TextPainter(
         text: TextSpan(
-          text: kGlobeCountries[key]!.lang.toUpperCase(),
+          text: kGlobeCountries[key]!.code.toUpperCase(),
           style: const TextStyle(
             color: Color(0xFF1B1B1F),
             fontSize: 12.5,

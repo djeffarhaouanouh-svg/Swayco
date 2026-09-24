@@ -16,6 +16,13 @@ abstract final class UserPrefs {
   /// once, editable later from the profile" pattern as [keyGender]. Empty
   /// when not yet provided.
   static const String keyPersonaCategory = 'profile_persona_category';
+  /// GPS-detected (or manually picked) country label, matching
+  /// `locations.dart`'s `kCountries`. Asked once during onboarding right
+  /// after language — same "asked once" pattern as [keyGender]. Cached here
+  /// (not just pushed to Supabase) so a value picked before sign-in survives
+  /// to [ProfileApi.updateMyLocation] once auth completes — see
+  /// `main.dart::_hydrateAuthedSession`. Empty when not yet provided.
+  static const String keyCountry = 'profile_country';
   static const String keyTranslatedVolume = 'audio_translated_volume';
   static const String keyOriginalVolume = 'audio_original_volume';
   static const String keyDuckingEnabled = 'audio_ducking_enabled';
@@ -120,6 +127,7 @@ abstract final class UserPrefs {
     required String targetLang,
     String gender = '',
     String personaCategory = '',
+    String country = '',
   }) async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(keyOnboardingDone, true);
@@ -133,6 +141,10 @@ abstract final class UserPrefs {
     final pc = personaCategory.trim();
     if (pc.isNotEmpty) {
       await p.setString(keyPersonaCategory, pc);
+    }
+    final c = country.trim();
+    if (c.isNotEmpty) {
+      await p.setString(keyCountry, c);
     }
   }
 
@@ -155,6 +167,7 @@ abstract final class UserPrefs {
       targetLang: p.getString(keyTargetLang) ?? '',
       gender: (g == 'm' || g == 'f' || g == 'x') ? g : '',
       personaCategory: (p.getString(keyPersonaCategory) ?? '').trim(),
+      country: (p.getString(keyCountry) ?? '').trim(),
     );
   }
 
@@ -164,6 +177,14 @@ abstract final class UserPrefs {
     final p = await SharedPreferences.getInstance();
     final g = (p.getString(keyGender) ?? '').trim();
     return g == 'm' || g == 'f' || g == 'x';
+  }
+
+  /// True once the user's country is known (GPS-detected or manually
+  /// picked) at least once. Mirrors [isGenderSet] — the onboarding step is
+  /// skipped on subsequent runs so it never re-prompts.
+  static Future<bool> isLocationSet() async {
+    final p = await SharedPreferences.getInstance();
+    return (p.getString(keyCountry) ?? '').trim().isNotEmpty;
   }
 
   /// True once the user picked a persona category at least once. Mirrors
@@ -320,6 +341,7 @@ class ProfileSnapshot {
     required this.targetLang,
     this.gender = '',
     this.personaCategory = '',
+    this.country = '',
   });
 
   final String firstName;
@@ -331,4 +353,7 @@ class ProfileSnapshot {
 
   /// A `kPersonaCategories` label, or `''` — see [UserPrefs.keyPersonaCategory].
   final String personaCategory;
+
+  /// A `locations.dart` country label, or `''` — see [UserPrefs.keyCountry].
+  final String country;
 }

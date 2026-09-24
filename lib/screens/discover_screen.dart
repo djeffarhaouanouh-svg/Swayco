@@ -172,14 +172,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  List<String> get _filterLangs => _countryKeys
-      .map(globeLangForCountry)
+  List<String> get _filterCountries => _countryKeys
+      .map(globeCountryDbName)
       .whereType<String>()
       .toSet()
       .toList();
 
   /// Opens the spinning-globe country picker (multi-select). A non-empty
-  /// result reloads the feed filtered to those countries' languages.
+  /// result reloads the feed filtered to those countries (the peer's actual
+  /// `profiles.country`, not what they speak).
   Future<void> _openGlobe() async {
     final keys = await showGeneralDialog<Set<String>>(
       context: context,
@@ -206,7 +207,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
     Analytics.track('screen_view',
         props: {'screen': 'discover', 'country_filter': keys.join(',')});
-    await _loadFeed(languages: _filterLangs);
+    await _loadFeed(countries: _filterCountries);
     if (!mounted) return;
     _transitionFeedDone = true;
     _maybeHideFilterTransition();
@@ -215,11 +216,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _clearCountryFilter() {
     if (_countryKeys.isEmpty) return;
     setState(() => _countryKeys = {});
-    _loadFeed(languages: null);
+    _loadFeed(countries: null);
   }
 
-  /// Reloads the Discover deck, optionally filtered by spoken [languages].
-  Future<void> _loadFeed({required List<String>? languages}) async {
+  /// Reloads the Discover deck, optionally filtered by peer [countries].
+  Future<void> _loadFeed({required List<String>? countries}) async {
     if (_myId.isEmpty || !isSupabaseReady) return;
     setState(() {
       _feedLoading = true;
@@ -231,7 +232,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     try {
       final feed = await ProfileApi.fetchDiscoverFeed(
         myId: _myId,
-        languages: languages,
+        countries: countries,
       ).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
@@ -243,7 +244,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (mounted && !_deckDone) _precacheAround(0);
       });
     } catch (e) {
-      debugPrint('discover: _loadFeed(langs=$languages) failed: $e');
+      debugPrint('discover: _loadFeed(countries=$countries) failed: $e');
       if (mounted) setState(() => _feedLoading = false);
     }
   }

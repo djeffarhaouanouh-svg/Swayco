@@ -78,6 +78,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/persona_categories.dart';
 import '../theme/swayco_theme.dart';
 
@@ -929,6 +930,109 @@ class SwayStepPersonaCategory extends StatelessWidget {
         _StepFooter(
           onBack: onBack,
           onFinish: selected == null ? null : onFinish,
+          finishLabelKey: finishLabelKey,
+        ),
+      ],
+    );
+  }
+}
+
+/// "Où es-tu ?" — GPS auto-detect (primary row) or the manual country/city
+/// picker (secondary link, and the fallback when detection fails). Mirrors
+/// [SwayStepGender]'s shape: one main action row, footer CTA disabled until
+/// a country is known.
+class SwayStepLocation extends StatelessWidget {
+  const SwayStepLocation({
+    super.key,
+    required this.country,
+    required this.detecting,
+    required this.onAutoDetect,
+    required this.onManual,
+    required this.onBack,
+    required this.onFinish,
+    this.finishLabelKey = 'onb_finish',
+  });
+
+  final String country;
+  final bool detecting;
+  final VoidCallback onAutoDetect;
+  final VoidCallback onManual;
+  final VoidCallback onBack;
+  final VoidCallback onFinish;
+  final String finishLabelKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = country.trim().isNotEmpty;
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                SwayOnb.gutter, 48, SwayOnb.gutter, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _StepHead(
+                  titleKey: 'onb_location_title',
+                  subtitleKey: 'onb_location_subtitle',
+                ),
+                const SizedBox(height: 34),
+                SwayPickRow(
+                  height: 74,
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16191D),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: detecting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: SC.accent,
+                            ),
+                          )
+                        : Text(
+                            has ? (countryFlagFor(country) ?? '🌍') : '📍',
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                  ),
+                  label:
+                      has ? country : AppStrings.t('onb_location_autodetect'),
+                  selected: has,
+                  onTap: onAutoDetect,
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: onManual,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      AppStrings.t('onb_location_manual'),
+                      style: const TextStyle(
+                        color: SwayOnb.dim,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _StepFooter(
+          onBack: onBack,
+          onFinish: has ? onFinish : null,
           finishLabelKey: finishLabelKey,
         ),
       ],

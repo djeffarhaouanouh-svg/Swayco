@@ -141,6 +141,20 @@ String? countryFlagFor(String country) {
 /// Jack and disc flags can't be faked with colour bands.
 String countryIso2For(String country) => _kIso2[country.trim()] ?? '';
 
+/// The inverse of [countryIso2For]: the canonical label stored on
+/// `profiles.country` for an ISO2 code, or null when it isn't one of our
+/// curated countries. Used to turn a GPS reverse-geocode result (which only
+/// gives an ISO2 code) back into the exact string every other consumer of
+/// `profiles.country` (flags, Discover's cross-country bonus, …) expects.
+String? countryNameForIso2(String iso2) {
+  final code = iso2.trim().toLowerCase();
+  if (code.isEmpty) return null;
+  for (final entry in _kIso2.entries) {
+    if (entry.value == code) return entry.key;
+  }
+  return null;
+}
+
 const Map<String, String> _kIso2 = {
   'France': 'fr',
   'Belgique': 'be',

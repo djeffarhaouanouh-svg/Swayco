@@ -117,6 +117,8 @@ dependencies:
   # TTS voice bundles ship as tar archives.
   archive: ^4.0.7
   google_mobile_ads: ^9.1.0
+  geolocator: ^14.0.2
+  geocoding: ^5.0.0
 
 # iOS + macOS: use the sherpa_onnx plugin patched with the ja external-tokens API
 # (SherpaOnnxOfflineTtsGenerateFromTokens) and shipping the OpenJTalk reading lib

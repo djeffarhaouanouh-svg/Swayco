@@ -595,6 +595,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           language: lang,
           gender: profile.gender,
         );
+        // upsertMyProfile doesn't carry country — a location picked (GPS or
+        // manual) during the pre-login first-run wizard only ever reached
+        // local prefs until now; push it up the moment an account exists.
+        // Never clobber an existing remote value with a blank local one.
+        if (profile.country.isNotEmpty &&
+            (remote?.country.isEmpty ?? true)) {
+          await ProfileApi.updateMyLocation(
+            userId: uid,
+            country: profile.country,
+            city: remote?.city ?? '',
+          );
+        }
       }
     } else if (remote != null) {
       // Returning user on a fresh device / freshly-installed app: local prefs
@@ -607,6 +619,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           sourceLang: remote.language,
           targetLang: '',
           gender: remote.gender,
+          country: remote.country,
         );
       }
     }

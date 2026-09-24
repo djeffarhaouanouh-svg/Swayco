@@ -86,6 +86,8 @@
 		     SDK initialize. -->
 		<key>GADApplicationIdentifier</key>
 		<string>ca-app-pub-1120860079267236~5103179016</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Swayco uses your approximate location to detect your country, so Discover can show you people from elsewhere.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
