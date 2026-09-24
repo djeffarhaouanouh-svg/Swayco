@@ -24,9 +24,8 @@ abstract final class RevenueCat {
   /// iOS public SDK key (from the RevenueCat dashboard → API keys → Apple).
   static const String _appleApiKey = 'appl_RgjIujVqOxrRtMNPtBIfCtLfSZI';
 
-  /// Android public SDK key (`goog_…`). Empty until the Play Store app is set
-  /// up on RevenueCat — purchases stay disabled on Android until it's pasted.
-  static const String _googleApiKey = '';
+  /// Android public SDK key (from the RevenueCat dashboard → API keys → Google).
+  static const String _googleApiKey = 'goog_peRXRVHvLKErMZAtOqvGlbPuBvu';
 
   static bool _configured = false;
 
