@@ -1236,12 +1236,25 @@ abstract final class ProfileApi {
   /// • Same "looking for" intent — +25 flat when both sides picked the
   ///   same answer.
   /// • Activity recency (gated on the peer not hiding their online
-  ///   status). A peer active in the last 5 min beats a week-old one.
+  ///   status). A peer active in the last 5 min beats a week-old one —
+  ///   capped at +30 (was +60): "online now" tracks local daytime hours,
+  ///   so left unchecked it silently favours same-timezone (and so
+  ///   same-region) peers over the cross-culture discovery the app is
+  ///   for. Halved so it can no longer outweigh the cross-country bonus
+  ///   below on its own.
   /// • Fetch-order bonus — the DB returns rows pre-sorted by
   ///   `updated_at desc`, so the position in that returned list is a
   ///   free proxy for "recently changed profile".
+  /// • Cross-country bonus — a peer from a different country is the
+  ///   clearest "somewhere else" signal there is, stronger than language
+  ///   alone (e.g. Belgium vs. France share French but not a country).
+  ///   Sized to beat the online bonus above by itself, so a foreign
+  ///   profile who isn't online right now still outranks a domestic one
+  ///   who is.
   /// • Cross-language bonus — Swayco is a translation app, so a peer
   ///   who speaks a different language is more interesting by default.
+  ///   Stacks with the cross-country bonus (different country AND
+  ///   language is the most "elsewhere" a match can be).
   /// • Popularity bonus — log-scaled count of received likes so
   ///   already-loved profiles drift to the top of the deck without one
   ///   mega-popular account locking the #1 slot forever.
@@ -1256,6 +1269,7 @@ abstract final class ProfileApi {
     RemoteProfile p,
     int positionInFetch,
     String myLang,
+    String myCountry,
     int receivedLikes,
     Set<String> myInterests,
     String myLookingFor,
@@ -1291,13 +1305,13 @@ abstract final class ProfileApi {
     if (ls != null && !p.hideOnlineStatus) {
       final mins = DateTime.now().difference(ls).inMinutes;
       if (mins <= 5) {
-        s += 60;
+        s += 30;
       } else if (mins <= 60) {
-        s += 40;
+        s += 20;
       } else if (mins <= 60 * 24) {
-        s += 25;
+        s += 12;
       } else if (mins <= 60 * 24 * 7) {
-        s += 10;
+        s += 5;
       }
     }
 
@@ -1305,6 +1319,13 @@ abstract final class ProfileApi {
       s += 20;
     } else if (positionInFetch < 25) {
       s += 10;
+    }
+
+    final theirCountry = p.country.trim().toLowerCase();
+    if (myCountry.isNotEmpty &&
+        theirCountry.isNotEmpty &&
+        theirCountry != myCountry) {
+      s += 35;
     }
 
     final theirLang = p.language.trim().toLowerCase();
@@ -1404,18 +1425,20 @@ abstract final class ProfileApi {
           .toList(growable: false);
       if (candidates.isEmpty) return const [];
 
-      // Look up my language, interests and intent for the client-side
-      // scoring (cross-language bonus, shared-interest bonus, same-intent
-      // bonus). The peer privacy filter that depends on language already
-      // ran server-side in the RPC, so we no longer need it for
-      // correctness here — just for ranking.
+      // Look up my language, country, interests and intent for the
+      // client-side scoring (cross-language bonus, cross-country bonus,
+      // shared-interest bonus, same-intent bonus). The peer privacy filter
+      // that depends on language already ran server-side in the RPC, so we
+      // no longer need it for correctness here — just for ranking.
       String myLang = '';
+      String myCountry = '';
       Set<String> myInterests = const {};
       String myLookingFor = '';
       String myPersonaCategory = '';
       try {
         final me = await fetchById(myId);
         myLang = me?.language.trim().toLowerCase() ?? '';
+        myCountry = me?.country.trim().toLowerCase() ?? '';
         myInterests = me?.interests.toSet() ?? const {};
         myLookingFor = normalizeLookingFor(me?.lookingFor ?? '');
         myPersonaCategory = me?.personaCategory.trim() ?? '';
@@ -1463,6 +1486,7 @@ abstract final class ProfileApi {
               candidates[i],
               i,
               myLang,
+              myCountry,
               likeCounts[candidates[i].id] ?? 0,
               myInterests,
               myLookingFor,
