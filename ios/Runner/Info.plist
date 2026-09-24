@@ -81,6 +81,11 @@
 		<string>Microphone is used for video calls.</string>
 		<key>NSSpeechRecognitionUsageDescription</key>
 		<string>Swayco transcribes your voice directly on your iPhone to translate what you say in real time during a call.</string>
+		<!-- AdMob (google_mobile_ads): required or MobileAds.instance.initialize()
+		     crashes at startup. No ad unit is wired up yet — this only lets the
+		     SDK initialize. -->
+		<key>GADApplicationIdentifier</key>
+		<string>ca-app-pub-1120860079267236~5103179016</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>

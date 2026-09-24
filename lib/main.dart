@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart'
     show LiquidGlassWidgets;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -207,6 +208,18 @@ Future<void> main() async {
       await RevenueCat.init().timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
+    }
+    // AdMob (google_mobile_ads) — SDK init only, no ad unit wired up yet (that's
+    // a later step). Mobile only: the plugin has no web support. Best-effort,
+    // same as RevenueCat above — a slow/failed init mustn't gate boot.
+    if (!kIsWeb) {
+      try {
+        await MobileAds.instance.initialize().timeout(
+          const Duration(seconds: 5),
+        );
+      } catch (e) {
+        debugPrint('AdMob init slow/failed: $e');
+      }
     }
     // Warm up the premium on-device voice for the account language so it is
     // loaded before the first call. Native-only; a no-op on web, and it never

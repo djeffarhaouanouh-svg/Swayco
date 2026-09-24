@@ -103,6 +103,12 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
+        <!-- AdMob (google_mobile_ads): required or MobileAds.instance.initialize()
+             crashes at startup. No ad unit is wired up yet — this only lets the
+             SDK initialize. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-1120860079267236~4065429516" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
