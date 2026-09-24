@@ -11,12 +11,20 @@ import '../services/rewarded_video.dart';
 import '../theme/swayco_theme.dart';
 import 'profile_avatar.dart';
 
-/// Who may see the people who liked me: Pro (RevenueCat on mobile, the
-/// Stripe tier on web) reveals everyone; a rewarded video reveals one liker.
+/// Who may see the people who liked me: women always see everyone, free of
+/// charge — the lock only ever applies to men. For a man, Pro (RevenueCat on
+/// mobile, the Stripe tier on web) reveals everyone; a rewarded video reveals
+/// one liker.
 class LikesLock {
-  LikesLock(this.myId, {required this.webPro, required this.unlocked});
+  LikesLock(
+    this.myId, {
+    required this.alwaysRevealed,
+    required this.webPro,
+    required this.unlocked,
+  });
 
   final String myId;
+  final bool alwaysRevealed;
   final bool webPro;
   final Set<String> unlocked;
 
@@ -25,18 +33,24 @@ class LikesLock {
       ProfileApi.fetchById(myId),
       LikesUnlocks.load(myId),
     ]);
+    final me = results[0] as RemoteProfile?;
     return LikesLock(
       myId,
-      webPro: (results[0] as RemoteProfile?)?.isPlus ?? false,
+      alwaysRevealed: me?.gender == 'f',
+      webPro: me?.isPlus ?? false,
       unlocked: results[1] as Set<String>,
     );
   }
 
   bool isRevealed(String likerId) =>
-      webPro || RevenueCat.proActive.value || unlocked.contains(likerId);
+      alwaysRevealed ||
+      webPro ||
+      RevenueCat.proActive.value ||
+      unlocked.contains(likerId);
 }
 
-/// A liker's avatar, blurred beyond recognition.
+/// A liker's avatar, blurred just enough to hide who it is while still
+/// letting the shape/colours show through — a teaser, not a solid smudge.
 class BlurredAvatar extends StatelessWidget {
   const BlurredAvatar({super.key, required this.profile, required this.size});
 
@@ -47,7 +61,7 @@ class BlurredAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipOval(
       child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+        imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
         child: ProfileAvatar(
           displayName: '',
           avatarUrl: profile?.avatarUrl,
