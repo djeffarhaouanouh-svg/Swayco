@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 import '../screens/paywall_screen.dart';
+import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
@@ -90,6 +91,10 @@ Future<void> showLikesUnlockSheet(
     }
     final p = profile;
     if (p == null || !await RewardedVideo.show()) return;
+    // Attributed to the viewer via their Bearer token — the admin dashboard
+    // joins this to `profiles` for the gender/age breakdown, so no PII rides
+    // along in props.
+    Analytics.track('ad_watched', props: {'source': 'likes_unlock'});
     await LikesUnlocks.add(myId, p.id);
     onRevealed();
   }

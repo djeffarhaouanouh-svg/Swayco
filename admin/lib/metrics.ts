@@ -11,7 +11,7 @@
 // Event vocabulary actually emitted by the app (lib/services/analytics.dart
 // + its call sites) — nothing else is read here:
 //   app_open · screen_view · call_started · call_ended · call_failed
-//   message_sent · like_sent · friend_request_sent
+//   message_sent · like_sent · friend_request_sent · ad_watched
 // `call_ended` carries props.duration_ms and props.kind.
 
 import { createSupabaseServiceClient } from "./supabase/service";
@@ -556,6 +556,76 @@ export async function getActiveSendersSeries(days = 14): Promise<DayPoint[]> {
     q.gte("created_at", sinceISO(days)).limit(100000),
   );
   return bucketDistinctByDay(rows, "created_at", "sender", days);
+}
+
+// ─── ads ──────────────────────────────────────────────────────────────────
+
+export type AdStats = {
+  /** ad_watched events in the window (rewarded video completed). */
+  totalWatched: number;
+  /** Homme / Femme / Autre / Inconnu. */
+  byGender: Pair[];
+  /** "Homme · 19 ans" style rows — the exact "who's watching" breakdown. */
+  byGenderAge: Pair[];
+};
+
+function genderLabel(g: string | null): string {
+  if (g === "m") return "Homme";
+  if (g === "f") return "Femme";
+  if (g === "x") return "Autre";
+  return "Inconnu";
+}
+
+/**
+ * Who watches rewarded ads, by gender and age — joined against `profiles`
+ * at query time (not read off event props) so it always reflects the
+ * viewer's current profile, never a stale snapshot from when the ad played.
+ * `ad_watched` is emitted once per completed rewarded video (see
+ * lib/widgets/likes_lock.dart's watchVideo()).
+ */
+export async function getAdStats(days = 30): Promise<AdStats> {
+  const events = await safeRows("analytics_events", "user_id", (q) =>
+    q.eq("event", "ad_watched").gte("created_at", sinceISO(days)).limit(50000),
+  );
+  const totalWatched = events.length;
+
+  const userIds = [
+    ...new Set(events.map((e) => str(e.user_id)).filter((v): v is string => !!v)),
+  ];
+  if (userIds.length === 0) {
+    return { totalWatched, byGender: [], byGenderAge: [] };
+  }
+
+  const profiles = await safeRows("profiles", "id, gender, age", (q) =>
+    q.in("id", userIds),
+  );
+  const infoById = new Map<string, { gender: string | null; age: number | null }>();
+  for (const p of profiles) {
+    const id = str(p.id);
+    if (!id) continue;
+    infoById.set(id, {
+      gender: str(p.gender),
+      age: typeof p.age === "number" ? p.age : null,
+    });
+  }
+
+  const byGenderCount = new Map<string, number>();
+  const byGenderAgeCount = new Map<string, number>();
+  for (const e of events) {
+    const uid = str(e.user_id);
+    const info = uid ? infoById.get(uid) : undefined;
+    const g = genderLabel(info?.gender ?? null);
+    byGenderCount.set(g, (byGenderCount.get(g) ?? 0) + 1);
+    const ageLabel = info?.age ? `${info.age} ans` : "âge inconnu";
+    const key = `${g} · ${ageLabel}`;
+    byGenderAgeCount.set(key, (byGenderAgeCount.get(key) ?? 0) + 1);
+  }
+
+  return {
+    totalWatched,
+    byGender: topPairs(byGenderCount, 4),
+    byGenderAge: topPairs(byGenderAgeCount, 24),
+  };
 }
 
 // ─── retention ────────────────────────────────────────────────────────────
