@@ -1147,9 +1147,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                           ),
-                          if (!_isViewingOther &&
-                              !widget.preview &&
-                              RevenueCat.isSupported) ...[
+                          if (!_isViewingOther && !widget.preview) ...[
                             const SizedBox(height: 16),
                             _BoostButton(
                               boostedUntil: _remote?.boostedUntil,
