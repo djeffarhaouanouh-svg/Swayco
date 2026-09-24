@@ -13,6 +13,7 @@ import '../services/ios_callkit.dart';
 import '../services/languages.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
+import '../services/revenue_cat.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
@@ -22,6 +23,7 @@ import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
 import 'liked_photos_screen.dart';
+import 'paywall_screen.dart';
 
 /// Hosts every secondary account-level action that doesn't belong on the
 /// main profile view: account management, notification toggles, privacy,
@@ -558,6 +560,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.lock_reset,
                       label: AppStrings.t('settings_change_password'),
                       onTap: _changePassword,
+                    ),
+                  ],
+                ),
+
+                _SectionHeader(
+                  label: AppStrings.t('settings_section_subscription'),
+                ),
+                _SettingsCard(
+                  children: [
+                    ValueListenableBuilder<bool>(
+                      valueListenable: RevenueCat.proActive,
+                      builder: (_, active, _) => _SettingsRow(
+                        icon: Icons.workspace_premium_outlined,
+                        label: AppStrings.t('my_subscription_section'),
+                        trailing: active
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: SC.accent,
+                                size: 20,
+                              )
+                            : null,
+                        onTap: () => showPaywallSheet(context),
+                      ),
                     ),
                   ],
                 ),

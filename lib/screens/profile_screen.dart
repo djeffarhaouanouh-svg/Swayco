@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,7 +49,6 @@ import 'chat_thread_screen.dart';
 import 'discover_screen.dart' show MyCardPreviewScreen;
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
-import 'paywall_screen.dart';
 import 'settings_screen.dart';
 
 /// Profile view. Two modes:
@@ -1153,12 +1151,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                               boostedUntil: _remote?.boostedUntil,
                               onPurchased: _awaitBoostCredit,
                             ),
-                          ],
-                          if (!_isViewingOther &&
-                              !widget.preview &&
-                              (kIsWeb || RevenueCat.isSupported)) ...[
-                            const SizedBox(height: 16),
-                            const _MySubscriptionRow(),
                           ],
                         ],
                       ),
@@ -4033,67 +4025,6 @@ class _BoostButtonState extends State<_BoostButton> {
 
 /// "Mon abonnement" — opens the paywall sheet. The trailing tick follows
 /// [RevenueCat.proActive], so it updates right after a purchase / restore.
-class _MySubscriptionRow extends StatelessWidget {
-  const _MySubscriptionRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SC.glassBorder),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => showPaywallSheet(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.workspace_premium_outlined,
-                  color: SC.accent,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    AppStrings.t('my_subscription_section'),
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                ValueListenableBuilder<bool>(
-                  valueListenable: RevenueCat.proActive,
-                  builder: (_, active, _) => active
-                      ? const Padding(
-                          padding: EdgeInsets.only(right: 4),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            color: SC.accent,
-                            size: 20,
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: SC.textMuted),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _EditAccountRow extends StatelessWidget {
   const _EditAccountRow({
     required this.icon,
