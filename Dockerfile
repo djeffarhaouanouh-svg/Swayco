@@ -35,6 +35,7 @@ COPY backend/server.js ./server.js
 COPY backend/notify.js ./notify.js
 COPY backend/apns_voip.js ./apns_voip.js
 COPY backend/stripe.js ./stripe.js
+COPY backend/revenuecat.js ./revenuecat.js
 COPY backend/analytics.js ./analytics.js
 COPY backend/tiers.js ./tiers.js
 # Online "X en ligne" broadcast tables — required by server.js (require('./nationalities')).

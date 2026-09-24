@@ -15,10 +15,12 @@ import '../services/match_celebration.dart';
 import '../services/nav_tab.dart';
 import '../services/profile_api.dart';
 import '../services/received_activity_unread.dart';
+import '../services/revenue_cat.dart';
 import '../services/supabase_service.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/likes_lock.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/profile_avatar.dart';
 import 'chat_thread_screen.dart';
@@ -40,6 +42,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
   List<IncomingFriendRequest> _requests = const [];
   // Profiles who liked one of my photos, newest first.
   List<RemoteProfile> _likers = const [];
+  LikesLock? _lock;
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
@@ -148,10 +151,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       // surfaces here.
       final since = ReceivedActivityUnread.featureStartAt;
       final likers = await LikeApi.fetchLikersSince(_myId, since);
+      final lock = await LikesLock.load(_myId);
       if (!mounted) return;
       setState(() {
         _requests = friendships;
         _likers = likers;
+        _lock = lock;
         _loading = false;
       });
       FriendRequestUnread.setCount(friendships.length);
@@ -261,7 +266,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
                 child: Text(AppStrings.t('demandes_title'), style: SCText.h1),
               ),
             ),
-            Expanded(child: _buildBody()),
+            Expanded(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: RevenueCat.proActive,
+                builder: (_, _, _) => _buildBody(),
+              ),
+            ),
           ],
         ),
       ),
@@ -287,19 +297,41 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
     }
     // Every category flattened into one list of rows — each its own floating
     // card, in priority order: incoming likes (need a decision) → photo likes.
+    // Without Pro (or a video unlock for that liker) the PDP is blurred, the
+    // name hidden, and tapping opens the unlock sheet instead of the profile.
+    bool revealed(RemoteProfile? p) =>
+        p != null && (_lock?.isRevealed(p.id) ?? false);
+    void openOrUnlock(RemoteProfile? p) {
+      if (p == null) return;
+      if (revealed(p)) {
+        _openProfile(p);
+        return;
+      }
+      showLikesUnlockSheet(
+        context,
+        myId: _myId,
+        profile: p,
+        onRevealed: () {
+          if (mounted) setState(() => _lock?.unlocked.add(p.id));
+        },
+      );
+    }
+
     final rows = <Widget>[
       for (final req in _requests)
         _RequestRow(
           request: req,
-          onOpenProfile: () {
-            final p = req.requester;
-            if (p != null) _openProfile(p);
-          },
+          revealed: revealed(req.requester),
+          onOpenProfile: () => openOrUnlock(req.requester),
           onAccept: () => _accept(req),
           onReject: () => _reject(req),
         ),
       for (final p in _likers)
-        _LikeRow(liker: p, onOpenProfile: () => _openProfile(p)),
+        _LikeRow(
+          liker: p,
+          revealed: revealed(p),
+          onOpenProfile: () => openOrUnlock(p),
+        ),
     ];
     final navBody = GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
     return RefreshIndicator(
@@ -335,9 +367,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
 /// country-else-language fallback as the Discover card header. Tapping the
 /// avatar itself opens the peer's profile.
 class _AvatarWithFlag extends StatelessWidget {
-  const _AvatarWithFlag({required this.profile, required this.onTap});
+  const _AvatarWithFlag({
+    required this.profile,
+    required this.revealed,
+    required this.onTap,
+  });
 
   final RemoteProfile? profile;
+  final bool revealed;
   final VoidCallback onTap;
 
   @override
@@ -354,13 +391,19 @@ class _AvatarWithFlag extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          ProfileAvatar(
-            displayName: p?.displayName ?? '',
-            avatarUrl: p?.avatarUrl,
-            fallbackUrl: p?.fallbackPhotoUrl,
-            size: 52,
-            onTap: onTap,
-          ),
+          if (revealed)
+            ProfileAvatar(
+              displayName: p?.displayName ?? '',
+              avatarUrl: p?.avatarUrl,
+              fallbackUrl: p?.fallbackPhotoUrl,
+              size: 52,
+              onTap: onTap,
+            )
+          else
+            GestureDetector(
+              onTap: onTap,
+              child: BlurredAvatar(profile: p, size: 52),
+            ),
           if (flag.isNotEmpty)
             Positioned(
               bottom: -2,
@@ -388,12 +431,14 @@ class _AvatarWithFlag extends StatelessWidget {
 class _RequestRow extends StatelessWidget {
   const _RequestRow({
     required this.request,
+    required this.revealed,
     required this.onOpenProfile,
     required this.onAccept,
     required this.onReject,
   });
 
   final IncomingFriendRequest request;
+  final bool revealed;
   final VoidCallback onOpenProfile;
   final VoidCallback onAccept;
   final VoidCallback onReject;
@@ -401,7 +446,9 @@ class _RequestRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = request.requester;
-    final name = p?.displayName.isNotEmpty == true
+    final name = !revealed
+        ? AppStrings.t('likes_someone')
+        : p?.displayName.isNotEmpty == true
         ? p!.displayName
         : (p?.handle.isNotEmpty == true
               ? '@${p!.handle}'
@@ -420,7 +467,11 @@ class _RequestRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _AvatarWithFlag(profile: p, onTap: onOpenProfile),
+          _AvatarWithFlag(
+            profile: p,
+            revealed: revealed,
+            onTap: onOpenProfile,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
@@ -446,14 +497,21 @@ class _RequestRow extends StatelessWidget {
 
 /// A "X liked your photo ❤" row on the Demandes feed.
 class _LikeRow extends StatelessWidget {
-  const _LikeRow({required this.liker, required this.onOpenProfile});
+  const _LikeRow({
+    required this.liker,
+    required this.revealed,
+    required this.onOpenProfile,
+  });
 
   final RemoteProfile liker;
+  final bool revealed;
   final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
-    final name = liker.displayName.isNotEmpty
+    final name = !revealed
+        ? AppStrings.t('likes_someone')
+        : liker.displayName.isNotEmpty
         ? liker.displayName
         : (liker.handle.isNotEmpty
               ? '@${liker.handle}'
@@ -472,7 +530,11 @@ class _LikeRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _AvatarWithFlag(profile: liker, onTap: onOpenProfile),
+          _AvatarWithFlag(
+            profile: liker,
+            revealed: revealed,
+            onTap: onOpenProfile,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Text(

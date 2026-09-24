@@ -224,6 +224,21 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
+  /// The backend credits a Boost from the RevenueCat webhook, a few seconds
+  /// after the store sheet closes: poll my row until boosted_until shows up.
+  Future<void> _awaitBoostCredit() async {
+    for (var i = 0; i < 10; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final me = await ProfileApi.fetchById(_deviceId);
+      if (!mounted) return;
+      if (me != null && me.isBoosted) {
+        setState(() => _remote = me);
+        return;
+      }
+    }
+  }
+
   /// Optimistic like/unlike of one of the peer's photos (viewer mode). Roll
   /// back the local set if the DB write fails.
   Future<void> _togglePhotoLike(String photoUrl) async {
@@ -1132,6 +1147,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                           ),
+                          if (!_isViewingOther &&
+                              !widget.preview &&
+                              RevenueCat.isSupported) ...[
+                            const SizedBox(height: 16),
+                            _BoostButton(
+                              boostedUntil: _remote?.boostedUntil,
+                              onPurchased: _awaitBoostCredit,
+                            ),
+                          ],
                           if (!_isViewingOther &&
                               !widget.preview &&
                               (kIsWeb || RevenueCat.isSupported)) ...[
@@ -3918,6 +3942,93 @@ class _DragDownToCloseState extends State<_DragDownToClose> {
         }
       },
       child: widget.child,
+    );
+  }
+}
+
+/// "Boost" — buys the consumable Boost package through RevenueCat. The
+/// backend webhook credits it (24 h in Discover); while it runs the button
+/// shows the end time instead. Placeholder look, final design to come.
+class _BoostButton extends StatefulWidget {
+  const _BoostButton({required this.boostedUntil, required this.onPurchased});
+
+  final DateTime? boostedUntil;
+  final Future<void> Function() onPurchased;
+
+  @override
+  State<_BoostButton> createState() => _BoostButtonState();
+}
+
+class _BoostButtonState extends State<_BoostButton> {
+  String? _price;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    RevenueCat.priceOf(RevenueCat.boostPackageId).then((p) {
+      if (mounted) setState(() => _price = p);
+    });
+  }
+
+  Future<void> _buy() async {
+    setState(() => _busy = true);
+    final outcome = await RevenueCat.purchaseConsumable(
+      RevenueCat.boostPackageId,
+    );
+    if (!mounted) return;
+    final key = switch (outcome) {
+      PurchaseOutcome.success => 'boost_snack_success',
+      PurchaseOutcome.unavailable => 'paywall_snack_unavailable',
+      PurchaseOutcome.error => 'paywall_snack_error',
+      PurchaseOutcome.cancelled => null,
+    };
+    if (key != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t(key))));
+    }
+    if (outcome == PurchaseOutcome.success) await widget.onPurchased();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final until = widget.boostedUntil;
+    final active = until != null && until.isAfter(DateTime.now());
+    final String label;
+    if (active) {
+      final time = MaterialLocalizations.of(
+        context,
+      ).formatTimeOfDay(TimeOfDay.fromDateTime(until));
+      label = AppStrings.t('boost_active_until', args: {'time': time});
+    } else {
+      label = _price == null ? 'Boost' : 'Boost · $_price';
+    }
+    return FilledButton.icon(
+      onPressed: active || _busy ? null : _buy,
+      style: FilledButton.styleFrom(
+        backgroundColor: SC.accent,
+        foregroundColor: SC.bgDeep,
+        disabledBackgroundColor: SC.accent.withValues(alpha: 0.18),
+        disabledForegroundColor: SC.accent,
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      icon: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: SC.bgDeep,
+              ),
+            )
+          : const Icon(Icons.rocket_launch_rounded, size: 20),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+      ),
     );
   }
 }

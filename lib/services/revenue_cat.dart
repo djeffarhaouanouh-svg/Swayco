@@ -34,6 +34,10 @@ abstract final class RevenueCat {
   static const String proPackageId = 'pro_monthly';
   static const String proEntitlementId = 'pro';
 
+  /// Consumable Boost package (iOS `Boost_1`, Android `boost_1`). No
+  /// entitlement: the backend webhook credits it (profiles.boosted_until).
+  static const String boostPackageId = 'Boost';
+
   /// Whether the `pro` entitlement is active for the current store user. Kept
   /// current by the SDK listener and after every purchase / restore / login.
   static final ValueNotifier<bool> proActive = ValueNotifier(false);
@@ -129,7 +133,7 @@ abstract final class RevenueCat {
   static Future<Package?> _package(String packageId) async {
     final packages = await fetchPackages();
     for (final p in packages) {
-      if (p.identifier == packageId) return p;
+      if (p.identifier.toLowerCase() == packageId.toLowerCase()) return p;
     }
     debugPrint(
       'RevenueCat: package "$packageId" not in current offering '
@@ -168,6 +172,28 @@ abstract final class RevenueCat {
       return PurchaseOutcome.error;
     } catch (e) {
       debugPrint('RevenueCat purchase error: $e');
+      return PurchaseOutcome.error;
+    }
+  }
+
+  /// Buy the consumable [packageId] once. Success = the store charged; what it
+  /// grants is credited server-side by the RevenueCat webhook.
+  static Future<PurchaseOutcome> purchaseConsumable(String packageId) async {
+    if (!_configured) return PurchaseOutcome.unavailable;
+    final pkg = await _package(packageId);
+    if (pkg == null) return PurchaseOutcome.unavailable;
+    try {
+      await Purchases.purchase(PurchaseParams.package(pkg));
+      return PurchaseOutcome.success;
+    } on PlatformException catch (e) {
+      if (PurchasesErrorHelper.getErrorCode(e) ==
+          PurchasesErrorCode.purchaseCancelledError) {
+        return PurchaseOutcome.cancelled;
+      }
+      debugPrint('RevenueCat consumable error: ${e.message}');
+      return PurchaseOutcome.error;
+    } catch (e) {
+      debugPrint('RevenueCat consumable error: $e');
       return PurchaseOutcome.error;
     }
   }

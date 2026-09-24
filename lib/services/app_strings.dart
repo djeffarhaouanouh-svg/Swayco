@@ -543,6 +543,16 @@ abstract final class AppStrings {
     'call_speak_lang_hint': 'Parle en {lang} pour que la traduction fonctionne',
     // Likes received
     'who_liked_me': "Qui m'a liké",
+    'likes_someone': "Quelqu'un",
+    'likes_locked_title': "Découvre qui t'a liké",
+    'likes_locked_body':
+        'Passe à Pro pour voir tous tes likes, ou regarde une vidéo pour en révéler un.',
+    'likes_watch_video': 'Regarder une vidéo',
+    'likes_video_soon': 'Bientôt disponible',
+    'likes_go_pro': 'Passer à Pro',
+    'boost_snack_success':
+        'Boost acheté ! Ton profil est mis en avant pendant 24 h.',
+    'boost_active_until': "Boost actif jusqu'à {time}",
     'no_one_liked_yet': "Personne ne t'a encore liké",
     'like_explainer':
         "Quand quelqu'un appuie sur le ❤ de ta carte Discover, tu le verras apparaître ici.",
@@ -1150,6 +1160,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': "It's correct",
     'call_speak_lang_hint': 'Speak in {lang} so the translation works',
     'who_liked_me': 'Who liked me',
+    'likes_someone': 'Someone',
+    'likes_locked_title': 'See who liked you',
+    'likes_locked_body':
+        'Go Pro to see all your likes, or watch a video to reveal one.',
+    'likes_watch_video': 'Watch a video',
+    'likes_video_soon': 'Coming soon',
+    'likes_go_pro': 'Go Pro',
+    'boost_snack_success':
+        'Boost purchased! Your profile is featured for 24 h.',
+    'boost_active_until': 'Boost active until {time}',
     'no_one_liked_yet': 'No one has liked you yet',
     'like_explainer':
         "When someone taps the ❤ on your Discover card, you'll see them here.",
@@ -1724,6 +1744,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'Es el correcto',
     'call_speak_lang_hint': 'Habla en {lang} para que la traducción funcione',
     'who_liked_me': 'Quién me dio like',
+    'likes_someone': 'Alguien',
+    'likes_locked_title': 'Descubre quién te dio like',
+    'likes_locked_body':
+        'Hazte Pro para ver todos tus likes, o mira un vídeo para revelar uno.',
+    'likes_watch_video': 'Ver un vídeo',
+    'likes_video_soon': 'Muy pronto',
+    'likes_go_pro': 'Hazte Pro',
+    'boost_snack_success':
+        '¡Boost comprado! Tu perfil se destaca durante 24 h.',
+    'boost_active_until': 'Boost activo hasta las {time}',
     'no_one_liked_yet': 'Nadie te ha dado like todavía',
     'like_explainer':
         'Cuando alguien toque el ❤ de tu tarjeta Discover, lo verás aparecer aquí.',
@@ -2251,6 +2281,16 @@ abstract final class AppStrings {
     'call_speak_lang_hint':
         'Sprich auf {lang}, damit die Übersetzung funktioniert',
     'who_liked_me': 'Wer mich gelikt hat',
+    'likes_someone': 'Jemand',
+    'likes_locked_title': 'Sieh, wer dich gelikt hat',
+    'likes_locked_body':
+        'Hol dir Pro, um alle deine Likes zu sehen, oder schau ein Video, um einen aufzudecken.',
+    'likes_watch_video': 'Video ansehen',
+    'likes_video_soon': 'Bald verfügbar',
+    'likes_go_pro': 'Pro holen',
+    'boost_snack_success':
+        'Boost gekauft! Dein Profil wird 24 Std. lang hervorgehoben.',
+    'boost_active_until': 'Boost aktiv bis {time}',
     'no_one_liked_yet': 'Noch niemand hat dich gelikt',
     'like_explainer':
         'Wenn jemand auf das ❤ deiner Discover-Karte tippt, siehst du es hier.',
@@ -2860,6 +2900,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'È quella giusta',
     'call_speak_lang_hint': 'Parla in {lang} così la traduzione funziona',
     'who_liked_me': 'Chi mi ha messo mi piace',
+    'likes_someone': 'Qualcuno',
+    'likes_locked_title': 'Scopri chi ti ha messo mi piace',
+    'likes_locked_body':
+        'Passa a Pro per vedere tutti i tuoi like, o guarda un video per scoprirne uno.',
+    'likes_watch_video': 'Guarda un video',
+    'likes_video_soon': 'Presto disponibile',
+    'likes_go_pro': 'Passa a Pro',
+    'boost_snack_success':
+        'Boost acquistato! Il tuo profilo è in evidenza per 24 h.',
+    'boost_active_until': 'Boost attivo fino alle {time}',
     'no_one_liked_yet': 'Nessuno ti ha ancora messo mi piace',
     'like_explainer':
         'Quando qualcuno tocca il ❤ sulla tua scheda Discover, lo vedrai qui.',
@@ -3464,6 +3514,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'Está correto',
     'call_speak_lang_hint': 'Fala em {lang} para a tradução funcionar',
     'who_liked_me': 'Quem me curtiu',
+    'likes_someone': 'Alguém',
+    'likes_locked_title': 'Descubra quem te curtiu',
+    'likes_locked_body':
+        'Assine o Pro para ver todas as suas curtidas, ou assista a um vídeo para revelar uma.',
+    'likes_watch_video': 'Assistir a um vídeo',
+    'likes_video_soon': 'Em breve',
+    'likes_go_pro': 'Assinar o Pro',
+    'boost_snack_success':
+        'Boost comprado! Seu perfil fica em destaque por 24 h.',
+    'boost_active_until': 'Boost ativo até {time}',
     'no_one_liked_yet': 'Ninguém te curtiu ainda',
     'like_explainer':
         'Quando alguém tocar no ❤ do seu cartão Discover, você verá aqui.',
@@ -4071,6 +4131,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'Die klopt',
     'call_speak_lang_hint': 'Spreek in het {lang} zodat de vertaling werkt',
     'who_liked_me': 'Wie heeft mij geliket',
+    'likes_someone': 'Iemand',
+    'likes_locked_title': 'Ontdek wie jou heeft geliket',
+    'likes_locked_body':
+        'Neem Pro om al je likes te zien, of bekijk een video om er één te onthullen.',
+    'likes_watch_video': 'Video bekijken',
+    'likes_video_soon': 'Binnenkort beschikbaar',
+    'likes_go_pro': 'Neem Pro',
+    'boost_snack_success':
+        'Boost gekocht! Je profiel wordt 24 uur uitgelicht.',
+    'boost_active_until': 'Boost actief tot {time}',
     'no_one_liked_yet': 'Niemand heeft je nog geliket',
     'like_explainer':
         'Wanneer iemand op het ❤ van je Discover-kaart tikt, zie je het hier.',
@@ -4666,6 +4736,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'إنها صحيحة',
     'call_speak_lang_hint': 'تحدّث بـ {lang} حتى تعمل الترجمة',
     'who_liked_me': 'من أعجب بي',
+    'likes_someone': 'شخص ما',
+    'likes_locked_title': 'اكتشف من أعجب بك',
+    'likes_locked_body':
+        'اشترك في Pro لرؤية كل الإعجابات، أو شاهد فيديو لكشف إعجاب واحد.',
+    'likes_watch_video': 'مشاهدة فيديو',
+    'likes_video_soon': 'قريبًا',
+    'likes_go_pro': 'اشترك في Pro',
+    'boost_snack_success':
+        'تم شراء Boost! سيظهر ملفك الشخصي بشكل بارز لمدة 24 ساعة.',
+    'boost_active_until': 'Boost مفعّل حتى {time}',
     'no_one_liked_yet': 'لم يعجب بك أحد بعد',
     'like_explainer':
         'عندما يضغط شخص ما على ❤ في بطاقة Discover الخاصة بك، ستراه هنا.',
@@ -5264,6 +5344,16 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'Всё верно',
     'call_speak_lang_hint': 'Говорите на {lang}, чтобы перевод работал',
     'who_liked_me': 'Кто мне поставил лайк',
+    'likes_someone': 'Кто-то',
+    'likes_locked_title': 'Узнай, кто тебя лайкнул',
+    'likes_locked_body':
+        'Оформи Pro, чтобы видеть все лайки, или посмотри видео, чтобы открыть один.',
+    'likes_watch_video': 'Посмотреть видео',
+    'likes_video_soon': 'Скоро',
+    'likes_go_pro': 'Оформить Pro',
+    'boost_snack_success':
+        'Boost куплен! Твой профиль будет выделен 24 ч.',
+    'boost_active_until': 'Boost активен до {time}',
     'no_one_liked_yet': 'Тебя ещё никто не лайкнул',
     'like_explainer':
         'Когда кто-то нажмёт ❤ на твоей карточке Discover, ты увидишь его здесь.',
@@ -5839,6 +5929,14 @@ abstract final class AppStrings {
     'call_lang_check_keep': '没错',
     'call_speak_lang_hint': '请用{lang}说话，翻译才能正常工作',
     'who_liked_me': '谁喜欢我',
+    'likes_someone': '有人',
+    'likes_locked_title': '看看谁喜欢了你',
+    'likes_locked_body': '升级 Pro 查看所有喜欢，或观看一段视频解锁一个。',
+    'likes_watch_video': '观看视频',
+    'likes_video_soon': '即将推出',
+    'likes_go_pro': '升级 Pro',
+    'boost_snack_success': 'Boost 购买成功！你的资料将被推荐 24 小时。',
+    'boost_active_until': 'Boost 生效至 {time}',
     'no_one_liked_yet': '还没有人喜欢你',
     'like_explainer': '当有人点击你 Discover 卡片上的 ❤ 时，你会在这里看到。',
     'profile_speaks': '说{lang}',
@@ -6396,6 +6494,14 @@ abstract final class AppStrings {
     'call_lang_check_keep': 'これで正しい',
     'call_speak_lang_hint': '翻訳が機能するように{lang}で話してください',
     'who_liked_me': 'いいねをくれた人',
+    'likes_someone': '誰か',
+    'likes_locked_title': 'いいねした人を見よう',
+    'likes_locked_body': 'Pro ですべてのいいねを表示、または動画を見て1人を表示できます。',
+    'likes_watch_video': '動画を見る',
+    'likes_video_soon': '近日公開',
+    'likes_go_pro': 'Pro にする',
+    'boost_snack_success': 'Boost を購入しました！プロフィールが24時間目立ちます。',
+    'boost_active_until': 'Boost 有効：{time} まで',
     'no_one_liked_yet': 'まだ誰もあなたにいいねしていません',
     'like_explainer': '誰かがあなたの Discover カードの ❤ をタップすると、ここに表示されます。',
     'profile_speaks': '{lang}を話します',
@@ -6956,6 +7062,14 @@ abstract final class AppStrings {
     'call_lang_check_keep': '맞아요',
     'call_speak_lang_hint': '번역이 작동하도록 {lang}로 말하세요',
     'who_liked_me': '나를 좋아한 사람',
+    'likes_someone': '누군가',
+    'likes_locked_title': '누가 좋아했는지 확인하세요',
+    'likes_locked_body': 'Pro로 모든 좋아요를 보거나, 영상을 보고 한 명을 공개하세요.',
+    'likes_watch_video': '영상 보기',
+    'likes_video_soon': '곧 제공 예정',
+    'likes_go_pro': 'Pro 시작하기',
+    'boost_snack_success': 'Boost 구매 완료! 24시간 동안 프로필이 돋보입니다.',
+    'boost_active_until': 'Boost 활성: {time}까지',
     'no_one_liked_yet': '아직 아무도 좋아요를 누르지 않았습니다',
     'like_explainer': '누군가 당신의 Discover 카드의 ❤를 탭하면 여기에 표시됩니다.',
     'profile_speaks': '{lang}를 사용합니다',

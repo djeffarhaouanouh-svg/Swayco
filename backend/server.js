@@ -20,6 +20,7 @@ const {
   verifyWebhook,
   handleEvent: handleStripeEvent,
 } = require('./stripe');
+const revenueCat = require('./revenuecat');
 
 dotenv.config();
 
@@ -446,6 +447,7 @@ app.use(cors());
 const _limGlobal = rateLimit({ name: 'global', windowMs: 60000, max: 600 });
 app.use((req, res, next) => {
   if (req.path === '/api/stripe/webhook') return next();
+  if (req.path === '/api/revenuecat/webhook') return next();
   return _limGlobal(req, res, next);
 });
 
@@ -504,6 +506,29 @@ app.post(
       // eslint-disable-next-line no-console
       console.error('[stripe webhook] handler failed:', e);
       // Return 500 so Stripe retries.
+      return res.status(500).json({ error: 'handler_failed' });
+    }
+  },
+);
+
+// RevenueCat webhook — credits Boost purchases (see revenuecat.js).
+app.post(
+  '/api/revenuecat/webhook',
+  express.json({ limit: '256kb' }),
+  async (req, res) => {
+    if (!revenueCat.isConfigured()) {
+      return res.status(503).json({ error: 'revenuecat_not_configured' });
+    }
+    if (!revenueCat.isAuthorized(req)) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+      const status = await revenueCat.handleEvent(req.body);
+      return res.json({ received: true, status });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[revenuecat webhook] handler failed:', e);
+      // 500 so RevenueCat retries; grant_boost is idempotent per transaction.
       return res.status(500).json({ error: 'handler_failed' });
     }
   },

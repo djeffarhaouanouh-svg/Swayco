@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -6,14 +6,16 @@ import '../services/app_strings.dart';
 import '../services/device_id.dart';
 import '../services/like_api.dart';
 import '../services/profile_api.dart';
+import '../services/revenue_cat.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/likes_lock.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_screen.dart';
 
 /// Lists every Supabase user that has liked the current account, newest
-/// first. Tapping a row opens that user's profile (read-only) so the
-/// recipient can act on the like (chat / block / etc.).
+/// first. Without Pro each liker's PDP is blurred and the name hidden
+/// ([LikesLock]); tapping a revealed row opens that user's profile.
 class LikesReceivedScreen extends StatefulWidget {
   const LikesReceivedScreen({super.key});
 
@@ -24,6 +26,7 @@ class LikesReceivedScreen extends StatefulWidget {
 class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
   bool _loading = true;
   List<RemoteProfile> _likers = const [];
+  LikesLock? _lock;
   Timer? _pollTimer;
 
   @override
@@ -45,12 +48,35 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     final uid = await DeviceId.getOrCreate();
-    final list = await LikeApi.fetchLikersOf(uid);
+    final results = await Future.wait<Object?>([
+      LikeApi.fetchLikersOf(uid),
+      LikesLock.load(uid),
+    ]);
     if (!mounted) return;
     setState(() {
-      _likers = list;
+      _likers = results[0] as List<RemoteProfile>;
+      _lock = results[1] as LikesLock;
       _loading = false;
     });
+  }
+
+  void _openOrUnlock(RemoteProfile p) {
+    final lock = _lock;
+    if (lock == null) return;
+    if (lock.isRevealed(p.id)) {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: p.id)),
+      );
+      return;
+    }
+    showLikesUnlockSheet(
+      context,
+      myId: lock.myId,
+      profile: p,
+      onRevealed: () {
+        if (mounted) setState(() => lock.unlocked.add(p.id));
+      },
+    );
   }
 
   @override
@@ -67,39 +93,43 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
         ),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                  color: SC.accent))
+          ? const Center(child: CircularProgressIndicator(color: SC.accent))
           : _likers.isEmpty
-              ? const _EmptyState()
-              : RefreshIndicator(
-                  color: SC.accent,
-                  backgroundColor: SC.menu,
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    itemCount: _likers.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) {
-                      final p = _likers[i];
-                      return _LikerRow(
-                        profile: p,
-                        onTap: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ProfileScreen(userId: p.id),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+          ? const _EmptyState()
+          : ValueListenableBuilder<bool>(
+              valueListenable: RevenueCat.proActive,
+              builder: (context, _, _) => RefreshIndicator(
+                color: SC.accent,
+                backgroundColor: SC.menu,
+                onRefresh: _load,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  itemCount: _likers.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final p = _likers[i];
+                    return _LikerRow(
+                      profile: p,
+                      revealed: _lock?.isRevealed(p.id) ?? false,
+                      onTap: () => _openOrUnlock(p),
+                    );
+                  },
                 ),
+              ),
+            ),
     );
   }
 }
 
 class _LikerRow extends StatelessWidget {
-  const _LikerRow({required this.profile, required this.onTap});
+  const _LikerRow({
+    required this.profile,
+    required this.revealed,
+    required this.onTap,
+  });
+
   final RemoteProfile profile;
+  final bool revealed;
   final VoidCallback onTap;
 
   @override
@@ -118,12 +148,15 @@ class _LikerRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              ProfileAvatar(
-                displayName: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                fallbackUrl: profile.fallbackPhotoUrl,
-                size: 44,
-              ),
+              if (revealed)
+                ProfileAvatar(
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                  fallbackUrl: profile.fallbackPhotoUrl,
+                  size: 44,
+                )
+              else
+                BlurredAvatar(profile: profile, size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -131,14 +164,18 @@ class _LikerRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      profile.displayName.isEmpty ? 'â€”' : profile.displayName,
+                      !revealed
+                          ? AppStrings.t('likes_someone')
+                          : profile.displayName.isEmpty
+                          ? '—'
+                          : profile.displayName,
                       style: const TextStyle(
                         color: SC.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (profile.handle.isNotEmpty)
+                    if (revealed && profile.handle.isNotEmpty)
                       Text(
                         '@${profile.handle}',
                         style: const TextStyle(
@@ -149,8 +186,7 @@ class _LikerRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.favorite,
-                  color: Color(0xFFFF3B5C), size: 20),
+              const Icon(Icons.favorite, color: Color(0xFFFF3B5C), size: 20),
             ],
           ),
         ),
@@ -170,8 +206,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.favorite_border,
-                size: 56, color: SC.textMuted),
+            const Icon(Icons.favorite_border, size: 56, color: SC.textMuted),
             const SizedBox(height: 14),
             Text(
               AppStrings.t('no_one_liked_yet'),

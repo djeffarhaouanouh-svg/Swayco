@@ -33,6 +33,7 @@ class RemoteProfile {
     this.proExpiresAt,
     this.lastSeen,
     this.nameChangedAt,
+    this.boostedUntil,
     this.age,
     this.heightCm,
     this.job = '',
@@ -176,6 +177,15 @@ class RemoteProfile {
   /// trigger (migration 0044) as the real, un-bypassable guard.
   final DateTime? nameChangedAt;
 
+  /// End of the current paid Boost (migration 0059). Written only by the
+  /// backend's RevenueCat webhook; a DB trigger ignores client writes.
+  final DateTime? boostedUntil;
+
+  bool get isBoosted {
+    final until = boostedUntil;
+    return until != null && until.isAfter(DateTime.now());
+  }
+
 
   /// Backwards-compat shim — the rest of the UI still reads `firstName` /
   /// `sourceLang`. Same data, different schema names.
@@ -265,6 +275,7 @@ class RemoteProfile {
     proExpiresAt: _parseDate(m['pro_expires_at']),
     lastSeen: _parseDate(m['last_seen']),
     nameChangedAt: _parseDate(m['display_name_changed_at']),
+    boostedUntil: _parseDate(m['boosted_until']),
   );
 
   /// Returns a copy with the given fields overridden. Used by the few call
@@ -328,6 +339,7 @@ class RemoteProfile {
     proExpiresAt: proExpiresAt ?? this.proExpiresAt,
     lastSeen: lastSeen ?? this.lastSeen,
     nameChangedAt: nameChangedAt ?? this.nameChangedAt,
+    boostedUntil: boostedUntil,
   );
 }
 
@@ -1308,6 +1320,10 @@ abstract final class ProfileApi {
     }
 
     if (p.bio.trim().isNotEmpty) s += 8;
+
+    // Paid Boost (24 h): large enough to lift a profile near the top of
+    // most decks, without guaranteeing first place over strong matches.
+    if (p.isBoosted) s += 120;
 
     s += _feedRng.nextDouble() * 10;
     return s;
