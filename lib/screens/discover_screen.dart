@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
@@ -277,6 +278,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _bootstrap();
     _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
+    // Warm up the "Discover" interstitial in the background so one is ready
+    // the moment something calls AdService.showDiscoverInterstitial() — no
+    // such call site exists yet in this first step, only the mechanism.
+    // No-ops for Pro subscribers and never blocks/throws on failure.
+    unawaited(AdService.preload());
   }
 
   Future<void> _maybeShowSwipeCoach() async {
