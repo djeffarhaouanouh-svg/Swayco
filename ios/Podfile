@@ -43,13 +43,14 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       # permission_handler (iOS) gates each permission behind a compile-time
-      # macro. Without these, microphone/camera requests silently return
-      # "denied" and the system prompt never appears. Enable the two we use
-      # for calls.
+      # macro. Without these, requests silently return "denied" and the
+      # system prompt never appears. Camera/mic for calls; when-in-use
+      # location for the onboarding country step (never "Always").
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_CAMERA=1',
         'PERMISSION_MICROPHONE=1',
+        'PERMISSION_LOCATION_WHENINUSE=1',
       ]
     end
   end

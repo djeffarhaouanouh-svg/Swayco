@@ -88,6 +88,13 @@
 		<string>ca-app-pub-1120860079267236~5103179016</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Swayco uses your approximate location to detect your country, so Discover can show you people from elsewhere.</string>
+		<!-- Required by App Store static analysis (ITMS-90683) because the
+		     geolocator plugin (built via SwiftPM, so no compile-time bypass)
+		     contains requestAlwaysAuthorization code. Never actually used:
+		     geolocator checks the WhenInUse key above first, and the app only
+		     requests when-in-use via permission_handler. -->
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Swayco only uses your approximate location while the app is open, to detect your country so Discover can show you people from elsewhere.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
