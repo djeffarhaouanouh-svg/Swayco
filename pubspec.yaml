@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 6.1.12+182
+version: 6.1.12+183
 
 environment:
   sdk: ^3.11.0
@@ -116,7 +116,13 @@ dependencies:
   ffi: ^2.1.3
   # TTS voice bundles ship as tar archives.
   archive: ^4.0.7
-  google_mobile_ads: ^9.1.0
+  # Pinned exactly (not ^9.0.0): 9.1.0 added a non-modular #import of
+  # GoogleMobileAds_Beta.h in FLTAd_Internal.h/FLTAdPreloader.h, which fails
+  # the iOS Release archive ("Include of non-modular header inside framework
+  # module") — a CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES
+  # Podfile workaround does NOT fix it for Release. Un-pin once Google ships
+  # a fixed release.
+  google_mobile_ads: 9.0.0
   geolocator: ^14.0.2
   geocoding: ^5.0.0
 
