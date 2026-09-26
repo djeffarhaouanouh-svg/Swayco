@@ -51,6 +51,12 @@ post_install do |installer|
         'PERMISSION_CAMERA=1',
         'PERMISSION_MICROPHONE=1',
       ]
+      # google_mobile_ads' GoogleMobileAds.xcframework ships a private/beta
+      # header (GoogleMobileAds_Beta.h) that its own module map doesn't
+      # declare. With use_modular_headers! above, Xcode treats that include
+      # as an error ("non-modular header inside framework module") and the
+      # archive fails. This is Google's own documented workaround.
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
     end
   end
 end
