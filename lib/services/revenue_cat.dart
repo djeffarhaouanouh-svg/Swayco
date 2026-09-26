@@ -31,7 +31,14 @@ abstract final class RevenueCat {
 
   /// Package identifier in the RevenueCat offering — the same on both stores
   /// (iOS product `pro_monthly`, Android `pro_monthly:monthly`).
-  static const String proPackageId = 'pro_monthly';
+  ///
+  /// `$rc_monthly`, not `pro_monthly`: the package was created through
+  /// RevenueCat's default-package flow, which assigns this reserved
+  /// identifier and doesn't allow renaming it from the dashboard. Matching
+  /// on the display name would have worked too, but the package identifier
+  /// is the value `Purchases.getOfferings()` actually exposes as
+  /// `Package.identifier` — see [_package].
+  static const String proPackageId = '\$rc_monthly';
   static const String proEntitlementId = 'pro';
 
   /// Consumable Boost package (iOS `Boost_1`, Android `boost_1`). No
