@@ -49,6 +49,13 @@ abstract final class AuthService {
   /// / Home in reaction to sign-in or sign-out.
   static Stream<AuthState> get onAuthStateChange => _auth.onAuthStateChange;
 
+  /// How the current session was opened — `email`, `google` or `apple`.
+  /// Read by main.dart when it reports the sign-up / login to [Attribution]:
+  /// only THERE is it known whether the account is brand new (no profiles row
+  /// yet), and that verdict is provider-independent, so the method has to
+  /// travel from here rather than each call site firing its own event.
+  static String lastSignInMethod = '';
+
   static Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -56,6 +63,7 @@ abstract final class AuthService {
     if (!isSupabaseReady) {
       throw StateError('Supabase non configuré');
     }
+    lastSignInMethod = 'email';
     return _auth.signUp(email: email.trim().toLowerCase(), password: password);
   }
 
@@ -66,6 +74,7 @@ abstract final class AuthService {
     if (!isSupabaseReady) {
       throw StateError('Supabase non configuré');
     }
+    lastSignInMethod = 'email';
     return _auth.signInWithPassword(
       email: email.trim().toLowerCase(),
       password: password,
@@ -158,6 +167,7 @@ abstract final class AuthService {
       throw const AuthException('Aucun ID token renvoyé par Google.');
     }
 
+    lastSignInMethod = 'google';
     return _auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
@@ -195,6 +205,7 @@ abstract final class AuthService {
       throw const AuthException('Aucun ID token renvoyé par Apple.');
     }
 
+    lastSignInMethod = 'apple';
     final response = await _auth.signInWithIdToken(
       provider: OAuthProvider.apple,
       idToken: idToken,

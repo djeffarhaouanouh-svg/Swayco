@@ -95,6 +95,15 @@
 		     requests when-in-use via permission_handler. -->
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 		<string>Swayco only uses your approximate location while the app is open, to detect your country so Discover can show you people from elsewhere.</string>
+		<!-- App Tracking Transparency. Required for AppsFlyer to read the IDFA,
+		     which is what attributes a paid install (Snapchat Ads) to its
+		     campaign. Without a granted ATT the install still attributes, but
+		     only through SKAdNetwork: aggregated, capped and delayed.
+		     The user-facing text is LOCALIZED in the 10 InfoPlist.strings files
+		     (fr, en, es, it, pt-BR, nl…); this English copy is the fallback for
+		     a locale we don't ship. -->
+		<key>NSUserTrackingUsageDescription</key>
+		<string>Used to deliver a more relevant experience. You can decline without losing access to any feature.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Used to pick your profile photo and Discover photo from your gallery.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>

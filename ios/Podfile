@@ -51,6 +51,10 @@ post_install do |installer|
         'PERMISSION_CAMERA=1',
         'PERMISSION_MICROPHONE=1',
         'PERMISSION_LOCATION_WHENINUSE=1',
+        # App Tracking Transparency — compiled OUT by default, so without this
+        # line Permission.appTrackingTransparency silently resolves to
+        # "permanently denied" and AppsFlyer never sees an IDFA.
+        'PERMISSION_APP_TRACKING_TRANSPARENCY=1',
       ]
     end
   end

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../swayco/asr/asr_service.dart';
 import '../services/app_strings.dart';
+import '../services/attribution.dart';
 import '../services/auth_service.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
@@ -369,6 +370,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (!kIsWeb) {
       unawaited(AsrService.instance.ensureLanguageInstalled(_selectedLang!));
     }
+    // The "activated user" signal — the account is only really usable from
+    // here, so this is what a paid campaign should optimise against.
+    Attribution.logOnboardingCompleted();
     if (!mounted) return;
     widget.onCompleted();
   }

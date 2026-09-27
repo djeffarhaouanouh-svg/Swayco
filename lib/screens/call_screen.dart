@@ -16,6 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
 
 import '../services/analytics.dart';
+import '../services/attribution.dart';
 import '../services/app_strings.dart';
 import '../swayco/asr/apple_stt_channel.dart';
 import '../swayco/asr/asr_service.dart';
@@ -2095,6 +2096,7 @@ class _CallScreenState extends State<CallScreen> {
         langTo: _attachedTargetLang,
         props: {'kind': _callKind},
       );
+      Attribution.logCallStarted(_callKind);
     } catch (e) {
       await room.disconnect();
       Analytics.track(
@@ -2880,6 +2882,7 @@ class _CallScreenState extends State<CallScreen> {
           'translation_ms': _translationLive.elapsed.inMilliseconds,
         },
       );
+      Attribution.logCallEnded(_callKind, durMs);
     }
     widget.translation.translationListenable?.removeListener(_onTranslationStateChanged);
     _audio.dispose();

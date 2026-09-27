@@ -24,6 +24,7 @@ import 'services/app_settings.dart';
 import 'services/remote_config.dart';
 import 'services/app_strings.dart';
 import 'services/app_boot.dart';
+import 'services/attribution.dart';
 import 'services/auth_service.dart';
 import 'services/call_alert.dart';
 import 'services/chat_unread.dart';
@@ -209,6 +210,9 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('RevenueCat init slow/failed: $e');
     }
+    // AppsFlyer install attribution (iOS/Android, no-op on web). Not awaited:
+    // it sends its own session once ready and must never hold up boot.
+    unawaited(Attribution.init(customerUserId: AuthService.currentUserId));
     // AdMob (google_mobile_ads) — SDK init only, no ad unit wired up yet (that's
     // a later step). Mobile only: the plugin has no web support. Best-effort,
     // same as RevenueCat above — a slow/failed init mustn't gate boot.
@@ -479,6 +483,18 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     } catch (e, s) {
       debugPrint('_onSignedIn failed: $e\n$s');
     }
+    // A brand-new account is exactly the one with no usable profiles row yet,
+    // which is what needsOnboarding means — and it reads the same whether the
+    // user arrived by email, Google or Apple, so the sign-up / login split is
+    // decided here rather than in each provider's own path.
+    final method = AuthService.lastSignInMethod;
+    if (method.isNotEmpty) {
+      if (needsOnboarding) {
+        Attribution.logSignUp(method);
+      } else {
+        Attribution.logLogin(method);
+      }
+    }
     if (!mounted) return;
     setState(() {
       _authed = true;
@@ -540,6 +556,7 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     PresenceService.start(uid);
     // Tie store purchases to this account (no-op on web / unconfigured).
     unawaited(RevenueCat.identify(uid));
+    unawaited(Attribution.identify(uid));
     final profile = await UserPrefs.loadProfile();
     // The ACCOUNT (remote profile) is the source of truth for the interface
     // language: a change made on another device / the web syncs DOWN here

@@ -92,6 +92,12 @@ dependencies:
   # using the Stripe checkout via StripeApi; RevenueCat's native SDK has no
   # web support).
   purchases_flutter: ^10.2.2
+  # AppsFlyer — install attribution (which campaign / ad brought the user)
+  # on iOS / Android. No web support; lib/services/attribution.dart no-ops
+  # there. Pinned exactly: AppsFlyer ships release candidates as
+  # "7.0.2+2-rc1", where "-rc1" sits in the build metadata, so pub ranks it
+  # ABOVE the stable 7.0.2+2 and a caret constraint picks the RC.
+  appsflyer_sdk: 7.0.2+2
 
   # Liquid Glass (iOS 26) on the Messages screen.
   # - cupertino_native_plus: native platform-view glass for the STATIC

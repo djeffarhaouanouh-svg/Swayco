@@ -104,6 +104,19 @@ abstract final class RevenueCat {
     }
   }
 
+  /// Hand RevenueCat the AppsFlyer device id so it reports purchases,
+  /// renewals and refunds to AppsFlyer **server-side** (see [Attribution]).
+  /// Called once at boot; a failure only costs purchase attribution, never
+  /// the purchase itself.
+  static Future<void> setAppsflyerId(String appsflyerId) async {
+    if (!_configured || appsflyerId.isEmpty) return;
+    try {
+      await Purchases.setAppsflyerID(appsflyerId);
+    } catch (e) {
+      debugPrint('RevenueCat setAppsflyerID failed: $e');
+    }
+  }
+
   /// Detach the user on sign-out (reverts to an anonymous RevenueCat id).
   static Future<void> logOut() async {
     if (!_configured) return;
