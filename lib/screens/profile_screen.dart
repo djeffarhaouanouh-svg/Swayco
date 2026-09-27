@@ -3974,9 +3974,17 @@ class _BoostButtonState extends State<_BoostButton> {
       PurchaseOutcome.cancelled => null,
     };
     if (key != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppStrings.t(key))));
+      final why = outcome == PurchaseOutcome.unavailable
+          ? RevenueCat.lastUnavailableReason
+          : '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: Duration(seconds: why.isEmpty ? 4 : 8),
+          content: Text(
+            why.isEmpty ? AppStrings.t(key) : '${AppStrings.t(key)}\n($why)',
+          ),
+        ),
+      );
     }
     if (outcome == PurchaseOutcome.success) await widget.onPurchased();
     if (mounted) setState(() => _busy = false);

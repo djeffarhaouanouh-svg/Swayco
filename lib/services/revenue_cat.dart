@@ -82,9 +82,17 @@ abstract final class RevenueCat {
       unawaited(Purchases.getCustomerInfo().then(_onCustomerInfo, onError: (_) {}));
       debugPrint('RevenueCat configured (appUserID=${appUserId ?? '<anon>'})');
     } catch (e) {
+      _configureError = '$e';
       debugPrint('RevenueCat configure failed: $e');
     }
   }
+
+  static String _configureError = '';
+
+  /// Short reason for the last "unavailable" outcome — surfaced in the
+  /// paywall/Boost snackbar because TestFlight builds have no readable
+  /// console, and guessing the cause cost several build cycles.
+  static String lastUnavailableReason = '';
 
   /// Attach purchases to the signed-in Supabase user id (call on sign-in).
   static Future<void> identify(String userId) async {
@@ -110,11 +118,32 @@ abstract final class RevenueCat {
   /// The current offering's purchasable packages. Empty when unsupported, not
   /// configured, or no current offering is set on the dashboard.
   static Future<List<Package>> fetchPackages() async {
-    if (!_configured) return const [];
+    if (!_configured) {
+      lastUnavailableReason = _configureError.isEmpty
+          ? 'not configured'
+          : 'configure failed: $_configureError';
+      return const [];
+    }
     try {
       final offerings = await Purchases.getOfferings();
-      return offerings.current?.availablePackages ?? const [];
+      final current = offerings.current;
+      if (current == null) {
+        lastUnavailableReason =
+            'no current offering (all: ${offerings.all.keys.join(', ')})';
+        return const [];
+      }
+      if (current.availablePackages.isEmpty) {
+        lastUnavailableReason =
+            'offering "${current.identifier}" has 0 packages from the store';
+      }
+      return current.availablePackages;
+    } on PlatformException catch (e) {
+      lastUnavailableReason =
+          'getOfferings: ${e.code} ${e.message ?? ''}'.trim();
+      debugPrint('RevenueCat getOfferings failed: $e');
+      return const [];
     } catch (e) {
+      lastUnavailableReason = 'getOfferings: $e';
       debugPrint('RevenueCat getOfferings failed: $e');
       return const [];
     }
@@ -134,18 +163,36 @@ abstract final class RevenueCat {
     }
   }
 
-  /// The package whose RevenueCat identifier is [packageId] in the current
-  /// offering. Matched on the package id, never the store product id, which
-  /// differs per store (Android appends the base plan: `pro_monthly:monthly`).
+  /// Store product id behind each package id we look up, used as a fallback
+  /// match: the base id (Android's `:basePlan` suffix stripped) is the same
+  /// on both stores up to case (`Boost_1` / `boost_1`).
+  static const Map<String, String> _productFallback = {
+    proPackageId: 'pro_monthly',
+    boostPackageId: 'boost_1',
+  };
+
+  /// The package for [packageId] in the current offering — matched on the
+  /// RevenueCat package identifier first, then on the store product id, so
+  /// a dashboard-side identifier we guessed wrong can't make it vanish.
   static Future<Package?> _package(String packageId) async {
+    lastUnavailableReason = '';
     final packages = await fetchPackages();
+    final wanted = packageId.toLowerCase();
+    final wantedProduct = _productFallback[packageId]?.toLowerCase();
     for (final p in packages) {
-      if (p.identifier.toLowerCase() == packageId.toLowerCase()) return p;
+      if (p.identifier.toLowerCase() == wanted) return p;
     }
-    debugPrint(
-      'RevenueCat: package "$packageId" not in current offering '
-      '(has: ${packages.map((p) => p.identifier).join(', ')})',
-    );
+    if (wantedProduct != null) {
+      for (final p in packages) {
+        final base = p.storeProduct.identifier.split(':').first.toLowerCase();
+        if (base == wantedProduct) return p;
+      }
+    }
+    if (packages.isNotEmpty) {
+      lastUnavailableReason = 'package "$packageId" missing (have: '
+          '${packages.map((p) => '${p.identifier}=${p.storeProduct.identifier}').join(', ')})';
+    }
+    debugPrint('RevenueCat: $lastUnavailableReason');
     return null;
   }
 
@@ -161,7 +208,6 @@ abstract final class RevenueCat {
     required String packageId,
     required String entitlementId,
   }) async {
-    if (!_configured) return PurchaseOutcome.unavailable;
     final pkg = await _package(packageId);
     if (pkg == null) return PurchaseOutcome.unavailable;
     try {
@@ -186,7 +232,6 @@ abstract final class RevenueCat {
   /// Buy the consumable [packageId] once. Success = the store charged; what it
   /// grants is credited server-side by the RevenueCat webhook.
   static Future<PurchaseOutcome> purchaseConsumable(String packageId) async {
-    if (!_configured) return PurchaseOutcome.unavailable;
     final pkg = await _package(packageId);
     if (pkg == null) return PurchaseOutcome.unavailable;
     try {

@@ -95,8 +95,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       );
       Navigator.of(context).maybePop();
     } else if (outcome == PurchaseOutcome.unavailable) {
+      final why = RevenueCat.lastUnavailableReason;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('paywall_snack_unavailable'))),
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text(
+            why.isEmpty
+                ? AppStrings.t('paywall_snack_unavailable')
+                : '${AppStrings.t('paywall_snack_unavailable')}\n($why)',
+          ),
+        ),
       );
     } else if (outcome == PurchaseOutcome.error) {
       ScaffoldMessenger.of(context).showSnackBar(
