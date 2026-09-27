@@ -1,4 +1,4 @@
-﻿name: livekit_translate
+name: livekit_translate
 description: Flutter 1:1 LiveKit video calling with secure token backend and hooks for realtime translation.
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -34,9 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  # Drapeaux ronds du bouton de langue, en appel. L'emoji drapeau dÃ©pend de la
-  # police du systÃ¨me (et n'existe pas du tout sous Windows) ; ceux-ci sont des
-  # SVG embarquÃ©s (flag-icons), rendus Ã  l'identique partout.
+  # Drapeaux ronds du bouton de langue, en appel. L'emoji drapeau dépend de la
+  # police du système (et n'existe pas du tout sous Windows) ; ceux-ci sont des
+  # SVG embarqués (flag-icons), rendus à l'identique partout.
   country_flags: ^4.1.2
   livekit_client: 2.7.0
   flutter_webrtc: 1.4.0
@@ -52,14 +52,14 @@ dependencies:
   # firebase_messaging: ask permission, get FCM token, listen to refreshes.
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3
-  # Open external URLs (Terms, Privacy, support email) â€” required for
-  # store compliance (App Store Â§5.1.1, Play Data Safety).
+  # Open external URLs (Terms, Privacy, support email) — required for
+  # store compliance (App Store §5.1.1, Play Data Safety).
   url_launcher: ^6.3.1
   share_plus: ^12.0.2
   # Reads the real app version/build number for the Settings screen.
   package_info_plus: ^8.0.0
   # Call mic capture (record) + in-call / TTS playback (audioplayers).
-  # 6.x â€” required because record_linux 0.7.2 (the latest in the 5.x
+  # 6.x — required because record_linux 0.7.2 (the latest in the 5.x
   # tree) doesn't implement the streaming API introduced in
   # record_platform_interface 1.4+, breaking the Android release build
   # at kernel_snapshot time. 6.x ships a record_linux that satisfies
@@ -72,7 +72,7 @@ dependencies:
   # backend /translation/tts endpoint isn't available).
   flutter_tts: ^4.2.0
   path_provider: ^2.1.4
-  # Swayco Midnight design â€” Bricolage Grotesque (titles) + DM Sans (body).
+  # Swayco Midnight design — Bricolage Grotesque (titles) + DM Sans (body).
   google_fonts: ^6.2.1
   flutter_local_notifications: ^18.0.1
   # Absolute-instant scheduling for `zonedSchedule` (the onboarding
@@ -88,14 +88,14 @@ dependencies:
   # Renders the official multicolour Google "G" on the login social button
   # (a font IconData can't carry Google's 4 brand colours).
   flutter_svg: ^2.0.0
-  # RevenueCat â€” in-app subscriptions on iOS / Android (the web build keeps
+  # RevenueCat — in-app subscriptions on iOS / Android (the web build keeps
   # using the Stripe checkout via StripeApi; RevenueCat's native SDK has no
   # web support).
   purchases_flutter: ^10.2.2
 
   # Liquid Glass (iOS 26) on the Messages screen.
   # - cupertino_native_plus: native platform-view glass for the STATIC
-  #   "Invite to a call" button (CNButton.glass) on iOS 26+. iOS/macOS only â€”
+  #   "Invite to a call" button (CNButton.glass) on iOS 26+. iOS/macOS only —
   #   every use is guarded behind PlatformVersion.shouldUseNativeGlass, with a
   #   fallback widget so Android / iOS<26 never instantiate it.
   # - liquid_glass_widgets: cross-platform shader glass (incl. web) for the
@@ -103,11 +103,11 @@ dependencies:
   cupertino_native_plus: ^0.0.11
   liquid_glass_widgets: ^0.15.0
 
-  # sherpa_onnx â€” the single ONNX Runtime the app consolidates on. Drives both
+  # sherpa_onnx — the single ONNX Runtime the app consolidates on. Drives both
   # on-device TTS (OfflineTts: Kokoro + Piper/VITS, espeak-ng inside each model
   # bundle) and on-device STT (OfflineRecognizer: universal Whisper) plus the
   # VAD segmenter (seg.onnx). It statically links its own runtime, so it must
-  # be the ONLY ONNX Runtime in the app â€” a second one makes iOS fail to link
+  # be the ONLY ONNX Runtime in the app — a second one makes iOS fail to link
   # on duplicate symbols. Models stay download-on-demand.
   sherpa_onnx: ^1.13.4
 
@@ -119,7 +119,7 @@ dependencies:
   # Pinned exactly (not ^9.0.0): 9.1.0 added a non-modular #import of
   # GoogleMobileAds_Beta.h in FLTAd_Internal.h/FLTAdPreloader.h, which fails
   # the iOS Release archive ("Include of non-modular header inside framework
-  # module") â€” a CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES
+  # module") — a CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES
   # Podfile workaround does NOT fix it for Release. Un-pin once Google ships
   # a fixed release.
   google_mobile_ads: 9.0.0
@@ -128,7 +128,7 @@ dependencies:
 
 # iOS + macOS: use the sherpa_onnx plugin patched with the ja external-tokens API
 # (SherpaOnnxOfflineTtsGenerateFromTokens) and shipping the OpenJTalk reading lib
-# alongside it â€” that pair is what makes the Japanese voice run on the app's
+# alongside it — that pair is what makes the Japanese voice run on the app's
 # SINGLE ONNX Runtime (see native/sherpa_ja_patch + native/ja_openjtalk).
 # The native binaries are git-ignored; regenerate them with each override's
 # setup.sh / build_ios.sh. Android still uses the stock plugin (no ja voice yet).
@@ -141,7 +141,7 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # Drives the real app() on a device â€” required by everything under
+  # Drives the real app() on a device — required by everything under
   # integration_test/. It was missing, so that whole suite failed to
   # compile ("Target of URI doesn't exist").
   integration_test:
@@ -153,7 +153,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  # flutter_native_splash retired in 6.1.2+10 â€” its in-app overlay
+  # flutter_native_splash retired in 6.1.2+10 — its in-app overlay
   # was never being dismissed in Release builds on real iPhone /
   # Android devices, leaving a pure-black surface over a correctly
   # rendered LoginScreen (confirmed by Railway pings showing
@@ -171,33 +171,33 @@ flutter_launcher_icons:
   image_path: "assets/icon-app.png"
   android: true
   # Android 8+ needs an adaptive icon, drawn on a 108dp canvas of which
-  # only the CENTER 72dp is ever shown â€” the outer ring is clipped
+  # only the CENTER 72dp is ever shown — the outer ring is clipped
   # outright before any mask shape even runs, on every launcher, no
   # exceptions. Guaranteed-visible content must stay within a 66dp
-  # "safe zone" circle (source: Android's adaptive icon spec â€” see
+  # "safe zone" circle (source: Android's adaptive icon spec — see
   # developer.android.com/develop/ui/views/launch/icon_design_adaptive).
   #
-  # The whole flat tile used to go in the BACKGROUND layer â€” logo baked
+  # The whole flat tile used to go in the BACKGROUND layer — logo baked
   # in, edge to edge, foreground left transparent. Measured on
   # icon-app.png: the arrow's tip sits at 85% of the way to the edge,
   # more than double the 61% (33dp of 54dp half-canvas) the safe zone
   # actually guarantees. Every real device was cropping the tip clean
-  # off, and what stayed on screen read as a zoomed-in, cropped logo â€”
+  # off, and what stayed on screen read as a zoomed-in, cropped logo —
   # "the icon looks too big" once installed from the store, though the
-  # flat 1024Ã—1024 preview (and the separate 512Ã—512 Play Store listing
-  # icon, assets/icon-android.png â€” untouched, uploaded by hand, not
+  # flat 1024×1024 preview (and the separate 512×512 Play Store listing
+  # icon, assets/icon-android.png — untouched, uploaded by hand, not
   # part of this pipeline) looked perfectly normal.
   #
   # Split in two, as adaptive icons are meant to be: icon-adaptive-bg.png
-  # is the gradient ALONE, still edge to edge â€” a plain fill is exactly
+  # is the gradient ALONE, still edge to edge — a plain fill is exactly
   # what is safe to bleed into the clipped ring. icon-adaptive-fg.png is
   # the white logo ALONE, transparent elsewhere, rescaled so its
-  # farthest point sits at 30% of canvas width from centre â€” inside the
+  # farthest point sits at 30% of canvas width from centre — inside the
   # 30.6% safe-zone radius, not merely inside the 33% viewport crop.
   adaptive_icon_background: "assets/icon-adaptive-bg.png"
   adaptive_icon_foreground: "assets/icon-adaptive-fg.png"
   ios: true
-  # iOS icons may not carry transparency â€” flatten the rounded-corner
+  # iOS icons may not carry transparency — flatten the rounded-corner
   # alpha onto the icon's own near-black background.
   remove_alpha_ios: true
   background_color_ios: "#000000"
@@ -226,28 +226,28 @@ flutter:
     - assets/add-picture.png
     # Group-selfie photo heading the onboarding welcome step.
     - assets/bienvenue.jpg
-    # Cyan Ã˜ brand mark (cropped from test-logo.png).
+    # Cyan Ø brand mark (cropped from test-logo.png).
     - assets/test-logo.png
-    # Transparent Ã˜-arrows mark â€” call connecting splash ("sas").
+    # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
-    # Boot splash â€” Splash Sync Call "cassure nette" (same file as web/splash.json).
+    # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).
     - assets/splash.json
-    # Discover globe filter â€” "Go" transition (Ring+Arrow, no wordmark).
+    # Discover globe filter — "Go" transition (Ring+Arrow, no wordmark).
     - assets/discover_filter_transition.json
-    # Official multicolour Google "G" â€” login "Continue with Google" button.
+    # Official multicolour Google "G" — login "Continue with Google" button.
     - assets/google-logo-search-new-svgrepo-com.svg
     # Short chime played when the "It's a match" badge pops.
     - assets/sounds/match_pop.wav
     # Nav-bar glyphs drawn as SVG (the Discover coconut).
     - assets/icons/
-    # Preview photo in the "LÃ©a veut t'ajouter" onboarding tip card.
+    # Preview photo in the "Léa veut t'ajouter" onboarding tip card.
     - assets/tips/lea_preview.jpg
-    # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) â€”
+    # Natural Earth 110m country outlines (GeoJSON, coords rounded to 2dp) —
     # drives the Discover country-picker globe (lib/widgets/discover_globe.dart).
     - assets/geo/world-110m.geo.json
 
-  # The swaycÃ¸ wordmark is set in Glacial Indifference (SIL Open Font
-  # License â€” see assets/fonts/OFL.txt). Brand type only: the rest of the UI
+  # The swaycø wordmark is set in Glacial Indifference (SIL Open Font
+  # License — see assets/fonts/OFL.txt). Brand type only: the rest of the UI
   # stays on Bricolage Grotesque / DM Sans via google_fonts.
   fonts:
     - family: GlacialIndifference
