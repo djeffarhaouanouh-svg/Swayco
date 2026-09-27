@@ -111,6 +111,13 @@ abstract final class RevenueCat {
   static Future<void> setAppsflyerId(String appsflyerId) async {
     if (!_configured || appsflyerId.isEmpty) return;
     try {
+      // The id alone is not enough: RevenueCat also needs the device
+      // identifiers (IDFA / IDFV / GAID / IP) to match a purchase back to the
+      // install AppsFlyer attributed. RevenueCat's own integration guide calls
+      // both, and warns that "if the AppsFlyer ID is missing, some events may
+      // not be delivered" — collecting only half the pair is how a purchase
+      // silently never shows up on the AppsFlyer side.
+      await Purchases.collectDeviceIdentifiers();
       await Purchases.setAppsflyerID(appsflyerId);
     } catch (e) {
       debugPrint('RevenueCat setAppsflyerID failed: $e');
