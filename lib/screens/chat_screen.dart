@@ -980,13 +980,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _openSearch,
-                child: const SizedBox(
+                // Cerclée : un rond du même gris que la pastille « en ligne »,
+                // avec un liseré, pour qu'on la voie comme un bouton.
+                child: Container(
                   width: 40,
                   height: 40,
-                  child: Icon(
+                  decoration: BoxDecoration(
+                    color: SC.menu,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
                     Icons.search_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 22,
                   ),
                 ),
               ),
