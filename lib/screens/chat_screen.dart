@@ -806,7 +806,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   color: Colors.white.withValues(alpha: 0.10),
                 ),
                 Expanded(
-                  child: _searchExpanded
+                  // Loupe ouverte mais rien de tapé : la liste reste là.
+                  // Les résultats ne la remplacent qu'à la première lettre.
+                  child: _searchExpanded && _searchCtrl.text.trim().isNotEmpty
                       ? _buildSearchResults()
                       : _buildBody(),
                 ),
@@ -1090,13 +1092,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// La page de recherche : vide tant qu'on n'a rien tapé, puis les profils
-  /// trouvés, chacun avec son état (ami / demande envoyée / à ajouter).
+  /// Les profils trouvés pour ce qui est tapé, chacun avec son état (ami /
+  /// demande envoyée / à ajouter). Appelée seulement quand le champ n'est pas
+  /// vide — sinon c'est la liste des conversations qui s'affiche.
   Widget _buildSearchResults() {
     final q = _searchCtrl.text.trim();
     final navBody =
         GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
-    if (q.isEmpty) return const SizedBox.shrink();
     if (_searching && _searchResults.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 32),
