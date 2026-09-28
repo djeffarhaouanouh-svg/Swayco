@@ -377,6 +377,8 @@ abstract final class AppStrings {
     'gif_none': 'Aucun GIF trouvé',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Inviter à un appel',
+    'call_anyone_title': "Appelle n'importe qui, chacun dans sa langue",
+    'call_anyone_sub': "Traduction en direct pendant l'appel",
     'invite_call_share_text':
         'Rejoins mon appel vidéo traduit en direct sur Swayco 🌍 — clique, pas besoin de compte : {link}',
     'invite_call_creating': 'Création du lien…',
@@ -1014,6 +1016,8 @@ abstract final class AppStrings {
     'gif_none': 'No GIF found',
     // Invite-to-call (guest link, no account needed)
     'invite_to_call': 'Invite to a call',
+    'call_anyone_title': 'Call anyone, each in their own language',
+    'call_anyone_sub': 'Live translation during the call',
     'invite_call_share_text':
         'Join my live-translated video call on Swayco 🌍 — just tap, no account needed: {link}',
     'invite_call_creating': 'Creating link…',
@@ -1891,6 +1895,8 @@ abstract final class AppStrings {
     'report_reason_scam': 'Estafa',
     'report_reason_other': 'Otro',
     'invite_to_call': 'Invitar a una llamada',
+    'call_anyone_title': 'Llama a quien quieras, cada uno en su idioma',
+    'call_anyone_sub': 'Traducción en directo durante la llamada',
     'invite_call_share_text':
         'Únete a mi videollamada con traducción en directo en Swayco 🌍 — solo toca, sin necesidad de cuenta: {link}',
     'invite_call_creating': 'Creando enlace…',
@@ -2497,6 +2503,8 @@ abstract final class AppStrings {
     'report_reason_other': 'Sonstiges',
     'discover_message_sent': 'Nachricht gesendet',
     'invite_to_call': 'Zu einem Anruf einladen',
+    'call_anyone_title': 'Ruf jeden an, jeder in seiner Sprache',
+    'call_anyone_sub': 'Live-Übersetzung während des Anrufs',
     'invite_call_share_text':
         'Komm zu meinem live-übersetzten Videoanruf auf Swayco 🌍 — einfach tippen, kein Konto nötig: {link}',
     'invite_call_creating': 'Link wird erstellt…',
@@ -3129,6 +3137,8 @@ abstract final class AppStrings {
     'report_reason_other': 'Altro',
     'discover_message_sent': 'Messaggio inviato',
     'invite_to_call': 'Invita a una chiamata',
+    'call_anyone_title': 'Chiama chiunque, ognuno nella sua lingua',
+    'call_anyone_sub': 'Traduzione dal vivo durante la chiamata',
     'invite_call_share_text':
         'Unisciti alla mia videochiamata con traduzione in diretta su Swayco 🌍 — basta un tocco, senza bisogno di account: {link}',
     'invite_call_creating': 'Creazione del link…',
@@ -3758,6 +3768,8 @@ abstract final class AppStrings {
     'report_reason_other': 'Outro',
     'discover_message_sent': 'Mensagem enviada',
     'invite_to_call': 'Convidar para uma chamada',
+    'call_anyone_title': 'Ligue para qualquer pessoa, cada um na sua língua',
+    'call_anyone_sub': 'Tradução ao vivo durante a chamada',
     'invite_call_share_text':
         'Junte-se à minha videochamada com tradução em direto no Swayco 🌍 — basta tocar, sem necessidade de conta: {link}',
     'invite_call_creating': 'A criar link…',
@@ -4389,6 +4401,8 @@ abstract final class AppStrings {
     'report_reason_other': 'Overig',
     'discover_message_sent': 'Bericht verstuurd',
     'invite_to_call': 'Uitnodigen voor een gesprek',
+    'call_anyone_title': 'Bel iedereen, ieder in zijn eigen taal',
+    'call_anyone_sub': 'Live vertaling tijdens het gesprek',
     'invite_call_share_text':
         'Doe mee aan mijn livevertaalde videogesprek op Swayco 🌍 — gewoon tikken, geen account nodig: {link}',
     'invite_call_creating': 'Link maken…',
@@ -5006,6 +5020,8 @@ abstract final class AppStrings {
     'report_reason_other': 'أخرى',
     'discover_message_sent': 'تم إرسال الرسالة',
     'invite_to_call': 'دعوة إلى مكالمة',
+    'call_anyone_title': 'اتصل بأي شخص، كلٌّ بلغته',
+    'call_anyone_sub': 'ترجمة فورية أثناء المكالمة',
     'invite_call_share_text':
         'انضم إلى مكالمة الفيديو المترجمة مباشرةً على Swayco 🌍 — اضغط فقط، دون الحاجة إلى حساب: {link}',
     'invite_call_creating': 'جارٍ إنشاء الرابط…',
@@ -5632,6 +5648,8 @@ abstract final class AppStrings {
     'report_reason_other': 'Другое',
     'discover_message_sent': 'Сообщение отправлено',
     'invite_to_call': 'Пригласить на звонок',
+    'call_anyone_title': 'Звони кому угодно, каждый на своём языке',
+    'call_anyone_sub': 'Перевод в реальном времени во время звонка',
     'invite_call_share_text':
         'Присоединяйтесь к моему видеозвонку с живым переводом в Swayco 🌍 — просто нажмите, аккаунт не нужен: {link}',
     'invite_call_creating': 'Создание ссылки…',
@@ -6217,6 +6235,8 @@ abstract final class AppStrings {
     'report_reason_other': '其他',
     'discover_message_sent': '消息已发送',
     'invite_to_call': '邀请通话',
+    'call_anyone_title': '和任何人通话，各说各的语言',
+    'call_anyone_sub': '通话中实时翻译',
     'invite_call_share_text': '来 Swayco 加入我的实时翻译视频通话 🌍 — 点一下即可，无需账户：{link}',
     'invite_call_creating': '正在创建链接…',
     'invite_call_failed': '无法创建邀请链接，请重试。',
@@ -6800,6 +6820,8 @@ abstract final class AppStrings {
     'report_reason_other': 'その他',
     'discover_message_sent': 'メッセージを送信しました',
     'invite_to_call': '通話に招待',
+    'call_anyone_title': '誰とでも、それぞれの言葉で話そう',
+    'call_anyone_sub': '通話中にリアルタイム翻訳',
     'invite_call_share_text':
         'Swayco のリアルタイム翻訳ビデオ通話に参加しよう 🌍 — タップするだけ、アカウント不要: {link}',
     'invite_call_creating': 'リンクを作成中…',
@@ -7379,6 +7401,8 @@ abstract final class AppStrings {
     'report_reason_other': '기타',
     'discover_message_sent': '메시지를 보냈어요',
     'invite_to_call': '통화에 초대',
+    'call_anyone_title': '누구에게나 전화하세요, 각자의 언어로',
+    'call_anyone_sub': '통화 중 실시간 번역',
     'invite_call_share_text':
         'Swayco에서 실시간 번역 영상 통화에 함께해요 🌍 — 계정 없이 탭만 하면 돼요: {link}',
     'invite_call_creating': '링크 만드는 중…',

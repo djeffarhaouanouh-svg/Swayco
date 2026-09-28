@@ -5,6 +5,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
 
@@ -12,6 +14,7 @@ import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
+import '../services/call_launcher.dart';
 import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/debug_overlay.dart';
@@ -22,12 +25,14 @@ import '../services/locations.dart';
 import '../services/match_seen.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
+import '../services/guest_invite_api.dart';
 import '../services/nav_tab.dart';
 import '../services/notif_enable_flow.dart';
 import '../services/notification_client.dart';
 import '../services/profile_api.dart';
 import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
+import '../services/token_api.dart';
 import '../services/user_prefs.dart';
 import '../services/wave_api.dart';
 import '../services/web_poll.dart';
@@ -37,8 +42,10 @@ import '../widgets/appear.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
+import '../widgets/spoken_language_gate.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_wave_promo.dart';
+import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
@@ -96,6 +103,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<({String conversationId, DateTime createdAt})> _inbound = const [];
   bool _loading = true;
   String? _error;
+  /// UI lock while a guest-invite link is being minted (prevents double-tap).
+  bool _creatingInvite = false;
   /// Bumps on every [_reload] so an older in-flight fetch cannot overwrite
   /// a newer one and yank a row (Alice flashing in, then out).
   int _reloadSeq = 0;
@@ -800,6 +809,92 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
 
+  /// Mint a guest-invite link, open the share sheet, then drop the host into
+  /// the call's waiting room. Whoever opens the link joins with no account;
+  /// the host (the caller) is the one billed for the call. Restored from
+  /// 5c13f6c for the "Appelle n'importe qui" banner.
+  Future<void> _shareCallInvite() async {
+    if (_creatingInvite) return;
+    setState(() => _creatingInvite = true);
+    Analytics.track('call_invite_link', props: {'source': 'messages_banner'});
+    try {
+      // The host needs a name + spoken language for the call's translation
+      // route — resolved exactly like a direct peer call.
+      final me = await CallLauncher.resolveMyIdentity();
+      if (!me.isComplete) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('invite_call_need_profile'))),
+        );
+        return;
+      }
+      final invite = await GuestInviteApi.create();
+      if (invite == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.t('invite_call_failed'))),
+        );
+        return;
+      }
+      final shareText = AppStrings.t(
+        'invite_call_share_text',
+        args: {'link': invite.link},
+      );
+      if (mounted) {
+        final box = context.findRenderObject() as RenderBox?;
+        try {
+          await SharePlus.instance.share(
+            ShareParams(
+              text: shareText,
+              subject: AppStrings.t('invite_to_call'),
+              sharePositionOrigin: box != null
+                  ? box.localToGlobal(Offset.zero) & box.size
+                  : null,
+            ),
+          );
+        } catch (_) {
+          // Sheet dismissed — still enter the waiting room; the host can
+          // re-share the link from there.
+        }
+      }
+      // Which language will be spoken, resolved before minting the token:
+      // it carries it into the LiveKit metadata the peer translates FROM.
+      final spokenLang = await resolveSpokenLanguage(preselect: me.sourceLang);
+      if (!mounted) return;
+      final token = await fetchLiveKitToken(
+        roomName: invite.roomName,
+        identity: 'u${DateTime.now().millisecondsSinceEpoch}'
+            '${math.Random().nextInt(999999)}',
+        displayName: me.name,
+        sourceLang: spokenLang,
+        inviteSig: invite.sig,
+        inviteExp: invite.exp,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => CallScreen(
+            wsUrl: token.url,
+            jwt: token.token,
+            roomName: token.roomName,
+            displayName: me.name,
+            mySourceLang: spokenLang,
+            translation: widget.translation,
+            inviteShareText: shareText,
+            isCaller: true,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('invite_call_failed'))),
+      );
+    } finally {
+      if (mounted) setState(() => _creatingInvite = false);
+    }
+  }
+
   Widget _buildBody() {
     if (_loading) {
       // Skeleton list while data lands — keeps the layout in place
@@ -859,6 +954,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 setState(() => _notifBannerDismissed = true),
                           ),
                         ),
+                      // « Appelle n'importe qui » — l'appel par lien, sans
+                      // compte, en tête de page (maquette Messages).
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
+                        child: _CallAnyoneBanner(
+                          busy: _creatingInvite,
+                          onTap: _shareCallInvite,
+                        ),
+                      ),
                       // "Nouveaux matchs" — the bubble rail, newest first.
                       if (_newMatches.isNotEmpty) ...[
                         _SectionHeader(
@@ -1398,6 +1502,112 @@ class _UnreadBadge extends StatelessWidget {
 /// to turn them on right where missed messages hurt. Benefit-framed copy, a
 /// one-tap "enable" that runs the priming → OS-prompt / Settings flow, and a
 /// dismiss for the session.
+/// « Appelle n'importe qui, chacun dans sa langue » — la bannière cyan de la
+/// maquette Messages. Toute la carte est la cible : elle crée un lien
+/// d'invitation (appel sans compte) et ouvre la salle d'attente.
+class _CallAnyoneBanner extends StatefulWidget {
+  const _CallAnyoneBanner({required this.onTap, required this.busy});
+
+  final VoidCallback onTap;
+
+  /// Lien en cours de création : le rond tourne, la carte ne répond plus.
+  final bool busy;
+
+  @override
+  State<_CallAnyoneBanner> createState() => _CallAnyoneBannerState();
+}
+
+class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF0B0B0C);
+    return Semantics(
+      button: true,
+      label: AppStrings.t('call_anyone_title'),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.busy ? null : widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.98 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+            decoration: BoxDecoration(
+              color: SC.accent,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        AppStrings.t('call_anyone_title'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.archivo(
+                          color: ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        AppStrings.t('call_anyone_sub'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.archivo(
+                          color: ink.withValues(alpha: 0.78),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: ink,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: widget.busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.call_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NotifBanner extends StatelessWidget {
   const _NotifBanner({required this.onEnable, required this.onDismiss});
 
