@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,72 @@ import 'profile_screen.dart';
 /// One-to-one chat thread for [conversationId]. Title is the human-friendly
 /// name shown in the header. The header phone icon dials the peer directly
 /// via CallLauncher.
+/// Fond de la conversation 1b (handoff) — un cran au-dessus du noir pur.
+const Color _kThreadBg = Color(0xFF0B0B0C);
+
+/// Bulle reçue (1b).
+const Color _kBubbleIn = Color(0xFF1E1E22);
+
+/// « traduit · voir l'original » (1b : text-muted).
+const Color _kMetaMuted = Color(0xFF77777D);
+
+/// « ES → FR  Traduction auto activée » — pastille en verre centrée sous le
+/// header, tant que le toggle de traduction est allumé et que les deux
+/// langues diffèrent.
+class _TranslateRoutePill extends StatelessWidget {
+  const _TranslateRoutePill({required this.from, required this.to});
+
+  final String from;
+  final String to;
+
+  static const double height = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$from → $to',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                AppStrings.t('auto_translate_on'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
     super.key,
@@ -731,11 +798,31 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
+  /// « ES → FR » : ce que la traduction auto fait en ce moment, ou null quand
+  /// elle ne fait rien (coupée, langue du pair inconnue, même langue).
+  ({String from, String to})? get _translateRoute {
+    if (!_autoTranslate) return null;
+    final from = (_peer?.language ?? '').trim().split('-').first;
+    final to = _myLang.trim().split('-').first;
+    if (from.isEmpty || to.isEmpty || from == to) return null;
+    return (from: from.toUpperCase(), to: to.toUpperCase());
+  }
+
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
+    final safeTop = MediaQuery.paddingOf(context).top;
+    final route = _translateRoute;
+    // Conversation 1b : la liste occupe TOUT l'écran ; header et footer sont
+    // des calques posés dessus, fondus dans le fond (façon Insta / Telegram).
+    // La liste leur réserve juste la place de ne pas cacher un message au
+    // repos — au défilement, les messages passent dessous et s'y dissolvent.
+    final headerH = safeTop +
+        _ThreadHeader.height +
+        (route != null ? _TranslateRoutePill.height + 8 : 0) +
+        (_error != null ? 40 : 0);
     return Scaffold(
-      backgroundColor: SC.bg,
+      backgroundColor: _kThreadBg,
       body: GestureDetector(
         // Swipe right anywhere to leave the conversation (back).
         onHorizontalDragEnd: (d) {
@@ -743,109 +830,99 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         },
         child: Stack(
           children: [
-            ColoredBox(
-              color: SC.bg,
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    _ThreadHeader(
-                      title: widget.title,
-                      peer: _peer,
-                      clock: peerClock,
-                      place: _peer?.city ?? '',
-                      blockedByPeer: _peerBlockedMe,
-                      onCall: () => _startCall(withCamera: false),
-                      onVideoCall: () => _startCall(withCamera: true),
-                      onViewProfile: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ProfileScreen(userId: widget.peerDeviceId),
+            // ── La liste, plein écran ─────────────────────────────────────
+            // Un tap n'importe où ferme le clavier ; translucide pour que la
+            // liste défile et que les bulles reçoivent leurs taps.
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                  _MessageBubble.dismissActivePicker();
+                },
+                child: _buildMessageList(topInset: headerH + 8),
+              ),
+            ),
+            // ── Header : dégradé bg 100 % → 95 % à 55 % → 0 %, + 22 de fondu
+            //    sous la pastille. Les boutons, eux, sont en verre. ─────────
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0, 0.55, 1],
+                    colors: [
+                      _kThreadBg,
+                      _kThreadBg.withValues(alpha: 0.95),
+                      _kThreadBg.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.only(top: safeTop, bottom: 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ThreadHeader(
+                        title: widget.title,
+                        peer: _peer,
+                        clock: peerClock,
+                        place: _peer?.city ?? '',
+                        blockedByPeer: _peerBlockedMe,
+                        onCall: () => _startCall(withCamera: false),
+                        onVideoCall: () => _startCall(withCamera: true),
+                        onViewProfile: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                ProfileScreen(userId: widget.peerDeviceId),
+                          ),
                         ),
+                        peerBlocked: _peerBlocked,
+                        onToggleBlock: _toggleBlockPeer,
+                        onReport: _reportPeer,
                       ),
-                      peerBlocked: _peerBlocked,
-                      onToggleBlock: _toggleBlockPeer,
-                      onReport: _reportPeer,
-                    ),
-                    if (_error != null) _ErrorBanner(message: _error!),
-                    // Pure-black background ONLY behind the messages zone — the
-                    // header and composer keep the lighter 0E0E0E surface.
-                    // Tapping anywhere in the area dismisses the keyboard;
-                    // translucent so the list still scrolls and taps register.
-                    Expanded(
-                      child: ColoredBox(
-                        color: const Color(0xFF000000),
-                        child: Stack(
-                          children: [
-                            GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onTap: () {
-                                FocusScope.of(context).unfocus();
-                                _MessageBubble.dismissActivePicker();
-                              },
-                              child: _buildMessageList(),
-                            ),
-                            // Top fade — messages dissolve into black under the
-                            // header (floating, not empty).
-                            const Positioned(
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              child: IgnorePointer(
-                                child: SizedBox(
-                                  // Taller + lower-opacity peak so the top fades
-                                  // gently (floating, not a hard black bar) —
-                                  // same soft feel as the footer fade below.
-                                  height: 88,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0x99000000),
-                                          Color(0x00000000),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Bottom fade — messages dissolve into black under
-                            // the floating composer.
-                            const Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: IgnorePointer(
-                                child: SizedBox(
-                                  height: 160,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0x00000000),
-                                          Color(0x99000000),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      if (route != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _TranslateRoutePill(
+                            from: route.from,
+                            to: route.to,
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      if (_error != null) _ErrorBanner(message: _error!),
+                    ],
+                  ),
                 ),
               ),
             ),
-            // Floating glass composer OVER the messages — no dark footer behind
-            // it, so the glass refracts the conversation.
+            // ── Footer : même dégradé, inversé, 26 de fondu au-dessus. ─────
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: 26 + 76 + MediaQuery.paddingOf(context).bottom,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      stops: const [0, 0.55, 1],
+                      colors: [
+                        _kThreadBg,
+                        _kThreadBg.withValues(alpha: 0.95),
+                        _kThreadBg.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Composer en verre posé SUR la conversation.
             Positioned(
               left: 0,
               right: 0,
@@ -890,6 +967,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           autoTranslate: _autoTranslate,
                           onToggleTranslate: _toggleAutoTranslate,
                           myLang: _myLang,
+                          peerLang: _peer?.language ?? '',
+                          peerFirstName: (_peer?.displayName.isNotEmpty == true
+                                  ? _peer!.displayName
+                                  : widget.title)
+                              .trim()
+                              .split(RegExp(r'\s+'))
+                              .first,
                         ),
                       ],
                     ),
@@ -994,11 +1078,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  Widget _buildMessageList() {
+  Widget _buildMessageList({required double topInset}) {
     if (_messages.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.fromLTRB(32, topInset, 32, 32),
           child: Text(
             AppStrings.t('no_messages'),
             style: const TextStyle(color: SC.textMuted, fontSize: 14),
@@ -1035,6 +1119,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       }
     }
 
+    // La barre de réactions rapides (😂 ❤️ 🔥 👍 +) ne se pose que sous le
+    // DERNIER message du pair, et seulement s'il est le dernier du fil et que
+    // je n'y ai pas encore réagi : c'est une invitation à répondre, pas un
+    // décor à répéter sous chaque bulle.
+    String? quickReactId;
+    if (_messages.isNotEmpty && _messages.last.senderId != _myId) {
+      final last = _messages.last;
+      final reacted = (_reactionsByMessage[last.id] ?? const [])
+          .any((r) => r.userId == _myId);
+      if (!reacted && last.id.isNotEmpty) quickReactId = last.id;
+    }
+
     // Local TTS is local — no cloud cost, available to all tiers.
     //
     // reverse: true — the list's resting position (scroll offset 0) IS the
@@ -1049,10 +1145,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     return ListView.builder(
       controller: _scrollCtrl,
       reverse: true,
-      // Bottom room so the last message clears the floating composer.
+      // Haut : la place du header en calque. Bas : celle du composer.
       padding: EdgeInsets.fromLTRB(
         12,
-        12,
+        topInset,
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
@@ -1064,10 +1160,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         }
         final m = item.message!;
         final mine = m.senderId == _myId;
+        final display = _displayBodyFor(m);
         final bubble = _MessageBubble(
           message: m,
           mine: mine,
-          displayBody: _displayBodyFor(m),
+          displayBody: display,
+          // Reçu ET réellement réécrit par la traduction : la bulle le dit
+          // (« traduit · voir l'original ») et peut montrer l'original.
+          translated: !mine &&
+              display.trim().isNotEmpty &&
+              display.trim() != m.body.trim(),
+          showQuickReactions: m.id == quickReactId,
           translating: _translatingIds.contains(m.id),
           reactions: _reactionsByMessage[m.id] ?? const [],
           myId: _myId,
@@ -1221,38 +1324,46 @@ class _ThreadHeader extends StatelessWidget {
     return p != null && isPeerOnline(p);
   }
 
+  /// Hauteur du header sous la safe area (boutons 44 + 8 dessus/dessous).
+  static const double height = 60;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      // No frosted block behind the header any more — only the round glass
-      // buttons keep their glass. The row sits transparently over the chat.
-      padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+    return SizedBox(
+      height: height,
       child: Padding(
-        // Transparent header — only the round glass buttons carry the glass.
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        // Header transparent (1b) : seuls les boutons ronds portent le verre.
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
           children: [
             GlassIconButton(
               icon: Icons.arrow_back_rounded,
-              size: 40,
-              iconSize: 20,
+              size: 44,
+              iconSize: 22,
               // Bigger, marked grow-then-settle pop on tap (like the nav bar).
               popScale: 1.25,
               onTap: () => Navigator.of(context).maybePop(),
             ),
-            const SizedBox(width: 8),
-            // PDP bubble + online dot — tap opens the peer's profile.
+            const SizedBox(width: 10),
+            // PDP cerclée de cyan + point en ligne — tap = profil du pair.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  ProfileAvatar(
-                    displayName: title,
-                    avatarUrl: peer?.avatarUrl,
-                    fallbackUrl: peer?.fallbackPhotoUrl,
-                    size: 36,
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: SC.accent,
+                    ),
+                    child: ProfileAvatar(
+                      displayName: title,
+                      avatarUrl: peer?.avatarUrl,
+                      fallbackUrl: peer?.fallbackPhotoUrl,
+                      size: 40,
+                    ),
                   ),
                   if (_peerOnline)
                     Positioned(
@@ -1280,9 +1391,15 @@ class _ThreadHeader extends StatelessWidget {
             Expanded(
               child: Builder(
                 builder: (context) {
+                  // Ombre de texte : le prénom reste lisible quand les
+                  // messages passent sous le header transparent.
                   final nameStyle = SCText.h3.copyWith(
-                    fontSize: 15,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    shadows: const [
+                      Shadow(color: Color(0x99000000), blurRadius: 8),
+                    ],
                   );
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;
@@ -1313,8 +1430,8 @@ class _ThreadHeader extends StatelessWidget {
                               ),
                             ),
                             if (flag.isNotEmpty) ...[
-                              const SizedBox(width: 5),
-                              Text(flag, style: const TextStyle(fontSize: 14)),
+                              const SizedBox(width: 6),
+                              Text(flag, style: const TextStyle(fontSize: 15)),
                             ],
                           ],
                         ),
@@ -1337,13 +1454,14 @@ class _ThreadHeader extends StatelessWidget {
             // verre, plus de rebond, plus rien à toucher — il ne reste que les
             // deux icônes en creux. Un bouton grisé se presse quand même ;
             // une icône nue, non. Ce qu'on peut encore faire est en bas.
+            // Ordre de la maquette 1b : téléphone, puis caméra au bord.
             if (blockedByPeer)
               const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _DeadCallIcon(icon: Icons.videocam_rounded),
-                  SizedBox(width: 8),
                   _DeadCallIcon(icon: Icons.phone_rounded),
+                  SizedBox(width: 8),
+                  _DeadCallIcon(icon: Icons.videocam_rounded),
                 ],
               )
             else
@@ -1351,20 +1469,20 @@ class _ThreadHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GlassIconButton(
-                    icon: Icons.videocam_rounded,
-                    size: 40,
-                    iconSize: 20,
+                    icon: Icons.phone_rounded,
+                    size: 44,
+                    iconSize: 21,
                     // Marked pop on tap (matches the back button / nav bar).
                     popScale: 1.25,
-                    onTap: onVideoCall,
+                    onTap: onCall,
                   ),
                   const SizedBox(width: 8),
                   GlassIconButton(
-                    icon: Icons.phone_rounded,
-                    size: 40,
-                    iconSize: 20,
+                    icon: Icons.videocam_rounded,
+                    size: 44,
+                    iconSize: 22,
                     popScale: 1.25,
-                    onTap: onCall,
+                    onTap: onVideoCall,
                   ),
                 ],
               ),
@@ -1387,9 +1505,9 @@ class _DeadCallIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 40,
-      height: 40,
-      child: Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.32)),
+      width: 44,
+      height: 44,
+      child: Icon(icon, size: 21, color: Colors.white.withValues(alpha: 0.32)),
     );
   }
 }
@@ -1462,9 +1580,18 @@ class _MessageBubble extends StatefulWidget {
     required this.myId,
     required this.onReact,
     this.onLongPressDelete,
+    this.translated = false,
+    this.showQuickReactions = false,
   });
   final ChatMessage message;
   final bool mine;
+
+  /// Reçu et réécrit par la traduction auto : la bulle affiche « traduit ·
+  /// voir l'original » et peut basculer sur le texte d'origine.
+  final bool translated;
+
+  /// La barre 😂 ❤️ 🔥 👍 + sous la bulle (dernier message du pair seulement).
+  final bool showQuickReactions;
 
   /// Long-press handler — non-null only for the user's own messages.
   final VoidCallback? onLongPressDelete;
@@ -1496,9 +1623,14 @@ class _MessageBubble extends StatefulWidget {
 class _MessageBubbleState extends State<_MessageBubble> {
   String? _burstEmoji;
 
+  /// « voir l'original » touché : cette bulle montre le texte tel qu'écrit.
+  bool _showOriginal = false;
+
   ChatMessage get message => widget.message;
   bool get mine => widget.mine;
-  String get displayBody => widget.displayBody;
+  String get displayBody => widget.translated && _showOriginal
+      ? widget.message.body
+      : widget.displayBody;
   bool get translating => widget.translating;
   VoidCallback? get onLongPressDelete => widget.onLongPressDelete;
 
@@ -1571,15 +1703,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
-    // Dark text on the light bubbles (dark-teal on sent, near-black on
-    // received).
-    final bubbleText = mine ? SC.msgOutText : SC.msgInText;
-    final radius = BorderRadius.only(
-      topLeft: Radius.circular(mine ? 18 : 8),
-      topRight: Radius.circular(mine ? 8 : 18),
-      bottomLeft: const Radius.circular(18),
-      bottomRight: const Radius.circular(18),
-    );
+    // 1b : envoyé = cyan plein, texte encre ; reçu = surface-2, texte blanc.
+    final bubbleText = mine ? _kThreadBg : Colors.white;
+    final radius = BorderRadius.circular(20);
 
     final time =
         '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
@@ -1706,30 +1832,58 @@ class _MessageBubbleState extends State<_MessageBubble> {
               fontStyle: translating ? FontStyle.italic : FontStyle.normal,
             ),
           ),
-        const SizedBox(height: 2),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: Text(
-            time,
-            style: TextStyle(
-              // Sans bulle, l'heure se pose sur le fond noir de la page : le
-              // gris des bulles y serait illisible.
-              color: bareMedia
-                  ? SC.textMuted
-                  : bubbleText.withValues(alpha: 0.5),
-              fontSize: 10,
+        const SizedBox(height: 3),
+        if (widget.translated)
+          // « traduit · voir l'original · 14:32 » — le lien bascule la bulle
+          // entre la traduction et le texte tel qu'il a été écrit.
+          DefaultTextStyle.merge(
+            style: const TextStyle(color: _kMetaMuted, fontSize: 11.5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${AppStrings.t('msg_translated')} · '),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _showOriginal = !_showOriginal),
+                  child: Text(
+                    AppStrings.t(
+                      _showOriginal
+                          ? 'msg_see_translation'
+                          : 'msg_see_original',
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Text(' · $time'),
+              ],
+            ),
+          )
+        else
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text(
+              time,
+              style: TextStyle(
+                // Sans bulle, l'heure se pose sur le fond noir de la page : la
+                // couleur des bulles y serait illisible.
+                color: bareMedia
+                    ? SC.textMuted
+                    : (mine
+                        ? _kThreadBg.withValues(alpha: 0.55)
+                        : _kMetaMuted),
+                fontSize: 10,
+              ),
             ),
           ),
-        ),
       ],
     );
 
     final chips = reactionChipEmojis(widget.reactions);
 
-    return Align(
-      alignment: align,
-      child: Padding(
-        padding: EdgeInsets.only(top: chips.isNotEmpty ? 12 : 4, bottom: 4),
+    final bubbleStack = Padding(
+        // La puce de réaction déborde SOUS la bulle (1b) : on lui garde la
+        // place en bas, plus en haut.
+        padding: EdgeInsets.only(top: 4, bottom: chips.isNotEmpty ? 16 : 4),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -1751,29 +1905,23 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 decoration: bareMedia
                     ? null
                     : BoxDecoration(
-                        // Light "card" bubbles on the black message area: received =
-                        // neutral grey, sent = pale cyan with a cyan border.
-                        color: mine ? SC.msgOutBg : SC.msgInBg,
+                        color: mine ? SC.accent : _kBubbleIn,
                         borderRadius: radius,
-                        border: Border.all(
-                          color: mine ? SC.msgOutBorder : SC.msgInBorder,
-                        ),
                       ),
                 child: hugContent ? IntrinsicWidth(child: content) : content,
               ),
             ),
             if (chips.isNotEmpty)
               Positioned(
-                // Straddles the corner (half on the bubble, half hanging off
-                // it) instead of floating disconnected above it — the
-                // Instagram/WhatsApp tapback look.
-                top: -10,
-                right: -8,
+                // À cheval sur le bord BAS de la bulle, côté début (1b).
+                bottom: -14,
+                left: 10,
                 child: _ReactionChip(
                   // New key each time the reaction set changes → the pop
                   // animation replays on every add/change, not just once.
                   key: ValueKey(chips.join()),
                   emojis: chips,
+                  count: widget.reactions.length,
                   mineHighlighted: _myEmoji != null,
                   onTap: () {
                     final mineEmoji = _myEmoji;
@@ -1795,6 +1943,29 @@ class _MessageBubbleState extends State<_MessageBubble> {
               ),
           ],
         ),
+      );
+
+    return Align(
+      alignment: align,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          bubbleStack,
+          if (widget.showQuickReactions)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 6),
+              child: _QuickReactionBar(
+                onPick: (emoji) {
+                  HapticFeedback.lightImpact();
+                  setState(() => _burstEmoji = emoji);
+                  widget.onReact(emoji);
+                },
+                onMore: _openPicker,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1883,11 +2054,15 @@ class _ReactionChip extends StatelessWidget {
   const _ReactionChip({
     super.key,
     required this.emojis,
+    required this.count,
     required this.mineHighlighted,
     required this.onTap,
   });
 
   final List<String> emojis;
+
+  /// Nombre de réactions — « 🔥 1 » (1b).
+  final int count;
   final bool mineHighlighted;
   final VoidCallback onTap;
 
@@ -1918,12 +2093,77 @@ class _ReactionChip extends StatelessWidget {
                 width: mineHighlighted ? 1.4 : 1,
               ),
             ),
-            child: Text(
-              emojis.join(),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: emojis.join()),
+                  if (count > 0)
+                    TextSpan(
+                      text: ' $count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
               style: const TextStyle(fontSize: 14, height: 1.15),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 😂 ❤️ 🔥 👍 + sous le dernier message du pair (1b) : un tap réagit, le +
+/// ouvre le sélecteur complet (le même qu'un appui long sur la bulle).
+class _QuickReactionBar extends StatelessWidget {
+  const _QuickReactionBar({required this.onPick, required this.onMore});
+
+  final ValueChanged<String> onPick;
+  final VoidCallback onMore;
+
+  static const _emojis = ['😂', '❤️', '🔥', '👍'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: _kBubbleIn,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final e in _emojis)
+            Pressable(
+              onTap: () => onPick(e),
+              scale: 0.85,
+              child: SizedBox(
+                width: 34,
+                height: 34,
+                child: Center(
+                  child: Text(e, style: const TextStyle(fontSize: 19)),
+                ),
+              ),
+            ),
+          Pressable(
+            onTap: onMore,
+            scale: 0.85,
+            child: const SizedBox(
+              width: 34,
+              height: 34,
+              child: Icon(
+                Icons.add_reaction_outlined,
+                size: 20,
+                color: _kMetaMuted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2197,7 +2437,14 @@ class _Composer extends StatefulWidget {
     required this.autoTranslate,
     required this.onToggleTranslate,
     required this.myLang,
+    this.peerLang = '',
+    this.peerFirstName = '',
   });
+
+  /// Langue et prénom du pair — pour « Écris en français, Lucía lit en
+  /// espagnol » quand la traduction auto relie deux langues différentes.
+  final String peerLang;
+  final String peerFirstName;
 
   final TextEditingController controller;
   final bool sending;
@@ -2262,8 +2509,14 @@ class _ComposerState extends State<_Composer> {
     super.didUpdateWidget(old);
     // The spoken language loads a beat after the screen opens; retype the
     // placeholder once it resolves ("Message" → "Write in English") — but
-    // only after the open transition, so the retype stays visible.
-    if (_hintReady && old.myLang != widget.myLang) _animateHint();
+    // only after the open transition, so the retype stays visible. Same when
+    // the peer's language lands or the translate toggle flips.
+    if (_hintReady &&
+        (old.myLang != widget.myLang ||
+            old.peerLang != widget.peerLang ||
+            old.autoTranslate != widget.autoTranslate)) {
+      _animateHint();
+    }
   }
 
   /// Wait for the route's open transition to finish, then start typing.
@@ -2313,12 +2566,42 @@ class _ComposerState extends State<_Composer> {
   /// language — "Écrivez en Français" for a French user — falling back to the
   /// plain "Message" when their language is unknown.
   String get _composerHint {
+    final me = widget.myLang.trim().split('-').first;
+    final peer = widget.peerLang.trim().split('-').first;
+    if (widget.autoTranslate &&
+        me.isNotEmpty &&
+        peer.isNotEmpty &&
+        me != peer &&
+        widget.peerFirstName.isNotEmpty) {
+      return AppStrings.t(
+        'composer_hint_cross',
+        args: {
+          'me': _langName(me),
+          'peer': _langName(peer),
+          'name': widget.peerFirstName,
+        },
+      );
+    }
     final lang = findLanguageByCode(widget.myLang);
     if (lang == null) return AppStrings.t('composer_message_hint');
     return AppStrings.t(
       'composer_message_hint_lang',
       args: {'lang': lang.label},
     );
+  }
+
+  /// Nom de la langue [code] dans la langue de l'interface (« espagnol »).
+  /// En minuscule là où les noms de langue en prennent une (fr, es, it, pt,
+  /// nl) — « Écris en français », pas « en Français ».
+  static String _langName(String code) {
+    final name = AppStrings.t('lang_name_$code');
+    if (name == 'lang_name_$code') {
+      return findLanguageByCode(code)?.label ?? code.toUpperCase();
+    }
+    const lower = {'fr', 'es', 'it', 'pt', 'nl'};
+    return lower.contains(AppStrings.currentBcp47.value)
+        ? name.toLowerCase()
+        : name;
   }
 
   Widget _buildIdleBar() {
@@ -2356,11 +2639,14 @@ class _ComposerState extends State<_Composer> {
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
                             hintText: _typedHint,
-                            hintStyle: const TextStyle(color: SC.textMuted),
-                            // Keep the placeholder on ONE line — on the native
-                            // build the wider font wrapped "Écrivez en Français"
-                            // onto a second line and made the whole bar tall.
-                            hintMaxLines: 1,
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontSize: 14,
+                              height: 1.25,
+                            ),
+                            // Deux lignes au plus : « Écris en français, Lucía
+                            // lit en espagnol » tient sur deux (maquette 1b).
+                            hintMaxLines: 2,
                             filled: false,
                             contentPadding: const EdgeInsets.fromLTRB(
                               4,
@@ -2392,29 +2678,38 @@ class _ComposerState extends State<_Composer> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    // Le bouton rond : envoyer quand il y a du texte, sinon
-                    // ouvrir les GIF. Il a remplacé le micro — le chat
-                    // n'enregistre plus de vocaux.
-                    _CircleActionButton(
-                      icon: _hasText ? Icons.send : Icons.gif_box_rounded,
-                      busy: widget.sending,
-                      onTap: widget.sending
-                          ? null
-                          : (_hasText ? widget.onSend : widget.onSendGif),
+                    // La photo, à droite DANS le champ — la place de l'emoji
+                    // de la maquette 1b (le chat n'a pas de sélecteur
+                    // d'emoji ; il a l'envoi de photo).
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.sending ? null : widget.onSendImage,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 23,
+                          color: Colors.white.withValues(alpha: 0.75),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 4),
-            // Photo (add image) button — OUTSIDE the glass bar, so it gets its
-            // own glass circle + spring bounce (like the header buttons).
-            GlassIconButton(
-              icon: Icons.add_photo_alternate_outlined,
-              onTap: widget.sending ? null : widget.onSendImage,
-              size: 46,
-              iconSize: 24,
+            const SizedBox(width: 8),
+            // Le rond cyan plein (1b) : envoyer quand il y a du texte, sinon
+            // les GIF. Il tient la place du micro de la maquette — le chat
+            // n'enregistre pas de vocaux.
+            _CircleActionButton(
+              icon: _hasText ? Icons.send_rounded : Icons.gif_box_rounded,
+              busy: widget.sending,
+              onTap: widget.sending
+                  ? null
+                  : (_hasText ? widget.onSend : widget.onSendGif),
             ),
           ],
         ),
@@ -2435,40 +2730,27 @@ class _CircleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [SC.accent, SC.accentDeep],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: SC.accent.withValues(alpha: 0.45),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+    // 1b : cyan PLEIN (plus de dégradé ni de halo), icône à l'encre.
+    return Material(
+      color: SC.accent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Center(
             child: busy
                 ? const SizedBox(
-                    height: 22,
-                    width: 22,
+                    height: 20,
+                    width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: _kThreadBg,
                     ),
                   )
-                : Icon(icon, color: Colors.white, size: 22),
+                : Icon(icon, color: _kThreadBg, size: 22),
           ),
         ),
       ),
