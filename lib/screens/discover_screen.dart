@@ -956,20 +956,21 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader();
 
-  /// Hauteur sous la safe area : logo 42 + respiration.
-  static const double height = 52.0;
+  /// Hauteur sous la safe area : logo 30 + respiration (réduit : la place
+  /// va à la photo).
+  static const double height = 38.0;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
         child: Align(
           alignment: Alignment.centerLeft,
           child: SvgPicture.asset(
             'assets/swayco_logo_6d.svg',
-            height: 42,
+            height: 30,
             semanticsLabel: 'swaycø',
           ),
         ),
@@ -1002,8 +1003,9 @@ class _CountryRow extends StatefulWidget {
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// Bulle 44 + 6 + libellé 14, et 12 de marge dessus / dessous.
-  static const double height = 12 + 44 + 6 + 14 + 12;
+  /// Bulle 44 + 6 + libellé 14, 4 de marge dessus (collée au logo) et 10
+  /// dessous (avant la carte).
+  static const double height = 4 + 44 + 6 + 14 + 10;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
@@ -1059,7 +1061,7 @@ class _CountryRowState extends State<_CountryRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
               active: false,
@@ -1086,7 +1088,7 @@ class _CountryRowState extends State<_CountryRow> {
             child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(0, 12, 20, 12),
+              padding: const EdgeInsets.fromLTRB(0, 4, 20, 10),
               itemCount: keys.length,
               // Aéré comme la rangée fixe d'avant : ~20 px entre deux
               // bulles (12 ici + les 8 de marge de chaque case de 52).
