@@ -57,6 +57,10 @@ const double _kCardRadius = 32.0;
 /// Diamètre des boutons ✕ / message / ❤.
 const double _kActionSize = 58.0;
 
+/// Le bouton or du milieu, un cran plus petit que ✕ / ❤ (demandé : il
+/// écrasait les deux autres).
+const double _kMessageSize = 50.0;
+
 /// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
 const double _kActionPadV = 16.0;
 
@@ -1067,7 +1071,15 @@ class _CountryRow extends StatelessWidget {
                   ),
                 ),
                 alignment: Alignment.center,
-                child: CountrySilhouette(geoName: c.geo, iso2: c.iso),
+                // La silhouette remplit le rond (34 dans 40 utiles) et c'est
+                // la BULLE qui la rogne : elle en fait partie, pas posée
+                // dessus comme un autocollant.
+                clipBehavior: Clip.antiAlias,
+                child: CountrySilhouette(
+                  geoName: c.geo,
+                  iso2: c.iso,
+                  size: 34,
+                ),
               ),
             ),
         ],
@@ -2405,8 +2417,8 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOut,
           child: SizedBox(
-            width: _kActionSize,
-            height: _kActionSize,
+            width: _kMessageSize,
+            height: _kMessageSize,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
@@ -2420,8 +2432,8 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                       child: Transform.scale(
                         scale: 1 + 0.42 * t,
                         child: Container(
-                          width: _kActionSize,
-                          height: _kActionSize,
+                          width: _kMessageSize,
+                          height: _kMessageSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
@@ -2435,8 +2447,8 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                   },
                 ),
                 Container(
-                  width: _kActionSize,
-                  height: _kActionSize,
+                  width: _kMessageSize,
+                  height: _kMessageSize,
                   decoration: BoxDecoration(
                     color: _kSurface,
                     shape: BoxShape.circle,
@@ -2450,7 +2462,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                     shaderCallback: (r) => _goldGradient.createShader(r),
                     child: const Icon(
                       Icons.chat_bubble_rounded,
-                      size: 28,
+                      size: 24,
                       color: Colors.white,
                     ),
                   ),
@@ -2460,8 +2472,8 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                   top: -3,
                   right: -3,
                   child: Container(
-                    width: 20,
-                    height: 20,
+                    width: 18,
+                    height: 18,
                     decoration: BoxDecoration(
                       color: SC.bg,
                       shape: BoxShape.circle,

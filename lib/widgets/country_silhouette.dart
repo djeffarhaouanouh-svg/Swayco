@@ -51,25 +51,38 @@ class _CountrySilhouetteState extends State<CountrySilhouette> {
     final ring = _ring;
     if (ring == null || ring.length < 3) return SizedBox(width: s, height: s);
     final fitted = _fit(ring, s);
+    // Trois couches pour que le pays fasse corps avec sa bulle au lieu d'y
+    // flotter comme un autocollant : une ombre douce sous la forme, le
+    // drapeau découpé dedans, puis un liseré sombre qui en dessine le bord.
     return SizedBox(
       width: s,
       height: s,
-      child: ClipPath(
-        clipper: _PathClipper(fitted.path),
-        child: Stack(
-          children: [
-            Positioned.fromRect(
-              rect: fitted.bounds,
-              child: FittedBox(
-                fit: BoxFit.fill,
-                child: CountryFlag.fromCountryCode(
-                  widget.iso2,
-                  theme: const ImageTheme(width: 40, height: 30),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _ShadowPainter(fitted.path)),
+          ),
+          ClipPath(
+            clipper: _PathClipper(fitted.path),
+            child: Stack(
+              children: [
+                Positioned.fromRect(
+                  rect: fitted.bounds,
+                  child: FittedBox(
+                    fit: BoxFit.fill,
+                    child: CountryFlag.fromCountryCode(
+                      widget.iso2,
+                      theme: const ImageTheme(width: 40, height: 30),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned.fill(
+            child: CustomPaint(painter: _OutlinePainter(fitted.path)),
+          ),
+        ],
       ),
     );
   }
@@ -109,6 +122,48 @@ class _CountrySilhouetteState extends State<CountrySilhouette> {
       bounds: Rect.fromLTWH(dx, dy, w * scale, h * scale),
     );
   }
+}
+
+/// L'ombre portée de la silhouette, légèrement décalée vers le bas : la forme
+/// se pose DANS la bulle.
+class _ShadowPainter extends CustomPainter {
+  _ShadowPainter(this.path);
+  final Path path;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      path.shift(const Offset(0, 1.2)),
+      Paint()
+        ..color = const Color(0x8C000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ShadowPainter old) => old.path != path;
+}
+
+/// Le liseré qui dessine le bord du pays — sans lui, le blanc et le jaune des
+/// drapeaux se perdent sur le gris de la bulle.
+class _OutlinePainter extends CustomPainter {
+  _OutlinePainter(this.path);
+  final Path path;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..strokeJoin = StrokeJoin.round
+        ..color = const Color(0x59000000),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_OutlinePainter old) => old.path != path;
 }
 
 class _PathClipper extends CustomClipper<Path> {
