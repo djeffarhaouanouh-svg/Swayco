@@ -5,7 +5,6 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
-import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
@@ -1553,7 +1552,7 @@ class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
                         AppStrings.t('call_anyone_title'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.archivo(
+                        style: const TextStyle(
                           color: ink,
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -1566,7 +1565,7 @@ class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
                         AppStrings.t('call_anyone_sub'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.archivo(
+                        style: TextStyle(
                           color: ink.withValues(alpha: 0.78),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,

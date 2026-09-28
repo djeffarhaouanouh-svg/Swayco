@@ -5,7 +5,6 @@ import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
@@ -1111,7 +1110,7 @@ class _RowItem extends StatelessWidget {
                 overflow: TextOverflow.visible,
                 softWrap: false,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.dmSans(
+                style: TextStyle(
                   color: active ? SC.accent : const Color(0xFFAAAAAA),
                   fontSize: 11,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w500,
@@ -2110,12 +2109,13 @@ class _TinderCardState extends State<_TinderCard> {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.bricolageGrotesque(
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.4,
                             height: 1.1,
-                            shadows: const [
+                            shadows: [
                               Shadow(color: Color(0x66000000), blurRadius: 10),
                             ],
                           ),
@@ -2137,7 +2137,7 @@ class _TinderCardState extends State<_TinderCard> {
                     place,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.dmSans(
+                    style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -2208,7 +2208,7 @@ class _CardPills extends StatelessWidget {
     ];
     if (labels.isEmpty) return const SizedBox.shrink();
 
-    final style = GoogleFonts.dmSans(
+    const style = TextStyle(
       color: Colors.white,
       fontSize: 13,
       fontWeight: FontWeight.w600,
