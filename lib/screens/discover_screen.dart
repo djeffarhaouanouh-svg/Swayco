@@ -59,7 +59,7 @@ const double _kActionSize = 58.0;
 
 /// Le bouton or du milieu, un cran plus petit que ✕ / ❤ (demandé : il
 /// écrasait les deux autres).
-const double _kMessageSize = 50.0;
+const double _kMessageSize = 44.0;
 
 /// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
 const double _kActionPadV = 16.0;
@@ -2508,18 +2508,18 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                     shaderCallback: (r) => _goldGradient.createShader(r),
                     child: const Icon(
                       Icons.chat_bubble_rounded,
-                      size: 24,
+                      size: 20,
                       color: Colors.white,
                     ),
                   ),
                 ),
                 // ✦ en haut à droite : fond de page, liseré or.
                 Positioned(
-                  top: -3,
-                  right: -3,
+                  top: -4,
+                  right: -4,
                   child: Container(
-                    width: 18,
-                    height: 18,
+                    width: 16,
+                    height: 16,
                     decoration: BoxDecoration(
                       color: SC.bg,
                       shape: BoxShape.circle,
@@ -2530,7 +2530,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                       '✦',
                       style: TextStyle(
                         color: _kGold,
-                        fontSize: 10,
+                        fontSize: 9,
                         height: 1,
                       ),
                     ),
