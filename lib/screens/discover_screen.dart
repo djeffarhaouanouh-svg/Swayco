@@ -1059,7 +1059,7 @@ class _CountryRowState extends State<_CountryRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 6, 12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
               active: false,
@@ -1086,9 +1086,11 @@ class _CountryRowState extends State<_CountryRow> {
             child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(4, 12, 20, 12),
+              padding: const EdgeInsets.fromLTRB(0, 12, 20, 12),
               itemCount: keys.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              // Aéré comme la rangée fixe d'avant : ~20 px entre deux
+              // bulles (12 ici + les 8 de marge de chaque case de 52).
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (_, i) {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
