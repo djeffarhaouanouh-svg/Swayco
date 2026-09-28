@@ -1,7 +1,74 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/interests.dart';
+
+/// « ⚽ Football » — le texte d'une puce d'intérêt : l'emoji de sa catégorie
+/// puis son libellé traduit.
+String interestPillText(String tag) =>
+    [interestEmoji(tag), interestLabel(tag)].where((s) => s.isNotEmpty).join(' ');
+
+/// La puce d'intérêt de l'app (celle de la carte Découvrir) : pilule sombre,
+/// liseré blanc discret, emoji + libellé. Remplace les pastilles colorées
+/// « Relief 3D » partout où l'on AFFICHE des intérêts (carte, panneau,
+/// profil) — seul le sélecteur, qui a besoin d'un état coché, garde
+/// [InterestTagChip].
+class InterestPill extends StatelessWidget {
+  const InterestPill({
+    super.key,
+    required this.label,
+    this.onPhoto = false,
+    this.onTap,
+  });
+
+  /// Texte déjà composé — [interestPillText] pour un intérêt.
+  final String label;
+
+  /// Posée sur une photo : verre flouté (lisible sur n'importe quel cliché).
+  /// Sinon, aplat sombre — pas de flou inutile sur un fond uni.
+  final bool onPhoto;
+  final VoidCallback? onTap;
+
+  static const double padH = 12;
+  static const TextStyle textStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: padH, vertical: 7),
+      decoration: BoxDecoration(
+        color: onPhoto
+            ? Colors.black.withValues(alpha: 0.28)
+            : Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Text(label, maxLines: 1, softWrap: false, style: textStyle),
+    );
+    final surface = onPhoto
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: pill,
+            ),
+          )
+        : pill;
+    if (onTap == null) return surface;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: surface,
+    );
+  }
+}
 
 /// Interest tag pill — Style "Relief 3D" (design handoff).
 ///

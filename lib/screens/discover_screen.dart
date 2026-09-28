@@ -12,7 +12,6 @@ import '../services/app_strings.dart';
 import '../services/device_id.dart';
 import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
-import '../services/interests.dart';
 import '../services/job_sectors.dart';
 import '../services/languages.dart';
 import '../services/locations.dart';
@@ -1631,17 +1630,14 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                       if (p.interests.isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_interests')),
                         const SizedBox(height: 10),
+                        // Les mêmes puces que sur la carte (emoji + libellé),
+                        // plus les pastilles colorées « Relief 3D ».
                         Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            // Palette cyclique par position (handoff « Relief
-                            // 3D ») : vert, orange, magenta, bleu…
-                            for (var k = 0; k < p.interests.length; k++)
-                              InterestTagChip(
-                                label: p.interests[k],
-                                color: interestPaletteColor(k),
-                              ),
+                            for (final tag in p.interests)
+                              InterestPill(label: interestPillText(tag)),
                           ],
                         ),
                       ],
@@ -2247,7 +2243,6 @@ class _CardPills extends StatelessWidget {
   final RemoteProfile profile;
 
   static const double _gap = 8;
-  static const double _padH = 12;
 
   @override
   Widget build(BuildContext context) {
@@ -2255,19 +2250,11 @@ class _CardPills extends StatelessWidget {
     final labels = <String>[
       if (personaCategoryByLabel(p.personaCategory) case final cat?)
         '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}',
-      for (final tag in p.interests)
-        [interestEmoji(tag), interestLabel(tag)]
-            .where((s) => s.isNotEmpty)
-            .join(' '),
+      for (final tag in p.interests) interestPillText(tag),
     ];
     if (labels.isEmpty) return const SizedBox.shrink();
 
-    const style = TextStyle(
-      color: Colors.white,
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-      height: 1.2,
-    );
+    const style = InterestPill.textStyle;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: LayoutBuilder(
@@ -2282,7 +2269,8 @@ class _CardPills extends StatelessWidget {
               textScaler: scaler,
               maxLines: 1,
             )..layout();
-            final w = tp.width + _padH * 2 + 2; // +2 : la bordure.
+            // +2 : la bordure.
+            final w = tp.width + InterestPill.padH * 2 + 2;
             tp.dispose();
             final next = used + (fitting.isEmpty ? 0 : _gap) + w;
             if (next > c.maxWidth) break;
@@ -2293,40 +2281,11 @@ class _CardPills extends StatelessWidget {
             children: [
               for (var k = 0; k < fitting.length; k++) ...[
                 if (k > 0) const SizedBox(width: _gap),
-                _CardPill(label: fitting[k], style: style),
+                InterestPill(label: fitting[k], onPhoto: true),
               ],
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _CardPill extends StatelessWidget {
-  const _CardPill({required this.label, required this.style});
-
-  final String label;
-  final TextStyle style;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _CardPills._padH,
-            vertical: 7,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.28),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-          ),
-          child: Text(label, maxLines: 1, softWrap: false, style: style),
-        ),
       ),
     );
   }

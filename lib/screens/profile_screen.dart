@@ -1918,15 +1918,13 @@ class _IdentitySection extends StatelessWidget {
           const SizedBox(height: 24),
           _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
           const SizedBox(height: 12),
+          // Mêmes puces que la carte Découvrir (emoji + libellé).
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               for (final tag in interests)
-                InterestTagChip(
-                  label: tag,
-                  color: interestColor(tag),
-                ),
+                InterestPill(label: interestPillText(tag)),
             ],
           ),
         ],
@@ -3004,13 +3002,12 @@ class _InterestsSectionState extends State<_InterestsSection> {
         // Les chips choisis + le chip "Ajouter". N'importe lequel ouvre la
         // feuille de sÃ©lection, qui se pose PAR-DESSUS la page.
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 8,
+          runSpacing: 8,
           children: [
             for (final tag in _sel)
-              InterestTagChip(
-                label: tag,
-                color: interestColor(tag),
+              InterestPill(
+                label: interestPillText(tag),
                 onTap: _openPicker,
               ),
             if (_sel.length < profileInterestsMax)
