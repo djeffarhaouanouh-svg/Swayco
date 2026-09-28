@@ -216,10 +216,69 @@ abstract final class RevenueCat {
     return null;
   }
 
+  /// Exact store ids to ask the store for directly when a package is missing
+  /// from the offering. iOS ids are case-sensitive (`Boost_1`); unknown ids
+  /// are simply ignored by the store.
+  static const Map<String, List<String>> _storeIds = {
+    proPackageId: ['pro_monthly'],
+    boostPackageId: ['Boost_1', 'boost_1'],
+  };
+
+  static void _appendReason(String s) {
+    lastUnavailableReason =
+        lastUnavailableReason.isEmpty ? s : '$lastUnavailableReason · $s';
+  }
+
+  /// When the offering came back without [packageId], ask StoreKit / Play
+  /// for the product directly. RevenueCat drops a package from the offering
+  /// whenever its store product didn't load, so this both explains why
+  /// (appended to [lastUnavailableReason], with the account's storefront)
+  /// and lets the purchase go through if the store does know the product.
+  static Future<StoreProduct?> _storeProductFallback(String packageId) async {
+    final ids = _storeIds[packageId];
+    if (ids == null || !_configured) return null;
+    var country = '?';
+    try {
+      country = (await Purchases.storefront)?.countryCode ?? 'none';
+    } catch (_) {}
+    try {
+      final products = await Purchases.getProducts(
+        ids,
+        productCategory: packageId == boostPackageId
+            ? ProductCategory.nonSubscription
+            : ProductCategory.subscription,
+      );
+      _appendReason(
+        'store[${ids.join('/')}]='
+        '${products.isEmpty ? 'NOT FOUND' : products.first.identifier}'
+        ' storefront=$country',
+      );
+      return products.isEmpty ? null : products.first;
+    } on PlatformException catch (e) {
+      _appendReason(
+        'store lookup: ${e.code} ${e.message ?? ''} storefront=$country',
+      );
+      return null;
+    } catch (e) {
+      _appendReason('store lookup: $e storefront=$country');
+      return null;
+    }
+  }
+
+  /// Purchase params for [packageId]: the offering package when present,
+  /// else the store product fetched directly, else null (unavailable).
+  static Future<PurchaseParams?> _purchaseParams(String packageId) async {
+    final pkg = await _package(packageId);
+    if (pkg != null) return PurchaseParams.package(pkg);
+    final product = await _storeProductFallback(packageId);
+    return product == null ? null : PurchaseParams.storeProduct(product);
+  }
+
   /// Store-localized price of [packageId] (e.g. "6,99 €"), or null when the
-  /// package can't be loaded.
+  /// product can't be loaded at all.
   static Future<String?> priceOf(String packageId) async =>
-      (await _package(packageId))?.storeProduct.priceString;
+      (await _package(packageId))?.storeProduct.priceString ??
+      (await _storeProductFallback(packageId))?.priceString;
 
   /// High-level purchase: buy the offering package [packageId] and report
   /// whether [entitlementId] is active afterwards. Keeps `purchases_flutter`
@@ -228,10 +287,10 @@ abstract final class RevenueCat {
     required String packageId,
     required String entitlementId,
   }) async {
-    final pkg = await _package(packageId);
-    if (pkg == null) return PurchaseOutcome.unavailable;
+    final params = await _purchaseParams(packageId);
+    if (params == null) return PurchaseOutcome.unavailable;
     try {
-      final result = await Purchases.purchase(PurchaseParams.package(pkg));
+      final result = await Purchases.purchase(params);
       _onCustomerInfo(result.customerInfo);
       return result.customerInfo.entitlements.active.containsKey(entitlementId)
           ? PurchaseOutcome.success
@@ -252,10 +311,10 @@ abstract final class RevenueCat {
   /// Buy the consumable [packageId] once. Success = the store charged; what it
   /// grants is credited server-side by the RevenueCat webhook.
   static Future<PurchaseOutcome> purchaseConsumable(String packageId) async {
-    final pkg = await _package(packageId);
-    if (pkg == null) return PurchaseOutcome.unavailable;
+    final params = await _purchaseParams(packageId);
+    if (params == null) return PurchaseOutcome.unavailable;
     try {
-      await Purchases.purchase(PurchaseParams.package(pkg));
+      await Purchases.purchase(params);
       return PurchaseOutcome.success;
     } on PlatformException catch (e) {
       if (PurchasesErrorHelper.getErrorCode(e) ==
