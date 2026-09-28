@@ -18,6 +18,7 @@ import '../services/chat_unread.dart';
 import '../services/message_reactions.dart';
 import '../services/device_id.dart';
 import '../services/languages.dart';
+import '../services/locations.dart';
 import '../services/open_thread.dart';
 import '../services/peer_local_time.dart';
 import '../services/profile_api.dart';
@@ -1285,6 +1286,14 @@ class _ThreadHeader extends StatelessWidget {
                   );
                   // Local copy so the null check promotes (field `clock` cannot).
                   final peerClock = clock;
+                  // Country flag once the peer's country is known (the spoken
+                  // language doesn't always match the country); language
+                  // flag otherwise.
+                  final flag = countryFlagFor(peer?.country ?? '') ??
+                      (peer?.language.trim().isNotEmpty ?? false
+                          ? findLanguageByCode(peer!.language)?.flag
+                          : null) ??
+                      '';
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onViewProfile,
@@ -1292,11 +1301,22 @@ class _ThreadHeader extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: nameStyle,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: nameStyle,
+                              ),
+                            ),
+                            if (flag.isNotEmpty) ...[
+                              const SizedBox(width: 5),
+                              Text(flag, style: const TextStyle(fontSize: 14)),
+                            ],
+                          ],
                         ),
                         if (peerClock != null)
                           _PeerClockLine(

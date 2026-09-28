@@ -1041,9 +1041,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Portuguese), else the language flag. This is NOT the language card's
     // flag, which stays the spoken language on purpose.
     final nameFlag =
-        ((_remote?.city.trim().isNotEmpty ?? false)
-            ? countryFlagFor(_remote?.country ?? '')
-            : null) ??
+        countryFlagFor(_remote?.country ?? '') ??
         lang?.flag ??
         '';
     return Scaffold(

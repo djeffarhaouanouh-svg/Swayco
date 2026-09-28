@@ -2694,11 +2694,9 @@ class _CallScreenState extends State<CallScreen> {
         : AppStrings.t('profile_anonymous');
     final firstName = name.split(RegExp(r'\s+')).first;
     final lang = profile?.language.trim() ?? '';
-    // Country flag once the peer has set a location (the spoken language
+    // Country flag once the peer's country is known (the spoken language
     // doesn't always match the country); language flag otherwise.
-    final flagEmoji = ((profile?.city.trim().isNotEmpty ?? false)
-            ? countryFlagFor(profile?.country ?? '')
-            : null) ??
+    final flagEmoji = countryFlagFor(profile?.country ?? '') ??
         (lang.isEmpty ? null : findLanguageByCode(lang)?.flag) ??
         '';
     final dur = _finalDuration ?? Duration.zero;

@@ -16,7 +16,9 @@ import '../services/chat_api.dart';
 import '../services/chat_unread.dart';
 import '../services/debug_overlay.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
 import '../services/last_interaction.dart';
+import '../services/locations.dart';
 import '../services/match_seen.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
@@ -1248,18 +1250,36 @@ class _FriendChatRow extends StatelessWidget {
                 children: [
                   // Le prénom seul sur sa ligne : l'heure est partie à droite,
                   // avec le compte, là où l'œil va chercher l'état de la
-                  // conversation.
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: TextStyle(
-                      fontSize: 16.5,
-                      height: 1.2,
-                      fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
-                      color: unread ? SC.textPrimary : SC.textSecondary,
-                    ),
+                  // conversation. Le drapeau qui suit est celui du PAYS
+                  // (repli langue) — jamais la langue seule.
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            height: 1.2,
+                            fontWeight:
+                                unread ? FontWeight.w600 : FontWeight.w500,
+                            color: unread ? SC.textPrimary : SC.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Builder(builder: (context) {
+                        final flag = countryFlagFor(profile.country) ??
+                            findLanguageByCode(profile.language)?.flag ??
+                            '';
+                        if (flag.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 5),
+                          child: Text(flag, style: const TextStyle(fontSize: 14)),
+                        );
+                      }),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Row(

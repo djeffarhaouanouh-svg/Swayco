@@ -2,21 +2,27 @@ import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
 import '../services/locations.dart';
+import '../services/onboarding_location.dart';
 import '../theme/swayco_theme.dart';
 
 /// Cascading country → city picker sheet. Pops `(country, city)` on pick,
 /// or null on dismiss. Shared by onboarding (first-run location) and
 /// Settings (changing it later) so there's one place that knows the
 /// country list, the search, and the free-text fallback for an unlisted
-/// city.
+/// city. The city is optional ("skip" pops an empty city).
 class LocationPickerSheet extends StatefulWidget {
   const LocationPickerSheet({
     super.key,
     required this.initialCountry,
     required this.initialCity,
+    this.showDetect = false,
   });
   final String initialCountry;
   final String initialCity;
+
+  /// Adds a GPS "detect my location" row above the country list. Off for
+  /// onboarding, whose location step already has its own detect button.
+  final bool showDetect;
   @override
   State<LocationPickerSheet> createState() => _LocationPickerSheetState();
 }
@@ -25,7 +31,32 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   Country? _country;
   bool _onCityStep = false;
   String _search = '';
+  bool _locating = false;
+  bool _detectFailed = false;
   final TextEditingController _otherCityCtrl = TextEditingController();
+
+  /// GPS → country, popped straight away. The city is kept only when the
+  /// detected country is the one already stored (GPS never yields a city).
+  Future<void> _detect() async {
+    if (_locating) return;
+    setState(() {
+      _locating = true;
+      _detectFailed = false;
+    });
+    final country = await OnboardingLocation.detectCountry();
+    if (!mounted) return;
+    if (country == null) {
+      setState(() {
+        _locating = false;
+        _detectFailed = true;
+      });
+      return;
+    }
+    Navigator.of(context).pop((
+      country,
+      country == widget.initialCountry ? widget.initialCity : '',
+    ));
+  }
 
   @override
   void dispose() {
@@ -150,6 +181,36 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             ),
           ),
         ),
+        if (widget.showDetect && q.isEmpty) ...[
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            leading: _locating
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: SC.accent,
+                    ),
+                  )
+                : const Icon(Icons.my_location_rounded, color: SC.accent),
+            title: Text(
+              AppStrings.t('onb_location_autodetect'),
+              style: const TextStyle(
+                color: SC.accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: _detectFailed
+                ? Text(
+                    AppStrings.t('loc_detect_failed'),
+                    style: const TextStyle(color: SC.textMuted, fontSize: 12),
+                  )
+                : null,
+            onTap: _detect,
+          ),
+          const Divider(height: 1, color: SC.glassBorder),
+        ],
         Expanded(
           child: ListView.builder(
             controller: sc,
@@ -232,6 +293,18 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               },
             ),
           ],
+        ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(
+            AppStrings.t('loc_skip_city'),
+            style: const TextStyle(
+              color: SC.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
+          onTap: () => _commitCity(''),
         ),
         if (cities.isNotEmpty) const SizedBox(height: 8),
         for (final city in cities)

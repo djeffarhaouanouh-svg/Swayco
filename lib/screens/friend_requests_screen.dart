@@ -382,7 +382,7 @@ class _AvatarWithFlag extends StatelessWidget {
     final p = profile;
     final flag = p == null
         ? ''
-        : (p.city.trim().isNotEmpty ? countryFlagFor(p.country) : null) ??
+        : countryFlagFor(p.country) ??
             findLanguageByCode(p.language)?.flag ??
             '';
     return SizedBox(

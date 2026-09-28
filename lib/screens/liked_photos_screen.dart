@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
 import '../services/like_api.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass.dart';
@@ -176,15 +178,31 @@ class _LikedRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SC.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Builder(builder: (context) {
+                      final flag = countryFlagFor(o.country) ??
+                          findLanguageByCode(o.language)?.flag ??
+                          '';
+                      if (flag.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: Text(flag, style: const TextStyle(fontSize: 13)),
+                      );
+                    }),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),

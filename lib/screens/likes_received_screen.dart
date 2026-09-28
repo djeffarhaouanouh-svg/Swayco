@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../services/app_strings.dart';
 import '../services/device_id.dart';
+import '../services/languages.dart';
 import '../services/like_api.dart';
+import '../services/locations.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/web_poll.dart';
@@ -163,17 +165,42 @@ class _LikerRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      !revealed
-                          ? AppStrings.t('likes_someone')
-                          : profile.displayName.isEmpty
-                          ? '—'
-                          : profile.displayName,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            !revealed
+                                ? AppStrings.t('likes_someone')
+                                : profile.displayName.isEmpty
+                                ? '—'
+                                : profile.displayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SC.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (revealed)
+                          Builder(builder: (context) {
+                            // Not revealed yet: no flag either — it would
+                            // leak a clue about who's behind the blur.
+                            final flag =
+                                countryFlagFor(profile.country) ??
+                                    findLanguageByCode(profile.language)
+                                        ?.flag ??
+                                    '';
+                            if (flag.isEmpty) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 5),
+                              child: Text(
+                                flag,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            );
+                          }),
+                      ],
                     ),
                     if (revealed && profile.handle.isNotEmpty)
                       Text(

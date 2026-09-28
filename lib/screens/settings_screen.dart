@@ -230,7 +230,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ));
   }
 
-  Future<void> _editCity() async {
+  /// "Paris, France", "France" (GPS only yields a country) or "—".
+  String get _locationLabel {
+    final label = [
+      _profile?.city.trim() ?? '',
+      _profile?.country.trim() ?? '',
+    ].where((s) => s.isNotEmpty).join(', ');
+    return label.isEmpty ? '—' : label;
+  }
+
+  Future<void> _editLocation() async {
     final uid = await DeviceId.getOrCreate();
     if (uid.isEmpty || !mounted) return;
     final result = await showModalBottomSheet<(String, String)>(
@@ -240,6 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => LocationPickerSheet(
         initialCountry: _profile?.country ?? '',
         initialCity: _profile?.city ?? '',
+        showDetect: true,
       ),
     );
     if (result == null || !mounted) return;
@@ -547,14 +557,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: _editName,
                     ),
                     _SettingsRow(
-                      icon: Icons.location_city_outlined,
-                      label: AppStrings.t('settings_city'),
-                      trailing: _SubtleText(
-                        _profile?.city.trim().isNotEmpty ?? false
-                            ? _profile!.city.trim()
-                            : '—',
-                      ),
-                      onTap: _editCity,
+                      icon: Icons.location_on_outlined,
+                      label: AppStrings.t('onb_location_label'),
+                      trailing: _SubtleText(_locationLabel),
+                      onTap: _editLocation,
                     ),
                     _SettingsRow(
                       icon: Icons.lock_reset,
