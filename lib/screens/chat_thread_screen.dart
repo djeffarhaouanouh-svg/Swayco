@@ -46,6 +46,11 @@ import 'profile_screen.dart';
 /// Fond de la conversation 1b (handoff) — un cran au-dessus du noir pur.
 const Color _kThreadBg = Color(0xFF0B0B0C);
 
+/// Opacité du fondu du header / footer : au bord de l'écran, puis à 55 %
+/// de sa hauteur (il finit transparent). Baissée à la demande (1 / .95).
+const double _kChromeTop = 0.85;
+const double _kChromeMid = 0.78;
+
 /// Bulle reçue (1b).
 const Color _kBubbleIn = Color(0xFF1E1E22);
 
@@ -786,8 +791,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     end: Alignment.bottomCenter,
                     stops: const [0, 0.55, 1],
                     colors: [
-                      _kThreadBg,
-                      _kThreadBg.withValues(alpha: 0.95),
+                      // Un peu moins couvrant que la maquette (1 → .95) :
+                      // les messages transparaissent davantage dessous.
+                      _kThreadBg.withValues(alpha: _kChromeTop),
+                      _kThreadBg.withValues(alpha: _kChromeMid),
                       _kThreadBg.withValues(alpha: 0),
                     ],
                   ),
@@ -835,8 +842,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       end: Alignment.topCenter,
                       stops: const [0, 0.55, 1],
                       colors: [
-                        _kThreadBg,
-                        _kThreadBg.withValues(alpha: 0.95),
+                        _kThreadBg.withValues(alpha: _kChromeTop),
+                        _kThreadBg.withValues(alpha: _kChromeMid),
                         _kThreadBg.withValues(alpha: 0),
                       ],
                     ),
