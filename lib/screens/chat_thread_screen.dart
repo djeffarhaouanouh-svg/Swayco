@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -52,63 +51,6 @@ const Color _kBubbleIn = Color(0xFF1E1E22);
 
 /// « traduit · voir l'original » (1b : text-muted).
 const Color _kMetaMuted = Color(0xFF77777D);
-
-/// « ES → FR  Traduction auto activée » — pastille en verre centrée sous le
-/// header, tant que le toggle de traduction est allumé et que les deux
-/// langues diffèrent.
-class _TranslateRoutePill extends StatelessWidget {
-  const _TranslateRoutePill({required this.from, required this.to});
-
-  final String from;
-  final String to;
-
-  static const double height = 30;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          height: height,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$from → $to',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                AppStrings.t('auto_translate_on'),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
@@ -798,29 +740,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     }
   }
 
-  /// « ES → FR » : ce que la traduction auto fait en ce moment, ou null quand
-  /// elle ne fait rien (coupée, langue du pair inconnue, même langue).
-  ({String from, String to})? get _translateRoute {
-    if (!_autoTranslate) return null;
-    final from = (_peer?.language ?? '').trim().split('-').first;
-    final to = _myLang.trim().split('-').first;
-    if (from.isEmpty || to.isEmpty || from == to) return null;
-    return (from: from.toUpperCase(), to: to.toUpperCase());
-  }
-
   @override
   Widget build(BuildContext context) {
     final peerClock = _peerClock;
     final safeTop = MediaQuery.paddingOf(context).top;
-    final route = _translateRoute;
     // Conversation 1b : la liste occupe TOUT l'écran ; header et footer sont
     // des calques posés dessus, fondus dans le fond (façon Insta / Telegram).
     // La liste leur réserve juste la place de ne pas cacher un message au
     // repos — au défilement, les messages passent dessous et s'y dissolvent.
-    final headerH = safeTop +
-        _ThreadHeader.height +
-        (route != null ? _TranslateRoutePill.height + 8 : 0) +
-        (_error != null ? 40 : 0);
+    // (La pastille « ES → FR » de la maquette a été retirée à la demande.)
+    final headerH =
+        safeTop + _ThreadHeader.height + (_error != null ? 40 : 0);
     return Scaffold(
       backgroundColor: _kThreadBg,
       body: GestureDetector(
@@ -885,14 +815,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                         onToggleBlock: _toggleBlockPeer,
                         onReport: _reportPeer,
                       ),
-                      if (route != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: _TranslateRoutePill(
-                            from: route.from,
-                            to: route.to,
-                          ),
-                        ),
                       if (_error != null) _ErrorBanner(message: _error!),
                     ],
                   ),
@@ -1345,25 +1267,18 @@ class _ThreadHeader extends StatelessWidget {
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 10),
-            // PDP cerclée de cyan + point en ligne — tap = profil du pair.
+            // PDP (sans contour) + point en ligne — tap = profil du pair.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onViewProfile,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: SC.accent,
-                    ),
-                    child: ProfileAvatar(
-                      displayName: title,
-                      avatarUrl: peer?.avatarUrl,
-                      fallbackUrl: peer?.fallbackPhotoUrl,
-                      size: 40,
-                    ),
+                  ProfileAvatar(
+                    displayName: title,
+                    avatarUrl: peer?.avatarUrl,
+                    fallbackUrl: peer?.fallbackPhotoUrl,
+                    size: 44,
                   ),
                   if (_peerOnline)
                     Positioned(
