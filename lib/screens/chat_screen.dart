@@ -918,8 +918,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget get _titleRow => Row(
           children: [
-            // Le titre de la page, plus le logo (maquette Messages).
-            Flexible(
+            // Le titre de la page, plus le logo (maquette Messages). Expanded
+            // (et plus de Spacer) : il prend TOUTE la place libre, ce qui
+            // pousse la pastille et la loupe au bord droit. Un Flexible +
+            // un Spacer se partageaient cette place et la loupe finissait
+            // au milieu.
+            Expanded(
               child: Text(
                 AppStrings.t('messages_title'),
                 maxLines: 1,
@@ -932,7 +936,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            const Spacer(),
             // Personne en ligne = pas de pastille : un « 0 en ligne » est une
             // mauvaise nouvelle affichée en permanence.
             if (_onlineFriends > 0)
