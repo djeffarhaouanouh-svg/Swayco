@@ -196,6 +196,15 @@ Color interestColor(String label) {
   return const Color(0xFF64748B);
 }
 
+/// Emoji for a chip [label] = its CATEGORY emoji (⚽ for "Football"), or ''
+/// for a tag no longer in the taxonomy. Used by the Discover card pills.
+String interestEmoji(String label) {
+  for (final c in kAllInterestCategories) {
+    if (c.options.contains(label)) return c.emoji;
+  }
+  return '';
+}
+
 /// Shape for a chip [label] = its CATEGORY shape. Mirrors [interestColor];
 /// falls back to a pill for a tag no longer in the taxonomy. Picker rows know
 /// their own category, so they pass `cat.shape` directly instead (this is for

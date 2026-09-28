@@ -234,6 +234,8 @@ flutter:
     - assets/bienvenue.jpg
     # Cyan Ø brand mark (cropped from test-logo.png).
     - assets/test-logo.png
+    # swaycø wordmark — Discover header (design handoff 3c).
+    - assets/swayco_logo_6d.svg
     # Transparent Ø-arrows mark — call connecting splash ("sas").
     - assets/icon-saas.png
     # Boot splash — Splash Sync Call "cassure nette" (same file as web/splash.json).

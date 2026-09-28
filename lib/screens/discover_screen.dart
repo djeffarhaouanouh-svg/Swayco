@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
@@ -20,24 +23,26 @@ import '../services/match_celebration.dart';
 import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
-import '../services/presence_service.dart';
+import '../services/revenue_cat.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/country_silhouette.dart';
 import '../widgets/discover_globe.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
+import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
-import '../widgets/profile_avatar.dart';
 import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
+import 'paywall_screen.dart';
 import 'profile_screen.dart';
 
 /// Le fond du panneau déplié : opaque, un cran au-dessus du noir de la page —
@@ -45,15 +50,24 @@ import 'profile_screen.dart';
 /// pour rester du noir.
 const Color _kPanelBg = Color(0xFF141517);
 
-/// Marge latérale du bloc Discover (carte + bande blanche). Les deux DOIVENT
-/// la partager, sinon leurs bords ne s'alignent plus.
-const double _kCardInset = 16.0;
+/// Marge latérale de la carte (handoff 3c).
+const double _kCardInset = 14.0;
 
-/// Rayon des coins de la carte photo — et de ce qui doit s'y raccorder.
-const double _kCardRadius = 28.0;
+/// Rayon des coins de la carte photo (handoff 3c).
+const double _kCardRadius = 32.0;
 
-/// Hauteur de la barre « Filtrer par pays » posée au-dessus de la carte.
-const double _kGlobeBarH = 46.0;
+/// Diamètre des boutons ✕ / message / ❤.
+const double _kActionSize = 58.0;
+
+/// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
+const double _kActionPadV = 16.0;
+
+/// Surfaces pleines du handoff : bulles pays, bouton message.
+const Color _kSurface = Color(0xFF1A1A1D);
+const Color _kSurfaceBorder = Color(0xFF2A2A2E);
+
+/// L'or de l'accès privilégié — jamais de cyan sur une action payante.
+const Color _kGold = Color(0xFFF5C451);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
@@ -138,15 +152,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool get _hasActiveCard =>
       !_feedLoading && _cards.isNotEmpty && !_deckDone;
 
-  // Search
-  bool _searchExpanded = false;
-  final _searchCtrl = TextEditingController();
-  final _searchFocus = FocusNode();
-  Timer? _searchDebounce;
   Timer? _pollTimer;
   String _myId = '';
-  bool _searching = false;
-  List<RemoteProfile> _searchResults = const [];
 
   /// The card's info panel: pulled up from the photo, folded back down by a
   /// drag or a tap on the scrim. While it's open the nav bar slides away and
@@ -220,6 +227,53 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _loadFeed(countries: null);
   }
 
+  /// A bubble of the country row: filters the deck to that one country, or
+  /// clears the filter when it's already the only one picked.
+  Future<void> _toggleCountry(String key) async {
+    if (_countryKeys.length == 1 && _countryKeys.contains(key)) {
+      _clearCountryFilter();
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      _countryKeys = {key};
+      _showFilterTransition = true;
+      _transitionAnimDone = false;
+      _transitionFeedDone = false;
+    });
+    Analytics.track('screen_view',
+        props: {'screen': 'discover', 'country_filter': key, 'source': 'row'});
+    await _loadFeed(countries: _filterCountries);
+    if (!mounted) return;
+    _transitionFeedDone = true;
+    _maybeHideFilterTransition();
+  }
+
+  /// The gold button: write to the card's person without matching first.
+  /// Premium only — everyone else gets the paywall.
+  Future<void> _directMessage() async {
+    if (!_hasActiveCard) return;
+    final peer = _cards[_currentIndex].profile;
+    if (!RevenueCat.proActive.value) {
+      Analytics.track('paywall_open', props: {'source': 'discover_direct_message'});
+      await showPaywallSheet(context);
+      if (!mounted || !RevenueCat.proActive.value) return;
+    }
+    final ids = [_myId, peer.id]..sort();
+    final name = peer.displayName.trim().isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : peer.displayName.trim();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatThreadScreen(
+          conversationId: 'dm-${ids[0]}-${ids[1]}',
+          title: name,
+          peerDeviceId: peer.id,
+        ),
+      ),
+    );
+  }
+
   /// Reloads the Discover deck, optionally filtered by peer [countries].
   Future<void> _loadFeed({required List<String>? countries}) async {
     if (_myId.isEmpty || !isSupabaseReady) return;
@@ -262,10 +316,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     NavChrome.show();
   }
 
-  // Tabs
-  int _activeTab = 0;
-  static const _tabs = ['Pour vous', 'Double Date', 'Astrologie'];
-
   // "Glisse pour choisir" one-shot coach — the very first time this screen
   // is reached (right after onboarding). Starts closed: it only opens once
   // the flag lookup confirms it has never played.
@@ -296,9 +346,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void dispose() {
     NavChrome.show();
     _pollTimer?.cancel();
-    _searchDebounce?.cancel();
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -452,9 +499,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  FriendshipStatus _statusFor(RemoteProfile peer) =>
-      FriendshipApi.statusWith(_myId, peer.id, _myFriendships).$1;
-
   void _onCardSwiped(bool isRight, RemoteProfile profile) {
     _closeInfo();
     // Standard Tinder convention: dragging/flying RIGHT is the like, LEFT
@@ -502,55 +546,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _onSwipeLeft() => _stackKey.currentState?.triggerSwipe(false);
   void _onSwipeRight() => _stackKey.currentState?.triggerSwipe(true);
-
-  // Search
-  void _openSearch() {
-    setState(() => _searchExpanded = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _searchFocus.requestFocus());
-  }
-
-  void _closeSearch() {
-    _searchDebounce?.cancel();
-    _searchFocus.unfocus();
-    setState(() {
-      _searchExpanded = false;
-      _searchCtrl.clear();
-      _searchResults = const [];
-      _searching = false;
-    });
-  }
-
-  void _onSearchChanged(String v) {
-    setState(() {});
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 250), () => _runSearch(v));
-  }
-
-  Future<void> _runSearch(String value) async {
-    final q = value.trim();
-    if (q.isEmpty) {
-      if (mounted) setState(() { _searchResults = const []; _searching = false; });
-      return;
-    }
-    if (!isSupabaseReady || _myId.isEmpty) return;
-    setState(() => _searching = true);
-    try {
-      final r = await ProfileApi.searchProfiles(query: q, myDeviceId: _myId);
-      if (mounted) setState(() => _searchResults = r);
-    } catch (_) {
-      if (mounted) setState(() => _searchResults = const []);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  Future<void> _openResult(RemoteProfile peer) async {
-    _closeSearch();
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: peer.id)),
-    );
-    if (mounted) _refreshFriendships();
-  }
 
   /// Empty-state / end-of-deck Restart.
   /// Prefer replaying the cards we already have (or today's cache). A live
@@ -609,38 +604,46 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    // 58 (bouton) + 2 × 9 (respiration) : la bande blanche serre les boutons
-    // au lieu de leur faire un socle.
-    const actionH = 76.0;
-    // Écart entre le bas de la bande blanche et la nav. Tout le reste en
-    // découle : `cardBottom` se calcule à partir de `btnBottom`, donc monter
-    // cette valeur remonte la bande ET raccourcit la photo d'autant. C'est la
-    // seule ligne à toucher pour régler la respiration au-dessus de la nav.
-    const gapToNav = 32.0;
-    final btnBottom = GlassNavBar.totalReservedHeight + safeBottom + gapToNav;
-    // La photo s'arrête PILE sur la bande — mais avec des coins bas arrondis,
-    // donc le blanc doit aussi passer DERRIÈRE elle (voir le socle plus bas),
-    // sinon les arrondis s'ouvriraient sur le fond noir de la page.
-    final cardBottom = btnBottom + actionH;
-    final tabBarH = safeTop + _TopTabBar.height;
+    // Handoff 3c, de haut en bas : logo · rangée de pays · carte · ✕ ✉ ❤ ·
+    // nav. La rangée d'actions se pose sur la nav avec sa propre respiration
+    // (16 dessus, 16 dessous) — plus de bande blanche.
+    final btnBottom =
+        GlassNavBar.totalReservedHeight + safeBottom + _kActionPadV;
+    final cardBottom = btnBottom + _kActionSize + _kActionPadV;
+    final headerBottom = safeTop + _DiscoverHeader.height + _CountryRow.height;
 
-    // Panneau ouvert : la carte prend toute la hauteur — elle monte sous la
-    // barre d'onglets et descend dans l'espace libéré par la nav. Le panneau y
-    // gagne assez de place pour tout montrer sans qu'on ait à faire défiler.
+    // Panneau ouvert : la carte prend toute la hauteur — elle monte par-dessus
+    // le logo et les pays, et descend dans l'espace libéré par la nav. Le
+    // panneau y gagne assez de place pour tout montrer sans défiler.
     final openCardBottom = safeBottom + 12;
     final currentCardBottom = _infoOpen ? openCardBottom : cardBottom;
-
-    // Pastille « Filtrer » : posée SUR la photo, coin haut-gauche (là où était
-    // le retour). Le retour arrière passe à droite.
-    final showBar = !_infoOpen && !_searchExpanded;
-    final currentCardTop = _infoOpen ? safeTop + 4 : tabBarH + 8;
+    final currentCardTop = _infoOpen ? safeTop + 4 : headerBottom;
 
     return Scaffold(
       backgroundColor: SC.bg,
       extendBody: true,
       body: Stack(
         children: [
-          // ── Card — flotte sous le header (coins arrondis bien visibles) ──
+          // ── Logo + rangée de pays. AVANT la carte dans la pile : panneau
+          //    ouvert, la carte monte et les recouvre. ──────────────────────
+          Positioned(
+            top: safeTop,
+            left: 0,
+            right: 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _DiscoverHeader(),
+                _CountryRow(
+                  selected: _countryKeys,
+                  onFilter: _openGlobe,
+                  onCountry: _toggleCountry,
+                ),
+              ],
+            ),
+          ),
+
+          // ── Card ─────────────────────────────────────────────────────────
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
@@ -672,18 +675,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             onPullUp: _openInfo,
                             infoOpen: _infoOpen,
                             onCloseInfo: _closeInfo,
-                            // Les deux chips du haut vivent DANS la carte :
-                            // elles glissent avec elle au swipe. Retirées
-                            // pendant la transition "Go" et le panneau infos.
-                            topLeftBadge: (!_infoOpen &&
-                                    !_searchExpanded &&
-                                    !_showFilterTransition)
-                                ? _GlobeFilterBar(
-                                    countryKeys: _countryKeys,
-                                    onOpen: _openGlobe,
-                                    onClear: _clearCountryFilter,
-                                  )
-                                : null,
+                            // Le retour vit DANS la carte : il glisse avec
+                            // elle au swipe. Retiré pendant la transition
+                            // "Go" et le panneau infos.
                             topRightBadge:
                                 (!_infoOpen && !_showFilterTransition)
                                     ? _CardUndoButton(onTap: _onActionUndo)
@@ -722,99 +716,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               ),
             ),
 
-          // ── Pastille « Filtrer » — coin haut-gauche. Quand une carte est
-          //    active elle est DANS la carte (topLeftBadge, elle glisse au
-          //    swipe) ; sur l'écran vide / fin de deck, elle flotte ici pour
-          //    rester accessible. ─────────────────────────────────────────────
-          if (showBar && !_hasActiveCard && !_showFilterTransition)
-            Positioned(
-              top: tabBarH + 20,
-              left: _kCardInset + 12,
-              child: _GlobeFilterBar(
-                countryKeys: _countryKeys,
-                onOpen: _openGlobe,
-                onClear: _clearCountryFilter,
-              ),
-            ),
-
-          // ── Top bar — flotte sur la card ──────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _TopTabBar(
-              tabs: _tabs,
-              activeIndex: _activeTab,
-              onTabSelected: (i) => setState(() => _activeTab = i),
-              onSearch: _openSearch,
-              onSettings: () {},
-              topInset: safeTop,
-              searchExpanded: _searchExpanded,
-              searchController: _searchCtrl,
-              searchFocus: _searchFocus,
-              onSearchChanged: _onSearchChanged,
-              onCloseSearch: _closeSearch,
-            ),
-          ),
-
-          // ── Bas blanc + boutons — sous la carte au repos, flottant
-          //    PAR-DESSUS elle (sur le panneau) dès qu'il est déplié.
-          //    Au repos, le blanc remonte d'un rayon DERRIÈRE la photo pour en
-          //    combler les deux coins arrondis : les deux surfaces n'en font
-          //    qu'une. Déplié, ce raccord n'a plus rien à épouser — il tombe à
-          //    zéro, sinon deux cornes blanches dépasseraient sur le panneau.
+          // ── ✕ · message direct · ❤ — sous la carte au repos, flottant
+          //    PAR-DESSUS elle (sur le panneau) dès qu'il est déplié. ─────────
           AnimatedPositioned(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
-            bottom: _infoOpen ? safeBottom + 4 : btnBottom,
-            height: actionH + (_infoOpen ? 0 : _kCardRadius),
+            bottom: _infoOpen ? safeBottom + 8 : btnBottom,
+            height: _kActionSize,
             child: _hasActiveCard && !_showFilterTransition
                 ? _SwipeActionBar(
-                    height: actionH,
-                    topJoin: _infoOpen ? 0 : _kCardRadius,
                     onNope: _onSwipeLeft,
                     onLike: _onSwipeRight,
-                    onMessage: () {
-                      if (!_hasActiveCard) return;
-                      Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ProfileScreen(
-                            userId: _cards[_currentIndex].profile.id,
-                          ),
-                        ),
-                      );
-                    },
+                    onMessage: _directMessage,
                   )
                 : const SizedBox.shrink(),
           ),
-
-          // ── Search overlay ────────────────────────────────────────────────
-          if (_searchExpanded) ...[
-            Positioned.fill(
-              top: tabBarH,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _closeSearch,
-                child: const ColoredBox(color: Color(0x88000000)),
-              ),
-            ),
-            if (_searchCtrl.text.trim().isNotEmpty)
-              Positioned(
-                left: 12,
-                right: 12,
-                top: tabBarH + 8,
-                child: _SearchOverlay(
-                  loading: _searching,
-                  results: _searchResults,
-                  query: _searchCtrl.text.trim(),
-                  statusFor: _statusFor,
-                  onAdd: _likePeer,
-                  onOpen: _openResult,
-                ),
-              ),
-          ],
 
           // ── Coach "glisse pour choisir" — une seule fois, à l'arrivée ────
           if (_showSwipeCoach)
@@ -1020,261 +938,183 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Top Tinder-style tab bar (frosted glass dark)
+// Header — le logo swaycø, seul (handoff 3c : pas de loupe)
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _TopTabBar extends StatelessWidget {
-  const _TopTabBar({
-    required this.tabs,
-    required this.activeIndex,
-    required this.onTabSelected,
-    required this.onSearch,
-    required this.onSettings,
-    required this.searchExpanded,
-    required this.searchController,
-    required this.searchFocus,
-    required this.onSearchChanged,
-    required this.onCloseSearch,
-    this.topInset = 0,
-  });
+class _DiscoverHeader extends StatelessWidget {
+  const _DiscoverHeader();
 
-  final List<String> tabs;
-  final int activeIndex;
-  final ValueChanged<int> onTabSelected;
-  final VoidCallback onSearch;
-  final VoidCallback onSettings;
-  final double topInset;
-
-  /// Search: the loupe stretches open into the field right here in the header
-  /// (220 ms), the wordmark stepping aside while it does.
-  final bool searchExpanded;
-  final TextEditingController searchController;
-  final FocusNode searchFocus;
-  final ValueChanged<String> onSearchChanged;
-  final VoidCallback onCloseSearch;
-
-  // Content height (excluding safe-area top inset)
+  /// Hauteur sous la safe area : logo 42 + respiration.
   static const double height = 52.0;
 
   @override
   Widget build(BuildContext context) {
-    // No blur — readability comes from the card's top gradient behind it.
-    return Container(
-      height: height + topInset,
-      padding: EdgeInsets.fromLTRB(16, topInset, 16, 0),
-      child: Row(
-            children: [
-              // Wordmark swaycø — le "ø" en cyan. Il s'efface pendant la
-              // recherche pour laisser le champ s'étirer sur toute la barre.
-              if (!searchExpanded)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onSettings,
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'swayc'),
-                        TextSpan(
-                          text: 'ø',
-                          style: TextStyle(color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: SC.brandFont,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-              ),
-              // Onglets retirés — logo à gauche, actions à droite.
-              const Spacer(),
-              // La loupe s'ouvre EN champ : même pastille, largeur animée
-              // (220 ms) — le geste d'origine, avant que la recherche ne
-              // s'ouvre d'un coup.
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: searchExpanded ? null : onSearch,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOut,
-                  width: searchExpanded
-                      ? (MediaQuery.sizeOf(context).width - 56).clamp(
-                          200.0,
-                          520.0,
-                        )
-                      : 40,
-                  height: 40,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: searchExpanded ? 14 : 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: searchExpanded
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: searchExpanded
-                          ? Colors.white.withValues(alpha: 0.18)
-                          : Colors.transparent,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      if (searchExpanded) ...[
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: searchController,
-                            focusNode: searchFocus,
-                            onChanged: onSearchChanged,
-                            textInputAction: TextInputAction.search,
-                            cursorColor: const Color(0xFF22D3EE),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              hintText: AppStrings.t('search_friend_hint'),
-                              hintStyle: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 15,
-                              ),
-                              // The pill already draws the surface. Without
-                              // these the theme paints its navy fill and cyan
-                              // focus ring INSIDE the pill — a square box on
-                              // top of a rounded one.
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onCloseSearch,
-                          child: const Padding(
-                            padding: EdgeInsets.only(left: 4),
-                            child: Icon(
-                              Icons.close_rounded,
-                              color: Colors.white70,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Globe filter bar — compact "Filtrer" pill, left-aligned above the card
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _GlobeFilterBar extends StatelessWidget {
-  const _GlobeFilterBar({
-    required this.countryKeys,
-    required this.onOpen,
-    required this.onClear,
-  });
-
-  final Set<String> countryKeys;
-  final VoidCallback onOpen;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final keys =
-        countryKeys.where(kGlobeCountries.containsKey).toList(growable: false);
-    final selected = keys.isNotEmpty;
-
-    // Sélectionné : UNIQUEMENT le(s) drapeau(x) (3 max, puis "+N").
-    final flags = keys.length <= 3
-        ? keys.map((k) => kGlobeCountries[k]!.flag).join(' ')
-        : '${keys.take(3).map((k) => kGlobeCountries[k]!.flag).join(' ')}'
-            '  +${keys.length - 3}';
-
-    final pill = ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          height: _kGlobeBarH,
-          padding: EdgeInsets.only(left: selected ? 14 : 4, right: selected ? 4 : 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: selected ? 0.34 : 0.28),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? SC.accent.withValues(alpha: 0.60)
-                  : Colors.white.withValues(alpha: 0.14),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Zone d'ouverture : replié = toute la pastille (grande cible),
-              // déplié = juste les drapeaux (la croix a sa propre zone).
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onOpen,
-                child: selected
-                    ? Text(flags,
-                        style: const TextStyle(fontSize: 15, height: 1))
-                    : const SizedBox(
-                        width: 44,
-                        height: _kGlobeBarH,
-                        child: Icon(Icons.tune_rounded,
-                            size: 18, color: Colors.white),
-                      ),
-              ),
-              if (selected)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onClear,
-                  child: Container(
-                    color: Colors.transparent,
-                    padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
-                    child: const Icon(Icons.close_rounded,
-                        size: 18, color: Colors.white),
-                  ),
-                ),
-            ],
+    return SizedBox(
+      height: height,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: SvgPicture.asset(
+            'assets/swayco_logo_6d.svg',
+            height: 42,
+            semanticsLabel: 'swaycø',
           ),
         ),
       ),
     );
+  }
+}
 
-    // Replié : toute la pastille est cliquable, hit-area élargi.
-    return selected
-        ? pill
-        : GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onOpen,
-            child: pill,
-          );
+// ══════════════════════════════════════════════════════════════════════════════
+// Rangée de pays — « Filtrer » (le globe) + cinq pays en un tap
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Les pays de la rangée, dans l'ordre du handoff. `key` est la clé du globe
+/// ([kGlobeCountries], qui porte aussi le nom stocké en base), `geo` le nom
+/// dans le GeoJSON, `label` la clé de traduction du libellé.
+const _kRowCountries = <({String key, String geo, String iso, String label})>[
+  (key: 'France', geo: 'France', iso: 'fr', label: 'country_fr'),
+  (key: 'Spain', geo: 'Spain', iso: 'es', label: 'country_es'),
+  (key: 'Brazil', geo: 'Brazil', iso: 'br', label: 'country_br'),
+  (key: 'Sweden', geo: 'Sweden', iso: 'se', label: 'country_se'),
+  (key: 'Morocco', geo: 'Morocco', iso: 'ma', label: 'country_ma'),
+];
+
+class _CountryRow extends StatelessWidget {
+  const _CountryRow({
+    required this.selected,
+    required this.onFilter,
+    required this.onCountry,
+  });
+
+  final Set<String> selected;
+  final VoidCallback onFilter;
+  final ValueChanged<String> onCountry;
+
+  /// Bulle 44 + 6 + libellé 14, et 12 de marge dessus / dessous.
+  static const double height = 12 + 44 + 6 + 14 + 12;
+
+  @override
+  Widget build(BuildContext context) {
+    // Filtré depuis le globe sur un pays hors de la rangée : c'est « Filtrer »
+    // qui le signale, aucune bulle ne pouvant s'allumer pour lui.
+    final rowKeys = {for (final c in _kRowCountries) c.key};
+    final filterActive = selected.any((k) => !rowKeys.contains(k));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _RowItem(
+            label: AppStrings.t('globe_filter_cta'),
+            active: filterActive,
+            onTap: onFilter,
+            bubble: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                LiquidGlassButton(
+                  icon: Icons.tune_rounded,
+                  sfSymbol: 'slider.horizontal.3',
+                  size: 44,
+                  iconSize: 22,
+                  onTap: onFilter,
+                  semanticLabel: AppStrings.t('globe_filter_cta'),
+                ),
+                if (filterActive)
+                  Positioned(
+                    top: -1,
+                    right: -1,
+                    child: IgnorePointer(
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: SC.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: SC.bg, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          for (final c in _kRowCountries)
+            _RowItem(
+              label: AppStrings.t(c.label),
+              active: selected.contains(c.key),
+              onTap: () => onCountry(c.key),
+              bubble: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _kSurface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected.contains(c.key)
+                        ? SC.accent
+                        : _kSurfaceBorder,
+                    width: 2,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: CountrySilhouette(geoName: c.geo, iso2: c.iso),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RowItem extends StatelessWidget {
+  const _RowItem({
+    required this.bubble,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final Widget bubble;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 52,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            bubble,
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 14,
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+                softWrap: false,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(
+                  color: active ? SC.accent : const Color(0xFFAAAAAA),
+                  fontSize: 11,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1291,7 +1131,6 @@ class _TinderCardStack extends StatefulWidget {
     required this.onPullUp,
     required this.infoOpen,
     required this.onCloseInfo,
-    this.topLeftBadge,
     this.topRightBadge,
   });
 
@@ -1306,8 +1145,7 @@ class _TinderCardStack extends StatefulWidget {
   final bool infoOpen;
   final VoidCallback onCloseInfo;
 
-  /// Chips pinned to the top card's corners (they ride the swipe transform).
-  final Widget? topLeftBadge;
+  /// Chip pinned to the top card's corner (it rides the swipe transform).
   final Widget? topRightBadge;
 
   @override
@@ -1380,6 +1218,24 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     final hasMid = i + 1 < n;
     final hasBack = i + 2 < n;
 
+    // Les deux cartes fantômes (handoff 3c : +4° / −3°) dépassent du cadre de
+    // la carte — elles vivent donc HORS du clip. Tout le reste (la carte, la
+    // suivante, le panneau caché sous le bord) reste rogné au rectangle.
+    // Une fantôme par carte restante, jamais plus de deux : la pile ne ment
+    // pas sur ce qu'il reste à voir. Rangées pendant que le panneau est ouvert.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (hasBack && !widget.infoOpen)
+          const _GhostCard(angleDeg: -3),
+        if (hasMid && !widget.infoOpen)
+          const _GhostCard(angleDeg: 4),
+        Positioned.fill(child: ClipRect(child: _buildStack(i, hasMid))),
+      ],
+    );
+  }
+
+  Widget _buildStack(int i, bool hasMid) {
     return LayoutBuilder(
       builder: (context, c) {
         // Le panneau prend les trois quarts de la carte : assez pour poser la
@@ -1388,22 +1244,15 @@ class _TinderCardStackState extends State<_TinderCardStack> {
         final panelH = c.maxHeight * 0.76;
         return Stack(
         children: [
-          // Back card (3rd)
-          if (hasBack)
-            _StackCard(
-              key: ValueKey('back_${i + 2}'),
-              scale: 0.90,
-              translateY: 18,
-              child: _buildCard(widget.cards[i + 2]),
-            ),
-          // Middle card (2nd) — scales up as top card moves
+          // Carte suivante — pleine taille dessous, elle grandit à mesure
+          // que celle du dessus s'en va.
           if (hasMid)
             ValueListenableBuilder<double>(
               valueListenable: _progress,
               builder: (_, p, child) => _StackCard(
                 key: ValueKey('mid_${i + 1}'),
-                scale: 0.95 + 0.05 * p.clamp(0.0, 1.0),
-                translateY: 9 * (1 - p.clamp(0.0, 1.0)),
+                scale: 0.96 + 0.04 * p.clamp(0.0, 1.0),
+                translateY: 0,
                 child: _buildCard(widget.cards[i + 1]),
               ),
             ),
@@ -1417,7 +1266,6 @@ class _TinderCardStackState extends State<_TinderCardStack> {
               // Pulling the photo up is what opens the panel — no chevron.
               onPullUp: widget.onPullUp,
               locked: widget.infoOpen,
-              topLeftBadge: widget.topLeftBadge,
               topRightBadge: widget.topRightBadge,
               child: _buildCard(widget.cards[i]),
             ),
@@ -1461,34 +1309,51 @@ class _TinderCardStackState extends State<_TinderCardStack> {
   }
 
   Widget _buildCard(({RemoteProfile profile, List<String> photos}) card) {
-    // Carte photo arrondie qui flotte sur le fond noir de la page, cerclée
-    // d'un liseré aux couleurs du drapeau de la langue parlée par le profil.
-    final tinderCard = _TinderCard(
-      key: ValueKey(card.profile.id),
-      profile: card.profile,
-      photos: card.photos,
-    );
-    final country = flagCountryForLanguage(card.profile.language);
-    // Arrondie sur ses QUATRE coins : elle est posée sur la bande blanche, pas
-    // soudée à elle — le blanc qu'on voit dans les deux arrondis du bas vient
-    // du socle glissé derrière.
+    // Carte photo arrondie (32) qui flotte sur le fond noir — plus de liseré
+    // drapeau : le drapeau est à côté du prénom, en image.
     return SizedBox.expand(
-      child: country != null
-          ? FlagBorder(
-              country: country,
-              radius: _kCardRadius,
-              borderWidth: 3,
-              // La pile de cartes est rognée au rectangle : lueur et ombre
-              // rempliraient les coins arrondis du haut et se feraient couper
-              // au carré. On les coupe ici -> coins nets.
-              glow: false,
-              dropShadow: false,
-              child: tinderCard,
-            )
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(_kCardRadius),
-              child: tinderCard,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kCardRadius),
+        child: _TinderCard(
+          key: ValueKey(card.profile.id),
+          profile: card.profile,
+          photos: card.photos,
+        ),
+      ),
+    );
+  }
+}
+
+/// Une carte fantôme : la tranche de la pile qui dépasse derrière la carte,
+/// inclinée de [angleDeg]. Pas de photo — juste la surface, un cran plus
+/// petite et descendue de 10 : elle ne se voit que sous la carte et par ses
+/// coins.
+class _GhostCard extends StatelessWidget {
+  const _GhostCard({required this.angleDeg});
+
+  final double angleDeg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Transform.translate(
+          offset: const Offset(0, 10),
+          child: Transform.rotate(
+          angle: angleDeg * 3.141592653589793 / 180,
+          child: Transform.scale(
+            scale: 0.96,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _kSurface,
+                borderRadius: BorderRadius.circular(_kCardRadius),
+                border: Border.all(color: _kSurfaceBorder),
+              ),
             ),
+          ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1702,10 +1567,12 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                           spacing: 12,
                           runSpacing: 12,
                           children: [
-                            for (final tag in p.interests)
+                            // Palette cyclique par position (handoff « Relief
+                            // 3D ») : vert, orange, magenta, bleu…
+                            for (var k = 0; k < p.interests.length; k++)
                               InterestTagChip(
-                                label: tag,
-                                color: interestColor(tag),
+                                label: p.interests[k],
+                                color: interestPaletteColor(k),
                               ),
                           ],
                         ),
@@ -1753,9 +1620,7 @@ class _PanelHeader extends StatelessWidget {
     final name = profile.displayName.trim().isEmpty
         ? AppStrings.t('profile_anonymous')
         : profile.displayName.trim();
-    final flag = (profile.city.trim().isNotEmpty
-            ? countryFlagFor(profile.country)
-            : null) ??
+    final flag = countryFlagFor(profile.country) ??
         findLanguageByCode(profile.language)?.flag ??
         '';
     return Row(
@@ -1871,7 +1736,6 @@ class _DraggableCard extends StatefulWidget {
     required this.onProgress,
     this.onPullUp,
     this.locked = false,
-    this.topLeftBadge,
     this.topRightBadge,
   });
   final Widget child;
@@ -1885,10 +1749,9 @@ class _DraggableCard extends StatefulWidget {
   /// True while the panel is up: the card must not swipe under it.
   final bool locked;
 
-  /// Floating chips pinned to the card's top corners (filter pill / undo).
-  /// They live INSIDE the card's transform so they slide and tilt with it
-  /// during a swipe.
-  final Widget? topLeftBadge;
+  /// Floating chip pinned to the card's top-right corner (undo). It lives
+  /// INSIDE the card's transform so it slides and tilts with it during a
+  /// swipe.
   final Widget? topRightBadge;
 
   @override
@@ -2068,8 +1931,6 @@ class _DraggableCardState extends State<_DraggableCard>
                 ),
               // Pastille filtre / retour — dans le transform de la carte, donc
               // elles glissent et s'inclinent avec elle.
-              if (widget.topLeftBadge != null)
-                Positioned(top: 12, left: 12, child: widget.topLeftBadge!),
               if (widget.topRightBadge != null)
                 Positioned(top: 12, right: 12, child: widget.topRightBadge!),
             ],
@@ -2149,17 +2010,10 @@ class _TinderCardState extends State<_TinderCard> {
     final photos = widget.photos;
     final currentUrl = photos.isNotEmpty ? photos[_photoIndex] : '';
 
-    final flag = (p.city.trim().isNotEmpty
-            ? countryFlagFor(p.country)
-            : null) ??
-        findLanguageByCode(p.language)?.flag ??
-        '';
-    final location = [p.city.trim(), p.country.trim()]
-        .where((s) => s.isNotEmpty)
-        .join(', ');
-    // La règle commune : elle ajoute ici la réciprocité qui manquait — masquer
-    // son propre statut n'éteignait pas les pastilles des autres sur Discover.
-    final online = isPeerOnline(p);
+    final name = p.displayName.trim().isEmpty ? '—' : p.displayName.trim();
+    final title = p.age != null ? '$name, ${p.age}' : name;
+    // La ville seule (« Stockholm ») : le pays, lui, est dans le drapeau.
+    final place = p.city.trim().isNotEmpty ? p.city.trim() : p.country.trim();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2222,19 +2076,17 @@ class _TinderCardState extends State<_TinderCard> {
             ),
           ),
 
-          // ── Bottom info (net, au-dessus des chevrons) ───────────────────
+          // ── Bas de carte (handoff 3c) : « Elin, 23 » + drapeau · ville ·
+          //    puces. Pas de pastille « en ligne », pas de « points communs ».
           Positioned(
-            left: 10,
-            // Plus de bouton dans le coin : le bloc peut aller au bord.
+            left: 20,
             right: 20,
-            // Bas de la photo, avec une petite respiration.
             bottom: 22,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Name + flag + online dot — tap the name row to open the
-                // peer's profile page.
+                // Tap sur le prénom → la page profil.
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => Navigator.of(context).push<void>(
@@ -2243,220 +2095,175 @@ class _TinderCardState extends State<_TinderCard> {
                     ),
                   ),
                   child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        p.displayName.isEmpty ? '—' : p.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 31,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                          shadows: [Shadow(color: Color(0x66000000), blurRadius: 10)],
-                        ),
-                      ),
-                    ),
-                    if (p.isPro) ...[
-                      const SizedBox(width: 6),
-                      const Icon(Icons.verified_rounded,
-                          color: Color(0xFF60A5FA), size: 22),
-                    ],
-                    if (flag.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Text(flag, style: const TextStyle(fontSize: 22)),
-                    ],
-                    if (online) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4ADE80),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF4ADE80).withValues(alpha: 0.7),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                  ),
-                ),
-                // Location
-                if (location.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_on, size: 12, color: Colors.white),
-                      const SizedBox(width: 3),
                       Flexible(
                         child: Text(
-                          location,
+                          title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: GoogleFonts.bricolageGrotesque(
                             color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1,
+                            shadows: const [
+                              Shadow(color: Color(0x66000000), blurRadius: 10),
+                            ],
                           ),
                         ),
                       ),
+                      if (p.isPro) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified_rounded,
+                            color: Color(0xFF60A5FA), size: 22),
+                      ],
+                      const SizedBox(width: 10),
+                      _NameFlag(profile: p),
                     ],
+                  ),
+                ),
+                if (place.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    place,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      shadows: const [
+                        Shadow(color: Color(0x66000000), blurRadius: 8),
+                      ],
+                    ),
                   ),
                 ],
-                // One chip on the card (the rest lives in the info panel):
-                // the persona category ("what defines you most") when set —
-                // the higher-signal, deliberate answer — else fall back to
-                // the first interest tag for profiles onboarded before this
-                // field existed.
-                if (personaCategoryByLabel(p.personaCategory) != null) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      InterestTagChip(
-                        label:
-                            '${personaCategoryByLabel(p.personaCategory)!.emoji} '
-                            '${personaCategoryLabel(p.personaCategory)}',
-                        color: const Color(0xFF22D3EE),
-                        compact: true,
-                      ),
-                    ],
-                  ),
-                ] else if (p.interests.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.apps_rounded, size: 12,
-                          color: Colors.white.withValues(alpha: 0.65)),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Centres d\'intérêt',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.70),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                          shadows: const [
-                            Shadow(color: Color(0x55000000), blurRadius: 6),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (final tag in p.interests.take(1))
-                        InterestTagChip(
-                          label: tag,
-                          color: interestColor(tag),
-                          compact: true,
-                        ),
-                    ],
-                  ),
-                ],
+                _CardPills(profile: p),
               ],
             ),
           ),
-
-          // ── Repère "tire vers le haut" : les deux chevrons qui sautent,
-          //    centrés tout en bas de la photo.
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 2,
-            child: IgnorePointer(
-              child: Center(child: _ScrollHintChevrons()),
-            ),
-          ),
-
         ],
       );
   }
 }
 
-/// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
-/// marquent une pause avant de recommencer. Le repère "il y a des infos à
-/// découvrir, tire vers le haut", posé tout en bas de la carte.
-///
-/// (L'ancienne version faisait défiler les chevrons en boucle, façon
-/// escalator ; le saut se lit mieux et n'attire pas l'œil en permanence.)
-class _ScrollHintChevrons extends StatefulWidget {
-  const _ScrollHintChevrons();
+/// Le drapeau posé après le prénom : une IMAGE 28×19, rayon 4 (handoff 3c) —
+/// l'emoji dépend de la police du système et n'existe pas partout. Celui du
+/// PAYS ; à défaut, celui de la langue parlée.
+class _NameFlag extends StatelessWidget {
+  const _NameFlag({required this.profile});
 
-  @override
-  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
-}
-
-class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
+  final RemoteProfile profile;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Le chevron du bas part une fraction de seconde après celui du
-          // haut : les deux sautent ensemble sans être collés.
-          _chevron(0.0),
-          Transform.translate(
-            offset: const Offset(0, -14),
-            child: _chevron(0.10),
-          ),
-        ],
+    const theme = ImageTheme(
+      width: 28,
+      height: 19,
+      shape: RoundedRectangle(4),
+    );
+    final iso = countryIso2For(profile.country);
+    if (iso.isNotEmpty) {
+      return CountryFlag.fromCountryCode(iso, theme: theme);
+    }
+    final lang = profile.language.trim();
+    if (lang.isEmpty) return const SizedBox.shrink();
+    return CountryFlag.fromLanguageCode(lang.split('-').first, theme: theme);
+  }
+}
+
+/// Les puces sous la ville : ce qui définit la personne (sa catégorie
+/// « persona ») d'abord, puis ses centres d'intérêt, chacun avec son emoji.
+///
+/// Une seule ligne, jamais coupée : on mesure chaque puce et on n'affiche que
+/// celles qui tiennent EN ENTIER dans la largeur — une puce tronquée ou une
+/// deuxième ligne mangerait la photo. Le reste est dans le panneau.
+class _CardPills extends StatelessWidget {
+  const _CardPills({required this.profile});
+
+  final RemoteProfile profile;
+
+  static const double _gap = 8;
+  static const double _padH = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final labels = <String>[
+      if (personaCategoryByLabel(p.personaCategory) case final cat?)
+        '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}',
+      for (final tag in p.interests)
+        [interestEmoji(tag), interestLabel(tag)]
+            .where((s) => s.isNotEmpty)
+            .join(' '),
+    ];
+    if (labels.isEmpty) return const SizedBox.shrink();
+
+    final style = GoogleFonts.dmSans(
+      color: Colors.white,
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final scaler = MediaQuery.textScalerOf(context);
+          final fitting = <String>[];
+          var used = 0.0;
+          for (final label in labels) {
+            final tp = TextPainter(
+              text: TextSpan(text: label, style: style),
+              textDirection: TextDirection.ltr,
+              textScaler: scaler,
+              maxLines: 1,
+            )..layout();
+            final w = tp.width + _padH * 2 + 2; // +2 : la bordure.
+            tp.dispose();
+            final next = used + (fitting.isEmpty ? 0 : _gap) + w;
+            if (next > c.maxWidth) break;
+            fitting.add(label);
+            used = next;
+          }
+          return Row(
+            children: [
+              for (var k = 0; k < fitting.length; k++) ...[
+                if (k > 0) const SizedBox(width: _gap),
+                _CardPill(label: fitting[k], style: style),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
+}
 
-  /// Un chevron, [delay] tours de retard sur le cycle. Le saut occupe la
-  /// première moitié du cycle, le reste est une pause.
-  Widget _chevron(double delay) {
-    final u = (_c.value - delay) % 1.0;
-    double lift;
-    if (u < 0.25) {
-      // Montée franche.
-      lift = Curves.easeOutCubic.transform(u / 0.25);
-    } else if (u < 0.5) {
-      // Retombée.
-      lift = 1 - Curves.easeInCubic.transform((u - 0.25) / 0.25);
-    } else {
-      lift = 0; // pause
-    }
-    return Transform.translate(
-      offset: Offset(0, -12 * lift),
-      child: Opacity(
-        // À peine plus vif en haut du saut.
-        opacity: 0.75 + 0.25 * lift,
-        child: const Icon(
-          Icons.keyboard_arrow_up_rounded,
-          color: Colors.white,
-          size: 34,
-          shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+class _CardPill extends StatelessWidget {
+  const _CardPill({required this.label, required this.style});
+
+  final String label;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _CardPills._padH,
+            vertical: 7,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.28),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+          ),
+          child: Text(label, maxLines: 1, softWrap: false, style: style),
         ),
       ),
     );
@@ -2506,64 +2313,169 @@ class _PhotoDots extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Action bar — pass / like. The rewind arrow lives on the card now, and the
-// super-like / send-a-message buttons are gone.
+// Barre d'actions — ✕ (verre) · message direct (or, Premium) · ❤ (verre)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SwipeActionBar extends StatelessWidget {
   const _SwipeActionBar({
-    required this.height,
-    required this.topJoin,
     required this.onNope,
     required this.onLike,
     required this.onMessage,
   });
 
-  /// Hauteur de la bande VISIBLE (celle qui porte les boutons).
-  final double height;
-
-  /// Hauteur du raccord qui remonte derrière la photo. Il ne déborde pas sur
-  /// l'image : il n'en remplit que les deux coins arrondis, pour que le blanc
-  /// et la carte se lisent d'un seul tenant. 0 = pas de raccord.
-  final double topJoin;
-
   final VoidCallback onNope;
   final VoidCallback onLike;
-
-  /// Kept wired (the profile opens from here) even though no button surfaces
-  /// it any more — the card itself opens the profile.
   final VoidCallback onMessage;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height + topJoin,
-      child: Padding(
-        // Même marge que la carte : les deux bords s'alignent au pixel.
-        padding: const EdgeInsets.symmetric(horizontal: _kCardInset),
-        child: CustomPaint(
-          painter: _ActionBarShape(topJoin: topJoin, radius: _kCardRadius),
-          child: Padding(
-            // Les boutons se centrent dans la bande visible, jamais dans le
-            // raccord — sinon ils descendraient d'un demi-rayon.
-            padding: EdgeInsets.only(top: topJoin),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        LiquidGlassButton(
+          icon: Icons.close_rounded,
+          sfSymbol: 'xmark',
+          iconSize: 24,
+          onTap: onNope,
+          semanticLabel: 'Nope',
+        ),
+        const SizedBox(width: 18),
+        _DirectMessageButton(onTap: onMessage),
+        const SizedBox(width: 18),
+        LiquidGlassButton(
+          icon: Icons.favorite_rounded,
+          sfSymbol: 'heart.fill',
+          iconSize: 26,
+          iconColor: const Color(0xFFFF5A7A),
+          onTap: onLike,
+          semanticLabel: 'Like',
+        ),
+      ],
+    );
+  }
+}
+
+/// Le message direct — l'accès privilégié, donc en OR (jamais de cyan sur une
+/// action payante). Rond plein #1A1A1D cerclé d'or, bulle en dégradé or,
+/// étoile ✦ en haut à droite, et un anneau qui pulse en boucle pour dire
+/// qu'il se passe quelque chose de spécial ici.
+class _DirectMessageButton extends StatefulWidget {
+  const _DirectMessageButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_DirectMessageButton> createState() => _DirectMessageButtonState();
+}
+
+class _DirectMessageButtonState extends State<_DirectMessageButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2300),
+  )..repeat();
+  bool _pressed = false;
+
+  static const _goldGradient = LinearGradient(
+    // 145° CSS : du haut-gauche vers le bas-droite.
+    begin: Alignment(-0.57, -0.82),
+    end: Alignment(0.57, 0.82),
+    colors: [Color(0xFFFBE7A1), Color(0xFFE9B949), Color(0xFFC48E22)],
+  );
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Message',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.92 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: SizedBox(
+            width: _kActionSize,
+            height: _kActionSize,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
               children: [
-                _ActionButton(
-                  background: Colors.black,
-                  onTap: onNope,
-                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                // Anneau pulsé : 1 → 1.42, opacité .65 → 0, ease-out.
+                AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, _) {
+                    final t = Curves.easeOut.transform(_pulse.value);
+                    return IgnorePointer(
+                      child: Transform.scale(
+                        scale: 1 + 0.42 * t,
+                        child: Container(
+                          width: _kActionSize,
+                          height: _kActionSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _kGold.withValues(alpha: 0.65 * (1 - t)),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                const SizedBox(width: 45),
-                _ActionButton(
-                  background: const Color(0xFF22D3EE),
-                  onTap: onLike,
-                  child: const Icon(
-                    Icons.favorite,
-                    color: Color(0xFF111111),
-                    size: 24,
+                Container(
+                  width: _kActionSize,
+                  height: _kActionSize,
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _kGold, width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  // Le dégradé ne teinte que l'icône : aucun flou dessous,
+                  // donc pas de piège ShaderMask × BackdropFilter.
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (r) => _goldGradient.createShader(r),
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      size: 28,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // ✦ en haut à droite : fond de page, liseré or.
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: SC.bg,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _kGold, width: 1.5),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      '✦',
+                      style: TextStyle(
+                        color: _kGold,
+                        fontSize: 10,
+                        height: 1,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -2575,94 +2487,9 @@ class _SwipeActionBar extends StatelessWidget {
   }
 }
 
-/// Le bas blanc : une bande à bas arrondi, surmontée — quand [topJoin] > 0 —
-/// des deux « cornes » qui viennent combler les coins arrondis du bas de la
-/// photo. Ces cornes sont EXACTEMENT le complément de ces coins : le blanc
-/// monte jusqu'au bord de l'image sans jamais mordre dessus, et la carte et la
-/// bande n'ont plus de couture entre elles.
-class _ActionBarShape extends CustomPainter {
-  const _ActionBarShape({required this.topJoin, required this.radius});
-
-  final double topJoin;
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = Radius.circular(radius);
-    final bar = RRect.fromRectAndCorners(
-      Rect.fromLTRB(0, topJoin, size.width, size.height),
-      bottomLeft: r,
-      bottomRight: r,
-    );
-
-    // Ombre du bloc (design swipe_card.dart : 0x59000000, blur 30, +12). Elle
-    // ne part QUE de la bande : les cornes sont sous la photo, leur ombre
-    // salirait le bas de l'image.
-    canvas.drawPath(
-      Path()..addRRect(bar.shift(const Offset(0, 12))),
-      Paint()
-        ..color = const Color(0x59000000)
-        // sigma ≈ blurRadius × 0.57735, la conversion de BoxShadow.
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 17.3),
-    );
-
-    var shape = Path()..addRRect(bar);
-    if (topJoin > 0) {
-      // La bande du raccord MOINS l'empreinte du bas de la carte : il ne reste
-      // que les deux angles que l'arrondi laissait ouverts sur le fond.
-      final band = Path()
-        ..addRect(Rect.fromLTWH(0, 0, size.width, topJoin));
-      final cardFoot = Path()
-        ..addRRect(
-          RRect.fromRectAndCorners(
-            Rect.fromLTRB(0, -radius, size.width, topJoin),
-            bottomLeft: r,
-            bottomRight: r,
-          ),
-        );
-      shape = Path.combine(
-        PathOperation.union,
-        shape,
-        Path.combine(PathOperation.difference, band, cardFoot),
-      );
-    }
-    canvas.drawPath(shape, Paint()..color = Colors.white);
-  }
-
-  @override
-  bool shouldRepaint(_ActionBarShape old) =>
-      old.topJoin != topJoin || old.radius != radius;
-}
-
-/// Les deux boutons de match : un rond plein de 58, noir pour passer, cyan de
-/// marque pour valider. Rien de translucide — ils sont posés sur du blanc.
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.background,
-    required this.child,
-    this.onTap,
-  });
-
-  final Color background;
-  final Widget child;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: SizedBox(width: 58, height: 58, child: Center(child: child)),
-      ),
-    );
-  }
-}
-
-/// Le retour arrière posé sur la photo : verre flouté SANS contour coloré —
-/// seule l'icône reste cyan, le cercle se fond dans l'image.
+/// Le retour arrière posé sur la photo : 44, verre sombre (black .22, blur
+/// 12), sans bordure, icône blanche. Verre Flutter et non natif : une
+/// platform view dans la carte qu'on balaie scintillait (commit 051f0fd).
 class _CardUndoButton extends StatelessWidget {
   const _CardUndoButton({required this.onTap});
 
@@ -2685,7 +2512,7 @@ class _CardUndoButton extends StatelessWidget {
             ),
             child: const Icon(
               Icons.replay_rounded,
-              color: Color(0xFF22D3EE),
+              color: Colors.white,
               size: 22,
             ),
           ),
@@ -2695,193 +2522,6 @@ class _CardUndoButton extends StatelessWidget {
   }
 }
 
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Search overlay
-// ══════════════════════════════════════════════════════════════════════════════
-
-/// Le panneau de résultats, sous le header. Le champ de saisie, lui, vit dans
-/// la barre du haut : c'est la loupe elle-même qui s'étire pour le devenir.
-class _SearchOverlay extends StatelessWidget {
-  const _SearchOverlay({
-    required this.loading,
-    required this.results,
-    required this.query,
-    required this.statusFor,
-    required this.onAdd,
-    required this.onOpen,
-  });
-
-  final bool loading;
-  final List<RemoteProfile> results;
-  final String query;
-  final FriendshipStatus Function(RemoteProfile) statusFor;
-  final ValueChanged<RemoteProfile> onAdd;
-  final ValueChanged<RemoteProfile> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [_buildResults()],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResults() {
-    if (loading) {
-      return const Padding(
-        padding: EdgeInsets.all(20),
-        child: Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-    if (results.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          'Aucun profil pour « $query »',
-          style: const TextStyle(color: Colors.white60, fontSize: 13),
-        ),
-      );
-    }
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 320),
-      child: ListView.separated(
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        itemCount: results.length,
-        separatorBuilder: (_, _) =>
-            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
-        itemBuilder: (_, i) {
-          final peer = results[i];
-          return _SearchRow(
-            profile: peer,
-            status: statusFor(peer),
-            onTap: () => onOpen(peer),
-            onAdd: () => onAdd(peer),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SearchRow extends StatelessWidget {
-  const _SearchRow({
-    required this.profile,
-    required this.status,
-    required this.onTap,
-    required this.onAdd,
-  });
-  final RemoteProfile profile;
-  final FriendshipStatus status;
-  final VoidCallback onTap;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        child: Row(
-          children: [
-            ProfileAvatar(
-              displayName: profile.displayName,
-              avatarUrl: profile.avatarUrl,
-              fallbackUrl: profile.fallbackPhotoUrl,
-              size: 38,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    profile.displayName.isEmpty ? '—' : profile.displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (profile.handle.isNotEmpty)
-                    Text(
-                      '@${profile.handle}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                ],
-              ),
-            ),
-            _statusBadge(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _statusBadge(BuildContext context) {
-    switch (status) {
-      case FriendshipStatus.accepted:
-        return _Pill(label: AppStrings.t('friendship_friend'), color: const Color(0xFF3DCA72));
-      case FriendshipStatus.pendingOutgoing:
-        return _Pill(label: AppStrings.t('friendship_sent'), color: Colors.amber);
-      case FriendshipStatus.pendingIncoming:
-        return _Pill(label: AppStrings.t('friendship_pending_in'), color: Colors.amber);
-      case FriendshipStatus.rejected:
-      case FriendshipStatus.none:
-        return GestureDetector(
-          onTap: onAdd,
-          child: _Pill(label: AppStrings.t('add_friend_short'), color: const Color(0xFF3DCA72)),
-        );
-    }
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.50)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Empty / end-of-deck

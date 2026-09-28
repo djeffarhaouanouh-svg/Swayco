@@ -32,6 +32,10 @@ kGlobeCountries = {
   'Japan': (flag: '🇯🇵', center: Offset(138.3, 36.3), code: 'jp', dbName: 'Japon'),
   'Belgium': (flag: '🇧🇪', center: Offset(4.5, 50.6), code: 'be', dbName: 'Belgique'),
   'Brazil': (flag: '🇧🇷', center: Offset(-53.1, -10.8), code: 'br', dbName: 'Brésil'),
+  // Added with the Discover country row (FR · ES · BR · SE · MA).
+  'Spain': (flag: '🇪🇸', center: Offset(-3.7, 40.2), code: 'es', dbName: 'Espagne'),
+  'Sweden': (flag: '🇸🇪', center: Offset(16.0, 62.5), code: 'se', dbName: 'Suède'),
+  'Morocco': (flag: '🇲🇦', center: Offset(-6.3, 31.8), code: 'ma', dbName: 'Maroc'),
 };
 
 /// The `profiles.country` value a globe country key maps to, or null if it
@@ -195,6 +199,10 @@ const Map<String, Offset> _kBubbleOffset = {
   'Japan': Offset(34, 10),
   'Belgium': Offset(30, 24),
   'Brazil': Offset(-40, 30),
+  // Same caveat for these three (Discover country row).
+  'Spain': Offset(-44, 8),
+  'Sweden': Offset(-8, -40),
+  'Morocco': Offset(-40, 22),
 };
 
 const double _kBubbleR = 18;
