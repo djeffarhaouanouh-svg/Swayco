@@ -1011,16 +1011,24 @@ class _CountryRow extends StatelessWidget {
             label: AppStrings.t('globe_filter_cta'),
             active: filterActive,
             onTap: onFilter,
+            // Pas de verre dans la rangée : la bulle « Filtrer » est pleine,
+            // comme les bulles pays.
             bubble: Stack(
               clipBehavior: Clip.none,
               children: [
-                LiquidGlassButton(
-                  icon: Icons.tune_rounded,
-                  sfSymbol: 'slider.horizontal.3',
-                  size: 44,
-                  iconSize: 22,
-                  onTap: onFilter,
-                  semanticLabel: AppStrings.t('globe_filter_cta'),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _kSurfaceBorder, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.tune_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
                 if (filterActive)
                   Positioned(
