@@ -229,22 +229,32 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _loadFeed(countries: null);
   }
 
-  /// A bubble of the country row: filters the deck to that one country, or
-  /// clears the filter when it's already the only one picked.
+  /// A bubble of the country row is a filter toggle: it adds its country to
+  /// the filter (several can be on at once), or removes it. The set keeps
+  /// insertion order, so the country just switched on is the LAST one — the
+  /// row shows it first. Last one switched off = back to the whole deck.
   Future<void> _toggleCountry(String key) async {
-    if (_countryKeys.length == 1 && _countryKeys.contains(key)) {
-      _clearCountryFilter();
-      return;
-    }
     HapticFeedback.selectionClick();
+    if (_countryKeys.contains(key)) {
+      final rest = {..._countryKeys}..remove(key);
+      if (rest.isEmpty) {
+        _clearCountryFilter();
+        return;
+      }
+      setState(() => _countryKeys = rest);
+    } else {
+      setState(() => _countryKeys = {..._countryKeys, key});
+    }
     setState(() {
-      _countryKeys = {key};
       _showFilterTransition = true;
       _transitionAnimDone = false;
       _transitionFeedDone = false;
     });
-    Analytics.track('screen_view',
-        props: {'screen': 'discover', 'country_filter': key, 'source': 'row'});
+    Analytics.track('screen_view', props: {
+      'screen': 'discover',
+      'country_filter': _countryKeys.join(','),
+      'source': 'row',
+    });
     await _loadFeed(countries: _filterCountries);
     if (!mounted) return;
     _transitionFeedDone = true;
@@ -969,27 +979,25 @@ class _DiscoverHeader extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Rangée de pays — « Filtrer » (le globe) + cinq pays en un tap
+// Rangée de pays — « Filtrer » (le globe) + tous les pays du globe, en filtres
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Les pays de la rangée, dans l'ordre du handoff. `key` est la clé du globe
-/// ([kGlobeCountries], qui porte aussi le nom stocké en base), `geo` le nom
-/// dans le GeoJSON, `label` la clé de traduction du libellé.
-const _kRowCountries = <({String key, String geo, String iso, String label})>[
-  (key: 'France', geo: 'France', iso: 'fr', label: 'country_fr'),
-  (key: 'Spain', geo: 'Spain', iso: 'es', label: 'country_es'),
-  (key: 'Brazil', geo: 'Brazil', iso: 'br', label: 'country_br'),
-  (key: 'Sweden', geo: 'Sweden', iso: 'se', label: 'country_se'),
-  (key: 'Morocco', geo: 'Morocco', iso: 'ma', label: 'country_ma'),
-];
-
-class _CountryRow extends StatelessWidget {
+/// La rangée : « Filtrer » fixe à gauche, puis TOUS les pays du globe
+/// ([kGlobeCountries]) dans une bande qui défile. Chaque bulle est un filtre
+/// qu'on allume / éteint ; plusieurs peuvent l'être à la fois.
+///
+/// Ordre : les pays sélectionnés d'abord, le DERNIER choisi en tête (on voit
+/// tout de suite ce qu'on vient d'allumer), puis les autres dans l'ordre du
+/// globe. La bande revient au début à chaque changement.
+class _CountryRow extends StatefulWidget {
   const _CountryRow({
     required this.selected,
     required this.onFilter,
     required this.onCountry,
   });
 
+  /// Pays sélectionnés, dans l'ordre où ils l'ont été (Set à insertion
+  /// ordonnée : le dernier ajouté est le dernier de l'itération).
   final Set<String> selected;
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
@@ -998,90 +1006,127 @@ class _CountryRow extends StatelessWidget {
   static const double height = 12 + 44 + 6 + 14 + 12;
 
   @override
+  State<_CountryRow> createState() => _CountryRowState();
+}
+
+class _CountryRowState extends State<_CountryRow> {
+  final _scroll = ScrollController();
+
+  @override
+  void didUpdateWidget(_CountryRow old) {
+    super.didUpdateWidget(old);
+    // Une sélection vient de changer : le pays choisi est passé en tête —
+    // on y ramène la bande pour qu'il reste sous les yeux.
+    if (old.selected.length != widget.selected.length ||
+        !old.selected.containsAll(widget.selected)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  List<String> get _orderedKeys {
+    final picked = widget.selected
+        .where(kGlobeCountries.containsKey)
+        .toList()
+        .reversed
+        .toList();
+    return [
+      ...picked,
+      for (final k in kGlobeCountries.keys)
+        if (!widget.selected.contains(k)) k,
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Filtré depuis le globe sur un pays hors de la rangée : c'est « Filtrer »
-    // qui le signale, aucune bulle ne pouvant s'allumer pour lui.
-    final rowKeys = {for (final c in _kRowCountries) c.key};
-    final filterActive = selected.any((k) => !rowKeys.contains(k));
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    final keys = _orderedKeys;
+    return SizedBox(
+      height: _CountryRow.height,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _RowItem(
-            label: AppStrings.t('globe_filter_cta'),
-            active: filterActive,
-            onTap: onFilter,
-            // Pas de verre dans la rangée : la bulle « Filtrer » est pleine,
-            // comme les bulles pays.
-            bubble: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _kSurface,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _kSurfaceBorder, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.tune_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                if (filterActive)
-                  Positioned(
-                    top: -1,
-                    right: -1,
-                    child: IgnorePointer(
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: SC.accent,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: SC.bg, width: 2),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          for (final c in _kRowCountries)
-            _RowItem(
-              label: AppStrings.t(c.label),
-              active: selected.contains(c.key),
-              onTap: () => onCountry(c.key),
-              bubble: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 6, 12),
+            child: _RowItem(
+              label: AppStrings.t('globe_filter_cta'),
+              active: false,
+              onTap: widget.onFilter,
+              // Pas de verre dans la rangée : la bulle « Filtrer » est
+              // pleine, comme les bulles pays.
+              bubble: Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
                   color: _kSurface,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected.contains(c.key)
-                        ? SC.accent
-                        : _kSurfaceBorder,
-                    width: 2,
-                  ),
+                  border: Border.all(color: _kSurfaceBorder, width: 2),
                 ),
-                alignment: Alignment.center,
-                // La silhouette remplit le rond (34 dans 40 utiles) et c'est
-                // la BULLE qui la rogne : elle en fait partie, pas posée
-                // dessus comme un autocollant.
-                clipBehavior: Clip.antiAlias,
-                child: CountrySilhouette(
-                  geoName: c.geo,
-                  iso2: c.iso,
-                  size: 34,
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: Colors.white,
+                  size: 22,
                 ),
               ),
             ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              controller: _scroll,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(4, 12, 20, 12),
+              itemCount: keys.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (_, i) {
+                final key = keys[i];
+                final code = kGlobeCountries[key]!.code;
+                final on = widget.selected.contains(key);
+                return _RowItem(
+                  // La clé suit le pays, pas sa place : quand l'ordre
+                  // change, chaque bulle garde sa silhouette déjà chargée.
+                  key: ValueKey(key),
+                  label: AppStrings.t('country_$code'),
+                  active: on,
+                  onTap: () => widget.onCountry(key),
+                  bubble: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _kSurface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: on ? SC.accent : _kSurfaceBorder,
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    // La silhouette remplit le rond (34 dans 40 utiles) et
+                    // c'est la BULLE qui la rogne : elle en fait partie, pas
+                    // posée dessus comme un autocollant.
+                    clipBehavior: Clip.antiAlias,
+                    child: CountrySilhouette(
+                      geoName: key,
+                      iso2: code,
+                      size: 34,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -1090,6 +1135,7 @@ class _CountryRow extends StatelessWidget {
 
 class _RowItem extends StatelessWidget {
   const _RowItem({
+    super.key,
     required this.bubble,
     required this.label,
     required this.active,
