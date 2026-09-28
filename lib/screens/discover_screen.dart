@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -2156,9 +2155,9 @@ class _TinderCardState extends State<_TinderCard> {
   }
 }
 
-/// Le drapeau posé après le prénom : une IMAGE 28×19, rayon 4 (handoff 3c) —
-/// l'emoji dépend de la police du système et n'existe pas partout. Celui du
-/// PAYS ; à défaut, celui de la langue parlée.
+/// Le drapeau posé après le prénom : l'EMOJI, le même que sur la page
+/// Messages (le handoff voulait une image 28×19 — refusé, 2026-09-29). Celui
+/// du PAYS ; à défaut, celui de la langue parlée.
 class _NameFlag extends StatelessWidget {
   const _NameFlag({required this.profile});
 
@@ -2166,18 +2165,11 @@ class _NameFlag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const theme = ImageTheme(
-      width: 28,
-      height: 19,
-      shape: RoundedRectangle(4),
-    );
-    final iso = countryIso2For(profile.country);
-    if (iso.isNotEmpty) {
-      return CountryFlag.fromCountryCode(iso, theme: theme);
-    }
-    final lang = profile.language.trim();
-    if (lang.isEmpty) return const SizedBox.shrink();
-    return CountryFlag.fromLanguageCode(lang.split('-').first, theme: theme);
+    final flag = countryFlagFor(profile.country) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
+    if (flag.isEmpty) return const SizedBox.shrink();
+    return Text(flag, style: const TextStyle(fontSize: 24, height: 1));
   }
 }
 
