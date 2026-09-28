@@ -104,6 +104,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? _error;
   /// UI lock while a guest-invite link is being minted (prevents double-tap).
   bool _creatingInvite = false;
+
+  // Recherche — la loupe du header s'étire en champ (220 ms) ; les résultats
+  // prennent la place de la liste tant qu'elle est ouverte. (Venue de
+  // Découvrir, qui n'a plus de loupe depuis le handoff 3c.)
+  bool _searchExpanded = false;
+  final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
+  Timer? _searchDebounce;
+  bool _searching = false;
+  List<RemoteProfile> _searchResults = const [];
+  /// Mes liens d'amitié, lus à l'ouverture de la recherche : ils disent pour
+  /// chaque résultat « Ami », « Envoyée » ou « Ajouter ».
+  List<Friendship> _myFriendships = const [];
   /// Bumps on every [_reload] so an older in-flight fetch cannot overwrite
   /// a newer one and yank a row (Alice flashing in, then out).
   int _reloadSeq = 0;
@@ -214,11 +227,92 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
     final ch = _friendshipChannel;
     if (ch != null) {
       unawaited(Supabase.instance.client.removeChannel(ch));
     }
     super.dispose();
+  }
+
+  // ── Recherche ─────────────────────────────────────────────────────────────
+
+  void _openSearch() {
+    setState(() => _searchExpanded = true);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _searchFocus.requestFocus());
+    if (_myId.isNotEmpty) {
+      FriendshipApi.fetchMine(_myId).then((mine) {
+        if (mounted) setState(() => _myFriendships = mine);
+      }).catchError((_) {});
+    }
+  }
+
+  void _closeSearch() {
+    _searchDebounce?.cancel();
+    _searchFocus.unfocus();
+    setState(() {
+      _searchExpanded = false;
+      _searchCtrl.clear();
+      _searchResults = const [];
+      _searching = false;
+    });
+  }
+
+  void _onSearchChanged(String v) {
+    setState(() {});
+    _searchDebounce?.cancel();
+    _searchDebounce =
+        Timer(const Duration(milliseconds: 250), () => _runSearch(v));
+  }
+
+  Future<void> _runSearch(String value) async {
+    final q = value.trim();
+    if (q.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _searchResults = const [];
+          _searching = false;
+        });
+      }
+      return;
+    }
+    if (!isSupabaseReady || _myId.isEmpty) return;
+    setState(() => _searching = true);
+    try {
+      final r = await ProfileApi.searchProfiles(query: q, myDeviceId: _myId);
+      // Une frappe plus récente a pu partir entre-temps : on n'affiche que
+      // la réponse à ce qui est ÉCRIT maintenant.
+      if (mounted && _searchCtrl.text.trim() == q) {
+        setState(() => _searchResults = r);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _searchResults = const []);
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  Future<void> _openSearchResult(RemoteProfile peer) async {
+    _searchFocus.unfocus();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: peer.id)),
+    );
+  }
+
+  Future<void> _addFromSearch(RemoteProfile peer) async {
+    HapticFeedback.lightImpact();
+    final res = await FriendshipApi.like(meId: _myId, peerId: peer.id);
+    Analytics.track(
+      'friend_request_sent',
+      props: {'source': 'search', 'kind': res.matched ? 'match' : 'like'},
+    );
+    final f = res.friendship;
+    if (!mounted || f == null) return;
+    setState(() => _myFriendships = [..._myFriendships, f]);
+    if (res.matched) unawaited(_reload());
   }
 
   void _onHideOnlineChanged() {
@@ -711,7 +805,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   thickness: 1,
                   color: Colors.white.withValues(alpha: 0.10),
                 ),
-                Expanded(child: _buildBody()),
+                Expanded(
+                  child: _searchExpanded
+                      ? _buildSearchResults()
+                      : _buildBody(),
+                ),
               ],
             ),
           ),
@@ -745,9 +843,78 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// chiffre de la page qui ne parle pas du passé : tout le reste dit ce qui
   /// s'est dit, celui-là dit qui est là.
   Widget get _titleBar => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
+        child: SizedBox(
+          height: 40,
+          child: _searchExpanded ? _searchField : _titleRow,
+        ),
+      );
+
+  /// La loupe ouverte : même pastille, étirée sur toute la bande (220 ms).
+  Widget get _searchField => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        builder: (context, t, child) => Align(
+          alignment: Alignment.centerRight,
+          child: FractionallySizedBox(
+            widthFactor: 0.12 + 0.88 * t,
+            child: child,
+          ),
+        ),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  focusNode: _searchFocus,
+                  onChanged: _onSearchChanged,
+                  textInputAction: TextInputAction.search,
+                  cursorColor: SC.accent,
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: AppStrings.t('search_friend_hint'),
+                    hintStyle:
+                        const TextStyle(color: Colors.white54, fontSize: 15),
+                    // La pastille dessine déjà la surface : sans ça le thème
+                    // peint son fond et son anneau cyan DANS la pastille.
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _closeSearch,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget get _titleRow => Row(
           children: [
             const Text.rich(
               TextSpan(
@@ -767,6 +934,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 letterSpacing: 0.3,
               ),
             ),
+            const Spacer(),
             // Personne en ligne = pas de pastille : un « 0 en ligne » est une
             // mauvaise nouvelle affichée en permanence.
             if (_onlineFriends > 0)
@@ -804,9 +972,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+            const SizedBox(width: 6),
+            // La loupe — venue de Découvrir. Elle s'étire en champ au tap.
+            Semantics(
+              button: true,
+              label: AppStrings.t('search_friend_hint'),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openSearch,
+                child: const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ],
-        ),
-      );
+        );
 
   /// Mint a guest-invite link, open the share sheet, then drop the host into
   /// the call's waiting room. Whoever opens the link joins with no account;
@@ -892,6 +1078,54 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } finally {
       if (mounted) setState(() => _creatingInvite = false);
     }
+  }
+
+  /// La page de recherche : vide tant qu'on n'a rien tapé, puis les profils
+  /// trouvés, chacun avec son état (ami / demande envoyée / à ajouter).
+  Widget _buildSearchResults() {
+    final q = _searchCtrl.text.trim();
+    final navBody =
+        GlassNavBar.totalReservedHeight + MediaQuery.paddingOf(context).bottom;
+    if (q.isEmpty) return const SizedBox.shrink();
+    if (_searching && _searchResults.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 32),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
+    }
+    if (_searchResults.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        child: Text(
+          AppStrings.t('search_no_result', args: {'q': q}),
+          style: const TextStyle(color: SC.textMuted, fontSize: 14),
+        ),
+      );
+    }
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.only(top: 8, bottom: navBody + 12),
+      itemCount: _searchResults.length,
+      itemBuilder: (_, i) {
+        final peer = _searchResults[i];
+        return _SearchResultRow(
+          profile: peer,
+          status: FriendshipApi.statusWith(_myId, peer.id, _myFriendships).$1,
+          onTap: () => _openSearchResult(peer),
+          onAdd: () => _addFromSearch(peer),
+        );
+      },
+    );
   }
 
   Widget _buildBody() {
@@ -1501,6 +1735,143 @@ class _UnreadBadge extends StatelessWidget {
 /// to turn them on right where missed messages hurt. Benefit-framed copy, a
 /// one-tap "enable" that runs the priming → OS-prompt / Settings flow, and a
 /// dismiss for the session.
+/// Une ligne de résultat de recherche : avatar + prénom + drapeau, @handle,
+/// et à droite l'état du lien (ou « Ajouter »).
+class _SearchResultRow extends StatelessWidget {
+  const _SearchResultRow({
+    required this.profile,
+    required this.status,
+    required this.onTap,
+    required this.onAdd,
+  });
+
+  final RemoteProfile profile;
+  final FriendshipStatus status;
+  final VoidCallback onTap;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final flag = countryFlagFor(profile.country) ??
+        findLanguageByCode(profile.language)?.flag ??
+        '';
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            ProfileAvatar(
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+              fallbackUrl: profile.fallbackPhotoUrl,
+              size: 46,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          profile.displayName.isEmpty
+                              ? '—'
+                              : profile.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SC.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (flag.isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        Text(flag, style: const TextStyle(fontSize: 14)),
+                      ],
+                    ],
+                  ),
+                  if (profile.handle.isNotEmpty)
+                    Text(
+                      '@${profile.handle}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(color: SC.textMuted, fontSize: 13),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _statusBadge(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge() {
+    switch (status) {
+      case FriendshipStatus.accepted:
+        return _StatusPill(
+          label: AppStrings.t('friendship_friend'),
+          color: const Color(0xFF3DCA72),
+        );
+      case FriendshipStatus.pendingOutgoing:
+        return _StatusPill(
+          label: AppStrings.t('friendship_sent'),
+          color: Colors.amber,
+        );
+      case FriendshipStatus.pendingIncoming:
+        return _StatusPill(
+          label: AppStrings.t('friendship_pending_in'),
+          color: Colors.amber,
+        );
+      case FriendshipStatus.rejected:
+      case FriendshipStatus.none:
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onAdd,
+          child: _StatusPill(
+            label: AppStrings.t('add_friend_short'),
+            color: SC.accent,
+          ),
+        );
+    }
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 /// « Appelle n'importe qui, chacun dans sa langue » — la bannière cyan de la
 /// maquette Messages. Toute la carte est la cible : elle crée un lien
 /// d'invitation (appel sans compte) et ouvre la salle d'attente.
