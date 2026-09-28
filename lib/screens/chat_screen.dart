@@ -918,22 +918,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget get _titleRow => Row(
           children: [
-            const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: 'swayc'),
-                  TextSpan(
-                    text: 'ø',
-                    style: TextStyle(color: SC.accent),
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: SC.brandFont,
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
+            // Le titre de la page, plus le logo (maquette Messages).
+            Flexible(
+              child: Text(
+                AppStrings.t('messages_title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
             const Spacer(),

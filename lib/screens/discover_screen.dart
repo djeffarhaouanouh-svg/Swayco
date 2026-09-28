@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/ad_service.dart';
 import '../services/analytics.dart';
@@ -955,22 +954,40 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader();
 
-  /// Hauteur sous la safe area : logo 30 + respiration (réduit : la place
-  /// va à la photo).
-  static const double height = 38.0;
+  /// Hauteur sous la safe area — celle de l'ancienne barre du haut (52).
+  static const double height = 52.0;
 
+  /// Le logo d'origine, taille et place d'origine : le mot « swaycø » en
+  /// police de marque, 26, le « ø » en cyan, à 16 + 6 du bord, centré dans
+  /// la bande. (Le SVG du handoff a été retiré à la demande.)
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+        padding: EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: SvgPicture.asset(
-            'assets/swayco_logo_6d.svg',
-            height: 30,
-            semanticsLabel: 'swaycø',
+          child: Padding(
+            padding: EdgeInsets.all(6),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: 'swayc'),
+                  TextSpan(
+                    text: 'ø',
+                    style: TextStyle(color: Color(0xFF22D3EE)),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: SC.brandFont,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
           ),
         ),
       ),
