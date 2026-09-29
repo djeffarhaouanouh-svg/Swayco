@@ -1022,7 +1022,7 @@ abstract final class AppStrings {
     'info_interests': 'Interests',
     'info_empty': 'This person hasn\'t shared anything yet.',
     'info_age_value': '{n} years old',
-    'info_section_title': 'My info',
+    'info_section_title': 'My details',
     'info_age': 'Age',
     'info_height': 'Height (cm)',
     'info_job': 'Job',

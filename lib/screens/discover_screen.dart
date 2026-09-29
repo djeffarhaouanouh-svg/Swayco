@@ -1060,8 +1060,8 @@ class _DiscoverHeader extends StatelessWidget {
   static const double height = 52.0;
 
   /// Le logo d'origine, taille et place d'origine : le mot « swaycø » en
-  /// police de marque, 26, le « ø » en cyan, à 16 + 6 du bord, centré dans
-  /// la bande. (Le SVG du handoff a été retiré à la demande.)
+  /// police de marque, 26, le « ø » en cyan, centré horizontalement dans la
+  /// bande. (Le SVG du handoff a été retiré à la demande.)
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
@@ -1069,7 +1069,7 @@ class _DiscoverHeader extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
           child: Padding(
             padding: EdgeInsets.all(6),
             child: Text.rich(
