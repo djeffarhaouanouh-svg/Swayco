@@ -1899,8 +1899,6 @@ class _CallAnyoneBanner extends StatefulWidget {
 }
 
 class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
-  bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     const ink = Color(0xFF0B0B0C);
@@ -1945,43 +1943,18 @@ class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Semantics(
-                  button: true,
-                  label: AppStrings.t('call_anyone_title'),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (_) => setState(() => _pressed = true),
-                    onTapUp: (_) => setState(() => _pressed = false),
-                    onTapCancel: () => setState(() => _pressed = false),
-                    onTap: widget.busy ? null : widget.onTap,
-                    child: AnimatedScale(
-                      scale: _pressed ? 0.92 : 1,
-                      duration: const Duration(milliseconds: 120),
-                      curve: Curves.easeOut,
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        decoration: const BoxDecoration(
-                          color: ink,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: widget.busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.call_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                      ),
-                    ),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: ink,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.call_rounded,
+                    color: Colors.white,
+                    size: 22,
                   ),
                 ),
               ],
