@@ -1142,7 +1142,7 @@ class _DiscoverHeader extends StatelessWidget {
 /// tout de suite ce qu'on vient d'allumer), puis les autres dans l'ordre du
 /// globe. La bande revient au début à chaque changement.
 /// Diamètre des bulles de la rangée (sans libellé dessous : plus grandes).
-const double _kBubble = 54.0;
+const double _kBubble = 50.0;
 
 class _CountryRow extends StatefulWidget {
   const _CountryRow({
@@ -1157,9 +1157,9 @@ class _CountryRow extends StatefulWidget {
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// Même hauteur totale qu'avant (78) : 4 dessus + bulle 54 + 3 + nom 13
-  /// (seulement sous les pays choisis) + 4 dessous.
-  static const double height = 4 + _kBubble + 3 + 13 + 4;
+  /// 4 dessus + bulle + 3 + nom 13 (seulement sous les pays choisis) + 4
+  /// dessous — kept at 78 total, as before the bigger bubbles.
+  static const double height = 4 + 54 + 3 + 13 + 4;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
@@ -1271,7 +1271,7 @@ class _CountryRowState extends State<_CountryRow> {
                     child: CountrySilhouette(
                       geoName: key,
                       iso2: code,
-                      size: 42,
+                      size: 39,
                     ),
                   );
                 return _RowItem(
