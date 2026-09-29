@@ -1141,6 +1141,9 @@ class _DiscoverHeader extends StatelessWidget {
 /// Ordre : les pays sélectionnés d'abord, le DERNIER choisi en tête (on voit
 /// tout de suite ce qu'on vient d'allumer), puis les autres dans l'ordre du
 /// globe. La bande revient au début à chaque changement.
+/// Diamètre des bulles de la rangée (sans libellé dessous : plus grandes).
+const double _kBubble = 54.0;
+
 class _CountryRow extends StatefulWidget {
   const _CountryRow({
     required this.selected,
@@ -1154,9 +1157,9 @@ class _CountryRow extends StatefulWidget {
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// Bulle 44 + 6 + libellé 14, 4 de marge dessus (collée au logo) et 10
-  /// dessous (avant la carte).
-  static const double height = 4 + 44 + 6 + 14 + 10;
+  /// Même hauteur totale qu'avant (78) : 4 dessus + bulle 54 + 3 + nom 13
+  /// (seulement sous les pays choisis) + 4 dessous.
+  static const double height = 4 + _kBubble + 3 + 13 + 4;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
@@ -1214,7 +1217,7 @@ class _CountryRowState extends State<_CountryRow> {
           Padding(
             // 15 + 2 (et non 20 + 12) : les cases font 62 de large au lieu de
             // 52, les bulles restent exactement où elles étaient.
-            padding: const EdgeInsets.fromLTRB(15, 4, 2, 10),
+            padding: const EdgeInsets.fromLTRB(15, 4, 2, 4),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
               active: false,
@@ -1222,8 +1225,8 @@ class _CountryRowState extends State<_CountryRow> {
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
               bubble: Container(
-                width: 44,
-                height: 44,
+                width: _kBubble,
+                height: _kBubble,
                 decoration: BoxDecoration(
                   color: _kSurface,
                   shape: BoxShape.circle,
@@ -1232,7 +1235,7 @@ class _CountryRowState extends State<_CountryRow> {
                 child: const Icon(
                   Icons.tune_rounded,
                   color: Colors.white,
-                  size: 22,
+                  size: 26,
                 ),
               ),
             ),
@@ -1241,20 +1244,17 @@ class _CountryRowState extends State<_CountryRow> {
             child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(0, 4, 20, 10),
+              padding: const EdgeInsets.fromLTRB(0, 4, 20, 4),
               itemCount: keys.length,
-              // Même pas qu'avant (64 d'une bulle à l'autre) : case de 62 +
-              // 2 ici. La case est plus large que la bulle pour que « Allemagne »
-              // tienne sous elle sans mordre sur sa voisine.
-              separatorBuilder: (_, _) => const SizedBox(width: 2),
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
               itemBuilder: (_, i) {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
                 final circle = AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    width: 44,
-                    height: 44,
+                    width: _kBubble,
+                    height: _kBubble,
                     decoration: BoxDecoration(
                       color: _kSurface,
                       shape: BoxShape.circle,
@@ -1271,7 +1271,7 @@ class _CountryRowState extends State<_CountryRow> {
                     child: CountrySilhouette(
                       geoName: key,
                       iso2: code,
-                      size: 34,
+                      size: 42,
                     ),
                   );
                 return _RowItem(
@@ -1286,8 +1286,8 @@ class _CountryRowState extends State<_CountryRow> {
                     if (!on) widget.onCountry(key);
                   },
                   bubble: SizedBox(
-                    width: 44,
-                    height: 44,
+                    width: _kBubble,
+                    height: _kBubble,
                     child: Stack(
                       children: [
                         circle,
@@ -1362,18 +1362,23 @@ class _RowItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: 62,
+        width: 60,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            bubble,
-            const SizedBox(height: 6),
+            // Le nom n'est plus affiché que sous un pays CHOISI : la bulle
+            // parle d'elle-même, et le libellé dit ce qui filtre. Il reste
+            // lu par le lecteur d'écran partout.
+            Semantics(label: label, button: true, child: bubble),
+            const SizedBox(height: 3),
             SizedBox(
-              height: 14,
+              height: 13,
               // scaleDown : un nom trop long pour la case (« Deutschland »,
               // « Allemagne ») rétrécit au lieu de déborder sur la bulle d'à
               // côté ; un nom court garde sa taille.
-              child: FittedBox(
+              child: !active
+                  ? null
+                  : FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
