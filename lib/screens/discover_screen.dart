@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show Random;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -339,11 +340,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // the flag lookup confirms it has never played.
   bool _showSwipeCoach = false;
 
-  // Sponsored card: every [_kAdEvery] swipes, an ad card takes the slot of the
-  // next profile until the user taps "Continuer". Not part of [_cards], so the
-  // deck, its saved cursor and the swipe counters are untouched.
-  static const int _kAdEvery = 3;
+  // Sponsored card: after a random 1-5 swipes (redrawn after each ad, so the
+  // rhythm isn't predictable), an ad card takes the slot of the next profile
+  // until the user taps "Continuer". Not part of [_cards], so the deck, its
+  // saved cursor and the swipe counters are untouched.
+  static final Random _adRng = Random();
+  static int _nextAdGap() => _adRng.nextInt(5) + 1;
   int _swipesSinceAd = 0;
+  int _adAfter = _nextAdGap();
   bool _showAdCard = false;
 
   @override
@@ -553,8 +557,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       }
       _precacheAround(_currentIndex);
       _swipesSinceAd++;
-      if (_swipesSinceAd >= _kAdEvery && AdService.cardAdsEnabled) {
+      if (_swipesSinceAd >= _adAfter && AdService.cardAdsEnabled) {
         _swipesSinceAd = 0;
+        _adAfter = _nextAdGap();
         _showAdCard = true;
       }
     });
