@@ -1112,7 +1112,9 @@ class _CountryRowState extends State<_CountryRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
+            // 15 + 2 (et non 20 + 12) : les cases font 62 de large au lieu de
+            // 52, les bulles restent exactement où elles étaient.
+            padding: const EdgeInsets.fromLTRB(15, 4, 2, 10),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
               active: false,
@@ -1141,9 +1143,10 @@ class _CountryRowState extends State<_CountryRow> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(0, 4, 20, 10),
               itemCount: keys.length,
-              // Aéré comme la rangée fixe d'avant : ~20 px entre deux
-              // bulles (12 ici + les 8 de marge de chaque case de 52).
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              // Même pas qu'avant (64 d'une bulle à l'autre) : case de 62 +
+              // 2 ici. La case est plus large que la bulle pour que « Allemagne »
+              // tienne sous elle sans mordre sur sa voisine.
+              separatorBuilder: (_, _) => const SizedBox(width: 2),
               itemBuilder: (_, i) {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
@@ -1208,7 +1211,7 @@ class _RowItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: 52,
+        width: 62,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1216,17 +1219,22 @@ class _RowItem extends StatelessWidget {
             const SizedBox(height: 6),
             SizedBox(
               height: 14,
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.visible,
-                softWrap: false,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: active ? SC.accent : const Color(0xFFAAAAAA),
-                  fontSize: 11,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  height: 1.2,
+              // scaleDown : un nom trop long pour la case (« Deutschland »,
+              // « Allemagne ») rétrécit au lieu de déborder sur la bulle d'à
+              // côté ; un nom court garde sa taille.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: active ? SC.accent : const Color(0xFFAAAAAA),
+                    fontSize: 11,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    height: 1.2,
+                  ),
                 ),
               ),
             ),
