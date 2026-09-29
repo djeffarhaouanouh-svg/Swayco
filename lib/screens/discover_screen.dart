@@ -28,6 +28,7 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/ad_info_sheet.dart';
 import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
@@ -268,7 +269,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       // Switching a country ON shows the full-screen ad while the filtered
       // feed loads underneath. Capped (45 s), Pro-exempt and best-effort in
       // AdService — the filter never waits on it.
-      unawaited(AdService.showDiscoverInterstitial());
+      // After the first ad actually watched, explain once how to skip them.
+      unawaited(AdService.showDiscoverInterstitial().then((shown) {
+        if (shown && mounted) showAdInfoSheetOnce(context);
+      }));
     }
     setState(() {
       _showFilterTransition = true;
