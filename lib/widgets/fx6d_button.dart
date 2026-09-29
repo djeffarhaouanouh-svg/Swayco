@@ -261,10 +261,14 @@ class _IconPainter extends CustomPainter {
       canvas.drawPath(
         path,
         stroke()
-          ..color = Colors.white.withValues(alpha: .55)
+          ..color = Colors.white.withValues(alpha: .35)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
       );
-      canvas.drawPath(path, stroke()..color = Colors.white);
+      // Toned down a notch from pure white (less glaring than the heart).
+      canvas.drawPath(
+        path,
+        stroke()..color = Colors.white.withValues(alpha: .82),
+      );
     }
   }
 
