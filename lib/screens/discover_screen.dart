@@ -1213,14 +1213,7 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
-                return _RowItem(
-                  // La clé suit le pays, pas sa place : quand l'ordre
-                  // change, chaque bulle garde sa silhouette déjà chargée.
-                  key: ValueKey(key),
-                  label: AppStrings.t('country_$code'),
-                  active: on,
-                  onTap: () => widget.onCountry(key),
-                  bubble: AnimatedContainer(
+                final circle = AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     width: 44,
                     height: 44,
@@ -1241,6 +1234,64 @@ class _CountryRowState extends State<_CountryRow> {
                       geoName: key,
                       iso2: code,
                       size: 34,
+                    ),
+                  );
+                return _RowItem(
+                  // La clé suit le pays, pas sa place : quand l'ordre
+                  // change, chaque bulle garde sa silhouette déjà chargée.
+                  key: ValueKey(key),
+                  label: AppStrings.t('country_$code'),
+                  active: on,
+                  // Plusieurs pays à la fois : un tap AJOUTE. Retirer passe
+                  // par la petite croix, jamais par un tap sur la bulle.
+                  onTap: () {
+                    if (!on) widget.onCountry(key);
+                  },
+                  bubble: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Stack(
+                      children: [
+                        circle,
+                        if (on)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => widget.onCountry(key),
+                              child: Semantics(
+                                button: true,
+                                label: AppStrings.t('cancel'),
+                                // Zone de tap 24, dessin 17 dans le coin.
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Align(
+                                    alignment: Alignment.topRight,
+                                    child: Container(
+                                      width: 17,
+                                      height: 17,
+                                      decoration: BoxDecoration(
+                                        color: _kSurface,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: SC.accent,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.close_rounded,
+                                        color: Colors.white,
+                                        size: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 );
