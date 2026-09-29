@@ -1166,14 +1166,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onToggleBlock: _toggleBlock,
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
+                            aboveGallery: (!_isViewingOther && !widget.preview)
+                                ? _BoostButton(
+                                    boostedUntil: _remote?.boostedUntil,
+                                    onPurchased: _awaitBoostCredit,
+                                  )
+                                : null,
                           ),
-                          if (!_isViewingOther && !widget.preview) ...[
-                            const SizedBox(height: 16),
-                            _BoostButton(
-                              boostedUntil: _remote?.boostedUntil,
-                              onPurchased: _awaitBoostCredit,
-                            ),
-                          ],
                         ],
                       ),
               ),
@@ -1357,6 +1356,7 @@ class _IdentitySection extends StatelessWidget {
     required this.onSettings,
     this.onEditAccount,
     this.onPreview,
+    this.aboveGallery,
     this.preview = false,
     this.viewerMode = false,
     this.matched = false,
@@ -1447,6 +1447,9 @@ class _IdentitySection extends StatelessWidget {
 
   /// Own profile: ouvre l'aperÃ§u "vu de l'extÃ©rieur" (bouton Åil).
   final VoidCallback? onPreview;
+
+  /// Own profile only: shown just above the "Mes photos" header (Boost).
+  final Widget? aboveGallery;
 
   /// True quand CETTE instance EST l'aperÃ§u (rendu viewer sur mes donnÃ©es) :
   /// masque toutes les actions relationnelles.
@@ -1748,6 +1751,10 @@ class _IdentitySection extends StatelessWidget {
           style: const TextStyle(color: SC.textMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
+        if (aboveGallery != null) ...[
+          Center(child: aboveGallery!),
+          const SizedBox(height: 20),
+        ],
         // Photos EN HAUT : "Tes photos (n)" + galerie horizontale.
         _ProfileSectionHeader(
           photosTitle,
@@ -4020,7 +4027,9 @@ class _BoostButtonState extends State<_BoostButton> {
       ).formatTimeOfDay(TimeOfDay.fromDateTime(until));
       label = AppStrings.t('boost_active_until', args: {'time': time});
     } else {
-      label = _price == null ? 'Boost' : 'Boost · $_price';
+      label = _price == null
+          ? AppStrings.t('boost_my_profile')
+          : '${AppStrings.t('boost_my_profile')} · $_price';
     }
     return FilledButton.icon(
       onPressed: active || _busy ? null : _buy,
@@ -4029,8 +4038,10 @@ class _BoostButtonState extends State<_BoostButton> {
         foregroundColor: SC.bgDeep,
         disabledBackgroundColor: SC.accent.withValues(alpha: 0.18),
         disabledForegroundColor: SC.accent,
-        minimumSize: const Size.fromHeight(50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        // Resserré : largeur du contenu, pas toute la page.
+        minimumSize: const Size(0, 46),
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
       ),
       icon: _busy
           ? const SizedBox(

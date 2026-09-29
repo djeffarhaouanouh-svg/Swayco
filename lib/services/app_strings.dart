@@ -587,6 +587,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost acheté ! Ton profil est mis en avant pendant 24 h.',
     'boost_active_until': "Boost actif jusqu'à {time}",
+    'boost_my_profile': 'Booster mon profil',
     'no_one_liked_yet': "Personne ne t'a encore liké",
     'like_explainer':
         "Quand quelqu'un appuie sur le ❤ de ta carte Discover, tu le verras apparaître ici.",
@@ -1245,6 +1246,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost purchased! Your profile is featured for 24 h.',
     'boost_active_until': 'Boost active until {time}',
+    'boost_my_profile': 'Boost my profile',
     'no_one_liked_yet': 'No one has liked you yet',
     'like_explainer':
         "When someone taps the ❤ on your Discover card, you'll see them here.",
@@ -1868,6 +1870,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         '¡Boost comprado! Tu perfil se destaca durante 24 h.',
     'boost_active_until': 'Boost activo hasta las {time}',
+    'boost_my_profile': 'Impulsar mi perfil',
     'no_one_liked_yet': 'Nadie te ha dado like todavía',
     'like_explainer':
         'Cuando alguien toque el ❤ de tu tarjeta Discover, lo verás aparecer aquí.',
@@ -2444,6 +2447,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost gekauft! Dein Profil wird 24 Std. lang hervorgehoben.',
     'boost_active_until': 'Boost aktiv bis {time}',
+    'boost_my_profile': 'Mein Profil boosten',
     'no_one_liked_yet': 'Noch niemand hat dich gelikt',
     'like_explainer':
         'Wenn jemand auf das ❤ deiner Discover-Karte tippt, siehst du es hier.',
@@ -3104,6 +3108,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost acquistato! Il tuo profilo è in evidenza per 24 h.',
     'boost_active_until': 'Boost attivo fino alle {time}',
+    'boost_my_profile': 'Metti in risalto il mio profilo',
     'no_one_liked_yet': 'Nessuno ti ha ancora messo mi piace',
     'like_explainer':
         'Quando qualcuno tocca il ❤ sulla tua scheda Discover, lo vedrai qui.',
@@ -3759,6 +3764,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost comprado! Seu perfil fica em destaque por 24 h.',
     'boost_active_until': 'Boost ativo até {time}',
+    'boost_my_profile': 'Impulsionar o meu perfil',
     'no_one_liked_yet': 'Ninguém te curtiu ainda',
     'like_explainer':
         'Quando alguém tocar no ❤ do seu cartão Discover, você verá aqui.',
@@ -4417,6 +4423,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost gekocht! Je profiel wordt 24 uur uitgelicht.',
     'boost_active_until': 'Boost actief tot {time}',
+    'boost_my_profile': 'Mijn profiel boosten',
     'no_one_liked_yet': 'Niemand heeft je nog geliket',
     'like_explainer':
         'Wanneer iemand op het ❤ van je Discover-kaart tikt, zie je het hier.',
@@ -5063,6 +5070,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'تم شراء Boost! سيظهر ملفك الشخصي بشكل بارز لمدة 24 ساعة.',
     'boost_active_until': 'Boost مفعّل حتى {time}',
+    'boost_my_profile': 'عزّز ملفي الشخصي',
     'no_one_liked_yet': 'لم يعجب بك أحد بعد',
     'like_explainer':
         'عندما يضغط شخص ما على ❤ في بطاقة Discover الخاصة بك، ستراه هنا.',
@@ -5712,6 +5720,7 @@ abstract final class AppStrings {
     'boost_snack_success':
         'Boost куплен! Твой профиль будет выделен 24 ч.',
     'boost_active_until': 'Boost активен до {time}',
+    'boost_my_profile': 'Продвинуть мой профиль',
     'no_one_liked_yet': 'Тебя ещё никто не лайкнул',
     'like_explainer':
         'Когда кто-то нажмёт ❤ на твоей карточке Discover, ты увидишь его здесь.',
@@ -6332,6 +6341,7 @@ abstract final class AppStrings {
     'likes_go_pro': '升级 Pro',
     'boost_snack_success': 'Boost 购买成功！你的资料将被推荐 24 小时。',
     'boost_active_until': 'Boost 生效至 {time}',
+    'boost_my_profile': '提升我的资料曝光',
     'no_one_liked_yet': '还没有人喜欢你',
     'like_explainer': '当有人点击你 Discover 卡片上的 ❤ 时，你会在这里看到。',
     'profile_speaks': '说{lang}',
@@ -6933,6 +6943,7 @@ abstract final class AppStrings {
     'likes_go_pro': 'Pro にする',
     'boost_snack_success': 'Boost を購入しました！プロフィールが24時間目立ちます。',
     'boost_active_until': 'Boost 有効：{time} まで',
+    'boost_my_profile': 'プロフィールをブースト',
     'no_one_liked_yet': 'まだ誰もあなたにいいねしていません',
     'like_explainer': '誰かがあなたの Discover カードの ❤ をタップすると、ここに表示されます。',
     'profile_speaks': '{lang}を話します',
@@ -7537,6 +7548,7 @@ abstract final class AppStrings {
     'likes_go_pro': 'Pro 시작하기',
     'boost_snack_success': 'Boost 구매 완료! 24시간 동안 프로필이 돋보입니다.',
     'boost_active_until': 'Boost 활성: {time}까지',
+    'boost_my_profile': '내 프로필 부스트',
     'no_one_liked_yet': '아직 아무도 좋아요를 누르지 않았습니다',
     'like_explainer': '누군가 당신의 Discover 카드의 ❤를 탭하면 여기에 표시됩니다.',
     'profile_speaks': '{lang}를 사용합니다',
