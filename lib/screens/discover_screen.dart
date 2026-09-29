@@ -270,7 +270,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// row shows it first. Last one switched off = back to the whole deck.
   Future<void> _toggleCountry(String key) async {
     HapticFeedback.selectionClick();
-    if (_countryKeys.contains(key)) {
+    final removing = _countryKeys.contains(key);
+    if (removing) {
       final rest = {..._countryKeys}..remove(key);
       if (rest.isEmpty) {
         _clearCountryFilter();
@@ -281,11 +282,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       setState(() => _countryKeys = {..._countryKeys, key});
       _showFilterAd();
     }
-    setState(() {
-      _showFilterTransition = true;
-      _transitionAnimDone = false;
-      _transitionFeedDone = false;
-    });
+    // The "Go" loader animation only when a country is ADDED — removing one
+    // just reloads the deck quietly.
+    if (!removing) {
+      setState(() {
+        _showFilterTransition = true;
+        _transitionAnimDone = false;
+        _transitionFeedDone = false;
+      });
+    }
     Analytics.track('screen_view', props: {
       'screen': 'discover',
       'country_filter': _countryKeys.join(','),
