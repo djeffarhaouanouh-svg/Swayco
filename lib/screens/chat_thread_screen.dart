@@ -896,6 +896,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           autoTranslate: _autoTranslate,
                           onToggleTranslate: _toggleAutoTranslate,
                           myLang: _myLang,
+                          peerLang: _peer?.language ?? '',
+                          peerFirstName: (_peer?.displayName.isNotEmpty == true
+                                  ? _peer!.displayName
+                                  : widget.title)
+                              .trim()
+                              .split(RegExp(r'\s+'))
+                              .first,
                         ),
                       ],
                     ),
@@ -2352,7 +2359,14 @@ class _Composer extends StatefulWidget {
     required this.autoTranslate,
     required this.onToggleTranslate,
     required this.myLang,
+    this.peerLang = '',
+    this.peerFirstName = '',
   });
+
+  /// Langue et prénom du pair — pour « Écris en français, Lucía lit en
+  /// espagnol » quand la traduction auto relie deux langues différentes.
+  final String peerLang;
+  final String peerFirstName;
 
   final TextEditingController controller;
   final bool sending;
@@ -2417,8 +2431,36 @@ class _ComposerState extends State<_Composer> {
     super.didUpdateWidget(old);
     // The spoken language loads a beat after the screen opens; retype the
     // placeholder once it resolves ("Message" → "Write in English") — but
-    // only after the open transition, so the retype stays visible.
-    if (_hintReady && old.myLang != widget.myLang) _animateHint();
+    // only after the open transition, so the retype stays visible. Same when
+    // the peer's language lands or the translate toggle flips.
+    // Retaper seulement si le TEXTE à taper change vraiment (langue du pair
+    // arrivée, toggle basculé) — pas à chaque reconstruction du parent.
+    if (_hintReady && !_waitingForLangs && _composerHint != _typingFor) {
+      _animateHint();
+    }
+  }
+
+  /// Ce que la machine à écrire tape (ou a fini de taper).
+  String? _typingFor;
+
+  /// Vrai tant qu'on attend que les langues arrivent avant de taper.
+  bool _waitingForLangs = false;
+
+  /// Tape le texte d'aide une fois qu'il est DÉFINITIF : ma langue et celle
+  /// du pair arrivent un instant après l'ouverture, et taper « Écrivez en
+  /// Français » pour le remplacer aussitôt par « Écris en français, Lucía
+  /// lit en espagnol » cassait l'animation. On patiente 1,2 s au plus.
+  void _typeWhenLangsKnown([int waitedMs = 0]) {
+    if (!mounted) return;
+    final known = widget.myLang.isNotEmpty && widget.peerLang.isNotEmpty;
+    if (!known && waitedMs < 1200) {
+      _waitingForLangs = true;
+      Timer(const Duration(milliseconds: 150),
+          () => _typeWhenLangsKnown(waitedMs + 150));
+      return;
+    }
+    _waitingForLangs = false;
+    _animateHint();
   }
 
   /// Wait for the route's open transition to finish, then start typing.
@@ -2432,14 +2474,14 @@ class _ComposerState extends State<_Composer> {
           anim.removeStatusListener(onStatus);
           if (!mounted) return;
           _hintReady = true;
-          _animateHint();
+          _typeWhenLangsKnown();
         }
       }
 
       anim.addStatusListener(onStatus);
     } else {
       _hintReady = true;
-      _animateHint();
+      _typeWhenLangsKnown();
     }
   }
 
@@ -2449,9 +2491,14 @@ class _ComposerState extends State<_Composer> {
     _hintTimer?.cancel();
     final full = _composerHint;
     if (!mounted) return;
+    _typingFor = full;
     setState(() => _typedHint = '');
     var shown = 0;
-    _hintTimer = Timer.periodic(const Duration(milliseconds: 75), (t) {
+    // Même durée que l'animation d'origine (~1,5 s pour « Écrivez en
+    // Français ») quelle que soit la longueur : la phrase longue ne traîne
+    // pas 3 s, une courte garde son rythme de 75 ms.
+    final tick = (1500 / full.length.clamp(1, 1000)).round().clamp(28, 75);
+    _hintTimer = Timer.periodic(Duration(milliseconds: tick), (t) {
       if (!mounted || shown >= full.length) {
         t.cancel();
         return;
@@ -2468,12 +2515,42 @@ class _ComposerState extends State<_Composer> {
   /// language — "Écrivez en Français" for a French user — falling back to the
   /// plain "Message" when their language is unknown.
   String get _composerHint {
+    final me = widget.myLang.trim().split('-').first;
+    final peer = widget.peerLang.trim().split('-').first;
+    if (widget.autoTranslate &&
+        me.isNotEmpty &&
+        peer.isNotEmpty &&
+        me != peer &&
+        widget.peerFirstName.isNotEmpty) {
+      return AppStrings.t(
+        'composer_hint_cross',
+        args: {
+          'me': _langName(me),
+          'peer': _langName(peer),
+          'name': widget.peerFirstName,
+        },
+      );
+    }
     final lang = findLanguageByCode(widget.myLang);
     if (lang == null) return AppStrings.t('composer_message_hint');
     return AppStrings.t(
       'composer_message_hint_lang',
       args: {'lang': lang.label},
     );
+  }
+
+  /// Nom de la langue [code] dans la langue de l'interface (« espagnol »).
+  /// En minuscule là où les noms de langue en prennent une (fr, es, it, pt,
+  /// nl) — « Écris en français », pas « en Français ».
+  static String _langName(String code) {
+    final name = AppStrings.t('lang_name_$code');
+    if (name == 'lang_name_$code') {
+      return findLanguageByCode(code)?.label ?? code.toUpperCase();
+    }
+    const lower = {'fr', 'es', 'it', 'pt', 'nl'};
+    return lower.contains(AppStrings.currentBcp47.value)
+        ? name.toLowerCase()
+        : name;
   }
 
   Widget _buildIdleBar() {
@@ -2511,11 +2588,14 @@ class _ComposerState extends State<_Composer> {
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
                             hintText: _typedHint,
-                            hintStyle: const TextStyle(color: SC.textMuted),
-                            // Keep the placeholder on ONE line — on the native
-                            // build the wider font wrapped "Écrivez en Français"
-                            // onto a second line and made the whole bar tall.
-                            hintMaxLines: 1,
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontSize: 14,
+                              height: 1.25,
+                            ),
+                            // Deux lignes au plus : « Écris en français, Lucía
+                            // lit en espagnol » tient sur deux (maquette 1b).
+                            hintMaxLines: 2,
                             filled: false,
                             contentPadding: const EdgeInsets.fromLTRB(
                               4,
