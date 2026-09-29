@@ -46,10 +46,36 @@ import 'profile_screen.dart';
 /// Fond de la conversation 1b (handoff) — un cran au-dessus du noir pur.
 const Color _kThreadBg = Color(0xFF0B0B0C);
 
-/// Opacité du fondu du header / footer : au bord de l'écran, puis à 55 %
-/// de sa hauteur (il finit transparent). Baissée à la demande (1 / .95).
-const double _kChromeTop = 0.85;
-const double _kChromeMid = 0.78;
+/// Opacité du fond DERRIÈRE le header et le composer. Constante sur toute
+/// leur hauteur : un dégradé qui baissait déjà derrière le prénom laissait
+/// une bulle cyan transparaître en vert sale sous le texte.
+const double _kChromeSolid = 0.92;
+
+/// Hauteur du fondu qui prolonge le header (vers le bas) et le composer
+/// (vers le haut) : c'est LÀ que les messages transparaissent.
+const double _kChromeFade = 40;
+
+/// Le fond du header / du footer : [solid] px à [_kChromeSolid] (là où il y a
+/// du contenu), puis [_kChromeFade] px de fondu jusqu'à transparent, en
+/// courbe douce — un fondu linéaire court faisait une marche visible.
+LinearGradient _chromeGradient({required double solid, required bool top}) {
+  final f = solid / (solid + _kChromeFade);
+  final tail = 1 - f;
+  final c = _kThreadBg;
+  return LinearGradient(
+    begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+    end: top ? Alignment.bottomCenter : Alignment.topCenter,
+    stops: [0, f, f + tail * 0.25, f + tail * 0.5, f + tail * 0.75, 1],
+    colors: [
+      c.withValues(alpha: _kChromeSolid),
+      c.withValues(alpha: _kChromeSolid),
+      c.withValues(alpha: _kChromeSolid * 0.78),
+      c.withValues(alpha: _kChromeSolid * 0.45),
+      c.withValues(alpha: _kChromeSolid * 0.15),
+      c.withValues(alpha: 0),
+    ],
+  );
+}
 
 /// Bulle reçue (1b).
 const Color _kBubbleIn = Color(0xFF1E1E22);
@@ -756,6 +782,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // (La pastille « ES → FR » de la maquette a été retirée à la demande.)
     final headerH =
         safeTop + _ThreadHeader.height + (_error != null ? 40 : 0);
+    // Hauteur du composer (champ ~50 + 4 dessus + 12 dessous + une part de
+    // la safe area, cf. _buildIdleBar) : le fond y reste constant.
+    final footerSolid = 70 + MediaQuery.paddingOf(context).bottom * 0.4;
     return Scaffold(
       backgroundColor: _kThreadBg,
       body: GestureDetector(
@@ -778,29 +807,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                 child: _buildMessageList(topInset: headerH + 8),
               ),
             ),
-            // ── Header : dégradé bg 100 % → 95 % à 55 % → 0 %, + 22 de fondu
-            //    sous la pastille. Les boutons, eux, sont en verre. ─────────
+            // ── Header : fond constant derrière le prénom et les boutons, puis
+            //    un fondu doux de 40 px sous lui. Les boutons sont en verre. ──
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0, 0.55, 1],
-                    colors: [
-                      // Un peu moins couvrant que la maquette (1 → .95) :
-                      // les messages transparaissent davantage dessous.
-                      _kThreadBg.withValues(alpha: _kChromeTop),
-                      _kThreadBg.withValues(alpha: _kChromeMid),
-                      _kThreadBg.withValues(alpha: 0),
-                    ],
-                  ),
+                  gradient: _chromeGradient(solid: headerH, top: true),
                 ),
                 child: Padding(
-                  padding: EdgeInsets.only(top: safeTop, bottom: 22),
+                  padding: EdgeInsets.only(top: safeTop, bottom: _kChromeFade),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -828,25 +846,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                 ),
               ),
             ),
-            // ── Footer : même dégradé, inversé, 26 de fondu au-dessus. ─────
+            // ── Footer : même fond, inversé — constant derrière le composer,
+            //    puis 40 px de fondu doux au-dessus. ─────────────────────────
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: IgnorePointer(
                 child: Container(
-                  height: 26 + 76 + MediaQuery.paddingOf(context).bottom,
+                  height: _kChromeFade + footerSolid,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      stops: const [0, 0.55, 1],
-                      colors: [
-                        _kThreadBg.withValues(alpha: _kChromeTop),
-                        _kThreadBg.withValues(alpha: _kChromeMid),
-                        _kThreadBg.withValues(alpha: 0),
-                      ],
-                    ),
+                    gradient: _chromeGradient(solid: footerSolid, top: false),
                   ),
                 ),
               ),
@@ -2388,7 +2398,18 @@ class _Composer extends StatefulWidget {
   State<_Composer> createState() => _ComposerState();
 }
 
-class _ComposerState extends State<_Composer> {
+class _ComposerState extends State<_Composer>
+    with SingleTickerProviderStateMixin {
+  /// Opacité du texte d'aide : 1 = visible, 0 = effacé. S'efface vite quand
+  /// on touche le champ, revient en fondu quand on le quitte — plus d'aller-
+  /// retour brutal.
+  late final AnimationController _hintFade = AnimationController(
+    vsync: this,
+    value: 1,
+    duration: const Duration(milliseconds: 300),
+    reverseDuration: const Duration(milliseconds: 150),
+  )..addListener(() => setState(() {}));
+
   /// True while the input field has any text — in that case we render
   /// the send button (instead of the mic) so the gesture matches the
   /// user's clear intent.
@@ -2409,8 +2430,12 @@ class _ComposerState extends State<_Composer> {
   bool _focused = false;
 
   void _onFocusChanged() {
-    if (_focus.hasFocus != _focused) {
-      setState(() => _focused = _focus.hasFocus);
+    if (_focus.hasFocus == _focused) return;
+    _focused = _focus.hasFocus;
+    if (_focused) {
+      _hintFade.reverse();
+    } else {
+      _hintFade.forward();
     }
   }
 
@@ -2431,6 +2456,7 @@ class _ComposerState extends State<_Composer> {
     _focus
       ..removeListener(_onFocusChanged)
       ..dispose();
+    _hintFade.dispose();
     _hintTimer?.cancel();
     super.dispose();
   }
@@ -2603,9 +2629,13 @@ class _ComposerState extends State<_Composer> {
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
                             // Effacé dès que le champ a le focus.
-                            hintText: _focused ? null : _typedHint,
+                            // S'efface / revient en fondu avec le focus.
+                            hintText: _hintFade.value == 0 ? null : _typedHint,
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
+                              color: Colors.white.withValues(
+                                alpha: 0.55 *
+                                    Curves.easeOut.transform(_hintFade.value),
+                              ),
                               fontSize: 14,
                               height: 1.25,
                             ),
@@ -2738,24 +2768,25 @@ class _ComposerTranslateToggle extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.only(left: 10, right: 8),
-        // L'icône « traduire », petite, posée en haut à gauche du toggle
-        // (à cheval sur son coin) au lieu d'être à côté de lui.
+        // L'icône « traduire », petite, en haut à gauche du toggle — HORS de
+        // lui : ils ne se touchent que coin contre coin (le coin arrondi de
+        // la pilule laisse un petit vide), au lieu de se chevaucher.
         child: SizedBox(
-          width: 48,
-          height: 34,
+          width: 56,
+          height: 36,
           child: Stack(
             children: [
               Positioned(
-                right: 0,
-                bottom: 3,
+                left: 13,
+                top: 12,
                 child: _pill(),
               ),
               Positioned(
                 left: 0,
-                top: 0,
+                top: 1,
                 child: Icon(
                   Icons.translate,
-                  size: 13,
+                  size: 12,
                   color: active ? SC.accent : SC.textMuted,
                 ),
               ),
