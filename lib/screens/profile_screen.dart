@@ -3976,16 +3976,7 @@ class _BoostButton extends StatefulWidget {
 }
 
 class _BoostButtonState extends State<_BoostButton> {
-  String? _price;
   bool _busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    RevenueCat.priceOf(RevenueCat.boostPackageId).then((p) {
-      if (mounted) setState(() => _price = p);
-    });
-  }
 
   Future<void> _buy() async {
     setState(() => _busy = true);
@@ -4027,9 +4018,7 @@ class _BoostButtonState extends State<_BoostButton> {
       ).formatTimeOfDay(TimeOfDay.fromDateTime(until));
       label = AppStrings.t('boost_active_until', args: {'time': time});
     } else {
-      label = _price == null
-          ? AppStrings.t('boost_my_profile')
-          : '${AppStrings.t('boost_my_profile')} · $_price';
+      label = AppStrings.t('boost_my_profile');
     }
     return FilledButton.icon(
       onPressed: active || _busy ? null : _buy,
