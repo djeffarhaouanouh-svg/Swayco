@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_strings.dart';
+import 'demonyms.dart';
 import 'profile_api.dart';
 import 'push_dispatcher.dart';
 import 'supabase_service.dart';
@@ -311,12 +312,23 @@ abstract final class FriendshipApi {
       final myName = myProfile?.displayName.trim() ?? '';
       final peer = await ProfileApi.fetchById(peerId);
       final lang = peer?.language ?? '';
+      // The Likes page blurs who liked a man without Premium — the push must
+      // not reveal the name either: "Une Brésilienne t'a ajouté 👀" instead.
+      final blurred = peer != null && peer.gender != 'f' && !peer.isPro;
+      final anonBody = blurred
+          ? (addedByNationality(
+                lang: lang,
+                country: myProfile?.country ?? '',
+                senderGender: myProfile?.gender ?? '',
+              ) ??
+              AppStrings.tIn(lang, 'push_added_anon'))
+          : null;
       await PushDispatcher.notify(
         recipientUid: peerId,
-        title: myName.isEmpty
+        title: (blurred || myName.isEmpty)
             ? AppStrings.tIn(lang, 'push_friend_request_title')
             : myName,
-        body: AppStrings.tIn(lang, 'push_friend_request_body'),
+        body: anonBody ?? AppStrings.tIn(lang, 'push_friend_request_body'),
         type: 'friend_request',
         data: {'requesterId': meId},
       );
