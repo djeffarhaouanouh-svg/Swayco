@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:math' show Random;
 import 'dart:ui';
 
@@ -29,11 +30,10 @@ import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/ad_info_sheet.dart';
+import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
-import '../widgets/flag_border.dart';
-import '../widgets/flag_gradients.dart';
 import '../widgets/fx6d_button.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
@@ -894,6 +894,23 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
     });
   }
 
+  /// The webhook credits a Boost a few seconds after the store sheet closes:
+  /// poll my row until boosted_until shows up (same as the profile page).
+  Future<void> _awaitBoostCredit() async {
+    final id = _me?.id ?? '';
+    if (id.isEmpty) return;
+    for (var i = 0; i < 10; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final me = await ProfileApi.fetchById(id);
+      if (!mounted) return;
+      if (me != null && me.isBoosted) {
+        setState(() => _me = me);
+        return;
+      }
+    }
+  }
+
   /// Même repli que le feed : la galerie d'abord, sinon la photo Discover,
   /// sinon la PDP. Une liste vide reste possible (aucune photo encore) — la
   /// carte se rend alors sur son fond sombre, ce qui EST ce que les autres
@@ -908,6 +925,8 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
     return const [];
   }
 
+  bool get _showBoost => !_loading && _me != null && !_infoOpen;
+
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
@@ -920,9 +939,17 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
         children: [
           Positioned(
             top: safeTop + 64,
-            left: 8,
-            right: 8,
-            bottom: safeBottom + 12,
+            // Same inset, corners and ratio as the real Discover card — not
+            // taller than the feed shows it (room left for the Boost button).
+            left: _kCardInset,
+            right: _kCardInset,
+            height: math.min(
+              (MediaQuery.sizeOf(context).width - 2 * _kCardInset) /
+                  discoverCardAspect(context),
+              MediaQuery.sizeOf(context).height -
+                  (safeTop + 64) -
+                  (safeBottom + 12 + (_showBoost ? 50 + 14 : 0)),
+            ),
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(
@@ -948,22 +975,15 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                             profile: me,
                             photos: _photos,
                           );
-                          final country =
-                              flagCountryForLanguage(me.language);
                           return Stack(
                             children: [
+                              // Exactly the feed card: r32, no flag border.
                               Positioned.fill(
-                                child: country != null
-                                    ? FlagBorder(
-                                        country: country,
-                                        radius: 24,
-                                        child: card,
-                                      )
-                                    : ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(24),
-                                        child: card,
-                                      ),
+                                child: ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(_kCardRadius),
+                                  child: card,
+                                ),
                               ),
                               // Tirer la photo vers le haut déplie le panneau,
                               // exactement comme dans le feed.
@@ -1016,6 +1036,19 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                         },
                       ),
           ),
+          // « Booster mon profil » sous la carte, là où le feed a ✕ ✉ ❤.
+          if (_showBoost)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: safeBottom + 12,
+              child: Center(
+                child: BoostButton(
+                  boostedUntil: me!.boostedUntil,
+                  onPurchased: _awaitBoostCredit,
+                ),
+              ),
+            ),
           // Retour + bandeau "voici ta carte telle que les autres la voient".
           Positioned(
             top: safeTop + 8,

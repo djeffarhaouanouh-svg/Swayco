@@ -43,6 +43,7 @@ import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
+import '../widgets/boost_button.dart';
 import 'chat_thread_screen.dart';
 import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
@@ -1167,7 +1168,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onTogglePhotoLike: _togglePhotoLike,
                             onMessagePeer: _openChatWithPeer,
                             aboveGallery: (!_isViewingOther && !widget.preview)
-                                ? _BoostButton(
+                                ? BoostButton(
                                     boostedUntil: _remote?.boostedUntil,
                                     onPurchased: _awaitBoostCredit,
                                   )
@@ -3958,94 +3959,6 @@ class _DragDownToCloseState extends State<_DragDownToClose> {
         }
       },
       child: widget.child,
-    );
-  }
-}
-
-/// "Boost" — buys the consumable Boost package through RevenueCat. The
-/// backend webhook credits it (24 h in Discover); while it runs the button
-/// shows the end time instead. Placeholder look, final design to come.
-class _BoostButton extends StatefulWidget {
-  const _BoostButton({required this.boostedUntil, required this.onPurchased});
-
-  final DateTime? boostedUntil;
-  final Future<void> Function() onPurchased;
-
-  @override
-  State<_BoostButton> createState() => _BoostButtonState();
-}
-
-class _BoostButtonState extends State<_BoostButton> {
-  bool _busy = false;
-
-  Future<void> _buy() async {
-    setState(() => _busy = true);
-    final outcome = await RevenueCat.purchaseConsumable(
-      RevenueCat.boostPackageId,
-    );
-    if (!mounted) return;
-    final key = switch (outcome) {
-      PurchaseOutcome.success => 'boost_snack_success',
-      PurchaseOutcome.unavailable => 'paywall_snack_unavailable',
-      PurchaseOutcome.error => 'paywall_snack_error',
-      PurchaseOutcome.cancelled => null,
-    };
-    if (key != null) {
-      final why = outcome == PurchaseOutcome.unavailable
-          ? RevenueCat.lastUnavailableReason
-          : '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: Duration(seconds: why.isEmpty ? 4 : 8),
-          content: Text(
-            why.isEmpty ? AppStrings.t(key) : '${AppStrings.t(key)}\n($why)',
-          ),
-        ),
-      );
-    }
-    if (outcome == PurchaseOutcome.success) await widget.onPurchased();
-    if (mounted) setState(() => _busy = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final until = widget.boostedUntil;
-    final active = until != null && until.isAfter(DateTime.now());
-    final String label;
-    if (active) {
-      final time = MaterialLocalizations.of(
-        context,
-      ).formatTimeOfDay(TimeOfDay.fromDateTime(until));
-      label = AppStrings.t('boost_active_until', args: {'time': time});
-    } else {
-      label = AppStrings.t('boost_my_profile');
-    }
-    return FilledButton.icon(
-      onPressed: active || _busy ? null : _buy,
-      style: FilledButton.styleFrom(
-        backgroundColor: SC.accent,
-        foregroundColor: SC.bgDeep,
-        disabledBackgroundColor: SC.accent.withValues(alpha: 0.18),
-        disabledForegroundColor: SC.accent,
-        // Resserré : largeur du contenu, pas toute la page.
-        minimumSize: const Size(0, 50),
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      icon: _busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: SC.bgDeep,
-              ),
-            )
-          : const Icon(Icons.rocket_launch_rounded, size: 20),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
-      ),
     );
   }
 }
