@@ -299,6 +299,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ? mine!.language.trim()
             : AppStrings.currentBcp47.value,
         recipientLang: peer.language,
+        special: true,
       );
       Analytics.track('message_sent',
           props: {'source': 'discover_direct', 'type': 'text'});
