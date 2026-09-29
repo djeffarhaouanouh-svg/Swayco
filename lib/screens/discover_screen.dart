@@ -53,6 +53,23 @@ const Color _kPanelBg = Color(0xFF141517);
 /// Marge latérale de la carte (handoff 3c).
 const double _kCardInset = 14.0;
 
+/// Width / height of the Discover card on THIS device (same maths as
+/// [_DiscoverScreenState.build]: screen minus logo, country row, action row
+/// and nav). Lets the photo cropper frame exactly what the card will show.
+double discoverCardAspect(BuildContext context) {
+  final mq = MediaQuery.of(context);
+  final top = mq.padding.top + _DiscoverHeader.height + _CountryRow.height;
+  final bottom = GlassNavBar.totalReservedHeight +
+      mq.padding.bottom +
+      _kActionPadV +
+      _kActionSize +
+      _kActionPadV;
+  final h = mq.size.height - top - bottom;
+  final w = mq.size.width - 2 * _kCardInset;
+  if (h <= 0 || w <= 0) return 0.66;
+  return w / h;
+}
+
 /// Rayon des coins de la carte photo (handoff 3c).
 const double _kCardRadius = 32.0;
 

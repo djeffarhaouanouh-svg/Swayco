@@ -47,7 +47,7 @@ import 'chat_thread_screen.dart';
 import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
 // du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
-import 'discover_screen.dart' show MyCardPreviewScreen;
+import 'discover_screen.dart' show MyCardPreviewScreen, discoverCardAspect;
 import 'likes_received_screen.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
@@ -571,7 +571,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final cropped = await PhotoCropScreen.pick(
       context,
       bytes: bytes,
-      aspect: 0.66,
+      aspect: discoverCardAspect(context),
       maxEdge: 1600,
     );
     if (cropped == null || !mounted) return;
