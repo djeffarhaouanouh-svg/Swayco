@@ -9,6 +9,7 @@ import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_boot.dart';
 import '../services/app_strings.dart';
+import '../services/chat_api.dart';
 import '../services/device_id.dart';
 import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
@@ -276,19 +277,44 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       await showPaywallSheet(context);
       if (!mounted || !RevenueCat.proActive.value) return;
     }
-    final ids = [_myId, peer.id]..sort();
-    final name = peer.displayName.trim().isEmpty
-        ? AppStrings.t('profile_anonymous')
-        : peer.displayName.trim();
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatThreadScreen(
-          conversationId: 'dm-${ids[0]}-${ids[1]}',
-          title: name,
-          peerDeviceId: peer.id,
-        ),
-      ),
+    final body = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _DirectMessageSheet(),
     );
+    if (body == null || body.trim().isEmpty || !mounted) return;
+    try {
+      final mine = await ProfileApi.fetchById(_myId);
+      final ids = [_myId, peer.id]..sort();
+      await ChatApi.sendMessage(
+        conversationId: 'dm-${ids[0]}-${ids[1]}',
+        senderId: _myId,
+        senderName: (mine?.displayName.trim().isNotEmpty ?? false)
+            ? mine!.displayName.trim()
+            : 'Moi',
+        recipientId: peer.id,
+        body: body.trim(),
+        language: (mine?.language.trim().isNotEmpty ?? false)
+            ? mine!.language.trim()
+            : AppStrings.currentBcp47.value,
+        recipientLang: peer.language,
+      );
+      Analytics.track('message_sent',
+          props: {'source': 'discover_direct', 'type': 'text'});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('👋', textAlign: TextAlign.center),
+          duration: Duration(seconds: 2),
+        ));
+    } catch (e) {
+      debugPrint('discover: direct message failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Envoi échoué: $e')));
+    }
   }
 
   /// Reloads the Discover deck, optionally filtered by peer [countries].
@@ -2437,6 +2463,89 @@ class _SwipeActionBar extends StatelessWidget {
           semanticLabel: 'Like',
         ),
       ],
+    );
+  }
+}
+
+/// Popup du message direct : une zone de texte et un bouton d'envoi. Rend le
+/// texte saisi (ou null si fermée) ; l'envoi lui-même est fait par l'appelant.
+class _DirectMessageSheet extends StatefulWidget {
+  const _DirectMessageSheet();
+
+  @override
+  State<_DirectMessageSheet> createState() => _DirectMessageSheetState();
+}
+
+class _DirectMessageSheetState extends State<_DirectMessageSheet> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        decoration: const BoxDecoration(
+          color: _kSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _ctrl,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: AppStrings.t('dm_write_hint'),
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  counterText: '',
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    final t = _ctrl.text.trim();
+                    if (t.isNotEmpty) Navigator.of(context).pop(t);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kGold,
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    AppStrings.t('send_emoji'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
