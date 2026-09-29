@@ -216,7 +216,7 @@ abstract final class ChatApi {
     String discoverPhoto = '',
     String recipientLang = '',
     // Discover direct message (no friendship): the push is a generic
-    // "special message" teaser instead of the sender's name + text.
+    // "special message" teaser (under the sender's name) instead of the text.
     bool special = false,
   }) async {
     // The insert FK-references my profiles row (messages_sender_fkey); make
@@ -267,11 +267,9 @@ abstract final class ChatApi {
         : (await ProfileApi.fetchById(recipientId))?.language ?? '';
     await PushDispatcher.notify(
       recipientUid: recipientId,
-      title: special
-          ? 'Swayco'
-          : (senderName.isEmpty
-              ? AppStrings.tIn(lang, 'push_new_message')
-              : senderName),
+      title: senderName.isEmpty
+          ? AppStrings.tIn(lang, 'push_new_message')
+          : senderName,
       body: special
           ? AppStrings.tIn(lang, 'push_special_message')
           : (imageBody ? AppStrings.tIn(lang, 'push_photo') : body),
