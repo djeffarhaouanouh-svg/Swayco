@@ -5,10 +5,12 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show RealtimeChannel, Supabase;
 
+import '../services/ad_service.dart';
 import '../services/analytics.dart';
 import '../services/app_settings.dart';
 import '../services/app_strings.dart';
@@ -1202,9 +1204,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       // compte, en tête de page (maquette Messages).
                       Padding(
                         padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
-                        child: _CallAnyoneBanner(
-                          busy: _creatingInvite,
-                          onTap: _shareCallInvite,
+                        child: _TopCarousel(
+                          helper: _CallAnyoneBanner(
+                            busy: _creatingInvite,
+                            onTap: _shareCallInvite,
+                          ),
                         ),
                       ),
                       // "Nouveaux matchs" — the bubble rail, newest first.
@@ -1883,9 +1887,172 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+/// Haut de la page Messages : le panneau d'aide cyan, qui alterne avec une
+/// bannière pub (320×50) quand une pub est chargée. Défile tout seul (aide
+/// 5 s, pub 8 s), se met en pause tant qu'on le touche, se balaie aussi à la
+/// main. Montré aussi aux Premium. Pas de pub chargée ou écran trop étroit :
+/// l'aide seule.
+class _TopCarousel extends StatefulWidget {
+  const _TopCarousel({required this.helper});
+
+  final Widget helper;
+
+  @override
+  State<_TopCarousel> createState() => _TopCarouselState();
+}
+
+class _TopCarouselState extends State<_TopCarousel> {
+  /// Hauteur fixe des deux pages : l'aide sur deux lignes y tient, la
+  /// bannière 50 aussi avec son libellé « Publicité ».
+  static const double _height = 92;
+  static const _helpFor = Duration(seconds: 5);
+  static const _adFor = Duration(seconds: 8);
+
+  final _page = PageController();
+  BannerAd? _banner;
+  bool _adLoaded = false;
+  bool _touching = false;
+  int _index = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    final unit = AdService.bannerAdUnitId;
+    // Premium compris : ce carrousel s'affiche pour tout le monde.
+    if (unit == null) return;
+    _banner = BannerAd(
+      adUnitId: unit,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          if (!mounted) return;
+          setState(() => _adLoaded = true);
+          _schedule();
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('Messages banner failed to load: $error');
+          ad.dispose();
+          _banner = null;
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _page.dispose();
+    _banner?.dispose();
+    super.dispose();
+  }
+
+  void _schedule() {
+    _timer?.cancel();
+    if (!_adLoaded || _touching) return;
+    _timer = Timer(_index == 0 ? _helpFor : _adFor, () {
+      if (!mounted || !_page.hasClients) return;
+      _page.animateToPage(
+        _index == 0 ? 1 : 0,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Pas de place réservée là où aucune pub ne peut venir (web…).
+    if (_banner == null && !_adLoaded) {
+      return AdService.bannerAdUnitId != null
+          ? SizedBox(height: _height, child: widget.helper)
+          : widget.helper;
+    }
+    final banner = _banner;
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (!_adLoaded || banner == null || box.maxWidth < 330) {
+          return SizedBox(height: _height, child: widget.helper);
+        }
+        return SizedBox(
+          height: _height,
+          child: Listener(
+            onPointerDown: (_) {
+              _touching = true;
+              _timer?.cancel();
+            },
+            onPointerUp: (_) {
+              _touching = false;
+              _schedule();
+            },
+            onPointerCancel: (_) {
+              _touching = false;
+              _schedule();
+            },
+            child: PageView(
+              controller: _page,
+              onPageChanged: (i) {
+                _index = i;
+                _schedule();
+              },
+              children: [
+                widget.helper,
+                _AdSlide(banner: banner),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// La page pub du carrousel : même gabarit que le panneau d'aide (rayon 18),
+/// fond sombre, libellé « Publicité » bien visible, bannière centrée.
+class _AdSlide extends StatelessWidget {
+  const _AdSlide({required this.banner});
+
+  final BannerAd banner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1D),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF2A2A2E)),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: SizedBox(
+              width: banner.size.width.toDouble(),
+              height: banner.size.height.toDouble(),
+              child: AdWidget(ad: banner),
+            ),
+          ),
+          Positioned(
+            top: 6,
+            left: 12,
+            child: Text(
+              AppStrings.t('ad_label'),
+              style: const TextStyle(
+                color: SC.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// « Appelle n'importe qui, chacun dans sa langue » — la bannière cyan de la
-/// maquette Messages. Toute la carte est la cible : elle crée un lien
-/// d'invitation (appel sans compte) et ouvre la salle d'attente.
+/// maquette Messages. Information seule : rien n'y est cliquable.
 class _CallAnyoneBanner extends StatefulWidget {
   const _CallAnyoneBanner({required this.onTap, required this.busy});
 
