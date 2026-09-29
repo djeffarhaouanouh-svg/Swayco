@@ -27,10 +27,22 @@ const String _kProdInterstitialAndroid =
     'ca-app-pub-1120860079267236/1603129738';
 const String _kProdInterstitialIOS = 'ca-app-pub-1120860079267236/1890818620';
 
-/// The "Discover" interstitial — a full-screen ad the Discover screen can
-/// show at a moment of its own choosing. No such moment is wired up yet in
-/// this first step: only the mechanism and the call point Discover needs
-/// ([showDiscoverInterstitial]) exist so far.
+/// Google's test banner ad units (used for the in-deck "card" ad).
+const String _kTestBannerAndroid = 'ca-app-pub-3940256099942544/6300978111';
+const String _kTestBannerIOS = 'ca-app-pub-3940256099942544/2934735716';
+
+/// Production banner units: NOT created in AdMob yet. Empty means "no card
+/// ad" in a production build — never fall back to test ads for real users.
+const String _kProdBannerAndroid = '';
+const String _kProdBannerIOS = '';
+
+/// Minimum gap between two interstitials, so toggling several country
+/// bubbles in a row can't spam the user.
+const Duration _kInterstitialMinGap = Duration(seconds: 45);
+
+/// The "Discover" interstitial — a full-screen ad the Discover screen shows
+/// when a country bubble is switched on ([showDiscoverInterstitial]) — plus
+/// the medium-rectangle banner used for the ad card every few cards.
 ///
 /// Pro subscribers never see it — every show attempt checks
 /// [RevenueCat.proActive] first. Loading and showing are both best-effort:
@@ -50,6 +62,28 @@ abstract final class AdService {
 
   /// True once an interstitial is loaded and ready to show.
   static bool get isReady => _interstitial != null;
+
+  static DateTime? _lastInterstitialAt;
+
+  /// True only on the build deliberately made for real users
+  /// (`--dart-define=ADMOB_PRODUCTION=true`); every other build serves
+  /// Google's test ads.
+  static bool get useProduction => _kAdsUseProduction;
+
+  /// Banner unit for the in-deck ad card, or null when there is none for
+  /// this build (production build before the banner units exist).
+  static String? get bannerAdUnitId {
+    if (!isSupported) return null;
+    final ios = defaultTargetPlatform == TargetPlatform.iOS;
+    final id = _kAdsUseProduction
+        ? (ios ? _kProdBannerIOS : _kProdBannerAndroid)
+        : (ios ? _kTestBannerIOS : _kTestBannerAndroid);
+    return id.isEmpty ? null : id;
+  }
+
+  /// Whether the ad card should appear in the deck for this viewer.
+  static bool get cardAdsEnabled =>
+      bannerAdUnitId != null && !RevenueCat.proActive.value;
 
   static String get _adUnitId {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -97,6 +131,10 @@ abstract final class AdService {
   /// call has a fresh ad ready.
   static Future<bool> showDiscoverInterstitial() async {
     if (!isSupported || RevenueCat.proActive.value) return false;
+    final last = _lastInterstitialAt;
+    if (last != null && DateTime.now().difference(last) < _kInterstitialMinGap) {
+      return false;
+    }
     final ad = _interstitial;
     if (ad == null) {
       // Nothing ready — don't make the caller wait on a fresh load; just
@@ -105,6 +143,7 @@ abstract final class AdService {
       return false;
     }
     _interstitial = null;
+    _lastInterstitialAt = DateTime.now();
     final completer = Completer<bool>();
     void finish(bool shown) {
       if (!completer.isCompleted) completer.complete(shown);

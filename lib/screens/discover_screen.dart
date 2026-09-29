@@ -20,12 +20,14 @@ import '../services/persona_categories.dart';
 import '../services/nav_chrome.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
+import '../services/rewarded_video.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/country_silhouette.dart';
+import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
@@ -242,6 +244,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       setState(() => _countryKeys = rest);
     } else {
       setState(() => _countryKeys = {..._countryKeys, key});
+      // Switching a country ON shows the full-screen ad while the filtered
+      // feed loads underneath. Capped (45 s), Pro-exempt and best-effort in
+      // AdService — the filter never waits on it.
+      unawaited(AdService.showDiscoverInterstitial());
     }
     setState(() {
       _showFilterTransition = true;
@@ -292,6 +298,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _currentIndex = 0;
       _deckDone = false;
       _infoOpen = false;
+      _showAdCard = false;
+      _swipesSinceAd = 0;
     });
     NavChrome.show();
     try {
@@ -331,6 +339,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   // the flag lookup confirms it has never played.
   bool _showSwipeCoach = false;
 
+  // Sponsored card: every [_kAdEvery] swipes, an ad card takes the slot of the
+  // next profile until the user taps "Continuer". Not part of [_cards], so the
+  // deck, its saved cursor and the swipe counters are untouched.
+  static const int _kAdEvery = 3;
+  int _swipesSinceAd = 0;
+  bool _showAdCard = false;
+
   @override
   void initState() {
     super.initState();
@@ -338,11 +353,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _bootstrap();
     _maybeShowSwipeCoach();
     _pollTimer = WebPoll.every(const Duration(seconds: 12), _refreshFriendships);
-    // Warm up the "Discover" interstitial in the background so one is ready
-    // the moment something calls AdService.showDiscoverInterstitial() — no
-    // such call site exists yet in this first step, only the mechanism.
+    // Warm up the "Discover" interstitial (shown when a country bubble is
+    // switched on) and the rewarded video (Likes unlock) in the background.
     // No-ops for Pro subscribers and never blocks/throws on failure.
     unawaited(AdService.preload());
+    unawaited(RewardedVideo.preload());
   }
 
   Future<void> _maybeShowSwipeCoach() async {
@@ -537,6 +552,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         UserPrefs.saveDiscoverCursor(_cards[_currentIndex].profile.id);
       }
       _precacheAround(_currentIndex);
+      _swipesSinceAd++;
+      if (_swipesSinceAd >= _kAdEvery && AdService.cardAdsEnabled) {
+        _swipesSinceAd = 0;
+        _showAdCard = true;
+      }
     });
   }
 
@@ -695,6 +715,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           ),
           ),
 
+          // ── Carte publicitaire : prend la place de la prochaine carte, même
+          //    gabarit, jusqu'à « Continuer » (ou dès que la pub échoue). ─────
+          if (_showAdCard && !_infoOpen && !_feedLoading && !_deckDone)
+            Positioned(
+              top: currentCardTop,
+              left: _kCardInset,
+              right: _kCardInset,
+              bottom: currentCardBottom,
+              child: DiscoverAdCard(
+                onDone: () {
+                  if (mounted) setState(() => _showAdCard = false);
+                },
+              ),
+            ),
+
           // ── Transition "Go" du filtre globe — icône Ring+Arrow (SANS
           //    wordmark, contrairement au splash de boot) + un "Chargement"
           //    séparé, plus haut et plus grand que le wordmark du boot (celui-là
@@ -735,7 +770,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             right: 0,
             bottom: _infoOpen ? safeBottom + 8 : btnBottom,
             height: _kActionSize,
-            child: _hasActiveCard && !_showFilterTransition
+            child: _hasActiveCard && !_showFilterTransition && !_showAdCard
                 ? _SwipeActionBar(
                     onNope: _onSwipeLeft,
                     onLike: _onSwipeRight,

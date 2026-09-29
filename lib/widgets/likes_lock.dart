@@ -82,6 +82,9 @@ Future<void> showLikesUnlockSheet(
   required RemoteProfile? profile,
   required VoidCallback onRevealed,
 }) {
+  // Backup for the warm-up done at Discover start: if that load failed or was
+  // consumed, this makes one ready for the next open.
+  unawaited(RewardedVideo.preload());
   Future<void> watchVideo() async {
     if (!RewardedVideo.isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
