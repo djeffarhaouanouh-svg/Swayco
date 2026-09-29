@@ -269,9 +269,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       // Switching a country ON shows the full-screen ad while the filtered
       // feed loads underneath. Capped (45 s), Pro-exempt and best-effort in
       // AdService — the filter never waits on it.
-      // After the first ad actually watched, explain once how to skip them.
+      // After an ad actually watched: "how to skip" the first time, then the
+      // "go Premium, no ads" sheet at most once a day.
       unawaited(AdService.showDiscoverInterstitial().then((shown) {
-        if (shown && mounted) showAdInfoSheetOnce(context);
+        if (shown && mounted) showAfterAdSheet(context);
       }));
     }
     setState(() {
