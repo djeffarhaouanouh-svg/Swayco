@@ -46,6 +46,9 @@ dependencies:
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.8.0
   image_picker: ^1.1.2
+  # Already resolved transitively (4.8.0); direct now for the crop screen's
+  # JPEG encoding.
+  image: ^4.8.0
   flutter_dotenv: ^5.2.1
   # Push notifications (iOS + Android natifs).
   # firebase_core: bootstraps the SDK from lib/firebase_options.dart.

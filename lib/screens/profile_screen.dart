@@ -44,6 +44,7 @@ import '../widgets/swayco_dialog.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import 'chat_thread_screen.dart';
+import 'photo_crop_screen.dart';
 // L'aperÃ§u "ma carte" vit dans le Discover : il rÃ©utilise le widget de carte
 // du feed pour que l'aperÃ§u soit le rendu rÃ©el, pas une copie qui dÃ©rive.
 import 'discover_screen.dart' show MyCardPreviewScreen;
@@ -542,7 +543,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     final XFile? file;
-    final Uint8List bytes;
+    Uint8List bytes;
     try {
       final picker = ImagePicker();
       file = await picker.pickImage(
@@ -566,7 +567,19 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     if (!mounted) return;
-    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    // Let the user reframe / resize before posting (Discover card ratio).
+    final cropped = await PhotoCropScreen.pick(
+      context,
+      bytes: bytes,
+      aspect: 0.66,
+      maxEdge: 1600,
+    );
+    if (cropped == null || !mounted) return;
+    bytes = cropped;
+    // The crop exports JPEG; on its untouched-original fallback keep the PNG tag.
+    final ext = (bytes.length > 1 && bytes[0] == 0x89 && bytes[1] == 0x50)
+        ? 'png'
+        : 'jpg';
     try {
       await ProfileApi.addProfilePhoto(
         deviceId: _deviceId,
@@ -600,7 +613,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     final XFile? file;
-    final Uint8List bytes;
+    Uint8List bytes;
     try {
       final picker = ImagePicker();
       file = await picker.pickImage(
@@ -624,7 +637,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
     if (!mounted) return;
-    final ext = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    final cropped = await PhotoCropScreen.pick(
+      context,
+      bytes: bytes,
+      aspect: 1,
+      maxEdge: 1024,
+      circle: true,
+    );
+    if (cropped == null || !mounted) return;
+    bytes = cropped;
+    final ext = (bytes.length > 1 && bytes[0] == 0x89 && bytes[1] == 0x50)
+        ? 'png'
+        : 'jpg';
     try {
       await ProfileApi.uploadAvatar(
         deviceId: _deviceId,
