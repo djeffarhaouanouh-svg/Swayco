@@ -2404,10 +2404,21 @@ class _ComposerState extends State<_Composer> {
   /// of during the slide-in + initial message load (where it isn't seen).
   bool _hintReady = false;
 
+  /// Focus du champ : dès qu'on tape dessus, le texte d'aide s'efface.
+  final FocusNode _focus = FocusNode();
+  bool _focused = false;
+
+  void _onFocusChanged() {
+    if (_focus.hasFocus != _focused) {
+      setState(() => _focused = _focus.hasFocus);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTextChanged);
+    _focus.addListener(_onFocusChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _startHintWhenSettled(),
@@ -2417,6 +2428,9 @@ class _ComposerState extends State<_Composer> {
   @override
   void dispose() {
     widget.controller.removeListener(_onTextChanged);
+    _focus
+      ..removeListener(_onFocusChanged)
+      ..dispose();
     _hintTimer?.cancel();
     super.dispose();
   }
@@ -2580,6 +2594,7 @@ class _ComposerState extends State<_Composer> {
                         constraints: const BoxConstraints(maxHeight: 140),
                         child: TextField(
                           controller: widget.controller,
+                          focusNode: _focus,
                           enabled: !widget.sending,
                           minLines: 1,
                           maxLines: 6,
@@ -2587,7 +2602,8 @@ class _ComposerState extends State<_Composer> {
                           cursorColor: SC.accent,
                           style: const TextStyle(color: SC.textPrimary),
                           decoration: InputDecoration(
-                            hintText: _typedHint,
+                            // Effacé dès que le champ a le focus.
+                            hintText: _focused ? null : _typedHint,
                             hintStyle: TextStyle(
                               color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 14,
@@ -2722,17 +2738,37 @@ class _ComposerTranslateToggle extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.only(left: 10, right: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.translate,
-              size: 24,
-              color: active ? SC.accent : SC.textMuted,
-            ),
-            const SizedBox(width: 8),
-            // Sliding pill — bigger so it reads as a real toggle.
-            Container(
+        // L'icône « traduire », petite, posée en haut à gauche du toggle
+        // (à cheval sur son coin) au lieu d'être à côté de lui.
+        child: SizedBox(
+          width: 48,
+          height: 34,
+          child: Stack(
+            children: [
+              Positioned(
+                right: 0,
+                bottom: 3,
+                child: _pill(),
+              ),
+              Positioned(
+                left: 0,
+                top: 0,
+                child: Icon(
+                  Icons.translate,
+                  size: 13,
+                  color: active ? SC.accent : SC.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Sliding pill — bigger so it reads as a real toggle.
+  Widget _pill() {
+    return Container(
               width: 42,
               height: 22,
               padding: const EdgeInsets.all(3),
@@ -2768,11 +2804,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
+            );
   }
 }
 
