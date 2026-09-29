@@ -231,6 +231,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ),
     );
     if (!mounted || keys == null || keys.isEmpty) return;
+    // "Lancer" on the globe → same full-screen ad as a country bubble.
+    _showFilterAd();
     setState(() {
       _countryKeys = keys;
       _showFilterTransition = true;
@@ -243,6 +245,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (!mounted) return;
     _transitionFeedDone = true;
     _maybeHideFilterTransition();
+  }
+
+  /// Full-screen ad when a country filter is applied (a bubble switched ON,
+  /// or "Lancer" on the globe), while the filtered feed loads underneath.
+  /// Capped (45 s), Pro-exempt and best-effort in AdService — the filter
+  /// never waits on it. After an ad actually watched: "how to skip" the first
+  /// time, then the "go Premium, no ads" sheet at most once a day.
+  void _showFilterAd() {
+    unawaited(AdService.showDiscoverInterstitial().then((shown) {
+      if (shown && mounted) showAfterAdSheet(context);
+    }));
   }
 
   void _clearCountryFilter() {
@@ -266,14 +279,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       setState(() => _countryKeys = rest);
     } else {
       setState(() => _countryKeys = {..._countryKeys, key});
-      // Switching a country ON shows the full-screen ad while the filtered
-      // feed loads underneath. Capped (45 s), Pro-exempt and best-effort in
-      // AdService — the filter never waits on it.
-      // After an ad actually watched: "how to skip" the first time, then the
-      // "go Premium, no ads" sheet at most once a day.
-      unawaited(AdService.showDiscoverInterstitial().then((shown) {
-        if (shown && mounted) showAfterAdSheet(context);
-      }));
+      _showFilterAd();
     }
     setState(() {
       _showFilterTransition = true;
