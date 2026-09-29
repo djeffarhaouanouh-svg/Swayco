@@ -27,7 +27,9 @@ enum _Mode { signIn, signUp }
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  _Mode _mode = _Mode.signIn;
+  // A visitor with no session opens on account creation; someone who already
+  // has an account switches with the toggle below the form.
+  _Mode _mode = _Mode.signUp;
   bool _busy = false;
   bool _showPassword = false;
   String? _error;
