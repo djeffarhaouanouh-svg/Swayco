@@ -1158,8 +1158,9 @@ class _CountryRow extends StatefulWidget {
   final ValueChanged<String> onCountry;
 
   /// 4 dessus + bulle + 3 + nom 13 (seulement sous les pays choisis) + 4
-  /// dessous — kept at 78 total, as before the bigger bubbles.
-  static const double height = 4 + 54 + 3 + 13 + 4;
+  /// dessous. Suit _kBubble — la baisser (54 → 50) libère cette hauteur
+  /// pour la carte en dessous au lieu de laisser un blanc mort.
+  static const double height = 4 + _kBubble + 3 + 13 + 4;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
