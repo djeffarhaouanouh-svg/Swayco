@@ -2772,21 +2772,21 @@ class _ComposerTranslateToggle extends StatelessWidget {
         // lui : ils ne se touchent que coin contre coin (le coin arrondi de
         // la pilule laisse un petit vide), au lieu de se chevaucher.
         child: SizedBox(
-          width: 56,
-          height: 36,
+          width: 58,
+          height: 37,
           child: Stack(
             children: [
               Positioned(
-                left: 13,
-                top: 12,
+                left: 15,
+                top: 14,
                 child: _pill(),
               ),
               Positioned(
                 left: 0,
-                top: 1,
+                top: 0,
                 child: Icon(
                   Icons.translate,
-                  size: 12,
+                  size: 15,
                   color: active ? SC.accent : SC.textMuted,
                 ),
               ),
