@@ -13,34 +13,16 @@ import 'package:flutter/services.dart';
 ///
 /// The flag is stretched over the whole outline (never cropped): it fills the
 /// silhouette's bounding box, so Brazil's rhombus stays whole.
-/// Nom de la forme dans le GeoJSON (Natural Earth, en anglais) pour chaque
-/// pays que l'app connaît (`locations.dart`). Ce n'est pas la liste des pays
-/// AFFICHÉS — elle vient des profils — seulement le dictionnaire code → forme.
-const Map<String, String> _kGeoNameByIso2 = {
-  'fr': 'France', 'be': 'Belgium', 'ch': 'Switzerland', 'ca': 'Canada',
-  'us': 'United States of America', 'gb': 'United Kingdom', 'es': 'Spain',
-  'pt': 'Portugal', 'it': 'Italy', 'de': 'Germany', 'nl': 'Netherlands',
-  'mx': 'Mexico', 'ar': 'Argentina', 'co': 'Colombia', 'br': 'Brazil',
-  'ma': 'Morocco', 'dz': 'Algeria', 'tn': 'Tunisia', 'sn': 'Senegal',
-  'ci': "Côte d'Ivoire", 'eg': 'Egypt', 'sa': 'Saudi Arabia',
-  'ae': 'United Arab Emirates', 'tr': 'Turkey', 'ru': 'Russia', 'cn': 'China',
-  'jp': 'Japan', 'kr': 'South Korea', 'in': 'India', 'au': 'Australia',
-  'lu': 'Luxembourg', 'is': 'Iceland', 'no': 'Norway', 'se': 'Sweden',
-  'dk': 'Denmark', 'fi': 'Finland', 'ie': 'Ireland', 'pl': 'Poland',
-  'ua': 'Ukraine', 'gr': 'Greece',
-};
-
 class CountrySilhouette extends StatefulWidget {
   const CountrySilhouette({
     super.key,
+    required this.geoName,
     required this.iso2,
-    this.geoName,
     this.size = 28,
   });
 
-  /// Feature name in the GeoJSON (English, e.g. 'Spain'). Optional: resolved
-  /// from [iso2] when omitted.
-  final String? geoName;
+  /// Feature name in the GeoJSON (English, e.g. 'Spain').
+  final String geoName;
 
   /// ISO-3166-1 alpha-2 code of the flag to paint (e.g. 'es').
   final String iso2;
@@ -54,24 +36,12 @@ class CountrySilhouette extends StatefulWidget {
 
 class _CountrySilhouetteState extends State<CountrySilhouette> {
   List<Offset>? _ring;
-  bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    final name =
-        widget.geoName ?? _kGeoNameByIso2[widget.iso2.toLowerCase()] ?? '';
-    if (name.isEmpty) {
-      _loaded = true;
-      return;
-    }
-    _OutlineCache.ring(name).then((r) {
-      if (mounted) {
-        setState(() {
-          _ring = r;
-          _loaded = true;
-        });
-      }
+    _OutlineCache.ring(widget.geoName).then((r) {
+      if (mounted) setState(() => _ring = r);
     });
   }
 
@@ -79,15 +49,7 @@ class _CountrySilhouetteState extends State<CountrySilhouette> {
   Widget build(BuildContext context) {
     final s = widget.size;
     final ring = _ring;
-    if (ring == null || ring.length < 3) {
-      // Pas (encore) de forme : rien pendant le chargement ; après, le
-      // drapeau en rond — jamais une bulle vide.
-      if (!_loaded) return SizedBox(width: s, height: s);
-      return CountryFlag.fromCountryCode(
-        widget.iso2,
-        theme: ImageTheme(width: s, height: s, shape: const Circle()),
-      );
-    }
+    if (ring == null || ring.length < 3) return SizedBox(width: s, height: s);
     final fitted = _fit(ring, s);
     // Trois couches pour que le pays fasse corps avec sa bulle au lieu d'y
     // flotter comme un autocollant : une ombre douce sous la forme, le

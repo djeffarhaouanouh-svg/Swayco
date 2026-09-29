@@ -160,26 +160,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// the ✕ / ♥ float on top of the card.
   bool _infoOpen = false;
 
-  /// Countries picked as filters, as stored in `profiles.country` (e.g.
-  /// {'France', 'Espagne'}) — exactly what the feed filters on. Insertion
-  /// order = pick order (the row shows the latest first). Empty = unfiltered
-  /// deck; a filtered deck's state is NOT persisted (it's ephemeral).
+  /// Countries picked on the globe filter bar (world-atlas keys, e.g.
+  /// {'France', 'Germany'}), empty for the unfiltered deck. When non-empty the
+  /// feed is reloaded filtered to those countries' spoken languages and today's
+  /// deck state is NOT persisted (the filtered view is ephemeral).
   Set<String> _countryKeys = {};
   bool get _filtered => _countryKeys.isNotEmpty;
-
-  /// The country row, built from the profiles that actually exist (most
-  /// populated first) — not a hard-coded list. Falls back to the globe's
-  /// countries until / unless that read succeeds.
-  List<String> _rowCountries = [
-    for (final c in kGlobeCountries.values) c.dbName,
-  ];
-
-  Future<void> _loadRowCountries() async {
-    if (_myId.isEmpty) return;
-    final found = await ProfileApi.fetchProfileCountries(myId: _myId);
-    if (!mounted || found.isEmpty) return;
-    setState(() => _rowCountries = [for (final c in found) c.country]);
-  }
 
   // Ring+Arrow transition shown while the globe-filtered feed loads — hidden
   // once BOTH the clip has played through AND the feed has actually landed,
@@ -194,7 +180,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  List<String> get _filterCountries => _countryKeys.toList();
+  List<String> get _filterCountries => _countryKeys
+      .map(globeCountryDbName)
+      .whereType<String>()
+      .toSet()
+      .toList();
 
   /// Opens the spinning-globe country picker (multi-select). A non-empty
   /// result reloads the feed filtered to those countries (the peer's actual
@@ -206,14 +196,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
-      // Le globe parle en clés de carte ('Spain'), la sélection en noms
-      // stockés ('Espagne') : on convertit à l'aller…
-      pageBuilder: (_, _, _) => DiscoverGlobeSheet(
-        initial: {
-          for (final e in kGlobeCountries.entries)
-            if (_countryKeys.contains(e.value.dbName)) e.key,
-        },
-      ),
+      pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKeys),
       transitionBuilder: (_, anim, _, child) => FadeTransition(
         opacity: anim,
         child: ScaleTransition(
@@ -224,11 +207,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       ),
     );
     if (!mounted || keys == null || keys.isEmpty) return;
-    // … et au retour.
-    final picked = keys.map(globeCountryDbName).whereType<String>().toSet();
-    if (picked.isEmpty) return;
     setState(() {
-      _countryKeys = picked;
+      _countryKeys = keys;
       _showFilterTransition = true;
       _transitionAnimDone = false;
       _transitionFeedDone = false;
@@ -396,8 +376,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       AppBoot.markHomeReady();
       return;
     }
-    // La rangée de pays se remplit à part : elle ne retarde pas le deck.
-    unawaited(_loadRowCountries());
     try {
       final results = await Future.wait(<Future<Object>>[
         FriendshipApi.fetchMine(id),
@@ -667,7 +645,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               children: [
                 const _DiscoverHeader(),
                 _CountryRow(
-                  countries: _rowCountries,
                   selected: _countryKeys,
                   onFilter: _openGlobe,
                   onCountry: _toggleCountry,
@@ -1019,28 +996,22 @@ class _DiscoverHeader extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Rangée de pays — « Filtrer » (le globe) + les pays des profils, en filtres
+// Rangée de pays — « Filtrer » (le globe) + tous les pays du globe, en filtres
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// La rangée : « Filtrer » fixe à gauche, puis les pays où il y a VRAIMENT des
-/// profils ([countries], lus en base — rien d'écrit en dur) dans une bande qui
-/// défile. Chaque bulle est un filtre qu'on allume / éteint ; plusieurs
-/// peuvent l'être à la fois.
+/// La rangée : « Filtrer » fixe à gauche, puis TOUS les pays du globe
+/// ([kGlobeCountries]) dans une bande qui défile. Chaque bulle est un filtre
+/// qu'on allume / éteint ; plusieurs peuvent l'être à la fois.
 ///
 /// Ordre : les pays sélectionnés d'abord, le DERNIER choisi en tête (on voit
-/// tout de suite ce qu'on vient d'allumer), puis les autres du plus peuplé au
-/// moins peuplé. La bande revient au début à chaque changement.
+/// tout de suite ce qu'on vient d'allumer), puis les autres dans l'ordre du
+/// globe. La bande revient au début à chaque changement.
 class _CountryRow extends StatefulWidget {
   const _CountryRow({
-    required this.countries,
     required this.selected,
     required this.onFilter,
     required this.onCountry,
   });
-
-  /// Pays proposés, noms tels que stockés dans `profiles.country`, du plus
-  /// peuplé au moins peuplé.
-  final List<String> countries;
 
   /// Pays sélectionnés, dans l'ordre où ils l'ont été (Set à insertion
   /// ordonnée : le dernier ajouté est le dernier de l'itération).
@@ -1085,20 +1056,16 @@ class _CountryRowState extends State<_CountryRow> {
   }
 
   List<String> get _orderedKeys {
-    final picked = widget.selected.toList().reversed.toList();
+    final picked = widget.selected
+        .where(kGlobeCountries.containsKey)
+        .toList()
+        .reversed
+        .toList();
     return [
       ...picked,
-      for (final k in widget.countries)
+      for (final k in kGlobeCountries.keys)
         if (!widget.selected.contains(k)) k,
     ];
-  }
-
-  /// Libellé traduit quand l'app en a un (`country_fr`…), sinon le nom tel
-  /// que stocké — jamais la clé brute.
-  static String _labelFor(String country, String iso) {
-    final key = 'country_$iso';
-    final t = AppStrings.t(key);
-    return t == key ? country : t;
   }
 
   @override
@@ -1144,13 +1111,13 @@ class _CountryRowState extends State<_CountryRow> {
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (_, i) {
                 final key = keys[i];
-                final code = countryIso2For(key);
+                final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
                 return _RowItem(
                   // La clé suit le pays, pas sa place : quand l'ordre
                   // change, chaque bulle garde sa silhouette déjà chargée.
                   key: ValueKey(key),
-                  label: _labelFor(key, code),
+                  label: AppStrings.t('country_$code'),
                   active: on,
                   onTap: () => widget.onCountry(key),
                   bubble: AnimatedContainer(
@@ -1170,8 +1137,11 @@ class _CountryRowState extends State<_CountryRow> {
                     // c'est la BULLE qui la rogne : elle en fait partie, pas
                     // posée dessus comme un autocollant.
                     clipBehavior: Clip.antiAlias,
-                    // La forme se retrouve à partir du code ISO.
-                    child: CountrySilhouette(iso2: code, size: 34),
+                    child: CountrySilhouette(
+                      geoName: key,
+                      iso2: code,
+                      size: 34,
+                    ),
                   ),
                 );
               },
