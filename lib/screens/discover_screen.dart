@@ -75,9 +75,8 @@ const double _kCardRadius = 32.0;
 
 /// Diamètre des boutons ✕ / message / ❤.
 const double _kActionSize = 58.0;
-// Visible diameter of the ✕ / ❤ buttons: the old native glass circle drew
-// smaller than its 58 box, so 58 looked far too big.
-const double _kFxSize = 46.0;
+// Diameter of the ✕ / ❤ buttons.
+const double _kFxSize = 58.0;
 
 /// Le bouton or du milieu, un cran plus petit que ✕ / ❤ (demandé : il
 /// écrasait les deux autres).
