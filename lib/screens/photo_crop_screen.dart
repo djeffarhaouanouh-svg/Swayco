@@ -92,33 +92,48 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
     if (image == null || _saving) return;
     setState(() => _saving = true);
     try {
-      final tl = _ctrl.toScene(Offset.zero);
-      final br = _ctrl.toScene(Offset(l.frameW, l.frameH));
-      final src = Rect.fromLTRB(
-        (tl.dx / l.base).clamp(0, image.width.toDouble()),
-        (tl.dy / l.base).clamp(0, image.height.toDouble()),
-        (br.dx / l.base).clamp(0, image.width.toDouble()),
-        (br.dy / l.base).clamp(0, image.height.toDouble()),
+      // Where the whole image sits inside the frame right now (may be smaller
+      // than the frame when zoomed out, or overflow it when zoomed in).
+      final m = _ctrl.value;
+      final placed = MatrixUtils.transformRect(
+        m,
+        Rect.fromLTWH(0, 0, l.childW, l.childH),
       );
-      var outW = src.width;
-      var outH = src.height;
+      // Export at the photo's own pixel density (source px per frame px),
+      // capped at maxEdge on the long side.
+      final scale = m.getMaxScaleOnAxis();
+      var outW = l.frameW / (l.base * scale);
+      var outH = l.frameH / (l.base * scale);
       final long = outW > outH ? outW : outH;
       if (long > widget.maxEdge) {
         final k = widget.maxEdge / long;
         outW *= k;
         outH *= k;
       }
+      outW = outW.roundToDouble().clamp(1, 16384);
+      outH = outH.roundToDouble().clamp(1, 16384);
+      final k = outW / l.frameW;
       final rec = ui.PictureRecorder();
       final canvas = Canvas(rec);
+      // Black where the photo doesn't reach the edges of the frame.
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, outW, outH),
+        Paint()..color = Colors.black,
+      );
       canvas.drawImageRect(
         image,
-        src,
-        Rect.fromLTWH(0, 0, outW.roundToDouble(), outH.roundToDouble()),
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Rect.fromLTRB(
+          placed.left * k,
+          placed.top * k,
+          placed.right * k,
+          placed.bottom * k,
+        ),
         Paint()..filterQuality = FilterQuality.high,
       );
       final out = await rec
           .endRecording()
-          .toImage(outW.round().clamp(1, 1 << 14), outH.round().clamp(1, 1 << 14));
+          .toImage(outW.round(), outH.round());
       final data = await out.toByteData(format: ui.ImageByteFormat.rawRgba);
       final w = out.width, h = out.height;
       out.dispose();
@@ -217,9 +232,14 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                         child: InteractiveViewer(
                           transformationController: _ctrl,
                           constrained: false,
-                          minScale: 1,
-                          maxScale: 6,
-                          boundaryMargin: EdgeInsets.zero,
+                          // Zoom out down to the whole photo (or further),
+                          // zoom in up to 8×, and slide it freely — the
+                          // margin lets any edge reach the middle of the frame.
+                          minScale: l.minScale,
+                          maxScale: 8,
+                          boundaryMargin: EdgeInsets.all(
+                            l.frameW > l.frameH ? l.frameW : l.frameH,
+                          ),
                           child: SizedBox(
                             width: l.childW,
                             height: l.childH,
@@ -270,9 +290,13 @@ class _Layout {
     required this.childW,
     required this.childH,
     required this.base,
+    required this.minScale,
   });
 
   final double frameW, frameH;
+
+  /// Zoom-out limit: the whole photo visible (≤ 1), never below 0.3.
+  final double minScale;
 
   /// Size of the image at scale 1 (it exactly covers the frame).
   final double childW, childH;
@@ -294,7 +318,9 @@ class _Layout {
       fw = fh * aspect;
     }
     final base = (fw / imgW) > (fh / imgH) ? fw / imgW : fh / imgH;
+    final contain = (fw / imgW) < (fh / imgH) ? fw / imgW : fh / imgH;
     return _Layout(
+      minScale: (contain / base).clamp(0.3, 1.0),
       frameW: fw,
       frameH: fh,
       childW: imgW * base,
