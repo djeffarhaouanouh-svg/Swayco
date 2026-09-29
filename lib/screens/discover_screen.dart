@@ -2500,6 +2500,16 @@ class _DirectMessageSheetState extends State<_DirectMessageSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Text(
+                AppStrings.t('dm_explain'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
               TextField(
                 controller: _ctrl,
                 autofocus: true,
