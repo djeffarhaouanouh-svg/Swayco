@@ -61,7 +61,7 @@ class _Fx6dButtonState extends State<Fx6dButton>
         _Particle(
           angle: (i / 10) * math.pi * 2 + rnd.nextDouble() * .3,
           size: 4 + rnd.nextDouble() * 4,
-          dist: 50 * (.8 + rnd.nextDouble() * .4),
+          dist: 50 * widget.size / 76 * (.8 + rnd.nextDouble() * .4),
         ),
     ];
     _c.forward(from: 0);
@@ -169,7 +169,9 @@ class _Fx6dButtonState extends State<Fx6dButton>
                             scale: iconScale,
                             child: CustomPaint(
                               size: Size.square(
-                                widget.kind == Fx6dKind.heart ? 32 : 28,
+                                (widget.kind == Fx6dKind.heart ? 32 : 28) *
+                                    s /
+                                    76,
                               ),
                               painter: _IconPainter(widget.kind),
                             ),

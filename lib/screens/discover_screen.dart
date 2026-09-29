@@ -57,7 +57,7 @@ const double _kCardInset = 14.0;
 const double _kCardRadius = 32.0;
 
 /// Diamètre des boutons ✕ / message / ❤.
-const double _kActionSize = 76.0;
+const double _kActionSize = 58.0;
 
 /// Le bouton or du milieu, un cran plus petit que ✕ / ❤ (demandé : il
 /// écrasait les deux autres).
