@@ -33,10 +33,10 @@ import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
 import '../widgets/flag_border.dart';
 import '../widgets/flag_gradients.dart';
+import '../widgets/fx6d_button.dart';
 import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
-import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/swipe_coach_overlay.dart';
@@ -57,7 +57,7 @@ const double _kCardInset = 14.0;
 const double _kCardRadius = 32.0;
 
 /// Diamètre des boutons ✕ / message / ❤.
-const double _kActionSize = 58.0;
+const double _kActionSize = 76.0;
 
 /// Le bouton or du milieu, un cran plus petit que ✕ / ❤ (demandé : il
 /// écrasait les deux autres).
@@ -2445,21 +2445,18 @@ class _SwipeActionBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        LiquidGlassButton(
-          icon: Icons.close_rounded,
-          sfSymbol: 'xmark',
-          iconSize: 24,
+        Fx6dButton(
+          kind: Fx6dKind.cross,
+          size: _kActionSize,
           onTap: onNope,
           semanticLabel: 'Nope',
         ),
         const SizedBox(width: 18),
         _DirectMessageButton(onTap: onMessage),
         const SizedBox(width: 18),
-        LiquidGlassButton(
-          icon: Icons.favorite_rounded,
-          sfSymbol: 'heart.fill',
-          iconSize: 26,
-          iconColor: const Color(0xFFFF5A7A),
+        Fx6dButton(
+          kind: Fx6dKind.heart,
+          size: _kActionSize,
           onTap: onLike,
           semanticLabel: 'Like',
         ),
