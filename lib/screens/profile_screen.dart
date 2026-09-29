@@ -4039,9 +4039,9 @@ class _BoostButtonState extends State<_BoostButton> {
         disabledBackgroundColor: SC.accent.withValues(alpha: 0.18),
         disabledForegroundColor: SC.accent,
         // Resserré : largeur du contenu, pas toute la page.
-        minimumSize: const Size(0, 46),
+        minimumSize: const Size(0, 50),
         padding: const EdgeInsets.symmetric(horizontal: 22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       icon: _busy
           ? const SizedBox(
