@@ -2783,7 +2783,7 @@ class _ComposerTranslateToggle extends StatelessWidget {
               ),
               Positioned(
                 left: 0,
-                top: 0,
+                top: 3,
                 child: Icon(
                   Icons.translate,
                   size: 15,
