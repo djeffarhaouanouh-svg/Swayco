@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
 import 'debug_overlay.dart';
+import 'locations.dart';
 import 'looking_for.dart';
 import 'supabase_service.dart';
 import 'user_prefs.dart';
@@ -1393,6 +1394,45 @@ abstract final class ProfileApi {
   /// The composite scoring lives client-side: it carries a random
   /// jitter between refreshes and only affects display order, so
   /// keeping it here doesn't weaken any privacy guarantee.
+  /// Les pays où il y a VRAIMENT des gens — la rangée de filtres de
+  /// Découvrir se construit dessus au lieu d'une liste écrite en dur. Lus
+  /// dans `profiles.country` (moi exclu), comptés, du plus peuplé au moins
+  /// peuplé. Seuls les pays reconnus ([countryIso2For] non vide) sont
+  /// gardés : une saisie libre mal orthographiée n'a ni drapeau ni forme.
+  ///
+  /// Une seule colonne, 5000 lignes au plus : assez à l'échelle actuelle.
+  /// Au-delà, passer par une fonction SQL qui fait le GROUP BY côté base.
+  static Future<List<({String country, int count})>> fetchProfileCountries({
+    required String myId,
+  }) async {
+    if (!isSupabaseReady) return const [];
+    try {
+      final rows = await _c
+          .from('profiles')
+          .select('country')
+          .neq('id', myId)
+          .not('country', 'is', null)
+          .neq('country', '')
+          .limit(5000);
+      final counts = <String, int>{};
+      for (final r in rows) {
+        final name = (r['country'] ?? '').toString().trim();
+        if (name.isEmpty || countryIso2For(name).isEmpty) continue;
+        counts[name] = (counts[name] ?? 0) + 1;
+      }
+      final out = [
+        for (final e in counts.entries) (country: e.key, count: e.value),
+      ]..sort((a, b) {
+          final byCount = b.count.compareTo(a.count);
+          return byCount != 0 ? byCount : a.country.compareTo(b.country);
+        });
+      return out;
+    } catch (e) {
+      debugPrint('fetchProfileCountries failed: $e');
+      return const [];
+    }
+  }
+
   static Future<List<RemoteProfile>> fetchDiscoverFeed({
     required String myId,
     int limit = 50,
