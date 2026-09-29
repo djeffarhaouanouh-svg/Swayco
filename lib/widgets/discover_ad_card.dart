@@ -27,7 +27,7 @@ class DiscoverAdCard extends StatefulWidget {
 class _DiscoverAdCardState extends State<DiscoverAdCard> {
   static const _cardColor = Color(0xFF1A1A1D);
   static const _cardBorder = Color(0xFF2A2A2E);
-  static const _loadTimeout = Duration(seconds: 4);
+  static const _loadTimeout = Duration(seconds: 6);
 
   BannerAd? _banner;
   bool _loaded = false;
