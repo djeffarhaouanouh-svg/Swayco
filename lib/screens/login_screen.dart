@@ -246,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       stops: [0, _kPhotoSharpUntil, 1],
                     ).createShader(rect),
                     child: Image.asset(
-                      'assets/bienvenue.jpg',
+                      'assets/bienvenue_8c.jpg',
                       fit: BoxFit.cover,
                       // Crop from the BOTTOM of the source: the whole group
                       // rides up, the lower faces land above the title.
