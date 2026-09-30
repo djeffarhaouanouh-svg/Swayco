@@ -601,6 +601,14 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
           await UserPrefs.setSourceLang(lang);
         }
       }
+      // Le prénom et le genre suivent le COMPTE, comme la langue. Avant, le
+      // cache local était renvoyé tel quel : un renommage (qui n'écrit que le
+      // compte) était écrasé par l'ancien prénom au démarrage suivant. Le
+      // cache ne sert plus que pour un compte qui n'a encore rien.
+      final remoteName = remote?.displayName.trim() ?? '';
+      final name = remoteName.isNotEmpty ? remoteName : profile.firstName;
+      if (name != profile.firstName) await UserPrefs.setFirstName(name);
+      final remoteGender = remote?.gender.trim() ?? '';
       // Only publish UP when we have a trustworthy read of the account. Two
       // devices can share one account, so a flaky read on THIS device must
       // never clobber the language the OTHER device just set — skip the write
@@ -608,9 +616,9 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
       if (remoteOk) {
         await ProfileApi.upsertMyProfile(
           deviceId: uid,
-          displayName: profile.firstName,
+          displayName: name,
           language: lang,
-          gender: profile.gender,
+          gender: remoteGender.isNotEmpty ? remoteGender : profile.gender,
         );
         // upsertMyProfile doesn't carry country — a location picked (GPS or
         // manual) during the pre-login first-run wizard only ever reached

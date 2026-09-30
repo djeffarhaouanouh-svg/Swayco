@@ -224,6 +224,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _toast(AppStrings.t('save_failed'));
       return;
     }
+    await UserPrefs.setFirstName(saved);
+    if (!mounted) return;
     setState(() => _profile = _profile?.copyWith(
           displayName: saved,
           nameChangedAt: DateTime.now(),

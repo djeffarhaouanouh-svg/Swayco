@@ -805,6 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('save_failed'))));
       return;
     }
+    await UserPrefs.setFirstName(saved);
     if (!mounted || _remote == null) return;
     // Reflect the new cooldown locally so it takes effect without a reload.
     setState(

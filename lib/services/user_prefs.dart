@@ -156,6 +156,15 @@ abstract final class UserPrefs {
     await p.setString(keySourceLang, code.trim());
   }
 
+  /// Keep the cached first name in step with the account (rename, or a
+  /// rename made on another device synced down at boot).
+  static Future<void> setFirstName(String name) async {
+    final n = name.trim();
+    if (n.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(keyFirstName, n);
+  }
+
   static Future<ProfileSnapshot?> loadProfile() async {
     final p = await SharedPreferences.getInstance();
     final name = p.getString(keyFirstName);
