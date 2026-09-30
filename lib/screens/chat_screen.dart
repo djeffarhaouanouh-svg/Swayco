@@ -1815,7 +1815,12 @@ class _TopCarouselState extends State<_TopCarousel> {
   static const _helpFor = Duration(seconds: 5);
   static const _adFor = Duration(seconds: 8);
 
-  final _page = PageController();
+  /// Boucle sans fin, toujours dans le même sens : pages paires = l'aide,
+  /// impaires = la pub. On part loin de 0 pour qu'un balayage à la main vers
+  /// l'arrière ait aussi de la place.
+  static const _startPage = 10000;
+
+  final _page = PageController(initialPage: _startPage);
   BannerAd? _banner;
   bool _adLoaded = false;
   bool _touching = false;
@@ -1860,8 +1865,7 @@ class _TopCarouselState extends State<_TopCarousel> {
     if (!_adLoaded || _touching) return;
     _timer = Timer(_index == 0 ? _helpFor : _adFor, () {
       if (!mounted || !_page.hasClients) return;
-      _page.animateToPage(
-        _index == 0 ? 1 : 0,
+      _page.nextPage(
         duration: const Duration(milliseconds: 450),
         curve: Curves.easeInOutCubic,
       );
@@ -1897,16 +1901,16 @@ class _TopCarouselState extends State<_TopCarousel> {
               _touching = false;
               _schedule();
             },
-            child: PageView(
+            // Une page = toute la largeur : deux pages pub ne sont jamais
+            // montées en même temps, donc la même bannière peut resservir.
+            child: PageView.builder(
               controller: _page,
               onPageChanged: (i) {
-                _index = i;
+                _index = i % 2;
                 _schedule();
               },
-              children: [
-                widget.helper,
-                _AdSlide(banner: banner),
-              ],
+              itemBuilder: (_, i) =>
+                  i.isEven ? widget.helper : _AdSlide(banner: banner),
             ),
           ),
         );
