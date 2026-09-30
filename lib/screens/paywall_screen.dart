@@ -27,6 +27,21 @@ Future<void> showPaywallSheet(BuildContext context) {
   );
 }
 
+/// The Boost offer, same family as 1c: my card highlighted and "BOOSTÉ",
+/// 24 h at the top of Discover, one-time purchase. [onPurchased] runs once
+/// the store confirmed (the webhook credits the Boost a few seconds later).
+Future<void> showBoostPaywall(
+  BuildContext context, {
+  required Future<void> Function() onPurchased,
+}) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => _BoostPaywall(onPurchased: onPurchased),
+    ),
+  );
+}
+
 /// The Likes-page paywall ("1b"): a wall of the blurred likers, go Pro or
 /// watch a video to reveal one. [onWatchVideo] runs after this screen closed.
 Future<void> showLikesWallPaywall(
@@ -331,7 +346,13 @@ class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
                         ),
                       ),
                       const SizedBox(height: 22),
-                      _PreviewCard(me: _me, pro: _pro),
+                      _PreviewCard(
+                        me: _me,
+                        highlighted: _pro,
+                        badge: _pro
+                            ? AppStrings.t('paywall_popular').toUpperCase()
+                            : null,
+                      ),
                       const SizedBox(height: 28),
                       _HighlightTitle(
                         head: AppStrings.t('pw_preview_title'),
@@ -439,12 +460,18 @@ class _FreeProSwitch extends StatelessWidget {
 }
 
 /// My Discover card, tilted −3°: the real photo, "Toi, 24", city · language.
-/// Pro = brand-gradient frame + blue glow + yellow "POPULAIRE" badge.
+/// [highlighted] = brand-gradient frame + blue glow; [badge] = yellow pill
+/// top-left ("POPULAIRE" for Pro, "BOOSTÉ" for a Boost).
 class _PreviewCard extends StatelessWidget {
-  const _PreviewCard({required this.me, required this.pro});
+  const _PreviewCard({
+    required this.me,
+    required this.highlighted,
+    this.badge,
+  });
 
   final RemoteProfile? me;
-  final bool pro;
+  final bool highlighted;
+  final String? badge;
 
   String get _photo {
     final p = me;
@@ -479,8 +506,8 @@ class _PreviewCard extends StatelessWidget {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
-          gradient: pro ? SC.brandGradient : null,
-          boxShadow: pro
+          gradient: highlighted ? SC.brandGradient : null,
+          boxShadow: highlighted
               ? [
                   BoxShadow(
                     color: SC.brandBlue.withValues(alpha: 0.8),
@@ -522,7 +549,7 @@ class _PreviewCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (pro)
+              if (badge case final b?)
                 Positioned(
                   top: 12,
                   left: 12,
@@ -536,7 +563,7 @@ class _PreviewCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      AppStrings.t('paywall_popular').toUpperCase(),
+                      b,
                       style: const TextStyle(
                         color: SC.onAccent,
                         fontSize: 12,
@@ -717,6 +744,226 @@ class _TwoLineCta extends StatelessWidget {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Boost — same family as 1c, one-time purchase
+// ══════════════════════════════════════════════════════════════════════════
+
+class _BoostPaywall extends StatefulWidget {
+  const _BoostPaywall({required this.onPurchased});
+
+  final Future<void> Function() onPurchased;
+
+  @override
+  State<_BoostPaywall> createState() => _BoostPaywallState();
+}
+
+class _BoostPaywallState extends State<_BoostPaywall> {
+  bool _busy = false;
+  String? _price;
+  RemoteProfile? _me;
+
+  @override
+  void initState() {
+    super.initState();
+    if (RevenueCat.isSupported) {
+      RevenueCat.priceOf(RevenueCat.boostPackageId).then((p) {
+        if (mounted) setState(() => _price = p);
+      });
+    }
+    _loadMe();
+  }
+
+  Future<void> _loadMe() async {
+    try {
+      final id = await DeviceId.getOrCreate();
+      final me = await ProfileApi.fetchById(id);
+      if (mounted) setState(() => _me = me);
+    } catch (_) {
+      // The card falls back to its placeholder — nothing else depends on it.
+    }
+  }
+
+  Future<void> _buy() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final outcome = await RevenueCat.purchaseConsumable(
+      RevenueCat.boostPackageId,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    final key = switch (outcome) {
+      PurchaseOutcome.success => 'boost_snack_success',
+      PurchaseOutcome.unavailable => 'paywall_snack_unavailable',
+      PurchaseOutcome.error => 'paywall_snack_error',
+      PurchaseOutcome.cancelled => null,
+    };
+    final messenger = ScaffoldMessenger.of(context);
+    if (key != null) {
+      final why = outcome == PurchaseOutcome.unavailable
+          ? RevenueCat.lastUnavailableReason
+          : '';
+      messenger.showSnackBar(
+        SnackBar(
+          duration: Duration(seconds: why.isEmpty ? 4 : 8),
+          content: Text(
+            why.isEmpty ? AppStrings.t(key) : '${AppStrings.t(key)}\n($why)',
+          ),
+        ),
+      );
+    }
+    if (outcome == PurchaseOutcome.success) {
+      Navigator.of(context).maybePop();
+      await widget.onPurchased();
+    }
+  }
+
+  Future<void> _openExternal(String url) async {
+    final ok = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(url)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final safe = MediaQuery.paddingOf(context);
+    final price = _price;
+    final ctaSub = price == null
+        ? AppStrings.t('boost_pw_one_time')
+        : '$price · ${AppStrings.t('boost_pw_one_time')}';
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: SC.bg,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.bg],
+              stops: [0, 0.45, 1],
+            ),
+          ),
+          child: Stack(
+            children: [
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 380,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment.topCenter,
+                      radius: 1.2,
+                      colors: [
+                        Color(0x8C2B7FFF),
+                        Color(0x1F18DDEA),
+                        Color(0x001F5EFF),
+                      ],
+                      stops: [0, 0.45, 0.75],
+                    ),
+                  ),
+                ),
+              ),
+              SafeArea(
+                bottom: false,
+                child: _ScrollFill(
+                  padding: EdgeInsets.fromLTRB(22, 12, 22, safe.bottom + 14),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 44,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: _CloseButton(
+                            onTap: () => Navigator.of(context).maybePop(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      _PreviewCard(
+                        me: _me,
+                        highlighted: true,
+                        badge: AppStrings.t('boost_pw_badge'),
+                      ),
+                      const SizedBox(height: 28),
+                      _HighlightTitle(
+                        head: AppStrings.t('boost_pw_title_head'),
+                        tail: AppStrings.t('boost_pw_title_tail'),
+                        fontSize: 26,
+                        tailBg: SC.accent,
+                        tailFg: SC.onAccent,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        AppStrings.t('boost_pw_sub'),
+                        textAlign: TextAlign.center,
+                        style: SCText.subtitle.copyWith(
+                          fontSize: 14.5,
+                          height: 1.5,
+                          color: SC.textPrimary.withValues(alpha: 0.75),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _PerkRow(
+                        icon: Icons.rocket_launch_rounded,
+                        label: AppStrings.t('boost_pw_row_place'),
+                        value: AppStrings.t('boost_pw_row_place_value'),
+                        on: true,
+                      ),
+                      const SizedBox(height: 10),
+                      _PerkRow(
+                        icon: Icons.schedule_rounded,
+                        label: AppStrings.t('boost_pw_row_duration'),
+                        value: AppStrings.t('boost_pw_row_duration_value'),
+                        on: true,
+                      ),
+                      const Spacer(),
+                      const SizedBox(height: 22),
+                      _TwoLineCta(
+                        title: AppStrings.t('boost_my_profile'),
+                        subtitle: ctaSub,
+                        busy: _busy,
+                        onPressed: _buy,
+                      ),
+                      const SizedBox(height: 12),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _FooterLink(
+                              AppStrings.t('paywall_terms'),
+                              () => _openExternal(
+                                'https://www.swayco.fr/terms',
+                              ),
+                            ),
+                            const _FooterDot(),
+                            _FooterLink(
+                              AppStrings.t('paywall_privacy'),
+                              () => _openExternal(
+                                'https://www.swayco.fr/privacy',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
