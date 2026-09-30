@@ -13,6 +13,12 @@ import '../widgets/sway_onb_kit.dart';
 import '../widgets/swayco_wordmark.dart';
 import 'forgot_password_screen.dart';
 
+/// Photo framing: how far above the screen top it starts (more negative =
+/// the whole group higher), and down to which fraction of its height it
+/// stays sharp before melting into the gradient.
+const double _kPhotoTop = -110;
+const double _kPhotoSharpUntil = 0.78;
+
 /// Welcome screen shown when the user has no Supabase Auth session — direction
 /// 8c: the group photo on top melting into the onboarding's blue → cyan
 /// gradient, the form below (white fields, yellow pill). After a successful
@@ -221,11 +227,11 @@ class _LoginScreenState extends State<LoginScreen> {
           body: SizedBox.expand(
             child: Stack(
               children: [
-                // The photo, 58 % of the screen, pulled 88 px up under the
-                // status bar. It fades ITSELF out (dstIn) so the gradient shows
+                // The photo, 58 % of the screen, pulled up under the status
+                // bar ([_kPhotoTop]). It fades ITSELF out (dstIn) so the gradient shows
                 // through with no seam. No blur anywhere under this mask.
                 Positioned(
-                  top: -88,
+                  top: _kPhotoTop,
                   left: 0,
                   right: 0,
                   height: size.height * 0.58,
@@ -235,13 +241,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [Colors.white, Colors.white, Colors.transparent],
-                      stops: [0, 0.55, 1],
+                      // Sharp down to the two girls at the bottom of the
+                      // group; the fade only starts just above the title.
+                      stops: [0, _kPhotoSharpUntil, 1],
                     ).createShader(rect),
                     child: Image.asset(
                       'assets/bienvenue.jpg',
                       fit: BoxFit.cover,
-                      // Faces sit high in the 900×1200 source.
-                      alignment: const Alignment(0, -0.76),
+                      // Crop from the BOTTOM of the source: the whole group
+                      // rides up, the lower faces land above the title.
+                      alignment: const Alignment(0, 1),
                     ),
                   ),
                 ),
