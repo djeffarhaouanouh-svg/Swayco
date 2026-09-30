@@ -56,6 +56,10 @@ const Color _kPanelBg = Color(0xFF141517);
 /// Marge latérale de la carte (handoff 3c).
 const double _kCardInset = 14.0;
 
+/// Aperçu de ma carte : écart carte → bouton Boost, assez pour passer sous
+/// les cartes fantômes inclinées qui dépassent du bas.
+const double _kBoostGap = 28.0;
+
 /// Width / height of the Discover card on THIS device (same maths as
 /// [_DiscoverScreenState.build]: screen minus logo, country row, action row
 /// and nav). Lets the photo cropper frame exactly what the card will show.
@@ -936,24 +940,26 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final me = _me;
+    final cardTop = safeTop + 64;
+    // Same inset, corners and ratio as the real Discover card — not taller
+    // than the feed shows it (room left for the Boost button).
+    final cardH = math.min(
+      (MediaQuery.sizeOf(context).width - 2 * _kCardInset) /
+          discoverCardAspect(context),
+      MediaQuery.sizeOf(context).height -
+          cardTop -
+          (safeBottom + 12 + (_showBoost ? 50 + _kBoostGap : 0)),
+    );
 
     return Scaffold(
       backgroundColor: SC.bg,
       body: Stack(
         children: [
           Positioned(
-            top: safeTop + 64,
-            // Same inset, corners and ratio as the real Discover card — not
-            // taller than the feed shows it (room left for the Boost button).
+            top: cardTop,
             left: _kCardInset,
             right: _kCardInset,
-            height: math.min(
-              (MediaQuery.sizeOf(context).width - 2 * _kCardInset) /
-                  discoverCardAspect(context),
-              MediaQuery.sizeOf(context).height -
-                  (safeTop + 64) -
-                  (safeBottom + 12 + (_showBoost ? 50 + 14 : 0)),
-            ),
+            height: cardH,
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(
@@ -1057,12 +1063,13 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                         },
                       ),
           ),
-          // « Booster mon profil » sous la carte, là où le feed a ✕ ✉ ❤.
+          // « Booster mon profil » juste sous la carte, là où le feed a
+          // ✕ ✉ ❤ — pas collé au bas de l'écran.
           if (_showBoost)
             Positioned(
               left: 0,
               right: 0,
-              bottom: safeBottom + 12,
+              top: cardTop + cardH + _kBoostGap,
               child: Center(
                 child: BoostButton(
                   boostedUntil: me!.boostedUntil,
