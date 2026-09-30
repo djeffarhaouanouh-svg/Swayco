@@ -103,7 +103,7 @@ class _PrimingSheet extends StatelessWidget {
               child: FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: SC.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: SC.onAccent,
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text(confirmLabel),

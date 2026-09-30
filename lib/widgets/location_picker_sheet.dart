@@ -284,7 +284,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             IconButton(
               style: IconButton.styleFrom(
                 backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
+                foregroundColor: SC.onAccent,
               ),
               icon: const Icon(Icons.check_rounded),
               onPressed: () {

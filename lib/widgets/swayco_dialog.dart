@@ -148,8 +148,8 @@ class _ConfirmButton extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: destructive ? Colors.white : SC.onAccent,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.2,

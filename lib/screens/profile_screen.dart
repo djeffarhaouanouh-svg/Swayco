@@ -3207,7 +3207,7 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
               onPressed: widget.onDone,
               style: FilledButton.styleFrom(
                 backgroundColor: SC.accent,
-                foregroundColor: Colors.white,
+                foregroundColor: SC.onAccent,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(AppStrings.t('save')),

@@ -1,82 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Swayco "Midnight" palette — deep navy mesh background, glass
-/// surfaces, cyan accent. Source of truth for every theme-aware
-/// surface in the app since the legacy WhatsApp-green palette was
-/// retired.
+/// Swayco — direction 8c.
+/// Fond #0E0E0E et GlassNavBar inchangés. Nouveau : dégradé de l'icône
+/// (bleu franc → bleu → cyan, sans indigo), accent jaune 8c #F4FF1F,
+/// titres Unbounded, texte / sous-titres Plus Jakarta Sans.
+/// Tous les anciens noms sont conservés : rien d'autre à renommer dans l'app.
 abstract final class SC {
-  // Backgrounds
-  // Un seul fond pour toute l'app : le gris quasi-noir que portaient déjà
-  // Profil / Messages / Demandes. Discover était en noir pur et les pages
-  // secondaires en bleu nuit — passer d'un onglet à l'autre se voyait.
-  // Toute surface de fond passe par [bg] : ne pas recoder la valeur en dur.
+  // Backgrounds (inchangés)
   static const bg            = Color(0xFF0E0E0E);
-  // Encre sombre posée SUR l'accent cyan (texte des badges / boutons pleins),
-  // pas un fond : elle reste bleu nuit.
-  static const bgDeep        = Color(0xFF050817);
+  /// Encre posée SUR l'accent jaune (texte des badges / boutons pleins).
+  static const bgDeep        = Color(0xFF04123A);
 
-  // Mesh halo colors (used by MeshBackground).
-  static const meshBlue      = Color(0xFF3B82F6);
-  static const meshViolet    = Color(0xFF7C3AED);
-  static const meshCyan      = Color(0xFF06B6D4);
-  static const meshNavy      = Color(0xFF1E40AF);
+  // Dégradé de marque — celui de l'icône, indigo retiré.
+  static const brandBlueDeep = Color(0xFF1F5EFF);
+  static const brandBlue     = Color(0xFF2B7FFF);
+  static const brandCyan     = Color(0xFF18DDEA);
+  static const brandGradient = LinearGradient(
+    begin: Alignment(-0.6, -1),
+    end: Alignment(0.6, 1),
+    colors: [brandBlueDeep, brandBlue, brandCyan],
+    stops: [0, .52, 1],
+  );
 
-  // Accent
-  static const accent        = Color(0xFF22D3EE);
-  static const accentDeep    = Color(0xFF0891B2);
+  // Mesh halo colors (MeshBackground) — le violet devient le bleu franc.
+  static const meshBlue      = brandBlue;
+  static const meshViolet    = brandBlueDeep;
+  static const meshCyan      = brandCyan;
+  static const meshNavy      = Color(0xFF1A4FD6);
 
-  /// Type of the swaycø wordmark (declared in pubspec). Brand only — the rest
-  /// of the UI stays on the google_fonts families in [SCText]. It tops out at
-  /// Bold, so pair it with [FontWeight.w700], never w800.
+  // Accent — jaune 8c.
+  static const accent        = Color(0xFFF4FF1F);
+  static const accentDeep    = Color(0xFFC8D100);
+  /// Texte / icône posé sur [accent]. Jamais de blanc sur le jaune.
+  static const onAccent      = bgDeep;
+
   static const brandFont     = 'GlacialIndifference';
 
-  // "Online" indicator — light green, used for presence dots / labels and
-  // the auto-translate toggle in the chat composer.
+  // Online (inchangé)
   static const online        = Color(0xFF4ADE80);
   static const onlineDeep    = Color(0xFF22C55E);
 
-  // Text
+  // Text (inchangé)
   static const textPrimary   = Color(0xFFF5F7FF);
   static const textSecondary = Color(0xB3F5F7FF);
   static const textMuted     = Color(0x80F5F7FF);
 
-  // Surface des menus contextuels (⋮ Signaler / Bloquer) : un gris neutre,
-  // détaché du bleu nuit des bulles — un menu n'est pas une bulle de chat.
   static const menu          = Color(0xFF2B2B2B);
 
-  // Bubble (incoming) — opaque, no blur, for legibility against the mesh.
   static const bubbleIn      = Color(0xFF1A2138);
   static const bubbleInBorder = Color(0x14FFFFFF);
 
-  // Glass surfaces
+  // Glass (inchangé)
   static const glass         = Color(0x0FFFFFFF);
   static const glassStrong   = Color(0x1AFFFFFF);
   static const glassBorder   = Color(0x1AFFFFFF);
   static const glassBorderStrong = Color(0x33FFFFFF);
 
-  // Outgoing bubble gradient stops.
-  static const outBubbleStart = Color(0xFF0891B2);
-  static const outBubbleEnd   = Color(0xFF0E7490);
+  // Bulle sortante : bleu de marque au lieu du cyan foncé.
+  static const outBubbleStart = brandBlueDeep;
+  static const outBubbleEnd   = brandBlue;
 
-  // Chat message bubbles — "card" style on the black message area.
-  // Incoming (received): dark slate grey. Outgoing (sent): dark cyan with a
-  // bright cyan border. Both keep light text so they read on the black area.
   static const msgInBg       = Color(0xFF2F333B);
   static const msgInText     = Color(0xFFF5F7FF);
   static const msgInBorder   = Color(0x1FFFFFFF);
-  static const msgOutBg      = Color(0xFF0F505F);
-  static const msgOutBorder  = accent;
-  static const msgOutText    = Color(0xFFEAFBFF);
+  static const msgOutBg      = Color(0xFF123C9E);
+  static const msgOutBorder  = brandBlue;
+  static const msgOutText    = Color(0xFFFFFFFF);
 
-  /// Global Material 3 theme used by [MaterialApp.theme]. Mirrors the
-  /// Midnight palette so any widget that opts into the inherited
-  /// theme (default FilledButton, InputDecoration, AppBar, etc.) lands
-  /// on cyan + navy instead of the old WhatsApp green + black.
   static ThemeData material() {
     const base = ColorScheme.dark(
       primary: accent,
-      onPrimary: Colors.white,
+      onPrimary: onAccent,
+      secondary: brandBlue,
+      onSecondary: Colors.white,
       surface: menu,
       onSurface: textPrimary,
       error: Color(0xFFE53935),
@@ -87,23 +84,24 @@ abstract final class SC {
       brightness: Brightness.dark,
       colorScheme: base,
       scaffoldBackgroundColor: bg,
-      appBarTheme: const AppBarTheme(
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(
+        ThemeData.dark().textTheme,
+      ).apply(bodyColor: textPrimary, displayColor: textPrimary),
+      appBarTheme: AppBarTheme(
         backgroundColor: bg,
         foregroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.unbounded(
           color: textPrimary,
           fontSize: 20,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        // Neutral grey, not the navy [bubbleIn] the chat bubbles use: a blue
-        // cast on every input read as a foreign surface on the dark screens.
         fillColor: menu,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -123,12 +121,13 @@ abstract final class SC {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: accent,
-          foregroundColor: Colors.white,
+          foregroundColor: onAccent,
           minimumSize: const Size.fromHeight(48),
-          padding:
-              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          shape: const StadiumBorder(),
+          textStyle: GoogleFonts.unbounded(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -143,31 +142,39 @@ abstract final class SC {
 }
 
 abstract final class SCText {
-  static TextStyle h1 = GoogleFonts.bricolageGrotesque(
+  // Titres — Unbounded (maquettes 8c).
+  static TextStyle h1 = GoogleFonts.unbounded(
     fontSize: 30, fontWeight: FontWeight.w800,
-    letterSpacing: -1.0, color: SC.textPrimary, height: 1.05,
+    letterSpacing: -0.9, color: SC.textPrimary, height: 1.05,
   );
-  static TextStyle h2 = GoogleFonts.bricolageGrotesque(
+  static TextStyle h2 = GoogleFonts.unbounded(
     fontSize: 22, fontWeight: FontWeight.w700,
-    letterSpacing: -0.4, color: SC.textPrimary,
+    letterSpacing: -0.5, color: SC.textPrimary,
   );
-  static TextStyle h3 = GoogleFonts.bricolageGrotesque(
-    fontSize: 18, fontWeight: FontWeight.w700,
-    letterSpacing: -0.2, color: SC.textPrimary,
+  static TextStyle h3 = GoogleFonts.unbounded(
+    fontSize: 18, fontWeight: FontWeight.w600,
+    letterSpacing: -0.3, color: SC.textPrimary,
   );
-  static TextStyle name = GoogleFonts.dmSans(
+
+  // Texte, sous-titres, méta — Plus Jakarta Sans.
+  static TextStyle subtitle = GoogleFonts.plusJakartaSans(
+    fontSize: 15, fontWeight: FontWeight.w500,
+    color: SC.textPrimary, height: 1.45,
+  );
+  static TextStyle name = GoogleFonts.plusJakartaSans(
     fontSize: 16, fontWeight: FontWeight.w700, color: SC.textPrimary,
   );
-  static TextStyle body = GoogleFonts.dmSans(
-    fontSize: 15, fontWeight: FontWeight.w500, color: SC.textPrimary, height: 1.3,
+  static TextStyle body = GoogleFonts.plusJakartaSans(
+    fontSize: 15, fontWeight: FontWeight.w500,
+    color: SC.textPrimary, height: 1.3,
   );
-  static TextStyle preview = GoogleFonts.dmSans(
+  static TextStyle preview = GoogleFonts.plusJakartaSans(
     fontSize: 12, fontWeight: FontWeight.w400, color: SC.textMuted,
   );
-  static TextStyle meta = GoogleFonts.dmSans(
+  static TextStyle meta = GoogleFonts.plusJakartaSans(
     fontSize: 11, fontWeight: FontWeight.w600, color: SC.textMuted,
   );
-  static TextStyle accent = GoogleFonts.dmSans(
+  static TextStyle accent = GoogleFonts.plusJakartaSans(
     fontSize: 12, fontWeight: FontWeight.w700, color: SC.accent,
   );
 }

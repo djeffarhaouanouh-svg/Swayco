@@ -485,7 +485,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         onPressed: _finish,
                         style: FilledButton.styleFrom(
                           backgroundColor: SC.accent,
-                          foregroundColor: Colors.white,
+                          foregroundColor: SC.onAccent,
                           minimumSize: const Size.fromHeight(50),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
