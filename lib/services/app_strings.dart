@@ -342,7 +342,7 @@ abstract final class AppStrings {
     'globe_hint': 'Touche un ou plusieurs pays. Pince pour zoomer.',
     'globe_title': 'Quels pays ?',
     'globe_filter_empty': 'Personne dans ce pays pour l\'instant.',
-    'send_emoji': 'Envoyer 👋',
+    'send_emoji': 'Envoyer',
     'dm_write_hint': 'Écris ton message…',
     'dm_explain':
         "Cette fonctionnalité te permet d'envoyer un message à cette personne sans que vous soyez amis.",
@@ -1008,7 +1008,7 @@ abstract final class AppStrings {
     'globe_hint': 'Tap one or more countries. Pinch to zoom.',
     'globe_title': 'Which countries?',
     'globe_filter_empty': 'No one from this country yet.',
-    'send_emoji': 'Send 👋',
+    'send_emoji': 'Send',
     'dm_write_hint': 'Write your message…',
     'dm_explain':
         "This feature lets you send a message to this person even if you aren't friends.",
@@ -1653,7 +1653,7 @@ abstract final class AppStrings {
     'globe_hint': 'Toca uno o varios países. Pellizca para acercar.',
     'globe_title': '¿Qué países?',
     'globe_filter_empty': 'Nadie de este país por ahora.',
-    'send_emoji': 'Enviar 👋',
+    'send_emoji': 'Enviar',
     'dm_write_hint': 'Escribe tu mensaje…',
     'dm_explain':
         'Esta función te permite enviar un mensaje a esta persona sin que seáis amigos.',
@@ -2230,7 +2230,7 @@ abstract final class AppStrings {
     'globe_hint': 'Tippe ein oder mehrere Länder an. Zwei Finger zum Zoomen.',
     'globe_title': 'Welche Länder?',
     'globe_filter_empty': 'Noch niemand aus diesem Land.',
-    'send_emoji': 'Senden 👋',
+    'send_emoji': 'Senden',
     'dm_write_hint': 'Schreib deine Nachricht…',
     'dm_explain':
         'Mit dieser Funktion kannst du dieser Person eine Nachricht senden, ohne dass ihr befreundet seid.',
@@ -2894,7 +2894,7 @@ abstract final class AppStrings {
     'globe_hint': 'Tocca uno o più paesi. Pizzica per lo zoom.',
     'globe_title': 'Quali paesi?',
     'globe_filter_empty': 'Ancora nessuno da questo paese.',
-    'send_emoji': 'Invia 👋',
+    'send_emoji': 'Invia',
     'dm_write_hint': 'Scrivi il tuo messaggio…',
     'dm_explain':
         'Questa funzione ti permette di inviare un messaggio a questa persona senza essere amici.',
@@ -3551,7 +3551,7 @@ abstract final class AppStrings {
     'globe_hint': 'Toca num ou mais países. Belisca para ampliar.',
     'globe_title': 'Que países?',
     'globe_filter_empty': 'Ainda ninguém deste país.',
-    'send_emoji': 'Enviar 👋',
+    'send_emoji': 'Enviar',
     'dm_write_hint': 'Escreve a tua mensagem…',
     'dm_explain':
         'Esta funcionalidade permite-te enviar uma mensagem a esta pessoa sem serem amigos.',
@@ -4210,7 +4210,7 @@ abstract final class AppStrings {
     'globe_hint': 'Tik op één of meer landen. Knijp om te zoomen.',
     'globe_title': 'Welke landen?',
     'globe_filter_empty': 'Nog niemand uit dit land.',
-    'send_emoji': 'Verstuur 👋',
+    'send_emoji': 'Verstuur',
     'dm_write_hint': 'Schrijf je bericht…',
     'dm_explain':
         'Met deze functie kun je deze persoon een bericht sturen zonder dat jullie vrienden zijn.',
@@ -4861,7 +4861,7 @@ abstract final class AppStrings {
     'globe_hint': 'المس دولة واحدة أو أكثر. اقرص للتكبير.',
     'globe_title': 'أي بلدان؟',
     'globe_filter_empty': 'لا أحد من هذه الدولة بعد.',
-    'send_emoji': 'إرسال 👋',
+    'send_emoji': 'إرسال',
     'dm_write_hint': 'اكتب رسالتك…',
     'dm_explain':
         'تتيح لك هذه الميزة إرسال رسالة إلى هذا الشخص دون أن تكونا صديقين.',
@@ -5509,7 +5509,7 @@ abstract final class AppStrings {
     'globe_hint': 'Коснитесь одной или нескольких стран. Щипок для масштаба.',
     'globe_title': 'Какие страны?',
     'globe_filter_empty': 'Пока никого из этой страны.',
-    'send_emoji': 'Отправить 👋',
+    'send_emoji': 'Отправить',
     'dm_write_hint': 'Напиши своё сообщение…',
     'dm_explain':
         'Эта функция позволяет отправить сообщение этому человеку, даже если вы не друзья.',
@@ -6153,7 +6153,7 @@ abstract final class AppStrings {
     'globe_hint': '点按一个或多个国家。双指缩放。',
     'globe_title': '哪些国家？',
     'globe_filter_empty': '该国目前还没有人。',
-    'send_emoji': '发送 👋',
+    'send_emoji': '发送',
     'dm_write_hint': '写下你的消息…',
     'dm_explain': '通过此功能，即使你们还不是好友，也可以给对方发送消息。',
     'add_friend_short': '添加',
@@ -6771,7 +6771,7 @@ abstract final class AppStrings {
     'globe_hint': '1つ以上の国をタップ。ピンチで拡大。',
     'globe_title': 'どの国？',
     'globe_filter_empty': 'この国の人はまだいません。',
-    'send_emoji': '送信 👋',
+    'send_emoji': '送信',
     'dm_write_hint': 'メッセージを書いてください…',
     'dm_explain': 'この機能を使うと、友達でなくてもこの相手にメッセージを送れます。',
     'add_friend_short': '追加',
@@ -7359,7 +7359,7 @@ abstract final class AppStrings {
     'globe_hint': '하나 이상의 국가를 탭하세요. 손가락으로 확대.',
     'globe_title': '어떤 나라?',
     'globe_filter_empty': '아직 이 나라 사람이 없어요.',
-    'send_emoji': '보내기 👋',
+    'send_emoji': '보내기',
     'dm_write_hint': '메시지를 입력하세요…',
     'dm_explain': '이 기능을 사용하면 친구가 아니어도 이 사람에게 메시지를 보낼 수 있어요.',
     'add_friend_short': '추가',
