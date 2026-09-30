@@ -31,8 +31,8 @@ import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/gif_picker_sheet.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/liquid_glass_button.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -1275,12 +1275,14 @@ class _ThreadHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
           children: [
-            GlassIconButton(
+            // Apple Liquid Glass (natif iOS 26+, verre flouté ailleurs) sur
+            // les trois boutons de l'en-tête.
+            LiquidGlassButton(
               icon: Icons.arrow_back_rounded,
+              sfSymbol: 'arrow.left',
               size: 44,
-              iconSize: 22,
-              // Bigger, marked grow-then-settle pop on tap (like the nav bar).
-              popScale: 1.25,
+              iconSize: 20,
+              semanticLabel: MaterialLocalizations.of(context).backButtonTooltip,
               onTap: () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 10),
@@ -1400,20 +1402,21 @@ class _ThreadHeader extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GlassIconButton(
+                  LiquidGlassButton(
                     icon: Icons.phone_rounded,
+                    sfSymbol: 'phone.fill',
                     size: 44,
-                    iconSize: 21,
-                    // Marked pop on tap (matches the back button / nav bar).
-                    popScale: 1.25,
+                    iconSize: 19,
+                    semanticLabel: 'Call',
                     onTap: onCall,
                   ),
                   const SizedBox(width: 8),
-                  GlassIconButton(
+                  LiquidGlassButton(
                     icon: Icons.videocam_rounded,
+                    sfSymbol: 'video.fill',
                     size: 44,
-                    iconSize: 22,
-                    popScale: 1.25,
+                    iconSize: 19,
+                    semanticLabel: 'Video call',
                     onTap: onVideoCall,
                   ),
                 ],

@@ -286,6 +286,7 @@ abstract final class AppStrings {
     'delete': 'Supprimer',
     'save': 'Enregistrer',
     'photo_crop_hint': 'Pince pour zoomer, glisse pour cadrer',
+    'preview_no_photo': "Tu n'as pas encore ajouté de photo",
     'ad_info_title':
         "Les publicités peuvent être passées après quelques secondes et aident à soutenir le développement de l'application",
     'ad_info_body':
@@ -953,6 +954,7 @@ abstract final class AppStrings {
     'delete': 'Delete',
     'save': 'Save',
     'photo_crop_hint': 'Pinch to zoom, drag to frame',
+    'preview_no_photo': "You haven't added a photo yet",
     'ad_info_title':
         'Ads can be skipped after a few seconds and help support the future development of the app',
     'ad_info_body':
@@ -1612,6 +1614,7 @@ abstract final class AppStrings {
     'delete': 'Eliminar',
     'save': 'Guardar',
     'photo_crop_hint': 'Pellizca para hacer zoom, arrastra para encuadrar',
+    'preview_no_photo': 'Todavía no has añadido ninguna foto',
     'ad_info_title':
         'Los anuncios se pueden saltar tras unos segundos y ayudan a mantener el desarrollo de la aplicación',
     'ad_info_body':
@@ -2189,6 +2192,7 @@ abstract final class AppStrings {
     'delete': 'Löschen',
     'save': 'Speichern',
     'photo_crop_hint': 'Zum Zoomen zusammenziehen, zum Ausrichten ziehen',
+    'preview_no_photo': 'Du hast noch kein Foto hinzugefügt',
     'ad_info_title':
         'Werbung lässt sich nach wenigen Sekunden überspringen und hilft, die App weiterzuentwickeln',
     'ad_info_body':
@@ -2852,6 +2856,7 @@ abstract final class AppStrings {
     'delete': 'Elimina',
     'save': 'Salva',
     'photo_crop_hint': 'Pizzica per ingrandire, trascina per inquadrare',
+    'preview_no_photo': 'Non hai ancora aggiunto nessuna foto',
     'ad_info_title':
         "Le pubblicità si possono saltare dopo qualche secondo e aiutano a sostenere lo sviluppo dell'app",
     'ad_info_body':
@@ -3508,6 +3513,7 @@ abstract final class AppStrings {
     'delete': 'Excluir',
     'save': 'Salvar',
     'photo_crop_hint': 'Faz pinça para ampliar, arrasta para enquadrar',
+    'preview_no_photo': 'Ainda não adicionaste nenhuma foto',
     'ad_info_title':
         'Os anúncios podem ser ignorados após alguns segundos e ajudam a apoiar o desenvolvimento da aplicação',
     'ad_info_body':
@@ -4166,6 +4172,7 @@ abstract final class AppStrings {
     'delete': 'Verwijderen',
     'save': 'Opslaan',
     'photo_crop_hint': 'Knijp om te zoomen, sleep om te kaderen',
+    'preview_no_photo': "Je hebt nog geen foto toegevoegd",
     'ad_info_title':
         'Advertenties kun je na een paar seconden overslaan en helpen de ontwikkeling van de app te steunen',
     'ad_info_body':
@@ -4816,6 +4823,7 @@ abstract final class AppStrings {
     'delete': 'حذف',
     'save': 'حفظ',
     'photo_crop_hint': 'قرّب بإصبعين للتكبير واسحب لضبط الإطار',
+    'preview_no_photo': 'لم تُضف أي صورة بعد',
     'ad_info_title':
         'يمكن تخطي الإعلانات بعد بضع ثوانٍ، وهي تساعد على دعم تطوير التطبيق',
     'ad_info_body':
@@ -5463,6 +5471,7 @@ abstract final class AppStrings {
     'delete': 'Удалить',
     'save': 'Сохранить',
     'photo_crop_hint': 'Сведи пальцы для зума, перетащи для кадрирования',
+    'preview_no_photo': 'Ты ещё не добавил(а) ни одного фото',
     'ad_info_title':
         'Рекламу можно пропустить через несколько секунд, и она помогает развивать приложение',
     'ad_info_body':
@@ -6108,6 +6117,7 @@ abstract final class AppStrings {
     'delete': '删除',
     'save': '保存',
     'photo_crop_hint': '双指缩放，拖动调整取景',
+    'preview_no_photo': '你还没有添加照片',
     'ad_info_title': '广告几秒钟后即可跳过，并有助于支持应用的后续开发',
     'ad_info_body': '观看广告时点击下方任一按钮即可跳过并继续使用',
     'ad_upsell_title': '升级 Premium，畅享无广告的 Swayco',
@@ -6725,6 +6735,7 @@ abstract final class AppStrings {
     'delete': '削除',
     'save': '保存',
     'photo_crop_hint': 'ピンチで拡大、ドラッグで位置を調整',
+    'preview_no_photo': 'まだ写真が追加されていません',
     'ad_info_title': '広告は数秒後にスキップでき、アプリの今後の開発を支えます',
     'ad_info_body': '広告の再生中に下のいずれかのボタンをタップすると、スキップして続けられます',
     'ad_upsell_title': 'Premium で広告なしの Swayco を楽しもう',
@@ -7312,6 +7323,7 @@ abstract final class AppStrings {
     'delete': '삭제',
     'save': '저장',
     'photo_crop_hint': '핀치로 확대하고 드래그로 위치를 맞추세요',
+    'preview_no_photo': '아직 사진을 추가하지 않았어요',
     'ad_info_title': '광고는 몇 초 후에 건너뛸 수 있으며 앱의 향후 개발에 도움이 됩니다',
     'ad_info_body': '광고 중에 아래 버튼 중 하나를 누르면 건너뛰고 계속할 수 있어요',
     'ad_upsell_title': 'Premium으로 광고 없이 Swayco를 즐기세요',

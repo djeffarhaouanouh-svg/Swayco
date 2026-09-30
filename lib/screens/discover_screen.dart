@@ -35,9 +35,9 @@ import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
 import '../widgets/fx6d_button.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
+import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/swipe_coach_overlay.dart';
@@ -974,8 +974,21 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                           final card = _TinderCard(
                             profile: me,
                             photos: _photos,
+                            preview: true,
                           );
+                          // Comme le feed : les deux cartes fantômes
+                          // (+4° / −3°) dépassent derrière, HORS du clip ;
+                          // la carte et son panneau restent rognés.
                           return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              if (!_infoOpen) ...const [
+                                _GhostCard(angleDeg: -3),
+                                _GhostCard(angleDeg: 4),
+                              ],
+                              Positioned.fill(
+                                child: ClipRect(
+                                  child: Stack(
                             children: [
                               // Exactly the feed card: r32, no flag border.
                               Positioned.fill(
@@ -1032,6 +1045,10 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
                                 ),
                               ),
                             ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -1056,8 +1073,14 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
             right: 16,
             child: Row(
               children: [
-                GlassIconButton(
+                // Apple Liquid Glass, comme l'en-tête de la conversation.
+                LiquidGlassButton(
                   icon: Icons.arrow_back_rounded,
+                  sfSymbol: 'arrow.left',
+                  size: 44,
+                  iconSize: 20,
+                  semanticLabel:
+                      MaterialLocalizations.of(context).backButtonTooltip,
                   onTap: () => Navigator.of(context).maybePop(),
                 ),
                 const SizedBox(width: 12),
@@ -2264,9 +2287,15 @@ class _TinderCard extends StatefulWidget {
     super.key,
     required this.profile,
     required this.photos,
+    this.preview = false,
   });
   final RemoteProfile profile;
   final List<String> photos;
+
+  /// Ma propre carte dans l'aperçu (l'œil du profil) : ce qui manque encore
+  /// se voit — une invite quand il n'y a aucune photo, des puces fantômes là
+  /// où iront les centres d'intérêt — et le prénom n'ouvre rien.
+  final bool preview;
 
   @override
   State<_TinderCard> createState() => _TinderCardState();
@@ -2307,6 +2336,36 @@ class _TinderCardState extends State<_TinderCard> {
               alignment: const Alignment(0, -0.6),
               gaplessPlayback: true,
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+
+          // ── Aperçu sans photo : l'invite, au-dessus du bloc du bas. ──────
+          if (widget.preview && currentUrl.isEmpty)
+            Align(
+              alignment: const Alignment(0, -0.25),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: Colors.white.withValues(alpha: 0.35),
+                      size: 46,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      AppStrings.t('preview_no_photo'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
           // ── Tap areas (photo carousel) ──────────────────────────────────
@@ -2370,11 +2429,13 @@ class _TinderCardState extends State<_TinderCard> {
                 // Tap sur le prénom → la page profil.
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ProfileScreen(userId: p.id),
-                    ),
-                  ),
+                  onTap: widget.preview
+                      ? null
+                      : () => Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ProfileScreen(userId: p.id),
+                            ),
+                          ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -2421,7 +2482,7 @@ class _TinderCardState extends State<_TinderCard> {
                     ),
                   ),
                 ],
-                _CardPills(profile: p),
+                _CardPills(profile: p, placeholder: widget.preview),
               ],
             ),
           ),
@@ -2455,9 +2516,12 @@ class _NameFlag extends StatelessWidget {
 /// celles qui tiennent EN ENTIER dans la largeur — une puce tronquée ou une
 /// deuxième ligne mangerait la photo. Le reste est dans le panneau.
 class _CardPills extends StatelessWidget {
-  const _CardPills({required this.profile});
+  const _CardPills({required this.profile, this.placeholder = false});
 
   final RemoteProfile profile;
+
+  /// Aperçu de ma carte : sans aucune puce, on montre leur emplacement.
+  final bool placeholder;
 
   static const double _gap = 8;
 
@@ -2469,7 +2533,31 @@ class _CardPills extends StatelessWidget {
         '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}',
       for (final tag in p.interests) interestPillText(tag),
     ];
-    if (labels.isEmpty) return const SizedBox.shrink();
+    if (labels.isEmpty) {
+      if (!placeholder) return const SizedBox.shrink();
+      // Trois puces fantômes, même hauteur que les vraies (≈ 32).
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            for (final (k, w) in const [86.0, 70.0, 98.0].indexed) ...[
+              if (k > 0) const SizedBox(width: _gap),
+              Container(
+                width: w,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     const style = InterestPill.textStyle;
     return Padding(
