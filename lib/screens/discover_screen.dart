@@ -1254,7 +1254,7 @@ class _CountryRowState extends State<_CountryRow> {
                 decoration: BoxDecoration(
                   color: _kSurface,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 2),
+                  border: Border.all(color: Colors.black, width: 1),
                 ),
                 child: const Icon(
                   Icons.tune_rounded,
@@ -1284,7 +1284,8 @@ class _CountryRowState extends State<_CountryRow> {
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: on ? SC.accent : Colors.black,
-                        width: 2,
+                        // Noire fine au repos, cyan plus marquée si choisie.
+                        width: on ? 2 : 1,
                       ),
                     ),
                     alignment: Alignment.center,
