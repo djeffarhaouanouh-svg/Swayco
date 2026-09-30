@@ -2568,8 +2568,8 @@ class _MatchBubble extends StatelessWidget {
 
   final RemoteProfile profile;
 
-  /// Déjà vu : l'anneau tombe et la bulle s'estompe. Elle reste là — le match
-  /// n'a pas disparu, c'est la nouveauté qui s'est éteinte.
+  /// Déjà vu : l'anneau passe au gris et la bulle s'estompe. Elle reste là —
+  /// le match n'a pas disparu, c'est la nouveauté qui s'est éteinte.
   final bool seen;
   final VoidCallback onTap;
 
@@ -2584,15 +2584,17 @@ class _MatchBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // L'anneau au dégradé de marque du match pas encore regardé. Il est peint SOUS
-            // la photo, qui garde un liseré de fond entre les deux : sans ça
-            // le dégradé touche le visage et se lit comme une bordure.
+            // L'anneau : dégradé de marque pour le match pas encore regardé,
+            // gris discret une fois vu. Il est peint SOUS la photo, qui garde
+            // un liseré de fond entre les deux : sans ça l'anneau touche le
+            // visage et se lit comme une bordure.
             Container(
               width: 64,
               height: 64,
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: seen ? Colors.white.withValues(alpha: 0.35) : null,
                 gradient: seen
                     ? null
                     : const LinearGradient(
