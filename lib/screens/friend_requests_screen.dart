@@ -481,7 +481,7 @@ class _RequestRow extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
-                color: SC.accent,
+                color: Colors.white,
               ),
             ),
           ),
