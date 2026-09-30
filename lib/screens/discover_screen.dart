@@ -2470,11 +2470,6 @@ class _TinderCardState extends State<_TinderCard> {
                           ),
                         ),
                       ),
-                      if (p.isPro) ...[
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified_rounded,
-                            color: Color(0xFF60A5FA), size: 22),
-                      ],
                       const SizedBox(width: 10),
                       _NameFlag(profile: p),
                     ],
