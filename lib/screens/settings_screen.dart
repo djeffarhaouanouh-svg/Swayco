@@ -22,6 +22,7 @@ import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/mesh_background.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_popups_extra.dart';
 import 'liked_photos_screen.dart';
 import 'paywall_screen.dart';
 
@@ -206,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => _TextPromptDialog(
+      builder: (ctx) => SwaycoTextPromptDialog(
         title: AppStrings.t('settings_first_name'),
         controller: ctrl,
         maxLength: profileNameMaxLength,
@@ -1068,95 +1069,6 @@ class _BlockedEmptyState extends StatelessWidget {
                 fontSize: 13,
                 height: 1.4,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Minimal single-line text prompt — used for the first-name edit in
-/// Settings. There's no existing "ask for a short string" dialog to reuse
-/// (swayco_dialog.dart only has confirm/cancel); this stays local rather
-/// than growing that file for one field.
-class _TextPromptDialog extends StatelessWidget {
-  const _TextPromptDialog({
-    required this.title,
-    required this.controller,
-    required this.maxLength,
-  });
-
-  final String title;
-  final TextEditingController controller;
-  final int maxLength;
-
-  static const _fieldBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.all(Radius.circular(14)),
-    borderSide: BorderSide(color: SC.glassBorder),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: SC.menu,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: maxLength,
-              textCapitalization: TextCapitalization.words,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: SC.textPrimary, fontSize: 15),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: SC.bg,
-                counterStyle: const TextStyle(color: SC.textMuted),
-                border: _fieldBorder,
-                enabledBorder: _fieldBorder,
-                focusedBorder: _fieldBorder.copyWith(
-                  borderSide: const BorderSide(color: SC.accent, width: 1.5),
-                ),
-              ),
-              onSubmitted: (v) => Navigator.of(context).pop(v),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      AppStrings.t('cancel'),
-                      style: const TextStyle(color: SC.textMuted),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(backgroundColor: SC.accent),
-                    onPressed: () =>
-                        Navigator.of(context).pop(controller.text),
-                    child: Text(AppStrings.t('save')),
-                  ),
-                ),
-              ],
             ),
           ],
         ),

@@ -37,10 +37,12 @@ import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
 import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_popups_extra.dart';
 import '../widgets/translated_profile_text.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/boost_button.dart';
@@ -993,7 +995,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: ctx,
-      builder: (dCtx) => _NamePromptDialog(
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (dCtx) => SwaycoTextPromptDialog(
         title: AppStrings.t('settings_first_name'),
         controller: ctrl,
         maxLength: profileNameMaxLength,
@@ -3102,11 +3105,11 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
     return Container(
       // Plus de marge haute : elle datait du temps oÃ¹ ce panneau se dÃ©pliait
       // sous les chips. Dans une pop-up centrÃ©e, elle dÃ©centrait le contenu.
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
       decoration: BoxDecoration(
-        color: SC.bg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: SC.glassBorderStrong),
+        color: PopupTokens.surface,
+        borderRadius: BorderRadius.circular(PopupTokens.radius),
+        border: Border.all(color: PopupTokens.border),
       ),
       child: Column(
         // SANS Ã§a, la colonne prend toute la hauteur qu'on lui offre : dans un
@@ -3202,17 +3205,10 @@ class _InlineInterestPickerState extends State<_InlineInterestPicker> {
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: widget.onDone,
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: SC.onAccent,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(AppStrings.t('save')),
-            ),
+          PopupButton(
+            label: AppStrings.t('save'),
+            height: 52,
+            onPressed: widget.onDone,
           ),
         ],
       ),
@@ -3776,7 +3772,7 @@ class _EditAccountSheet extends StatelessWidget {
       child: ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: ColoredBox(
-        color: SC.bg,
+        color: PopupTokens.surface,
         child: SafeArea(
           top: false,
           child: Column(
@@ -3817,7 +3813,10 @@ class _EditAccountSheet extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: SC.accentSoft,
                         shape: BoxShape.circle,
-                        border: Border.all(color: SC.bg, width: 2),
+                        border: Border.all(
+                          color: PopupTokens.surface,
+                          width: 2,
+                        ),
                       ),
                       child: const Icon(
                         Icons.camera_alt,
@@ -3842,7 +3841,10 @@ class _EditAccountSheet extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: const Color(0xFF2A2A2E),
                             shape: BoxShape.circle,
-                            border: Border.all(color: SC.bg, width: 2),
+                            border: Border.all(
+                              color: PopupTokens.surface,
+                              width: 2,
+                            ),
                           ),
                           child: const Icon(
                             Icons.close_rounded,
@@ -3859,10 +3861,10 @@ class _EditAccountSheet extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+                style: popupDisplay(
+                  color: Colors.white,
+                  fontSize: 18,
+                  letterSpacing: -0.5,
                 ),
               ),
               Padding(
@@ -3884,7 +3886,7 @@ class _EditAccountSheet extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: SC.menu,
+                    color: PopupTokens.ghost,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
@@ -4018,93 +4020,6 @@ class _EditAccountRow extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right, size: 20, color: SC.textMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Same prompt as Settings' first-name dialog â kept local to avoid exporting
-/// a private widget across screens.
-class _NamePromptDialog extends StatelessWidget {
-  const _NamePromptDialog({
-    required this.title,
-    required this.controller,
-    required this.maxLength,
-  });
-
-  final String title;
-  final TextEditingController controller;
-  final int maxLength;
-
-  static const _fieldBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.all(Radius.circular(14)),
-    borderSide: BorderSide(color: SC.glassBorder),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: SC.menu,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: maxLength,
-              textCapitalization: TextCapitalization.words,
-              cursorColor: SC.accent,
-              style: const TextStyle(color: SC.textPrimary, fontSize: 15),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: SC.bg,
-                counterStyle: const TextStyle(color: SC.textMuted),
-                border: _fieldBorder,
-                enabledBorder: _fieldBorder,
-                focusedBorder: _fieldBorder.copyWith(
-                  borderSide: const BorderSide(color: SC.accent, width: 1.5),
-                ),
-              ),
-              onSubmitted: (v) => Navigator.of(context).pop(v),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      AppStrings.t('cancel'),
-                      style: const TextStyle(color: SC.textMuted),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(backgroundColor: SC.accent),
-                    onPressed: () =>
-                        Navigator.of(context).pop(controller.text),
-                    child: Text(AppStrings.t('save')),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),

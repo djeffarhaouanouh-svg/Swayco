@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
-/// Feuille à roulette : un titre, une colonne de valeurs qui défile sous un
-/// cadre cyan, un bouton Enregistrer. Le format est imposé par la liste — on ne
-/// tape rien, donc rien à valider.
-///
-/// Rend l'INDICE choisi, `-1` si on a touché « Supprimer » ([allowClear]), et
-/// `null` si la feuille a été refermée sans rien décider.
+/// Feuille à roulette (direction 8c) : titre, colonne de valeurs sous un cadre
+/// jaune, bouton Enregistrer. Rend l'INDICE choisi, `-1` si « Supprimer »
+/// ([allowClear]), `null` si la feuille est refermée. Même signature qu'avant.
 Future<int?> showWheelPicker({
   required BuildContext context,
   required String title,
@@ -21,6 +20,7 @@ Future<int?> showWheelPicker({
   return showModalBottomSheet<int>(
     context: context,
     backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.6),
     builder: (_) => _WheelPickerSheet(
       title: title,
       labels: labels,
@@ -63,26 +63,19 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: ColoredBox(
-        color: SC.bg,
-        child: SafeArea(
-          top: false,
+    return PopupSurface(
+      sheet: true,
+      washHeight: 110,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
+              const PopupHandle(),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -90,12 +83,11 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                       Text(widget.emoji, style: const TextStyle(fontSize: 18)),
                       const SizedBox(width: 10),
                     ],
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
+                    Flexible(
+                      child: PopupTitle(
+                        widget.title,
                         fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        highlightLast: false,
                       ),
                     ),
                   ],
@@ -105,16 +97,15 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                 height: 190,
                 child: Stack(
                   children: [
-                    // Le cadre qui marque la ligne sélectionnée.
                     Center(
                       child: Container(
                         height: 40,
-                        margin: const EdgeInsets.symmetric(horizontal: 40),
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
                         decoration: BoxDecoration(
-                          color: SC.accent.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(12),
+                          color: SC.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: SC.accent.withValues(alpha: 0.35),
+                            color: SC.accent.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -134,11 +125,14 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                               widget.labels[i],
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: selected ? SC.textPrimary : SC.textMuted,
-                                fontSize: selected ? 20 : 17,
-                                fontWeight:
-                                    selected ? FontWeight.w700 : FontWeight.w500,
+                              style: GoogleFonts.dmSans(
+                                color: selected
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.5),
+                                fontSize: selected ? 21 : 17,
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
                               ),
                             ),
                           );
@@ -148,31 +142,33 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Row(
-                  children: [
-                    if (widget.allowClear) ...[
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(-1),
-                          child: Text(
-                            AppStrings.t('delete'),
-                            style: const TextStyle(color: SC.textMuted),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (widget.allowClear) ...[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(-1),
+                        child: Text(
+                          AppStrings.t('delete'),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                    ],
-                    Expanded(
-                      flex: 2,
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(context).pop(_index),
-                        child: Text(AppStrings.t('save')),
-                      ),
                     ),
+                    const SizedBox(width: 8),
                   ],
-                ),
+                  Expanded(
+                    flex: 2,
+                    child: PopupButton(
+                      label: AppStrings.t('save'),
+                      height: 54,
+                      onPressed: () => Navigator.of(context).pop(_index),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -181,3 +177,4 @@ class _WheelPickerSheetState extends State<_WheelPickerSheet> {
     );
   }
 }
+

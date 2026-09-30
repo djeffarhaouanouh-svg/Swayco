@@ -32,8 +32,8 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/match_overlay.dart';
-import '../widgets/profile_avatar.dart';
 import '../widgets/sway_tip_dialog.dart';
+import '../widgets/swayco_popups_extra.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
 import 'chat_thread_screen.dart';
@@ -425,10 +425,14 @@ class _RootShellState extends State<RootShell> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogCtx = ctx;
-        return _IncomingCallDialog(
+        return SwaycoIncomingCallDialog(
           callerName: callerName,
           callerAvatarUrl: caller?.avatarUrl,
           callerAvatarColor: caller?.avatarColor,
+          beforeAccept: () {
+            armCallAudio();
+            armSpeechSynthesis();
+          },
         );
       },
     );
@@ -882,166 +886,3 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
     return widget.child;
   }
 }
-
-/// Modal shown to the callee when a peer rings them. Pops `true` on
-/// "Accepter", `false` on "Refuser".
-class _IncomingCallDialog extends StatefulWidget {
-  const _IncomingCallDialog({
-    required this.callerName,
-    required this.callerAvatarUrl,
-    required this.callerAvatarColor,
-  });
-
-  final String callerName;
-  final String? callerAvatarUrl;
-  final String? callerAvatarColor;
-
-  @override
-  State<_IncomingCallDialog> createState() => _IncomingCallDialogState();
-}
-
-class _IncomingCallDialogState extends State<_IncomingCallDialog> {
-  static const _timeout = Duration(seconds: 30);
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Auto-decline if the user doesn't answer in time so the call doesn't
-    // ring forever after the caller has already given up.
-    _timer = Timer(_timeout, () {
-      if (mounted) Navigator.of(context).pop(false);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: SC.menu,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Tappable hero zone — clicking anywhere on the avatar / name /
-          // label accepts the call directly, same effect as the green
-          // button. Keeps the explicit Accept / Decline buttons below
-          // for users who want to refuse.
-          InkWell(
-            onTap: () {
-              armCallAudio();
-              armSpeechSynthesis();
-              Navigator.of(context).pop(true);
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ProfileAvatar(
-                    displayName: widget.callerName,
-                    avatarUrl: widget.callerAvatarUrl,
-                    size: 88,
-                    fontSize: 36,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    widget.callerName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: SC.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    AppStrings.t('incoming_call_label'),
-                    style: const TextStyle(color: SC.textMuted, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _RoundActionButton(
-                  icon: Icons.call_end,
-                  label: AppStrings.t('decline'),
-                  color: const Color(0xFFE53935),
-                  onTap: () => Navigator.of(context).pop(false),
-                ),
-                _RoundActionButton(
-                  icon: Icons.call,
-                  label: AppStrings.t('accept'),
-                  color: SC.accent,
-                  onTap: () {
-              armCallAudio();
-              armSpeechSynthesis();
-              Navigator.of(context).pop(true);
-            },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoundActionButton extends StatelessWidget {
-  const _RoundActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: color,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: SC.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-

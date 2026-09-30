@@ -5,6 +5,7 @@ import '../screens/paywall_screen.dart';
 import '../services/app_strings.dart';
 import '../services/revenue_cat.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
 const _kInfoSeenKey = 'ad_info_sheet_seen';
 const _kUpsellAtKey = 'ad_upsell_sheet_at';
@@ -12,10 +13,9 @@ const _kUpsellAtKey = 'ad_upsell_sheet_at';
 /// Minimum gap between two "go Premium" sheets.
 const _kUpsellGap = Duration(hours: 24);
 
-/// Called right after a full-screen ad the user actually watched.
-///
-/// The very first time: the "how to skip ads" sheet (once per install).
-/// After that: the "enjoy Swayco ad-free" Premium sheet, at most once a day.
+/// Appelée juste après une pub regardée en entier (direction 8c). Logique
+/// inchangée : 1re fois = feuille « comment passer les pubs », ensuite =
+/// feuille Premium, au plus une fois par jour.
 Future<void> showAfterAdSheet(BuildContext context) async {
   final SharedPreferences p;
   try {
@@ -43,14 +43,11 @@ Future<T?> _show<T>(BuildContext context, Widget sheet) =>
     showModalBottomSheet<T>(
       context: context,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       isScrollControlled: true,
       builder: (_) => sheet,
     );
 
-const _kSurface = Color(0xFF1A1A1D);
-const _kChip = Color(0xFF2A2A2E);
-
-/// Shared look of both sheets: dark rounded card, ✕ top-right, cyan CTA.
 class _SheetShell extends StatelessWidget {
   const _SheetShell({
     required this.title,
@@ -68,84 +65,57 @@ class _SheetShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 20),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _kChip),
-      ),
+    return PopupSurface(
+      sheet: true,
+      washHeight: 140,
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: const BoxDecoration(
-                    color: _kChip,
-                    shape: BoxShape.circle,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  const PopupHandle(),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: const BoxDecoration(
+                          color: PopupTokens.ghost,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white70,
+                          size: 18,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                ),
+                ],
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 12),
-            body,
-            if (extra != null) ...[const SizedBox(height: 18), extra!],
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onCta,
-                style: FilledButton.styleFrom(
-                  backgroundColor: SC.accent,
-                  foregroundColor: const Color(0xFF0B0B0C),
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                ),
-                child: Text(
-                  ctaLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              PopupTitle(title, fontSize: 21),
+              const SizedBox(height: 12),
+              body,
+              if (extra != null) ...[const SizedBox(height: 18), extra!],
+              const SizedBox(height: 22),
+              PopupButton(label: ctaLabel, height: 54, onPressed: onCta),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-const _kBodyStyle = TextStyle(color: SC.textMuted, fontSize: 14, height: 1.35);
-
-/// "Ads can be skipped after a few seconds…" + the skip-button icons.
 class _AdInfoSheet extends StatelessWidget {
   const _AdInfoSheet();
 
@@ -153,11 +123,7 @@ class _AdInfoSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SheetShell(
       title: AppStrings.t('ad_info_title'),
-      body: Text(
-        AppStrings.t('ad_info_body'),
-        textAlign: TextAlign.center,
-        style: _kBodyStyle,
-      ),
+      body: PopupBody(AppStrings.t('ad_info_body')),
       extra: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -175,26 +141,24 @@ class _AdInfoSheet extends StatelessWidget {
 
 class _SkipIcon extends StatelessWidget {
   const _SkipIcon(this.icon);
-
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 38,
-      height: 38,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      width: 40,
+      height: 40,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: _kChip,
-        borderRadius: BorderRadius.circular(10),
+        color: PopupTokens.ghost,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PopupTokens.ghostBorder),
       ),
       child: Icon(icon, color: Colors.white, size: 20),
     );
   }
 }
 
-/// "Enjoy Swayco ad-free by going Premium" — price from the store, the CTA
-/// pops `true` so the caller opens the real paywall (purchase + legal).
 class _AdUpsellSheet extends StatefulWidget {
   const _AdUpsellSheet();
 
@@ -227,18 +191,23 @@ class _AdUpsellSheetState extends State<_AdUpsellSheet> {
               TextSpan(
                 text: '$price${AppStrings.t('paywall_period_month')}\n',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+                  color: SC.accent,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             TextSpan(text: AppStrings.t('ad_upsell_terms')),
           ],
         ),
         textAlign: TextAlign.center,
-        style: _kBodyStyle,
+        style: SCText.subtitle.copyWith(
+          fontSize: 14,
+          height: 1.45,
+          color: Colors.white.withValues(alpha: 0.72),
+        ),
       ),
       ctaLabel: AppStrings.t('ad_upsell_cta'),
       onCta: () => Navigator.of(context).pop(true),
     );
   }
 }
+

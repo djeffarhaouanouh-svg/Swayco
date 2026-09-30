@@ -10,6 +10,7 @@ import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/rewarded_video.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 import 'profile_avatar.dart';
 
 /// Who may see the people who liked me: women always see everyone, free of
@@ -74,16 +75,15 @@ class BlurredAvatar extends StatelessWidget {
   }
 }
 
-/// Bottom sheet on a blurred liker: go Pro (reveals all) or watch a video
-/// (reveals this one). [onRevealed] fires once a video unlocked [profile].
+/// Bottom sheet on a blurred liker (direction 8c): go Pro (reveals all) or
+/// watch a video (reveals this one). [onRevealed] fires once a video unlocked
+/// [profile]. Même signature et même logique qu'avant.
 Future<void> showLikesUnlockSheet(
   BuildContext context, {
   required String myId,
   required RemoteProfile? profile,
   required VoidCallback onRevealed,
 }) {
-  // Backup for the warm-up done at Discover start: if that load failed or was
-  // consumed, this makes one ready for the next open.
   unawaited(RewardedVideo.preload());
   Future<void> watchVideo() async {
     if (!RewardedVideo.isAvailable) {
@@ -94,9 +94,6 @@ Future<void> showLikesUnlockSheet(
     }
     final p = profile;
     if (p == null || !await RewardedVideo.show()) return;
-    // Attributed to the viewer via their Bearer token — the admin dashboard
-    // joins this to `profiles` for the gender/age breakdown, so no PII rides
-    // along in props.
     Analytics.track('ad_watched', props: {'source': 'likes_unlock'});
     await LikesUnlocks.add(myId, p.id);
     onRevealed();
@@ -104,76 +101,95 @@ Future<void> showLikesUnlockSheet(
 
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: SC.menu,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
-    builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(child: BlurredAvatar(profile: profile, size: 72)),
-            const SizedBox(height: 16),
-            Text(
-              AppStrings.t('likes_locked_title'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.6),
+    builder: (ctx) => PopupSurface(
+      sheet: true,
+      washHeight: 150,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(child: PopupHandle()),
+              const SizedBox(height: 6),
+              Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: SC.brandGradient,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: PopupTokens.surface,
+                        ),
+                        child: BlurredAvatar(profile: profile, size: 72),
+                      ),
+                    ),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: SC.accent,
+                          border: Border.all(
+                            color: PopupTokens.surface,
+                            width: 3,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 15,
+                          color: SC.onAccent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              AppStrings.t('likes_locked_body'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: SC.textMuted,
-                fontSize: 13.5,
-                height: 1.4,
+              const SizedBox(height: 16),
+              PopupTitle(AppStrings.t('likes_locked_title')),
+              const SizedBox(height: 10),
+              PopupBody(AppStrings.t('likes_locked_body')),
+              const SizedBox(height: 22),
+              PopupButton(
+                label: AppStrings.t('likes_go_pro'),
+                height: 54,
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  unawaited(showPaywallSheet(context));
+                },
               ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                unawaited(showPaywallSheet(context));
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: SC.accent,
-                foregroundColor: SC.bgDeep,
-                minimumSize: const Size.fromHeight(50),
-              ),
-              child: Text(
-                AppStrings.t('likes_go_pro'),
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                unawaited(watchVideo());
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SC.textPrimary,
-                side: const BorderSide(color: SC.glassBorderStrong),
-                minimumSize: const Size.fromHeight(50),
-              ),
-              icon: const Icon(Icons.play_circle_outline_rounded),
-              label: Text(
-                RewardedVideo.isAvailable
+              const SizedBox(height: 8),
+              PopupGhostButton(
+                icon: Icons.play_circle_outline_rounded,
+                height: 50,
+                label: RewardedVideo.isAvailable
                     ? AppStrings.t('likes_watch_video')
                     : '${AppStrings.t('likes_watch_video')} · '
-                          '${AppStrings.t('likes_video_soon')}',
+                        '${AppStrings.t('likes_video_soon')}',
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  unawaited(watchVideo());
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
   );
 }
+

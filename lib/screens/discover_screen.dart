@@ -43,6 +43,7 @@ import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
 import '../widgets/sent_confirmation.dart';
+import '../widgets/swayco_direct_message_sheet.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
@@ -327,7 +328,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _DirectMessageSheet(),
+      builder: (_) => const SwaycoDirectMessageSheet(),
     );
     if (body == null || body.trim().isEmpty || !mounted) return;
     try {
@@ -2697,99 +2698,6 @@ class _SwipeActionBar extends StatelessWidget {
           semanticLabel: 'Like',
         ),
       ],
-    );
-  }
-}
-
-/// Popup du message direct : une zone de texte et un bouton d'envoi. Rend le
-/// texte saisi (ou null si fermée) ; l'envoi lui-même est fait par l'appelant.
-class _DirectMessageSheet extends StatefulWidget {
-  const _DirectMessageSheet();
-
-  @override
-  State<_DirectMessageSheet> createState() => _DirectMessageSheetState();
-}
-
-class _DirectMessageSheetState extends State<_DirectMessageSheet> {
-  final _ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        decoration: const BoxDecoration(
-          color: _kSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                AppStrings.t('dm_explain'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _ctrl,
-                autofocus: true,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 500,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-                decoration: InputDecoration(
-                  hintText: AppStrings.t('dm_write_hint'),
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  counterText: '',
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    final t = _ctrl.text.trim();
-                    if (t.isNotEmpty) Navigator.of(context).pop(t);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: SC.onAccent,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    AppStrings.t('send_emoji'),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

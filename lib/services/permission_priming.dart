@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../theme/swayco_theme.dart';
+import '../widgets/popup_kit.dart';
 import 'app_strings.dart';
 
-/// Soft "pre-permission priming" sheet shown BEFORE the real OS prompt.
-///
-/// iOS only lets an app trigger the native notification/mic dialog once — a
-/// refusal there is final (only Settings can undo it). So we never fire the
-/// OS prompt cold: this sheet explains the benefit first, and only if the
-/// user taps the primary button does the caller trigger the real prompt.
-/// Tapping "later" / dismissing returns false and preserves the one-shot.
+/// Feuille « pré-permission » affichée AVANT la vraie demande de l'OS
+/// (direction 8c). iOS ne laisse qu'un essai : on explique d'abord, et on ne
+/// déclenche la demande native que si l'utilisateur touche le bouton principal.
+/// Même signature qu'avant.
 abstract final class PermissionPriming {
   static Future<bool> show(
     BuildContext context, {
@@ -20,11 +17,9 @@ abstract final class PermissionPriming {
   }) async {
     final res = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: SC.bg,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => _PrimingSheet(
         icon: icon,
         title: title,
@@ -51,75 +46,46 @@ class _PrimingSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 38,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 22),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              width: 88,
-              height: 88,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: SC.accent.withValues(alpha: 0.15),
-              ),
-              child: Icon(icon, color: SC.accent, size: 42),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14.5,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: SC.accent,
-                  foregroundColor: SC.onAccent,
-                ),
+    return PopupSurface(
+      sheet: true,
+      washHeight: 150,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(child: PopupHandle()),
+              const SizedBox(height: 6),
+              Center(child: PopupBadge(icon: icon, size: 84)),
+              const SizedBox(height: 16),
+              PopupTitle(title, fontSize: 20),
+              const SizedBox(height: 10),
+              PopupBody(body),
+              const SizedBox(height: 24),
+              PopupButton(
+                label: confirmLabel,
+                height: 54,
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text(confirmLabel),
               ),
-            ),
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                AppStrings.t('prime_later'),
-                style: const TextStyle(color: Colors.white70),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  AppStrings.t('prime_later'),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+

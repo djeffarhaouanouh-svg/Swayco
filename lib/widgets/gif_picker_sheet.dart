@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/app_strings.dart';
 import '../services/giphy_api.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
 /// Ouvre le sélecteur de GIF et rend celui qu'on a touché (null si on ferme).
 Future<GiphyGif?> showGifPicker(BuildContext context) {
@@ -12,6 +13,7 @@ Future<GiphyGif?> showGifPicker(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.6),
     builder: (_) => const _GifPickerSheet(),
   );
 }
@@ -64,8 +66,6 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
     });
   }
 
-  /// Page suivante — l'offset EST la longueur courante, donc pas de compteur
-  /// à tenir à jour à côté.
   Future<void> _loadMore() async {
     if (_loadingMore || _exhausted || _loading) return;
     setState(() => _loadingMore = true);
@@ -93,8 +93,6 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
     _debounce = Timer(const Duration(milliseconds: 320), _load);
   }
 
-  /// Deux colonnes en quinconce : on alterne les tuiles, chacune à son propre
-  /// ratio, ce qu'une GridView à ratio fixe ne sait pas faire.
   List<List<GiphyGif>> get _columns {
     final left = <GiphyGif>[];
     final right = <GiphyGif>[];
@@ -104,57 +102,46 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
     return [left, right];
   }
 
+  static OutlineInputBorder _b(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: c, width: w),
+      );
+
   @override
   Widget build(BuildContext context) {
     final insets = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
-      // Le clavier pousse la feuille au lieu de la recouvrir.
       padding: EdgeInsets.only(bottom: insets),
       child: FractionallySizedBox(
         heightFactor: 0.82,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: ColoredBox(
-            color: SC.bg,
+        child: PopupSurface(
+          sheet: true,
+          washHeight: 110,
+          child: SizedBox.expand(
             child: Column(
               children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
+                const SizedBox(height: 12),
+                const PopupHandle(),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: TextField(
                     controller: _query,
                     onChanged: _onQueryChanged,
-                    autofocus: false,
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _load(),
-                    style: const TextStyle(color: SC.textPrimary),
+                    cursorColor: SC.accent,
+                    style: SCText.subtitle.copyWith(fontSize: 15),
                     decoration: InputDecoration(
                       hintText: AppStrings.t('gif_search_hint'),
                       hintStyle: const TextStyle(color: SC.textMuted),
                       prefixIcon: const Icon(Icons.search, color: SC.textMuted),
                       isDense: true,
                       filled: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: SC.glassBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: SC.glassBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: SC.accent),
-                      ),
+                      fillColor: PopupTokens.ghost,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      border: _b(PopupTokens.ghostBorder),
+                      enabledBorder: _b(PopupTokens.ghostBorder),
+                      focusedBorder: _b(SC.accent, 1.5),
                     ),
                   ),
                 ),
@@ -168,7 +155,7 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
                   child: Text(
                     'POWERED BY GIPHY',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -193,7 +180,7 @@ class _GifPickerSheetState extends State<_GifPickerSheet> {
       return Center(
         child: Text(
           AppStrings.t('gif_none'),
-          style: const TextStyle(color: SC.textMuted, fontSize: 14),
+          style: SCText.subtitle.copyWith(color: SC.textMuted, fontSize: 14),
         ),
       );
     }
@@ -247,16 +234,14 @@ class _GifTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: AspectRatio(
           aspectRatio: gif.aspect,
           child: ColoredBox(
-            color: SC.menu,
+            color: PopupTokens.ghost,
             child: Image.network(
               gif.previewUrl,
               fit: BoxFit.cover,
-              // Pas de spinner par tuile : le fond gris tient la place, le GIF
-              // apparaît dessus. Une grille de spinners clignote pour rien.
               errorBuilder: (_, _, _) => const Center(
                 child: Icon(Icons.broken_image_outlined, color: SC.textMuted),
               ),
@@ -267,3 +252,4 @@ class _GifTile extends StatelessWidget {
     );
   }
 }
+

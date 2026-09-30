@@ -151,6 +151,11 @@ abstract final class SCText {
     fontSize: 18, fontWeight: FontWeight.w700,
     letterSpacing: -0.2, color: SC.textPrimary,
   );
+  /// Body copy of the pop-ups (and other multi-line helper text).
+  static TextStyle subtitle = GoogleFonts.dmSans(
+    fontSize: 15, fontWeight: FontWeight.w500,
+    color: SC.textPrimary, height: 1.45,
+  );
   static TextStyle name = GoogleFonts.dmSans(
     fontSize: 16, fontWeight: FontWeight.w700, color: SC.textPrimary,
   );

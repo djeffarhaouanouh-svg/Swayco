@@ -4,12 +4,10 @@ import '../services/app_strings.dart';
 import '../services/locations.dart';
 import '../services/onboarding_location.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
-/// Cascading country → city picker sheet. Pops `(country, city)` on pick,
-/// or null on dismiss. Shared by onboarding (first-run location) and
-/// Settings (changing it later) so there's one place that knows the
-/// country list, the search, and the free-text fallback for an unlisted
-/// city. The city is optional ("skip" pops an empty city).
+/// Sélecteur pays → ville (direction 8c). Renvoie `(pays, ville)` ou null.
+/// Mêmes paramètres et même logique qu'avant ; seul l'habillage change.
 class LocationPickerSheet extends StatefulWidget {
   const LocationPickerSheet({
     super.key,
@@ -19,9 +17,6 @@ class LocationPickerSheet extends StatefulWidget {
   });
   final String initialCountry;
   final String initialCity;
-
-  /// Adds a GPS "detect my location" row above the country list. Off for
-  /// onboarding, whose location step already has its own detect button.
   final bool showDetect;
   @override
   State<LocationPickerSheet> createState() => _LocationPickerSheetState();
@@ -35,8 +30,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   bool _detectFailed = false;
   final TextEditingController _otherCityCtrl = TextEditingController();
 
-  /// GPS → country, popped straight away. The city is kept only when the
-  /// detected country is the one already stored (GPS never yields a city).
   Future<void> _detect() async {
     if (_locating) return;
     setState(() {
@@ -68,9 +61,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     setState(() {
       _country = c;
       _onCityStep = true;
-      _otherCityCtrl.text = c.name == widget.initialCountry
-          ? widget.initialCity
-          : '';
+      _otherCityCtrl.text =
+          c.name == widget.initialCountry ? widget.initialCity : '';
     });
   }
 
@@ -80,6 +72,24 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     Navigator.of(context).pop((c.name, city.trim()));
   }
 
+  static OutlineInputBorder _b(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: c, width: w),
+      );
+
+  InputDecoration _field(String hint, IconData icon) => InputDecoration(
+        isDense: true,
+        prefixIcon: Icon(icon, color: SC.textMuted),
+        hintText: hint,
+        hintStyle: const TextStyle(color: SC.textMuted),
+        filled: true,
+        fillColor: PopupTokens.ghost,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        border: _b(PopupTokens.ghostBorder),
+        enabledBorder: _b(PopupTokens.ghostBorder),
+        focusedBorder: _b(SC.accent, 1.5),
+      );
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -87,57 +97,48 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       expand: false,
-      builder: (ctx, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: SC.menu,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 4),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: SC.textMuted.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-              child: Row(
-                children: [
-                  if (_onCityStep)
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: SC.textPrimary,
-                      ),
-                      onPressed: () => setState(() => _onCityStep = false),
-                    )
-                  else
-                    const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _onCityStep
-                          ? '${_country!.flag}  ${_country!.name}'
-                          : AppStrings.t('onb_location_label'),
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
+      builder: (ctx, scrollController) => PopupSurface(
+        sheet: true,
+        washHeight: 110,
+        child: SizedBox.expand(
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              const PopupHandle(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 16, 8),
+                child: Row(
+                  children: [
+                    if (_onCityStep)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => setState(() => _onCityStep = false),
+                      )
+                    else
+                      const SizedBox(width: 12),
+                    Expanded(
+                      child: PopupTitle(
+                        _onCityStep
+                            ? '${_country!.flag}  ${_country!.name}'
+                            : AppStrings.t('onb_location_label'),
+                        fontSize: 18,
+                        textAlign: TextAlign.start,
+                        highlightLast: false,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: _onCityStep
-                  ? _buildCityList(scrollController)
-                  : _buildCountryList(scrollController),
-            ),
-          ],
+              Expanded(
+                child: _onCityStep
+                    ? _buildCityList(scrollController)
+                    : _buildCountryList(scrollController),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -148,37 +149,17 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     final list = q.isEmpty
         ? kCountries
         : kCountries
-              .where((c) => c.name.toLowerCase().contains(q))
-              .toList(growable: false);
+            .where((c) => c.name.toLowerCase().contains(q))
+            .toList(growable: false);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: TextField(
-            autofocus: false,
             cursorColor: SC.accent,
             onChanged: (v) => setState(() => _search = v),
-            style: const TextStyle(color: SC.textPrimary, fontSize: 15),
-            decoration: InputDecoration(
-              isDense: true,
-              prefixIcon: const Icon(Icons.search, color: SC.textMuted),
-              hintText: AppStrings.t('loc_search_country'),
-              hintStyle: const TextStyle(color: SC.textMuted),
-              filled: true,
-              fillColor: SC.bg,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: SC.glassBorder),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: SC.glassBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: SC.accent, width: 1.5),
-              ),
-            ),
+            style: SCText.subtitle.copyWith(fontSize: 15),
+            decoration: _field(AppStrings.t('loc_search_country'), Icons.search),
           ),
         ),
         if (widget.showDetect && q.isEmpty) ...[
@@ -196,9 +177,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 : const Icon(Icons.my_location_rounded, color: SC.accent),
             title: Text(
               AppStrings.t('onb_location_autodetect'),
-              style: const TextStyle(
+              style: SCText.subtitle.copyWith(
                 color: SC.accent,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
             subtitle: _detectFailed
@@ -209,7 +190,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 : null,
             onTap: _detect,
           ),
-          const Divider(height: 1, color: SC.glassBorder),
+          const Divider(height: 1, color: PopupTokens.border),
         ],
         Expanded(
           child: ListView.builder(
@@ -222,10 +203,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
                 title: Text(
                   c.name,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: SCText.subtitle.copyWith(fontWeight: FontWeight.w700),
                 ),
                 trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
                 onTap: () => _pickCountry(c),
@@ -243,7 +221,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       controller: sc,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        // Always-present free-text fallback for unlisted cities.
         Row(
           children: [
             Expanded(
@@ -251,32 +228,13 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 controller: _otherCityCtrl,
                 textCapitalization: TextCapitalization.words,
                 cursorColor: SC.accent,
-                style: const TextStyle(color: SC.textPrimary, fontSize: 15),
+                style: SCText.subtitle.copyWith(fontSize: 15),
                 onSubmitted: (v) {
                   if (v.trim().isNotEmpty) _commitCity(v);
                 },
-                decoration: InputDecoration(
-                  isDense: true,
-                  prefixIcon: const Icon(
-                    Icons.edit_location_alt_outlined,
-                    color: SC.textMuted,
-                  ),
-                  hintText: AppStrings.t('loc_other_city_hint'),
-                  hintStyle: const TextStyle(color: SC.textMuted),
-                  filled: true,
-                  fillColor: SC.bg,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: SC.glassBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: SC.glassBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: SC.accent, width: 1.5),
-                  ),
+                decoration: _field(
+                  AppStrings.t('loc_other_city_hint'),
+                  Icons.edit_location_alt_outlined,
                 ),
               ),
             ),
@@ -285,6 +243,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               style: IconButton.styleFrom(
                 backgroundColor: SC.accent,
                 foregroundColor: SC.onAccent,
+                minimumSize: const Size(48, 48),
               ),
               icon: const Icon(Icons.check_rounded),
               onPressed: () {
@@ -298,9 +257,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           title: Text(
             AppStrings.t('loc_skip_city'),
-            style: const TextStyle(
+            style: SCText.subtitle.copyWith(
               color: SC.textMuted,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
           trailing: const Icon(Icons.chevron_right, color: SC.textMuted),
@@ -312,13 +271,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
             title: Text(
               city,
-              style: const TextStyle(
-                color: SC.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
+              style: SCText.subtitle.copyWith(fontWeight: FontWeight.w700),
             ),
-            trailing:
-                city == widget.initialCity &&
+            trailing: city == widget.initialCity &&
                     _country?.name == widget.initialCountry
                 ? const Icon(Icons.check_rounded, color: SC.accent)
                 : null,
@@ -328,3 +283,4 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     );
   }
 }
+

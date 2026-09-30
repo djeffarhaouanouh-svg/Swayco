@@ -39,8 +39,11 @@ import '../theme/swayco_theme.dart';
 import '../swayco/realtime_translation_port.dart';
 import '../swayco/translation_route.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_dialog.dart';
+import '../widgets/swayco_popups_extra.dart';
 import '../widgets/swayco_wordmark.dart';
 
 /// The connecting-splash ("sas") mark, decoded at boot and pinned for the
@@ -249,7 +252,7 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _sheetOpen = true);
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SC.bg,
+      backgroundColor: PopupTokens.surface,
       // Pas de voile : c'est l'écran d'appel qui floute, sous le galet. Un
       // voile par-dessus le flouterait lui aussi.
       barrierColor: Colors.transparent,
@@ -1620,42 +1623,12 @@ class _CallScreenState extends State<CallScreen> {
     // n'ouvre pas de dialogue pendant une construction.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      showDialog<void>(
+      showSwaycoNotice(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: SC.menu,
-          // Material 3 reteinte toute surface élevée avec la couleur primaire :
-          // le gris du menu virait au bleu cyan. On coupe la teinte.
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          icon: const Icon(
-            Icons.mic_off_rounded,
-            color: Color(0xFFE53935),
-            size: 34,
-          ),
-          content: Text(
-            AppStrings.t(key),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 15,
-              height: 1.45,
-            ),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(AppStrings.t('tip_got_it')),
-              ),
-            ),
-          ],
-        ),
+        icon: Icons.mic_off_rounded,
+        message: AppStrings.t(key),
+        buttonLabel: AppStrings.t('tip_got_it'),
+        danger: true,
       );
     });
   }
@@ -1668,51 +1641,15 @@ class _CallScreenState extends State<CallScreen> {
   void _promptSpokenLanguageCheck() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      showDialog<void>(
+      showSwaycoNotice(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: SC.menu,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          icon: const Icon(
-            Icons.translate_rounded,
-            color: SC.accent,
-            size: 34,
-          ),
-          content: Text(
-            AppStrings.t('call_lang_check_q'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 15,
-              height: 1.45,
-            ),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  _openLanguagePairSheet();
-                },
-                child: Text(AppStrings.t('call_lang_check_change')),
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(AppStrings.t('call_lang_check_keep')),
-              ),
-            ),
-          ],
-        ),
-      );
+        icon: Icons.translate_rounded,
+        message: AppStrings.t('call_lang_check_q'),
+        buttonLabel: AppStrings.t('call_lang_check_change'),
+        secondaryLabel: AppStrings.t('call_lang_check_keep'),
+      ).then((change) {
+        if (change == true && mounted) _openLanguagePairSheet();
+      });
     });
   }
 
@@ -2810,28 +2747,13 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _confirmLeave() async {
-    final leave = await showDialog<bool>(
+    final leave = await showSwaycoConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SC.menu,
-        title: Text(AppStrings.t('call_leave_q'),
-            style: const TextStyle(color: SC.textPrimary)),
-        content: Text(
-          AppStrings.t('call_leave_body'),
-          style: const TextStyle(color: SC.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppStrings.t('call_stay')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE53935)),
-            child: Text(AppStrings.t('call_leave')),
-          ),
-        ],
-      ),
+      title: AppStrings.t('call_leave_q'),
+      body: AppStrings.t('call_leave_body'),
+      confirmLabel: AppStrings.t('call_leave'),
+      cancelLabel: AppStrings.t('call_stay'),
+      icon: Icons.call_end_rounded,
     );
     if (leave == true && mounted) await _hangUp();
   }
