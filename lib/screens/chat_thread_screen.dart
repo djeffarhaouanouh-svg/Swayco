@@ -791,142 +791,151 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     final footerSolid = 70 + MediaQuery.paddingOf(context).bottom * 0.4;
     return Scaffold(
       backgroundColor: _kThreadBg,
-      body: GestureDetector(
-        // Balayer vers la GAUCHE, n'importe où, quitte la conversation.
-        onHorizontalDragEnd: (d) {
-          if ((d.primaryVelocity ?? 0) < -300) Navigator.of(context).maybePop();
+      // canPop:false coupe le glissement retour d'iOS (bord gauche → droite) :
+      // ici on ne quitte qu'en balayant vers la gauche. Flèche, maybePop et
+      // retour Android passent par onPopInvokedWithResult, qui ferme la page.
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) Navigator.of(context).pop();
         },
-        child: Stack(
-          children: [
-            // ── La liste, plein écran ─────────────────────────────────────
-            // Un tap n'importe où ferme le clavier ; translucide pour que la
-            // liste défile et que les bulles reçoivent leurs taps.
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                  _MessageBubble.dismissActivePicker();
-                },
-                child: _buildMessageList(topInset: headerH + 8),
-              ),
-            ),
-            // ── Header : fond constant derrière le prénom et les boutons, puis
-            //    un fondu doux de 40 px sous lui. Les boutons sont en verre. ──
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: _chromeGradient(solid: headerH, top: true),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.only(top: safeTop, bottom: _kChromeFade),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _ThreadHeader(
-                        title: widget.title,
-                        peer: _peer,
-                        clock: peerClock,
-                        place: _peer?.city ?? '',
-                        blockedByPeer: _peerBlockedMe,
-                        onCall: () => _startCall(withCamera: false),
-                        onVideoCall: () => _startCall(withCamera: true),
-                        onViewProfile: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                ProfileScreen(userId: widget.peerDeviceId),
-                          ),
-                        ),
-                        peerBlocked: _peerBlocked,
-                        onToggleBlock: _toggleBlockPeer,
-                        onReport: _reportPeer,
-                      ),
-                      if (_error != null) _ErrorBanner(message: _error!),
-                    ],
-                  ),
+        child: GestureDetector(
+          // Balayer vers la GAUCHE, n'importe où, quitte la conversation.
+          onHorizontalDragEnd: (d) {
+            if ((d.primaryVelocity ?? 0) < -300) Navigator.of(context).maybePop();
+          },
+          child: Stack(
+            children: [
+              // ── La liste, plein écran ─────────────────────────────────────
+              // Un tap n'importe où ferme le clavier ; translucide pour que la
+              // liste défile et que les bulles reçoivent leurs taps.
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    _MessageBubble.dismissActivePicker();
+                  },
+                  child: _buildMessageList(topInset: headerH + 8),
                 ),
               ),
-            ),
-            // ── Footer : même fond, inversé — constant derrière le composer,
-            //    puis 40 px de fondu doux au-dessus. ─────────────────────────
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: Container(
-                  height: _kChromeFade + footerSolid,
+              // ── Header : fond constant derrière le prénom et les boutons, puis
+              //    un fondu doux de 40 px sous lui. Les boutons sont en verre. ──
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: _chromeGradient(solid: footerSolid, top: false),
+                    gradient: _chromeGradient(solid: headerH, top: true),
                   ),
-                ),
-              ),
-            ),
-            // Composer en verre posé SUR la conversation.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _peerBlockedMe
-                  ? _BlockedComposerNotice(
-                      name: _peer?.displayName.isNotEmpty == true
-                          ? _peer!.displayName
-                          : widget.title,
-                      onReport: _reportPeer,
-                      onDelete: _deleteConversation,
-                    )
-                  : Column(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: safeTop, bottom: _kChromeFade),
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_showCallPromo)
-                          SwaycoCallPromo(
-                            calleeName: _peer?.displayName.isNotEmpty == true
-                                ? _peer!.displayName
-                                : widget.title,
-                            myLang: _myLang,
-                            peerLang: _peer?.language ?? '',
-                            myAvatarUrl: _myAvatarUrl,
-                            myName: _myName,
-                            peerAvatarUrl: _peer?.avatarUrl ?? '',
-                            peerName: _peer?.displayName.isNotEmpty == true
-                                ? _peer!.displayName
-                                : widget.title,
-                            onCall: () {
-                              setState(() => _showCallPromo = false);
-                              _startCall(withCamera: false);
-                            },
-                            onDismiss: () =>
-                                setState(() => _showCallPromo = false),
+                        _ThreadHeader(
+                          title: widget.title,
+                          peer: _peer,
+                          clock: peerClock,
+                          place: _peer?.city ?? '',
+                          blockedByPeer: _peerBlockedMe,
+                          onCall: () => _startCall(withCamera: false),
+                          onVideoCall: () => _startCall(withCamera: true),
+                          onViewProfile: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  ProfileScreen(userId: widget.peerDeviceId),
+                            ),
                           ),
-                        _Composer(
-                          controller: _inputCtrl,
-                          sending: _sending,
-                          onSend: _send,
-                          onSendImage: _sendImage,
-                          onSendGif: _sendGif,
-                          autoTranslate: _autoTranslate,
-                          onToggleTranslate: _toggleAutoTranslate,
-                          myLang: _myLang,
-                          peerLang: _peer?.language ?? '',
-                          peerFirstName: (_peer?.displayName.isNotEmpty == true
-                                  ? _peer!.displayName
-                                  : widget.title)
-                              .trim()
-                              .split(RegExp(r'\s+'))
-                              .first,
+                          peerBlocked: _peerBlocked,
+                          onToggleBlock: _toggleBlockPeer,
+                          onReport: _reportPeer,
                         ),
+                        if (_error != null) _ErrorBanner(message: _error!),
                       ],
                     ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: _ActivationWaveOverlay(animation: _activationWave),
+                  ),
+                ),
               ),
-            ),
-          ],
+              // ── Footer : même fond, inversé — constant derrière le composer,
+              //    puis 40 px de fondu doux au-dessus. ─────────────────────────
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    height: _kChromeFade + footerSolid,
+                    decoration: BoxDecoration(
+                      gradient: _chromeGradient(solid: footerSolid, top: false),
+                    ),
+                  ),
+                ),
+              ),
+              // Composer en verre posé SUR la conversation.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _peerBlockedMe
+                    ? _BlockedComposerNotice(
+                        name: _peer?.displayName.isNotEmpty == true
+                            ? _peer!.displayName
+                            : widget.title,
+                        onReport: _reportPeer,
+                        onDelete: _deleteConversation,
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_showCallPromo)
+                            SwaycoCallPromo(
+                              calleeName: _peer?.displayName.isNotEmpty == true
+                                  ? _peer!.displayName
+                                  : widget.title,
+                              myLang: _myLang,
+                              peerLang: _peer?.language ?? '',
+                              myAvatarUrl: _myAvatarUrl,
+                              myName: _myName,
+                              peerAvatarUrl: _peer?.avatarUrl ?? '',
+                              peerName: _peer?.displayName.isNotEmpty == true
+                                  ? _peer!.displayName
+                                  : widget.title,
+                              onCall: () {
+                                setState(() => _showCallPromo = false);
+                                _startCall(withCamera: false);
+                              },
+                              onDismiss: () =>
+                                  setState(() => _showCallPromo = false),
+                            ),
+                          _Composer(
+                            controller: _inputCtrl,
+                            sending: _sending,
+                            onSend: _send,
+                            onSendImage: _sendImage,
+                            onSendGif: _sendGif,
+                            autoTranslate: _autoTranslate,
+                            onToggleTranslate: _toggleAutoTranslate,
+                            myLang: _myLang,
+                            peerLang: _peer?.language ?? '',
+                            peerFirstName: (_peer?.displayName.isNotEmpty == true
+                                    ? _peer!.displayName
+                                    : widget.title)
+                                .trim()
+                                .split(RegExp(r'\s+'))
+                                .first,
+                          ),
+                        ],
+                      ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _ActivationWaveOverlay(animation: _activationWave),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
