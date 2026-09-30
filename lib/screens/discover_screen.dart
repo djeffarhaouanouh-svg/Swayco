@@ -42,6 +42,7 @@ import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/sent_confirmation.dart';
 import '../widgets/swayco_wordmark.dart';
 import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
@@ -349,12 +350,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       Analytics.track('message_sent',
           props: {'source': 'discover_direct', 'type': 'text'});
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-          content: Text('👋', textAlign: TextAlign.center),
-          duration: Duration(seconds: 2),
-        ));
+      showSentConfirmation(context, AppStrings.t('dm_sent'));
     } catch (e) {
       debugPrint('discover: direct message failed: $e');
       if (!mounted) return;
