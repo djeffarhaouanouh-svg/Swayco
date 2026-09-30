@@ -1242,20 +1242,27 @@ class _CountryRowState extends State<_CountryRow> {
               onTap: widget.onFilter,
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
-              // Fine bordure noire : seules les bulles pays portent l'anneau
-              // en dégradé.
+              // Anneau d'1 px au dégradé de marque (le fond du rond extérieur
+              // vu à travers le padding) ; les bulles pays, elles, ont une
+              // fine bordure noire.
               bubble: Container(
                 width: _kBubble,
                 height: _kBubble,
-                decoration: BoxDecoration(
-                  color: _kSurface,
+                padding: const EdgeInsets.all(1),
+                decoration: const BoxDecoration(
+                  gradient: SC.brandGradient,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 1),
                 ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Colors.white,
-                  size: 26,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
                 ),
               ),
             ),
@@ -1271,15 +1278,15 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
-                // Anneau = le dégradé du rond extérieur vu à travers le
-                // padding : 1 px, choisi ou non (le nom jaune et la croix
-                // disent déjà qu'il est choisi).
+                // Fine bordure noire d'1 px, choisi ou non (le nom jaune et la
+                // croix disent déjà qu'il est choisi) ; c'est « Filtrer » qui
+                // porte l'anneau en dégradé.
                 final circle = Container(
                     width: _kBubble,
                     height: _kBubble,
                     padding: const EdgeInsets.all(1),
                     decoration: const BoxDecoration(
-                      gradient: SC.brandGradient,
+                      color: Colors.black,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
