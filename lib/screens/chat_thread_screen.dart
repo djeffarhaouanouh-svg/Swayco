@@ -792,9 +792,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     return Scaffold(
       backgroundColor: _kThreadBg,
       body: GestureDetector(
-        // Swipe right anywhere to leave the conversation (back).
+        // Balayer vers la GAUCHE, n'importe où, quitte la conversation.
         onHorizontalDragEnd: (d) {
-          if ((d.primaryVelocity ?? 0) > 300) Navigator.of(context).maybePop();
+          if ((d.primaryVelocity ?? 0) < -300) Navigator.of(context).maybePop();
         },
         child: Stack(
           children: [
@@ -2625,14 +2625,18 @@ class _ComposerState extends State<_Composer>
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 140),
+                      // Hauteur FIXE : un long message défile dans le champ au
+                      // lieu de l'agrandir.
+                      child: SizedBox(
+                        height: 50,
                         child: TextField(
                           controller: widget.controller,
                           focusNode: _focus,
                           enabled: !widget.sending,
-                          minLines: 1,
-                          maxLines: 6,
+                          expands: true,
+                          minLines: null,
+                          maxLines: null,
+                          textAlignVertical: TextAlignVertical.center,
                           textCapitalization: TextCapitalization.sentences,
                           cursorColor: SC.accent,
                           style: const TextStyle(color: SC.textPrimary),
@@ -2654,21 +2658,15 @@ class _ComposerState extends State<_Composer>
                             filled: false,
                             contentPadding: const EdgeInsets.fromLTRB(
                               4,
-                              8,
+                              6,
                               12,
-                              8,
+                              6,
                             ),
                             // Only the translate toggle on the left — the photo
                             // button now sits OUTSIDE the bar (right).
-                            prefixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const SizedBox(width: 8),
-                                _ComposerTranslateToggle(
-                                  active: widget.autoTranslate,
-                                  onTap: widget.onToggleTranslate,
-                                ),
-                              ],
+                            prefixIcon: _ComposerTranslateToggle(
+                              active: widget.autoTranslate,
+                              onTap: widget.onToggleTranslate,
                             ),
                             prefixIconConstraints: const BoxConstraints(
                               minWidth: 0,
