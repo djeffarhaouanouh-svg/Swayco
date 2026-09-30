@@ -103,9 +103,6 @@ const double _kActionPadV = 16.0;
 const Color _kSurface = Color(0xFF1A1A1D);
 const Color _kSurfaceBorder = Color(0xFF2A2A2E);
 
-/// L'or de l'accès privilégié — jamais de cyan sur une action payante.
-const Color _kGold = Color(0xFFF5C451);
-
 // ══════════════════════════════════════════════════════════════════════════════
 // DiscoverScreen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2780,8 +2777,8 @@ class _DirectMessageSheetState extends State<_DirectMessageSheet> {
                     if (t.isNotEmpty) Navigator.of(context).pop(t);
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: _kGold,
-                    foregroundColor: Colors.black,
+                    backgroundColor: SC.accent,
+                    foregroundColor: SC.onAccent,
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -2801,10 +2798,9 @@ class _DirectMessageSheetState extends State<_DirectMessageSheet> {
   }
 }
 
-/// Le message direct — l'accès privilégié, donc en OR (jamais de cyan sur une
-/// action payante). Rond plein #1A1A1D cerclé d'or, bulle en dégradé or,
-/// étoile ✦ en haut à droite, et un anneau qui pulse en boucle pour dire
-/// qu'il se passe quelque chose de spécial ici.
+/// Le message direct — l'accès privilégié : rond au dégradé de marque, bulle
+/// blanche, pastille ✦ jaune en haut à droite, et un anneau qui pulse en
+/// boucle pour dire qu'il se passe quelque chose de spécial ici.
 class _DirectMessageButton extends StatefulWidget {
   const _DirectMessageButton({required this.onTap});
 
