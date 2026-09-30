@@ -23,7 +23,6 @@ import '../services/device_id.dart';
 import '../services/languages.dart';
 import '../services/last_interaction.dart';
 import '../services/locations.dart';
-import '../services/match_seen.dart';
 import '../services/muted_calls.dart';
 import '../services/friendship_api.dart';
 import '../services/guest_invite_api.dart';
@@ -50,19 +49,10 @@ import 'call_screen.dart';
 import 'chat_thread_screen.dart';
 import 'profile_screen.dart';
 
-/// Combien de temps un match reste dans le rail "Nouveaux matchs". Le compte
-/// part du match, pas du premier message : la bulle et la ligne coexistent
-/// pendant toute cette fenêtre.
-const Duration _kMatchBubbleLife = Duration(days: 7);
-
 /// La police des chiffres et des titres de section : une chasse fixe, pour que
 /// les heures d'une ligne à l'autre tombent sur la même colonne et que les
 /// libellés se lisent comme des étiquettes, pas comme du texte.
 const String _kMono = 'monospace';
-
-/// Le fil de cheveu qui sépare les sections — presque rien, juste de quoi dire
-/// que ce qui suit est autre chose.
-const Color _kHairline = Color(0x12FFFFFF);
 
 /// WhatsApp-style chat home: lists every accepted friend (union of followers
 /// + following). Tapping a row opens the direct-message thread; the trailing
@@ -84,16 +74,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<RemoteProfile> _friends = const [];
   /// Peer ids with an accepted friendship — drives "Supprimer le match".
   Set<String> _matchedIds = const {};
-  /// Matchs des 7 derniers jours, du plus récent au plus ancien — le rail de
-  /// bulles sous le logo. Ils ont AUSSI leur ligne dans Messages ; la bulle
-  /// disparaît quand la fenêtre expire, pas quand la conversation démarre.
-  List<RemoteProfile> _newMatches = const [];
-  /// Matches the user has already laid eyes on — they stay in the rail but
-  /// stop counting toward the badge.
-  Set<String> _seenMatches = const {};
-  /// Fires a few seconds after the rail is on screen: by then the user has
-  /// seen the new matches, so the badge clears.
-  Timer? _matchSeenTimer;
   Map<String, ChatMessage> _latestByConv = const {};
   // Raw inbound messages (not yet known-seen at _reload() time) — the read
   // pointer itself is NOT cached here. [_isUnread]/[_unreadCountFor] read
@@ -226,7 +206,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     AppSettings.hideOnlineLocal.removeListener(_onHideOnlineChanged);
     NavTab.index.removeListener(_onNavTabChanged);
     ChatUnread.revision.removeListener(_onUnreadRevisionChanged);
-    _matchSeenTimer?.cancel();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
     _searchDebounce?.cancel();
@@ -334,36 +313,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Without this, a match made while the user was on Discover only shows
       // up after an app resume (the poll below is web-only).
       _reload(silent: true);
-      _scheduleMatchSeen();
-    } else {
-      _matchSeenTimer?.cancel();
-      _matchSeenTimer = null;
     }
   }
-
-  /// The badge is a "you have new matches" nudge, so it dies once the rail has
-  /// actually been looked at: three seconds on the Messages tab with unseen
-  /// bubbles on screen is enough. The bubbles themselves stay.
-  void _scheduleMatchSeen() {
-    if (_matchSeenTimer != null) return;
-    if (_unseenMatches == 0) return;
-    if (NavTab.index.value != NavTab.chat) return;
-    _matchSeenTimer = Timer(const Duration(seconds: 3), () async {
-      _matchSeenTimer = null;
-      if (!mounted) return;
-      final ids = _newMatches.map((p) => p.id).toList();
-      final seen = await MatchSeen.markSeen(
-        ids,
-        stillMatched: ids.toSet(),
-      );
-      if (!mounted) return;
-      setState(() => _seenMatches = seen);
-    });
-  }
-
-  /// Matches in the rail the user hasn't laid eyes on yet — the badge count.
-  int get _unseenMatches =>
-      _newMatches.where((p) => !_seenMatches.contains(p.id)).length;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -380,7 +331,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // After the first paint, keep the current rows on screen. Swapping in
     // the skeleton made the 4th conversation (already opened) vanish, then
     // FadeSlideIn replayed it as if it were new.
-    if (!silent && _friends.isEmpty && _newMatches.isEmpty) {
+    if (!silent && _friends.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
@@ -394,7 +345,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _myId = id;
           _friends = const [];
           _matchedIds = const {};
-          _newMatches = const [];
           _loading = false;
         });
         return;
@@ -485,18 +435,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         if (visible.any((v) => v.id == p.id)) continue;
         if (isVisible(p)) visible.add(p);
       }
-      // Une bulle ET une ligne, pas l'un OU l'autre. La bulle tient
-      // [_kMatchBubbleLife] à partir du match (qu'on ait écrit ou non), puis
-      // elle s'efface ; la ligne, elle, reste. `matches` arrive déjà du plus
-      // récent au plus ancien, donc le dernier match ouvre le rail.
-      final now = DateTime.now();
-      final newMatches = [
-        for (final p in matches)
-          if (visible.contains(p))
-            if (matchedAtById[p.id] case final t?)
-              if (now.difference(t) < _kMatchBubbleLife) p,
-      ];
-      final seenMatches = await MatchSeen.load();
       // Tout le monde a sa ligne : un match sans message compris. Les rangées
       // muettes descendent sous les conversations, du match le plus récent au
       // plus ancien.
@@ -534,8 +472,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _myId = id;
         _friends = friends;
         _matchedIds = {for (final p in matches) p.id};
-        _newMatches = newMatches;
-        _seenMatches = seenMatches;
         _latestByConv = latest;
         _inbound = inbound;
         _loading = false;
@@ -544,8 +480,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // de plus, et une liste qui attend après elles s'afficherait plus tard
       // pour tout le monde, y compris ceux à qui personne n'a fait signe.
       unawaited(_reloadWaves());
-      // Landed on Messages with fresh matches → start the "seen" countdown.
-      _scheduleMatchSeen();
       if (friends.isNotEmpty) unawaited(_maybeShowWavePromo());
     } catch (e) {
       if (!mounted || seq != _reloadSeq) return;
@@ -566,10 +500,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // même si l'utilisateur est sur Discover. Inutile d'interroger le réseau
     // pour des pastilles que personne ne regarde.
     if (NavTab.index.value != NavTab.chat) return;
-    final ids = <String>{
-      for (final p in _friends) p.id,
-      for (final p in _newMatches) p.id,
-    }.toList();
+    final ids = [for (final p in _friends) p.id];
     if (ids.isEmpty) return;
     try {
       final fresh = await ProfileApi.fetchByIds(ids);
@@ -592,7 +523,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       setState(() {
         _friends = [for (final p in _friends) byId[p.id] ?? p];
-        _newMatches = [for (final p in _newMatches) byId[p.id] ?? p];
       });
     } catch (e) {
       // La présence est un confort : un échec réseau ne doit rien casser.
@@ -1162,7 +1092,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    if (_friends.isEmpty && _newMatches.isEmpty) {
+    if (_friends.isEmpty) {
       return const _NoFriendsEmpty();
     }
     // LAYER STRUCTURE: the mesh fond (built in build()) sits at the back; the
@@ -1211,29 +1141,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      // "Nouveaux matchs" — the bubble rail, newest first.
-                      if (_newMatches.isNotEmpty) ...[
-                        _SectionHeader(
-                          label: AppStrings.t('new_matches_section'),
-                          count: _unseenMatches,
-                          countLeads: true,
-                        ),
-                        _MatchBubbleRail(
-                          matches: _newMatches,
-                          seen: _seenMatches,
-                          onTap: _openThread,
-                        ),
-                        // Le trait qui referme le rail : sans lui les bulles et
-                        // la première conversation se touchent.
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 14),
-                          child: Divider(
-                            height: 37,
-                            thickness: 1,
-                            color: _kHairline,
-                          ),
-                        ),
-                      ],
                       if (_friends.isNotEmpty)
                         _SectionHeader(
                           label: AppStrings.t('messages_section'),
@@ -2465,20 +2372,13 @@ class _RowWaveButtonState extends State<_RowWaveButton>
 /// et son compte. La pastille pleine a disparu — deux badges cyan (celui de la
 /// section, celui de la ligne) se disputaient l'œil pour dire la même chose.
 ///
-/// Deux formes selon ce que le compte veut dire. Pour les matchs il ouvre le
-/// titre ([countLeads]) — « 3 NOUVEAUX MATCHS », c'est un stock. Pour les
-/// messages il le suit en cyan — « MESSAGES · 3 non lus », c'est un reste à
+/// Le compte suit le titre — « MESSAGES · 3 non lus », c'est un reste à
 /// traiter, et le titre reste lisible quand il tombe à zéro.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.label,
-    required this.count,
-    this.countLeads = false,
-  });
+  const _SectionHeader({required this.label, required this.count});
 
   final String label;
   final int count;
-  final bool countLeads;
 
   static const TextStyle _label = TextStyle(
     fontFamily: _kMono,
@@ -2492,147 +2392,27 @@ class _SectionHeader extends StatelessWidget {
     final title = label.toUpperCase();
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-      child: countLeads
-          ? Text(
-              count > 0 ? '$count $title' : title,
-              style: _label.copyWith(color: SC.accent),
-            )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  title,
-                  style: _label.copyWith(
-                    color: Colors.white.withValues(alpha: 0.45),
-                  ),
-                ),
-                if (count > 0) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    AppStrings.t('chat_unread_count', args: {'n': '$count'}),
-                    style: _label.copyWith(
-                      color: SC.accent,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            title,
+            style: _label.copyWith(
+              color: Colors.white.withValues(alpha: 0.45),
             ),
-    );
-  }
-}
-
-/// The horizontal rail of match bubbles: one circle per match you haven't
-/// written to yet, newest first, name underneath. Tapping one opens the
-/// conversation — which is exactly what moves it out of the rail.
-class _MatchBubbleRail extends StatelessWidget {
-  const _MatchBubbleRail({
-    required this.matches,
-    required this.seen,
-    required this.onTap,
-  });
-
-  final List<RemoteProfile> matches;
-
-  /// Les matchs déjà regardés : ils restent dans le rail, sans anneau.
-  final Set<String> seen;
-  final void Function(RemoteProfile) onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      // La bulle, son anneau, et le prénom dessous.
-      height: 92,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        itemCount: matches.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (ctx, i) => _MatchBubble(
-          profile: matches[i],
-          seen: seen.contains(matches[i].id),
-          onTap: () => onTap(matches[i]),
-        ),
-      ),
-    );
-  }
-}
-
-class _MatchBubble extends StatelessWidget {
-  const _MatchBubble({
-    required this.profile,
-    required this.seen,
-    required this.onTap,
-  });
-
-  final RemoteProfile profile;
-
-  /// Déjà vu : l'anneau passe au gris et la bulle s'estompe. Elle reste là —
-  /// le match n'a pas disparu, c'est la nouveauté qui s'est éteinte.
-  final bool seen;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstName = profile.displayName.trim().split(RegExp(r'\s+')).first;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Opacity(
-        opacity: seen ? 0.55 : 1,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // L'anneau : dégradé de marque pour le match pas encore regardé,
-            // gris discret une fois vu. Il est peint SOUS la photo, qui garde
-            // un liseré de fond entre les deux : sans ça l'anneau touche le
-            // visage et se lit comme une bordure.
-            Container(
-              width: 64,
-              height: 64,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: seen ? Colors.white.withValues(alpha: 0.35) : null,
-                gradient: seen
-                    ? null
-                    : const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
-                      ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: SC.bg, width: 2),
-                ),
-                child: ProfileAvatar(
-                  displayName: profile.displayName,
-                  avatarUrl: profile.avatarUrl,
-                  fallbackUrl: profile.fallbackPhotoUrl,
-                  size: 56,
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            SizedBox(
-              width: 64,
-              child: Text(
-                firstName,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                  color: seen ? SC.textMuted : SC.textSecondary,
-                ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(width: 8),
+            Text(
+              AppStrings.t('chat_unread_count', args: {'n': '$count'}),
+              style: _label.copyWith(
+                color: SC.accent,
+                letterSpacing: 0,
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

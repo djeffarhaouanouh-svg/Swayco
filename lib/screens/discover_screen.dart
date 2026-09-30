@@ -1271,12 +1271,12 @@ class _CountryRowState extends State<_CountryRow> {
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
                 // Anneau = le dégradé du rond extérieur vu à travers le
-                // padding, plus épais quand le pays est choisi.
-                final circle = AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
+                // padding : 1 px, choisi ou non (le nom jaune et la croix
+                // disent déjà qu'il est choisi).
+                final circle = Container(
                     width: _kBubble,
                     height: _kBubble,
-                    padding: EdgeInsets.all(on ? 3 : 2),
+                    padding: const EdgeInsets.all(1),
                     decoration: const BoxDecoration(
                       gradient: SC.brandGradient,
                       shape: BoxShape.circle,
