@@ -1241,13 +1241,15 @@ class _CountryRowState extends State<_CountryRow> {
               onTap: widget.onFilter,
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
-              // Sans bordure : seules les bulles pays portent l'anneau.
+              // Fine bordure noire : seules les bulles pays portent l'anneau
+              // en dégradé.
               bubble: Container(
                 width: _kBubble,
                 height: _kBubble,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: _kSurface,
                   shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black, width: 1),
                 ),
                 child: const Icon(
                   Icons.tune_rounded,
