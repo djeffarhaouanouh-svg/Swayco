@@ -1218,7 +1218,7 @@ class _CountryRowState extends State<_CountryRow> {
           Padding(
             // 15 + 2 (et non 20 + 12) : les cases font 62 de large au lieu de
             // 52, les bulles restent exactement où elles étaient.
-            padding: const EdgeInsets.fromLTRB(15, 4, 2, 4),
+            padding: const EdgeInsets.fromLTRB(15, 8, 2, 0),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
               active: false,
@@ -1231,7 +1231,7 @@ class _CountryRowState extends State<_CountryRow> {
                 decoration: BoxDecoration(
                   color: _kSurface,
                   shape: BoxShape.circle,
-                  border: Border.all(color: _kSurfaceBorder, width: 2),
+                  border: Border.all(color: Colors.black, width: 2),
                 ),
                 child: const Icon(
                   Icons.tune_rounded,
@@ -1245,7 +1245,7 @@ class _CountryRowState extends State<_CountryRow> {
             child: ListView.separated(
               controller: _scroll,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(0, 4, 20, 4),
+              padding: const EdgeInsets.fromLTRB(0, 8, 20, 0),
               itemCount: keys.length,
               separatorBuilder: (_, _) => const SizedBox(width: 6),
               itemBuilder: (_, i) {
@@ -1260,7 +1260,7 @@ class _CountryRowState extends State<_CountryRow> {
                       color: _kSurface,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: on ? SC.accent : _kSurfaceBorder,
+                        color: on ? SC.accent : Colors.black,
                         width: 2,
                       ),
                     ),
