@@ -97,14 +97,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final msg = e.message.toLowerCase();
       final notConfirmed =
           code == 'email_not_confirmed' || msg.contains('email not confirmed');
-      final invalidCredentials = code == 'invalid_credentials' ||
+      final invalidCredentials =
+          code == 'invalid_credentials' ||
           msg.contains('invalid login credentials');
       setState(() {
         _error = notConfirmed
             ? AppStrings.t('login_err_not_confirmed')
             : invalidCredentials
-                ? AppStrings.t('login_err_invalid_credentials')
-                : e.message;
+            ? AppStrings.t('login_err_invalid_credentials')
+            : e.message;
         _showResendConfirmation = notConfirmed;
         _busy = false;
       });
@@ -210,87 +211,93 @@ class _LoginScreenState extends State<LoginScreen> {
     final size = MediaQuery.sizeOf(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: SC.brandBlueDeep,
-        body: DecoratedBox(
-          decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
-          child: Stack(
-            children: [
-              // The photo, 58 % of the screen, pulled 44 px up under the
-              // status bar. It fades ITSELF out (dstIn) so the gradient shows
-              // through with no seam. No blur anywhere under this mask.
-              Positioned(
-                top: -44,
-                left: 0,
-                right: 0,
-                height: size.height * 0.58,
-                child: ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  shaderCallback: (rect) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Colors.white, Colors.transparent],
-                    stops: [0, 0.55, 1],
-                  ).createShader(rect),
-                  child: Image.asset(
-                    'assets/bienvenue.jpg',
-                    fit: BoxFit.cover,
-                    // Faces sit high in the 900×1200 source.
-                    alignment: const Alignment(0, -0.76),
-                  ),
-                ),
-              ),
-              // A light blue tint at the very top keeps the white status-bar
-              // glyphs and the logo readable over the bright sky.
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 140,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
+      // The gradient sits BEHIND the transparent Scaffold, so any strip the
+      // body doesn't cover still shows it — a Scaffold colour here left a
+      // dark band along the bottom.
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SizedBox.expand(
+            child: Stack(
+              children: [
+                // The photo, 58 % of the screen, pulled 88 px up under the
+                // status bar. It fades ITSELF out (dstIn) so the gradient shows
+                // through with no seam. No blur anywhere under this mask.
+                Positioned(
+                  top: -88,
+                  left: 0,
+                  right: 0,
+                  height: size.height * 0.58,
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (rect) => const LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x4D1F5EFF), Color(0x001F5EFF)],
+                      colors: [Colors.white, Colors.white, Colors.transparent],
+                      stops: [0, 0.55, 1],
+                    ).createShader(rect),
+                    child: Image.asset(
+                      'assets/bienvenue.jpg',
+                      fit: BoxFit.cover,
+                      // Faces sit high in the 900×1200 source.
+                      alignment: const Alignment(0, -0.76),
                     ),
                   ),
                 ),
-              ),
-              SafeArea(
-                bottom: false,
-                child: SingleChildScrollView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 18),
-                      const SwaycoWordmark(
-                        fontSize: 26,
-                        shadows: [
-                          Shadow(color: Color(0x40000000), blurRadius: 8),
-                        ],
+                // A light blue tint at the very top keeps the white status-bar
+                // glyphs and the logo readable over the bright sky.
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 140,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x4D1F5EFF), Color(0x001F5EFF)],
                       ),
-                      SizedBox(height: size.height * 0.30),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          22,
-                          0,
-                          22,
-                          MediaQuery.paddingOf(context).bottom + 24,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 420),
-                            child: _form(isSignUp),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                SafeArea(
+                  bottom: false,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 18),
+                        const SwaycoWordmark(
+                          fontSize: 26,
+                          oColor: SC.accent,
+                          shadows: [
+                            Shadow(color: Color(0x40000000), blurRadius: 8),
+                          ],
+                        ),
+                        SizedBox(height: size.height * 0.30),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            22,
+                            0,
+                            22,
+                            MediaQuery.paddingOf(context).bottom + 24,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: _form(isSignUp),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -445,16 +452,16 @@ class _LoginScreenState extends State<LoginScreen> {
             height: 20,
           ),
           label: AppStrings.t('login_continue_google'),
-          onPressed:
-              _busy ? null : () => _social(AuthService.signInWithGoogle),
+          onPressed: _busy ? null : () => _social(AuthService.signInWithGoogle),
         ),
         if (_showApple) ...[
           const SizedBox(height: 8),
           _SocialButton(
             icon: Icons.apple,
             label: AppStrings.t('login_continue_apple'),
-            onPressed:
-                _busy ? null : () => _social(AuthService.signInWithApple),
+            onPressed: _busy
+                ? null
+                : () => _social(AuthService.signInWithApple),
           ),
         ],
         const SizedBox(height: 10),
