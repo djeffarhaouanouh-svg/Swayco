@@ -40,6 +40,7 @@ import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
 import '../widgets/lottie_icon_transition.dart';
 import '../widgets/match_overlay.dart';
+import '../widgets/swayco_wordmark.dart';
 import '../widgets/swipe_coach_overlay.dart';
 import '../widgets/translated_profile_text.dart';
 import 'chat_thread_screen.dart';
@@ -1117,60 +1118,19 @@ class _DiscoverHeader extends StatelessWidget {
   /// Hauteur sous la safe area — celle de l'ancienne barre du haut (52).
   static const double height = 52.0;
 
-  /// Le logo d'origine, taille et place d'origine : le mot « swaycø » en
-  /// police de marque, 26, le « ø » au dégradé de marque, centré
-  /// horizontalement dans la bande. (Le SVG du handoff a été retiré à la
-  /// demande.)
+  /// Le logo d'origine, taille et place d'origine, centré horizontalement
+  /// dans la bande. (Le SVG du handoff a été retiré à la demande.)
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.center,
           child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: 'swayc'),
-                  // Un shader de TextSpan se cale sur le paragraphe entier,
-                  // pas sur le glyphe : le masque est posé sur le « ø » seul.
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.baseline,
-                    baseline: TextBaseline.alphabetic,
-                    child: ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      // Moitié claire du dégradé : sur un glyphe de 26, le
-                      // bleu franc du départ l'assombrit trop.
-                      shaderCallback: const LinearGradient(
-                        begin: Alignment(-0.6, -1),
-                        end: Alignment(0.6, 1),
-                        colors: [SC.brandBlue, SC.brandCyan],
-                      ).createShader,
-                      child: const Text(
-                        'ø',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: SC.brandFont,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              style: const TextStyle(
-                color: Colors.white,
-                fontFamily: SC.brandFont,
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-              ),
-            ),
+            padding: EdgeInsets.all(6),
+            child: SwaycoWordmark(),
           ),
         ),
       ),
