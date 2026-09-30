@@ -1547,14 +1547,14 @@ class _IdentitySection extends StatelessWidget {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: SC.accent,
+              color: SC.accentSoft,
               shape: BoxShape.circle,
               border: Border.all(color: SC.bg, width: 2),
             ),
             child: const Icon(
               Icons.camera_alt,
               size: 14,
-              color: Colors.white,
+              color: SC.onAccent,
             ),
           ),
         // Viewer mode: a green presence dot on the lower-right of the PDP
@@ -3814,14 +3814,14 @@ class _EditAccountSheet extends StatelessWidget {
                       height: 22,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: SC.accent,
+                        color: SC.accentSoft,
                         shape: BoxShape.circle,
                         border: Border.all(color: SC.bg, width: 2),
                       ),
                       child: const Icon(
                         Icons.camera_alt,
                         size: 11,
-                        color: Colors.white,
+                        color: SC.onAccent,
                       ),
                     ),
                   ),

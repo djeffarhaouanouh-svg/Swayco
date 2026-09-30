@@ -33,6 +33,9 @@ abstract final class SC {
   // Accent — jaune 8c.
   static const accent        = Color(0xFFF4FF1F);
   static const accentDeep    = Color(0xFFC8D100);
+  /// [accent] éclairci (40 % vers le blanc) : petites pastilles posées sur
+  /// une photo, où le jaune plein paraît trop lourd.
+  static const accentSoft    = Color(0xFFF8FF79);
   /// Texte / icône posé sur [accent]. Jamais de blanc sur le jaune.
   static const onAccent      = bgDeep;
 

@@ -68,31 +68,53 @@ class _BoostButtonState extends State<BoostButton> {
     } else {
       label = AppStrings.t('boost_my_profile');
     }
-    return FilledButton.icon(
-      onPressed: active || _busy ? null : _buy,
-      style: FilledButton.styleFrom(
-        backgroundColor: SC.accent,
-        foregroundColor: SC.bgDeep,
-        disabledBackgroundColor: SC.accent.withValues(alpha: 0.18),
-        disabledForegroundColor: SC.accent,
-        // Resserré : largeur du contenu, pas toute la page.
-        minimumSize: const Size(0, 50),
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      icon: _busy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: SC.bgDeep,
-              ),
-            )
-          : const Icon(Icons.rocket_launch_rounded, size: 20),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+    final radius = BorderRadius.circular(16);
+    // Même habillage que le bouton message de Discover : dégradé de marque +
+    // lueur bleue. Boost déjà actif : simple pastille bleutée, sans lueur.
+    return Container(
+      decoration: active
+          ? null
+          : BoxDecoration(
+              gradient: SC.brandGradient,
+              borderRadius: radius,
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x732B7FFF),
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+      child: FilledButton.icon(
+        onPressed: active || _busy ? null : _buy,
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: active
+              ? SC.brandBlue.withValues(alpha: 0.18)
+              : Colors.transparent,
+          disabledForegroundColor: active ? SC.brandCyan : Colors.white,
+          shadowColor: Colors.transparent,
+          elevation: 0,
+          // Resserré : largeur du contenu, pas toute la page.
+          minimumSize: const Size(0, 50),
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          shape: RoundedRectangleBorder(borderRadius: radius),
+        ),
+        icon: _busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.rocket_launch_rounded, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+        ),
       ),
     );
   }
