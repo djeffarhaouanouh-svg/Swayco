@@ -156,6 +156,19 @@ abstract final class UserPrefs {
     await p.setString(keySourceLang, code.trim());
   }
 
+  /// On sign-out: forget who the previous account was (name, gender, persona,
+  /// country). Otherwise a new account created on this device inherits them
+  /// — onboarding prefilled them and skipped their steps — which is how
+  /// every test account ended up named after the first one. The language is
+  /// kept: it's the device's, and the login screen renders in it.
+  static Future<void> clearAccountIdentity() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(keyFirstName);
+    await p.remove(keyGender);
+    await p.remove(keyPersonaCategory);
+    await p.remove(keyCountry);
+  }
+
   /// Keep the cached first name in step with the account (rename, or a
   /// rename made on another device synced down at boot).
   static Future<void> setFirstName(String name) async {

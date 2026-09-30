@@ -510,6 +510,8 @@ class _LiveKitTranslateAppState extends State<LiveKitTranslateApp> {
     });
     // Detach from RevenueCat so the next user starts on a clean store id.
     unawaited(RevenueCat.logOut());
+    // Same for the cached identity: the next account must not inherit it.
+    unawaited(UserPrefs.clearAccountIdentity());
   }
 
   /// True when this auth user has never completed onboarding — detected
