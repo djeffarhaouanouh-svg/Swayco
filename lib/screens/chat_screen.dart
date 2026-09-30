@@ -2068,13 +2068,13 @@ class _CallAnyoneBanner extends StatefulWidget {
 class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF0B0B0C);
+    const ink = Colors.white;
     // Le panneau n'est qu'une information : seul le rond d'appel est cliquable.
     return Container(
             padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
             decoration: BoxDecoration(
-              color: SC.accent,
-              borderRadius: BorderRadius.circular(18),
+              gradient: SC.brandGradient,
+              borderRadius: BorderRadius.circular(22),
             ),
             child: Row(
               children: [
@@ -2101,7 +2101,7 @@ class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: ink.withValues(alpha: 0.78),
+                          color: ink.withValues(alpha: 0.85),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -2114,13 +2114,13 @@ class _CallAnyoneBannerState extends State<_CallAnyoneBanner> {
                   width: 46,
                   height: 46,
                   decoration: const BoxDecoration(
-                    color: ink,
+                    color: SC.accent,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: const Icon(
                     Icons.call_rounded,
-                    color: Colors.white,
+                    color: SC.onAccent,
                     size: 22,
                   ),
                 ),
@@ -2264,7 +2264,7 @@ class _TopToastState extends State<_TopToast>
                   widget.message,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Color(0xFF04141A),
+                    color: SC.onAccent,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2584,7 +2584,7 @@ class _MatchBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // L'anneau cyan→vert du match pas encore regardé. Il est peint SOUS
+            // L'anneau au dégradé de marque du match pas encore regardé. Il est peint SOUS
             // la photo, qui garde un liseré de fond entre les deux : sans ça
             // le dégradé touche le visage et se lit comme une bordure.
             Container(
@@ -2598,7 +2598,7 @@ class _MatchBubble extends StatelessWidget {
                     : const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [SC.accent, SC.online],
+                        colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
                       ),
               ),
               child: Container(
