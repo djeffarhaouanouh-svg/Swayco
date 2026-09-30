@@ -75,6 +75,7 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
       context,
       myId: lock.myId,
       profile: p,
+      likers: _likers,
       onRevealed: () {
         if (mounted) setState(() => lock.unlocked.add(p.id));
       },

@@ -1,46 +1,57 @@
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_strings.dart';
+import '../services/device_id.dart';
+import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/glass.dart';
-import '../widgets/glass_panel.dart';
+import '../widgets/popup_kit.dart';
+import '../widgets/profile_avatar.dart';
 
-/// Opens the subscription paywall as a modal sheet that slides up from
-/// the bottom (rounded top corners, grab handle, dismiss by swipe / tap
-/// outside). Call this from anywhere — e.g. the profile's "Mon
-/// abonnement" row.
+/// The subscription paywall ("1c", direction 8c): a preview of MY card as a
+/// Pro, with a Free / Pro switch. Full screen, slides up; pops when closed or
+/// once the purchase went through. Call from anywhere (settings, Discover…).
 Future<void> showPaywallSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.62),
-    builder: (_) => const _PaywallSheet(),
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => const _ProPreviewPaywall(),
+    ),
   );
 }
 
-/// Subscription paywall — Swayco "Midnight" reskin of the classic store
-/// layout, presented as a bottom sheet: grab handle + close, a
-/// social-proof pill, a bold headline + value prop, the logo as hero
-/// art, the single Pro plan card (price from the store via RevenueCat),
-/// the subscribe CTA, and the legal / restore footer.
-///
-/// Dark navy surface, hairline grey card borders, cyan accent on the
-/// selected card + CTA — matching [SC] everywhere instead of the pink
-/// reference it was adapted from.
-class _PaywallSheet extends StatefulWidget {
-  const _PaywallSheet();
-
-  @override
-  State<_PaywallSheet> createState() => _PaywallSheetState();
+/// The Likes-page paywall ("1b"): a wall of the blurred likers, go Pro or
+/// watch a video to reveal one. [onWatchVideo] runs after this screen closed.
+Future<void> showLikesWallPaywall(
+  BuildContext context, {
+  required List<RemoteProfile?> likers,
+  required bool videoAvailable,
+  required VoidCallback onWatchVideo,
+}) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => _LikesWallPaywall(
+        likers: likers,
+        videoAvailable: videoAvailable,
+        onWatchVideo: onWatchVideo,
+      ),
+    ),
+  );
 }
 
-class _PaywallSheetState extends State<_PaywallSheet> {
+// ══════════════════════════════════════════════════════════════════════════
+// Shared purchase logic — identical for both paywalls.
+// ══════════════════════════════════════════════════════════════════════════
+
+mixin _PaywallPurchase<T extends StatefulWidget> on State<T> {
   /// Backend tier the web Stripe checkout sells for the Pro plan.
   static const String _stripeTier = 'plus';
 
@@ -50,22 +61,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   /// on web (Stripe shows its own price) or when the package can't load.
   String? _price;
 
-  @override
-  void initState() {
-    super.initState();
-    if (RevenueCat.isSupported) {
-      RevenueCat.priceOf(RevenueCat.proPackageId).then((p) {
-        if (mounted) setState(() => _price = p);
-      });
-    }
+  void _loadPrice() {
+    if (!RevenueCat.isSupported) return;
+    RevenueCat.priceOf(RevenueCat.proPackageId).then((p) {
+      if (mounted) setState(() => _price = p);
+    });
   }
-
-  _Plan get _plan => _Plan(
-    name: 'Pro',
-    price: _price,
-    // Highlighted (cyan) fragments are wrapped in *asterisks*.
-    subKey: 'paywall_plus_sub',
-  );
 
   Future<void> _subscribe() async {
     if (_busy) return;
@@ -136,17 +137,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(url)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(url)));
     }
   }
 
-  /// "Restaurer les achats" → opens the Stripe customer portal (where an
-  /// existing subscription is re-attached / managed). Falls back to a
-  /// toast on native where the portal is unavailable.
+  /// Mobile → RevenueCat restore. Web → the Stripe customer portal.
   Future<void> _restore() async {
-    // Mobile → RevenueCat restore. Web → the Stripe customer portal.
     if (RevenueCat.isSupported) {
       setState(() => _busy = true);
       final active = await RevenueCat.restoreEntitlements();
@@ -189,224 +185,471 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     }
   }
 
-  /// Auto-renewable subscription disclosure required by App Store
-  /// Guideline 3.1.2(c): title, length, price, plus the renewal and
-  /// cancellation terms — shown on the paywall, next to the functional
-  /// Conditions / Confidentialité links in the footer below.
+  /// Auto-renewable subscription disclosure required by App Store Guideline
+  /// 3.1.2(c) — kept on both paywalls even though the mock-ups omit it.
   Widget _legalDisclosure() {
-    final plan = _plan;
-    final tiers = plan.price == null
-        ? plan.name
-        : '${plan.name} ${plan.price}${AppStrings.t('paywall_period_month')}';
+    final price = _price;
+    final tiers = price == null
+        ? 'Pro'
+        : 'Pro $price${AppStrings.t('paywall_period_month')}';
     return Text(
       AppStrings.t(
         'paywall_legal',
         args: {'tiers': tiers, 'account': _accountPhrase()},
       ),
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: SC.textMuted,
-        fontSize: 10.5,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.4),
+        fontSize: 10,
         height: 1.35,
       ),
     );
   }
 
+  /// "Restaurer · Conditions · Confidentialité" on ONE line.
+  Widget _footer() {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _FooterLink(AppStrings.t('paywall_restore'), _restore),
+          const _FooterDot(),
+          _FooterLink(
+            AppStrings.t('paywall_terms'),
+            () => _openExternal('https://www.swayco.fr/terms'),
+          ),
+          const _FooterDot(),
+          _FooterLink(
+            AppStrings.t('paywall_privacy'),
+            () => _openExternal('https://www.swayco.fr/privacy'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 1c — Preview of my card as a Pro
+// ══════════════════════════════════════════════════════════════════════════
+
+class _ProPreviewPaywall extends StatefulWidget {
+  const _ProPreviewPaywall();
+
+  @override
+  State<_ProPreviewPaywall> createState() => _ProPreviewPaywallState();
+}
+
+class _ProPreviewPaywallState extends State<_ProPreviewPaywall>
+    with _PaywallPurchase {
+  bool _pro = true;
+  RemoteProfile? _me;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrice();
+    _loadMe();
+  }
+
+  Future<void> _loadMe() async {
+    try {
+      final id = await DeviceId.getOrCreate();
+      final me = await ProfileApi.fetchById(id);
+      if (mounted) setState(() => _me = me);
+    } catch (_) {
+      // The card falls back to its placeholder — nothing else depends on it.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Cap the sheet height so a tall screen doesn't stretch it edge to
-    // edge — it should read as a window that slid up, not a full page.
-    final maxH = MediaQuery.of(context).size.height * 0.9;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxH),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: SC.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-          border: Border(
-            top: BorderSide(color: SC.glassBorderStrong),
+    final safe = MediaQuery.paddingOf(context);
+    final price = _price;
+    final ctaSub = price == null
+        ? AppStrings.t('pw_cancel_anytime')
+        : '$price${AppStrings.t('paywall_period_month')} · '
+            '${AppStrings.t('pw_cancel_anytime')}';
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: SC.bg,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A2040), Color(0xFF10121C), SC.bg],
+              stops: [0, 0.45, 1],
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Grab handle.
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: SC.glassBorderStrong,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-
-            // Top row: social-proof pill centred, close button left.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Reserve room on each side for the close button so the pill
-                  // stays centred, and scale it down if a wider native font /
-                  // larger system text size would otherwise clip the label
-                  // (it fits natively on web, not always on a device).
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 44),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: _SocialProofPill(),
+          child: Stack(
+            children: [
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 380,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment.topCenter,
+                      radius: 1.2,
+                      colors: [
+                        Color(0x8C2B7FFF),
+                        Color(0x1F18DDEA),
+                        Color(0x001F5EFF),
+                      ],
+                      stops: [0, 0.45, 0.75],
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: GlassIconButton(
-                      icon: Icons.close,
-                      iconSize: 18,
-                      size: 36,
-                      onTap: () => Navigator.of(context).maybePop(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Scrollable hero + plans (shrinks to content when short,
-            // scrolls once it would overflow the capped height).
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 4),
-                    Text(
-                      AppStrings.t('paywall_headline'),
-                      textAlign: TextAlign.center,
-                      style: SCText.h1.copyWith(fontSize: 25, height: 1.12),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      AppStrings.t('paywall_subtitle'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: SC.textMuted,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    const _HeroLogo(),
-                    const SizedBox(height: 26),
-                    _PlanTile(plan: _plan),
-                    const SizedBox(height: 18),
-                    _legalDisclosure(),
-                  ],
                 ),
               ),
-            ),
-
-            // Pinned CTA + footer.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _busy ? null : _subscribe,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SC.accent,
-                    foregroundColor: SC.bgDeep,
-                    minimumSize: const Size.fromHeight(54),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: SC.bgDeep,
-                          ),
-                        )
-                      : Text(
-                          AppStrings.t('paywall_cta'),
-                          style: const TextStyle(
-                            fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
-                          ),
+              SafeArea(
+                bottom: false,
+                child: _ScrollFill(
+                  padding: EdgeInsets.fromLTRB(22, 12, 22, safe.bottom + 14),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 44,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: _CloseButton(
+                                onTap: () => Navigator.of(context).maybePop(),
+                              ),
+                            ),
+                            _FreeProSwitch(
+                              pro: _pro,
+                              onChanged: (v) => setState(() => _pro = v),
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(height: 22),
+                      _PreviewCard(me: _me, pro: _pro),
+                      const SizedBox(height: 28),
+                      _HighlightTitle(
+                        head: AppStrings.t('pw_preview_title'),
+                        tail: AppStrings.t(
+                          _pro ? 'pw_preview_tail_pro' : 'pw_preview_tail_free',
+                        ),
+                        fontSize: 26,
+                        tailBg: _pro
+                            ? SC.accent
+                            : Colors.white.withValues(alpha: 0.14),
+                        tailFg: _pro ? SC.onAccent : SC.textPrimary,
+                      ),
+                      const SizedBox(height: 16),
+                      _PerkRow(
+                        icon: Icons.favorite_rounded,
+                        label: AppStrings.t('pw_row_likes'),
+                        value: AppStrings.t(
+                          _pro ? 'pw_row_visible' : 'pw_row_blurred',
+                        ),
+                        on: _pro,
+                      ),
+                      const SizedBox(height: 10),
+                      _PerkRow(
+                        icon: Icons.verified_rounded,
+                        label: AppStrings.t('pw_row_badge'),
+                        value: _pro
+                            ? AppStrings.t('paywall_popular').toUpperCase()
+                            : AppStrings.t('pw_row_none'),
+                        on: _pro,
+                      ),
+                      const Spacer(),
+                      const SizedBox(height: 22),
+                      _TwoLineCta(
+                        title: AppStrings.t('pw_activate'),
+                        subtitle: ctaSub,
+                        busy: _busy,
+                        onPressed: _subscribe,
+                      ),
+                      const SizedBox(height: 10),
+                      _legalDisclosure(),
+                      const SizedBox(height: 10),
+                      _footer(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              // Horizontal margins so the scaled-down line never touches the
-              // edges; FittedBox shrinks the three links to fit on ONE line
-              // (so "Restaurer" / "Confidentialité" aren't clipped).
-              padding: const EdgeInsets.fromLTRB(28, 2, 28, 12),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _FooterLink(AppStrings.t('paywall_restore'), _restore),
-                    const _FooterDot(),
-                    _FooterLink(
-                      AppStrings.t('paywall_terms'),
-                      () => _openExternal('https://www.swayco.fr/terms'),
-                    ),
-                    const _FooterDot(),
-                    _FooterLink(
-                      AppStrings.t('paywall_privacy'),
-                      () => _openExternal('https://www.swayco.fr/privacy'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Plain data holder for a single plan row.
-class _Plan {
-  const _Plan({
-    required this.name,
-    required this.price,
-    required this.subKey,
-  });
+/// Glass pill with the two options; the active one is yellow.
+class _FreeProSwitch extends StatelessWidget {
+  const _FreeProSwitch({required this.pro, required this.onChanged});
 
-  final String name;
-  /// Store-localized price; null hides the price column.
-  final String? price;
-  /// AppStrings key for the localized sublabel (with *highlight* markers).
-  final String subKey;
-}
-
-/// Social-proof chip at the top — glass pill, cyan verified badge.
-class _SocialProofPill extends StatelessWidget {
-  const _SocialProofPill();
+  final bool pro;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      borderRadius: 999,
-      color: SC.glassStrong,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+    Widget option(String label, bool active, VoidCallback onTap) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            color: active ? SC.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: active
+                  ? SC.onAccent
+                  : SC.textPrimary.withValues(alpha: 0.6),
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.verified_rounded, size: 16, color: SC.accent),
-          const SizedBox(width: 7),
+          option(AppStrings.t('pw_free'), !pro, () => onChanged(false)),
+          option('Pro', pro, () => onChanged(true)),
+        ],
+      ),
+    );
+  }
+}
+
+/// My Discover card, tilted −3°: the real photo, "Toi, 24", city · language.
+/// Pro = brand-gradient frame + blue glow + yellow "POPULAIRE" badge.
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.me, required this.pro});
+
+  final RemoteProfile? me;
+  final bool pro;
+
+  String get _photo {
+    final p = me;
+    if (p == null) return '';
+    for (final u in p.photos) {
+      if (u.isNotEmpty) return u;
+    }
+    if (p.discoverPhotoUrl.isNotEmpty) return p.discoverPhotoUrl;
+    return p.avatarUrl;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = me;
+    final you = AppStrings.t('pw_you');
+    final title = p?.age != null ? '$you, ${p!.age}' : you;
+    final place = [
+      if (p != null && p.city.trim().isNotEmpty)
+        p.city.trim()
+      else if (p != null && p.country.trim().isNotEmpty)
+        p.country.trim(),
+      if (p != null && p.language.trim().isNotEmpty)
+        p.language.trim().toUpperCase(),
+    ].join(' · ');
+    final photo = _photo;
+    return Transform.rotate(
+      angle: -3 * math.pi / 180,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 224,
+        height: 300,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          gradient: pro ? SC.brandGradient : null,
+          boxShadow: pro
+              ? [
+                  BoxShadow(
+                    color: SC.brandBlue.withValues(alpha: 0.8),
+                    blurRadius: 50,
+                    spreadRadius: -8,
+                  ),
+                ]
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(27),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Color(0xFF26262A)),
+              if (photo.isNotEmpty)
+                Image.network(
+                  photo,
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(0, -0.4),
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                )
+              else if (p != null)
+                Center(
+                  child: ProfileAvatar(
+                    displayName: p.displayName,
+                    avatarUrl: null,
+                    size: 96,
+                    fontSize: 40,
+                  ),
+                ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0xCC000000)],
+                    stops: [0.5, 1],
+                  ),
+                ),
+              ),
+              if (pro)
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SC.accent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      AppStrings.t('paywall_popular').toUpperCase(),
+                      style: const TextStyle(
+                        color: SC.onAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: popupDisplay(
+                        fontSize: 22,
+                        letterSpacing: -0.6,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (place.isNotEmpty)
+                      Text(
+                        place,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One perk line: gradient disc + icon, the perk, its value on the right.
+class _PerkRow extends StatelessWidget {
+  const _PerkRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.on,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool on;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [SC.brandBlueDeep, SC.brandCyan],
+              ),
+            ),
+            child: Icon(icon, size: 17, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: SC.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
           Text(
-            AppStrings.t('paywall_social_proof'),
-            style: const TextStyle(
-              color: SC.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              color: on ? SC.accent : SC.textPrimary.withValues(alpha: 0.55),
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -415,95 +658,423 @@ class _SocialProofPill extends StatelessWidget {
   }
 }
 
-/// App logo as hero art, sitting on a soft cyan glow (the reference's
-/// pink sparkle halo, restyled to the Midnight accent).
-class _HeroLogo extends StatelessWidget {
-  const _HeroLogo();
+/// Yellow pill, 64 high: "Activer Pro" over "6,99 €/mois · résiliable…".
+class _TwoLineCta extends StatelessWidget {
+  const _TwoLineCta({
+    required this.title,
+    required this.subtitle,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool busy;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 132,
-      height: 132,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            SC.accent.withValues(alpha: 0.22),
-            SC.accent.withValues(alpha: 0.0),
-          ],
+    return SizedBox(
+      height: 64,
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: busy ? null : onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: SC.accent,
+          foregroundColor: SC.onAccent,
+          disabledBackgroundColor: SC.accent.withValues(alpha: 0.6),
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
         ),
-      ),
-      alignment: Alignment.center,
-      child: Image.asset(
-        'assets/test-logo.png',
-        width: 100,
-        height: 100,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) =>
-            const Icon(Icons.translate_rounded, size: 84, color: SC.accent),
+        child: busy
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: SC.onAccent,
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: popupDisplay(fontSize: 15, color: SC.onAccent),
+                  ),
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      subtitle,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: SC.onAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
 }
 
-/// The plan card: tick on the left, name + sub-label in the middle, price
-/// on the right, drawn in the selected style (cyan border, faint cyan fill).
-class _PlanTile extends StatelessWidget {
-  const _PlanTile({required this.plan});
+// ══════════════════════════════════════════════════════════════════════════
+// 1b — Wall of blurred likes
+// ══════════════════════════════════════════════════════════════════════════
 
-  final _Plan plan;
+class _LikesWallPaywall extends StatefulWidget {
+  const _LikesWallPaywall({
+    required this.likers,
+    required this.videoAvailable,
+    required this.onWatchVideo,
+  });
+
+  final List<RemoteProfile?> likers;
+  final bool videoAvailable;
+  final VoidCallback onWatchVideo;
+
+  @override
+  State<_LikesWallPaywall> createState() => _LikesWallPaywallState();
+}
+
+class _LikesWallPaywallState extends State<_LikesWallPaywall>
+    with _PaywallPurchase {
+  @override
+  void initState() {
+    super.initState();
+    _loadPrice();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final price = plan.price;
+    final safe = MediaQuery.paddingOf(context);
+    final count = widget.likers.length;
+    final countLabel = count == 1
+        ? AppStrings.t('pw_likes_count_one')
+        : AppStrings.t('pw_likes_count', args: {'n': '$count'});
+    final price = _price;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: SC.bg,
+        body: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 430,
+              child: _BlurredWall(likers: widget.likers),
+            ),
+            // Lock in the middle of the wall.
+            Positioned(
+              top: 210,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: SC.brandGradient,
+                    boxShadow: [
+                      BoxShadow(
+                        color: SC.brandBlue.withValues(alpha: 0.9),
+                        blurRadius: 40,
+                        spreadRadius: -6,
+                      ),
+                    ],
+                  ),
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: SC.bg,
+                    ),
+                    child: Icon(Icons.lock_rounded, size: 34, color: SC.accent),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: safe.top + 12,
+              left: 18,
+              child: _CloseButton(
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned.fill(
+              top: 330,
+              child: _ScrollFill(
+                padding: EdgeInsets.fromLTRB(22, 0, 22, safe.bottom + 14),
+                child: Column(
+                  children: [
+                    if (count > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: SC.accent,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SC.accent.withValues(alpha: 0.45),
+                              blurRadius: 28,
+                              spreadRadius: -4,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.favorite_rounded,
+                              size: 18,
+                              color: SC.onAccent,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                countLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: SC.onAccent,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    _HighlightTitle(
+                      head: AppStrings.t('pw_likes_title_head'),
+                      tail: AppStrings.t('pw_likes_title_tail'),
+                      fontSize: 28,
+                      tailBg: SC.accent,
+                      tailFg: SC.onAccent,
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      child: Text(
+                        AppStrings.t('pw_likes_sub'),
+                        textAlign: TextAlign.center,
+                        style: SCText.subtitle.copyWith(
+                          fontSize: 14.5,
+                          height: 1.5,
+                          color: SC.textPrimary.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _PlanCard(price: price),
+                    const Spacer(),
+                    const SizedBox(height: 20),
+                    PopupButton(
+                      label: AppStrings.t('paywall_cta'),
+                      height: 56,
+                      busy: _busy,
+                      onPressed: _subscribe,
+                    ),
+                    const SizedBox(height: 8),
+                    _VideoButton(
+                      label: widget.videoAvailable
+                          ? AppStrings.t('pw_video_reveal')
+                          : '${AppStrings.t('pw_video_reveal')} · '
+                              '${AppStrings.t('likes_video_soon')}',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onWatchVideo();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _legalDisclosure(),
+                    const SizedBox(height: 10),
+                    _footer(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 3×2 wall of tiles, tilted −4° and blurred: the likers' real photos when
+/// there are some, warm colour tiles otherwise. Fades into blue, then black.
+class _BlurredWall extends StatelessWidget {
+  const _BlurredWall({required this.likers});
+
+  final List<RemoteProfile?> likers;
+
+  static const _swatches = [
+    [Color(0xFFC2715A), Color(0xFF6B3B30)],
+    [Color(0xFF8C8A4B), Color(0xFF3B3C22)],
+    [Color(0xFF9B6F66), Color(0xFF463531)],
+    [Color(0xFFB0596E), Color(0xFF4A2230)],
+    [Color(0xFFA26C54), Color(0xFF45291F)],
+    [Color(0xFF5E9A5B), Color(0xFF26431F)],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = [
+      for (final p in likers)
+        if (p != null && p.fallbackPhotoUrl.isNotEmpty)
+          p.fallbackPhotoUrl
+        else if (p != null && p.avatarUrl.isNotEmpty)
+          p.avatarUrl,
+    ];
+    Widget tile(int i) {
+      final sw = _swatches[i % _swatches.length];
+      return Container(
+        height: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: sw,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: i < photos.length
+            ? Image.network(
+                photos[i],
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              )
+            : null,
+      );
+    }
+
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -20,
+            left: -20,
+            right: -20,
+            bottom: -20,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Transform.rotate(
+                angle: -4 * math.pi / 180,
+                child: Transform.scale(
+                  scale: 1.1,
+                  child: Column(
+                    children: [
+                      for (var r = 0; r < 2; r++) ...[
+                        if (r > 0) const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            for (var c = 0; c < 3; c++) ...[
+                              if (c > 0) const SizedBox(width: 10),
+                              Expanded(child: tile(r * 3 + c)),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x260E0E0E), Color(0x401F5EFF), SC.bg],
+                stops: [0, 0.4, 1],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Swayco Pro — Likes révélés · badge Pro — 6,99 € / mois", selected look.
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({required this.price});
+
+  final String? price;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = price;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: SC.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
+        color: SC.accent.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: SC.accent, width: 1.6),
       ),
       child: Row(
         children: [
-          const _Radio(selected: true),
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: SC.accent,
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 15,
+              color: SC.onAccent,
+            ),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  plan.name,
-                  style: const TextStyle(
-                    color: SC.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                  'Swayco Pro',
+                  style: popupDisplay(fontSize: 16, color: SC.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppStrings.t('pw_plan_perks'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: SC.textPrimary.withValues(alpha: 0.6),
+                    fontSize: 12.5,
                   ),
                 ),
-                const SizedBox(height: 3),
-                _Sublabel(AppStrings.t(plan.subKey)),
               ],
             ),
           ),
-          if (price != null) ...[
+          if (p != null) ...[
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  price,
-                  style: const TextStyle(
-                    color: SC.accent,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text(p, style: popupDisplay(fontSize: 16, color: SC.accent)),
                 Text(
                   AppStrings.t('paywall_period_month'),
-                  style: const TextStyle(
-                    color: SC.textMuted,
+                  style: TextStyle(
+                    color: SC.textPrimary.withValues(alpha: 0.6),
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -515,65 +1086,164 @@ class _PlanTile extends StatelessWidget {
   }
 }
 
-/// Custom radio dot — hollow grey ring when off, filled cyan with a
-/// white centre tick when on.
-class _Radio extends StatelessWidget {
-  const _Radio({required this.selected});
+/// Secondary action of 1b: brand-gradient pill, white label, blue shadow.
+class _VideoButton extends StatelessWidget {
+  const _VideoButton({required this.label, required this.onTap});
 
-  final bool selected;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      width: 24,
-      height: 24,
+    return Container(
+      height: 48,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? SC.accent : Colors.transparent,
-        border: Border.all(
-          color: selected ? SC.accent : const Color(0xFF3A4753),
-          width: 2,
+        gradient: SC.brandGradient,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: SC.brandBlue.withValues(alpha: 0.4),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.play_circle_outline_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-      child: selected
-          ? const Icon(Icons.check_rounded, size: 15, color: SC.bgDeep)
-          : null,
     );
   }
 }
 
-/// Renders a sublabel where *fragments* wrapped in asterisks are tinted
-/// cyan and bolded (the "gratuit" / "3 jours" emphasis from the source
-/// design).
-class _Sublabel extends StatelessWidget {
-  const _Sublabel(this.raw);
+// ══════════════════════════════════════════════════════════════════════════
+// Shared bits
+// ══════════════════════════════════════════════════════════════════════════
 
-  final String raw;
+/// Scrolls only when it must (small phones); otherwise fills the height so a
+/// [Spacer] inside [child] pushes the CTA down to the bottom.
+class _ScrollFill extends StatelessWidget {
+  const _ScrollFill({required this.child, required this.padding});
+
+  final Widget child;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
-    // split('*') alternates plain / highlighted fragments: the
-    // odd-indexed pieces are the ones that were wrapped in asterisks.
-    final pieces = raw.split('*');
-    final styled = <TextSpan>[];
-    for (var i = 0; i < pieces.length; i++) {
-      if (pieces[i].isEmpty) continue;
-      final highlight = i.isOdd;
-      styled.add(
-        TextSpan(
-          text: pieces[i],
-          style: TextStyle(
-            color: highlight ? SC.accent : SC.textMuted,
-            fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
+    return LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        padding: padding,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: math.max(0, box.maxHeight - padding.vertical),
           ),
+          child: IntrinsicHeight(child: child),
         ),
-      );
-    }
+      ),
+    );
+  }
+}
+
+/// Title whose tail sits on a pill that never breaks across lines.
+class _HighlightTitle extends StatelessWidget {
+  const _HighlightTitle({
+    required this.head,
+    required this.tail,
+    required this.fontSize,
+    required this.tailBg,
+    required this.tailFg,
+  });
+
+  final String head;
+  final String tail;
+  final double fontSize;
+  final Color tailBg;
+  final Color tailFg;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = popupDisplay(
+      fontSize: fontSize,
+      letterSpacing: -fontSize * 0.03,
+      height: 1.18,
+      color: SC.textPrimary,
+    );
     return Text.rich(
       TextSpan(
-        style: const TextStyle(fontSize: 12.5, height: 1.3),
-        children: styled,
+        style: style,
+        children: [
+          TextSpan(text: '$head '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: tailBg,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(tail, style: style.copyWith(color: tailFg)),
+            ),
+          ),
+        ],
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+}
+
+class _CloseButton extends StatelessWidget {
+  const _CloseButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: CircleBorder(
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.close_rounded, size: 20, color: Colors.white),
+        ),
       ),
     );
   }
@@ -587,18 +1257,19 @@ class _FooterLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = SC.textPrimary.withValues(alpha: 0.55);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Text(
           label,
-          style: const TextStyle(
-            color: SC.textMuted,
+          style: TextStyle(
+            color: c,
             fontSize: 12,
             fontWeight: FontWeight.w600,
             decoration: TextDecoration.underline,
-            decorationColor: SC.textMuted,
+            decorationColor: c,
           ),
         ),
       ),
@@ -611,9 +1282,15 @@ class _FooterDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 10),
-      child: Text('·', style: TextStyle(color: SC.textMuted, fontSize: 12)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Text(
+        '·',
+        style: TextStyle(
+          color: SC.textPrimary.withValues(alpha: 0.55),
+          fontSize: 12,
+        ),
+      ),
     );
   }
 }

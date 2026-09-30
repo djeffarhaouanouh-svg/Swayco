@@ -9,8 +9,6 @@ import '../services/app_strings.dart';
 import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/rewarded_video.dart';
-import '../theme/swayco_theme.dart';
-import 'popup_kit.dart';
 import 'profile_avatar.dart';
 
 /// Who may see the people who liked me: women always see everyone, free of
@@ -75,14 +73,15 @@ class BlurredAvatar extends StatelessWidget {
   }
 }
 
-/// Bottom sheet on a blurred liker (direction 8c): go Pro (reveals all) or
-/// watch a video (reveals this one). [onRevealed] fires once a video unlocked
-/// [profile]. Même signature et même logique qu'avant.
+/// Tap on a blurred liker → the Likes paywall ("1b", full screen): the wall
+/// of [likers] (blurred) with their count, go Pro (reveals all) or watch a
+/// video (reveals [profile]). [onRevealed] fires once a video unlocked it.
 Future<void> showLikesUnlockSheet(
   BuildContext context, {
   required String myId,
   required RemoteProfile? profile,
   required VoidCallback onRevealed,
+  List<RemoteProfile?> likers = const [],
 }) {
   unawaited(RewardedVideo.preload());
   Future<void> watchVideo() async {
@@ -99,97 +98,10 @@ Future<void> showLikesUnlockSheet(
     onRevealed();
   }
 
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
-    builder: (ctx) => PopupSurface(
-      sheet: true,
-      washHeight: 150,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Center(child: PopupHandle()),
-              const SizedBox(height: 6),
-              Center(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: SC.brandGradient,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: PopupTokens.surface,
-                        ),
-                        child: BlurredAvatar(profile: profile, size: 72),
-                      ),
-                    ),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: SC.accent,
-                          border: Border.all(
-                            color: PopupTokens.surface,
-                            width: 3,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.lock_rounded,
-                          size: 15,
-                          color: SC.onAccent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              PopupTitle(AppStrings.t('likes_locked_title')),
-              const SizedBox(height: 10),
-              PopupBody(AppStrings.t('likes_locked_body')),
-              const SizedBox(height: 22),
-              PopupButton(
-                label: AppStrings.t('likes_go_pro'),
-                height: 54,
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  unawaited(showPaywallSheet(context));
-                },
-              ),
-              const SizedBox(height: 8),
-              PopupGhostButton(
-                icon: Icons.play_circle_outline_rounded,
-                height: 50,
-                label: RewardedVideo.isAvailable
-                    ? AppStrings.t('likes_watch_video')
-                    : '${AppStrings.t('likes_watch_video')} · '
-                        '${AppStrings.t('likes_video_soon')}',
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  unawaited(watchVideo());
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
+  return showLikesWallPaywall(
+    context,
+    likers: likers.isEmpty ? [profile] : likers,
+    videoAvailable: RewardedVideo.isAvailable,
+    onWatchVideo: () => unawaited(watchVideo()),
   );
 }
-

@@ -307,10 +307,17 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
         _openProfile(p);
         return;
       }
+      // The paywall's wall + "N people liked you": everyone who liked me,
+      // requests and photo likes alike, each person once.
+      final seen = <String>{};
       showLikesUnlockSheet(
         context,
         myId: _myId,
         profile: p,
+        likers: [
+          for (final q in [for (final r in _requests) r.requester, ..._likers])
+            if (q != null && seen.add(q.id)) q,
+        ],
         onRevealed: () {
           if (mounted) setState(() => _lock?.unlocked.add(p.id));
         },
