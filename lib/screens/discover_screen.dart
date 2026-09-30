@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:math' show Random;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -59,6 +60,12 @@ const double _kCardInset = 14.0;
 /// Aperçu de ma carte : écart carte → bouton Boost, assez pour passer sous
 /// les cartes fantômes inclinées qui dépassent du bas.
 const double _kBoostGap = 28.0;
+
+/// Parallaxe de la photo : zoom qui crée la marge latérale (10 % → 5 % de
+/// chaque côté) et course maximale, en fraction de la largeur de la carte.
+/// La course reste sous la demi-marge : le bord de la photo ne se voit jamais.
+const double _kParallaxZoom = 1.10;
+const double _kParallaxShift = 0.045;
 
 /// Width / height of the Discover card on THIS device (same maths as
 /// [_DiscoverScreenState.build]: screen minus logo, country row, action row
@@ -2341,17 +2348,28 @@ class _TinderCardState extends State<_TinderCard> {
         // ── Photo ──────────────────────────────────────────────────────────
         const ColoredBox(color: Color(0xFF111111)),
           if (currentUrl.isNotEmpty)
-            // Parallaxe : l'inclinaison déplace l'ALIGNEMENT horizontal. En
-            // cover, il ne parcourt que la marge de la photo — sans marge
-            // latérale, rien ne bouge. Toujours 0 sur le web.
-            ValueListenableBuilder<double>(
-              valueListenable: DeviceTilt.roll,
-              builder: (_, roll, _) => Image.network(
-                currentUrl,
-                fit: BoxFit.cover,
-                alignment: Alignment(roll, -0.6),
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            // Parallaxe (natif) : les photos portrait n'ont de marge qu'en
+            // haut / bas, donc la photo est zoomée de _kParallaxZoom pour s'en
+            // créer une à gauche / droite, puis glisse dedans selon
+            // l'inclinaison — sans jamais montrer son bord. Web : ni zoom ni
+            // mouvement.
+            ClipRect(
+              child: ValueListenableBuilder<double>(
+                valueListenable: DeviceTilt.roll,
+                builder: (_, roll, child) => FractionalTranslation(
+                  translation: Offset(roll * _kParallaxShift, 0),
+                  child: child,
+                ),
+                child: Transform.scale(
+                  scale: kIsWeb ? 1.0 : _kParallaxZoom,
+                  child: Image.network(
+                    currentUrl,
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, -0.6),
+                    gaplessPlayback: true,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
               ),
             ),
 

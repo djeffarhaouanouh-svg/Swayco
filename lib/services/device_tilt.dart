@@ -13,17 +13,16 @@ import 'package:sensors_plus/sensors_plus.dart';
 abstract final class DeviceTilt {
   static final ValueNotifier<double> roll = ValueNotifier(0);
 
-  /// Effet léger : au maximum un tiers de la marge de chaque côté, jamais
-  /// la photo entière qui défile.
-  static const double amplitude = 0.33;
+  /// Toute la plage : c'est le zoom de la carte qui borne le déplacement.
+  static const double amplitude = 1.0;
 
-  /// sin(30°) : il faut pencher de 30° pour atteindre [amplitude].
-  static const double _fullTilt = 0.5;
+  /// sin(20°) : pencher de 20° amène la photo au bout de sa course.
+  static const double _fullTilt = 0.34;
   static const double _gravity = 9.81;
 
-  /// Part de l'écart rattrapée à chaque mesure (~50 Hz, soit ~0,3 s pour
-  /// rejoindre le geste) : la photo suit en douceur, sans à-coups.
-  static const double _smoothing = 0.06;
+  /// Part de l'écart rattrapée à chaque mesure (~50 Hz, soit ~0,2 s pour
+  /// rejoindre le geste) : la photo suit sans à-coups.
+  static const double _smoothing = 0.1;
 
   static StreamSubscription<AccelerometerEvent>? _sub;
   static int _users = 0;
