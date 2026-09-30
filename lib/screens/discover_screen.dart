@@ -835,7 +835,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
-            bottom: _infoOpen ? safeBottom + 8 : btnBottom,
+            // Panneau ouvert : les boutons remontent DANS la carte, 16 au-dessus
+            // de son bord bas (la liste du panneau garde 96 de marge dessous).
+            bottom: _infoOpen ? openCardBottom + 16 : btnBottom,
             height: _kActionSize,
             child: _hasActiveCard && !_showFilterTransition && !_showAdCard
                 ? _SwipeActionBar(
