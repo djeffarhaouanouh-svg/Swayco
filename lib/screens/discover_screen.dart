@@ -2428,6 +2428,35 @@ class _TinderCardState extends State<_TinderCard> {
               ),
             ),
 
+          // ── « POPULAIRE » — le badge que vend le paywall Pro, en haut à
+          //    gauche comme sur l'aperçu du paywall. Ne capte aucun tap.
+          if (p.isPro || p.isPlus)
+            Positioned(
+              top: 14,
+              left: 14,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: SC.accent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    AppStrings.t('paywall_popular').toUpperCase(),
+                    style: const TextStyle(
+                      color: SC.onAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           // ── Dégradé noir en bas (style Tinder) — transparent sur le haut,
           //    fondu progressif jusqu'au noir sous le nom / la ville, pour que
           //    le texte reste lisible sur n'importe quelle photo. ────────────
