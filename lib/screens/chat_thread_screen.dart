@@ -80,6 +80,10 @@ LinearGradient _chromeGradient({required double solid, required bool top}) {
 /// Bulle reçue (1b).
 const Color _kBubbleIn = Color(0xFF1E1E22);
 
+/// Bulle envoyée et contour de ma réaction : le cyan d'avant la 8c, gardé
+/// ici alors que [SC.accent] est passé au jaune.
+const Color _kBubbleMine = Color(0xFF22D3EE);
+
 /// « traduit · voir l'original » (1b : text-muted).
 const Color _kMetaMuted = Color(0xFF77777D);
 
@@ -1840,7 +1844,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 decoration: bareMedia
                     ? null
                     : BoxDecoration(
-                        color: mine ? SC.accent : _kBubbleIn,
+                        color: mine ? _kBubbleMine : _kBubbleIn,
                         borderRadius: radius,
                       ),
                 child: hugContent ? IntrinsicWidth(child: content) : content,
@@ -2024,7 +2028,7 @@ class _ReactionChip extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: mineHighlighted ? SC.accent : const Color(0x33FFFFFF),
+                color: mineHighlighted ? _kBubbleMine : const Color(0x33FFFFFF),
                 width: mineHighlighted ? 1.4 : 1,
               ),
             ),
