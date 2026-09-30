@@ -109,7 +109,9 @@ abstract final class SwayOnb {
     color: Colors.white,
   );
 
-  static TextStyle body = GoogleFonts.dmSans(
+  /// Sous-titres de l'onboarding (direction 8c) — seul endroit de l'app
+  /// en Plus Jakarta Sans, le reste garde dmSans/bricolageGrotesque.
+  static TextStyle body = GoogleFonts.plusJakartaSans(
     fontSize: 16,
     height: 1.5,
     fontWeight: FontWeight.w500,

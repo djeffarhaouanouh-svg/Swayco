@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Swayco — direction 8c.
-/// Fond #0E0E0E et GlassNavBar inchangés. Nouveau : dégradé de l'icône
-/// (bleu franc → bleu → cyan, sans indigo), accent jaune 8c #F4FF1F,
-/// titres Unbounded, texte / sous-titres Plus Jakarta Sans.
+/// Fond #0E0E0E, GlassNavBar et polices (bricolageGrotesque / dmSans)
+/// inchangés. Nouveau : dégradé de l'icône (bleu franc → bleu → cyan,
+/// sans indigo), accent jaune 8c #F4FF1F. La police Plus Jakarta Sans de
+/// la 8c est réservée aux sous-titres de l'onboarding ([SwayOnb.body]).
 /// Tous les anciens noms sont conservés : rien d'autre à renommer dans l'app.
 abstract final class SC {
   // Backgrounds (inchangés)
@@ -84,20 +85,17 @@ abstract final class SC {
       brightness: Brightness.dark,
       colorScheme: base,
       scaffoldBackgroundColor: bg,
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(
-        ThemeData.dark().textTheme,
-      ).apply(bodyColor: textPrimary, displayColor: textPrimary),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: bg,
         foregroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.unbounded(
+        titleTextStyle: TextStyle(
           color: textPrimary,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -125,10 +123,6 @@ abstract final class SC {
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.unbounded(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
       textSelectionTheme: TextSelectionThemeData(
@@ -142,39 +136,31 @@ abstract final class SC {
 }
 
 abstract final class SCText {
-  // Titres — Unbounded (maquettes 8c).
-  static TextStyle h1 = GoogleFonts.unbounded(
+  static TextStyle h1 = GoogleFonts.bricolageGrotesque(
     fontSize: 30, fontWeight: FontWeight.w800,
-    letterSpacing: -0.9, color: SC.textPrimary, height: 1.05,
+    letterSpacing: -1.0, color: SC.textPrimary, height: 1.05,
   );
-  static TextStyle h2 = GoogleFonts.unbounded(
+  static TextStyle h2 = GoogleFonts.bricolageGrotesque(
     fontSize: 22, fontWeight: FontWeight.w700,
-    letterSpacing: -0.5, color: SC.textPrimary,
+    letterSpacing: -0.4, color: SC.textPrimary,
   );
-  static TextStyle h3 = GoogleFonts.unbounded(
-    fontSize: 18, fontWeight: FontWeight.w600,
-    letterSpacing: -0.3, color: SC.textPrimary,
+  static TextStyle h3 = GoogleFonts.bricolageGrotesque(
+    fontSize: 18, fontWeight: FontWeight.w700,
+    letterSpacing: -0.2, color: SC.textPrimary,
   );
-
-  // Texte, sous-titres, méta — Plus Jakarta Sans.
-  static TextStyle subtitle = GoogleFonts.plusJakartaSans(
-    fontSize: 15, fontWeight: FontWeight.w500,
-    color: SC.textPrimary, height: 1.45,
-  );
-  static TextStyle name = GoogleFonts.plusJakartaSans(
+  static TextStyle name = GoogleFonts.dmSans(
     fontSize: 16, fontWeight: FontWeight.w700, color: SC.textPrimary,
   );
-  static TextStyle body = GoogleFonts.plusJakartaSans(
-    fontSize: 15, fontWeight: FontWeight.w500,
-    color: SC.textPrimary, height: 1.3,
+  static TextStyle body = GoogleFonts.dmSans(
+    fontSize: 15, fontWeight: FontWeight.w500, color: SC.textPrimary, height: 1.3,
   );
-  static TextStyle preview = GoogleFonts.plusJakartaSans(
+  static TextStyle preview = GoogleFonts.dmSans(
     fontSize: 12, fontWeight: FontWeight.w400, color: SC.textMuted,
   );
-  static TextStyle meta = GoogleFonts.plusJakartaSans(
+  static TextStyle meta = GoogleFonts.dmSans(
     fontSize: 11, fontWeight: FontWeight.w600, color: SC.textMuted,
   );
-  static TextStyle accent = GoogleFonts.plusJakartaSans(
+  static TextStyle accent = GoogleFonts.dmSans(
     fontSize: 12, fontWeight: FontWeight.w700, color: SC.accent,
   );
 }
