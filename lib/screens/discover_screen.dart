@@ -1118,29 +1118,46 @@ class _DiscoverHeader extends StatelessWidget {
   static const double height = 52.0;
 
   /// Le logo d'origine, taille et place d'origine : le mot « swaycø » en
-  /// police de marque, 26, le « ø » en cyan, centré horizontalement dans la
-  /// bande. (Le SVG du handoff a été retiré à la demande.)
+  /// police de marque, 26, le « ø » au dégradé de marque, centré
+  /// horizontalement dans la bande. (Le SVG du handoff a été retiré à la
+  /// demande.)
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: height,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.center,
           child: Padding(
-            padding: EdgeInsets.all(6),
+            padding: const EdgeInsets.all(6),
             child: Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(text: 'swayc'),
-                  TextSpan(
-                    text: 'ø',
-                    style: TextStyle(color: Color(0xFF22D3EE)),
+                  const TextSpan(text: 'swayc'),
+                  // Un shader de TextSpan se cale sur le paragraphe entier,
+                  // pas sur le glyphe : le masque est posé sur le « ø » seul.
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: SC.brandGradient.createShader,
+                      child: const Text(
+                        'ø',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: SC.brandFont,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontFamily: SC.brandFont,
                 fontSize: 26,
