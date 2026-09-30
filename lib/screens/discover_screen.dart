@@ -12,6 +12,7 @@ import '../services/app_boot.dart';
 import '../services/app_strings.dart';
 import '../services/chat_api.dart';
 import '../services/device_id.dart';
+import '../services/device_tilt.dart';
 import '../services/fact_emojis.dart';
 import '../services/friendship_api.dart';
 import '../services/job_sectors.dart';
@@ -2299,6 +2300,18 @@ class _TinderCard extends StatefulWidget {
 class _TinderCardState extends State<_TinderCard> {
   int _photoIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    DeviceTilt.acquire();
+  }
+
+  @override
+  void dispose() {
+    DeviceTilt.release();
+    super.dispose();
+  }
+
   void _nextPhoto() {
     if (_photoIndex < widget.photos.length - 1) {
       setState(() => _photoIndex++);
@@ -2325,12 +2338,18 @@ class _TinderCardState extends State<_TinderCard> {
         // ── Photo ──────────────────────────────────────────────────────────
         const ColoredBox(color: Color(0xFF111111)),
           if (currentUrl.isNotEmpty)
-            Image.network(
-              currentUrl,
-              fit: BoxFit.cover,
-              alignment: const Alignment(0, -0.6),
-              gaplessPlayback: true,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            // Parallaxe : l'inclinaison déplace l'ALIGNEMENT horizontal. En
+            // cover, il ne parcourt que la marge de la photo — sans marge
+            // latérale, rien ne bouge. Toujours 0 sur le web.
+            ValueListenableBuilder<double>(
+              valueListenable: DeviceTilt.roll,
+              builder: (_, roll, _) => Image.network(
+                currentUrl,
+                fit: BoxFit.cover,
+                alignment: Alignment(roll, -0.6),
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
             ),
 
           // ── Aperçu sans photo : l'invite, au-dessus du bloc du bas. ──────
