@@ -90,9 +90,23 @@ abstract final class SwayOnb {
   static const pinBg = Color(0xFF14171B);
   static const pinBorder = Color(0xFF2A2E33);
   static const rail = Color(0xFF1D2126);
-  static const onAccent = Color(0xFF04252B);
+  static const onAccent = SC.onAccent;
   static const muted = Color(0xFF8A939C);
   static const dim = Color(0xFF6D767F);
+
+  /// Fond des étapes de l'onboarding (8c) : bleu franc en haut, cyan en bas.
+  static const stepGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+    stops: [0, .5, 1],
+  );
+
+  /// Surfaces posées sur [stepGradient].
+  static const glassFill = Color(0x29FFFFFF);
+  static const glassEdge = Color(0x47FFFFFF);
+  static const onBlueSoft = Color(0xE6FFFFFF);
+  static const hintOnWhite = Color(0xFF8A93A6);
 
   static const haloCyan = Color(0xFF22D6EA);
   static const haloBlue = Color(0xFF3B4CFF);
@@ -115,13 +129,13 @@ abstract final class SwayOnb {
     fontSize: 16,
     height: 1.5,
     fontWeight: FontWeight.w500,
-    color: muted,
+    color: Colors.white,
   );
 
   static TextStyle field = GoogleFonts.dmSans(
     fontSize: 17,
     fontWeight: FontWeight.w500,
-    color: Colors.white,
+    color: SC.bgDeep,
   );
 }
 
@@ -210,7 +224,7 @@ class _Halo extends StatelessWidget {
   }
 }
 
-/// Titre display avec le dernier mot surligné en cyan (« BIEN·VENUE »).
+/// Titre display avec le dernier mot dans une pastille jaune (« Bien·venue »).
 /// Sur un mot unique, la coupe se fait au milieu, comme sur la maquette.
 class SwayTitle extends StatelessWidget {
   const SwayTitle(this.text, {super.key, this.size = 52});
@@ -220,7 +234,12 @@ class SwayTitle extends StatelessWidget {
 
   (String, String) get _split {
     final t = text.trim();
-    final i = t.lastIndexOf(' ');
+    var i = t.lastIndexOf(' ');
+    // « parles-tu ? » : la ponctuation isolée (espace fine française) reste
+    // collée au mot qui la précède, dans la pastille.
+    if (i > 0 && !RegExp(r'\p{L}', unicode: true).hasMatch(t.substring(i + 1))) {
+      i = t.lastIndexOf(' ', i - 1);
+    }
     if (i > 0) return ('${t.substring(0, i)} ', t.substring(i + 1));
     return (t.substring(0, t.length ~/ 2), t.substring(t.length ~/ 2));
   }
@@ -231,25 +250,17 @@ class SwayTitle extends StatelessWidget {
     final style = SwayOnb.display(size);
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
+      runSpacing: 4,
       children: [
-        Text(head.toUpperCase(), style: style),
+        Text(head, style: style),
         DecoratedBox(
           decoration: BoxDecoration(
             color: SC.accent,
-            boxShadow: [
-              BoxShadow(
-                color: SC.accent.withValues(alpha: 0.6),
-                blurRadius: 32,
-                spreadRadius: -4,
-              ),
-            ],
+            borderRadius: BorderRadius.circular(size * 0.32),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              tail.toUpperCase(),
-              style: style.copyWith(color: SwayOnb.onAccent),
-            ),
+            padding: EdgeInsets.symmetric(horizontal: size * 0.16),
+            child: Text(tail, style: style.copyWith(color: SC.onAccent)),
           ),
         ),
       ],
@@ -257,7 +268,7 @@ class SwayTitle extends StatelessWidget {
   }
 }
 
-/// Barre carrousel : segments pleine largeur, l'actif glow en cyan.
+/// Barre carrousel : segments pleine largeur, l'actif en jaune.
 class SwayStepBar extends StatelessWidget {
   const SwayStepBar({super.key, required this.index, required this.count});
 
@@ -279,16 +290,8 @@ class SwayStepBar extends StatelessWidget {
                 color: i == index
                     ? SC.accent
                     : i < index
-                        ? SC.accent.withValues(alpha: 0.35)
-                        : SwayOnb.rail,
-                boxShadow: i == index
-                    ? [
-                        BoxShadow(
-                          color: SC.accent.withValues(alpha: 0.67),
-                          blurRadius: 14,
-                        ),
-                      ]
-                    : null,
+                        ? Colors.white.withValues(alpha: 0.55)
+                        : Colors.white.withValues(alpha: 0.28),
               ),
             ),
           ),
@@ -298,7 +301,7 @@ class SwayStepBar extends StatelessWidget {
   }
 }
 
-/// Champ 1e : fond très sombre, repère cyan à gauche, bord cyan au focus.
+/// Champ 8c : fond blanc, repère bleu à gauche, anneau bleu au focus.
 class SwayInput extends StatefulWidget {
   const SwayInput({
     super.key,
@@ -345,15 +348,16 @@ class _SwayInputState extends State<SwayInput> {
       duration: const Duration(milliseconds: 160),
       height: 64,
       decoration: BoxDecoration(
-        color: SwayOnb.fieldBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(SwayOnb.radius),
         border: Border.all(
-          color: focused ? SC.accent : SwayOnb.fieldBorder,
+          color: focused ? SC.brandBlue : Colors.white,
+          width: 1.5,
         ),
         boxShadow: focused
             ? [
                 BoxShadow(
-                  color: SC.accent.withValues(alpha: 0.12),
+                  color: SC.brandBlue.withValues(alpha: 0.25),
                   blurRadius: 0,
                   spreadRadius: 4,
                 ),
@@ -367,14 +371,8 @@ class _SwayInputState extends State<SwayInput> {
             width: 3,
             height: 22,
             decoration: BoxDecoration(
-              color: SC.accent,
+              color: SC.brandBlue,
               borderRadius: BorderRadius.circular(99),
-              boxShadow: [
-                BoxShadow(
-                  color: SC.accent.withValues(alpha: 0.8),
-                  blurRadius: 12,
-                ),
-              ],
             ),
           ),
           const SizedBox(width: 13),
@@ -386,7 +384,7 @@ class _SwayInputState extends State<SwayInput> {
               obscureText: widget.obscure,
               keyboardType: widget.keyboardType,
               textCapitalization: widget.textCapitalization,
-              cursorColor: SC.accent,
+              cursorColor: SC.brandBlue,
               style: SwayOnb.field,
               decoration: InputDecoration(
                 isCollapsed: true,
@@ -395,7 +393,7 @@ class _SwayInputState extends State<SwayInput> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 hintText: widget.hint,
-                hintStyle: SwayOnb.field.copyWith(color: const Color(0xFF5A646E)),
+                hintStyle: SwayOnb.field.copyWith(color: SwayOnb.hintOnWhite),
               ),
             ),
           ),
@@ -407,7 +405,7 @@ class _SwayInputState extends State<SwayInput> {
   }
 }
 
-/// Bouton principal : cyan plein, libellé display, lueur discrète.
+/// Bouton principal : pilule jaune pleine, libellé display foncé.
 class SwayCta extends StatelessWidget {
   const SwayCta({super.key, required this.label, required this.onPressed});
 
@@ -416,40 +414,20 @@ class SwayCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final off = onPressed == null;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(SwayOnb.radius),
-        boxShadow: off
-            ? null
-            : [
-                BoxShadow(
-                  color: SC.accent.withValues(alpha: 0.45),
-                  blurRadius: 22,
-                  spreadRadius: -14,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: SC.accent,
+        foregroundColor: SC.onAccent,
+        disabledBackgroundColor: Colors.white.withValues(alpha: 0.22),
+        disabledForegroundColor: Colors.white.withValues(alpha: 0.6),
+        minimumSize: const Size.fromHeight(SwayOnb.ctaHeight),
+        shape: const StadiumBorder(),
+        elevation: 0,
       ),
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: off ? const Color(0xFF101317) : SC.accent,
-          foregroundColor: off ? const Color(0xFF4E5862) : SwayOnb.onAccent,
-          disabledBackgroundColor: const Color(0xFF101317),
-          disabledForegroundColor: const Color(0xFF4E5862),
-          minimumSize: const Size.fromHeight(SwayOnb.ctaHeight),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(SwayOnb.radius),
-            side: off
-                ? const BorderSide(color: Color(0xFF1C2026))
-                : BorderSide.none,
-          ),
-        ),
-        child: Text(
-          label.toUpperCase(),
-          style: GoogleFonts.archivoBlack(fontSize: 17, letterSpacing: 0.2),
-        ),
+      child: Text(
+        label,
+        style: GoogleFonts.archivoBlack(fontSize: 17, letterSpacing: 0.2),
       ),
     );
   }
@@ -466,7 +444,7 @@ class SwayGhostButton extends StatelessWidget {
     return TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: SwayOnb.dim,
+        foregroundColor: SwayOnb.onBlueSoft,
         minimumSize: const Size(0, SwayOnb.ctaHeight),
         padding: const EdgeInsets.symmetric(horizontal: 24),
       ),
@@ -478,7 +456,8 @@ class SwayGhostButton extends StatelessWidget {
   }
 }
 
-/// Ligne de sélection (langue / genre) : carte sombre, bord cyan si choisie.
+/// Ligne de sélection (langue / genre) : verre blanc sur le bleu, blanche
+/// pleine avec coche jaune si choisie.
 class SwayPickRow extends StatelessWidget {
   const SwayPickRow({
     super.key,
@@ -498,7 +477,7 @@ class SwayPickRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SwayOnb.fieldBg,
+      color: selected ? Colors.white : SwayOnb.glassFill,
       borderRadius: BorderRadius.circular(SwayOnb.radius),
       child: InkWell(
         borderRadius: BorderRadius.circular(SwayOnb.radius),
@@ -509,8 +488,7 @@ class SwayPickRow extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(SwayOnb.radius),
             border: Border.all(
-              color: selected ? SC.accent : SwayOnb.fieldBorder,
-              width: selected ? 1.5 : 1,
+              color: selected ? Colors.white : SwayOnb.glassEdge,
             ),
           ),
           child: Row(
@@ -522,8 +500,8 @@ class SwayPickRow extends StatelessWidget {
                   label,
                   style: GoogleFonts.dmSans(
                     fontSize: 17,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFFE6EBEF),
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? SC.bgDeep : Colors.white,
                   ),
                 ),
               ),
@@ -532,12 +510,12 @@ class SwayPickRow extends StatelessWidget {
                   width: 22,
                   height: 22,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: SC.accent,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.check_rounded,
-                      size: 14, color: SwayOnb.onAccent),
+                      size: 14, color: SC.onAccent),
                 ),
             ],
           ),
@@ -551,12 +529,13 @@ class SwayPickRow extends StatelessWidget {
 class SwayPins extends StatelessWidget {
   const SwayPins({super.key});
 
-  static const _pins = <(String, double, double, double, bool)>[
-    ('Hola', 46, -24, -8, true),
-    ('Ciao', 96, 999, 6, false),
-    ('こんにちは', 178, 34, -4, false),
-    ('Olá', 300, 999, 7, false),
-    ('Hallo', 360, 22, -5, false),
+  // Genre de pastille : 0 = jaune, 1 = verre, 2 = bleu nuit.
+  static const _pins = <(String, double, double, double, int)>[
+    ('Hola', 46, -24, -8, 0),
+    ('Ciao', 96, 999, 6, 1),
+    ('こんにちは', 178, 34, -4, 1),
+    ('Olá', 300, 999, 7, 2),
+    ('Hallo', 360, 22, -5, 1),
   ];
 
   @override
@@ -564,7 +543,7 @@ class SwayPins extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        for (final (label, top, left, angle, accent) in _pins)
+        for (final (label, top, left, angle, kind) in _pins)
           Positioned(
             top: top,
             left: left == 999 ? null : left,
@@ -574,28 +553,22 @@ class SwayPins extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
                 decoration: BoxDecoration(
-                  color: accent ? SC.accent : SwayOnb.pinBg,
+                  color: switch (kind) {
+                    0 => SC.accent,
+                    2 => SC.bgDeep,
+                    _ => SwayOnb.glassFill,
+                  },
                   borderRadius: BorderRadius.circular(99),
-                  border: accent
-                      ? null
-                      : Border.all(color: SwayOnb.pinBorder),
-                  boxShadow: accent
-                      ? [
-                          BoxShadow(
-                            color: SC.accent.withValues(alpha: 0.7),
-                            blurRadius: 30,
-                            spreadRadius: -8,
-                            offset: const Offset(0, 10),
-                          ),
-                        ]
+                  border: kind == 1
+                      ? Border.all(color: SwayOnb.glassEdge)
                       : null,
                 ),
                 child: Text(
                   label,
                   style: GoogleFonts.dmSans(
                     fontSize: 15,
-                    fontWeight: accent ? FontWeight.w700 : FontWeight.w500,
-                    color: accent ? SwayOnb.onAccent : const Color(0xFFA9B2BA),
+                    fontWeight: kind == 1 ? FontWeight.w500 : FontWeight.w700,
+                    color: kind == 0 ? SC.onAccent : Colors.white,
                   ),
                 ),
               ),
@@ -606,7 +579,7 @@ class SwayPins extends StatelessWidget {
   }
 }
 
-/// Coque du wizard : halos par étape + barre carrousel + PageView.
+/// Coque du wizard : fond dégradé bleu → cyan + barre carrousel + PageView.
 class SwayOnbShell extends StatelessWidget {
   const SwayOnbShell({
     super.key,
@@ -623,18 +596,12 @@ class SwayOnbShell extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final List<Widget> pages;
 
-  SwayHaloPreset get _preset => switch (page) {
-        0 => SwayHaloPreset.welcome,
-        1 => SwayHaloPreset.language,
-        _ => SwayHaloPreset.gender,
-      };
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SwayOnb.screenBg,
-      body: SwayHalo(
-        preset: _preset,
+      backgroundColor: SC.brandBlueDeep,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: SwayOnb.stepGradient),
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -694,7 +661,7 @@ class _StepHead extends StatelessWidget {
               style: SwayOnb.body.copyWith(
                 fontSize: 13,
                 height: 1.4,
-                color: SwayOnb.dim,
+                color: SwayOnb.onBlueSoft,
               ),
             ),
           ),
@@ -840,15 +807,15 @@ class SwayStepGender extends StatelessWidget {
                 for (final (value, icon, key) in _options) ...[
                   SwayPickRow(
                     height: 74,
-                    leading: Container(
-                      width: 42,
-                      height: 42,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16191D),
-                        borderRadius: BorderRadius.circular(14),
+                    leading: _PickTile(
+                      selected: selected == value,
+                      child: Icon(
+                        icon,
+                        size: 20,
+                        color: selected == value
+                            ? SC.brandBlue
+                            : Colors.white,
                       ),
-                      child: Icon(icon, color: SC.accent, size: 20),
                     ),
                     label: AppStrings.t(key),
                     selected: selected == value,
@@ -982,21 +949,15 @@ class SwayStepLocation extends StatelessWidget {
                 const SizedBox(height: 34),
                 SwayPickRow(
                   height: 74,
-                  leading: Container(
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16191D),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                  leading: _PickTile(
+                    selected: has,
                     child: detecting
                         ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: SC.accent,
+                              color: Colors.white,
                             ),
                           )
                         : Text(
@@ -1022,8 +983,9 @@ class SwayStepLocation extends StatelessWidget {
                     child: Text(
                       AppStrings.t('onb_location_manual'),
                       style: const TextStyle(
-                        color: SwayOnb.dim,
+                        color: SwayOnb.onBlueSoft,
                         decoration: TextDecoration.underline,
+                        decorationColor: SwayOnb.onBlueSoft,
                       ),
                     ),
                   ),
@@ -1056,7 +1018,7 @@ class _PersonaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: SwayOnb.fieldBg,
+      color: selected ? Colors.white : SwayOnb.glassFill,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -1066,8 +1028,7 @@ class _PersonaCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? SC.accent : SwayOnb.fieldBorder,
-              width: selected ? 1.5 : 1,
+              color: selected ? Colors.white : SwayOnb.glassEdge,
             ),
           ),
           child: Column(
@@ -1089,7 +1050,7 @@ class _PersonaCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.check_rounded,
-                          size: 12, color: SwayOnb.onAccent),
+                          size: 12, color: SC.onAccent),
                     )
                   else
                     Container(
@@ -1098,7 +1059,7 @@ class _PersonaCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border:
-                            Border.all(color: SwayOnb.fieldBorder, width: 1.5),
+                            Border.all(color: SwayOnb.glassEdge, width: 1.5),
                       ),
                     ),
                 ],
@@ -1109,7 +1070,7 @@ class _PersonaCard extends StatelessWidget {
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFE6EBEF),
+                  color: selected ? SC.bgDeep : Colors.white,
                 ),
               ),
               const SizedBox(height: 3),
@@ -1121,13 +1082,40 @@ class _PersonaCard extends StatelessWidget {
                   fontSize: 12,
                   height: 1.4,
                   fontWeight: FontWeight.w500,
-                  color: SwayOnb.dim,
+                  color: selected
+                      ? SC.bgDeep.withValues(alpha: 0.65)
+                      : SwayOnb.onBlueSoft,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Pastille d'icône en tête d'une [SwayPickRow] : bleu nuit translucide sur
+/// le bleu, bleu très clair quand la ligne est choisie (fond blanc).
+class _PickTile extends StatelessWidget {
+  const _PickTile({required this.selected, required this.child});
+
+  final bool selected;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected
+            ? const Color(0xFFE6EEFF)
+            : SC.bgDeep.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: child,
     );
   }
 }

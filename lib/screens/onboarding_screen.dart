@@ -687,7 +687,11 @@ class _StepLanguageKeepPicker extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                _LanguageGrid(selected: selected, onSelect: onSelect),
+                _LanguageGrid(
+                  selected: selected,
+                  onSelect: onSelect,
+                  onBlue: true,
+                ),
               ],
             ),
           ),
@@ -721,10 +725,18 @@ class _StepLanguageKeepPicker extends StatelessWidget {
 }
 
 class _LanguageGrid extends StatelessWidget {
-  const _LanguageGrid({required this.selected, required this.onSelect});
+  const _LanguageGrid({
+    required this.selected,
+    required this.onSelect,
+    this.onBlue = false,
+  });
 
   final String? selected;
   final ValueChanged<String> onSelect;
+
+  /// Posé sur le dégradé de l'onboarding : champ blanc, texte foncé (comme
+  /// [SwayInput]). Sinon, le champ sombre de l'édition du profil.
+  final bool onBlue;
 
   @override
   Widget build(BuildContext context) {
@@ -732,23 +744,31 @@ class _LanguageGrid extends StatelessWidget {
         (selected != null && supportedLanguages.any((l) => l.code == selected))
         ? selected
         : null;
+    final fill = onBlue ? Colors.white : SC.menu;
+    final ink = onBlue ? SC.bgDeep : SC.textPrimary;
     return Container(
       decoration: BoxDecoration(
-        color: SC.menu,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: SC.glassBorder),
+        color: fill,
+        borderRadius: BorderRadius.circular(onBlue ? SwayOnb.radius : 14),
+        border: onBlue ? null : Border.all(color: SC.glassBorder),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: onBlue ? 6 : 0,
+      ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
           value: value,
-          dropdownColor: SC.menu,
+          dropdownColor: fill,
           borderRadius: BorderRadius.circular(14),
-          iconEnabledColor: SC.textPrimary,
+          iconEnabledColor: ink,
           hint: Text(
             AppStrings.t('onb_language_picker_label'),
-            style: const TextStyle(color: SC.textMuted, fontSize: 15),
+            style: TextStyle(
+              color: onBlue ? SwayOnb.hintOnWhite : SC.textMuted,
+              fontSize: 15,
+            ),
           ),
           items: [
             for (final lang in supportedLanguages)
@@ -761,10 +781,7 @@ class _LanguageGrid extends StatelessWidget {
                     const SizedBox(width: 10),
                     Text(
                       lang.label,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 15,
-                      ),
+                      style: TextStyle(color: ink, fontSize: 15),
                     ),
                   ],
                 ),
