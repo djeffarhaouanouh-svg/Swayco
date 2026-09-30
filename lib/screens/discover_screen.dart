@@ -1142,7 +1142,13 @@ class _DiscoverHeader extends StatelessWidget {
                     baseline: TextBaseline.alphabetic,
                     child: ShaderMask(
                       blendMode: BlendMode.srcIn,
-                      shaderCallback: SC.brandGradient.createShader,
+                      // Moitié claire du dégradé : sur un glyphe de 26, le
+                      // bleu franc du départ l'assombrit trop.
+                      shaderCallback: const LinearGradient(
+                        begin: Alignment(-0.6, -1),
+                        end: Alignment(0.6, 1),
+                        colors: [SC.brandBlue, SC.brandCyan],
+                      ).createShader,
                       child: const Text(
                         'ø',
                         style: TextStyle(
@@ -1300,16 +1306,15 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
-                // Anneau = le fond du rond extérieur vu à travers le padding :
-                // noir fin au repos, dégradé de marque plus marqué si choisi.
+                // Anneau = le dégradé du rond extérieur vu à travers le
+                // padding, plus épais quand le pays est choisi.
                 final circle = AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     width: _kBubble,
                     height: _kBubble,
-                    padding: EdgeInsets.all(on ? 2 : 1),
-                    decoration: BoxDecoration(
-                      color: on ? null : Colors.black,
-                      gradient: on ? SC.brandGradient : null,
+                    padding: EdgeInsets.all(on ? 3 : 2),
+                    decoration: const BoxDecoration(
+                      gradient: SC.brandGradient,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
