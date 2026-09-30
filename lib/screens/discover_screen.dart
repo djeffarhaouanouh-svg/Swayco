@@ -1253,15 +1253,21 @@ class _CountryRowState extends State<_CountryRow> {
               bubble: Container(
                 width: _kBubble,
                 height: _kBubble,
-                decoration: BoxDecoration(
-                  color: _kSurface,
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  gradient: SC.brandGradient,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 1),
                 ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Colors.white,
-                  size: 26,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
                 ),
               ),
             ),
@@ -1277,28 +1283,32 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
+                // Anneau = le fond du rond extérieur vu à travers le padding :
+                // noir fin au repos, dégradé de marque plus marqué si choisi.
                 final circle = AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     width: _kBubble,
                     height: _kBubble,
+                    padding: EdgeInsets.all(on ? 2 : 1),
                     decoration: BoxDecoration(
-                      color: _kSurface,
+                      color: on ? null : Colors.black,
+                      gradient: on ? SC.brandGradient : null,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: on ? SC.accent : Colors.black,
-                        // Noire fine au repos, cyan plus marquée si choisie.
-                        width: on ? 2 : 1,
-                      ),
                     ),
-                    alignment: Alignment.center,
-                    // La silhouette remplit le rond (34 dans 40 utiles) et
-                    // c'est la BULLE qui la rogne : elle en fait partie, pas
-                    // posée dessus comme un autocollant.
-                    clipBehavior: Clip.antiAlias,
-                    child: CountrySilhouette(
-                      geoName: key,
-                      iso2: code,
-                      size: 39,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: _kSurface,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      // La silhouette remplit le rond et c'est la BULLE qui la
+                      // rogne : elle en fait partie, pas posée dessus.
+                      clipBehavior: Clip.antiAlias,
+                      child: CountrySilhouette(
+                        geoName: key,
+                        iso2: code,
+                        size: 39,
+                      ),
                     ),
                   );
                 return _RowItem(
@@ -2795,13 +2805,6 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
   )..repeat();
   bool _pressed = false;
 
-  static const _goldGradient = LinearGradient(
-    // 145° CSS : du haut-gauche vers le bas-droite.
-    begin: Alignment(-0.57, -0.82),
-    end: Alignment(0.57, 0.82),
-    colors: [Color(0xFFFBE7A1), Color(0xFFE9B949), Color(0xFFC48E22)],
-  );
-
   @override
   void dispose() {
     _pulse.dispose();
@@ -2844,7 +2847,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: _kGold.withValues(alpha: 0.65 * (1 - t)),
+                              color: SC.brandBlue.withValues(alpha: 0.65 * (1 - t)),
                               width: 1.5,
                             ),
                           ),
@@ -2856,25 +2859,25 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                 Container(
                   width: _kMessageSize,
                   height: _kMessageSize,
-                  decoration: BoxDecoration(
-                    color: _kSurface,
+                  decoration: const BoxDecoration(
+                    gradient: SC.brandGradient,
                     shape: BoxShape.circle,
-                    border: Border.all(color: _kGold, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x732B7FFF),
+                        blurRadius: 20,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
                   ),
                   alignment: Alignment.center,
-                  // Le dégradé ne teinte que l'icône : aucun flou dessous,
-                  // donc pas de piège ShaderMask × BackdropFilter.
-                  child: ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (r) => _goldGradient.createShader(r),
-                    child: const Icon(
-                      Icons.chat_bubble_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
+                  child: const Icon(
+                    Icons.chat_bubble_rounded,
+                    size: 20,
+                    color: Colors.white,
                   ),
                 ),
-                // ✦ en haut à droite : fond de page, liseré or.
+                // ✦ en haut à droite : pastille jaune, liseré fond de page.
                 Positioned(
                   top: -4,
                   right: -4,
@@ -2882,15 +2885,15 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                     width: 16,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: SC.bg,
+                      color: SC.accent,
                       shape: BoxShape.circle,
-                      border: Border.all(color: _kGold, width: 1.5),
+                      border: Border.all(color: SC.bg, width: 1.5),
                     ),
                     alignment: Alignment.center,
                     child: const Text(
                       '✦',
                       style: TextStyle(
-                        color: _kGold,
+                        color: SC.onAccent,
                         fontSize: 9,
                         height: 1,
                       ),
