@@ -196,9 +196,54 @@ Color interestColor(String label) {
   return const Color(0xFF64748B);
 }
 
-/// Emoji for a chip [label] = its CATEGORY emoji (⚽ for "Football"), or ''
-/// for a tag no longer in the taxonomy. Used by the Discover card pills.
+/// Each interest's own emoji — the category's alone put ⚽ on "Tennis".
+/// Keyed by the stored label; an option missing here falls back to its
+/// category emoji.
+const Map<String, String> _kInterestEmoji = {
+  // Sport
+  'Football': '⚽', 'Basketball': '🏀', 'Tennis': '🎾', 'MMA': '🥊',
+  'Formule 1': '🏎️', 'Course à pied': '🏃', 'Musculation': '🏋️',
+  'Yoga': '🧘',
+  // Musique
+  'Rap': '🎧', 'R&B': '🎙️', 'K-pop': '🇰🇷', 'J-pop': '🇯🇵', 'Rock': '🎸',
+  'Afrobeats': '🥁', 'Karaoké': '🎤', 'Vocaloid': '🎹',
+  // Gaming
+  'Nintendo': '🍄', 'Pokémon': '⚡', 'Arcades': '🕹️', 'Compétitif': '🏆',
+  'Casual': '🎲', 'PlayStation': '🎮', 'PC': '🖥️', 'Mobile': '📱',
+  // Divertissement
+  'Manga': '📚', 'Anime': '📺', 'Studio Ghibli': '🍃',
+  'One Piece': '🏴‍☠️', 'Naruto': '🍥', 'Dragon Ball': '🐉',
+  'Demon Slayer': '🗡️', 'Cosplay': '🦸', 'Cinéma': '🎬', 'Séries': '🍿',
+  // Cuisine
+  'Sushi': '🍣', 'Ramen': '🍜', 'Matcha': '🍵', 'Wagyū': '🥩',
+  'Tempura': '🍤', 'Croissant': '🥐', 'Fromage': '🧀', 'Pâtisserie': '🍰',
+  'Vin': '🍷', 'Café': '☕',
+  // Voyage
+  'Tour Eiffel': '🗼', 'Paris': '🇫🇷', 'Versailles': '👑', 'Notre-Dame': '⛪',
+  'Arc de Triomphe': '🏛️', 'Châteaux': '🏰', 'Mont Fuji': '🗻',
+  'Tokyo': '🏙️', 'Kyoto': '⛩️', 'Osaka': '🏯',
+  // Nature & Bien-être
+  'Onsen': '♨️', 'Jardins zen': '🎋', 'Bonsaï': '🌳', 'Calligraphie': '🖌️',
+  'Bambou': '🎍', 'Randonnée': '🥾', 'Nature': '🌿',
+  // Art & Culture
+  'Samouraïs': '⚔️', 'Sakura': '🌸', 'Kimono': '👘', 'Temples': '🛕',
+  'Louvre': '🔺', 'Monet': '🎨', 'Littérature': '📖', 'Musées': '🖼️',
+  'Théâtre': '🎭', 'Architecture': '🏢',
+  // Lifestyle
+  'Mode': '👗', 'Haute couture': '🧵', 'Parfum': '💐', 'Luxe': '💎',
+  'Bijoux': '💍', 'Kawaii': '🎀', 'Romance': '💕', 'Terrasses': '🥂',
+  'Marchés': '🧺', 'Flâner': '🚶',
+  // Ambition
+  'Entrepreneuriat': '🚀', 'Startups': '💡', 'Tech': '💻', 'Robots': '🤖',
+  'Finance': '💰', 'Investissement': '📈', 'Études': '🎓', 'Carrière': '💼',
+};
+
+/// Emoji for a chip [label]: the interest's own ([_kInterestEmoji]), else its
+/// category's, or '' for a tag no longer in the taxonomy. Used by the
+/// Discover card pills and every read-only interest display.
 String interestEmoji(String label) {
+  final own = _kInterestEmoji[label];
+  if (own != null) return own;
   for (final c in kAllInterestCategories) {
     if (c.options.contains(label)) return c.emoji;
   }
