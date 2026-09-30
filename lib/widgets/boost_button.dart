@@ -69,8 +69,9 @@ class _BoostButtonState extends State<BoostButton> {
       label = AppStrings.t('boost_my_profile');
     }
     final radius = BorderRadius.circular(16);
-    // Même habillage que le bouton message de Discover : dégradé de marque +
-    // lueur bleue. Boost déjà actif : simple pastille bleutée, sans lueur.
+    // Même dégradé que le bouton message de Discover ; lueur bien plus
+    // discrète, sa taille la rendrait envahissante. Boost déjà actif :
+    // simple pastille bleutée, sans lueur.
     return Container(
       decoration: active
           ? null
@@ -79,9 +80,9 @@ class _BoostButtonState extends State<BoostButton> {
               borderRadius: radius,
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x732B7FFF),
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
+                  color: Color(0x262B7FFF),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
