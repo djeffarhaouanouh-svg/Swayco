@@ -80,8 +80,8 @@ LinearGradient _chromeGradient({required double solid, required bool top}) {
 /// Bulle reçue (1b).
 const Color _kBubbleIn = Color(0xFF1E1E22);
 
-/// Bulle envoyée et contour de ma réaction : le cyan d'avant la 8c, gardé
-/// ici alors que [SC.accent] est passé au jaune.
+/// Bulle envoyée : le cyan d'avant la 8c, gardé ici alors que [SC.accent]
+/// est passé au jaune.
 const Color _kBubbleMine = Color(0xFF22D3EE);
 
 /// « traduit · voir l'original » (1b : text-muted).
@@ -2028,7 +2028,9 @@ class _ReactionChip extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: mineHighlighted ? _kBubbleMine : const Color(0x33FFFFFF),
+                color: mineHighlighted
+                    ? Colors.white.withValues(alpha: 0.75)
+                    : const Color(0x33FFFFFF),
                 width: mineHighlighted ? 1.4 : 1,
               ),
             ),
