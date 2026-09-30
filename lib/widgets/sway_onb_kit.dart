@@ -838,10 +838,13 @@ class SwayStepGender extends StatelessWidget {
 }
 
 /// "Qu'est-ce qui te définit le plus ?" — single choice among the 18
-/// `kPersonaCategories`. Unlike the short 2-3 option lists elsewhere
-/// ([SwayStepGender], the language grid), 18 options need a 2-column grid
-/// rather than a tall list of full-width [SwayPickRow]s.
-class SwayStepPersonaCategory extends StatelessWidget {
+/// `kPersonaCategories`, as a 2-column grid of content-sized cards.
+///
+/// Everything scrolls as ONE page: title, every choice, then the buttons at
+/// the very end. Picking a card slides down to them; tapping the picked card
+/// again un-picks it ([onSelect] toggles) and the CTA disappears — only
+/// "Retour" stays.
+class SwayStepPersonaCategory extends StatefulWidget {
   const SwayStepPersonaCategory({
     super.key,
     required this.selected,
@@ -852,56 +855,115 @@ class SwayStepPersonaCategory extends StatelessWidget {
   });
 
   final String? selected;
+
+  /// Called with the tapped label; the parent toggles (same label = un-pick).
   final ValueChanged<String> onSelect;
   final VoidCallback onBack;
   final VoidCallback onFinish;
   final String finishLabelKey;
 
   @override
+  State<SwayStepPersonaCategory> createState() =>
+      _SwayStepPersonaCategoryState();
+}
+
+class _SwayStepPersonaCategoryState extends State<SwayStepPersonaCategory> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _tap(String label) {
+    final picking = widget.selected != label;
+    widget.onSelect(label);
+    if (!picking) return;
+    // After the rebuild: the CTA has just appeared, so the end moved.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Fixed header (unlike the other steps' single scrolling column) —
-        // with 18 cards below, the title/subtitle staying put while only the
-        // grid scrolls reads much better than the whole page scrolling.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              SwayOnb.gutter, 30, SwayOnb.gutter, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SwayTitle(AppStrings.t('onb_persona_title'), size: 30),
-              const SizedBox(height: 12),
-              Text(AppStrings.t('onb_persona_subtitle'), style: SwayOnb.body),
-            ],
-          ),
-        ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.92,
+    const cats = kPersonaCategories;
+    return SingleChildScrollView(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(22, 30, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SwayOnb.gutter - 22,
             ),
-            itemCount: kPersonaCategories.length,
-            itemBuilder: (context, i) {
-              final cat = kPersonaCategories[i];
-              return _PersonaCard(
-                category: cat,
-                selected: selected == cat.label,
-                onTap: () => onSelect(cat.label),
-              );
-            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwayTitle(AppStrings.t('onb_persona_title'), size: 30),
+                const SizedBox(height: 12),
+                Text(
+                  AppStrings.t('onb_persona_subtitle'),
+                  style: SwayOnb.body,
+                ),
+              ],
+            ),
           ),
-        ),
-        _StepFooter(
-          onBack: onBack,
-          onFinish: selected == null ? null : onFinish,
-          finishLabelKey: finishLabelKey,
-        ),
-      ],
+          const SizedBox(height: 22),
+          // Two per row, both cards of a row as tall as the taller one.
+          for (var i = 0; i < cats.length; i += 2) ...[
+            if (i > 0) const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var j = i; j < i + 2; j++) ...[
+                    if (j > i) const SizedBox(width: 10),
+                    Expanded(
+                      child: j < cats.length
+                          ? _PersonaCard(
+                              category: cats[j],
+                              selected: widget.selected == cats[j].label,
+                              onTap: () => _tap(cats[j].label),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                SwayOnb.gutter - 22, 8, SwayOnb.gutter - 22, 40),
+            child: Row(
+              children: [
+                SwayGhostButton(
+                  label: AppStrings.t('onb_back'),
+                  onPressed: widget.onBack,
+                ),
+                if (widget.selected != null) ...[
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: SwayCta(
+                      label: AppStrings.t(widget.finishLabelKey),
+                      onPressed: widget.onFinish,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

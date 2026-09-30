@@ -578,7 +578,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         if (showPersonaStep)
           SwayStepPersonaCategory(
             selected: _selectedPersonaCategory,
-            onSelect: (c) => setState(() => _selectedPersonaCategory = c),
+            // Retoucher le choix le décoche.
+            onSelect: (c) => setState(() => _selectedPersonaCategory =
+                _selectedPersonaCategory == c ? null : c),
             onBack: _back,
             onFinish: _finish,
           ),
