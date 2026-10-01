@@ -341,6 +341,41 @@ Future<String> fetchTextTranslation({
   }
 }
 
+/// Smart replies for the composer (`/translation/suggest`): up to 3 short
+/// messages [lang] the user could send to the last peer message in [history].
+/// Best effort — any failure returns an empty list.
+Future<List<String>> fetchReplySuggestions({
+  required String lang,
+  required List<TranslationHistoryItem> history,
+  String name = '',
+}) async {
+  if (lang.isEmpty || history.isEmpty) return const [];
+  try {
+    final base = _translationTextUri().toString().replaceFirst(
+          RegExp(r'/translation/text$'),
+          '/translation/suggest',
+        );
+    final res = await http
+        .post(
+          Uri.parse(base),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'lang': lang,
+            'history': history.map((h) => h.toJson()).toList(),
+            if (name.isNotEmpty) 'name': name,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (res.statusCode < 200 || res.statusCode >= 300) return const [];
+    final j = _decodeObjectMap(res.body);
+    final s = j['suggestions'];
+    if (s is! List) return const [];
+    return [for (final e in s) if (e is String && e.trim().isNotEmpty) e.trim()];
+  } catch (_) {
+    return const [];
+  }
+}
+
 /// Result of `/translation/fix`. [unclear] means no model could read the
 /// transcript with confidence — the caller must DROP the utterance rather than
 /// speak a plausible invention, which is fluent and therefore undetectable.

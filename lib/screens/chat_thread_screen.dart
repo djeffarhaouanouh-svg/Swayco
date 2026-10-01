@@ -388,6 +388,49 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     );
   }
 
+  /// Smart replies for the last peer message: fetched once per message,
+  /// dropped as soon as I (or nobody) spoke last.
+  List<String> _suggestions = const [];
+  String _suggestionsForId = '';
+
+  void _refreshSuggestions() {
+    if (_myLang.isEmpty || _messages.isEmpty) return;
+    final last = _messages.last;
+    if (last.senderId == _myId || last.id.isEmpty) {
+      if (_suggestions.isNotEmpty || _suggestionsForId.isNotEmpty) {
+        setState(() {
+          _suggestions = const [];
+          _suggestionsForId = '';
+        });
+      }
+      return;
+    }
+    // Photos and GIFs carry nothing to answer in words.
+    if (last.isImage || last.body.trim().isEmpty) return;
+    if (last.id == _suggestionsForId) return;
+    _suggestionsForId = last.id;
+    final start = _messages.length > 8 ? _messages.length - 8 : 0;
+    final history = [
+      for (final m in _messages.sublist(start))
+        if (m.body.trim().isNotEmpty && !m.isImage)
+          TranslationHistoryItem(
+            author: m.senderId == _myId ? 'me' : 'peer',
+            text: _displayBodyFor(m),
+          ),
+    ];
+    final forId = last.id;
+    () async {
+      final out = await fetchReplySuggestions(
+        lang: _myLang,
+        history: history,
+        name: _peer?.displayName ?? '',
+      );
+      // A newer message may have landed while the model was thinking.
+      if (!mounted || _suggestionsForId != forId) return;
+      setState(() => _suggestions = out);
+    }();
+  }
+
   void _maybeFetchTranslation(ChatMessage m) {
     if (!_autoTranslate || _myLang.isEmpty) return;
     final id = m.id;
@@ -528,6 +571,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
     });
+    // Les messages ont pu arriver avant ma langue : les propositions suivent.
+    _refreshSuggestions();
     // Vend la traduction : inutile si les deux comptes parlent déjà la
     // même langue. Ne bloque pas quand l'une des deux est inconnue — on
     // ne sait pas alors qu'elles sont identiques.
@@ -594,6 +639,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             _maybeFetchTranslation(m);
           }
         }
+        _refreshSuggestions();
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       },
       onError: (e) {
@@ -665,6 +711,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
             _maybeFetchTranslation(m);
           }
         }
+        _refreshSuggestions();
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       } catch (_) {
         // Swallow — the realtime sub is the primary path; polling errors
@@ -977,6 +1024,25 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                               },
                               onDismiss: () =>
                                   setState(() => _showCallPromo = false),
+                            ),
+                          // Les propositions, juste au-dessus du champ : seulement
+                          // tant que je n'ai rien commencé à écrire.
+                          if (_suggestions.isNotEmpty)
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _inputCtrl,
+                              builder: (_, v, _) => v.text.trim().isEmpty
+                                  ? _SuggestionChips(
+                                      suggestions: _suggestions,
+                                      onPick: (s) {
+                                        _inputCtrl.value = TextEditingValue(
+                                          text: s,
+                                          selection: TextSelection.collapsed(
+                                            offset: s.length,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : const SizedBox.shrink(),
                             ),
                           _Composer(
                             controller: _inputCtrl,
@@ -3177,6 +3243,51 @@ class _EmptyThreadState extends State<_EmptyThread>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Suggested replies in a row above the composer: glass pills, scrolling
+/// sideways when they don't fit. A tap drops the text into the field — it is
+/// never sent without the user's own tap on send.
+class _SuggestionChips extends StatelessWidget {
+  const _SuggestionChips({required this.suggestions, required this.onPick});
+
+  final List<String> suggestions;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        itemCount: suggestions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => Pressable(
+          onTap: () => onPick(suggestions[i]),
+          scale: 0.95,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Text(
+              suggestions[i],
+              maxLines: 1,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
