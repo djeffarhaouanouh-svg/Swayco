@@ -1166,10 +1166,9 @@ class _CountryRow extends StatefulWidget {
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// 4 dessus + bulle + 3 + nom 13 (seulement sous les pays choisis) + 4
-  /// dessous. Suit _kBubble — la baisser (54 → 50) libère cette hauteur
-  /// pour la carte en dessous au lieu de laisser un blanc mort.
-  static const double height = 4 + _kBubble + 3 + 13 + 4;
+  /// 8 dessus (le retrait des bulles) + bulle. Plus de nom dessous : cette
+  /// hauteur revient à la carte. Suit _kBubble.
+  static const double height = 8 + _kBubble;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
@@ -1230,7 +1229,6 @@ class _CountryRowState extends State<_CountryRow> {
             padding: const EdgeInsets.fromLTRB(15, 8, 2, 0),
             child: _RowItem(
               label: AppStrings.t('globe_filter_cta'),
-              active: false,
               onTap: widget.onFilter,
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
@@ -1302,7 +1300,6 @@ class _CountryRowState extends State<_CountryRow> {
                   // change, chaque bulle garde sa silhouette déjà chargée.
                   key: ValueKey(key),
                   label: AppStrings.t('country_$code'),
-                  active: on,
                   // Plusieurs pays à la fois : un tap AJOUTE. Retirer passe
                   // par la petite croix, jamais par un tap sur la bulle.
                   onTap: () {
@@ -1337,13 +1334,13 @@ class _CountryRowState extends State<_CountryRow> {
                                         color: _kSurface,
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: SC.glassBorderStrong,
+                                          color: SC.accent,
                                           width: 1.5,
                                         ),
                                       ),
                                       child: const Icon(
                                         Icons.close_rounded,
-                                        color: Colors.white,
+                                        color: SC.accent,
                                         size: 11,
                                       ),
                                     ),
@@ -1370,55 +1367,24 @@ class _RowItem extends StatelessWidget {
     super.key,
     required this.bubble,
     required this.label,
-    required this.active,
     required this.onTap,
   });
 
   final Widget bubble;
   final String label;
-  final bool active;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    // Plus aucun nom sous les bulles, même choisies : la silhouette parle
+    // d'elle-même et la croix jaune dit ce qui filtre. Le nom reste lu par
+    // le lecteur d'écran.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
         width: 60,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Le nom n'est plus affiché que sous un pays CHOISI : la bulle
-            // parle d'elle-même, et le libellé dit ce qui filtre. Il reste
-            // lu par le lecteur d'écran partout.
-            Semantics(label: label, button: true, child: bubble),
-            const SizedBox(height: 3),
-            SizedBox(
-              height: 13,
-              // scaleDown : un nom trop long pour la case (« Deutschland »,
-              // « Allemagne ») rétrécit au lieu de déborder sur la bulle d'à
-              // côté ; un nom court garde sa taille.
-              child: !active
-                  ? null
-                  : FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: false,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: active ? SC.accent : const Color(0xFFAAAAAA),
-                    fontSize: 11,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: Semantics(label: label, button: true, child: bubble),
       ),
     );
   }
