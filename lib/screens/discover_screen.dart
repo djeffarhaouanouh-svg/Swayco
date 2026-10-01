@@ -1234,13 +1234,13 @@ class _CountryRowState extends State<_CountryRow> {
               onTap: widget.onFilter,
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
-              // Anneau d'1 px au dégradé de marque (le fond du rond extérieur
+              // Anneau de 2 px au dégradé de marque (le fond du rond extérieur
               // vu à travers le padding) ; les bulles pays, elles, ont un fin
               // liseré de verre.
               bubble: Container(
                 width: _kBubble,
                 height: _kBubble,
-                padding: const EdgeInsets.all(1),
+                padding: const EdgeInsets.all(2),
                 decoration: const BoxDecoration(
                   gradient: SC.brandGradient,
                   shape: BoxShape.circle,

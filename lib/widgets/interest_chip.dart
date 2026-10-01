@@ -48,10 +48,7 @@ class InterestPill extends StatelessWidget {
             ? Colors.black.withValues(alpha: 0.28)
             : Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-          width: 2,
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Text(label, maxLines: 1, softWrap: false, style: textStyle),
     );
