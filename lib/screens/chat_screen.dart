@@ -596,7 +596,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ? peer.displayName
         : (peer.handle.isNotEmpty ? '@${peer.handle}' : 'Ami');
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+      chatThreadRoute(
         builder: (_) => ChatThreadScreen(
           conversationId: convId,
           title: title,

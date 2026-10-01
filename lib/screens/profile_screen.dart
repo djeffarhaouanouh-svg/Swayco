@@ -464,7 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ? AppStrings.t('profile_anonymous')
         : _displayName;
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+      chatThreadRoute(
         builder: (_) => ChatThreadScreen(
           conversationId: convId,
           title: title,

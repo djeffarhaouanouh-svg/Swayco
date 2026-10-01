@@ -90,6 +90,39 @@ const Color _kBubbleMine = Color(0xFF22D3EE);
 /// « traduit · voir l'original » (1b : text-muted).
 const Color _kMetaMuted = Color(0xFF77777D);
 
+/// Route for a conversation: slides in from the right like any page, but
+/// leaves to the LEFT — the way the closing swipe goes.
+Route<void> chatThreadRoute({required WidgetBuilder builder}) {
+  return PageRouteBuilder<void>(
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (context, _, _) => builder(context),
+    transitionsBuilder: (context, animation, _, child) => SlideTransition(
+      position: _InFromRightOutToLeft(
+        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      ),
+      child: child,
+    ),
+  );
+}
+
+/// Offset that enters from +1 (right) and, once the route reverses, exits to
+/// −1 (left). Read on every tick, so the direction flips the moment the pop
+/// starts — at value 1, where both sides are 0: no jump.
+class _InFromRightOutToLeft extends Animation<Offset>
+    with AnimationWithParentMixin<double> {
+  _InFromRightOutToLeft(this.parent);
+
+  @override
+  final Animation<double> parent;
+
+  @override
+  Offset get value {
+    final side = parent.status == AnimationStatus.reverse ? -1.0 : 1.0;
+    return Offset(side * (1 - parent.value), 0);
+  }
+}
+
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
     super.key,

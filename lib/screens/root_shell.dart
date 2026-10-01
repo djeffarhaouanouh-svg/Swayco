@@ -159,7 +159,7 @@ class _RootShellState extends State<RootShell> {
       }
       if (nav == null || !mounted) return;
       await nav.push<void>(
-        MaterialPageRoute<void>(
+        chatThreadRoute(
           builder: (_) => ChatThreadScreen(
             conversationId: convId,
             title: (peer?.displayName.trim().isNotEmpty ?? false)
@@ -293,7 +293,7 @@ class _RootShellState extends State<RootShell> {
         onSayHi: () {
           final ids = [myId, peer.id]..sort();
           Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
+            chatThreadRoute(
               builder: (_) => ChatThreadScreen(
                 conversationId: 'dm-${ids[0]}-${ids[1]}',
                 title: peerName,

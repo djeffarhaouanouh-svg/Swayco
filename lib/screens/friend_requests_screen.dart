@@ -217,7 +217,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen>
       onSayHi: () {
         final ids = [_myId, peer.id]..sort();
         Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
+          chatThreadRoute(
             builder: (_) => ChatThreadScreen(
               conversationId: 'dm-${ids[0]}-${ids[1]}',
               title: peerName,
