@@ -1110,7 +1110,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         ),
         child: Stack(
           children: [
-            Center(
+            Align(
+              // Remonté : photo et phrase au tiers haut, plus au centre.
+              alignment: const Alignment(0, -0.55),
               child: SingleChildScrollView(
                 child: _EmptyThread(
                   peerName: widget.title,
@@ -2841,51 +2843,32 @@ class _CircleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 8c : rond jaune plein 54, encre, légère lueur jaune.
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: SC.accent.withValues(alpha: 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: SC.accent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 54,
-            height: 54,
-            child: Center(
-              child: busy
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: SC.onAccent,
-                      ),
-                    )
-                  : send
-                      ? const Icon(
-                          Icons.send_rounded,
-                          color: SC.onAccent,
-                          size: 22,
-                        )
-                      : Text(
-                          'GIF',
-                          style: popupDisplay(
-                            fontSize: 12,
-                            color: SC.onAccent,
-                          ),
-                        ),
-            ),
+    // Le rond d'origine : jaune plein 46, icône GIF (flèche d'envoi dès
+    // qu'il y a du texte).
+    return Material(
+      color: SC.accent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Center(
+            child: busy
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _kThreadBg,
+                    ),
+                  )
+                : Icon(
+                    send ? Icons.send_rounded : Icons.gif_box_rounded,
+                    color: _kThreadBg,
+                    size: 22,
+                  ),
           ),
         ),
       ),
@@ -3027,6 +3010,29 @@ const Map<String, String> _kHello = {
   'hi': 'नमस्ते',
 };
 
+/// A second way to say hello, for when both sides speak the same language.
+const Map<String, String> _kHi = {
+  'fr': 'Bonjour',
+  'en': 'Hi',
+  'es': 'Buenas',
+  'de': 'Guten Tag',
+  'it': 'Buongiorno',
+  'pt': 'Oi',
+  'nl': 'Goedendag',
+  'ar': 'أهلاً',
+  'ru': 'Здравствуй',
+  'zh': '您好',
+  'ja': 'どうも',
+  'ko': '안녕',
+  'pl': 'Dzień dobry',
+  'tr': 'Selam',
+  'uk': 'Вітаю',
+  'hi': 'नमस्कार',
+};
+
+String _hi(String lang) =>
+    _kHi[lang.trim().split('-').first.toLowerCase()] ?? 'Hi';
+
 /// Never written to each other yet (8c, 3b): the peer's photo with three
 /// blue waves rippling out, « hello » in their language (yellow) and in
 /// mine (glass), and an invitation to write first.
@@ -3067,7 +3073,8 @@ class _EmptyThreadState extends State<_EmptyThread>
   Widget build(BuildContext context) {
     final theirs = _hello(widget.peerLang);
     var mine = _hello(widget.myLang);
-    if (mine == theirs) mine = '👋';
+    // Même langue des deux côtés : la 2e pastille dit « bonjour » autrement.
+    if (mine == theirs) mine = _hi(widget.myLang);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
