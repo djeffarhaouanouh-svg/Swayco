@@ -2477,6 +2477,18 @@ class _TinderCardState extends State<_TinderCard> {
               ],
             ),
           ),
+
+          // ── Repère « tire vers le haut » : deux chevrons qui sautent, tout
+          //    en bas de la photo. Pas sur l'aperçu de ma carte.
+          if (!widget.preview)
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 2,
+              child: IgnorePointer(
+                child: Center(child: _ScrollHintChevrons()),
+              ),
+            ),
         ],
       );
   }
@@ -2514,8 +2526,6 @@ class _CardPills extends StatelessWidget {
   /// Aperçu de ma carte : sans aucune puce, on montre leur emplacement.
   final bool placeholder;
 
-  static const double _gap = 8;
-
   @override
   Widget build(BuildContext context) {
     final p = profile;
@@ -2526,62 +2536,102 @@ class _CardPills extends StatelessWidget {
     ];
     if (labels.isEmpty) {
       if (!placeholder) return const SizedBox.shrink();
-      // Trois puces fantômes, même hauteur que les vraies (≈ 32).
+      // Une puce fantôme, même hauteur que la vraie (≈ 32).
       return Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: Row(
-          children: [
-            for (final (k, w) in const [86.0, 70.0, 98.0].indexed) ...[
-              if (k > 0) const SizedBox(width: _gap),
-              Container(
-                width: w,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.14),
-                  ),
-                ),
-              ),
-            ],
-          ],
+        child: Container(
+          width: 98,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
         ),
       );
     }
 
-    const style = InterestPill.textStyle;
+    // UNE seule puce (l'ancien système) : la catégorie « persona » quand elle
+    // est connue, sinon le premier intérêt. Le reste est dans le panneau, que
+    // les chevrons invitent à tirer.
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final scaler = MediaQuery.textScalerOf(context);
-          final fitting = <String>[];
-          var used = 0.0;
-          for (final label in labels) {
-            final tp = TextPainter(
-              text: TextSpan(text: label, style: style),
-              textDirection: TextDirection.ltr,
-              textScaler: scaler,
-              maxLines: 1,
-            )..layout();
-            // +2 : la bordure.
-            final w = tp.width + InterestPill.padH * 2 + 2;
-            tp.dispose();
-            final next = used + (fitting.isEmpty ? 0 : _gap) + w;
-            if (next > c.maxWidth) break;
-            fitting.add(label);
-            used = next;
-          }
-          return Row(
-            children: [
-              for (var k = 0; k < fitting.length; k++) ...[
-                if (k > 0) const SizedBox(width: _gap),
-                InterestPill(label: fitting[k], onPhoto: true),
-              ],
-            ],
-          );
-        },
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: InterestPill(label: labels.first, onPhoto: true),
+        ),
+      ),
+    );
+  }
+}
+
+/// Deux chevrons empilés qui SAUTENT vers le haut, puis retombent et
+/// marquent une pause : le repère « il y a des infos, tire vers le haut »,
+/// tout en bas de la carte.
+class _ScrollHintChevrons extends StatefulWidget {
+  const _ScrollHintChevrons();
+
+  @override
+  State<_ScrollHintChevrons> createState() => _ScrollHintChevronsState();
+}
+
+class _ScrollHintChevronsState extends State<_ScrollHintChevrons>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Le chevron du bas part une fraction de seconde après celui du
+          // haut : les deux sautent ensemble sans être collés.
+          _chevron(0.0),
+          Transform.translate(
+            offset: const Offset(0, -14),
+            child: _chevron(0.10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Un chevron, [delay] tours de retard sur le cycle. Le saut occupe la
+  /// première moitié du cycle, le reste est une pause.
+  Widget _chevron(double delay) {
+    final u = (_c.value - delay) % 1.0;
+    double lift;
+    if (u < 0.25) {
+      lift = Curves.easeOutCubic.transform(u / 0.25);
+    } else if (u < 0.5) {
+      lift = 1 - Curves.easeInCubic.transform((u - 0.25) / 0.25);
+    } else {
+      lift = 0;
+    }
+    return Transform.translate(
+      offset: Offset(0, -12 * lift),
+      child: Opacity(
+        opacity: 0.75 + 0.25 * lift,
+        child: const Icon(
+          Icons.keyboard_arrow_up_rounded,
+          color: Colors.white,
+          size: 34,
+          shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+        ),
       ),
     );
   }
