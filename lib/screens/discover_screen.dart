@@ -1129,8 +1129,9 @@ class _DiscoverHeader extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.center,
+          // Remonté de 6 px dans sa bande : la hauteur de la rangée ne change pas.
           child: Padding(
-            padding: EdgeInsets.all(6),
+            padding: EdgeInsets.fromLTRB(6, 0, 6, 12),
             child: SwaycoWordmark(),
           ),
         ),
