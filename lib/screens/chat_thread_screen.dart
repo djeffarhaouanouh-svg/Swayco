@@ -12,7 +12,6 @@ import '../services/analytics.dart';
 import '../services/app_strings.dart';
 import '../services/block_api.dart';
 import '../services/call_launcher.dart';
-import '../services/call_promo_seen.dart';
 import '../services/chat_api.dart';
 import '../services/chat_reads.dart';
 import '../services/chat_unread.dart';
@@ -39,7 +38,6 @@ import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
-import '../widgets/swayco_call_promo.dart';
 import '../widgets/swayco_dialog.dart';
 import 'profile_screen.dart';
 
@@ -211,10 +209,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// call button are disabled — messages / calls would go into a black hole.
   bool _peerBlockedMe = false;
 
-  /// One-shot "call — Swayco traduit" promo, shown above the composer only
-  /// the very first time this conversation is opened.
-  bool _showCallPromo = false;
-
   Future<void> _reportPeer() async {
     if (_myId.isEmpty || widget.peerDeviceId.isEmpty) return;
     final peerName = _peer?.displayName.isNotEmpty == true
@@ -296,13 +290,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // A picker pinned to a bubble would float in the wrong place once the
     // list moves — drop it the moment the user scrolls.
     _scrollCtrl.addListener(_MessageBubble.dismissActivePicker);
-  }
-
-  Future<void> _maybeShowCallPromo() async {
-    if (await CallPromoSeen.hasSeen(widget.conversationId)) return;
-    await CallPromoSeen.markSeen(widget.conversationId);
-    if (!mounted) return;
-    setState(() => _showCallPromo = true);
   }
 
   /// Local time at the peer's place, derived from the free-text city they
@@ -572,14 +559,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     });
     // Les messages ont pu arriver avant ma langue : les propositions suivent.
     _refreshSuggestions();
-    // Vend la traduction : inutile si les deux comptes parlent déjà la
-    // même langue. Ne bloque pas quand l'une des deux est inconnue — on
-    // ne sait pas alors qu'elles sont identiques.
-    final peerLang = peer?.language.trim().toLowerCase() ?? '';
-    final sameLang = _myLang.isNotEmpty &&
-        peerLang.isNotEmpty &&
-        _myLang.trim().toLowerCase() == peerLang;
-    if (!sameLang) _maybeShowCallPromo();
 
     // Les traductions déjà obtenues, relues du disque AVANT que les messages
     // arrivent : sans ça, le fil s'affiche dans la langue de l'autre puis
@@ -1004,26 +983,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (_showCallPromo)
-                            SwaycoCallPromo(
-                              calleeName: _peer?.displayName.isNotEmpty == true
-                                  ? _peer!.displayName
-                                  : widget.title,
-                              myLang: _myLang,
-                              peerLang: _peer?.language ?? '',
-                              myAvatarUrl: _myAvatarUrl,
-                              myName: _myName,
-                              peerAvatarUrl: _peer?.avatarUrl ?? '',
-                              peerName: _peer?.displayName.isNotEmpty == true
-                                  ? _peer!.displayName
-                                  : widget.title,
-                              onCall: () {
-                                setState(() => _showCallPromo = false);
-                                _startCall(withCamera: false);
-                              },
-                              onDismiss: () =>
-                                  setState(() => _showCallPromo = false),
-                            ),
                           // Les propositions, juste au-dessus du champ : seulement
                           // tant que je n'ai rien commencé à écrire.
                           if (_suggestions.isNotEmpty)
@@ -1254,7 +1213,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         12,
         topInset,
         12,
-        96 + MediaQuery.paddingOf(context).bottom,
+        // +48 quand la rangée de propositions (44) est posée au-dessus du
+        // champ : sans ça les réactions rapides du dernier message viennent
+        // se coller contre elles.
+        96 +
+            (_suggestions.isNotEmpty ? 48 : 0) +
+            MediaQuery.paddingOf(context).bottom,
       ),
       // The peer's "writing…" bubble is the newest row: index 0 of the
       // reversed list, under their last message.
