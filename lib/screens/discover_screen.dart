@@ -88,7 +88,7 @@ const double _kFxSize = 58.0;
 
 /// Le bouton message du milieu, toujours plus petit que ✕ / ❤ (il ne doit
 /// pas les écraser), mais pas trop discret non plus.
-const double _kMessageSize = 50.0;
+const double _kMessageSize = 47.0;
 
 /// Respiration au-dessus et au-dessous de la rangée ✕ / message / ❤.
 const double _kActionPadV = 16.0;
@@ -2789,7 +2789,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
                   alignment: Alignment.center,
                   child: const Icon(
                     Icons.chat_bubble_rounded,
-                    size: 22,
+                    size: 21,
                     color: Colors.white,
                   ),
                 ),
