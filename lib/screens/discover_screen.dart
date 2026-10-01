@@ -1235,8 +1235,8 @@ class _CountryRowState extends State<_CountryRow> {
               // Pas de verre dans la rangée : la bulle « Filtrer » est
               // pleine, comme les bulles pays.
               // Anneau d'1 px au dégradé de marque (le fond du rond extérieur
-              // vu à travers le padding) ; les bulles pays, elles, ont une
-              // fine bordure noire.
+              // vu à travers le padding) ; les bulles pays, elles, ont un fin
+              // liseré de verre.
               bubble: Container(
                 width: _kBubble,
                 height: _kBubble,
@@ -1270,15 +1270,15 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
-                // Fine bordure noire d'1 px, choisi ou non (le nom jaune et la
-                // croix disent déjà qu'il est choisi) ; c'est « Filtrer » qui
-                // porte l'anneau en dégradé.
+                // Liseré de verre (blanc 20 %, celui des boutons en verre) d'1 px,
+                // choisi ou non (le nom jaune et la croix disent déjà qu'il est
+                // choisi) ; c'est « Filtrer » qui porte l'anneau en dégradé.
                 final circle = Container(
                     width: _kBubble,
                     height: _kBubble,
                     padding: const EdgeInsets.all(1),
                     decoration: const BoxDecoration(
-                      color: Colors.black,
+                      color: SC.glassBorderStrong,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
