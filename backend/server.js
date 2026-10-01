@@ -1065,6 +1065,110 @@ app.post('/translation/text', _limText, async (req, res) => {
 });
 
 /**
+ * POST /translation/suggest — smart replies for the chat composer.
+ * Body: { lang: "fr", history: [{ author: "me"|"peer", text }], name?: string }
+ * Returns: { suggestions: ["Carrément ! 🙌", "Quelle heure ?", "😂"] }
+ *
+ * Three short replies the user could send to the LAST peer message (or, with an
+ * empty history, three ice-breakers), written in `lang` (the language the user
+ * writes in — the translation toggle handles the rest). Best effort: any failure returns an empty list, never an error the UI
+ * has to explain.
+ */
+app.post('/translation/suggest', _limText, async (req, res) => {
+  if (!TRANSLATE_KEY) return res.json({ suggestions: [] });
+  const lang = primaryLanguageTag(req.body?.lang);
+  if (!isReasonableLanguageTag(lang)) {
+    return res.status(400).json({ error: 'invalid_input' });
+  }
+  const historyIn = Array.isArray(req.body?.history) ? req.body.history : [];
+  const history = historyIn
+    .slice(-8)
+    .map((h) => {
+      const author = h?.author === 'me' ? 'me' : 'peer';
+      const t = typeof h?.text === 'string' ? h.text.trim().slice(0, 300) : '';
+      return t ? { author, text: t } : null;
+    })
+    .filter(Boolean);
+  // Two modes: an empty thread gets ice-breakers; otherwise it is only worth
+  // suggesting when the person on the other side spoke last.
+  const opener = history.length === 0;
+  if (!opener && history[history.length - 1].author !== 'peer') {
+    return res.json({ suggestions: [] });
+  }
+  const name =
+    typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 40) : '';
+  const sys = opener
+    ? `You write conversation openers for a casual chat app where people ` +
+      `meet and talk. The user is about to send the very first message to `+
+      `someone. Propose exactly 3 different short messages to break the ice.\n\n` +
+      `Rules:\n` +
+      `- Write them in the language with code "${lang}".\n` +
+      `- Informal, friendly register (tutoiement). Natural, like a real text.\n` +
+      `- Each at most 6 words: a greeting, a light question and a compliment `+
+      `or a fun hook make a good mix. Never creepy or pushy.\n` +
+      `- Never hedge with a parenthesis or slash ("content(e)").\n` +
+      `- Reply with a JSON array of 3 strings and NOTHING else.`
+    : `You write quick-reply suggestions for a casual chat app where people ` +
+    `meet and talk. Given a conversation, propose exactly 3 different short ` +
+    `replies the user could send to the LAST message from the other person.\n\n` +
+    `Rules:\n` +
+    `- Write them in the language with code "${lang}".\n` +
+    `- Informal, friendly register (tutoiement). Natural, like a real text.\n` +
+    `- Each reply is at most 6 words. A question, a reaction and a short ` +
+    `answer make a good mix; one may be a single emoji.\n` +
+    `- Never hedge with a parenthesis or slash ("content(e)").\n` +
+    `- Reply with a JSON array of 3 strings and NOTHING else.`;
+  const userMsg = opener
+    ? `Start a conversation with ${name || 'someone you just matched with'}.`
+    : (name ? `The other person is ${name}.\n` : '') +
+      '[Conversation, oldest→newest]\n' +
+      history
+        .map((h) => `${h.author === 'me' ? 'Me' : 'Them'}: ${h.text}`)
+        .join('\n');
+  try {
+    const r = await fetch(`${TRANSLATE_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TRANSLATE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: TRANSLATE_MODEL,
+        ...(TRANSLATE_EFFORT ? { reasoning_effort: TRANSLATE_EFFORT } : {}),
+        ...(TRANSLATE_IS_DEEPSEEK ? { thinking: { type: 'disabled' } } : {}),
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: userMsg },
+        ],
+        temperature: 0.7,
+        max_tokens: 120,
+      }),
+    });
+    if (!r.ok) return res.json({ suggestions: [] });
+    const parsed = await r.json().catch(() => null);
+    let raw = parsed?.choices?.[0]?.message?.content ?? '';
+    if (typeof raw !== 'string') raw = '';
+    // Some models wrap the array in a fence: take the first [...] block.
+    const m = raw.match(/\[[\s\S]*\]/);
+    let list = [];
+    try {
+      list = JSON.parse(m ? m[0] : raw);
+    } catch (_) {
+      list = [];
+    }
+    const suggestions = (Array.isArray(list) ? list : [])
+      .filter((s) => typeof s === 'string')
+      .map((s) => s.trim().slice(0, 60))
+      .filter(Boolean)
+      .slice(0, 3);
+    return res.json({ suggestions });
+  } catch (e) {
+    console.error('translation suggest', e);
+    return res.json({ suggestions: [] });
+  }
+});
+
+/**
  * Translate one transcript through Grok (/v1/chat/completions, OpenAI-compatible).
  * Returns { translated } on success, or { error, status, detail? } on failure.
  * When `from` is known and equals `to`, the transcript is returned unchanged.
@@ -1139,96 +1243,6 @@ async function grokSynthesizeSpeech({ text, voice, lang }) {
     }
     const audio = Buffer.from(await r.arrayBuffer());
     if (audio.length === 0) return { error: 'grok_tts_empty', status: 502 };
-/**
- * POST /translation/suggest — smart replies for the chat composer.
- * Body: { lang: "fr", history: [{ author: "me"|"peer", text }], name?: string }
- * Returns: { suggestions: ["Carrément ! 🙌", "Quelle heure ?", "😂"] }
- *
- * Three short replies the user could send to the LAST peer message, written in
- * `lang` (the language the user writes in — the translation toggle handles the
- * rest). Best effort: any failure returns an empty list, never an error the UI
- * has to explain.
- */
-app.post('/translation/suggest', _limText, async (req, res) => {
-  if (!TRANSLATE_KEY) return res.json({ suggestions: [] });
-  const lang = primaryLanguageTag(req.body?.lang);
-  if (!isReasonableLanguageTag(lang)) {
-    return res.status(400).json({ error: 'invalid_input' });
-  }
-  const historyIn = Array.isArray(req.body?.history) ? req.body.history : [];
-  const history = historyIn
-    .slice(-8)
-    .map((h) => {
-      const author = h?.author === 'me' ? 'me' : 'peer';
-      const t = typeof h?.text === 'string' ? h.text.trim().slice(0, 300) : '';
-      return t ? { author, text: t } : null;
-    })
-    .filter(Boolean);
-  // Only worth suggesting when the person on the other side spoke last.
-  if (!history.length || history[history.length - 1].author !== 'peer') {
-    return res.json({ suggestions: [] });
-  }
-  const name =
-    typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 40) : '';
-  const sys =
-    `You write quick-reply suggestions for a casual chat app where people ` +
-    `meet and talk. Given a conversation, propose exactly 3 different short ` +
-    `replies the user could send to the LAST message from the other person.\n\n` +
-    `Rules:\n` +
-    `- Write them in the language with code "${lang}".\n` +
-    `- Informal, friendly register (tutoiement). Natural, like a real text.\n` +
-    `- Each reply is at most 6 words. A question, a reaction and a short ` +
-    `answer make a good mix; one may be a single emoji.\n` +
-    `- Never hedge with a parenthesis or slash ("content(e)").\n` +
-    `- Reply with a JSON array of 3 strings and NOTHING else.`;
-  const userMsg =
-    (name ? `The other person is ${name}.\n` : '') +
-    '[Conversation, oldest→newest]\n' +
-    history
-      .map((h) => `${h.author === 'me' ? 'Me' : 'Them'}: ${h.text}`)
-      .join('\n');
-  try {
-    const r = await fetch(`${TRANSLATE_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${TRANSLATE_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: TRANSLATE_MODEL,
-        ...(TRANSLATE_EFFORT ? { reasoning_effort: TRANSLATE_EFFORT } : {}),
-        ...(TRANSLATE_IS_DEEPSEEK ? { thinking: { type: 'disabled' } } : {}),
-        messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: userMsg },
-        ],
-        temperature: 0.7,
-        max_tokens: 120,
-      }),
-    });
-    if (!r.ok) return res.json({ suggestions: [] });
-    const parsed = await r.json().catch(() => null);
-    let raw = parsed?.choices?.[0]?.message?.content ?? '';
-    if (typeof raw !== 'string') raw = '';
-    // Some models wrap the array in a fence: take the first [...] block.
-    const m = raw.match(/\[[\s\S]*\]/);
-    let list = [];
-    try {
-      list = JSON.parse(m ? m[0] : raw);
-    } catch (_) {
-      list = [];
-    }
-    const suggestions = (Array.isArray(list) ? list : [])
-      .filter((s) => typeof s === 'string')
-      .map((s) => s.trim().slice(0, 60))
-      .filter(Boolean)
-      .slice(0, 3);
-    return res.json({ suggestions });
-  } catch (e) {
-    console.error('translation suggest', e);
-    return res.json({ suggestions: [] });
-  }
-});
 
     return { audio };
   } catch (e) {

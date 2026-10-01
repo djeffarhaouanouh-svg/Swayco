@@ -342,14 +342,15 @@ Future<String> fetchTextTranslation({
 }
 
 /// Smart replies for the composer (`/translation/suggest`): up to 3 short
-/// messages [lang] the user could send to the last peer message in [history].
+/// messages [lang] the user could send to the last peer message in [history] —
+/// or, with an empty [history], three ice-breakers for a first message.
 /// Best effort — any failure returns an empty list.
 Future<List<String>> fetchReplySuggestions({
   required String lang,
   required List<TranslationHistoryItem> history,
   String name = '',
 }) async {
-  if (lang.isEmpty || history.isEmpty) return const [];
+  if (lang.isEmpty) return const [];
   try {
     final base = _translationTextUri().toString().replaceFirst(
           RegExp(r'/translation/text$'),

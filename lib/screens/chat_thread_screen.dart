@@ -378,7 +378,22 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _suggestionsForId = '';
 
   void _refreshSuggestions() {
-    if (_myLang.isEmpty || _messages.isEmpty) return;
+    if (_myLang.isEmpty) return;
+    // Conversation vide : des phrases d'accroche pour écrire le premier.
+    if (_messages.isEmpty) {
+      if (!_messagesLoaded || _suggestionsForId == '_opener') return;
+      _suggestionsForId = '_opener';
+      () async {
+        final out = await fetchReplySuggestions(
+          lang: _myLang,
+          history: const [],
+          name: _peer?.displayName ?? '',
+        );
+        if (!mounted || _suggestionsForId != '_opener') return;
+        setState(() => _suggestions = out);
+      }();
+      return;
+    }
     final last = _messages.last;
     if (last.senderId == _myId || last.id.isEmpty) {
       if (_suggestions.isNotEmpty || _suggestionsForId.isNotEmpty) {
