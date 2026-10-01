@@ -1910,7 +1910,6 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   key: ValueKey(chips.join()),
                   emojis: chips,
                   count: widget.reactions.length,
-                  mineHighlighted: _myEmoji != null,
                   onTap: () {
                     final mineEmoji = _myEmoji;
                     widget.onReact(mineEmoji ?? chips.first);
@@ -2044,7 +2043,6 @@ class _ReactionChip extends StatelessWidget {
     super.key,
     required this.emojis,
     required this.count,
-    required this.mineHighlighted,
     required this.onTap,
   });
 
@@ -2052,7 +2050,6 @@ class _ReactionChip extends StatelessWidget {
 
   /// Nombre de réactions — « 🔥 1 » (1b).
   final int count;
-  final bool mineHighlighted;
   final VoidCallback onTap;
 
   @override
@@ -2077,12 +2074,7 @@ class _ReactionChip extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: mineHighlighted
-                    ? Colors.white.withValues(alpha: 0.75)
-                    : const Color(0x33FFFFFF),
-                width: mineHighlighted ? 1.4 : 1,
-              ),
+              border: Border.all(color: const Color(0x33FFFFFF)),
             ),
             child: Text.rich(
               TextSpan(
