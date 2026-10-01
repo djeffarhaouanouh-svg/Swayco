@@ -170,7 +170,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   String _myName = '';
   String _myLang = '';
   String _myGender = '';
-  String _myAvatarUrl = '';
 
   RemoteProfile? _peer;
   bool _sending = false;
@@ -552,7 +551,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       _myGender = (profile?.gender.trim().isNotEmpty ?? false)
           ? profile!.gender.trim()
           : (mine?.gender.trim() ?? '');
-      _myAvatarUrl = mine?.avatarUrl ?? '';
       _peer = peer;
       _peerBlocked = blocked;
       _peerBlockedMe = blockedMe;
