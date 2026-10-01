@@ -1270,15 +1270,15 @@ class _CountryRowState extends State<_CountryRow> {
                 final key = keys[i];
                 final code = kGlobeCountries[key]!.code;
                 final on = widget.selected.contains(key);
-                // Liseré de verre (blanc 20 %, celui des boutons en verre) d'1 px,
-                // choisi ou non (le nom jaune et la croix disent déjà qu'il est
-                // choisi) ; c'est « Filtrer » qui porte l'anneau en dégradé.
+                // Liseré de verre discret (blanc 10 %) d'1 px : juste de quoi
+                // détacher la bulle du fond, choisie ou non ; c'est « Filtrer »
+                // qui porte l'anneau en dégradé.
                 final circle = Container(
                     width: _kBubble,
                     height: _kBubble,
                     padding: const EdgeInsets.all(1),
                     decoration: const BoxDecoration(
-                      color: SC.glassBorderStrong,
+                      color: SC.glassBorder,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
@@ -1337,7 +1337,7 @@ class _CountryRowState extends State<_CountryRow> {
                                         color: _kSurface,
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: SC.accent,
+                                          color: SC.glassBorderStrong,
                                           width: 1.5,
                                         ),
                                       ),
