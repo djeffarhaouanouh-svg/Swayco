@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
@@ -33,6 +34,7 @@ import '../swayco/realtime_translation_port.dart';
 import '../widgets/gif_picker_sheet.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/liquid_glass_button.dart';
+import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
@@ -77,8 +79,8 @@ LinearGradient _chromeGradient({required double solid, required bool top}) {
   );
 }
 
-/// Bulle reçue (1b).
-const Color _kBubbleIn = Color(0xFF1E1E22);
+/// Bulle reçue (8c) : gris ardoise, liseré blanc 12 % posé dans la bulle.
+const Color _kBubbleIn = Color(0xFF2F333B);
 
 /// Bulle envoyée : le cyan d'avant la 8c, gardé ici alors que [SC.accent]
 /// est passé au jaune.
@@ -139,6 +141,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// without the user reopening the thread.
   Timer? _clockTimer;
   List<ChatMessage> _messages = const [];
+
+  /// First snapshot received: only then does an empty list mean "you've never
+  /// written to each other" (the empty-thread screen), not "still loading".
+  bool _messagesLoaded = false;
   String _myId = '';
   String _myName = '';
   String _myLang = '';
@@ -523,6 +529,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         if (!mounted) return;
         setState(() {
           _messages = rows;
+          _messagesLoaded = true;
           // The realtime channel retries with its own backoff — a delivery
           // reaching here means it recovered, so the "connexion perdue"
           // banner (never cleared before) would otherwise sit there forever.
@@ -595,11 +602,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         final last = _messages.isEmpty ? null : _messages.last.id;
         final freshLast = rows.isEmpty ? null : rows.last.id;
         if (last == freshLast && rows.length == _messages.length) {
-          setState(() => _reactionsByMessage = nextReactions);
+          setState(() {
+            _reactionsByMessage = nextReactions;
+            _messagesLoaded = true;
+          });
           return;
         }
         setState(() {
           _messages = rows;
+          _messagesLoaded = true;
           _reactionsByMessage = nextReactions;
         });
         if (_autoTranslate) {
@@ -784,8 +795,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     // La liste leur réserve juste la place de ne pas cacher un message au
     // repos — au défilement, les messages passent dessous et s'y dissolvent.
     // (La pastille « ES → FR » de la maquette a été retirée à la demande.)
-    final headerH =
-        safeTop + _ThreadHeader.height + (_error != null ? 40 : 0);
+    final headerH = safeTop +
+        _ThreadHeader.height +
+        _TranslatePill.blockHeight +
+        (_error != null ? 40 : 0);
     // Hauteur du composer (champ ~50 + 4 dessus + 12 dessous + une part de
     // la safe area, cf. _buildIdleBar) : le fond y reste constant.
     final footerSolid = 70 + MediaQuery.paddingOf(context).bottom * 0.4;
@@ -852,6 +865,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                           onToggleBlock: _toggleBlockPeer,
                           onReport: _reportPeer,
                         ),
+                        // Le réglage de traduction : sous l'en-tête, plus dans
+                        // la barre d'écriture (maquette 8c).
+                        _TranslatePill(
+                          active: _autoTranslate,
+                          fromLang: _peer?.language ?? '',
+                          toLang: _myLang,
+                          onTap: _toggleAutoTranslate,
+                        ),
                         if (_error != null) _ErrorBanner(message: _error!),
                       ],
                     ),
@@ -916,7 +937,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onSendImage: _sendImage,
                             onSendGif: _sendGif,
                             autoTranslate: _autoTranslate,
-                            onToggleTranslate: _toggleAutoTranslate,
                             myLang: _myLang,
                             peerLang: _peer?.language ?? '',
                             peerFirstName: (_peer?.displayName.isNotEmpty == true
@@ -1032,13 +1052,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
 
   Widget _buildMessageList({required double topInset}) {
     if (_messages.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(32, topInset, 32, 32),
-          child: Text(
-            AppStrings.t('no_messages'),
-            style: const TextStyle(color: SC.textMuted, fontSize: 14),
-            textAlign: TextAlign.center,
+      // Still loading: nothing rather than a "no messages" flash.
+      if (!_messagesLoaded) return const SizedBox.shrink();
+      return Padding(
+        padding: EdgeInsets.only(
+          top: topInset,
+          bottom: 96 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            child: _EmptyThread(
+              peerName: widget.title,
+              photoUrl: (_peer?.avatarUrl.isNotEmpty ?? false)
+                  ? _peer!.avatarUrl
+                  : (_peer?.fallbackPhotoUrl ?? ''),
+              peerLang: _peer?.language ?? '',
+              myLang: _myLang,
+            ),
           ),
         ),
       );
@@ -1128,25 +1158,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           myId: _myId,
           onReact: (emoji) => _react(m, emoji),
           onLongPressDelete: mine ? () => _deleteMessage(m) : null,
+          // « 14:35 · lu » sous le dernier de mes messages que le pair a lus.
+          read: m.id == lastReadMineId,
         );
-        if (m.id != lastReadMineId) return bubble;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            bubble,
-            Padding(
-              padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2),
-              child: Text(
-                AppStrings.t('chat_read'),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 11,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
-          ],
-        );
+        return bubble;
       },
     );
   }
@@ -1173,13 +1188,13 @@ class _DaySeparator extends StatelessWidget {
 
   final DateTime day;
 
-  static const _hairline = Color(0x22FFFFFF);
+  static const _hairline = Color(0x1AFFFFFF);
   static const _label = TextStyle(
     fontFamily: 'monospace',
     fontSize: 11,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.2,
-    color: Color(0x66FFFFFF),
+    fontWeight: FontWeight.w500,
+    letterSpacing: 1,
+    color: Color(0x73F5F7FF),
   );
 
   @override
@@ -1340,10 +1355,11 @@ class _ThreadHeader extends StatelessWidget {
                 builder: (context) {
                   // Ombre de texte : le prénom reste lisible quand les
                   // messages passent sous le header transparent.
-                  final nameStyle = SCText.h3.copyWith(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                  final nameStyle = popupDisplay(
+                    fontSize: 16,
+                    letterSpacing: -0.3,
                     color: Colors.white,
+                  ).copyWith(
                     shadows: const [
                       Shadow(color: Color(0x99000000), blurRadius: 8),
                     ],
@@ -1470,14 +1486,14 @@ class _PeerClockLine extends StatelessWidget {
   /// The peer's city (their country when no city is set); empty = time alone.
   final String place;
 
-  static const _orange = Color(0xFFFFB74D);
+  static const _orange = Color(0xFFFF9F43);
 
   @override
   Widget build(BuildContext context) {
     const textStyle = TextStyle(
       color: _orange,
-      fontSize: 11.5,
-      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
       height: 1.15,
     );
     final city = place.trim();
@@ -1530,9 +1546,13 @@ class _MessageBubble extends StatefulWidget {
     this.onLongPressDelete,
     this.translated = false,
     this.showQuickReactions = false,
+    this.read = false,
   });
   final ChatMessage message;
   final bool mine;
+
+  /// Mine and the last one the peer has read: « 14:35 · lu » under it.
+  final bool read;
 
   /// Reçu et réécrit par la traduction auto : la bulle affiche « traduit ·
   /// voir l'original » et peut basculer sur le texte d'origine.
@@ -1651,9 +1671,22 @@ class _MessageBubbleState extends State<_MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final align = mine ? Alignment.centerRight : Alignment.centerLeft;
-    // 1b : envoyé = cyan plein, texte encre ; reçu = surface-2, texte blanc.
+    // Envoyé = cyan plein, texte encre ; reçu = gris ardoise liseré, texte
+    // blanc. Le petit coin (6) pointe vers l'auteur (maquette 8c).
     final bubbleText = mine ? _kThreadBg : Colors.white;
-    final radius = BorderRadius.circular(20);
+    final radius = mine
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(6),
+          )
+        : const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(6),
+            bottomRight: Radius.circular(20),
+          );
 
     final time =
         '${message.createdAt.hour.toString().padLeft(2, '0')}:${message.createdAt.minute.toString().padLeft(2, '0')}';
@@ -1776,54 +1809,56 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   ? bubbleText.withValues(alpha: 0.55)
                   : bubbleText,
               fontSize: 15,
-              height: 1.3,
+              height: 1.4,
               fontStyle: translating ? FontStyle.italic : FontStyle.normal,
             ),
           ),
-        const SizedBox(height: 3),
-        if (widget.translated)
-          // « traduit · voir l'original · 14:32 » — le lien bascule la bulle
-          // entre la traduction et le texte tel qu'il a été écrit.
-          DefaultTextStyle.merge(
-            style: const TextStyle(color: _kMetaMuted, fontSize: 11.5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${AppStrings.t('msg_translated')} · '),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _showOriginal = !_showOriginal),
-                  child: Text(
-                    AppStrings.t(
-                      _showOriginal
-                          ? 'msg_see_translation'
-                          : 'msg_see_original',
-                    ),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                Text(' · $time'),
-              ],
-            ),
-          )
-        else
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Text(
-              time,
-              style: TextStyle(
-                // Sans bulle, l'heure se pose sur le fond noir de la page : la
-                // couleur des bulles y serait illisible.
-                color: bareMedia
-                    ? SC.textMuted
-                    : (mine
-                        ? _kThreadBg.withValues(alpha: 0.55)
-                        : _kMetaMuted),
-                fontSize: 10,
-              ),
-            ),
-          ),
       ],
+    );
+
+    // Sous la bulle (8c) : « traduit · voir l'original · 14:32 » pour un
+    // message reçu traduit, « 14:35 · lu » pour le dernier des miens lu,
+    // l'heure seule sinon. Le lien bascule la bulle entre la traduction et
+    // le texte tel qu'il a été écrit.
+    final metaColor = SC.textPrimary.withValues(alpha: 0.5);
+    final meta = Padding(
+      padding: EdgeInsets.only(
+        top: 4,
+        left: mine ? 0 : 6,
+        right: mine ? 6 : 0,
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(color: metaColor, fontSize: 11.5),
+        child: widget.translated
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${AppStrings.t('msg_translated')} · '),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () =>
+                        setState(() => _showOriginal = !_showOriginal),
+                    child: Text(
+                      AppStrings.t(
+                        _showOriginal
+                            ? 'msg_see_translation'
+                            : 'msg_see_original',
+                      ),
+                      style: TextStyle(
+                        decoration: TextDecoration.underline,
+                        decorationColor: metaColor,
+                      ),
+                    ),
+                  ),
+                  Text(' · $time'),
+                ],
+              )
+            : Text(
+                widget.read
+                    ? '$time · ${AppStrings.t('chat_read').toLowerCase()}'
+                    : time,
+              ),
+      ),
     );
 
     final chips = reactionChipEmojis(widget.reactions);
@@ -1842,7 +1877,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
               child: Container(
                 padding: bareMedia
                     ? EdgeInsets.zero
-                    : const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                    : const EdgeInsets.fromLTRB(15, 11, 15, 11),
                 constraints: BoxConstraints(
                   // Floor so a tiny "👋" / "Coucou !" / "hello" still reads as a
                   // proper bubble instead of a cramped little square. Une image nue
@@ -1855,6 +1890,11 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     : BoxDecoration(
                         color: mine ? _kBubbleMine : _kBubbleIn,
                         borderRadius: radius,
+                        border: mine
+                            ? null
+                            : Border.all(
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
                       ),
                 child: hugContent ? IntrinsicWidth(child: content) : content,
               ),
@@ -1901,9 +1941,10 @@ class _MessageBubbleState extends State<_MessageBubble> {
             mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           bubbleStack,
+          meta,
           if (widget.showQuickReactions)
             Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 6),
+              padding: const EdgeInsets.only(top: 8, bottom: 6),
               child: _QuickReactionBar(
                 onPick: (emoji) {
                   HapticFeedback.lightImpact();
@@ -2077,38 +2118,41 @@ class _QuickReactionBar extends StatelessWidget {
 
   static const _emojis = ['😂', '❤️', '🔥', '👍'];
 
+  /// One glass pill, 36×30 (8c).
+  static Widget _pill(Widget child) => Container(
+        width: 36,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: child,
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: _kBubbleIn,
-        borderRadius: BorderRadius.circular(999),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final e in _emojis)
+          for (final e in _emojis) ...[
             Pressable(
               onTap: () => onPick(e),
               scale: 0.85,
-              child: SizedBox(
-                width: 34,
-                height: 34,
-                child: Center(
-                  child: Text(e, style: const TextStyle(fontSize: 19)),
-                ),
-              ),
+              child: _pill(Text(e, style: const TextStyle(fontSize: 15))),
             ),
+            const SizedBox(width: 6),
+          ],
           Pressable(
             onTap: onMore,
             scale: 0.85,
-            child: const SizedBox(
-              width: 34,
-              height: 34,
-              child: Icon(
+            child: _pill(
+              const Icon(
                 Icons.add_reaction_outlined,
-                size: 20,
+                size: 16,
                 color: _kMetaMuted,
               ),
             ),
@@ -2385,7 +2429,6 @@ class _Composer extends StatefulWidget {
     required this.onSendImage,
     required this.onSendGif,
     required this.autoTranslate,
-    required this.onToggleTranslate,
     required this.myLang,
     this.peerLang = '',
     this.peerFirstName = '',
@@ -2409,8 +2452,9 @@ class _Composer extends StatefulWidget {
 
   /// Ouvre le catalogue Giphy et envoie le GIF choisi.
   final Future<void> Function() onSendGif;
+
+  /// Drives the placeholder only — the switch itself is [_TranslatePill].
   final bool autoTranslate;
-  final VoidCallback onToggleTranslate;
 
   @override
   State<_Composer> createState() => _ComposerState();
@@ -2618,7 +2662,7 @@ class _ComposerState extends State<_Composer>
       padding: EdgeInsets.fromLTRB(
         12,
         4,
-        8,
+        12,
         // Nudged up very slightly (was 6) so the floating bar + photo button
         // sit a touch higher off the bottom edge.
         12 + MediaQuery.paddingOf(context).bottom * 0.4,
@@ -2628,8 +2672,8 @@ class _ComposerState extends State<_Composer>
           children: [
             Expanded(
               child: GlassPanel(
-                borderRadius: 26,
-                padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+                borderRadius: 27,
+                padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -2668,18 +2712,8 @@ class _ComposerState extends State<_Composer>
                             contentPadding: const EdgeInsets.fromLTRB(
                               4,
                               6,
-                              12,
+                              8,
                               6,
-                            ),
-                            // Only the translate toggle on the left — the photo
-                            // button now sits OUTSIDE the bar (right).
-                            prefixIcon: _ComposerTranslateToggle(
-                              active: widget.autoTranslate,
-                              onTap: widget.onToggleTranslate,
-                            ),
-                            prefixIconConstraints: const BoxConstraints(
-                              minWidth: 0,
-                              minHeight: 38,
                             ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -2711,12 +2745,11 @@ class _ComposerState extends State<_Composer>
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Le rond cyan plein (1b) : envoyer quand il y a du texte, sinon
-            // les GIF. Il tient la place du micro de la maquette — le chat
-            // n'enregistre pas de vocaux.
+            const SizedBox(width: 10),
+            // Le rond jaune (8c) : « GIF » quand le champ est vide, l'envoi
+            // dès qu'il y a du texte.
             _CircleActionButton(
-              icon: _hasText ? Icons.send_rounded : Icons.gif_box_rounded,
+              send: _hasText,
               busy: widget.sending,
               onTap: widget.sending
                   ? null
@@ -2731,37 +2764,63 @@ class _ComposerState extends State<_Composer>
 
 class _CircleActionButton extends StatelessWidget {
   const _CircleActionButton({
-    required this.icon,
+    required this.send,
     required this.busy,
     required this.onTap,
   });
-  final IconData icon;
+
+  /// Text typed → the send arrow; empty field → « GIF ».
+  final bool send;
   final bool busy;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    // 1b : cyan PLEIN (plus de dégradé ni de halo), icône à l'encre.
-    return Material(
-      color: SC.accent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 46,
-          height: 46,
-          child: Center(
-            child: busy
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _kThreadBg,
-                    ),
-                  )
-                : Icon(icon, color: _kThreadBg, size: 22),
+    // 8c : rond jaune plein 54, encre, légère lueur jaune.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: SC.accent.withValues(alpha: 0.25),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: SC.accent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 54,
+            height: 54,
+            child: Center(
+              child: busy
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: SC.onAccent,
+                      ),
+                    )
+                  : send
+                      ? const Icon(
+                          Icons.send_rounded,
+                          color: SC.onAccent,
+                          size: 22,
+                        )
+                      : Text(
+                          'GIF',
+                          style: popupDisplay(
+                            fontSize: 12,
+                            color: SC.onAccent,
+                          ),
+                        ),
+            ),
           ),
         ),
       ),
@@ -2769,89 +2828,313 @@ class _CircleActionButton extends StatelessWidget {
   }
 }
 
-/// Inline translate switch shown as a TextField prefix in the chat composer.
-/// Icon + sliding pill ball — tap anywhere on it flips _autoTranslate.
-class _ComposerTranslateToggle extends StatelessWidget {
-  const _ComposerTranslateToggle({required this.active, required this.onTap});
+/// The translation switch, under the header (8c): « 文A Traduction JA → FR ⬤ ».
+/// On = brand gradient, yellow icon and track; off = faint glass.
+class _TranslatePill extends StatelessWidget {
+  const _TranslatePill({
+    required this.active,
+    required this.fromLang,
+    required this.toLang,
+    required this.onTap,
+  });
 
   final bool active;
+
+  /// Peer's language → mine: what the switch translates (« JA → FR »).
+  final String fromLang;
+  final String toLang;
   final VoidCallback onTap;
+
+  /// 6 above + 36: the room the header reserves for it.
+  static const double blockHeight = 42;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 10, right: 8),
-        // L'icône « traduire », petite, en haut à gauche du toggle — HORS de
-        // lui : ils ne se touchent que coin contre coin (le coin arrondi de
-        // la pilule laisse un petit vide), au lieu de se chevaucher.
-        child: SizedBox(
-          width: 58,
-          height: 37,
-          child: Stack(
-            children: [
-              Positioned(
-                left: 15,
-                top: 14,
-                child: _pill(),
+    final from = fromLang.trim().split('-').first.toUpperCase();
+    final to = toLang.trim().split('-').first.toUpperCase();
+    final pair = from.isNotEmpty && to.isNotEmpty && from != to
+        ? '$from → $to'
+        : '';
+    final fg = active ? Colors.white : Colors.white.withValues(alpha: 0.6);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 36,
+            padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
+            decoration: BoxDecoration(
+              gradient: active ? SC.brandGradient : null,
+              color: active ? null : Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: active ? 0.3 : 0.2),
               ),
-              Positioned(
-                left: 0,
-                top: 3,
-                child: Icon(
-                  Icons.translate,
-                  size: 15,
-                  color: Colors.white.withValues(alpha: 0.75),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.translate_rounded,
+                  size: 18,
+                  color: active
+                      ? SC.accent
+                      : Colors.white.withValues(alpha: 0.6),
                 ),
-              ),
-            ],
+                const SizedBox(width: 9),
+                Text(
+                  AppStrings.t('call_lang_translation'),
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (pair.isNotEmpty) ...[
+                  const SizedBox(width: 9),
+                  Text(
+                    pair,
+                    style: TextStyle(
+                      color: fg,
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 9),
+                // The switch: 38×24 track, 18 knob.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 38,
+                  height: 24,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? SC.accent
+                        : Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    alignment:
+                        active ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: active ? SC.onAccent : Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  // Sliding pill — bigger so it reads as a real toggle.
-  Widget _pill() {
-    return Container(
-              width: 42,
-              height: 22,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: active
-                    ? SC.online.withValues(alpha: 0.55)
-                    : SC.glassStrong,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: SC.glassBorder),
-              ),
-              child: AnimatedAlign(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                alignment: active
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: active
-                        ? SC.online
-                        : Colors.white.withValues(alpha: 0.40),
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: SC.online.withValues(alpha: 0.55),
-                              blurRadius: 8,
+/// « Hello » in each language — the two floating pills of the empty thread.
+const Map<String, String> _kHello = {
+  'fr': 'Salut',
+  'en': 'Hello',
+  'es': 'Hola',
+  'de': 'Hallo',
+  'it': 'Ciao',
+  'pt': 'Olá',
+  'nl': 'Hoi',
+  'ar': 'مرحبا',
+  'ru': 'Привет',
+  'zh': '你好',
+  'ja': 'こんにちは',
+  'ko': '안녕하세요',
+  'pl': 'Cześć',
+  'tr': 'Merhaba',
+  'uk': 'Привіт',
+  'hi': 'नमस्ते',
+};
+
+/// Never written to each other yet (8c, 3b): the peer's photo with three
+/// blue waves rippling out, « hello » in their language (yellow) and in
+/// mine (glass), and an invitation to write first.
+class _EmptyThread extends StatefulWidget {
+  const _EmptyThread({
+    required this.peerName,
+    required this.photoUrl,
+    required this.peerLang,
+    required this.myLang,
+  });
+
+  final String peerName;
+  final String photoUrl;
+  final String peerLang;
+  final String myLang;
+
+  @override
+  State<_EmptyThread> createState() => _EmptyThreadState();
+}
+
+class _EmptyThreadState extends State<_EmptyThread>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _waves = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _waves.dispose();
+    super.dispose();
+  }
+
+  static String _hello(String lang) =>
+      _kHello[lang.trim().split('-').first.toLowerCase()] ?? '';
+
+  @override
+  Widget build(BuildContext context) {
+    final theirs = _hello(widget.peerLang);
+    var mine = _hello(widget.myLang);
+    if (mine == theirs) mine = '👋';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 300,
+          height: 300,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Three waves, a third of a cycle apart.
+              AnimatedBuilder(
+                animation: _waves,
+                builder: (_, _) => Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Builder(
+                        builder: (_) {
+                          final p = (_waves.value + i / 3) % 1;
+                          final eased = Curves.easeOut.transform(p);
+                          return Opacity(
+                            opacity: (1 - eased) * 0.8,
+                            child: Transform.scale(
+                              scale: 0.6 + eased,
+                              child: Container(
+                                width: 150,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: SC.brandBlue,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ]
-                        : null,
-                  ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
               ),
-            );
+              Container(
+                width: 132,
+                height: 132,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF222222),
+                  border: Border.all(color: SC.brandBlue, width: 3),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: widget.photoUrl.isNotEmpty
+                    ? Image.network(
+                        widget.photoUrl,
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(0, -0.44),
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      )
+                    : Center(
+                        child: ProfileAvatar(
+                          displayName: widget.peerName,
+                          avatarUrl: null,
+                          size: 126,
+                          fontSize: 48,
+                        ),
+                      ),
+              ),
+              if (theirs.isNotEmpty)
+                Positioned(
+                  left: 32,
+                  top: 76,
+                  child: Transform.rotate(
+                    angle: -8 * math.pi / 180,
+                    child: _HelloPill(text: theirs, yellow: true),
+                  ),
+                ),
+              if (mine.isNotEmpty)
+                Positioned(
+                  right: 26,
+                  bottom: 70,
+                  child: Transform.rotate(
+                    angle: 6 * math.pi / 180,
+                    child: _HelloPill(text: mine, yellow: false),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260),
+          child: Text(
+            AppStrings.t('no_messages'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: SC.textPrimary.withValues(alpha: 0.7),
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HelloPill extends StatelessWidget {
+  const _HelloPill({required this.text, required this.yellow});
+
+  final String text;
+  final bool yellow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: yellow ? SC.accent : Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: yellow
+            ? null
+            : Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: yellow ? SC.onAccent : Colors.white,
+          fontSize: 13,
+          fontWeight: yellow ? FontWeight.w800 : FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 
