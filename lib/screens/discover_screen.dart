@@ -1116,8 +1116,10 @@ class _MyCardPreviewScreenState extends State<MyCardPreviewScreen> {
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader();
 
-  /// Hauteur sous la safe area — celle de l'ancienne barre du haut (52).
-  static const double height = 52.0;
+  /// Hauteur sous la safe area. Resserrée (52 → 43) pour que l'écart logo →
+  /// bulles pays soit le même (≈ 16) que bulles pays → carte et carte →
+  /// boutons ; le logo, lui, garde sa place (voir le padding du build).
+  static const double height = 43.0;
 
   /// Le logo d'origine, taille et place d'origine, centré horizontalement
   /// dans la bande. (Le SVG du handoff a été retiré à la demande.)
@@ -1129,9 +1131,10 @@ class _DiscoverHeader extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.center,
-          // Remonté de 6 px dans sa bande : la hauteur de la rangée ne change pas.
+          // Centre à 20 px du haut de la bande, comme avant le resserrement
+          // (43 − 3 = 40 de zone utile).
           child: Padding(
-            padding: EdgeInsets.fromLTRB(6, 0, 6, 12),
+            padding: EdgeInsets.fromLTRB(6, 0, 6, 3),
             child: SwaycoWordmark(),
           ),
         ),
