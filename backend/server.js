@@ -1143,6 +1143,8 @@ app.post('/translation/suggest', _limText, async (req, res) => {
         temperature: 0.7,
         max_tokens: 120,
       }),
+      // Best effort: never hold the request open on a slow provider.
+      signal: AbortSignal.timeout(10000),
     });
     if (!r.ok) return res.json({ suggestions: [] });
     const parsed = await r.json().catch(() => null);
