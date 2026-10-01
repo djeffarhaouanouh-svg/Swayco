@@ -1166,9 +1166,10 @@ class _CountryRow extends StatefulWidget {
   final VoidCallback onFilter;
   final ValueChanged<String> onCountry;
 
-  /// 8 dessus (le retrait des bulles) + bulle. Plus de nom dessous : cette
-  /// hauteur revient à la carte. Suit _kBubble.
-  static const double height = 8 + _kBubble;
+  /// 8 dessus (le retrait des bulles) + bulle + 10 de respiration avant la
+  /// carte. Le nom ne s'affiche plus dessous : le reste de sa place (6 px)
+  /// revient à la carte. Suit _kBubble.
+  static const double height = 8 + _kBubble + 10;
 
   @override
   State<_CountryRow> createState() => _CountryRowState();
