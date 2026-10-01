@@ -27,6 +27,7 @@ import '../services/presence_service.dart';
 import '../services/supabase_service.dart';
 import '../services/translation_api.dart';
 import '../services/translation_cache.dart';
+import '../services/typing_signal.dart';
 import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
@@ -145,6 +146,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// First snapshot received: only then does an empty list mean "you've never
   /// written to each other" (the empty-thread screen), not "still loading".
   bool _messagesLoaded = false;
+
+  /// Typing indicator: I announce when my composer is open; the peer's
+  /// "writing…" bubble shows while [_peerTyping].
+  TypingSignal? _typing;
+  bool _peerTyping = false;
   String _myId = '';
   String _myName = '';
   String _myLang = '';
@@ -450,6 +456,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       meId: id,
     ));
     if (!mounted) return;
+    // « … en train d'écrire » dans les deux sens, tant que le fil est ouvert.
+    _typing = TypingSignal(
+      conversationId: widget.conversationId,
+      myId: id,
+      onPeerTyping: (typing) {
+        if (mounted) setState(() => _peerTyping = typing);
+      },
+    )..start();
     setState(() {
       _myId = id;
       _myName = profile?.firstName.trim() ?? '';
@@ -651,6 +665,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
     _sub?.cancel();
     _reactionSub?.cancel();
     _peerReadSub?.cancel();
+    _typing?.dispose();
     _pollTimer?.cancel();
     _presenceTimer?.cancel();
     _clockTimer?.cancel();
@@ -937,6 +952,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                             onSendImage: _sendImage,
                             onSendGif: _sendGif,
                             autoTranslate: _autoTranslate,
+                            onTypingChanged: (t) => _typing?.setTyping(t),
                             myLang: _myLang,
                             peerLang: _peer?.language ?? '',
                             peerFirstName: (_peer?.displayName.isNotEmpty == true
@@ -1059,17 +1075,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           top: topInset,
           bottom: 96 + MediaQuery.paddingOf(context).bottom,
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: _EmptyThread(
-              peerName: widget.title,
-              photoUrl: (_peer?.avatarUrl.isNotEmpty ?? false)
-                  ? _peer!.avatarUrl
-                  : (_peer?.fallbackPhotoUrl ?? ''),
-              peerLang: _peer?.language ?? '',
-              myLang: _myLang,
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                child: _EmptyThread(
+                  peerName: widget.title,
+                  photoUrl: (_peer?.avatarUrl.isNotEmpty ?? false)
+                      ? _peer!.avatarUrl
+                      : (_peer?.fallbackPhotoUrl ?? ''),
+                  peerLang: _peer?.language ?? '',
+                  myLang: _myLang,
+                ),
+              ),
             ),
-          ),
+            if (_peerTyping)
+              const Positioned(left: 12, bottom: 0, child: _TypingBubble()),
+          ],
         ),
       );
     }
@@ -1134,8 +1156,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
         12,
         96 + MediaQuery.paddingOf(context).bottom,
       ),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) {
+      // The peer's "writing…" bubble is the newest row: index 0 of the
+      // reversed list, under their last message.
+      itemCount: items.length + (_peerTyping ? 1 : 0),
+      itemBuilder: (ctx, index) {
+        if (_peerTyping && index == 0) {
+          return const Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(top: 6, bottom: 4),
+              child: _TypingBubble(),
+            ),
+          );
+        }
+        final i = _peerTyping ? index - 1 : index;
         final item = items[items.length - 1 - i];
         if (item.isDay) {
           return _DaySeparator(day: item.day!);
@@ -2422,9 +2456,14 @@ class _Composer extends StatefulWidget {
     required this.onSendGif,
     required this.autoTranslate,
     required this.myLang,
+    this.onTypingChanged,
     this.peerLang = '',
     this.peerFirstName = '',
   });
+
+  /// The field just opened (`true`) or closed (`false`) — drives the
+  /// "writing…" bubble on the peer's side.
+  final ValueChanged<bool>? onTypingChanged;
 
   /// Langue et prénom du pair — pour « Écris en français, Lucía lit en
   /// espagnol » quand la traduction auto relie deux langues différentes.
@@ -2486,6 +2525,7 @@ class _ComposerState extends State<_Composer>
   void _onFocusChanged() {
     if (_focus.hasFocus == _focused) return;
     _focused = _focus.hasFocus;
+    widget.onTypingChanged?.call(_focused);
     if (_focused) {
       _hintFade.reverse();
     } else {
@@ -3097,6 +3137,86 @@ class _EmptyThreadState extends State<_EmptyThread>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The peer is writing — iMessage's bubble: a received-style bubble with
+/// three dots rising and brightening one after the other. Pops in.
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutBack,
+      builder: (context, t, child) => Transform.scale(
+        scale: t,
+        alignment: Alignment.bottomLeft,
+        child: Opacity(opacity: t.clamp(0, 1), child: child),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: _kBubbleIn,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(6),
+            bottomRight: Radius.circular(20),
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 5),
+                Builder(
+                  builder: (_) {
+                    // Each dot peaks a third of a beat after the previous.
+                    final p = (_c.value - i * 0.18) % 1;
+                    final wave = p < 0.5 ? math.sin(p * 2 * math.pi) : 0.0;
+                    return Transform.translate(
+                      offset: Offset(0, -3 * wave),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white
+                              .withValues(alpha: 0.35 + 0.45 * wave),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
