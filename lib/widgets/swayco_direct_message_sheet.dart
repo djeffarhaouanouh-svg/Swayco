@@ -49,8 +49,6 @@ class _SwaycoDirectMessageSheetState extends State<SwaycoDirectMessageSheet> {
                 const Center(
                   child: PopupBadge(icon: Icons.chat_bubble_rounded, size: 52),
                 ),
-                const SizedBox(height: 14),
-                PopupBody(AppStrings.t('dm_explain')),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _ctrl,
