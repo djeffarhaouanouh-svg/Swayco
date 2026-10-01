@@ -2844,7 +2844,7 @@ class _DirectMessageButtonState extends State<_DirectMessageButton>
 }
 
 /// Le retour arrière posé sur la photo : 44, verre sombre (black .22, blur
-/// 12), sans bordure, icône blanche. Verre Flutter et non natif : une
+/// 12), même liseré que les bulles pays (blanc 20 %, 1 px), icône blanche. Verre Flutter et non natif : une
 /// platform view dans la carte qu'on balaie scintillait (commit 051f0fd).
 class _CardUndoButton extends StatelessWidget {
   const _CardUndoButton({required this.onTap});
@@ -2865,6 +2865,7 @@ class _CardUndoButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.22),
               shape: BoxShape.circle,
+              border: Border.all(color: SC.glassBorderStrong),
             ),
             child: const Icon(
               Icons.replay_rounded,
