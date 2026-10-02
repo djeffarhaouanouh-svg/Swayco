@@ -37,6 +37,7 @@ import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/fade_scale_route.dart';
 import '../widgets/info_bento.dart';
+import '../widgets/settings_hero.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/match_overlay.dart';
@@ -898,7 +899,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _openSettings() async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+      settingsHeroRoute<void>((_) => const SettingsScreen()),
     );
     // Profile data may have changed (e.g. account deleted â ignored;
     // sign-out â routed away by the auth listener).
@@ -1727,11 +1728,9 @@ class _IdentitySection extends StatelessWidget {
                       onTap: onPreview ?? () {},
                     ),
                     const SizedBox(width: 8),
-                    _GlassCircle(
-                      icon: Icons.settings_outlined,
-                      tooltip: AppStrings.t('settings_title'),
-                      onTap: onSettings,
-                    ),
+                    // Au tap, il glisse jusqu'à la place du retour puis les
+                    // Réglages s'ouvrent (voir settings_hero.dart).
+                    SettingsHeroButton(isBack: false, onTap: onSettings),
                   ],
                 ),
               ),

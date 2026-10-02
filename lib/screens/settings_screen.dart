@@ -17,6 +17,7 @@ import '../services/revenue_cat.dart';
 import '../services/supabase_service.dart';
 import '../services/user_prefs.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/settings_hero.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/wheel_picker_sheet.dart';
 import '../widgets/mesh_background.dart';
@@ -502,6 +503,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        // Le retour : le rond de verre où l'engrenage du profil vient se poser
+        // (même place que le retour du profil : 14 du bord, 44 de diamètre).
+        leadingWidth: 72,
+        leading: Navigator.of(context).canPop()
+            ? Padding(
+                padding: const EdgeInsets.only(left: 14),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SettingsHeroButton(
+                    isBack: true,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                ),
+              )
+            : null,
         title: Text(AppStrings.t('settings_title'), style: SCText.h3),
       ),
       body: MeshBackground(
