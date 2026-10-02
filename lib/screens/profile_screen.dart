@@ -1712,6 +1712,12 @@ class _IdentitySection extends StatelessWidget {
                 right: 14,
                 child: Row(
                   children: [
+                    // Retour : ramène sur Discover (l'onglet de ma page profil n'est
+                    // pas une route poussée, il n'y a rien à dépiler).
+                    _GlassCircle(
+                      icon: Icons.arrow_back_rounded,
+                      onTap: () => NavTab.select(NavTab.discover),
+                    ),
                     const Spacer(),
                     _GlassCircle(
                       icon: Icons.visibility_outlined,
