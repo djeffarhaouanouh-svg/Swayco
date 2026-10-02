@@ -511,8 +511,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.only(left: 14),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: SettingsHeroButton(
-                    isBack: true,
+                  child: SettingsBackButton(
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
                 ),

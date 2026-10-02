@@ -3,78 +3,99 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-/// Le rond « engrenage » du profil devient le rond « retour » des Réglages :
-/// au tap, il glisse le long de la barre jusqu'à la place du bouton retour en
-/// roulant sur lui-même, l'engrenage se change en flèche, PUIS la page des
-/// Réglages apparaît (et l'inverse au retour).
-const String settingsHeroTag = 'settings-gear-hero';
+/// Place du rond « retour » des Réglages, comptée depuis le bord gauche : celle
+/// du bouton retour de l'AppBar (14 de marge).
+const double _kBackLeft = 14;
 
-/// Durée totale : la première moitié pour le glissement, la seconde pour
-/// l'apparition de la page.
-const Duration _kDuration = Duration(milliseconds: 760);
-
-/// Ouvre [builder] avec la transition « l'engrenage glisse puis la page
-/// s'ouvre ».
+/// Les Réglages apparaissent en fondu : le rond est DÉJÀ arrivé à la place de
+/// leur bouton retour, la page n'a rien d'autre à animer.
 Route<T> settingsHeroRoute<T>(WidgetBuilder builder) {
   return PageRouteBuilder<T>(
-    transitionDuration: _kDuration,
-    reverseTransitionDuration: _kDuration,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (context, _, _) => builder(context),
-    transitionsBuilder: (_, anim, _, child) => FadeTransition(
-      // La page n'apparaît qu'une fois le rond arrivé (seconde moitié).
-      opacity: CurvedAnimation(
-        parent: anim,
-        // Le rond a fini de glisser à 45 % ; un temps de pose, puis la page.
-        curve: const Interval(0.58, 1, curve: Curves.easeOut),
-      ),
-      child: child,
-    ),
+    transitionsBuilder: (_, anim, _, child) =>
+        FadeTransition(opacity: anim, child: child),
   );
 }
 
-/// Le rond de verre (44) partagé : engrenage sur le profil, flèche retour
-/// dans les Réglages. [t] 0 = engrenage, 1 = flèche (le vol mélange les deux).
-class SettingsHeroButton extends StatelessWidget {
-  const SettingsHeroButton({super.key, required this.isBack, this.onTap});
+/// Le rond « engrenage » du profil. Au tap, il glisse seul jusqu'à la place
+/// du bouton retour en roulant sur lui-même — l'engrenage devient flèche en
+/// chemin. Il s'y POSE, et seulement alors la page des Réglages s'ouvre
+/// ([onOpen]). De retour sur le profil, il repart à sa place.
+///
+/// Deux temps distincts, et non un « vol » de Hero : un Hero suit la courbe de
+/// la transition de page, et le rond filait d'un coup comme une étoile
+/// filante au lieu de se déplacer.
+class SettingsHeroButton extends StatefulWidget {
+  const SettingsHeroButton({super.key, required this.onOpen});
 
-  final bool isBack;
-  final VoidCallback? onTap;
+  /// Ouvre la page ; la future se termine quand on revient sur le profil.
+  final Future<void> Function() onOpen;
+
+  @override
+  State<SettingsHeroButton> createState() => _SettingsHeroButtonState();
+}
+
+class _SettingsHeroButtonState extends State<SettingsHeroButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+  bool _busy = false;
+  double _distance = 0;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _go() async {
+    if (_busy) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    _busy = true;
+    // Distance jusqu'à la place du retour, mesurée sur l'écran.
+    _distance = box.localToGlobal(Offset.zero).dx - _kBackLeft;
+    // 1. Le rond se déplace et arrive.
+    await _c.forward(from: 0);
+    if (!mounted) return;
+    // 2. Un temps de pose, posé à destination.
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    // 3. Puis la page.
+    await widget.onOpen();
+    if (!mounted) return;
+    // Retour sur le profil : il repart à sa place.
+    await _c.reverse();
+    _busy = false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Hero(
-      tag: settingsHeroTag,
-      // Pendant le vol : le rond roule (un demi-tour vers la gauche) et
-      // l'engrenage se fond en flèche.
-      flightShuttleBuilder: (_, anim, direction, _, _) => AnimatedBuilder(
-        animation: anim,
-        builder: (_, _) => _GlassDisc(t: _firstHalf(anim.value)),
-      ),
-      // Trajet en ligne droite le long de la barre (pas l'arc Material),
-      // bouclé dans la première moitié : la page s'ouvre ensuite.
-      createRectTween: (a, b) => _FirstHalfRectTween(begin: a, end: b),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: _GlassDisc(t: isBack ? 1 : 0),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _go,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) {
+          final t = Curves.easeInOutCubic.transform(_c.value);
+          return Transform.translate(
+            offset: Offset(-_distance * t, 0),
+            child: SettingsDisc(t: t),
+          );
+        },
       ),
     );
   }
 }
 
-/// 0 → 0,5 de l'animation de la route ramené sur 0 → 1 (le reste : arrivé).
-double _firstHalf(double v) =>
-    Curves.easeInOut.transform((v / 0.45).clamp(0.0, 1.0));
-
-class _FirstHalfRectTween extends RectTween {
-  _FirstHalfRectTween({super.begin, super.end});
-
-  @override
-  Rect? lerp(double t) => super.lerp(_firstHalf(t));
-}
-
-class _GlassDisc extends StatelessWidget {
-  const _GlassDisc({required this.t});
+/// Le rond de verre (44). [t] 0 = engrenage, 1 = flèche retour ; entre les
+/// deux, il roule (un demi-tour vers la gauche) et les icônes se fondent.
+class SettingsDisc extends StatelessWidget {
+  const SettingsDisc({super.key, required this.t});
 
   final double t;
 
@@ -96,7 +117,6 @@ class _GlassDisc extends StatelessWidget {
               ),
             ),
             child: Transform.rotate(
-              // Il roule vers la gauche en glissant.
               angle: -t * math.pi,
               child: Stack(
                 alignment: Alignment.center,
@@ -127,6 +147,23 @@ class _GlassDisc extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Le bouton retour des Réglages : le même rond, déjà en flèche, exactement
+/// là où le rond du profil vient de se poser.
+class SettingsBackButton extends StatelessWidget {
+  const SettingsBackButton({super.key, this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: const SettingsDisc(t: 1),
     );
   }
 }

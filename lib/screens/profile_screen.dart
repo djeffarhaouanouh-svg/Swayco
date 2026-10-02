@@ -1446,7 +1446,7 @@ class _IdentitySection extends StatelessWidget {
   final VoidCallback onEdit;
 
   /// Own profile: open Settings (gear next to the name).
-  final VoidCallback onSettings;
+  final Future<void> Function() onSettings;
 
   /// Own profile: pencil beside the PDP â account edit bottom sheet.
   final VoidCallback? onEditAccount;
@@ -1730,7 +1730,7 @@ class _IdentitySection extends StatelessWidget {
                     const SizedBox(width: 8),
                     // Au tap, il glisse jusqu'à la place du retour puis les
                     // Réglages s'ouvrent (voir settings_hero.dart).
-                    SettingsHeroButton(isBack: false, onTap: onSettings),
+                    SettingsHeroButton(onOpen: onSettings),
                   ],
                 ),
               ),
