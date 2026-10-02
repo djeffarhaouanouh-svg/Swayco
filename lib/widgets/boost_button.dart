@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/paywall_screen.dart';
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
 /// "Booster mon profil" — opens the Boost offer screen ([showBoostPaywall]),
 /// which buys the consumable Boost package through RevenueCat. The backend
@@ -14,10 +15,15 @@ class BoostButton extends StatelessWidget {
     super.key,
     required this.boostedUntil,
     required this.onPurchased,
+    this.wide = false,
   });
 
   final DateTime? boostedUntil;
   final Future<void> Function() onPurchased;
+
+  /// Profil 6b : barre pleine largeur de 56 (au dégradé de marque, rond jaune
+  /// + fusée) au lieu du bouton qui épouse son contenu.
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +37,71 @@ class BoostButton extends StatelessWidget {
       label = AppStrings.t('boost_active_until', args: {'time': time});
     } else {
       label = AppStrings.t('boost_my_profile');
+    }
+    if (wide) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: active
+            ? null
+            : () => showBoostPaywall(context, onPurchased: onPurchased),
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: active
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+                    stops: [0, 0.52, 1],
+                  ),
+            color: active ? SC.brandBlue.withValues(alpha: 0.18) : null,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: active
+                ? null
+                : [
+                    BoxShadow(
+                      color: SC.brandBlue.withValues(alpha: 0.4),
+                      blurRadius: 30,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: SC.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.rocket_launch_rounded,
+                  size: 19,
+                  color: SC.onAccent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: popupDisplay(
+                    fontSize: 15,
+                    letterSpacing: -0.3,
+                    color: active ? SC.brandCyan : Colors.white,
+                  ),
+                ),
+              ),
+              if (!active)
+                const Icon(Icons.chevron_right, size: 22, color: Colors.white),
+            ],
+          ),
+        ),
+      );
     }
     final radius = BorderRadius.circular(16);
     // Même dégradé que le bouton message de Discover ; lueur bien plus

@@ -20,6 +20,7 @@ class InterestPill extends StatelessWidget {
     super.key,
     required this.label,
     this.onPhoto = false,
+    this.prominent = false,
     this.onTap,
   });
 
@@ -29,6 +30,9 @@ class InterestPill extends StatelessWidget {
   /// Posée sur une photo : verre flouté (lisible sur n'importe quel cliché).
   /// Sinon, aplat sombre — pas de flou inutile sur un fond uni.
   final bool onPhoto;
+
+  /// Profil : puce un peu plus marquée (blanc 10 %, bord 20 %, 13 / 800).
+  final bool prominent;
   final VoidCallback? onTap;
 
   static const double padH = 12;
@@ -42,15 +46,27 @@ class InterestPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: padH, vertical: 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: prominent ? 13 : padH,
+        vertical: prominent ? 8 : 7,
+      ),
       decoration: BoxDecoration(
         color: onPhoto
             ? Colors.black.withValues(alpha: 0.28)
-            : Colors.white.withValues(alpha: 0.07),
+            : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: prominent ? 0.20 : 0.16),
+        ),
       ),
-      child: Text(label, maxLines: 1, softWrap: false, style: textStyle),
+      child: Text(
+        label,
+        maxLines: 1,
+        softWrap: false,
+        style: prominent
+            ? textStyle.copyWith(fontWeight: FontWeight.w800)
+            : textStyle,
+      ),
     );
     final surface = onPhoto
         ? ClipRRect(

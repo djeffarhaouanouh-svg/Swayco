@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/analytics.dart';
@@ -32,7 +34,6 @@ import '../services/user_prefs.dart';
 import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
-import '../widgets/glass.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
@@ -1085,6 +1086,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Stack(
           children: [
             SafeArea(
+              top: false,
               bottom: false,
               child: RefreshIndicator(
                 color: SC.accent,
@@ -1094,7 +1096,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          const SizedBox(height: 120),
+                          SizedBox(height: MediaQuery.paddingOf(context).top + 120),
                           Center(
                             child: Column(
                               children: [
@@ -1120,15 +1122,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                         // des pages Likes / Messages (fromLTRB(16, ...)), pour
                         // que les cartes ("Compte", "Mes infos"…) s'alignent
                         // sur le bord gauche des cartes de ces pages.
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          // Own profile: title sits at the very top like the
-                          // other tabs (Discover / Messages). Viewer: just
-                          // clear the transparent AppBar drawn behind it, kept
-                          // tight so the whole profile sits higher on screen.
-                          _isViewingOther ? 36 : 12,
-                          16,
-                          32 + 64 + MediaQuery.paddingOf(context).bottom,
+                        // Pleine largeur : la couverture va jusqu'aux bords et sous la barre
+                        // d'état ; chaque section pose sa propre gouttière.
+                        padding: EdgeInsets.only(
+                          bottom: 32 + 64 + MediaQuery.paddingOf(context).bottom,
                         ),
                         children: [
                           _IdentitySection(
@@ -1174,6 +1171,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             onMessagePeer: _openChatWithPeer,
                             aboveGallery: (!_isViewingOther && !widget.preview)
                                 ? BoostButton(
+                                    wide: true,
                                     boostedUntil: _remote?.boostedUntil,
                                     onPurchased: _awaitBoostCredit,
                                   )
@@ -1196,10 +1194,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Padding(
                     // Un peu d'air : le retour ne colle plus au bord (sans
                     // pour autant le pousser vers le centre).
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
                     child: Row(
                       children: [
-                        GlassIconButton(
+                        _GlassCircle(
                           icon: Icons.arrow_back_rounded,
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
@@ -1209,10 +1207,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         if (!widget.preview)
                         PopupMenuButton<String>(
                           tooltip: AppStrings.t('tooltip_more'),
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: SC.textPrimary,
-                          ),
+                          padding: EdgeInsets.zero,
                           color: SC.menu,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1287,6 +1282,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                             ),
                           ],
+                          child: const _GlassCircle(icon: Icons.more_vert),
                         ),
                       ],
                     ),
@@ -1516,465 +1512,613 @@ class _IdentitySection extends StatelessWidget {
     return viewerMode ? _buildViewer(context) : _buildOwn(context);
   }
 
-  /// The round PDP bubble â the independent profile picture ([avatarUrl])
-  /// shown as a circular avatar at the top of both layouts. On my own
-  /// profile it carries the camera badge and a tap sets a new PDP (separate
-  /// from the gallery); read-only (no badge / tap) in the viewer.
-  ///
-  /// Own profile: the edit pencil sits mid-height of the bubble, pushed to
-  /// the right into the empty space (not on the photo). A matching left
-  /// spacer keeps the bubble centred. Tap â account edit bottom sheet.
-  Widget _pdpBubble({required bool editable}) {
-    // Par défaut la PDP EST la photo Discover (photos[0]). Une PDP choisie
-    // manuellement (avatar_url, via le badge appareil-photo) la remplace.
-    // Sans photo du tout -> initiales.
+  // ── Habillage 6b : photo plein cadre ──────────────────────────────────────
+
+  /// Hauteur de la couverture, barre d'état comprise (elle démarre à y = 0).
+  static const double _coverHeight = 380;
+
+  /// Le fond de la page, pour le fondu de la couverture.
+  static const Color _pageBg = Color(0xFF0E0E0E);
+
+  /// La couverture : la PDP — à défaut la première photo — en plein cadre,
+  /// recouverte d'un fondu qui la raccorde au fond de la page. Sur mon profil
+  /// un tap = choisir une nouvelle PDP.
+  Widget _cover({required bool editable, required double alignY}) {
     final pdp = avatarUrl.isNotEmpty
         ? avatarUrl
-        : (photos.isNotEmpty ? photos.first : null);
-    const pencilSize = 34.0;
-    const pencilGap = 14.0;
-    final bubble = Stack(
-      alignment: Alignment.bottomRight,
-      children: [
-        ProfileAvatar(
-          displayName: displayName,
-          avatarUrl: pdp,
-          // Un avatar_url périmé (fichier supprimé) retombe sur la photo
-          // Discover au lieu des initiales.
-          fallbackUrl: photos.isNotEmpty ? photos.first : null,
-          size: 128,
-          fontSize: 54,
-          onTap: editable ? onPickAvatar : null,
-        ),
-        if (editable)
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: SC.accentSoft,
-              shape: BoxShape.circle,
-              border: Border.all(color: SC.bg, width: 2),
-            ),
-            child: const Icon(
-              Icons.camera_alt,
-              size: 14,
-              color: SC.onAccent,
-            ),
+        : (photos.isNotEmpty ? photos.first : '');
+    // Un avatar_url périmé retombe sur la première photo de la galerie.
+    final fallback = photos.isNotEmpty ? photos.first : '';
+    Widget placeholder() => ColoredBox(
+          color: const Color(0xFF1B2A55),
+          child: Center(
+            child: editable
+                ? const Icon(Icons.photo_camera, size: 56, color: Colors.white54)
+                : ProfileAvatar(displayName: displayName, size: 120),
           ),
-        // Viewer mode: a green presence dot on the lower-right of the PDP
-        // when the peer is online (replaces the old "en ligne" text line).
-        if (!editable && online)
-          Positioned(
-            right: 10,
-            bottom: 10,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: SC.online,
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.bg, width: 3),
+        );
+    Widget image;
+    if (pdp.isEmpty) {
+      image = placeholder();
+    } else {
+      image = Image.network(
+        pdp,
+        fit: BoxFit.cover,
+        alignment: Alignment(0, alignY),
+        width: double.infinity,
+        height: double.infinity,
+        frameBuilder: popInFrameBuilder,
+        errorBuilder: (_, _, _) => fallback.isEmpty || fallback == pdp
+            ? placeholder()
+            : Image.network(
+                fallback,
+                fit: BoxFit.cover,
+                alignment: Alignment(0, alignY),
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (_, _, _) => placeholder(),
               ),
-            ),
-          ),
-      ],
-    );
-    if (!editable) return Center(child: bubble);
-
-    final pencil = Material(
-      color: Colors.white.withValues(alpha: 0.10),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onEditAccount ?? onSettings,
-        child: Tooltip(
-          message: AppStrings.t('settings_section_account'),
-          child: Container(
-            width: pencilSize,
-            height: pencilSize,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.22),
-              ),
-            ),
-            child: const Icon(
-              Icons.edit,
-              size: 17,
-              color: SC.textPrimary,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+      );
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: editable ? onPickAvatar : null,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Mirror the pencil+gap so the bubble stays visually centred.
-          const SizedBox(width: pencilSize + pencilGap),
-          bubble,
-          const SizedBox(width: pencilGap),
-          pencil,
+          image,
+          const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x590E0E0E), // 35 %
+                    Color(0x000E0E0E),
+                    Color(0xBF0E0E0E), // 75 %
+                    _pageBg,
+                  ],
+                  stops: [0, 0.30, 0.78, 1],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// My own profile â capture-1 layout: a "Ton profil" header with an edit
-  /// pencil, the round PDP bubble, name + @handle, the bio, the stats row
-  /// (with the settings gear), then the "Tes photos" gallery and the
-  /// "Emojis" section. Everything is editable in place; the pencil opens the
-  /// name / language editor.
+  /// Le drapeau du pays (vrai drapeau, hauteur 22), l'emoji à défaut.
+  Widget _flagImage() {
+    final iso = countryIso2For(country);
+    if (iso.isEmpty) {
+      return flag.isEmpty
+          ? const SizedBox.shrink()
+          : Text(flag, style: const TextStyle(fontSize: 20, height: 1));
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Image.network(
+        'https://flagcdn.com/w80/${iso.toLowerCase()}.png',
+        height: 22,
+        errorBuilder: (_, _, _) => flag.isEmpty
+            ? const SizedBox(height: 22)
+            : Text(flag, style: const TextStyle(fontSize: 20, height: 1)),
+      ),
+    );
+  }
+
+  /// Prénom (Unbounded-like 36) + drapeau, puis @pseudo — posés sur le bas de
+  /// la couverture. [editableName] : le prénom s'édite en place (mon profil).
+  Widget _identityBlock({required bool editableName}) {
+    final nameStyle = popupDisplay(
+      fontSize: 36,
+      letterSpacing: -1.8,
+      height: 1,
+      color: Colors.white,
+    ).copyWith(
+      shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+    );
+    final shown = displayName.trim().isEmpty
+        ? AppStrings.t('profile_anonymous')
+        : displayName;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: editableName
+                  // _InlineEditable pose 8 px de marge : on les reprend pour
+                  // que le prénom s'aligne sur le @pseudo.
+                  ? Transform.translate(
+                      offset: const Offset(-8, 0),
+                      child: _InlineEditable(
+                        value: displayName,
+                        placeholder: AppStrings.t('profile_anonymous'),
+                        onSave: onEditName,
+                        maxLength: profileNameMaxLength,
+                        style: nameStyle,
+                      ),
+                    )
+                  : Text(
+                      shown,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: nameStyle,
+                    ),
+            ),
+            if (flag.isNotEmpty || country.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              _flagImage(),
+            ],
+          ],
+        ),
+        SizedBox(height: editableName ? 0 : 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Pair en ligne : le point vert qui était sur la PDP ronde.
+            if (!editableName && online) ...[
+              Container(
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: SC.online,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.ibmPlexMono(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Mon profil — 6b : couverture plein cadre (œil + engrenage en verre),
+  /// prénom / drapeau / @pseudo posés sur le fondu et bouton caméra ; puis
+  /// Boost, « Mes photos » (vignettes 104 × 138) et le panneau « Mes infos ».
   Widget _buildOwn(BuildContext context) {
-    final photosTitle = photos.isEmpty
-        ? AppStrings.t('profile_photos_section')
-        : '${AppStrings.t('profile_photos_section')} (${photos.length})';
+    final safeTop = MediaQuery.paddingOf(context).top;
+    final photosCount = photos.isEmpty ? '' : '(${photos.length})';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header â "Ton profil" title with the settings gear pinned to the
-        // top-right corner of the page.
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                AppStrings.t('onb_profile_title'),
-                style: SCText.h1,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Åil = aperÃ§u de mon profil vu de l'extÃ©rieur. Couleur cyan
-            // (inversÃ©e avec l'engrenage, qui est passÃ© en verre gris).
-            Material(
-              color: SC.accent.withValues(alpha: 0.15),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onPreview ?? () {},
-                child: Tooltip(
-                  message: AppStrings.t('profile_preview'),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
+        SizedBox(
+          height: _coverHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(child: _cover(editable: true, alignY: -0.45)),
+              Positioned(
+                top: safeTop + 6,
+                left: 14,
+                right: 14,
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    _GlassCircle(
+                      icon: Icons.visibility_outlined,
+                      tooltip: AppStrings.t('profile_preview'),
+                      onTap: onPreview ?? () {},
                     ),
-                    child: const Icon(
-                      Icons.visibility_outlined,
-                      size: 21,
-                      color: SC.accent,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 26),
-        // Round PDP bubble (the independent avatar) â tap to set a new PDP.
-        _pdpBubble(editable: true),
-        const SizedBox(height: 14),
-        // Name centred under the PDP, with a cyan edit bubble towards the
-        // right (pulled in 20px from the edge). The left spacer (64 = bubble
-        // 44 + margin 20) keeps the name centred.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 76 = le bouton (44) + sa marge droite (32) : le prÃ©nom reste
-            // centrÃ© malgrÃ© le bouton d'un seul cÃ´tÃ©.
-            const SizedBox(width: 76),
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: _InlineEditable(
-                      value: displayName,
-                      placeholder: AppStrings.t('profile_anonymous'),
-                      onSave: onEditName,
-                      maxLength: profileNameMaxLength,
-                      style: const TextStyle(
-                        color: SC.textPrimary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (flag.isNotEmpty) ...[
                     const SizedBox(width: 8),
-                    Text(flag, style: const TextStyle(fontSize: 18)),
+                    _GlassCircle(
+                      icon: Icons.settings_outlined,
+                      tooltip: AppStrings.t('settings_title'),
+                      onTap: onSettings,
+                    ),
                   ],
-                ],
-              ),
-            ),
-            // ParamÃ¨tres (Ã  la place du crayon), en verre gris â couleur
-            // inversÃ©e avec l'Åil. L'Ã©dition du nom / de la bio se fait en
-            // tapant le texte directement.
-            Material(
-              color: Colors.white.withValues(alpha: 0.10),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onSettings,
-                child: Tooltip(
-                  message: AppStrings.t('settings_title'),
-                  child: Container(
-                    // MÃªme gabarit que l'Åil : 44 de cÃ´tÃ©, icÃ´ne 21.
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.settings_outlined,
-                      size: 21,
-                      color: SC.textPrimary,
-                    ),
-                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 32),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          handle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: SC.textMuted, fontSize: 13),
-        ),
-        const SizedBox(height: 24),
-        if (aboveGallery != null) ...[
-          Center(child: aboveGallery!),
-          const SizedBox(height: 20),
-        ],
-        // Photos EN HAUT : "Tes photos (n)" + galerie horizontale.
-        _ProfileSectionHeader(
-          photosTitle,
-          trailing: const _RewardHint(points: 40),
-        ),
-        const SizedBox(height: 12),
-        _PhotoGallery(
-          photos: photos,
-          viewerMode: false,
-          onPick: onPickPhoto,
-          onRemove: onRemovePhoto,
-          likesByPhoto: likesByPhoto,
-          onTapLikes: onTapLikes,
-          onReorderPhotos: onReorderPhotos,
-        ),
-        const SizedBox(height: 10),
-        // â hint â juste sous le cadre photo. Taps jump to Settings where
-        // "Me cacher de mon pays" lives.
-        _DiscoverVisibilityHint(
-          onTap: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 30,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: _identityBlock(editableName: true)),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onPickAvatar,
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: const BoxDecoration(
+                          color: SC.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.photo_camera,
+                          size: 22,
+                          color: SC.onAccent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 24),
-        // "Mes infos" : un seul panneau qui porte la bio (en haut), les faits
-        // perso, puis les centres d'intÃ©rÃªt (en bas).
-        _ProfileSectionHeader(
-          AppStrings.t('info_section_title'),
-          trailing: const _RewardHint(),
+        if (aboveGallery != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: aboveGallery!,
+          ),
+        // « Mes photos (n) » + « +40 pts ».
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+          child: _ProfileSectionHeader(
+            AppStrings.t('profile_photos_section'),
+            suffix: photosCount,
+            trailing: const _RewardHint(points: 40),
+          ),
         ),
         const SizedBox(height: 12),
-        _PersonalInfoSection(
-          profile: personalInfo,
-          onSave: onSavePersonalInfo,
-          // Bio en haut du panneau â Ã©dition en place, placeholder si vide.
-          top: _InlineEditable(
-            value: bio,
-            placeholder: _bioPlaceholder,
-            onSave: onEditBio,
-            maxLength: profileBioMaxLength,
-            maxLines: 3,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 15.5,
-              height: 1.4,
+        // La rangée déborde à droite : pas de marge de ce côté.
+        Padding(
+          padding: const EdgeInsets.only(left: 18),
+          child: _PhotoGallery(
+            photos: photos,
+            viewerMode: false,
+            onPick: onPickPhoto,
+            onRemove: onRemovePhoto,
+            likesByPhoto: likesByPhoto,
+            onTapLikes: onTapLikes,
+            onReorderPhotos: onReorderPhotos,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+          // Sous la rangée : mène aux Réglages, où vit « Me cacher de mon
+          // pays ».
+          child: _DiscoverVisibilityHint(
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
             ),
           ),
-          // Centres d'intÃ©rÃªt Ã  l'intÃ©rieur du panneau (choix unique).
-          bottom: _InterestsSection(
-            interests: interests,
-            onSave: onEditInterests,
-            country: country,
-            compact: true,
+        ),
+        // « Mes infos » : un seul panneau — bio, faits perso, puis les centres
+        // d'intérêt.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+          child: _ProfileSectionHeader(
+            AppStrings.t('info_section_title'),
+            trailing: const _RewardHint(),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: _PersonalInfoSection(
+            profile: personalInfo,
+            onSave: onSavePersonalInfo,
+            top: _InlineEditable(
+              value: bio,
+              placeholder: _bioPlaceholder,
+              onSave: onEditBio,
+              maxLength: profileBioMaxLength,
+              maxLines: 3,
+              style: const TextStyle(
+                color: SC.textPrimary,
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+            bottom: _InterestsSection(
+              interests: interests,
+              onSave: onEditInterests,
+              country: country,
+              compact: true,
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// Someone else's profile (read-only). Photo gallery + name/handle +
-  /// stats + the Message / Follow-back / Add action stack, then the peer's
-  /// emojis and bio when present.
+  /// Le profil d'un autre — 6b : même couverture (retour et ⋮ sont posés par
+  /// la page), identité sur le fondu, Message / Matched en pilules, puis la
+  /// grille « Ses photos » et le panneau bio + centres d'intérêt en lecture
+  /// seule.
   Widget _buildViewer(BuildContext context) {
     final emptyBio = bio.trim().isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Round PDP bubble (the first photo as a circular avatar) at the top â
-        // shows the user's initials when they have no photo yet.
-        _pdpBubble(editable: false),
-        const SizedBox(height: 16),
-        // Centred name + flag + handle. Falls back to the anonymous label
-        // when the peer has no display name set.
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                displayName.trim().isEmpty
-                    ? AppStrings.t('profile_anonymous')
-                    : displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: SC.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            if (flag.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Text(flag, style: const TextStyle(fontSize: 18)),
-            ],
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          handle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: SC.textMuted, fontSize: 13),
-        ),
-        // (Online presence is now a green dot on the PDP â see _pdpBubble.)
-        // Bio (read-only) â between the PDP/name block and the stats, centred.
-        // Translated into the viewer's UI language when it differs from the
-        // peer's spoken language.
-        if (!emptyBio) ...[
-          const SizedBox(height: 14),
-          TranslatedProfileText(
-            text: bio,
-            profileId: personalInfo?.id ?? handle,
-            field: 'bio',
-            fromLang: personalInfo?.language ?? '',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: SC.textPrimary,
-              fontSize: 16.5,
-              height: 1.4,
-            ),
-          ),
-        ],
-        // Action stack. When I've blocked this peer the whole stack
-        // collapses to a single "DÃ©bloquer" CTA â the match actions and the
-        // Message button would read as wrong on a profile I've cut off.
-        // Otherwise: Message + one match action, by relation:
-        //  â¢ we matched â "MatchÃ©" (inert badge).
-        //  â¢ they liked me first â "Accepter" (one tap = match).
-        //  â¢ I liked them, no answer yet â "EnvoyÃ©".
-        //  â¢ nobody liked anybody â "Matcher" (sends the like).
-        // En aperÃ§u de mon propre profil : aucune action (on ne se matche /
-        // bloque pas soi-mÃªme).
-        if (!preview) ...[
-        const SizedBox(height: 16),
-        if (peerBlocked) ...[
-          _GradientActionButton(
-            label: AppStrings.t('unblock'),
-            icon: Icons.lock_open,
-            onTap: onToggleBlock ?? () {},
-          ),
-        ] else ...[
-          // Message (et donc l'appel, qui vit dans la conversation) n'existe
-          // qu'entre matchs : avant, on ne peut que liker / accepter.
-          if (matched) ...[
-            _GradientActionButton(
-              label: AppStrings.t('profile_message'),
-              icon: Icons.chat_bubble_outline,
-              onTap: onMessagePeer ?? () {},
-              glass: true,
-            ),
-            if (!peerBlockedMe) const SizedBox(height: 10),
-          ],
-          // The peer blocked me â their edge with me is dead on their side,
-          // so hide the match actions.
-          if (!peerBlockedMe) ...[
-            if (matched) ...[
-              _GradientActionButton(
-                label: AppStrings.t('match_matched'),
-                icon: Icons.favorite,
-                onTap: () {},
-              ),
-            ] else if (peerLikedMe) ...[
-              const SizedBox(height: 10),
-              _GradientActionButton(
-                label: AppStrings.t('match_cta'),
-                icon: Icons.favorite,
-                onTap: onAcceptPeer ?? () {},
-              ),
-            ] else if (iLiked) ...[
-              const SizedBox(height: 10),
-              _GradientActionButton(
-                label: AppStrings.t('friendship_sent'),
-                icon: Icons.schedule,
-                onTap: () {},
-                subdued: true,
-              ),
-            ] else ...[
-              const SizedBox(height: 10),
-              _GradientActionButton(
-                label: AppStrings.t('match_cta'),
-                icon: Icons.favorite_border,
-                onTap: onLikePeer ?? () {},
-              ),
-            ],
-          ],
-        ],
-        ],
-        // Centres d'intÃ©rÃªt (read-only) â just above the photos.
-        if (interests.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _ProfileSectionHeader(AppStrings.t('profile_interests_section')),
-          const SizedBox(height: 12),
-          // Mêmes puces que la carte Découvrir (emoji + libellé).
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        SizedBox(
+          height: _coverHeight,
+          child: Stack(
             children: [
-              for (final tag in interests)
-                InterestPill(label: interestPillText(tag)),
+              Positioned.fill(child: _cover(editable: false, alignY: -0.4)),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 30,
+                child: _identityBlock(editableName: false),
+              ),
             ],
           ),
-        ],
-        // Grille photos (2 colonnes).
-        const SizedBox(height: 24),
-        _PeerMediaStack(
-          photos: photos,
-          likedPhotoUrls: likedPhotoUrls,
-          onTogglePhotoLike: onTogglePhotoLike,
         ),
+        // Actions. Bloqué par moi → un seul « Débloquer » ; sinon Message (entre
+        // matchs seulement) + une action de match selon la relation :
+        //  · matchés → « Matched » (inerte) ;
+        //  · il m'a liké → « Accepter » (un tap = match) ;
+        //  · j'ai liké, sans réponse → « Envoyé » ;
+        //  · rien → « Matcher » (envoie le like).
+        // Aperçu de mon propre profil : aucune action.
+        if (!preview)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (peerBlocked)
+                  _GradientActionButton(
+                    label: AppStrings.t('unblock'),
+                    icon: Icons.lock_open,
+                    onTap: onToggleBlock ?? () {},
+                  )
+                else ...[
+                  if (matched) ...[
+                    _GradientActionButton(
+                      label: AppStrings.t('profile_message'),
+                      icon: Icons.chat_bubble,
+                      onTap: onMessagePeer ?? () {},
+                      glass: true,
+                    ),
+                    if (!peerBlockedMe) const SizedBox(height: 10),
+                  ],
+                  if (!peerBlockedMe) ...[
+                    if (matched)
+                      _GradientActionButton(
+                        label: AppStrings.t('match_matched'),
+                        icon: Icons.favorite,
+                        onTap: () {},
+                      )
+                    else if (peerLikedMe)
+                      _GradientActionButton(
+                        label: AppStrings.t('match_cta'),
+                        icon: Icons.favorite,
+                        onTap: onAcceptPeer ?? () {},
+                      )
+                    else if (iLiked)
+                      _GradientActionButton(
+                        label: AppStrings.t('friendship_sent'),
+                        icon: Icons.schedule,
+                        onTap: () {},
+                        subdued: true,
+                      )
+                    else
+                      _GradientActionButton(
+                        label: AppStrings.t('match_cta'),
+                        icon: Icons.favorite_border,
+                        onTap: onLikePeer ?? () {},
+                      ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        // « Ses photos (n) » + grille 2 colonnes.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 26, 18, 0),
+          child: _ProfileSectionHeader(
+            AppStrings.t('peer_photos_section'),
+            suffix: photos.isEmpty ? '' : '(${photos.length})',
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: _PeerMediaStack(
+            photos: photos,
+            likedPhotoUrls: likedPhotoUrls,
+            onTogglePhotoLike: onTogglePhotoLike,
+          ),
+        ),
+        // Bio + centres d'intérêt : le panneau « Mes infos », sans rien
+        // d'éditable.
+        if (!emptyBio || interests.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: _infoPanelDecoration,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!emptyBio)
+                    // Traduite dans la langue de l'interface quand elle diffère
+                    // de celle que le pair parle.
+                    TranslatedProfileText(
+                      text: bio,
+                      profileId: personalInfo?.id ?? handle,
+                      field: 'bio',
+                      fromLang: personalInfo?.language ?? '',
+                      textAlign: TextAlign.start,
+                      style: const TextStyle(
+                        color: SC.textPrimary,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                  if (!emptyBio && interests.isNotEmpty)
+                    const SizedBox(height: 14),
+                  if (interests.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Text(
+                          kFactEmojiInterests,
+                          style: TextStyle(fontSize: 17),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          AppStrings.t('profile_interests_section'),
+                          style: const TextStyle(
+                            color: SC.textMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in interests)
+                          InterestPill(
+                            label: interestPillText(tag),
+                            prominent: true,
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
+}
+
+/// Le panneau « Mes infos » (et son pendant en lecture seule chez un pair) :
+/// rayon 24, fond blanc 6 %, bord blanc 12 %.
+final BoxDecoration _infoPanelDecoration = BoxDecoration(
+  color: Colors.white.withValues(alpha: 0.06),
+  borderRadius: BorderRadius.circular(24),
+  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+);
+
+/// Rond de 44 en verre (blanc 13 %, bord blanc 30 % de 1,2 px, flou 20) — les
+/// boutons posés sur la couverture.
+class _GlassCircle extends StatelessWidget {
+  const _GlassCircle({required this.icon, this.onTap, this.tooltip});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final circle = ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.13),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.3),
+              width: 1.2,
+            ),
+          ),
+          child: Icon(icon, size: 22, color: Colors.white),
+        ),
+      ),
+    );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: tooltip == null ? circle : Tooltip(message: tooltip!, child: circle),
+    );
+  }
+}
+
+/// Un cadre à bord POINTILLÉ (les cases « Ajouter » du profil).
+class _DashedBox extends StatelessWidget {
+  const _DashedBox({
+    required this.child,
+    required this.color,
+    required this.radius,
+    this.fill,
+    this.strokeWidth = 1.5,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final Widget child;
+  final Color color;
+  final Color? fill;
+  final double radius;
+  final double strokeWidth;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedRRectPainter(
+        color: color,
+        fill: fill,
+        radius: radius,
+        strokeWidth: strokeWidth,
+      ),
+      child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  const _DashedRRectPainter({
+    required this.color,
+    required this.fill,
+    required this.radius,
+    required this.strokeWidth,
+  });
+
+  final Color color;
+  final Color? fill;
+  final double radius;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = RRect.fromRectAndRadius(
+      (Offset.zero & size).deflate(strokeWidth / 2),
+      Radius.circular(radius),
+    );
+    if (fill != null) canvas.drawRRect(rrect, Paint()..color = fill!);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    final dash = strokeWidth * 3.2;
+    final gap = strokeWidth * 2.4;
+    for (final metric in (Path()..addRRect(rrect)).computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(d, math.min(d + dash, metric.length)),
+          paint,
+        );
+        d += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRRectPainter old) =>
+      old.color != color ||
+      old.fill != fill ||
+      old.radius != radius ||
+      old.strokeWidth != strokeWidth;
 }
 
 /// Grille 2 colonnes de photos sur le profil d'un pair. Tap â viewer plein
@@ -1990,8 +2134,8 @@ class _PeerMediaStack extends StatelessWidget {
   final Set<String> likedPhotoUrls;
   final void Function(String photoUrl)? onTogglePhotoLike;
 
-  static const double _aspect = 216 / 162; // height / width
-  static const double _spacing = 8;
+  static const double _aspect = 4 / 3; // height / width (ratio 3 / 4)
+  static const double _spacing = 10;
   static const int _columns = 2;
 
   @override
@@ -2040,19 +2184,39 @@ class _PeerMediaStack extends StatelessWidget {
 /// Section header used across the redesigned profile (capture-1 style):
 /// a bold left-aligned title.
 class _ProfileSectionHeader extends StatelessWidget {
-  const _ProfileSectionHeader(this.title, {this.trailing});
+  const _ProfileSectionHeader(this.title, {this.trailing, this.suffix = ''});
   final String title;
 
-  /// Optional widget pinned to the right of the title (e.g. a cyan "+40"
-  /// reward hint on the photos section).
+  /// Le « (n) » après le titre, en blanc 55 %.
+  final String suffix;
+
+  /// Optional widget pinned to the right of the title (la pastille « +40 pts »).
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: SCText.h2)),
-        ?trailing,
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              text: title,
+              children: [
+                if (suffix.isNotEmpty)
+                  TextSpan(
+                    text: ' $suffix',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55)),
+                  ),
+              ],
+            ),
+            style: popupDisplay(
+              fontSize: 17,
+              letterSpacing: -0.5,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
   }
@@ -2099,17 +2263,27 @@ class _RewardHint extends StatelessWidget {
   final int points;
   @override
   Widget build(BuildContext context) {
-    return Text(
-      '+$points',
-      style: const TextStyle(
-        color: SC.accent,
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
+    // Pastille jaune : ne se coupe jamais.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: SC.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        '+$points pts',
+        maxLines: 1,
+        softWrap: false,
+        style: const TextStyle(
+          color: SC.accent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
 }
-
 /// Full-screen overlay for profile photos. Swipe or use the side arrows to
 /// move between several photos; pinch to zoom; the â in the photo's top-right
 /// corner (or a tap on the backdrop) dismisses. Plus rien d'autre : la carte
@@ -2336,16 +2510,15 @@ class _PhotoGallery extends StatelessWidget {
   final VoidCallback? onTapLikes;
 
   // Portrait tiles (3:4) â a single horizontal, scrollable row of larger tiles.
-  static const double _aspect = 216 / 162; // height / width
-  static const double _spacing = 8;
+  static const double _spacing = 10;
 
   @override
   Widget build(BuildContext context) {
     final canAdd = photos.length < profilePhotosMax;
     // "Tes photos" agrandies : une rangÃ©e horizontale de grandes tuiles (la
     // tuile "+" d'abord), qu'on fait dÃ©filer.
-    const double tileWidth = 210;
-    final double tileHeight = tileWidth * _aspect;
+    const double tileWidth = 104;
+    const double tileHeight = 138;
     final count = (canAdd ? 1 : 0) + photos.length;
     final offset = canAdd ? 1 : 0;
     return SizedBox(
@@ -2495,12 +2668,8 @@ class _PersonalInfoSection extends StatelessWidget {
     // champ vide — une fois "Mélomane" choisi, la ligne s'annonce en 🎵.
     final personaCat = personaCategoryByLabel(p?.personaCategory ?? '');
     return Container(
-      decoration: BoxDecoration(
-        color: SC.glassStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SC.glassBorder),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: _infoPanelDecoration,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
         children: [
           if (top != null) ...[
@@ -2682,7 +2851,7 @@ class _PersonalInfoRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 17)),
+              Text(emoji, style: const TextStyle(fontSize: 19)),
               const SizedBox(width: 12),
               Text(
                 label,
@@ -2696,29 +2865,56 @@ class _PersonalInfoRow extends StatelessWidget {
               // droite dans cette largeur, donc la ligne se lit pareil.
               Expanded(
                 child: pick != null
-                    ? GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => pick(context),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Text(
-                            value.isEmpty ? AppStrings.t('info_add') : value,
-                            textAlign: TextAlign.right,
-                            // Une valeur trop longue s'abrège par la fin —
-                            // jamais une césure au milieu d'un mot.
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: value.isEmpty
-                                  ? SC.textMuted
-                                  : SC.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              fontStyle: value.isEmpty
-                                  ? FontStyle.italic
-                                  : FontStyle.normal,
-                            ),
-                          ),
+                    ? Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => pick(context),
+                          // Valeur renseignée : pastille jaune. Vide : « Ajouter »
+                          // en italique dans un cadre pointillé.
+                          child: value.isEmpty
+                              ? _DashedBox(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  radius: 999,
+                                  strokeWidth: 1.2,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 13,
+                                    vertical: 6,
+                                  ),
+                                  child: Text(
+                                    AppStrings.t('info_add'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.45),
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 13,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: SC.accent.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: SC.accent.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    value,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: SC.accent,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
                         ),
                       )
                     : _InlineEditable(
@@ -2881,39 +3077,34 @@ class _InterestAddChip extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: SC.accent.withValues(alpha: 0.6)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.add_rounded, color: SC.accent, size: 17),
-              const SizedBox(width: 4),
-              Text(
-                AppStrings.t('interests_add'),
-                style: const TextStyle(
-                  color: SC.accent,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _DashedBox(
+        color: SC.accent.withValues(alpha: 0.6),
+        fill: SC.accent.withValues(alpha: 0.12),
+        radius: 999,
+        strokeWidth: 1.2,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add_rounded, color: SC.accent, size: 17),
+            const SizedBox(width: 4),
+            Text(
+              AppStrings.t('interests_add'),
+              style: const TextStyle(
+                color: SC.accent,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
 /// The "Centres d'intÃ©rÃªt" section on my own profile: the picked chips plus
 /// an "add" chip. Tapping either UNFOLDS the category picker inline, right
 /// under the chips (no overlay / bottom sheet) â pick the tags, then tap
@@ -3045,6 +3236,7 @@ class _InterestsSectionState extends State<_InterestsSection> {
             for (final tag in _sel)
               InterestPill(
                 label: interestPillText(tag),
+                prominent: true,
                 onTap: _openPicker,
               ),
             if (_sel.length < profileInterestsMax)
@@ -3372,41 +3564,35 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 1),
-                child: Icon(Icons.info_outline, size: 14, color: SC.textMuted),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                // Keywords wrapped in **â¦** in app_strings render cyan.
-                child: Text.rich(
-                  _highlightKeywords(AppStrings.t('discover_visibility_hint')),
-                  style: const TextStyle(
-                    color: SC.textMuted,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
+    final muted = Colors.white.withValues(alpha: 0.6);
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_off_outlined, size: 17, color: muted),
+            const SizedBox(width: 8),
+            Expanded(
+              // Les mots entre ** ** (app_strings) sont mis en avant.
+              child: Text.rich(
+                _highlightKeywords(AppStrings.t('discover_visibility_hint')),
+                style: TextStyle(
+                  color: muted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
-            ],
-          ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: muted),
+          ],
         ),
       ),
     );
   }
 }
-
 /// The "+" add tile that opens the gallery picker, shown as the first tile
 /// of the "Tes photos" gallery on my own profile (and as the empty-state
 /// when no photo has been added yet). Accent-tinted square with a centred
@@ -3418,30 +3604,26 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: SC.accent.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
-          ),
-          child: Center(
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                color: SC.accent,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
+    // Bord pointillé jaune, fond jaune 7 %, rond jaune au centre.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _DashedBox(
+        color: SC.accent.withValues(alpha: 0.6),
+        fill: SC.accent.withValues(alpha: 0.07),
+        radius: 20,
+        child: Center(
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: SC.accent,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.add_rounded,
+              color: SC.onAccent,
+              size: 25,
             ),
           ),
         ),
@@ -3449,7 +3631,6 @@ class _AddDiscoverPhotoCta extends StatelessWidget {
     );
   }
 }
-
 class _PhotoCell extends StatelessWidget {
   const _PhotoCell({
     required this.photoUrl,
@@ -3495,7 +3676,7 @@ class _PhotoCell extends StatelessWidget {
     final showDeleteAction = !viewerMode && hasPhoto && onDelete != null;
     return Material(
       color: SC.menu,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
@@ -3590,41 +3771,42 @@ class _PhotoCell extends StatelessWidget {
             ),
           if (showLikeAction)
             Positioned(
-              right: 4,
-              bottom: 4,
+              right: 8,
+              bottom: 8,
               child: GestureDetector(
                 // Absorb the tap so the photo InkWell underneath doesn't also
                 // open the viewer when the heart is hit.
                 onTap: onTogglePeerLike,
                 behavior: HitTestBehavior.opaque,
-                child: Material(
-                  color: iLikePeer
-                      ? const Color(0xFFFF3B5C).withValues(alpha: 0.18)
-                      : Colors.black.withValues(alpha: 0.55),
-                  shape: const CircleBorder(),
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
+                // Rond de 38 en verre ; jaune plein une fois la photo likée.
+                child: ClipOval(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: iLikePeer
-                            ? const Color(0xFFFF3B5C)
-                            : Colors.white.withValues(alpha: 0.20),
-                        width: iLikePeer ? 1.5 : 1,
+                            ? SC.accent
+                            : Colors.white.withValues(alpha: 0.13),
+                        border: Border.all(
+                          color: iLikePeer
+                              ? SC.accent
+                              : Colors.white.withValues(alpha: 0.3),
+                          width: 1.2,
+                        ),
                       ),
-                    ),
-                    child: Icon(
-                      iLikePeer ? Icons.favorite : Icons.favorite_border,
-                      size: iLikePeer ? 16 : 14,
-                      color: iLikePeer ? const Color(0xFFFF3B5C) : Colors.white,
+                      child: Icon(
+                        iLikePeer ? Icons.favorite : Icons.favorite_border,
+                        size: 20,
+                        color: iLikePeer ? SC.onAccent : Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          // Le lisere cyan ne designe QUE la premiere photo de la galerie
+            ),          // Le lisere cyan ne designe QUE la premiere photo de la galerie
           // (la photo de profil) : sur les suivantes il transformait la rangee
           // en mur de cadres. Pas sur la cellule vide, qui n'est pas une photo.
           if (hasPhoto && isPrimary)
@@ -3632,8 +3814,8 @@ class _PhotoCell extends StatelessWidget {
               child: IgnorePointer(
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: SC.accent, width: 4),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: SC.accent, width: 2),
                   ),
                 ),
               ),
@@ -3657,16 +3839,16 @@ class _GradientActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  /// Muted, non-emphasised style â used for the inert "Following" state.
+  /// Muted, non-emphasised style — the inert "Envoyé" state.
   final bool subdued;
 
-  /// Dark frosted-glass fill with a hairline border (same surface as the
-  /// language card) and white content â used for the primary "Message"
-  /// action.
+  /// Le bouton « Message » : pilule au dégradé de marque (bleu). Les autres
+  /// sont jaunes.
   final bool glass;
 
   @override
   Widget build(BuildContext context) {
+    final fg = glass || subdued ? Colors.white : SC.onAccent;
     // Scale the icon+label down to fit when a translation is long (German /
     // Russian / katakana run wider) instead of overflowing.
     final content = FittedBox(
@@ -3675,62 +3857,61 @@ class _GradientActionButton extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Icon(icon, size: 21, color: fg),
+          const SizedBox(width: 10),
+          Text(label, style: popupDisplay(fontSize: 14, color: fg)),
         ],
       ),
     );
-    const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
-
-    // Primary "Message" action â REAL frosted glass (BackdropFilter blur), like
-    // the header / nav glass; accent fill for the default action, dark bubble
-    // for the subdued "Following" state.
+    final BoxDecoration decoration;
     if (glass) {
-      return Pressable(
-        bounce: true,
-        onTap: onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              decoration: BoxDecoration(
-                color: SC.glassStrong,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: SC.glassBorder),
-              ),
-              padding: padding,
-              alignment: Alignment.center,
-              child: content,
-            ),
-          ),
+      decoration = BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [SC.brandBlueDeep, SC.brandBlue, SC.brandCyan],
+          stops: [0, 0.52, 1],
         ),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: SC.brandBlue.withValues(alpha: 0.4),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      );
+    } else if (subdued) {
+      decoration = BoxDecoration(
+        color: SC.menu,
+        borderRadius: BorderRadius.circular(999),
+      );
+    } else {
+      decoration = BoxDecoration(
+        color: SC.accent,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: SC.accent.withValues(alpha: 0.28),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
       );
     }
     return Pressable(
       bounce: true,
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(
-          color: subdued ? SC.menu : SC.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        padding: padding,
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.center,
+        decoration: decoration,
         child: content,
       ),
     );
   }
 }
-
 /// Bottom sheet opened by the PDP pencil — same chrome as the language wheel
 /// (handle, dark panel, rounded top). Avatar on top, then name / city / live lang.
 class _EditAccountSheet extends StatelessWidget {
