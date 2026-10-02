@@ -225,11 +225,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, _, _) => DiscoverGlobeSheet(initial: _countryKeys),
-      // Plein écran : fondu + léger glissement vers le haut.
+      // Plein écran : apparaît SUR PLACE (fondu + très léger zoom), sans
+      // monter du bas.
       transitionBuilder: (_, anim, _, child) => FadeTransition(
         opacity: anim,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.97, end: 1.0)
               .animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
           child: child,
         ),
