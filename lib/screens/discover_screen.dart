@@ -2082,12 +2082,15 @@ class _DraggableCardState extends State<_DraggableCard>
     });
   }
 
-  void _flyOff(bool right) {
+  void _flyOff(bool right, {bool fromButton = false}) {
     _flying = true;
     _animateTo(
-      Offset(right ? 1000.0 : -1000.0, _pos.dy),
-      const Duration(milliseconds: 280),
-      Curves.easeIn,
+      // Bouton : la carte part en légère montée (arc naturel) et sa course
+      // épouse l'animation de la croix / du cœur (~400 ms, mêmes courbes
+      // « material » que Fx2bButton) au lieu de filer avant elle.
+      Offset(right ? 1000.0 : -1000.0, fromButton ? _pos.dy - 70 : _pos.dy),
+      Duration(milliseconds: fromButton ? 420 : 280),
+      fromButton ? const Cubic(.4, 0, .2, 1) : Curves.easeIn,
       done: () {
         if (mounted) widget.onSwiped(right);
       },
@@ -2096,7 +2099,7 @@ class _DraggableCardState extends State<_DraggableCard>
 
   void programmaticSwipe(bool right) {
     if (_flying) return;
-    _flyOff(right);
+    _flyOff(right, fromButton: true);
   }
 
   // Position au pointer-down, pour savoir si le geste a vraiment dépassé le

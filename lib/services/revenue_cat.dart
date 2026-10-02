@@ -51,6 +51,9 @@ abstract final class RevenueCat {
 
   static bool _configured = false;
 
+  /// Compte connecté avant que le SDK soit prêt ; rattaché dès configure.
+  static String? _pendingUserId;
+
   /// True once [init] has successfully run on this device.
   static bool get isConfigured => _configured;
 
@@ -79,7 +82,14 @@ abstract final class RevenueCat {
       );
       _configured = true;
       Purchases.addCustomerInfoUpdateListener(_onCustomerInfo);
-      unawaited(Purchases.getCustomerInfo().then(_onCustomerInfo, onError: (_) {}));
+      final pending = _pendingUserId;
+      if (pending != null) {
+        // Un compte s'est connecté pendant la configuration : on le rattache
+        // tout de suite (logIn rend directement ses droits actifs).
+        await identify(pending);
+      } else {
+        unawaited(Purchases.getCustomerInfo().then(_onCustomerInfo, onError: (_) {}));
+      }
       debugPrint('RevenueCat configured (appUserID=${appUserId ?? '<anon>'})');
     } catch (e) {
       _configureError = '$e';
@@ -96,7 +106,14 @@ abstract final class RevenueCat {
 
   /// Attach purchases to the signed-in Supabase user id (call on sign-in).
   static Future<void> identify(String userId) async {
-    if (!_configured || userId.isEmpty) return;
+    if (userId.isEmpty) return;
+    // La connexion peut arriver AVANT la fin de `configure` (démarrage à
+    // froid, réseau lent) : on retient l'identifiant, et `init` le rejoue.
+    // Sans ça, l'abonnement d'un compte qui se reconnecte n'était jamais
+    // rattaché et l'app le croyait gratuit.
+    _pendingUserId = userId;
+    if (!_configured) return;
+    _pendingUserId = null;
     try {
       _onCustomerInfo((await Purchases.logIn(userId)).customerInfo);
     } catch (e) {
@@ -126,6 +143,7 @@ abstract final class RevenueCat {
 
   /// Detach the user on sign-out (reverts to an anonymous RevenueCat id).
   static Future<void> logOut() async {
+    _pendingUserId = null;
     if (!_configured) return;
     proActive.value = false;
     try {
