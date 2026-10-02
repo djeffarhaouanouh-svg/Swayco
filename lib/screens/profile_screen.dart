@@ -1579,7 +1579,9 @@ class _IdentitySection extends StatelessWidget {
                     Color(0xBF0E0E0E), // 75 %
                     _pageBg,
                   ],
-                  stops: [0, 0.30, 0.78, 1],
+                  // Opaque un peu AVANT le bord : sinon la dernière ligne de pixels
+                  // laisse transparaître la photo (fine ligne claire).
+                  stops: [0, 0.30, 0.78, 0.985],
                 ),
               ),
             ),
