@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 
 import '../services/app_strings.dart';
 import '../theme/swayco_theme.dart';
+import 'popup_kit.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Discover globe — a spinning orthographic Earth used to pick a country. The
@@ -251,12 +254,24 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
   List<_Land>? _world;
   late Set<String> _selected = {...widget.initial};
 
+  final GlobalKey<_GlobeViewState> _globeKey = GlobalKey<_GlobeViewState>();
+  final TextEditingController _search = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
     _WorldGeo.load().then((w) {
       if (mounted) setState(() => _world = w);
     });
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
   bool _transitionPrecached = false;
@@ -278,166 +293,370 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
     }
   }
 
+  /// Nom affiché d'un pays : sa traduction `country_xx`, sinon sa clé.
+  String _nameOf(String key) {
+    final code = kGlobeCountries[key]!.code;
+    final t = AppStrings.t('country_$code');
+    return t == 'country_$code' ? key : t;
+  }
+
+  /// Pays dont le nom (traduit ou non) contient ce qui est tapé.
+  List<String> get _matches {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    return [
+      for (final key in kGlobeCountries.keys)
+        if (_nameOf(key).toLowerCase().contains(q) ||
+            key.toLowerCase().contains(q))
+          key,
+    ];
+  }
+
+  /// Un résultat de recherche : le pays est choisi et le globe y vole.
+  void _pickFromSearch(String key) {
+    if (!_selected.contains(key)) _toggle(key);
+    _globeKey.currentState?.flyToCountry(key);
+    _search.clear();
+    _searchFocus.unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final w = mq.size.width;
+    final h = mq.size.height;
     final canLaunch = _selected.isNotEmpty;
+    final globeSide = w * 1.8;
+    final barTop = mq.padding.top + 12;
+    final matches = _matches;
 
     return Material(
       type: MaterialType.transparency,
-      child: Stack(
-        children: [
-          // Scrim — assez léger pour laisser deviner le logo et la nav
-          // autour du panneau ; tap pour fermer.
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
-              child: const ColoredBox(color: Color(0x66000000)),
-            ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.2, 0.1),
+            radius: 1.0,
+            colors: [Color(0xFF1F4FD6), Color(0xFF0F1A3A), Color(0xFF0E0E0E)],
+            stops: [0, 0.55, 1],
           ),
-          // Panneau : couvre la carte / la photo, mais laisse voir le logo en
-          // haut et la barre de nav en bas. Le haut s'aligne PILE sous la
-          // rangée du logo (~52) — sinon le bord de la carte dépasse au-dessus.
-          Positioned.fill(
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 52, 14, 82),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141517),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFF26262D)),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Color(0x66000000),
-                          blurRadius: 40,
-                          offset: Offset(0, 18)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              AppStrings.t('globe_title'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.2,
+        ),
+        child: Stack(
+          children: [
+            // ── Le globe, immense : il dépasse à gauche et en bas. ───────────
+            Positioned(
+              left: -0.38 * w,
+              top: 0.18 * h,
+              width: globeSide,
+              height: globeSide,
+              child: _world == null
+                  ? const SizedBox.shrink()
+                  : Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Liseré bleu (5 px, 50 %) et halo bleu, collés au bord
+                        // du disque (le globe se peint à 8 px de son cadre).
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: SC.brandBlue
+                                          .withValues(alpha: 0.5),
+                                      spreadRadius: 5,
+                                    ),
+                                    BoxShadow(
+                                      color: SC.brandBlue
+                                          .withValues(alpha: 0.3),
+                                      blurRadius: 90,
+                                      spreadRadius: 12,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => Navigator.of(context).pop(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close_rounded,
-                                  color: Color(0xFF9A9AA2), size: 22),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Globe centré dans l'espace libre ; la phrase d'aide est
-                      // collée juste dessous (dans la même colonne), donc elle
-                      // remonte sans que le globe bouge.
-                      Expanded(
-                        child: Center(
-                          child: _world == null
-                              ? const SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: CircularProgressIndicator(
-                                      color: Colors.white24, strokeWidth: 2),
-                                )
-                              : LayoutBuilder(
-                                  builder: (context, c) {
-                                    final globeSide = math.min(
-                                      math.min(c.maxWidth, c.maxHeight - 24),
-                                      520.0,
-                                    );
-                                    return Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: globeSide,
-                                          height: globeSide,
-                                          child: Stack(
-                                            alignment: Alignment.center,
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              // Lueur : halo cyan + brume bleutée.
-                                              IgnorePointer(
-                                                child: Container(
-                                                  width: globeSide * 0.92,
-                                                  height: globeSide * 0.92,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: SC.accent
-                                                            .withValues(alpha: 0.34),
-                                                        blurRadius: 42,
-                                                        spreadRadius: -6,
-                                                      ),
-                                                      BoxShadow(
-                                                        color: const Color(0xFF7FA8BD)
-                                                            .withValues(alpha: 0.20),
-                                                        blurRadius: 85,
-                                                        spreadRadius: -18,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                              RepaintBoundary(
-                                                child: _GlobeView(
-                                                  world: _world!,
-                                                  selected: _selected,
-                                                  onToggle: _toggle,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 14),
-                                        Text(
-                                          AppStrings.t('globe_hint'),
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.42),
-                                            fontSize: 10,
-                                            height: 1.25,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
                         ),
-                      ),
-                      // Le bouton n'apparaît qu'une fois un pays touché, et se
-                      // pose en bas à DROITE — il ne prend pas toute la ligne.
-                      if (canLaunch) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: _LaunchButton(
-                            label:
-                                '${_selected.map((k) => kGlobeCountries[k]!.flag).join(' - ')}'
-                                '   ${AppStrings.t('globe_launch')}',
-                            onTap: () => Navigator.of(context).pop(_selected),
+                        RepaintBoundary(
+                          child: _GlobeView(
+                            key: _globeKey,
+                            world: _world!,
+                            selected: _selected,
+                            onToggle: _toggle,
                           ),
                         ),
                       ],
+                    ),
+            ),
+            if (_world == null)
+              const Center(
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    color: Colors.white54,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+
+            // ── Titre : « Où veux-tu [voyager ?] ». ─────────────────────────
+            Positioned(
+              top: barTop + 44 + 18,
+              left: 20,
+              child: IgnorePointer(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: _title(),
+                ),
+              ),
+            ),
+
+            // ── Barre du haut : fermer + recherche, en verre. ────────────────
+            Positioned(
+              top: barTop,
+              left: 14,
+              right: 14,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).pop(),
+                    child: _Glass(
+                      radius: 99,
+                      child: const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _Glass(
+                      radius: 99,
+                      child: SizedBox(
+                        height: 44,
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 14),
+                            Icon(
+                              Icons.search_rounded,
+                              size: 20,
+                              color: Colors.white.withValues(alpha: 0.65),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _search,
+                                focusNode: _searchFocus,
+                                textInputAction: TextInputAction.search,
+                                cursorColor: SC.accent,
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                                decoration: InputDecoration(
+                                  isCollapsed: true,
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  filled: false,
+                                  hintText: AppStrings.t('globe_search_hint'),
+                                  hintStyle: GoogleFonts.dmSans(
+                                    fontSize: 14,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.65),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Résultats de la recherche. ────────────────────────────────────
+            if (matches.isNotEmpty)
+              Positioned(
+                top: barTop + 44 + 8,
+                left: 14 + 44 + 10,
+                right: 14,
+                child: _Glass(
+                  radius: 22,
+                  tint: 0.55,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final key in matches)
+                        InkWell(
+                          onTap: () => _pickFromSearch(key),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                _GlobeFlag(
+                                  code: kGlobeCountries[key]!.code,
+                                  emoji: kGlobeCountries[key]!.flag,
+                                  height: 16,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _nameOf(key),
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                if (_selected.contains(key))
+                                  const Icon(
+                                    Icons.check_rounded,
+                                    size: 18,
+                                    color: SC.accent,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
+              ),
+
+            // ── Barre du bas : puces des pays choisis + valider. ─────────────
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: mq.padding.bottom + 12,
+              child: _Glass(
+                radius: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+                        child: Row(
+                          children: [
+                            for (final key in _selected) ...[
+                              _CountryChip(
+                                code: kGlobeCountries[key]!.code,
+                                emoji: kGlobeCountries[key]!.flag,
+                                name: _nameOf(key),
+                                onTap: () => _toggle(key),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              AppStrings.t('globe_pinch'),
+                              maxLines: 1,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: canLaunch
+                            ? () => Navigator.of(context).pop(_selected)
+                            : null,
+                        child: Container(
+                          height: 54,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: canLaunch
+                                ? SC.accent
+                                : Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            canLaunch
+                                ? AppStrings.t(
+                                    _selected.length == 1
+                                        ? 'globe_launch_1'
+                                        : 'globe_launch_n',
+                                    args: {'n': '${_selected.length}'},
+                                  )
+                                : AppStrings.t('globe_pick_one'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: popupDisplay(
+                              fontSize: 15,
+                              color: canLaunch
+                                  ? SC.onAccent
+                                  : Colors.white.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// « Où veux-tu [voyager ?] » : le `|` de la traduction marque le début du
+  /// groupe posé sur la pastille jaune (il ne se coupe pas).
+  Widget _title() {
+    final style = popupDisplay(
+      fontSize: 30,
+      height: 1.1,
+      letterSpacing: -0.6,
+      color: Colors.white,
+    ).copyWith(
+      shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+    );
+    final raw = AppStrings.t('globe_title_v2');
+    final cut = raw.indexOf('|');
+    if (cut < 0) return Text(raw, style: style);
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          TextSpan(text: raw.substring(0, cut)),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              decoration: BoxDecoration(
+                color: SC.accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                raw.substring(cut + 1),
+                maxLines: 1,
+                softWrap: false,
+                style: style.copyWith(color: SC.onAccent, shadows: const []),
               ),
             ),
           ),
@@ -447,35 +666,109 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
   }
 }
 
-class _LaunchButton extends StatelessWidget {
-  const _LaunchButton({required this.label, required this.onTap});
+/// Le verre de la barre de navigation : blanc 13 %, bord blanc 22 % de 1,2 px,
+/// flou 28. [tint] > 0.13 fonce le fond (liste de résultats, plus lisible).
+class _Glass extends StatelessWidget {
+  const _Glass({required this.child, required this.radius, this.tint = 0.13});
 
-  final String label;
+  final Widget child;
+  final double radius;
+  final double tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = BorderRadius.circular(radius);
+    return ClipRRect(
+      borderRadius: r,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: tint > 0.13
+                ? SC.onAccent.withValues(alpha: tint)
+                : Colors.white.withValues(alpha: tint),
+            borderRadius: r,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1.2,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Vrai drapeau (flagcdn), l'emoji du pays à défaut.
+class _GlobeFlag extends StatelessWidget {
+  const _GlobeFlag({
+    required this.code,
+    required this.emoji,
+    required this.height,
+  });
+
+  final String code;
+  final String emoji;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Image.network(
+        'https://flagcdn.com/w80/${code.toLowerCase()}.png',
+        height: height,
+        errorBuilder: (_, _, _) => Text(
+          emoji,
+          style: TextStyle(fontSize: height, height: 1),
+        ),
+      ),
+    );
+  }
+}
+
+/// Une puce de pays choisi : un tap la retire.
+class _CountryChip extends StatelessWidget {
+  const _CountryChip({
+    required this.code,
+    required this.emoji,
+    required this.name,
+    required this.onTap,
+  });
+
+  final String code;
+  final String emoji;
+  final String name;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        // Ni `alignment` ni `width` : un Container avec `alignment` non nul
-        // s'étire sur toute la largeur dispo (contraintes bornées) et le
-        // bouton cesse d'être « à droite ». Le padding suffit à lui donner
-        // sa forme de pilule autour du texte.
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+        padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
         decoration: BoxDecoration(
-          color: SC.accent,
-          borderRadius: BorderRadius.circular(999),
+          color: SC.onAccent.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(99),
         ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFF08080A),
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _GlobeFlag(code: code, emoji: emoji, height: 13),
+            const SizedBox(width: 7),
+            Text(
+              name,
+              maxLines: 1,
+              softWrap: false,
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -486,6 +779,7 @@ class _LaunchButton extends StatelessWidget {
 
 class _GlobeView extends StatefulWidget {
   const _GlobeView({
+    super.key,
     required this.world,
     required this.selected,
     required this.onToggle,
@@ -577,6 +871,12 @@ class _GlobeViewState extends State<_GlobeView> with TickerProviderStateMixin {
     _flyToLon = _rotLon + delta;
     _flyToLat = center.dy;
     _flyCtrl.forward(from: 0);
+  }
+
+  /// Amène le globe sur un pays (résultat de la recherche).
+  void flyToCountry(String key) {
+    final c = kGlobeCountries[key]?.center;
+    if (c != null) _flyTo(c);
   }
 
   void _select(String key) {
@@ -732,8 +1032,8 @@ class _GlobePainter extends CustomPainter {
           path,
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.2
-            ..color = SC.accent.withValues(alpha: 0.75),
+            ..strokeWidth = 1.4
+            ..color = SC.brandBlue.withValues(alpha: 0.9),
         );
       }
     }
