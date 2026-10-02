@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-import 'splash_screen_animation.dart' show kSplashBlueGradient;
+import 'splash_screen_animation.dart'
+    show kSplashBlueGradient, kBlackToTransparent;
 
 /// Plays a square Lottie icon once, centred on a solid background — no
 /// wordmark, unlike [SplashScreenAnimation]. For in-app transitions (e.g. the
@@ -62,7 +63,9 @@ class _LottieIconTransitionState extends State<LottieIconTransition>
       child: SizedBox(
         width: size,
         height: size,
-        child: Lottie.asset(
+        child: ColorFiltered(
+          colorFilter: kBlackToTransparent,
+          child: Lottie.asset(
           widget.asset,
           controller: _controller,
           fit: BoxFit.contain,
@@ -74,6 +77,7 @@ class _LottieIconTransitionState extends State<LottieIconTransition>
               ..duration = composition.duration
               ..forward();
           },
+          ),
         ),
       ),
     );

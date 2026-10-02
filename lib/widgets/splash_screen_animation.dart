@@ -13,6 +13,16 @@ const LinearGradient kSplashBlueGradient = LinearGradient(
   stops: [0, 0.48, 1],
 );
 
+/// Rend le fond noir du Lottie transparent : l'opacité devient la luminosité
+/// du pixel et la couleur reste blanche. Le logo (blanc) est conservé tel quel,
+/// le noir plein cadre disparaît et laisse voir le dégradé.
+const ColorFilter kBlackToTransparent = ColorFilter.matrix(<double>[
+  0, 0, 0, 0, 255,
+  0, 0, 0, 0, 255,
+  0, 0, 0, 0, 255,
+  0.299, 0.587, 0.114, 0, 0,
+]);
+
 /// Jaune de la DA 8c (le « ø » du mot swaycø).
 const Color kSplashYellow = Color(0xFFF4FF1F);
 
@@ -81,7 +91,9 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
             child: SizedBox(
               width: size,
               height: size,
-              child: Lottie.asset(
+              child: ColorFiltered(
+                colorFilter: kBlackToTransparent,
+                child: Lottie.asset(
                 widget.asset,
                 controller: _controller,
                 fit: BoxFit.contain,
@@ -94,6 +106,7 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                     ..duration = composition.duration * (1 / 1.2)
                     ..forward();
                 },
+                ),
               ),
             ),
           ),
