@@ -281,13 +281,15 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
   }
 }
 
-/// Emplacements fantômes du bas de la carte Discover : nom, pays - ville, puce.
+/// Emplacements fantômes du bas de la carte Discover, aux mêmes cotes que la
+/// vraie carte : dégradé noir, bloc à 20 px des bords / 22 px du bas, nom
+/// (28 px) + drapeau, pays - ville (14 px), puce (32 px).
 class _CardPlaceholders extends StatelessWidget {
   const _CardPlaceholders();
 
   @override
   Widget build(BuildContext context) {
-    Widget bar(double w, double h, double a) => Container(
+    Widget ghost(double w, double h, double a) => Container(
           width: w,
           height: h,
           decoration: BoxDecoration(
@@ -295,41 +297,60 @@ class _CardPlaceholders extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
           ),
         );
-    return Align(
-      alignment: Alignment.bottomLeft,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 40, 18, 22),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black.withValues(alpha: 0.55),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(0, 0.15),
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0xCC000000)],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 22,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 31,
+                child: Row(
+                  children: [
+                    ghost(140, 22, 0.35),
+                    const SizedBox(width: 10),
+                    ghost(24, 24, 0.35),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 17,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ghost(120, 12, 0.25),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: 98,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            bar(150, 20, 0.35),
-            const SizedBox(height: 8),
-            bar(110, 12, 0.25),
-            const SizedBox(height: 12),
-            Container(
-              width: 98,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
