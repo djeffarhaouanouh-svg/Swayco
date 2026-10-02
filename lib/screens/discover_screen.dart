@@ -34,7 +34,7 @@ import '../widgets/boost_button.dart';
 import '../widgets/country_silhouette.dart';
 import '../widgets/discover_ad_card.dart';
 import '../widgets/discover_globe.dart';
-import '../widgets/fx6d_button.dart';
+import '../widgets/fx2b_button.dart';
 import '../widgets/glass_nav_bar.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/liquid_glass_button.dart';
@@ -80,12 +80,6 @@ double discoverCardAspect(BuildContext context) {
 
 /// Rayon des coins de la carte photo (handoff 3c).
 const double _kCardRadius = 32.0;
-
-/// La lumière blanche, légère, derrière la photo de la carte.
-const List<BoxShadow> _kCardGlow = [
-  BoxShadow(color: Color(0x24FFFFFF), blurRadius: 30, spreadRadius: 1),
-];
-
 /// Diamètre des boutons ✕ / message / ❤.
 const double _kActionSize = 58.0;
 // Diameter of the ✕ / ❤ buttons.
@@ -1593,19 +1587,12 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     // Carte photo arrondie (32) qui flotte sur le fond noir — plus de liseré
     // drapeau : le drapeau est à côté du prénom, en image.
     return SizedBox.expand(
-      child: DecoratedBox(
-        // Une légère lumière blanche derrière la photo.
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_kCardRadius),
-          boxShadow: _kCardGlow,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(_kCardRadius),
-          child: _TinderCard(
-            key: ValueKey(card.profile.id),
-            profile: card.profile,
-            photos: card.photos,
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kCardRadius),
+        child: _TinderCard(
+          key: ValueKey(card.profile.id),
+          profile: card.profile,
+          photos: card.photos,
         ),
       ),
     );
@@ -2303,12 +2290,12 @@ class _TinderCardState extends State<_TinderCard> {
 
     final name = p.displayName.trim().isEmpty ? '—' : p.displayName.trim();
     final title = p.age != null ? '$name, ${p.age}' : name;
-    // Le pays puis la ville (« France · Toulouse ») ; l'un des deux seul quand
-    // l'autre manque.
+    // Le pays, un tiret, puis la ville (« France - Toulouse ») ; l'un des deux
+    // seul quand l'autre manque.
     final place = [
       if (p.country.trim().isNotEmpty) p.country.trim(),
       if (p.city.trim().isNotEmpty) p.city.trim(),
-    ].join(' · ');
+    ].join(' - ');
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2700,7 +2687,7 @@ class _PhotoDots extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Barre d'actions — ✕ (verre) · message direct (or, Premium) · ❤ (verre)
+// Barre d'actions — ✕ (clair) · message direct (Premium) · ❤ (rose)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SwipeActionBar extends StatelessWidget {
@@ -2719,8 +2706,8 @@ class _SwipeActionBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Fx6dButton(
-          kind: Fx6dKind.cross,
+        Fx2bButton(
+          kind: Fx2bKind.cross,
           size: _kFxSize,
           onTap: onNope,
           semanticLabel: 'Nope',
@@ -2728,8 +2715,8 @@ class _SwipeActionBar extends StatelessWidget {
         const SizedBox(width: 18),
         _DirectMessageButton(onTap: onMessage),
         const SizedBox(width: 18),
-        Fx6dButton(
-          kind: Fx6dKind.heart,
+        Fx2bButton(
+          kind: Fx2bKind.heart,
           size: _kFxSize,
           onTap: onLike,
           semanticLabel: 'Like',
