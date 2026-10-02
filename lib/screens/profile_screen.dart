@@ -35,6 +35,7 @@ import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/info_bento.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
 import '../widgets/match_overlay.dart';
@@ -1933,18 +1934,16 @@ class _IdentitySection extends StatelessWidget {
             onTogglePhotoLike: onTogglePhotoLike,
           ),
         ),
-        // Bio + centres d'intérêt : le panneau « Mes infos », sans rien
-        // d'éditable.
-        if (!emptyBio || interests.isNotEmpty)
+        // Bio + faits + centres d'intérêt : le même panneau « Mes infos », en
+        // lecture seule (une tuile sans valeur n'apparaît pas).
+        if (!emptyBio || _hasFacts(personalInfo) || interests.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: _infoPanelDecoration,
+            child: InfoGlassFrame(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!emptyBio)
+                  if (!emptyBio) ...[
                     // Traduite dans la langue de l'interface quand elle diffère
                     // de celle que le pair parle.
                     TranslatedProfileText(
@@ -1959,36 +1958,41 @@ class _IdentitySection extends StatelessWidget {
                         height: 1.4,
                       ),
                     ),
-                  if (!emptyBio && interests.isNotEmpty)
-                    const SizedBox(height: 14),
-                  if (interests.isNotEmpty) ...[
-                    Row(
-                      children: [
-                        const Text(
-                          kFactEmojiInterests,
-                          style: TextStyle(fontSize: 17),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          AppStrings.t('profile_interests_section'),
-                          style: const TextStyle(
-                            color: SC.textMuted,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final tag in interests)
-                          InterestPill(
-                            label: interestPillText(tag),
-                            prominent: true,
+                  ],
+                  InfoBento(
+                    age: _ageTile(personalInfo),
+                    others: _otherTiles(personalInfo),
+                  ),
+                  if (interests.isNotEmpty) ...[
+                    if (!emptyBio || _hasFacts(personalInfo))
+                      const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: bentoTileDecoration(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: bentoLabelStyle(),
                           ),
-                      ],
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final tag in interests)
+                                InterestPill(
+                                  label: interestPillText(tag),
+                                  prominent: true,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -1998,16 +2002,48 @@ class _IdentitySection extends StatelessWidget {
       ],
     );
   }
+
+  static bool _hasFacts(RemoteProfile? p) =>
+      p != null &&
+      (p.age != null ||
+          p.job.trim().isNotEmpty ||
+          p.zodiac.trim().isNotEmpty ||
+          p.lookingFor.trim().isNotEmpty ||
+          p.personaCategory.trim().isNotEmpty);
+
+  /// Les tuiles en lecture seule (pair) : mêmes libellés que sur mon profil.
+  static BentoTileData _ageTile(RemoteProfile? p) => BentoTileData(
+        emoji: kFactEmojiAge,
+        label: AppStrings.t('info_age'),
+        value: p?.age?.toString() ?? '',
+      );
+
+  static List<BentoTileData> _otherTiles(RemoteProfile? p) {
+    final cat = personaCategoryByLabel(p?.personaCategory ?? '');
+    return [
+      BentoTileData(
+        emoji: kFactEmojiJob,
+        label: AppStrings.t('info_job'),
+        value: displayJob(p?.job ?? ''),
+      ),
+      BentoTileData(
+        emoji: kFactEmojiZodiac,
+        label: AppStrings.t('info_zodiac'),
+        value: displayZodiac(p?.zodiac ?? ''),
+      ),
+      BentoTileData(
+        emoji: cat?.emoji ?? kFactEmojiPersonaCategory,
+        label: AppStrings.t('info_persona_category'),
+        value: cat == null ? '' : personaCategoryLabel(cat.label),
+      ),
+      BentoTileData(
+        emoji: kFactEmojiLookingFor,
+        label: AppStrings.t('info_looking_for'),
+        value: displayLookingFor(p?.lookingFor ?? ''),
+      ),
+    ];
+  }
 }
-
-/// Le panneau « Mes infos » (et son pendant en lecture seule chez un pair) :
-/// rayon 24, fond blanc 6 %, bord blanc 12 %.
-final BoxDecoration _infoPanelDecoration = BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.06),
-  borderRadius: BorderRadius.circular(24),
-  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-);
-
 /// Rond de 44 en verre (blanc 13 %, bord blanc 30 % de 1,2 px, flou 20) — les
 /// boutons posés sur la couverture.
 class _GlassCircle extends StatelessWidget {
@@ -2654,12 +2690,6 @@ class _PersonalInfoSection extends StatelessWidget {
   /// Rendu EN BAS du panneau, sous les lignes d'infos (les centres d'intÃ©rÃªt).
   final Widget? bottom;
 
-  static Widget get _divider => Divider(
-        height: 1,
-        thickness: 1,
-        color: Colors.white.withValues(alpha: 0.06),
-      );
-
   @override
   Widget build(BuildContext context) {
     final p = profile;
@@ -2669,148 +2699,151 @@ class _PersonalInfoSection extends StatelessWidget {
     // colonne de gauche de la ligne. La coupe n'est que le pictogramme du
     // champ vide — une fois "Mélomane" choisi, la ligne s'annonce en 🎵.
     final personaCat = personaCategoryByLabel(p?.personaCategory ?? '');
-    return Container(
-      decoration: _infoPanelDecoration,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+
+    Future<void> pickAge(BuildContext ctx) async {
+      final picked = await showWheelPicker(
+        context: ctx,
+        title: AppStrings.t('info_age'),
+        emoji: kFactEmojiAge,
+        labels: [for (final a in kAgeOptions) '$a'],
+        initialIndex: ageIndex(p?.age),
+        allowClear: p?.age != null,
+      );
+      if (picked == null) return;
+      if (picked < 0) {
+        await save(age: null);
+        return;
+      }
+      await save(age: kAgeOptions[picked]);
+    }
+
+    Future<void> pickJob(BuildContext ctx) async {
+      final current = normalizeJob(p?.job ?? '');
+      final picked = await showWheelPicker(
+        context: ctx,
+        title: AppStrings.t('info_job'),
+        emoji: kFactEmojiJob,
+        labels: [for (final k in kJobSectors) jobSectorLabel(k)],
+        initialIndex: jobSectorIndex(current),
+        allowClear: current.isNotEmpty,
+      );
+      if (picked == null) return;
+      if (picked < 0) {
+        await save(job: '');
+        return;
+      }
+      await save(job: kJobSectors[picked]);
+    }
+
+    Future<void> pickPersona(BuildContext ctx) async {
+      final current = p?.personaCategory ?? '';
+      final currentIndex = kPersonaCategoryLabels.indexOf(current);
+      final picked = await showWheelPicker(
+        context: ctx,
+        title: AppStrings.t('info_persona_category'),
+        emoji: kFactEmojiPersonaCategory,
+        labels: [
+          for (final cat in kPersonaCategories)
+            '${cat.emoji} ${personaCategoryLabel(cat.label)}',
+        ],
+        initialIndex: currentIndex < 0 ? 0 : currentIndex,
+        allowClear: current.isNotEmpty,
+      );
+      if (picked == null) return;
+      if (picked < 0) {
+        await save(personaCategory: '');
+        return;
+      }
+      await save(personaCategory: kPersonaCategoryLabels[picked]);
+    }
+
+    Future<void> pickZodiac(BuildContext ctx) async {
+      final current = normalizeZodiac(p?.zodiac ?? '');
+      final picked = await showWheelPicker(
+        context: ctx,
+        title: AppStrings.t('info_zodiac'),
+        emoji: kFactEmojiZodiac,
+        labels: [
+          // Les mois seulement dans la roulette — la carte montre le signe seul.
+          for (final k in kZodiacSigns) displayZodiacWithMonths(k),
+        ],
+        initialIndex: zodiacIndex(current),
+        allowClear: current.isNotEmpty,
+      );
+      if (picked == null) return;
+      if (picked < 0) {
+        await save(zodiac: '');
+        return;
+      }
+      await save(zodiac: kZodiacSigns[picked]);
+    }
+
+    Future<void> pickLooking(BuildContext ctx) async {
+      final current = normalizeLookingFor(p?.lookingFor ?? '');
+      final picked = await showWheelPicker(
+        context: ctx,
+        title: AppStrings.t('info_looking_for'),
+        emoji: kFactEmojiLookingFor,
+        labels: [for (final k in kLookingForOptions) lookingForLabel(k)],
+        initialIndex: lookingForIndex(current),
+        allowClear: current.isNotEmpty,
+      );
+      if (picked == null) return;
+      if (picked < 0) {
+        await save(lookingFor: '');
+        return;
+      }
+      await save(lookingFor: kLookingForOptions[picked]);
+    }
+
+    return InfoGlassFrame(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (top != null) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: top!,
+          if (top != null) ...[top!, const SizedBox(height: 10)],
+          InfoBento(
+            editable: true,
+            age: BentoTileData(
+              emoji: kFactEmojiAge,
+              label: AppStrings.t('info_age'),
+              value: p?.age?.toString() ?? '',
+              onTap: pickAge,
             ),
-            _divider,
-          ],
-          // Ãge : roulette 15â40, plus de saisie libre.
-          _PersonalInfoRow(
-            emoji: kFactEmojiAge,
-            label: AppStrings.t('info_age'),
-            value: p?.age?.toString() ?? '',
-            onPick: (ctx) async {
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_age'),
-                emoji: kFactEmojiAge,
-                labels: [for (final a in kAgeOptions) '$a'],
-                initialIndex: ageIndex(p?.age),
-                allowClear: p?.age != null,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(age: null);
-                return;
-              }
-              await save(age: kAgeOptions[picked]);
-            },
-          ),
-          // MÃ©tier / signe / looking-for : plus de champ libre. Une roulette
-          // Ã©crit une clÃ© FR stable ; l'affichage la localise pour le viewer.
-          _PersonalInfoRow(
-            emoji: kFactEmojiJob,
-            label: AppStrings.t('info_job'),
-            value: displayJob(p?.job ?? ''),
-            onPick: (ctx) async {
-              final current = normalizeJob(p?.job ?? '');
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_job'),
+            others: [
+              BentoTileData(
                 emoji: kFactEmojiJob,
-                labels: [for (final k in kJobSectors) jobSectorLabel(k)],
-                initialIndex: jobSectorIndex(current),
-                allowClear: current.isNotEmpty,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(job: '');
-                return;
-              }
-              await save(job: kJobSectors[picked]);
-            },
-          ),
-          _PersonalInfoRow(
-            emoji: personaCat?.emoji ?? kFactEmojiPersonaCategory,
-            label: AppStrings.t('info_persona_category'),
-            // Sans emoji ici : il est passé à gauche, l'écrire deux fois sur
-            // la même ligne le ferait passer pour une décoration.
-            value: personaCat == null
-                ? ''
-                : personaCategoryLabel(personaCat.label),
-            onPick: (ctx) async {
-              final current = p?.personaCategory ?? '';
-              final currentIndex = kPersonaCategoryLabels.indexOf(current);
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_persona_category'),
-                emoji: kFactEmojiPersonaCategory,
-                labels: [
-                  for (final cat in kPersonaCategories)
-                    '${cat.emoji} ${personaCategoryLabel(cat.label)}',
-                ],
-                initialIndex: currentIndex < 0 ? 0 : currentIndex,
-                allowClear: current.isNotEmpty,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(personaCategory: '');
-                return;
-              }
-              await save(personaCategory: kPersonaCategoryLabels[picked]);
-            },
-          ),
-          _PersonalInfoRow(
-            emoji: kFactEmojiZodiac,
-            label: AppStrings.t('info_zodiac'),
-            value: displayZodiac(p?.zodiac ?? ''),
-            onPick: (ctx) async {
-              final current = normalizeZodiac(p?.zodiac ?? '');
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_zodiac'),
+                label: AppStrings.t('info_job'),
+                value: displayJob(p?.job ?? ''),
+                onTap: pickJob,
+              ),
+              BentoTileData(
                 emoji: kFactEmojiZodiac,
-                labels: [
-                  // Months only in the wheel â cards show the sign alone.
-                  for (final k in kZodiacSigns) displayZodiacWithMonths(k),
-                ],
-                initialIndex: zodiacIndex(current),
-                allowClear: current.isNotEmpty,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(zodiac: '');
-                return;
-              }
-              await save(zodiac: kZodiacSigns[picked]);
-            },
-          ),
-          _PersonalInfoRow(
-            emoji: kFactEmojiLookingFor,
-            label: AppStrings.t('info_looking_for'),
-            value: displayLookingFor(p?.lookingFor ?? ''),
-            onPick: (ctx) async {
-              final current = normalizeLookingFor(p?.lookingFor ?? '');
-              final picked = await showWheelPicker(
-                context: ctx,
-                title: AppStrings.t('info_looking_for'),
+                label: AppStrings.t('info_zodiac'),
+                value: displayZodiac(p?.zodiac ?? ''),
+                onTap: pickZodiac,
+              ),
+              BentoTileData(
+                emoji: personaCat?.emoji ?? kFactEmojiPersonaCategory,
+                label: AppStrings.t('info_persona_category'),
+                value: personaCat == null
+                    ? ''
+                    : personaCategoryLabel(personaCat.label),
+                onTap: pickPersona,
+              ),
+              BentoTileData(
                 emoji: kFactEmojiLookingFor,
-                labels: [
-                  for (final k in kLookingForOptions) lookingForLabel(k),
-                ],
-                initialIndex: lookingForIndex(current),
-                allowClear: current.isNotEmpty,
-              );
-              if (picked == null) return;
-              if (picked < 0) {
-                await save(lookingFor: '');
-                return;
-              }
-              await save(lookingFor: kLookingForOptions[picked]);
-            },
-            last: bottom == null,
+                label: AppStrings.t('info_looking_for'),
+                value: displayLookingFor(p?.lookingFor ?? ''),
+                onTap: pickLooking,
+              ),
+            ],
           ),
           if (bottom != null) ...[
-            _divider,
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+            const SizedBox(height: 10),
+            // La tuile « centres d'intérêt », pleine largeur.
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: bentoTileDecoration(),
               child: bottom!,
             ),
           ],
@@ -2819,133 +2852,6 @@ class _PersonalInfoSection extends StatelessWidget {
     );
   }
 }
-
-class _PersonalInfoRow extends StatelessWidget {
-  const _PersonalInfoRow({
-    required this.emoji,
-    required this.label,
-    required this.value,
-    this.onSave,
-    this.onPick,
-    this.numeric = false,
-    this.last = false,
-  }) : assert(onSave != null || onPick != null);
-
-  final String emoji;
-  final String label;
-  final String value;
-  final bool numeric;
-  final bool last;
-
-  /// Champ libre : la valeur s'Ã©dite en place.
-  final Future<void> Function(String)? onSave;
-
-  /// Valeur Ã  format imposÃ© : un tap ouvre un sÃ©lecteur, il n'y a rien Ã 
-  /// taper. [onSave] est alors inutile.
-  final Future<void> Function(BuildContext)? onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final pick = onPick;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 19)),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(color: SC.textMuted, fontSize: 14),
-              ),
-              const SizedBox(width: 12),
-              // La valeur prend TOUT ce qui reste de la ligne. Avec un Spacer
-              // elle n'en avait que la moitié : sur un libellé long ("Ce qui
-              // me définit", "Das bin ich") il restait moins que le mot
-              // "Ajouter", qui se coupait en plein milieu. Le texte est calé à
-              // droite dans cette largeur, donc la ligne se lit pareil.
-              Expanded(
-                child: pick != null
-                    ? Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => pick(context),
-                          // Valeur renseignée : pastille jaune. Vide : « Ajouter »
-                          // en italique dans un cadre pointillé.
-                          child: value.isEmpty
-                              ? _DashedBox(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  radius: 999,
-                                  strokeWidth: 1.2,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 13,
-                                    vertical: 6,
-                                  ),
-                                  child: Text(
-                                    AppStrings.t('info_add'),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.45),
-                                      fontSize: 13,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 13,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: SC.accent.withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: SC.accent.withValues(alpha: 0.5),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    value,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: SC.accent,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      )
-                    : _InlineEditable(
-                        value: value,
-                        placeholder: AppStrings.t('info_add'),
-                        onSave: onSave!,
-                        maxLength: 60,
-                        keyboardType: numeric ? TextInputType.number : null,
-                        style: const TextStyle(
-                          color: SC.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ),
-        if (!last)
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: Colors.white.withValues(alpha: 0.06),
-          ),
-      ],
-    );
-  }
-}
-
 class _InlineEditable extends StatefulWidget {
   const _InlineEditable({
     required this.value,
@@ -2954,15 +2860,11 @@ class _InlineEditable extends StatefulWidget {
     required this.maxLength,
     required this.style,
     this.maxLines = 1,
-    this.keyboardType,
   });
   final String value;
   final String placeholder;
   final Future<void> Function(String) onSave;
   final int maxLength;
-
-  /// Number pad for the numeric facts (age, height); null = plain text.
-  final TextInputType? keyboardType;
 
   /// Text style used both for the display text and the field â so editing
   /// looks like the static text it replaces.
@@ -3034,7 +2936,6 @@ class _InlineEditableState extends State<_InlineEditable> {
       focusNode: _focus,
       autofocus: true,
       textAlign: TextAlign.center,
-      keyboardType: widget.keyboardType,
       maxLength: widget.maxLength,
       maxLines: widget.maxLines,
       minLines: 1,
@@ -3210,19 +3111,14 @@ class _InterestsSectionState extends State<_InterestsSection> {
       children: [
         if (widget.compact)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10, left: 2),
-            child: Row(
-              children: [
-                const Text(kFactEmojiInterests, style: TextStyle(fontSize: 17)),
-                const SizedBox(width: 12),
-                Text(
-                  AppStrings.t('profile_interests_section'),
-                  style: const TextStyle(color: SC.textMuted, fontSize: 14),
-                ),
-              ],
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              '$kFactEmojiInterests ${AppStrings.t('profile_interests_section').toUpperCase()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: bentoLabelStyle(),
             ),
-          )
-        else ...[
+          )        else ...[
           _ProfileSectionHeader(
             AppStrings.t('profile_interests_section'),
             trailing: const _RewardHint(),
