@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import 'splash_screen_animation.dart' show kSplashBlueGradient;
+
 /// Plays a square Lottie icon once, centred on a solid background — no
 /// wordmark, unlike [SplashScreenAnimation]. For in-app transitions (e.g. the
 /// Discover globe filter's "Go" confirmation), not the app boot splash.
@@ -10,14 +12,15 @@ class LottieIconTransition extends StatefulWidget {
   const LottieIconTransition({
     super.key,
     required this.asset,
-    this.background = const Color(0xFF000000),
+    this.gradient = kSplashBlueGradient,
     this.onComplete,
   });
 
   /// Lottie composition rendered at the centre.
   final String asset;
 
-  final Color background;
+  /// Fond : dégradé bleu de marque (avant : noir pur).
+  final Gradient gradient;
 
   /// Fired once, after the animation has played through a single time.
   final VoidCallback? onComplete;
@@ -54,7 +57,7 @@ class _LottieIconTransitionState extends State<LottieIconTransition>
     final size = math.min(shortest * 0.92, 640.0);
 
     return Container(
-      color: widget.background,
+      decoration: BoxDecoration(gradient: widget.gradient),
       alignment: Alignment.center,
       child: SizedBox(
         width: size,

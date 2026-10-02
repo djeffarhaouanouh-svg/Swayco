@@ -5,8 +5,19 @@ import 'package:lottie/lottie.dart';
 
 import 'swayco_wordmark.dart';
 
+/// Fond bleu de la DA 8c : cyan en haut, bleu franc en bas (11a).
+const LinearGradient kSplashBlueGradient = LinearGradient(
+  begin: Alignment(0.34, -1),
+  end: Alignment(-0.34, 1),
+  colors: [Color(0xFF18DDEA), Color(0xFF2B7FFF), Color(0xFF1F5EFF)],
+  stops: [0, 0.48, 1],
+);
+
+/// Jaune de la DA 8c (le « ø » du mot swaycø).
+const Color kSplashYellow = Color(0xFFF4FF1F);
+
 /// Boot splash for Swayco — plays `assets/splash.json` (Splash Sync Call —
-/// cassure nette) centred on pure black.
+/// cassure nette) centred on the blue brand gradient (8c).
 ///
 /// Plays through once (no loop) and holds the last frame. `main.dart` keeps
 /// the overlay up for at least 3s and until the landing screen is ready, then
@@ -15,15 +26,15 @@ class SplashScreenAnimation extends StatefulWidget {
   const SplashScreenAnimation({
     super.key,
     this.asset = 'assets/splash.json',
-    this.background = const Color(0xFF000000),
+    this.gradient = kSplashBlueGradient,
     this.onComplete,
   });
 
   /// Lottie composition rendered at the centre of the screen.
   final String asset;
 
-  /// Pure black by design — matches the web boot page and the app theme.
-  final Color background;
+  /// Fond du splash : dégradé bleu de marque (avant : noir pur).
+  final Gradient gradient;
 
   /// Optional. Boot does **not** wait on this — the overlay is dismissed by
   /// `main.dart` when the landing screen is ready, even mid-playback.
@@ -61,8 +72,10 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
     final size = math.min(shortest * 0.92, 640.0);
 
     return Scaffold(
-      backgroundColor: widget.background,
-      body: Stack(
+      backgroundColor: Colors.transparent,
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: widget.gradient),
+        child: Stack(
         children: [
           Center(
             child: SizedBox(
@@ -103,13 +116,18 @@ class _SplashScreenAnimationState extends State<SplashScreenAnimation>
                       parent: _controller,
                       curve: const Interval(0.08, 0.32, curve: Curves.easeOut),
                     ),
-                    child: const SwaycoWordmark(fontSize: 20),
+                    // « swayc » blanc + « ø » jaune.
+                    child: const SwaycoWordmark(
+                      fontSize: 20,
+                      oColor: kSplashYellow,
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ],
+        ),
       ),
     );
   }
