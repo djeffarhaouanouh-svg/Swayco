@@ -557,8 +557,7 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     children: [
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        // 8 dessus : le ✕ dépasse du coin haut-droit des puces.
-                        padding: const EdgeInsets.fromLTRB(2, 8, 2, 12),
+                        padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
                         child: Row(
                           children: [
                             for (final key in _selected) ...[
@@ -745,57 +744,77 @@ class _CountryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Toute la puce est une cible de retrait ; le ✕ jaune en haut à droite
+    // en est une zone élargie (44 × 44, DANS les bornes du widget : ce qui
+    // dépasse d'un Stack ne reçoit aucun tap — c'est ce qui obligeait à
+    // taper plusieurs fois).
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
-            decoration: BoxDecoration(
-              color: SC.onAccent.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        height: 50,
+        child: Stack(
+          alignment: Alignment.bottomLeft,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8, right: 8),
+              child: Container(
+                height: 34,
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                decoration: BoxDecoration(
+                  color: SC.onAccent.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _GlobeFlag(code: code, emoji: emoji, height: 13),
+                    const SizedBox(width: 7),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _GlobeFlag(code: code, emoji: emoji, height: 13),
-                const SizedBox(width: 7),
-                Text(
-                  name,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+            Positioned(
+              top: 0,
+              right: 0,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: SC.onAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: SC.accent, width: 1.5),
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: SC.accent,
+                        size: 12,
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          // Le ✕ jaune, en haut à droite : la même pastille que sur les
-          // bulles pays de la page Discover.
-          Positioned(
-            top: -6,
-            right: -4,
-            child: Container(
-              width: 17,
-              height: 17,
-              decoration: BoxDecoration(
-                color: SC.onAccent,
-                shape: BoxShape.circle,
-                border: Border.all(color: SC.accent, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.close_rounded,
-                color: SC.accent,
-                size: 11,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
