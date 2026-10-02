@@ -557,7 +557,8 @@ class _DiscoverGlobeSheetState extends State<DiscoverGlobeSheet> {
                     children: [
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+                        // 8 dessus : le ✕ dépasse du coin haut-droit des puces.
+                        padding: const EdgeInsets.fromLTRB(2, 8, 2, 12),
                         child: Row(
                           children: [
                             for (final key in _selected) ...[
@@ -747,35 +748,54 @@ class _CountryChip extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
-        decoration: BoxDecoration(
-          color: SC.onAccent.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _GlobeFlag(code: code, emoji: emoji, height: 13),
-            const SizedBox(width: 7),
-            Text(
-              name,
-              maxLines: 1,
-              softWrap: false,
-              style: GoogleFonts.dmSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+            decoration: BoxDecoration(
+              color: SC.onAccent.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _GlobeFlag(code: code, emoji: emoji, height: 13),
+                const SizedBox(width: 7),
+                Text(
+                  name,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Le ✕ jaune, en haut à droite : la même pastille que sur les
+          // bulles pays de la page Discover.
+          Positioned(
+            top: -6,
+            right: -4,
+            child: Container(
+              width: 17,
+              height: 17,
+              decoration: BoxDecoration(
+                color: SC.onAccent,
+                shape: BoxShape.circle,
+                border: Border.all(color: SC.accent, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                color: SC.accent,
+                size: 11,
               ),
             ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.close_rounded,
-              size: 15,
-              color: Colors.white.withValues(alpha: 0.75),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -990,19 +1010,6 @@ class _GlobePainter extends CustomPainter {
   static const _border = Color(0xFFB9B3A3);
   static const _rim = Color(0xFF7FA8BD);
 
-  /// Les bandes de couleur du drapeau de chaque pays sélectionnable.
-  static const Map<String, List<Color>> _flagColors = {
-    'France': [Color(0xFF0055A4), Color(0xFFFFFFFF), Color(0xFFEF4135)],
-    'Germany': [Color(0xFF000000), Color(0xFFDD0000), Color(0xFFFFCE00)],
-    'Canada': [Color(0xFFD52B1E), Color(0xFFFFFFFF), Color(0xFFD52B1E)],
-    'Japan': [Color(0xFFFFFFFF), Color(0xFFBC002D)],
-    'Belgium': [Color(0xFF000000), Color(0xFFFDDA24), Color(0xFFEF3340)],
-    'Brazil': [Color(0xFF009C3B), Color(0xFFFFDF00), Color(0xFF002776)],
-    'Spain': [Color(0xFFAA151B), Color(0xFFF1BF00), Color(0xFFAA151B)],
-    'Sweden': [Color(0xFF006AA7), Color(0xFFFECC00)],
-    'Morocco': [Color(0xFFC1272D), Color(0xFF006233)],
-  };
-
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -1044,24 +1051,7 @@ class _GlobePainter extends CustomPainter {
       } else {
         fill = _terrain(land.avgLat);
       }
-      final fillPaint = Paint()..color = fill;
-      // Un pays choisi se colorie aux couleurs de son drapeau (bandes).
-      final flag = isSelected ? _flagColors[land.name] : null;
-      if (flag != null) {
-        final bounds = path.getBounds();
-        if (!bounds.isEmpty) {
-          final n = flag.length;
-          fillPaint.shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [for (final c in flag) ...[c, c]],
-            stops: [
-              for (var i = 0; i < n; i++) ...[i / n, (i + 1) / n],
-            ],
-          ).createShader(bounds);
-        }
-      }
-      canvas.drawPath(path, fillPaint);
+      canvas.drawPath(path, Paint()..color = fill);
       canvas.drawPath(path, borderPaint);
       if (isCountry && !isSelected) {
         canvas.drawPath(
