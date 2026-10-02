@@ -2291,8 +2291,12 @@ class _TinderCardState extends State<_TinderCard> {
 
     final name = p.displayName.trim().isEmpty ? '—' : p.displayName.trim();
     final title = p.age != null ? '$name, ${p.age}' : name;
-    // La ville seule (« Stockholm ») : le pays, lui, est dans le drapeau.
-    final place = p.city.trim().isNotEmpty ? p.city.trim() : p.country.trim();
+    // Le pays puis la ville (« France · Toulouse ») ; l'un des deux seul quand
+    // l'autre manque.
+    final place = [
+      if (p.country.trim().isNotEmpty) p.country.trim(),
+      if (p.city.trim().isNotEmpty) p.city.trim(),
+    ].join(' · ');
     return Stack(
       fit: StackFit.expand,
       children: [
