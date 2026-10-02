@@ -81,6 +81,11 @@ double discoverCardAspect(BuildContext context) {
 /// Rayon des coins de la carte photo (handoff 3c).
 const double _kCardRadius = 32.0;
 
+/// La lumière blanche, légère, derrière la photo de la carte.
+const List<BoxShadow> _kCardGlow = [
+  BoxShadow(color: Color(0x24FFFFFF), blurRadius: 30, spreadRadius: 1),
+];
+
 /// Diamètre des boutons ✕ / message / ❤.
 const double _kActionSize = 58.0;
 // Diameter of the ✕ / ❤ buttons.
@@ -1588,12 +1593,19 @@ class _TinderCardStackState extends State<_TinderCardStack> {
     // Carte photo arrondie (32) qui flotte sur le fond noir — plus de liseré
     // drapeau : le drapeau est à côté du prénom, en image.
     return SizedBox.expand(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_kCardRadius),
-        child: _TinderCard(
-          key: ValueKey(card.profile.id),
-          profile: card.profile,
-          photos: card.photos,
+      child: DecoratedBox(
+        // Une légère lumière blanche derrière la photo.
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_kCardRadius),
+          boxShadow: _kCardGlow,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_kCardRadius),
+          child: _TinderCard(
+            key: ValueKey(card.profile.id),
+            profile: card.profile,
+            photos: card.photos,
+          ),
         ),
       ),
     );
@@ -2490,7 +2502,9 @@ class _TinderCardState extends State<_TinderCard> {
             const Positioned(
               left: 0,
               right: 0,
-              bottom: 2,
+              // Plus bas qu'avant (2 → −6) : la flèche, qui occupe le milieu
+              // de l'icône de 34, reste visible, plus près du bord.
+              bottom: -6,
               child: IgnorePointer(
                 child: Center(child: _ScrollHintChevrons()),
               ),
