@@ -2291,11 +2291,11 @@ class _TinderCardState extends State<_TinderCard> {
     final name = p.displayName.trim().isEmpty ? '—' : p.displayName.trim();
     final title = p.age != null ? '$name, ${p.age}' : name;
     // Le pays, un tiret, puis la ville (« France - Toulouse ») ; l'un des deux
-    // seul quand l'autre manque.
-    final place = [
-      if (p.country.trim().isNotEmpty) p.country.trim(),
-      if (p.city.trim().isNotEmpty) p.city.trim(),
-    ].join(' - ');
+    // seul quand l'autre manque. La ville, plus petite, se distingue du pays.
+    final country = p.country.trim();
+    final city = p.city.trim();
+    final place = [if (country.isNotEmpty) country, if (city.isNotEmpty) city]
+        .join(' - ');
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2464,8 +2464,24 @@ class _TinderCardState extends State<_TinderCard> {
                 ),
                 if (place.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    place,
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        if (country.isNotEmpty) TextSpan(text: country),
+                        if (country.isNotEmpty && city.isNotEmpty)
+                          const TextSpan(text: ' - '),
+                        // La ville : un cran plus petite et plus discrète.
+                        if (city.isNotEmpty)
+                          TextSpan(
+                            text: city,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.65),
+                            ),
+                          ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
