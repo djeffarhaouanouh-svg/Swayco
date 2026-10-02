@@ -229,7 +229,10 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                         borderRadius: BorderRadius.circular(
                           widget.circle ? l.frameW / 2 : 24,
                         ),
-                        child: InteractiveViewer(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            InteractiveViewer(
                           transformationController: _ctrl,
                           constrained: false,
                           // Zoom out down to the whole photo (or further),
@@ -249,6 +252,13 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                               filterQuality: FilterQuality.medium,
                             ),
                           ),
+                            ),
+                            // Où viendront le nom, le lieu et la puce sur la
+                            // carte : pour cadrer sans cacher ce qui s'y pose.
+                            // Hors export (le JPEG ne reprend que la photo).
+                            if (!widget.circle)
+                              const IgnorePointer(child: _CardPlaceholders()),
+                          ],
                         ),
                       ),
                     ),
@@ -265,6 +275,59 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Emplacements fantômes du bas de la carte Discover : nom, pays - ville, puce.
+class _CardPlaceholders extends StatelessWidget {
+  const _CardPlaceholders();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h, double a) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: a),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+    return Align(
+      alignment: Alignment.bottomLeft,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 40, 18, 22),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.black.withValues(alpha: 0.55),
+            ],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bar(150, 20, 0.35),
+            const SizedBox(height: 8),
+            bar(110, 12, 0.25),
+            const SizedBox(height: 12),
+            Container(
+              width: 98,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+            ),
+          ],
         ),
       ),
     );

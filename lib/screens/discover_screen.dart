@@ -2495,7 +2495,7 @@ class _TinderCardState extends State<_TinderCard> {
                     ),
                   ),
                 ],
-                _CardPills(profile: p, placeholder: widget.preview),
+                _CardPills(profile: p),
               ],
             ),
           ),
@@ -2543,12 +2543,9 @@ class _NameFlag extends StatelessWidget {
 /// celles qui tiennent EN ENTIER dans la largeur — une puce tronquée ou une
 /// deuxième ligne mangerait la photo. Le reste est dans le panneau.
 class _CardPills extends StatelessWidget {
-  const _CardPills({required this.profile, this.placeholder = false});
+  const _CardPills({required this.profile});
 
   final RemoteProfile profile;
-
-  /// Aperçu de ma carte : sans aucune puce, on montre leur emplacement.
-  final bool placeholder;
 
   @override
   Widget build(BuildContext context) {
@@ -2558,24 +2555,7 @@ class _CardPills extends StatelessWidget {
         '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}',
       for (final tag in p.interests) interestPillText(tag),
     ];
-    if (labels.isEmpty) {
-      if (!placeholder) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            width: 98,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            ),
-          ),
-        ),
-      );
-    }
+    if (labels.isEmpty) return const SizedBox.shrink();
 
     // UNE seule puce (l'ancien système) : la catégorie « persona » quand elle
     // est connue, sinon le premier intérêt. Le reste est dans le panneau, que
