@@ -768,6 +768,12 @@ class _CountryChip extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.close_rounded,
+              size: 15,
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
           ],
         ),
       ),
@@ -984,6 +990,19 @@ class _GlobePainter extends CustomPainter {
   static const _border = Color(0xFFB9B3A3);
   static const _rim = Color(0xFF7FA8BD);
 
+  /// Les bandes de couleur du drapeau de chaque pays sélectionnable.
+  static const Map<String, List<Color>> _flagColors = {
+    'France': [Color(0xFF0055A4), Color(0xFFFFFFFF), Color(0xFFEF4135)],
+    'Germany': [Color(0xFF000000), Color(0xFFDD0000), Color(0xFFFFCE00)],
+    'Canada': [Color(0xFFD52B1E), Color(0xFFFFFFFF), Color(0xFFD52B1E)],
+    'Japan': [Color(0xFFFFFFFF), Color(0xFFBC002D)],
+    'Belgium': [Color(0xFF000000), Color(0xFFFDDA24), Color(0xFFEF3340)],
+    'Brazil': [Color(0xFF009C3B), Color(0xFFFFDF00), Color(0xFF002776)],
+    'Spain': [Color(0xFFAA151B), Color(0xFFF1BF00), Color(0xFFAA151B)],
+    'Sweden': [Color(0xFF006AA7), Color(0xFFFECC00)],
+    'Morocco': [Color(0xFFC1272D), Color(0xFF006233)],
+  };
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -1025,7 +1044,24 @@ class _GlobePainter extends CustomPainter {
       } else {
         fill = _terrain(land.avgLat);
       }
-      canvas.drawPath(path, Paint()..color = fill);
+      final fillPaint = Paint()..color = fill;
+      // Un pays choisi se colorie aux couleurs de son drapeau (bandes).
+      final flag = isSelected ? _flagColors[land.name] : null;
+      if (flag != null) {
+        final bounds = path.getBounds();
+        if (!bounds.isEmpty) {
+          final n = flag.length;
+          fillPaint.shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [for (final c in flag) ...[c, c]],
+            stops: [
+              for (var i = 0; i < n; i++) ...[i / n, (i + 1) / n],
+            ],
+          ).createShader(bounds);
+        }
+      }
+      canvas.drawPath(path, fillPaint);
       canvas.drawPath(path, borderPaint);
       if (isCountry && !isSelected) {
         canvas.drawPath(
