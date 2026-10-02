@@ -11,7 +11,7 @@ const String settingsHeroTag = 'settings-gear-hero';
 
 /// Durée totale : la première moitié pour le glissement, la seconde pour
 /// l'apparition de la page.
-const Duration _kDuration = Duration(milliseconds: 560);
+const Duration _kDuration = Duration(milliseconds: 760);
 
 /// Ouvre [builder] avec la transition « l'engrenage glisse puis la page
 /// s'ouvre ».
@@ -24,7 +24,8 @@ Route<T> settingsHeroRoute<T>(WidgetBuilder builder) {
       // La page n'apparaît qu'une fois le rond arrivé (seconde moitié).
       opacity: CurvedAnimation(
         parent: anim,
-        curve: const Interval(0.5, 1, curve: Curves.easeOut),
+        // Le rond a fini de glisser à 45 % ; un temps de pose, puis la page.
+        curve: const Interval(0.58, 1, curve: Curves.easeOut),
       ),
       child: child,
     ),
@@ -63,7 +64,7 @@ class SettingsHeroButton extends StatelessWidget {
 
 /// 0 → 0,5 de l'animation de la route ramené sur 0 → 1 (le reste : arrivé).
 double _firstHalf(double v) =>
-    Curves.easeInOut.transform((v * 2).clamp(0.0, 1.0));
+    Curves.easeInOut.transform((v / 0.45).clamp(0.0, 1.0));
 
 class _FirstHalfRectTween extends RectTween {
   _FirstHalfRectTween({super.begin, super.end});
