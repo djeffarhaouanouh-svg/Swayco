@@ -911,11 +911,26 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                 top: 0,
                 left: 0,
                 right: 0,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: _chromeGradient(solid: headerH, top: true),
-                  ),
-                  child: Padding(
+                // Le fond (et son fondu) garde la hauteur d'avant la 8c : la
+                // pastille Traduction se pose DANS le fondu, elle n'allonge pas
+                // la zone opaque.
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: headerH - _TranslatePill.blockHeight + _kChromeFade,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: _chromeGradient(
+                            solid: headerH - _TranslatePill.blockHeight,
+                            top: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
                     padding: EdgeInsets.only(top: safeTop, bottom: _kChromeFade),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -950,6 +965,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
                       ],
                     ),
                   ),
+                  ],
                 ),
               ),
               // ── Footer : même fond, inversé — constant derrière le composer,
