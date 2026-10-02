@@ -118,6 +118,7 @@ class _MatchOverlayState extends State<MatchOverlay>
                   child: MatchCard(
                     kind: _kind,
                     peer: widget.peer,
+                    me: widget.me,
                     onSayHi: widget.onSayHi,
                     onDismiss: widget.onDismiss,
                   ),
