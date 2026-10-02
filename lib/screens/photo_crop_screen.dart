@@ -257,7 +257,21 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                             // carte : pour cadrer sans cacher ce qui s'y pose.
                             // Hors export (le JPEG ne reprend que la photo).
                             if (!widget.circle)
-                              const IgnorePointer(child: _CardPlaceholders()),
+                              IgnorePointer(
+                                child: FittedBox(
+                                  // Dessinés aux cotes d'une vraie carte
+                                  // (écran − 2 × 14 de marge), puis mis à
+                                  // l'échelle du cadre : même proportions.
+                                  fit: BoxFit.contain,
+                                  child: SizedBox(
+                                    width: MediaQuery.sizeOf(context).width - 28,
+                                    height:
+                                        (MediaQuery.sizeOf(context).width - 28) /
+                                            widget.aspect,
+                                    child: const _CardPlaceholders(),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
