@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 /// du bouton retour de l'AppBar (14 de marge).
 const double _kBackLeft = 14;
 
+/// Où était l'engrenage la dernière fois qu'il a ouvert les Réglages (bord
+/// gauche, en px) : le retour y glisse avant de refermer la page.
+double? _lastGearLeft;
+
 /// Les Réglages apparaissent en fondu : le rond est DÉJÀ arrivé à la place de
 /// leur bouton retour, la page n'a rien d'autre à animer.
 Route<T> settingsHeroRoute<T>(WidgetBuilder builder) {
@@ -58,7 +62,9 @@ class _SettingsHeroButtonState extends State<SettingsHeroButton>
     if (box == null) return;
     _busy = true;
     // Distance jusqu'à la place du retour, mesurée sur l'écran.
-    _distance = box.localToGlobal(Offset.zero).dx - _kBackLeft;
+    final gearLeft = box.localToGlobal(Offset.zero).dx;
+    _lastGearLeft = gearLeft;
+    _distance = gearLeft - _kBackLeft;
     // 1. Le rond se déplace et arrive.
     await _c.forward(from: 0);
     if (!mounted) return;
@@ -66,10 +72,13 @@ class _SettingsHeroButtonState extends State<SettingsHeroButton>
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (!mounted) return;
     // 3. Puis la page.
-    await widget.onOpen();
-    if (!mounted) return;
-    // Retour sur le profil : il repart à sa place.
-    await _c.reverse();
+    final closed = widget.onOpen();
+    // Une fois la page posée par-dessus, l'engrenage reprend sa place SOUS
+    // elle : au retour, c'est la flèche des Réglages qui glisse jusqu'à lui
+    // (SettingsBackButton), et la page s'efface sur un engrenage déjà là.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (mounted) _c.value = 0;
+    await closed;
     _busy = false;
   }
 
@@ -151,19 +160,72 @@ class SettingsDisc extends StatelessWidget {
   }
 }
 
-/// Le bouton retour des Réglages : le même rond, déjà en flèche, exactement
-/// là où le rond du profil vient de se poser.
-class SettingsBackButton extends StatelessWidget {
+/// Le bouton retour des Réglages : le même rond, déjà en flèche, là où le rond
+/// du profil vient de se poser. Au tap, l'effet inverse : il glisse vers la
+/// droite jusqu'à la place de l'engrenage en redevenant engrenage, s'y pose,
+/// PUIS la page se referme ([onTap]).
+class SettingsBackButton extends StatefulWidget {
   const SettingsBackButton({super.key, this.onTap});
 
   final VoidCallback? onTap;
 
   @override
+  State<SettingsBackButton> createState() => _SettingsBackButtonState();
+}
+
+class _SettingsBackButtonState extends State<SettingsBackButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+  bool _busy = false;
+  double _distance = 0;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _back() async {
+    if (_busy) return;
+    final gear = _lastGearLeft;
+    final box = context.findRenderObject() as RenderBox?;
+    // Réglages ouverts d'ailleurs (pas depuis l'engrenage) : retour simple.
+    if (gear == null || box == null) {
+      widget.onTap?.call();
+      return;
+    }
+    _busy = true;
+    _distance = gear - box.localToGlobal(Offset.zero).dx;
+    // 1. La flèche glisse jusqu'à l'engrenage.
+    await _c.forward(from: 0);
+    if (!mounted) return;
+    // 2. Pose.
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    // 3. Puis la page se referme.
+    widget.onTap?.call();
+    _busy = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: const SettingsDisc(t: 1),
+      onTap: _back,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) {
+          final t = Curves.easeInOutCubic.transform(_c.value);
+          return Transform.translate(
+            offset: Offset(_distance * t, 0),
+            // 1 → 0 : la flèche redevient engrenage en roulant à l'envers.
+            child: SettingsDisc(t: 1 - t),
+          );
+        },
+      ),
     );
   }
 }
