@@ -2308,8 +2308,8 @@ class _RewardHint extends StatelessWidget {
   final int points;
   @override
   Widget build(BuildContext context) {
-    // Le même verre que les ronds du haut (retour / œil / engrenage) : blanc
-    // 13 %, bord blanc 30 % de 1,2 px, flou 20. Ne se coupe jamais.
+    // Pastille en verre, comme les ronds du haut de la page (blanc 13 %, bord
+    // blanc 30 %, flou 20). Ne se coupe jamais.
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: BackdropFilter(
