@@ -195,10 +195,10 @@ class _LikerRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (revealed)
+                        // Le drapeau reste visible même flouté : c'est l'indice
+                        // qui donne envie de savoir qui se cache derrière.
+                        ...[
                           Builder(builder: (context) {
-                            // Not revealed yet: no flag either — it would
-                            // leak a clue about who's behind the blur.
                             final flag =
                                 countryFlagFor(profile.country) ??
                                     findLanguageByCode(profile.language)
@@ -209,10 +209,11 @@ class _LikerRow extends StatelessWidget {
                               padding: const EdgeInsets.only(left: 5),
                               child: Text(
                                 flag,
-                                style: const TextStyle(fontSize: 13),
+                                style: const TextStyle(fontSize: 15),
                               ),
                             );
                           }),
+                        ],
                       ],
                     ),
                     if (revealed && profile.handle.isNotEmpty)
