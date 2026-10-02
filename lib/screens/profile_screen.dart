@@ -2308,22 +2308,32 @@ class _RewardHint extends StatelessWidget {
   final int points;
   @override
   Widget build(BuildContext context) {
-    // Pastille jaune : ne se coupe jamais.
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: SC.accent.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: SC.accent.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        '+$points pts',
-        maxLines: 1,
-        softWrap: false,
-        style: const TextStyle(
-          color: SC.accent,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
+    // Le même verre que les ronds du haut (retour / œil / engrenage) : blanc
+    // 13 %, bord blanc 30 % de 1,2 px, flou 20. Ne se coupe jamais.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.3),
+              width: 1.2,
+            ),
+          ),
+          child: Text(
+            '+$points pts',
+            maxLines: 1,
+            softWrap: false,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );
