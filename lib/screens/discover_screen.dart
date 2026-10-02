@@ -1274,12 +1274,14 @@ class _CountryRowState extends State<_CountryRow> {
                 // Liseré de verre (blanc 20 %) d'1 px : juste de quoi détacher
                 // la bulle du fond, choisie ou non ; c'est « Filtrer » qui porte
                 // l'anneau en dégradé.
+                // Choisie : l'anneau passe au bleu de la marque (2 px).
                 final circle = Container(
                     width: _kBubble,
                     height: _kBubble,
-                    padding: const EdgeInsets.all(1),
-                    decoration: const BoxDecoration(
-                      color: SC.glassBorderStrong,
+                    padding: EdgeInsets.all(on ? 2 : 1),
+                    decoration: BoxDecoration(
+                      color: on ? null : SC.glassBorderStrong,
+                      gradient: on ? SC.brandGradient : null,
                       shape: BoxShape.circle,
                     ),
                     child: Container(
