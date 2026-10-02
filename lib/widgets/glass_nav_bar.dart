@@ -10,6 +10,7 @@ import '../services/platform_glass.dart';
 import '../theme/swayco_theme.dart';
 import 'spring_press.dart';
 import 'swayco_animations.dart';
+import 'swayco_nav_icons.dart';
 
 /// WhatsApp-style lens magnification for the nav icon at index [i], given the
 /// continuous pill position [frac]. The icon swells as the pill slides PAST it
@@ -22,7 +23,7 @@ double _navLensScale(int i, double frac, {double amp = 0.45}) {
 }
 
 /// Pill-centred lens magnification: the icon directly under the dragging pill
-/// is the biggest (distance 0 â†’ `1 + amp`), tapering back to 1.0 a slot away.
+/// is the biggest (distance 0 → `1 + amp`), tapering back to 1.0 a slot away.
 /// Used WHILE dragging the pill, where the icon under the finger should bulge.
 double _navPeakLens(int i, double frac, {double amp = 0.45}) {
   final d = (i - frac).abs().clamp(0.0, 1.0);
@@ -46,7 +47,7 @@ class GlassNavBar extends StatefulWidget {
     required this.unreadChat,
     required this.unreadRequests,
     required this.onSelect,
-    this.hugTopCorners = false,  // kept for API compat â€” no longer used
+    this.hugTopCorners = false,  // kept for API compat — no longer used
     this.selectedFraction,
   });
 
@@ -62,12 +63,12 @@ class GlassNavBar extends StatefulWidget {
   final bool hugTopCorners; // no-op with floating design
 
   /// Height of the pill content area. A 22px icon + 3px gap + 9px caption is
-  /// ~34px of actual content â€” 70 left it visibly padded/thick top and
+  /// ~34px of actual content — 70 left it visibly padded/thick top and
   /// bottom; 60 keeps it a comfortable tap target without the extra bulk.
   static const double height = 60;
 
   /// Gap between the pill bottom and the screen safe-area top. Volontairement
-  /// court : la barre est posÃ©e bas, prÃ¨s du pouce.
+  /// court : la barre est posée bas, près du pouce.
   static const double floatBottom = 8.0;
 
   /// Side inset of the floating island. Tight enough that four labelled
@@ -77,7 +78,7 @@ class GlassNavBar extends StatefulWidget {
   /// Total vertical space to reserve below content (height + float gap).
   static const double totalReservedHeight = height + floatBottom;
 
-  // Kept for callers that still reference hugRadius â€” value unused in layout.
+  // Kept for callers that still reference hugRadius — value unused in layout.
   static const double hugRadius = 28;
 
   @override
@@ -86,10 +87,10 @@ class GlassNavBar extends StatefulWidget {
 
 class _GlassNavBarState extends State<GlassNavBar>
     with SingleTickerProviderStateMixin {
-  // â”€â”€ Drag-to-switch (iOS-26 liquid glass): press & hold the bar, the pill
+  // ── Drag-to-switch (iOS-26 liquid glass): press & hold the bar, the pill
   // grows, then slide left/right to pick a tab; release snaps to the nearest.
   double? _dragFrac; // pill position override while dragging / settling
-  bool _dragging = false; // finger held â†’ pill grown + pill-centred lens
+  bool _dragging = false; // finger held → pill grown + pill-centred lens
   double _slot = 1; // slot width, cached from the LayoutBuilder each build
   int _count = 1; // number of tabs
   int _lastHovered = -1; // last tab the pill crossed (for a tick of haptic)
@@ -147,7 +148,7 @@ class _GlassNavBarState extends State<GlassNavBar>
 
   void _onDragUpdate(double dx) {
     final frac = _fracFromX(dx);
-    // A soft tick each time the pill crosses onto a new tab â€” iOS-style.
+    // A soft tick each time the pill crosses onto a new tab — iOS-style.
     final hovered = frac.round();
     if (hovered != _lastHovered) {
       _lastHovered = hovered;
@@ -176,39 +177,33 @@ class _GlassNavBarState extends State<GlassNavBar>
     const height = GlassNavBar.height;
     final items = <_NavItemData>[
       _NavItemData(
-        icon: Icons.chat_bubble_outline,
-        selectedIcon: Icons.chat_bubble,
+        kind: SwaycoNavKind.chat,
         label: AppStrings.t('nav_chat'),
         badge: unreadChat,
       ),
       _NavItemData(
-        // Card-stack glyph (Discover deck metaphor) â€” l'icÃ´ne d'avant la noix
-        // de coco. Le couple SVG reste dans le repo si on veut y revenir.
-        icon: Icons.style_outlined,
-        selectedIcon: Icons.style,
+        kind: SwaycoNavKind.discover,
         label: AppStrings.t('nav_search'),
       ),
       _NavItemData(
-        icon: Icons.favorite_border,
-        selectedIcon: Icons.favorite,
+        kind: SwaycoNavKind.requests,
         label: AppStrings.t('nav_demandes'),
         badge: unreadRequests,
       ),
       _NavItemData(
-        icon: Icons.person_outline,
-        selectedIcon: Icons.person,
+        kind: SwaycoNavKind.profile,
         label: AppStrings.t('nav_tab3'),
       ),
     ];
 
-    // The pill + items row â€” identical in every rendering path.
+    // The pill + items row — identical in every rendering path.
     final inner = SizedBox(
       height: height,
       child: LayoutBuilder(
             builder: (context, constraints) {
               // Each tab gets an equal slice of the full width; the pill and
               // the icons share the same slot geometry so they line up. Cache
-              // slot/count so the drag gesture can map x â†’ tab position.
+              // slot/count so the drag gesture can map x → tab position.
               final slot = constraints.maxWidth / items.length;
               _slot = slot;
               _count = items.length;
@@ -226,8 +221,8 @@ class _GlassNavBarState extends State<GlassNavBar>
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutBack,
                   child: Container(
-                    // Marge latÃ©rale dans le slot : 6 de chaque cÃ´tÃ©. La pastille
-                    // enveloppe l'icÃ´ne ET sa lÃ©gende plutÃ´t que de les serrer.
+                    // Marge latérale dans le slot : 6 de chaque côté. La pastille
+                    // enveloppe l'icône ET sa légende plutôt que de les serrer.
                     width: slot - 12,
                     height: height - 10,
                     decoration: BoxDecoration(
@@ -273,7 +268,7 @@ class _GlassNavBarState extends State<GlassNavBar>
                         width: slot,
                         child: pill,
                       ),
-                    // Items â€” one equal-width slot each.
+                    // Items — one equal-width slot each.
                     Row(
                       children: [
                         for (var i = 0; i < items.length; i++)
@@ -283,7 +278,7 @@ class _GlassNavBarState extends State<GlassNavBar>
                               child: _NavItem(
                                 data: items[i],
                                 selected: selected == i,
-                                // Dragging â†’ a lens centred on the pill (icon
+                                // Dragging → a lens centred on the pill (icon
                                 // under the finger bulges). Otherwise the swipe
                                 // bump that settles back to normal size.
                                 magnify: _dragging
@@ -352,13 +347,17 @@ class _NavItemData {
     this.selectedIcon,
     this.assetIcon,
     this.assetSelectedIcon,
+    this.kind,
     required this.label,
     this.badge = 0,
   }) : assert(
-          (assetIcon != null && assetSelectedIcon != null) ||
+          kind != null ||
+              (assetIcon != null && assetSelectedIcon != null) ||
               (icon != null && selectedIcon != null),
         );
 
+  /// Icône dessinée au Path (variante B « Plein arrondi »), prioritaire.
+  final SwaycoNavKind? kind;
   final IconData? icon;
   final IconData? selectedIcon;
 
@@ -380,7 +379,7 @@ class _NavItem extends StatefulWidget {
   final _NavItemData data;
   final bool selected;
 
-  /// Proximity scale from the sliding pill (1.0 far â†’ larger right under it).
+  /// Proximity scale from the sliding pill (1.0 far → larger right under it).
   final double magnify;
   final VoidCallback onTap;
 
@@ -391,20 +390,20 @@ class _NavItem extends StatefulWidget {
 class _NavItemState extends State<_NavItem>
     with SingleTickerProviderStateMixin {
   // One-shot "pop" played the instant this tab becomes selected: the icon
-  // grows past its size, then springs back to normal â€” the grow-then-shrink
+  // grows past its size, then springs back to normal — the grow-then-shrink
   // on click. Layered (multiplied) on top of the swipe lens magnification.
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 460),
   );
   late final Animation<double> _popScale = TweenSequence<double>([
-    // Quick grow to the overshoot peakâ€¦
+    // Quick grow to the overshoot peak…
     TweenSequenceItem(
       tween: Tween(begin: 1.0, end: 1.35)
           .chain(CurveTween(curve: Curves.easeOutCubic)),
       weight: 35,
     ),
-    // â€¦then a springy settle back to normal size.
+    // …then a springy settle back to normal size.
     TweenSequenceItem(
       tween: Tween(begin: 1.35, end: 1.0)
           .chain(CurveTween(curve: Curves.elasticOut)),
@@ -439,13 +438,22 @@ class _NavItemState extends State<_NavItem>
             AnimatedBuilder(
               animation: _popScale,
               builder: (context, child) => Transform.scale(
-                // Swipe lens Ã— selection pop â€” icon only, the caption stays put.
+                // Swipe lens × selection pop — icon only, the caption stays put.
                 scale: widget.magnify * _popScale.value,
                 child: child,
               ),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                child: widget.data.assetIcon != null
+                child: widget.data.kind != null
+                    ? SwaycoNavIcon(
+                        kind: widget.data.kind!,
+                        key: ValueKey(widget.selected),
+                        size: 22,
+                        color: widget.selected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.50),
+                      )
+                    : widget.data.assetIcon != null
                     ? SvgPicture.asset(
                         widget.selected
                             ? widget.data.assetSelectedIcon!
@@ -454,7 +462,7 @@ class _NavItemState extends State<_NavItem>
                         width: 22,
                         height: 22,
                         // The filled coconut carries its own two-tone shading
-                        // (the dark rim of the opening) â€” flattening it through
+                        // (the dark rim of the opening) — flattening it through
                         // a srcIn filter would erase that, so only the outline
                         // one gets tinted, to the same muted white as the other
                         // unselected tabs.
