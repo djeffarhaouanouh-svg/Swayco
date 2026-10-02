@@ -2470,14 +2470,15 @@ class _TinderCardState extends State<_TinderCard> {
                         if (country.isNotEmpty) TextSpan(text: country),
                         if (country.isNotEmpty && city.isNotEmpty)
                           const TextSpan(text: ' - '),
-                        // La ville : un cran plus petite et plus discrète.
+                        // La ville : un cran plus petite que le pays, mais bien
+                        // lisible (blanc 85 %).
                         if (city.isNotEmpty)
                           TextSpan(
                             text: city,
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.65),
+                              color: Colors.white.withValues(alpha: 0.85),
                             ),
                           ),
                       ],
@@ -2494,7 +2495,7 @@ class _TinderCardState extends State<_TinderCard> {
                     ),
                   ),
                 ],
-                _CardPills(profile: p, placeholder: widget.preview),
+                _CardPills(profile: p),
               ],
             ),
           ),
@@ -2542,12 +2543,9 @@ class _NameFlag extends StatelessWidget {
 /// celles qui tiennent EN ENTIER dans la largeur — une puce tronquée ou une
 /// deuxième ligne mangerait la photo. Le reste est dans le panneau.
 class _CardPills extends StatelessWidget {
-  const _CardPills({required this.profile, this.placeholder = false});
+  const _CardPills({required this.profile});
 
   final RemoteProfile profile;
-
-  /// Aperçu de ma carte : sans aucune puce, on montre leur emplacement.
-  final bool placeholder;
 
   @override
   Widget build(BuildContext context) {
@@ -2557,22 +2555,9 @@ class _CardPills extends StatelessWidget {
         '${cat.emoji} ${personaCategoryLabel(p.personaCategory)}',
       for (final tag in p.interests) interestPillText(tag),
     ];
-    if (labels.isEmpty) {
-      if (!placeholder) return const SizedBox.shrink();
-      // Une puce fantôme, même hauteur que la vraie (≈ 32).
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Container(
-          width: 98,
-          height: 32,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          ),
-        ),
-      );
-    }
+    // Rien à montrer : pas de puce, pas de puce fantôme non plus — même sur
+    // l'aperçu de ma carte (l'œil du profil).
+    if (labels.isEmpty) return const SizedBox.shrink();
 
     // UNE seule puce (l'ancien système) : la catégorie « persona » quand elle
     // est connue, sinon le premier intérêt. Le reste est dans le panneau, que
