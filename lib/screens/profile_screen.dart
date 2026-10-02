@@ -35,6 +35,7 @@ import '../services/web_poll.dart';
 import '../services/zodiac.dart';
 import '../theme/swayco_theme.dart';
 import '../widgets/glass_nav_bar.dart';
+import '../widgets/fade_scale_route.dart';
 import '../widgets/info_bento.dart';
 import '../widgets/interest_chip.dart';
 import '../widgets/location_picker_sheet.dart';
@@ -495,7 +496,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   /// si on te like.
   Future<void> _openSelfPreview() async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const MyCardPreviewScreen()),
+      // Apparaît sur place, comme la pop-up globe.
+      fadeScaleRoute<void>((_) => const MyCardPreviewScreen()),
     );
   }
 

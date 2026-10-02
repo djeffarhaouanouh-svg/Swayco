@@ -12,6 +12,7 @@ import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/stripe_api.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/fade_scale_route.dart';
 import '../widgets/popup_kit.dart';
 import '../widgets/profile_avatar.dart';
 
@@ -35,10 +36,8 @@ Future<void> showBoostPaywall(
   required Future<void> Function() onPurchased,
 }) {
   return Navigator.of(context).push<void>(
-    MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => _BoostPaywall(onPurchased: onPurchased),
-    ),
+    // Apparaît sur place, sans monter du bas.
+    fadeScaleRoute<void>((_) => _BoostPaywall(onPurchased: onPurchased)),
   );
 }
 
