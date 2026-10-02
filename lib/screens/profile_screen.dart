@@ -41,6 +41,7 @@ import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
+import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
 import '../widgets/swayco_popups_extra.dart';
 import '../widgets/translated_profile_text.dart';
@@ -3508,6 +3509,7 @@ class _PhotoCell extends StatelessWidget {
                 ? Image.network(
                     photoUrl!,
                     fit: BoxFit.cover,
+                    frameBuilder: popInFrameBuilder,
                     errorBuilder: (_, _, _) => const Center(
                       child: Icon(
                         Icons.broken_image_outlined,

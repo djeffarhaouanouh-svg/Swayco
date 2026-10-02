@@ -11,8 +11,10 @@ import '../services/profile_api.dart';
 import '../services/revenue_cat.dart';
 import '../services/web_poll.dart';
 import '../theme/swayco_theme.dart';
+import '../widgets/appear.dart';
 import '../widgets/likes_lock.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/swayco_animations.dart';
 import 'profile_screen.dart';
 
 /// Lists every Supabase user that has liked the current account, newest
@@ -111,10 +113,18 @@ class _LikesReceivedScreenState extends State<LikesReceivedScreen> {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final p = _likers[i];
-                    return _LikerRow(
+                    final row = _LikerRow(
                       profile: p,
                       revealed: _lock?.isRevealed(p.id) ?? false,
                       onTap: () => _openOrUnlock(p),
+                    );
+                    // Seules les 8 premières lignes s'animent : plus bas, la
+                    // liste est reconstruite au défilement et rejouerait l'effet.
+                    if (i >= 8) return row;
+                    return FadeSlideIn(
+                      key: ValueKey(p.id),
+                      delay: Duration(milliseconds: i * 70),
+                      child: row,
                     );
                   },
                 ),
@@ -151,15 +161,17 @@ class _LikerRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              if (revealed)
-                ProfileAvatar(
-                  displayName: profile.displayName,
+              BlurRevealAvatar(
+                revealed: revealed,
+                child: ProfileAvatar(
+                  // Non révélé : pas de nom, donc pas d'initiale qui trahit
+                  // la personne.
+                  displayName: revealed ? profile.displayName : '',
                   avatarUrl: profile.avatarUrl,
                   fallbackUrl: profile.fallbackPhotoUrl,
                   size: 44,
-                )
-              else
-                BlurredAvatar(profile: profile, size: 44),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

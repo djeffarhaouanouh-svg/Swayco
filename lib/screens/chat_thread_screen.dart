@@ -38,6 +38,7 @@ import '../widgets/popup_kit.dart';
 import '../widgets/pressable.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/report_dialog.dart';
+import '../widgets/swayco_animations.dart';
 import '../widgets/swayco_dialog.dart';
 import 'profile_screen.dart';
 
@@ -161,6 +162,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
   /// First snapshot received: only then does an empty list mean "you've never
   /// written to each other" (the empty-thread screen), not "still loading".
   bool _messagesLoaded = false;
+  final EntranceTracker _entrance = EntranceTracker();
 
   /// Typing indicator: I announce when my composer is open; the peer's
   /// "writing…" bubble shows while [_peerTyping].
@@ -1165,6 +1167,10 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
       }
       items.add(_ThreadListItem.message(m));
     }
+    // Les messages déjà là à l'ouverture ne s'animent pas (une seule fois).
+    if (_messagesLoaded) {
+      _entrance.prime([for (final m in _messages) m.id]);
+    }
 
     // Le DERNIER de mes messages que le pair a ouvert : c'est sous celui-là,
     // et lui seul, que « Lu » se pose. Un accusé par bulle ferait une colonne
@@ -1257,7 +1263,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen>
           // « 14:35 · lu » sous le dernier de mes messages que le pair a lus.
           read: m.id == lastReadMineId,
         );
-        return bubble;
+        return MessageEntrance(
+          key: ValueKey(m.id),
+          mine: mine,
+          animate: _entrance.take(m.id),
+          child: bubble,
+        );
       },
     );
   }
@@ -2891,10 +2902,9 @@ class _CircleActionButton extends StatelessWidget {
                       color: _kThreadBg,
                     ),
                   )
-                : Icon(
-                    send ? Icons.send_rounded : Icons.gif_box_rounded,
+                : SwapIcon(
+                    icon: send ? Icons.send_rounded : Icons.gif_box_rounded,
                     color: _kThreadBg,
-                    size: 22,
                   ),
           ),
         ),
