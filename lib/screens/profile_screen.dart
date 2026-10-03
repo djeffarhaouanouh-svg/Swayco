@@ -2181,12 +2181,12 @@ class _PeerMediaStack extends StatelessWidget {
   final Set<String> likedPhotoUrls;
   final void Function(String photoUrl)? onTogglePhotoLike;
 
-  /// Hauteur / largeur d'une vignette : le format de la carte Discover (un
-  /// peu moins haut qu'elle), borné pour rester une grille lisible.
+  /// Toutes les photos au MÊME format : celui de la carte Discover, un peu
+  /// plus haut (+ 8 %). Une colonne pleine largeur — aussi larges que la carte.
   static double _aspect(BuildContext context) =>
-      (1 / discoverCardAspect(context)).clamp(1.4, 1.75);
-  static const double _spacing = 10;
-  static const int _columns = 2;
+      (1 / discoverCardAspect(context)) * 1.08;
+  static const double _spacing = 14;
+  static const int _columns = 1;
 
   @override
   Widget build(BuildContext context) {
