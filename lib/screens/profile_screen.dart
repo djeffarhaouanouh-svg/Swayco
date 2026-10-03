@@ -3515,7 +3515,7 @@ class _DiscoverVisibilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.6);
+    final muted = SC.fgA(0.6);
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,

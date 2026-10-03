@@ -2470,7 +2470,7 @@ class _ChatListSkeletonState extends State<_ChatListSkeleton>
                     final t = Curves.easeInOut.transform(_ctrl.value);
                     // 0.10 → 0.18 alpha so the shimmer breathes gently.
                     final shimmer =
-                        (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.10 + 0.08 * t);
+                        SC.fgA(0.10 + 0.08 * t);
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [

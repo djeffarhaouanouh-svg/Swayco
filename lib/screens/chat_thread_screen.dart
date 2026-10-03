@@ -2957,7 +2957,8 @@ class _TranslatePill extends StatelessWidget {
     final pair = from.isNotEmpty && to.isNotEmpty && from != to
         ? '$from → $to'
         : '';
-    final fg = active ? (SC.light ? Colors.transparent : Colors.white) : (SC.light ? Colors.transparent : Colors.white).withValues(alpha: 0.6);
+    // Actif : texte blanc sur le dégradé bleu ; inactif : encre (clair) ou blanc 60 %.
+    final fg = active ? Colors.white : SC.fgA(0.6);
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Center(
