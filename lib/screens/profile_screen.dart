@@ -1988,8 +1988,8 @@ class _GlassCircle extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          width: light ? 44 : 42,
-          height: light ? 44 : 42,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: SC.fill.withValues(alpha: 0.13), boxShadow: SC.lift,
             shape: BoxShape.circle,
@@ -2005,19 +2005,11 @@ class _GlassCircle extends StatelessWidget {
         ),
       ),
     );
-    // Sombre / Noir : anneau de 1 px au degrade de marque, comme « Filtrer ».
+    // Sombre / Noir : anneau de 1 px au degrade de marque, comme « Filtrer »,
+    // trace PAR-DESSUS le rond (le fond du rond reste du verre).
     final circle = light
         ? disc
-        : Container(
-            width: 44,
-            height: 44,
-            padding: const EdgeInsets.all(1),
-            decoration: const BoxDecoration(
-              gradient: SC.brandGradient,
-              shape: BoxShape.circle,
-            ),
-            child: disc,
-          );
+        : CustomPaint(foregroundPainter: const BrandRingPainter(), child: disc);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,

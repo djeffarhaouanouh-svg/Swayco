@@ -167,6 +167,30 @@ class _SettingsHeroButtonState extends State<SettingsHeroButton>
   }
 }
 
+/// Anneau de 1 px au dégradé de marque, dessiné sur le bord d'un rond.
+class BrandRingPainter extends CustomPainter {
+  const BrandRingPainter({this.width = 1});
+
+  final double width;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width
+      ..shader = SC.brandGradient.createShader(rect);
+    canvas.drawCircle(
+      rect.center,
+      (size.shortestSide - width) / 2,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(BrandRingPainter old) => old.width != width;
+}
+
 /// Le rond de verre (44). [t] 0 = engrenage, 1 = flèche retour ; entre les
 /// deux, il roule (un demi-tour vers la gauche) et les icônes se fondent.
 class SettingsDisc extends StatelessWidget {
@@ -179,15 +203,10 @@ class SettingsDisc extends StatelessWidget {
     return SizedBox(
       width: 44,
       height: 44,
-      child: Container(
-        // Sombre / Noir : anneau de 1 px au degrade de marque (bulle Filtrer).
-        padding: SC.light ? EdgeInsets.zero : const EdgeInsets.all(1),
-        decoration: SC.light
-            ? null
-            : const BoxDecoration(
-                gradient: SC.brandGradient,
-                shape: BoxShape.circle,
-              ),
+      child: CustomPaint(
+        // Sombre / Noir : anneau de 1 px au degrade de marque (bulle Filtrer),
+        // trace par-dessus le verre.
+        foregroundPainter: SC.light ? null : const BrandRingPainter(),
         child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
