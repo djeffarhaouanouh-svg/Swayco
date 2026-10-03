@@ -22,6 +22,7 @@ class InterestPill extends StatelessWidget {
     required this.label,
     this.onPhoto = false,
     this.prominent = false,
+    this.forceDark = false,
     this.onTap,
   });
 
@@ -34,6 +35,9 @@ class InterestPill extends StatelessWidget {
 
   /// Profil : puce un peu plus marquée (blanc 10 %, bord 20 %, 13 / 800).
   final bool prominent;
+
+  /// Posée sur un panneau sombre (Discover) : style sombre même en clair.
+  final bool forceDark;
   final VoidCallback? onTap;
 
   static const double padH = 12;
@@ -56,16 +60,16 @@ class InterestPill extends StatelessWidget {
         // bord bleuté + ombre ; en sombre, blanc translucide comme avant.
         color: onPhoto
             ? Colors.black.withValues(alpha: 0.28)
-            : (SC.light
+            : (SC.light && !forceDark
                 ? SC.fill
                 : Colors.white.withValues(alpha: prominent ? 0.10 : 0.07)),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: onPhoto || !SC.light
+          color: onPhoto || !SC.light || forceDark
               ? Colors.white.withValues(alpha: prominent ? 0.20 : 0.16)
               : SC.stroke,
         ),
-        boxShadow: onPhoto ? null : SC.lift,
+        boxShadow: onPhoto || forceDark ? null : SC.lift,
       ),
       child: Text(
         label,
@@ -74,7 +78,7 @@ class InterestPill extends StatelessWidget {
         style: (prominent
                 ? textStyle.copyWith(fontWeight: FontWeight.w800)
                 : textStyle)
-            .copyWith(color: onPhoto ? Colors.white : SC.fg),
+            .copyWith(color: onPhoto || forceDark ? Colors.white : SC.fg),
       ),
     );
     final surface = onPhoto

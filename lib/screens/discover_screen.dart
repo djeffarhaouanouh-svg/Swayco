@@ -1815,7 +1815,12 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                       if (hasFacts) ...[
                         _PanelSectionTitle(AppStrings.t('info_about')),
                         const SizedBox(height: 10),
-                        InfoBento(age: ageTile, others: otherTiles),
+                        // Panneau sombre : valeurs en jaune « fluo » même en mode clair.
+                        InfoBento(
+                          age: ageTile,
+                          others: otherTiles,
+                          forceDark: true,
+                        ),
                         const SizedBox(height: 22),
                       ],                      if (p.interests.isNotEmpty) ...[
                         _PanelSectionTitle(AppStrings.t('info_interests')),
@@ -1830,6 +1835,7 @@ class _ProfileInfoPanelState extends State<_ProfileInfoPanel> {
                               InterestPill(
                                 label: interestPillText(tag),
                                 prominent: true,
+                                forceDark: true,
                               ),
                           ],
                         ),

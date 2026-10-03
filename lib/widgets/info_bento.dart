@@ -44,11 +44,16 @@ class InfoBento extends StatelessWidget {
     required this.age,
     required this.others,
     this.editable = false,
+    this.forceDark = false,
   });
 
   final BentoTileData age;
   final List<BentoTileData> others;
   final bool editable;
+
+  /// Posé sur un panneau sombre (Discover) : style sombre même en mode clair
+  /// — valeurs en jaune « fluo », tuiles grises.
+  final bool forceDark;
 
   static const double _gap = 10;
 
@@ -81,7 +86,7 @@ class InfoBento extends StatelessWidget {
                         children: [
                           for (var i = 0; i < right.length; i++) ...[
                             if (i > 0) const SizedBox(height: _gap),
-                            Expanded(child: _InfoTile(data: right[i])),
+                            Expanded(child: _InfoTile(data: right[i], dark: forceDark)),
                           ],
                         ],
                       ),
@@ -95,14 +100,14 @@ class InfoBento extends StatelessWidget {
       final pair = rest.sublist(i, math.min(i + 2, rest.length));
       rows.add(
         pair.length == 1
-            ? _InfoTile(data: pair[0])
+            ? _InfoTile(data: pair[0], dark: forceDark)
             : IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: _InfoTile(data: pair[0])),
+                    Expanded(child: _InfoTile(data: pair[0], dark: forceDark)),
                     const SizedBox(width: _gap),
-                    Expanded(child: _InfoTile(data: pair[1])),
+                    Expanded(child: _InfoTile(data: pair[1], dark: forceDark)),
                   ],
                 ),
               ),
@@ -121,18 +126,22 @@ class InfoBento extends StatelessWidget {
 }
 
 /// Style du petit libellé de tuile : mono, majuscules, blanc 55 %.
-TextStyle bentoLabelStyle() => GoogleFonts.ibmPlexMono(
+TextStyle bentoLabelStyle({bool dark = false}) => GoogleFonts.ibmPlexMono(
       fontSize: 11,
       letterSpacing: 1.1,
-      color: SC.light ? SC.textMuted : Colors.white.withValues(alpha: 0.55),
+      color: SC.light && !dark
+          ? SC.textMuted
+          : Colors.white.withValues(alpha: 0.55),
     );
 
 /// Le cadre d'une tuile « verre » : rayon 20, fond blanc 10 %, bord blanc 16 %.
-BoxDecoration bentoTileDecoration() => BoxDecoration(
-      color: SC.light ? SC.menu : Colors.white.withValues(alpha: 0.10),
+BoxDecoration bentoTileDecoration({bool dark = false}) => BoxDecoration(
+      color: SC.light && !dark ? SC.menu : Colors.white.withValues(alpha: 0.10),
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
-        color: SC.light ? SC.glassBorder : Colors.white.withValues(alpha: 0.16),
+        color: SC.light && !dark
+            ? SC.glassBorder
+            : Colors.white.withValues(alpha: 0.16),
       ),
     );
 
@@ -229,7 +238,10 @@ class _AgeTile extends StatelessWidget {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.data});
+  const _InfoTile({required this.data, this.dark = false});
+
+  /// Style sombre forcé (panneau Discover).
+  final bool dark;
 
   final BentoTileData data;
 
@@ -247,7 +259,7 @@ class _InfoTile extends StatelessWidget {
             '${data.emoji} ${data.label.toUpperCase()}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: bentoLabelStyle(),
+            style: bentoLabelStyle(dark: dark),
           ),
           const SizedBox(height: 4),
           Text(
@@ -257,8 +269,10 @@ class _InfoTile extends StatelessWidget {
             style: TextStyle(
               // Clair : le jaune n'est pas lisible sur blanc — la valeur passe en encre.
               color: filled
-                  ? (SC.light ? SC.textPrimary : SC.accent)
-                  : (SC.light ? SC.textMuted : Colors.white.withValues(alpha: 0.45)),
+                  ? (SC.light && !dark ? SC.textPrimary : SC.accent)
+                  : (SC.light && !dark
+                      ? SC.textMuted
+                      : Colors.white.withValues(alpha: 0.45)),
               fontSize: 16,
               height: 1.2,
               fontWeight: filled ? FontWeight.w800 : FontWeight.w500,
@@ -271,7 +285,7 @@ class _InfoTile extends StatelessWidget {
     final tile = filled
         ? Container(
             constraints: const BoxConstraints(minHeight: 76),
-            decoration: bentoTileDecoration(),
+            decoration: bentoTileDecoration(dark: dark),
             alignment: Alignment.centerLeft,
             child: content,
           )
